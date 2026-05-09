@@ -1,0 +1,89 @@
+{
+  "version": "1",
+  "issueId": "PAN-1044",
+  "created": "2026-05-08T00:00:00Z",
+  "updated": "2026-05-08T00:00:00Z",
+  "gitState": {
+    "branch": "feature/pan-1044",
+    "sha": "4020600df",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "SessionNode.type (not role) is used to classify session types. The PRD erroneously uses s.role === 'work' in the bucketing code. Actual schema: type: SessionNodeType (literals: planning, work, review, reviewer, test, merge, legacy); role: optional string used only for reviewer specialist sub-roles (e.g., 'correctness', 'security'). Implementation must use s.type === 'work' in bucketFeature.",
+      "recordedAt": "2026-05-08T00:00:00Z"
+    },
+    {
+      "id": "D2",
+      "summary": "issueCosts in CommandDeck is Record<string, number>, not Map<string, number> as stated in the PRD. CommandDeck stores both casings: map[entry.issueId] and map[entry.issueId.toLowerCase()]. ProjectOverviewProps.issueCosts must be typed as Record<string, number>.",
+      "recordedAt": "2026-05-08T00:00:00Z"
+    },
+    {
+      "id": "D3",
+      "summary": "feature.issueId from the resource-allocated endpoint is always uppercase (ensureIssue() in resource-discovery.ts calls .toUpperCase()). reviewStatusByIssueId keys are also uppercase (from rs.issueId set via events). Direct lookup reviewStatusByIssueId[feature.issueId] works without normalization.",
+      "recordedAt": "2026-05-08T00:00:00Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Store access for multiple issues: use const reviewStatusByIssueId = useDashboardStore(s => s.reviewStatusByIssueId) once at the top of ProjectOverview. Then pass reviewStatusByIssueId[feature.issueId] to bucketFeature for each feature. Cannot use useDashboardStore(selectReviewStatus(id)) inside features.map() because hooks cannot be called in loops.",
+      "recordedAt": "2026-05-08T00:00:00Z"
+    },
+    {
+      "id": "D5",
+      "summary": "bucketFeature exported from ProjectOverview.tsx for testability. Tests live in CommandDeck/__tests__/ProjectOverview.test.tsx and are committed in the same bead (B2) as the function. PRD restriction to keep sub-components in same file is followed; the export restriction was not stated.",
+      "recordedAt": "2026-05-08T00:00:00Z"
+    },
+    {
+      "id": "D6",
+      "summary": "ProjectNode click behavior: current code uses a single <button className={styles.projectHeader} onClick={() => setExpanded(!expanded)}>. The chevron ChevronRight is just an icon inside the button. To split click targets, wrap ChevronRight in a <span onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}>. The outer button onClick becomes the project-selection handler. This avoids nested buttons (invalid HTML).",
+      "recordedAt": "2026-05-08T00:00:00Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "ProjectNode is currently a single <button> for the entire header. Splitting click behavior without creating nested buttons (invalid HTML) requires the chevron to be a <span onClick e.stopPropagation> inside the button, while the outer button onClick handles project selection.",
+      "mitigation": "Use span with onClick + e.stopPropagation for the chevron inside the projectHeader button. The outer button onClick calls onSelectProject. Verified this doesn't conflict with existing keyboard behavior."
+    },
+    {
+      "id": "H2",
+      "summary": "CommandDeck passes issueCosts to ProjectNode for tree item display but not to ProjectOverview. When four-way routing is added, issueCosts must be passed as a prop to ProjectOverview inline in the routing JSX.",
+      "mitigation": "Pass issueCosts directly to ProjectOverview in the routing block in CommandDeck/index.tsx. issueCosts is already in scope."
+    },
+    {
+      "id": "H3",
+      "summary": "The projectsWithSessions variable in CommandDeck is ProjectData[] not Map. ProjectOverview.features must be found via projectsWithSessions.find(p => p.name === selectedProject)?.features ?? [].",
+      "mitigation": "Use .find() not .get() when computing features for the selected project."
+    }
+  ],
+  "resumePoint": {
+    "description": "Planning complete. Start implementation by claiming bead workspace-99sr (B1: PRD file creation — file docs/prds/planned/PAN-1044-project-overview-panel.md was created by planning agent, just commit it). Then proceed to workspace-z09w (B2: ProjectOverview.tsx skeleton + bucketFeature + tests). Read the PRD at docs/prds/planned/PAN-1044-project-overview-panel.md and spec at .pan/spec.vbrief.json before starting. Follow the one-bead-per-commit workflow.",
+    "beadId": "workspace-99sr",
+    "filesToRead": [
+      "docs/prds/planned/PAN-1044-project-overview-panel.md",
+      ".pan/spec.vbrief.json",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx",
+      "src/dashboard/frontend/src/lib/store.ts",
+      "packages/contracts/src/types.ts"
+    ]
+  },
+  "beadsMapping": {
+    "B1": "workspace-99sr",
+    "B2": "workspace-z09w",
+    "B3": "workspace-fgzt",
+    "B4": "workspace-fzdg",
+    "B5": "workspace-3udk"
+  },
+  "agentModel": "claude-opus-4-5",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "reason": "end",
+      "note": "Planning complete. Created PRD at docs/prds/planned/PAN-1044-project-overview-panel.md with codebase corrections (SessionNode.type vs role, Record vs Map, uppercase issueId). Created spec.vbrief.json with 5 beads (B1-B5). Created all 5 beads in beads database labeled pan-1044. Key finding: PRD had s.role === 'work' wrong — must be s.type === 'work' per SessionNode schema.",
+      "agentModel": "claude-opus-4-5"
+    }
+  ]
+}

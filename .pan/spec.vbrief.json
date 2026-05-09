@@ -1,99 +1,360 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "author": "agent:claude-code",
-    "description": "PAN-1030: Surface awaiting user input state on kanban, command deck, and inspector",
-    "created": "2026-05-09T00:00:00Z",
-    "updated": "2026-05-09T03:00:00Z"
+    "created": "2026-05-08T00:00:00Z",
+    "author": "planning-agent:claude-opus-4-5",
+    "description": "Plan for PAN-1044: Command Deck — Project Overview Panel with pipeline swimlanes. Empirically scoped 2026-05-08 — see docs/prds/planned/PAN-1044-project-overview-panel.md.",
+    "updated": "2026-05-09T01:25:03.504Z"
   },
   "plan": {
-    "id": "pan-1030",
-    "title": "Surface awaiting user input state on kanban + command deck",
-    "status": "active",
-    "uid": "pan-1030-awaiting-input-indicators",
-    "author": "agent:claude-code",
-    "sequence": 17,
-    "created": "2026-05-09T00:00:00Z",
-    "updated": "2026-05-09T03:00:00Z",
+    "id": "pan-1044",
+    "title": "Command Deck: Project Overview Panel with pipeline swimlanes",
+    "status": "proposed",
+    "uid": "b2a7f3c1-4d8e-4f29-9a6b-3c5e7f8d2b1a",
+    "author": "planning-agent:claude-opus-4-5",
+    "sequence": 2,
+    "created": "2026-05-08T00:00:00Z",
+    "updated": "2026-05-09T01:25:03.504Z",
     "references": [
       {
-        "uri": "https://github.com/eltmon/panopticon-cli/issues/1030",
-        "label": "PAN-1030",
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1044",
+        "label": "PAN-1044",
         "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/PAN-1044-project-overview-panel.md",
+        "label": "PRD (corrected)",
+        "type": "prd"
       }
     ],
     "tags": [
       "dashboard",
-      "awaiting-input",
-      "kanban",
       "command-deck",
-      "inspector"
+      "ui",
+      "project-overview",
+      "swimlanes"
     ],
     "narratives": {
-      "Problem": "Dashboard users need a clear, glanceable indication when work or planning agents are blocked on user input such as Claude Code permission prompts, planning Done prompts, Pi harness prompts, or generic y/n confirmations.",
-      "Approach": "Detect awaiting-input state observationally from existing runtime waiting signals, AskUserQuestion JSONL entries, and read-only tmux pane scans; then flow the state through agent enrichment, contracts, the read model, and existing dashboard surfaces without mutating agent state."
+      "summary": "Add a Project Overview panel to the Command Deck right content area. Clicking a project name (not the chevron) selects the project and shows a hero billboard, stuck/blocked callout, and pipeline swimlane board. All data is available client-side — no new API endpoints.",
+      "decisions": "D1: SessionNode.type (not role) classifies session types — PRD erroneously used s.role === 'work'. D2: issueCosts is Record<string,number> not Map. D3: feature.issueId is uppercase, reviewStatusByIssueId keys are uppercase — direct lookup is safe. D4: Use useDashboardStore(s => s.reviewStatusByIssueId) once at component top, not in a loop. D5: Export bucketFeature for testability, tests co-located in B2.",
+      "hazards": "H1: ProjectNode is currently one <button> — split with chevron <span onClick e.stopPropagation> inside the button. H2: issueCosts must be passed to ProjectOverview explicitly in routing block. H3: projectsWithSessions is ProjectData[] — use .find(p => p.name === selectedProject)?.features ?? []."
     },
     "items": [
       {
-        "id": "workspace-mla7",
-        "title": "Restore awaiting-input detection and indicators across dashboard surfaces",
-        "status": "completed",
+        "id": "prd-file",
+        "title": "PRD file creation in workspace",
+        "status": "pending",
         "priority": "high",
-        "created": "2026-05-09T00:00:00Z",
-        "completed": "2026-05-09T02:10:38.307Z",
+        "created": "2026-05-08T00:00:00Z",
         "metadata": {
-          "difficulty": "moderate",
-          "issueLabel": "PAN-1030",
-          "beadId": "workspace-mla7"
+          "requiresInspection": false,
+          "issueLabel": "pan-1044",
+          "beadId": "workspace-99sr"
         },
         "narrative": {
-          "Action": "Implement read-only awaiting-input detection, expose it through agent enrichment and shared contract types, and render INPUT-style indicators with prompt context in kanban cards, Command Deck issue rows, and the issue inspector."
+          "Action": "File docs/prds/planned/PAN-1044-project-overview-panel.md already created by planning agent. Mark bead workspace-ma73 complete."
         },
         "subItems": [
           {
-            "id": "workspace-mla7.ac1",
-            "title": "Kanban issue cards show an awaiting-input badge for blocked primary agents or planning sessions",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
+            "id": "prd-file.ac1",
+            "title": "File exists at docs/prds/planned/PAN-1044-project-overview-panel.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
-            "id": "workspace-mla7.ac2",
-            "title": "Command Deck issue rows show the same badge in the agent column with explanatory prompt text",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
+            "id": "prd-file.ac2",
+            "title": "Codebase corrections documented (SessionNode.type, Record types, uppercase issueId)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-overview-skeleton",
+        "title": "ProjectOverview.tsx skeleton + bucketFeature utility + tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-08T00:00:00Z",
+        "metadata": {
+          "requiresInspection": true,
+          "issueLabel": "pan-1044",
+          "beadId": "workspace-z09w",
+          "files": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx"
+          ]
+        },
+        "narrative": {
+          "Action": "Create ProjectOverview.tsx with: (1) exported bucketFeature(feature, reviewStatus) and PipelineStage type — see PRD for 9-stage bucketing logic with s.type === 'work' correction. (2) Hero billboard: background gradient, project name, issue count, total cost via LiveCounter, active agent count. (3) useDashboardStore(s => s.reviewStatusByIssueId) at top of component. (4) ProjectOverviewProps: { projectName, features: ProjectFeature[], issueCosts: Record<string, number>, onSelectFeature }. Create ProjectOverview.test.tsx covering all 9 bucketFeature stage branches (stuck via stuck flag, stuck via failed status, stuck via blockerReasons, merging, awaitingMerge, tests, review, buildGate, working, planning, idle)."
+        },
+        "subItems": [
+          {
+            "id": "project-overview-skeleton.ac1",
+            "title": "ProjectOverview.tsx renders hero billboard with project name, issue count, total cost (LiveCounter), active agent count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
-            "id": "workspace-mla7.ac3",
-            "title": "Issue Inspector surfaces exact prompt text and terminal attach path for answering in one click",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
+            "id": "project-overview-skeleton.ac2",
+            "title": "bucketFeature exported, returns correct PipelineStage for all 9 inputs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
-            "id": "workspace-mla7.ac4",
-            "title": "Awaiting-input badge clears automatically after the agent moves past the prompt",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
+            "id": "project-overview-skeleton.ac3",
+            "title": "ProjectOverview.test.tsx covers all 9 stage branches of bucketFeature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
-            "id": "workspace-mla7.ac5",
-            "title": "Detection covers Claude Code permission prompts, planning Done prompts, Pi prompts, and generic y/n confirmations",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
+            "id": "project-overview-skeleton.ac4",
+            "title": "npm run typecheck and npm test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-swimlanes",
+        "title": "Pipeline swimlanes + stuck/blocked callout",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-08T00:00:00Z",
+        "metadata": {
+          "requiresInspection": true,
+          "issueLabel": "pan-1044",
+          "beadId": "workspace-fgzt",
+          "files": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx"
+          ]
+        },
+        "narrative": {
+          "Action": "Complete ProjectOverview.tsx: (1) Add stuck/blocked callout section at top with AlertTriangle icon, var(--destructive) accent, only shown when stuck issues exist. Each stuck card shows: Issue ID (clickable onSelectFeature), title truncated 1 line, stuck reason (stuckReason or blockerReasons[0] or failed status name). (2) Add pipeline swimlane sections — one Section per non-empty stage. Header: stage name + count badge. Body: horizontal flex-wrap of issue cards. Cards: Issue ID (clickable), title truncated (12px), cost badge if cost exists, sub-status pill (review: reviewSubStatuses roles, merge: mergeStep, buildGate: verificationCycleCount if > 1). Empty stages hidden. All colors via CSS variables only."
+        },
+        "subItems": [
+          {
+            "id": "pipeline-swimlanes.ac1",
+            "title": "Stuck/blocked callout appears only when stuck issues exist, with AlertTriangle icon",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
-            "id": "workspace-mla7.ac6",
-            "title": "Detection is read-only and uses capture-pane heuristics without agent state mutation",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
+            "id": "pipeline-swimlanes.ac2",
+            "title": "Pipeline swimlane sections rendered, one per non-empty stage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
-            "id": "workspace-mla7.ac7",
-            "title": "Updates flow through the existing dashboard read-model heartbeat and event stream",
-            "status": "completed",
-            "metadata": { "kind": "acceptance_criterion" }
+            "id": "pipeline-swimlanes.ac3",
+            "title": "Empty pipeline stages are hidden",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-swimlanes.ac4",
+            "title": "Clicking issue card in any swimlane calls onSelectFeature with correct feature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-swimlanes.ac5",
+            "title": "All colors use CSS variables only (no hardcoded values)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-swimlanes.ac6",
+            "title": "npm run typecheck and npm test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-node-click-split",
+        "title": "ProjectNode.tsx — split click behavior and selection visual",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-08T00:00:00Z",
+        "metadata": {
+          "requiresInspection": true,
+          "issueLabel": "pan-1044",
+          "beadId": "workspace-fzdg",
+          "files": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx"
+          ]
+        },
+        "narrative": {
+          "Action": "Modify ProjectTree/ProjectNode.tsx: (1) Add props: onSelectProject?: (projectName: string) => void and selectedProject?: string | null. (2) Split click targets: wrap ChevronRight in <span onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>. Outer button onClick: calls onSelectProject?.(name) AND if (!expanded) setExpanded(true). (3) Apply style={{ background: selectedProject === name ? 'var(--accent)' : undefined }} to the projectHeader button. MessageSquarePlus e.stopPropagation() must be preserved."
+        },
+        "subItems": [
+          {
+            "id": "project-node-click-split.ac1",
+            "title": "Clicking chevron only toggles expand/collapse, does NOT select the project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-node-click-split.ac2",
+            "title": "Clicking project name row calls onSelectProject and expands if collapsed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-node-click-split.ac3",
+            "title": "Selected project row shows var(--accent) background",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-node-click-split.ac4",
+            "title": "MessageSquarePlus button still works with e.stopPropagation()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-node-click-split.ac5",
+            "title": "npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "commanddeck-routing",
+        "title": "CommandDeck/index.tsx — selectedProject state and four-way routing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-08T00:00:00Z",
+        "metadata": {
+          "requiresInspection": true,
+          "issueLabel": "pan-1044",
+          "beadId": "workspace-3udk",
+          "files": [
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx"
+          ]
+        },
+        "narrative": {
+          "Action": "Modify CommandDeck/index.tsx: (1) Add state: const [selectedProject, setSelectedProject] = useState<string | null>(null). (2) Add handler: const handleSelectProject = useCallback((projectName: string) => { setSelectedProject(projectName); setSelectedFeature(null); setSelectedConversation(null); }, []). (3) Update handleSelectFeature to add setSelectedProject(null). (4) Update handleSelectConversation to add setSelectedProject(null). (5) Pass onSelectProject={handleSelectProject} and selectedProject={selectedProject} to each ProjectNode. (6) In content area routing, add four-way: conversation -> ConversationView, feature -> IssueWorkbench, project -> ProjectOverview (with projectName={selectedProject}, features={projectsWithSessions.find(p => p.name === selectedProject)?.features ?? []}, issueCosts={issueCosts}, onSelectFeature={feature => handleSelectFeature(feature.issueId)}), empty -> EmptyState. Import ProjectOverview from './ProjectOverview'."
+        },
+        "subItems": [
+          {
+            "id": "commanddeck-routing.ac1",
+            "title": "Selecting a project shows ProjectOverview in the content area",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commanddeck-routing.ac2",
+            "title": "Selecting a feature clears selectedProject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commanddeck-routing.ac3",
+            "title": "Selecting a conversation clears selectedProject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commanddeck-routing.ac4",
+            "title": "Four-way routing priority: conversation > feature > project > empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commanddeck-routing.ac5",
+            "title": "Clicking issue card in ProjectOverview navigates to that issue's IssueWorkbench",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commanddeck-routing.ac6",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       }
-    ]
+    ],
+    "edges": [
+      {
+        "from": "prd-file",
+        "to": "project-overview-skeleton",
+        "type": "blocks"
+      },
+      {
+        "from": "project-overview-skeleton",
+        "to": "pipeline-swimlanes",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-swimlanes",
+        "to": "project-node-click-split",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-swimlanes",
+        "to": "commanddeck-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "project-node-click-split",
+        "to": "commanddeck-routing",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "issueId": "PAN-1044",
+      "githubUrl": "https://github.com/eltmon/panopticon-cli/issues/1044",
+      "prd": "docs/prds/planned/PAN-1044-project-overview-panel.md",
+      "canonicalFilename": "2026-05-09-PAN-1044-command-deck-project-overview-panel-with-pipeline-swimlanes.vbrief.json"
+    }
   }
 }
