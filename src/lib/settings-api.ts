@@ -5,11 +5,24 @@
  * Converts between YAML config format and frontend API format.
  */
 
-import { writeFile } from 'fs/promises';
-import yaml from 'js-yaml';
-import { loadConfig, getGlobalConfigPath, YamlConfig, clearConfigCache } from './config-yaml.js';
+import { readFile, writeFile } from 'fs/promises';
+import { parseDocument } from 'yaml';
+import {
+  DEFAULT_MODEL_REFS,
+  loadConfig,
+  getGlobalConfigPath,
+  clearConfigCache,
+  mergeConfigs,
+  type YamlConfig,
+  type ModelRef,
+  type RoleConfig,
+  type RolesConfig,
+  type WorkhorsesConfig,
+  type WorkhorseSlot,
+} from './config-yaml.js';
 import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
+import type { Role } from './agents.js';
 import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 import { reloadGlobalRouter } from './work-type-router.js';
 
@@ -86,6 +99,8 @@ export interface ApiDeprecationWarning {
 // Note: No cost_sensitivity - we're opinionated and always pick the best model
 // for each task. Users control cost by which providers they enable.
 export interface ApiSettingsConfig {
+  workhorses?: WorkhorsesConfig;
+  roles?: RolesConfig;
   models: {
     providers: {
       anthropic: boolean;
@@ -97,7 +112,8 @@ export interface ApiSettingsConfig {
       mimo: boolean;
       openrouter: boolean;
     };
-    overrides: Partial<Record<WorkTypeId, ModelId>>;
+    /** Legacy WorkTypeId overrides are no longer surfaced by GET /api/settings. */
+    overrides?: Partial<Record<WorkTypeId, ModelId>>;
     gemini_thinking_level?: number;
     default_conversation_model?: ModelId;
   };
@@ -178,6 +194,189 @@ const CONVOY_TO_REVIEW_MAP: Record<string, string> = {
   'convoy:synthesis-agent': 'review:synthesis',
 };
 
+const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship'];
+const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
+const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
+  work: ['inspect', 'inspect-deep'],
+  review: ['security', 'performance', 'correctness', 'requirements'],
+};
+const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
+  expensive: 'claude-opus-4-7',
+  mid: 'claude-sonnet-4-6',
+  cheap: 'claude-haiku-4-5',
+};
+
+function seededWorkhorses(config: Pick<ReturnType<typeof loadConfig>['config'], 'workhorses'>): WorkhorsesConfig {
+  return { ...DEFAULT_WORKHORSES, ...(config.workhorses ?? {}) };
+}
+
+function seededRoles(config: Pick<ReturnType<typeof loadConfig>['config'], 'roles'>): RolesConfig {
+  const roles: RolesConfig = {};
+  for (const role of ROLE_NAMES) {
+    roles[role] = {
+      model: DEFAULT_MODEL_REFS[role],
+      ...(config.roles?.[role] ?? {}),
+      sub: config.roles?.[role]?.sub ? { ...config.roles[role]!.sub } : undefined,
+    };
+  }
+  return roles;
+}
+
+function pruneUndefined<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((item) => pruneUndefined(item)) as T;
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .map(([key, entry]) => [key, pruneUndefined(entry)]),
+    ) as T;
+  }
+  return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isWorkhorseRef(ref: string): boolean {
+  return ref.startsWith('workhorse:');
+}
+
+function workhorseSlotFromRef(ref: string): string {
+  return ref.slice('workhorse:'.length);
+}
+
+function mergeRoles(current?: RolesConfig, updates?: RolesConfig): RolesConfig | undefined {
+  if (!current && !updates) return undefined;
+  const merged: RolesConfig = { ...(current ?? {}) };
+  for (const [role, roleConfig] of Object.entries(updates ?? {}) as Array<[Role, RoleConfig]>) {
+    merged[role] = {
+      ...(merged[role] ?? {}),
+      ...roleConfig,
+      sub: roleConfig.sub
+        ? {
+            ...(merged[role]?.sub ?? {}),
+            ...roleConfig.sub,
+          }
+        : merged[role]?.sub,
+    };
+  }
+  return merged;
+}
+
+function validateModelRef(
+  fieldPath: string,
+  ref: unknown,
+  effectiveWorkhorses: WorkhorsesConfig,
+  errors: string[],
+  warnings: string[],
+  allowWorkhorseRef: boolean,
+): void {
+  if (typeof ref !== 'string' || ref.trim() === '') {
+    errors.push(`${fieldPath} must be a non-empty model reference`);
+    return;
+  }
+
+  if (isWorkhorseRef(ref)) {
+    if (!allowWorkhorseRef) {
+      errors.push(`${fieldPath} cannot reference another workhorse`);
+      return;
+    }
+    const slot = workhorseSlotFromRef(ref);
+    if (!WORKHORSE_SLOTS.includes(slot as WorkhorseSlot)) {
+      errors.push(`${fieldPath} references unknown workhorse slot "${slot}"`);
+      return;
+    }
+    if (!effectiveWorkhorses[slot as WorkhorseSlot]) {
+      errors.push(`${fieldPath} references ${ref} but workhorses.${slot} is not defined`);
+    }
+    return;
+  }
+
+  if (MODEL_DEPRECATIONS[ref]) {
+    warnings.push(`${fieldPath}: "${ref}" is deprecated, use "${MODEL_DEPRECATIONS[ref]}" instead`);
+    return;
+  }
+
+  const resolved = resolveModelId(ref);
+  if (!MODEL_CAPABILITIES[resolved]) {
+    errors.push(`Invalid model reference "${ref}" at ${fieldPath}`);
+  }
+}
+
+function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[], warnings: string[]): void {
+  const effectiveWorkhorses: WorkhorsesConfig = { ...DEFAULT_WORKHORSES };
+
+  if (settings.workhorses !== undefined) {
+    if (!isRecord(settings.workhorses)) {
+      errors.push('workhorses must be an object');
+    } else {
+      for (const [slot, ref] of Object.entries(settings.workhorses)) {
+        if (!WORKHORSE_SLOTS.includes(slot as WorkhorseSlot)) {
+          errors.push(`Unknown workhorse slot "${slot}"`);
+          continue;
+        }
+        effectiveWorkhorses[slot as WorkhorseSlot] = ref as ModelRef;
+        validateModelRef(`workhorses.${slot}`, ref, effectiveWorkhorses, errors, warnings, false);
+      }
+    }
+  }
+
+  if (settings.roles !== undefined) {
+    if (!isRecord(settings.roles)) {
+      errors.push('roles must be an object');
+    } else {
+      for (const [roleName, rawRoleConfig] of Object.entries(settings.roles)) {
+        if (!ROLE_NAMES.includes(roleName as Role)) {
+          errors.push(`Unknown role "${roleName}"`);
+          continue;
+        }
+        const role = roleName as Role;
+        if (!isRecord(rawRoleConfig)) {
+          errors.push(`roles.${role}.model must be a non-empty model reference`);
+          continue;
+        }
+
+        validateModelRef(`roles.${role}.model`, rawRoleConfig.model, effectiveWorkhorses, errors, warnings, true);
+
+        if (rawRoleConfig.sub !== undefined) {
+          if (!isRecord(rawRoleConfig.sub)) {
+            errors.push(`roles.${role}.sub must be an object`);
+          } else {
+            const allowedSubRoles = ALLOWED_SUB_ROLES[role] ?? [];
+            for (const [subRole, rawSubConfig] of Object.entries(rawRoleConfig.sub)) {
+              if (!allowedSubRoles.includes(subRole)) {
+                errors.push(`Unknown sub-role "${subRole}" for role "${role}"`);
+                continue;
+              }
+              if (!isRecord(rawSubConfig)) {
+                errors.push(`roles.${role}.sub.${subRole}.model must be a non-empty model reference`);
+                continue;
+              }
+              validateModelRef(
+                `roles.${role}.sub.${subRole}.model`,
+                rawSubConfig.model,
+                effectiveWorkhorses,
+                errors,
+                warnings,
+                true,
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (errors.length === 0) {
+    try {
+      mergeConfigs({ workhorses: effectiveWorkhorses, roles: settings.roles });
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+}
+
 export function loadSettingsApi(): ApiSettingsConfig {
   const { config } = loadConfig();
 
@@ -205,6 +404,8 @@ export function loadSettingsApi(): ApiSettingsConfig {
   }
 
   return {
+    workhorses: seededWorkhorses(config),
+    roles: seededRoles(config),
     models: {
       providers: {
         anthropic: config.enabledProviders.has('anthropic'),
@@ -216,7 +417,6 @@ export function loadSettingsApi(): ApiSettingsConfig {
         mimo: config.enabledProviders.has('mimo'),
         openrouter: config.enabledProviders.has('openrouter'),
       },
-      overrides: migratedOverrides,
       gemini_thinking_level: config.geminiThinkingLevel,
       default_conversation_model: getDefaultConversationModelApi(),
     },
@@ -246,6 +446,62 @@ export function loadSettingsApi(): ApiSettingsConfig {
   };
 }
 
+async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promise<void> {
+  const configPath = getGlobalConfigPath();
+  let existingContent = '{}\n';
+  try {
+    const content = await readFile(configPath, 'utf-8');
+    existingContent = content.trim().length > 0 ? content : '{}\n';
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  const doc = parseDocument(existingContent);
+  if (doc.contents === null) {
+    doc.contents = parseDocument('{}\n').contents;
+  }
+  const config = pruneUndefined(yamlConfig);
+
+  doc.setIn(['workhorses'], config.workhorses ?? {});
+  doc.setIn(['roles'], config.roles ?? {});
+  doc.setIn(['models', 'providers'], config.models?.providers ?? {});
+  doc.deleteIn(['models', 'overrides']);
+
+  if (config.models?.gemini_thinking_level !== undefined) {
+    doc.setIn(['models', 'gemini_thinking_level'], config.models.gemini_thinking_level);
+  } else {
+    doc.deleteIn(['models', 'gemini_thinking_level']);
+  }
+
+  if (config.models?.default_conversation_model !== undefined) {
+    doc.setIn(['models', 'default_conversation_model'], config.models.default_conversation_model);
+  } else {
+    doc.deleteIn(['models', 'default_conversation_model']);
+  }
+
+  const topLevelSections: Array<[keyof YamlConfig, unknown]> = [
+    ['api_keys', config.api_keys],
+    ['openrouter', config.openrouter],
+    ['tmux', config.tmux],
+    ['conversations', config.conversations],
+    ['tracker_keys', config.tracker_keys],
+    ['experimental', config.experimental],
+    ['claude', config.claude],
+  ];
+
+  for (const [key, value] of topLevelSections) {
+    if (value === undefined) {
+      doc.deleteIn([key]);
+    } else {
+      doc.setIn([key], value);
+    }
+  }
+
+  await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
+}
+
 /**
  * Save settings from API format (for PUT /api/settings)
  */
@@ -256,6 +512,8 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
 
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
+    workhorses: settings.workhorses,
+    roles: settings.roles,
     models: {
       providers: {
         anthropic: settings.models.providers.anthropic,
@@ -279,7 +537,6 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
         mimo: settings.models.providers.mimo,
         openrouter: settings.models.providers.openrouter,
       },
-      overrides: settings.models.overrides,
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
       default_conversation_model: settings.models.default_conversation_model,
     },
@@ -304,14 +561,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
       : undefined,
   };
 
-  // Write to YAML file
-  const yamlContent = yaml.dump(yamlConfig, {
-    indent: 2,
-    lineWidth: 120,
-    noRefs: true,
-  });
-
-  await writeFile(getGlobalConfigPath(), yamlContent, 'utf-8');
+  await writeYamlConfigPreservingComments(yamlConfig);
 
   // Reload the global work-type router so in-memory overrides reflect the
   // freshly-written config. Without this, planning-agent / specialist overrides
@@ -333,6 +583,11 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
 
   // Merge updates
   const merged: ApiSettingsConfig = {
+    workhorses: {
+      ...current.workhorses,
+      ...updates.workhorses,
+    },
+    roles: mergeRoles(current.roles, updates.roles),
     models: {
       ...current.models,
       ...updates.models,
@@ -340,10 +595,7 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
         ...current.models.providers,
         ...updates.models?.providers,
       },
-      overrides: {
-        ...current.models.overrides,
-        ...updates.models?.overrides,
-      },
+      overrides: undefined,
     },
     api_keys: {
       ...current.api_keys,
@@ -438,6 +690,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
       }
     }
   }
+
+  validateWorkhorsesAndRoles(settings, errors, warnings);
 
   // Validate gemini thinking level
   if (settings.models?.gemini_thinking_level !== undefined) {
@@ -537,6 +791,8 @@ export function getAvailableModelsApi(): {
  */
 export function getOptimalDefaultsApi(): ApiSettingsConfig {
   return {
+    workhorses: { ...DEFAULT_WORKHORSES },
+    roles: seededRoles({ roles: undefined }),
     models: {
       providers: {
         anthropic: true,
@@ -548,7 +804,6 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         mimo: false,
         openrouter: false,
       },
-      overrides: getOptimalModelDefaults(),
       gemini_thinking_level: 3,
     },
     api_keys: {},
@@ -561,6 +816,12 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
  */
 export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
   return {
+    workhorses: {
+      expensive: 'minimax-m2.7-highspeed',
+      mid: 'minimax-m2.7-highspeed',
+      cheap: 'minimax-m2.7-highspeed',
+    },
+    roles: seededRoles({ roles: undefined }),
     models: {
       providers: {
         anthropic: false,
@@ -572,38 +833,10 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
         mimo: false,
         openrouter: false,
       },
-      overrides: getMiniMaxModelDefaults(),
       gemini_thinking_level: 3,
     },
     api_keys: {},
     tracker_keys: {},
-  };
-}
-
-function getMiniMaxModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
-  return {
-    'issue-agent:exploration': 'minimax-m2.7-highspeed',
-    'issue-agent:implementation': 'minimax-m2.7-highspeed',
-    'issue-agent:testing': 'minimax-m2.7-highspeed',
-    'issue-agent:documentation': 'minimax-m2.7-highspeed',
-    'issue-agent:review-response': 'minimax-m2.7-highspeed',
-    'specialist-review-agent': 'minimax-m2.7-highspeed',
-    'specialist-test-agent': 'minimax-m2.7-highspeed',
-    'specialist-merge-agent': 'minimax-m2.7-highspeed',
-    'specialist-inspect-agent': 'minimax-m2.7-highspeed',
-    'specialist-uat-agent': 'minimax-m2.7-highspeed',
-    'review:security': 'minimax-m2.7-highspeed',
-    'review:performance': 'minimax-m2.7-highspeed',
-    'review:correctness': 'minimax-m2.7-highspeed',
-    'review:requirements': 'minimax-m2.7-highspeed',
-    'review:synthesis': 'minimax-m2.7-highspeed',
-    'subagent:explore': 'minimax-m2.7-highspeed',
-    'subagent:plan': 'minimax-m2.7-highspeed',
-    'subagent:bash': 'minimax-m2.7-highspeed',
-    'subagent:general-purpose': 'minimax-m2.7-highspeed',
-    'planning-agent': 'minimax-m2.7-highspeed',
-    'cli:interactive': 'minimax-m2.7-highspeed',
-    'cli:quick-command': 'minimax-m2.7-highspeed',
   };
 }
 
