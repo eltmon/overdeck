@@ -99,10 +99,32 @@ describe('role definitions', () => {
     expect(body).toContain("resolveModel('review', 'requirements')");
   });
 
-  it('keeps legacy pan plan/work/review/inspect agent definitions until spawn migration deletes them', () => {
+  it('defines the ship role as ready-to-merge preparation without merge authority', () => {
+    const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/ship.md'));
+
+    expect(frontmatter).toMatchObject({
+      name: 'ship',
+      model: 'sonnet',
+      permissionMode: 'bypassPermissions',
+      effort: 'high',
+    });
+    expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash', 'Edit']));
+    expect(frontmatter.hooks).toEqual(expect.any(Object));
+    expect(body).toContain('Ship NEVER merges');
+    expect(body).toContain('ready-to-merge');
+    expect(body).toContain('gh pr merge');
+    expect(body).toContain('merge API `POST`');
+    expect(body).toContain('git merge` into `main`');
+    expect(body).toContain('npm run typecheck');
+    expect(body).toContain('npm run lint');
+    expect(body).toContain('npm test');
+  });
+
+  it('keeps legacy pan plan/work/review/inspect/merge agent definitions until spawn migration deletes them', () => {
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-planning-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-work-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-review-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-inspect-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), '.claude/agents/pan-merge-agent.md'))).toBe(true);
   });
 });

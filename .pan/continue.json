@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T21:09:41.150Z",
+  "updated": "2026-05-09T21:12:31.161Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-u1",
+    "sha": "pending-r5",
     "dirty": true
   },
   "decisions": [
@@ -158,12 +158,11 @@
     }
   ],
   "resumePoint": {
-    "description": "U1 WorkhorsePanel settings UI implemented and verified: the Settings model routing section now renders WorkhorsePanel above existing role cards; the panel reads workhorses from /api/settings, lists all enabled-provider models grouped by provider, exposes Expensive/Mid/Cheap dropdowns with descriptions, and PUTs merged settings updates on change. Commit and close workspace-xuld next.",
-    "beadId": "workspace-xuld",
+    "description": "R5 ship role definition implemented and verified: roles/ship.md prepares approved PRs by rebasing, resolving conflicts, re-running verification, pushing the feature branch, and transitioning to ready-to-merge while explicitly banning all merge operations. Commit, close workspace-6u9n, then run inspection because requiresInspection is true.",
+    "beadId": "workspace-6u9n",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/Settings/WorkhorsePanel.tsx",
-      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
-      "src/dashboard/frontend/src/components/Settings/__tests__/WorkhorsePanel.test.tsx"
+      "roles/ship.md",
+      "src/lib/__tests__/role-definitions.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -264,6 +263,12 @@
       "timestamp": "2026-05-09T21:09:41.150Z",
       "reason": "bead-complete",
       "note": "Implemented U1 WorkhorsePanel settings UI with three accessible workhorse dropdowns (Expensive/Mid/Cheap), provider-grouped options from /api/settings/available-models, settings read/PUT round-trip behavior, and inline slot descriptions. Integrated WorkhorsePanel at the top of Settings model routing and added focused component tests. Verified targeted test, typecheck, lint, and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T21:12:31.161Z",
+      "reason": "bead-complete",
+      "note": "Implemented R5 ship role definition at roles/ship.md. The role prepares an approved PR for human merge by fetching/rebasing onto main, resolving conflicts, running typecheck/lint/test, pushing the feature branch, and transitioning the issue/PR to ready-to-merge. It explicitly bans gh pr merge, merge API POSTs, git merge into main, direct/force pushes to main, and hook bypasses; legacy pan-merge-agent remains. Verified role definition test, typecheck, lint, and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

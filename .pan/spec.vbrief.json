@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T21:09:41.150Z"
+    "updated": "2026-05-09T21:12:31.161Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 16,
+    "sequence": 17,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T21:09:41.150Z",
+    "updated": "2026-05-09T21:12:31.161Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -462,7 +462,7 @@
       {
         "id": "r5-role-ship-md-human-merge",
         "title": "Create roles/ship.md with explicit human-merge invariant",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -477,7 +477,7 @@
           {
             "id": "r5-role-ship-md-human-merge.ac1",
             "title": "File exists at roles/ship.md (frontmatter: name: ship) covering rebase/conflict-resolve/re-verify/push",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -485,7 +485,7 @@
           {
             "id": "r5-role-ship-md-human-merge.ac2",
             "title": "Body explicitly states ship NEVER merges and lists banned commands: `gh pr merge`, any merge API POST, any `git merge` to main",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -493,7 +493,7 @@
           {
             "id": "r5-role-ship-md-human-merge.ac3",
             "title": "Body documents the issue-state transition ship makes (e.g., to a 'ready-to-merge' state) so the dashboard can render the Merge button",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -501,12 +501,13 @@
           {
             "id": "r5-role-ship-md-human-merge.ac4",
             "title": "Old .claude/agents/pan-merge-agent.md NOT deleted (X1 handles deletion)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:12:31.161Z"
       },
       {
         "id": "s1-wire-plan-end-to-end",
