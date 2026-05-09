@@ -129,6 +129,15 @@ function isLoopbackAddress(addr: string): boolean {
   return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
 }
 
+function getHeader(
+  request: HttpServerRequest.HttpServerRequest,
+  name: string,
+): string | undefined {
+  const value = (request.headers as Record<string, string | string[] | undefined>)[name];
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
 function getClientIp(request: HttpServerRequest.HttpServerRequest): string {
   const remoteAddress = Option.getOrElse(request.remoteAddress, () => 'unknown');
   // Only trust X-Forwarded-From when the direct connection comes from a
