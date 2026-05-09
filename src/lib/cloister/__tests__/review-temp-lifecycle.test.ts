@@ -70,7 +70,7 @@ vi.mock('../feedback-writer.js', () => ({
   writeFeedbackFile: vi.fn(async () => {}),
 }));
 
-vi.mock('../pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
+vi.mock('../../pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitActivityTts: vi.fn() }));
 vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon' })) }));
 vi.mock('../specialists.js', () => ({
@@ -98,6 +98,7 @@ vi.mock('../../paths.js', () => ({
 }));
 
 import { dispatchParallelReview, runParallelReview } from '../review-agent.js';
+import { notifyPipeline } from '../../pipeline-notifier.js';
 
 describe('review-temp stash lifecycle', () => {
   beforeEach(() => {
@@ -165,7 +166,7 @@ describe('review-temp stash lifecycle', () => {
       reviewTempStashSequence: 3,
     });
 
-    const waitFn = vi.fn(async () => 'failed' as const);
+    const waitFn = vi.fn(async () => ({ status: 'failed' as const, reason: 'session_exited' as const }));
 
     const { result } = await runParallelReview(
       {
@@ -179,7 +180,7 @@ describe('review-temp stash lifecycle', () => {
       {
         spawnFn: vi.fn(async () => {}),
         waitFn,
-        waitSynthesisFn: vi.fn(async () => 'completed' as const),
+        waitSynthesisFn: vi.fn(async () => ({ status: 'completed' as const })),
         parseSynthesisFn: vi.fn(async () => ({ success: true, reviewResult: 'APPROVED' as const })),
         postReviewFn: vi.fn(async () => {}),
         resolvePromptTemplateFn: vi.fn(() => '/tmp/template.md'),
@@ -188,5 +189,62 @@ describe('review-temp stash lifecycle', () => {
 
     expect(result.success).toBe(false);
     expect(reviewStatusState.get('PAN-2')?.reviewTempStashRef).toBeUndefined();
+  });
+
+  it('retries a timed-out reviewer twice before synthesis', async () => {
+    vi.useFakeTimers();
+    try {
+      const spawnFn = vi.fn(async () => {});
+      const waitFn = vi.fn()
+        .mockResolvedValueOnce({ status: 'failed' as const, reason: 'timeout' as const })
+        .mockResolvedValueOnce({ status: 'failed' as const, reason: 'timeout' as const })
+        .mockResolvedValueOnce({ status: 'completed' as const });
+      const waitSynthesisFn = vi.fn(async () => ({ status: 'completed' as const }));
+      const resultPromise = runParallelReview(
+        {
+          issueId: 'PAN-3',
+          projectPath: '/tmp/workspace',
+          prUrl: 'https://example.test/pr/3',
+          branch: 'feature/pan-3',
+        },
+        ['src/file.ts'],
+        [{ name: 'security' } as any],
+        {
+          spawnFn,
+          waitFn,
+          waitSynthesisFn,
+          parseSynthesisFn: vi.fn(async () => ({ success: true, reviewResult: 'APPROVED' as const })),
+          postReviewFn: vi.fn(async () => {}),
+          resolvePromptTemplateFn: vi.fn(() => '/tmp/template.md'),
+        },
+      );
+
+      await vi.runAllTimersAsync();
+      const { result } = await resultPromise;
+
+      expect(result.success).toBe(true);
+      expect(waitFn).toHaveBeenCalledTimes(3);
+      expect(spawnFn).toHaveBeenCalledTimes(4);
+      expect(spawnFn.mock.calls.filter(([session]) => String(session).endsWith('-security'))).toHaveLength(3);
+      expect(waitSynthesisFn).toHaveBeenCalledTimes(1);
+      expect(notifyPipeline).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'reviewer_timed_out',
+        issueId: 'PAN-3',
+        role: 'security',
+        attempt: 1,
+        maxRetries: 2,
+        willRetry: true,
+      }));
+      expect(notifyPipeline).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'reviewer_timed_out',
+        issueId: 'PAN-3',
+        role: 'security',
+        attempt: 2,
+        maxRetries: 2,
+        willRetry: true,
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -74,6 +74,20 @@ interface ReviewHistoryEntry {
  * Performance reviewers of large PRs can need 20+ minutes of analysis time.
  */
 const REVIEW_TIMEOUT_MS = 30 * 60 * 1000;
+const MAX_REVIEWER_TIMEOUT_RETRIES = 2;
+const REVIEWER_TIMEOUT_RETRY_BACKOFF_MS = [2_000, 5_000];
+
+function reviewerRetryBackoffMs(attempt: number): number {
+  return REVIEWER_TIMEOUT_RETRY_BACKOFF_MS[Math.min(attempt - 1, REVIEWER_TIMEOUT_RETRY_BACKOFF_MS.length - 1)] ?? 5_000;
+}
+
+function isRetryableReviewerFailure(reason?: ReviewerFailureReason): boolean {
+  return reason === 'timeout' || reason === 'pane_dead';
+}
+
+async function delay(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /**
  * Default reviewer agents used when specialists.review_agents is not configured.
@@ -1165,8 +1179,27 @@ export async function runParallelReview(
       // Non-fatal: event emission is best-effort
     }
   };
-  let reviewerResults: ReviewerOutcome[] = await Promise.all(
-    reviewerSessions.map(({ sessionName, outputFile, role }) =>
+  const emitReviewerTimedOut = async (outcome: ReviewerOutcome, attempt: number, willRetry: boolean) => {
+    if (outcome.status !== 'failed' || outcome.failureReason !== 'timeout' || !outcome.sessionName) return;
+    try {
+      const { notifyPipeline } = await import('../pipeline-notifier.js');
+      notifyPipeline({
+        type: 'reviewer_timed_out',
+        issueId: context.issueId,
+        role: outcome.role,
+        sessionName: outcome.sessionName,
+        attempt,
+        maxRetries: MAX_REVIEWER_TIMEOUT_RETRIES,
+        willRetry,
+      });
+    } catch {
+      // Non-fatal: event emission is best-effort
+    }
+  };
+  const waitForReviewerSessions = async (
+    sessions: Array<{ sessionName: string; outputFile: string; role: string }>,
+  ): Promise<ReviewerOutcome[]> => Promise.all(
+    sessions.map(({ sessionName, outputFile, role }) =>
       waitFn(sessionName, outputFile, REVIEW_TIMEOUT_MS)
         .then(async (waitResult): Promise<ReviewerOutcome> => {
           if (waitResult.status === 'completed') {
@@ -1185,84 +1218,69 @@ export async function runParallelReview(
     ),
   );
 
-  // ── Phase 2b: One auto-respawn for reviewers that failed with a dead pane.
-  // Transient failures (e.g. 503 auth_unavailable that kills the pane) recover
-  // on respawn ~90% of the time. We retry once to avoid burning a full review
-  // cycle for a blip. We ONLY retry when the pane is dead AND the failure was
-  // not a terminal-API error — if the session is gone entirely, the pane is
-  // still alive, or the upstream provider returned a non-recoverable error
-  // (quota exhausted, login required), respawn won't help.
-  const failedReviewerResults = reviewerResults.filter(r => r.status === 'failed');
-  if (failedReviewerResults.length > 0) {
-    const retryable: typeof failedReviewerResults = [];
+  let reviewerResults: ReviewerOutcome[] = await waitForReviewerSessions(reviewerSessions);
+
+  // ── Phase 2b: Auto-respawn reviewers that fail from retryable transient states.
+  // Timeouts were previously terminal and stranded issues with review=pending until
+  // a human manually restarted the review. Retry the specific timed-out/dead-pane
+  // reviewer only, with a capped two-retry backoff, while still skipping terminal
+  // provider errors because the same auth/quota/login problem would recur.
+  for (let attempt = 1; attempt <= MAX_REVIEWER_TIMEOUT_RETRIES; attempt++) {
+    const failedReviewerResults = reviewerResults.filter(r => r.status === 'failed');
+    const retryable = failedReviewerResults.filter(r => isRetryableReviewerFailure(r.failureReason));
     for (const failed of failedReviewerResults) {
-      // Skip respawn for terminal API errors — same provider/quota/auth
-      // problem will hit again immediately. Surface the error to the user
-      // instead.
+      await emitReviewerTimedOut(failed, attempt, retryable.includes(failed));
       if (failed.failureReason === 'terminal_api_error') {
         console.log(`[review-agent] Skipping respawn for ${failed.sessionName} — terminal API error: ${failed.apiError?.summary ?? 'unknown'}`);
-        continue;
       }
-      const paneDead = failed.sessionName ? await isPaneDeadAsync(failed.sessionName) : false;
-      if (!paneDead) continue;
+    }
+    if (retryable.length === 0) break;
 
+    await delay(reviewerRetryBackoffMs(attempt));
+
+    const retrySessions: Array<{ sessionName: string; outputFile: string; role: string }> = [];
+    for (const failed of retryable) {
       const agent = agents.find(a => a.name === failed.role);
-      if (!agent) continue;
+      if (!agent || !failed.sessionName) continue;
       const promptName = `code-review-${agent.name}`;
       const promptTemplatePath = resolvePromptTemplateFn(promptName, context.projectPath);
       const template = await parseReviewerTemplate(promptTemplatePath);
       const model = resolveReviewerModel(agent, template.model);
       const promptFile = join(outputDir, `${agent.name}-prompt.md`);
 
-      console.log(`[review-agent] Auto-respawning dead reviewer ${failed.sessionName} for retry`);
-      emitActivityEntry({ source: 'review-specialist', level: 'warn', message: `${context.issueId} — auto-respawning dead reviewer ${failed.role}`, issueId: context.issueId });
+      console.log(`[review-agent] Auto-respawning reviewer ${failed.sessionName} after ${failed.failureReason} (attempt ${attempt}/${MAX_REVIEWER_TIMEOUT_RETRIES})`);
+      emitActivityEntry({
+        source: 'review-specialist',
+        level: 'warn',
+        message: `${context.issueId} — auto-respawning ${failed.role} reviewer after ${failed.failureReason} (attempt ${attempt}/${MAX_REVIEWER_TIMEOUT_RETRIES})`,
+        issueId: context.issueId,
+      });
 
-      // Kill stale session (if any) and respawn fresh
-      if (failed.sessionName) {
-        try { await killSessionAsync(failed.sessionName); } catch { /* ignore */ }
-        try { await spawnFn(failed.sessionName, model, promptFile, context.projectPath); } catch (err) {
-          console.error(`[review-agent] Respawn of ${failed.sessionName} failed:`, err);
-          continue;
-        }
-        try { await setOptionAsync(failed.sessionName, 'remain-on-exit', 'on'); } catch { /* ignore */ }
-        // PAN-915 — respawned reviewer is running again
-        try {
-          const { notifyPipeline } = await import('../pipeline-notifier.js');
-          notifyPipeline({
-            type: 'reviewer_started',
-            issueId: context.issueId,
-            role: failed.role,
-            sessionName: failed.sessionName,
-          });
-        } catch { /* non-fatal */ }
+      try { await killSessionAsync(failed.sessionName); } catch { /* ignore */ }
+      try { await spawnFn(failed.sessionName, model, promptFile, context.projectPath); } catch (err) {
+        console.error(`[review-agent] Respawn of ${failed.sessionName} failed:`, err);
+        continue;
       }
-      retryable.push(failed);
+      try { await setOptionAsync(failed.sessionName, 'remain-on-exit', 'on'); } catch { /* ignore */ }
+      try {
+        const { notifyPipeline } = await import('../pipeline-notifier.js');
+        notifyPipeline({
+          type: 'reviewer_started',
+          issueId: context.issueId,
+          role: failed.role,
+          sessionName: failed.sessionName,
+        });
+      } catch { /* non-fatal */ }
+      retrySessions.push({ sessionName: failed.sessionName, outputFile: failed.outputFile, role: failed.role });
     }
 
-    if (retryable.length > 0) {
-      const retryResults: ReviewerOutcome[] = await Promise.all(
-        retryable.map(({ sessionName, outputFile, role }) =>
-          waitFn(sessionName!, outputFile, REVIEW_TIMEOUT_MS)
-            .then(async (waitResult): Promise<ReviewerOutcome> => {
-              if (waitResult.status === 'completed') {
-                await emitReviewerCompleted(role);
-                return { role, status: 'completed', outputFile, sessionName };
-              }
-              return {
-                role,
-                status: 'failed',
-                outputFile,
-                sessionName,
-                failureReason: waitResult.reason,
-                apiError: waitResult.apiError,
-              };
-            }),
-        ),
-      );
-      // Merge retry results back into the main result set
-      const retryMap = new Map(retryResults.map(r => [r.role, r]));
-      reviewerResults = reviewerResults.map(r => (r.status === 'failed' && retryMap.has(r.role) ? retryMap.get(r.role)! : r));
-    }
+    if (retrySessions.length === 0) break;
+    const retryResults = await waitForReviewerSessions(retrySessions);
+    const retryMap = new Map(retryResults.map(r => [r.role, r]));
+    reviewerResults = reviewerResults.map(r => (r.status === 'failed' && retryMap.has(r.role) ? retryMap.get(r.role)! : r));
+  }
+  for (const failed of reviewerResults.filter(r => r.status === 'failed' && r.failureReason === 'timeout')) {
+    await emitReviewerTimedOut(failed, MAX_REVIEWER_TIMEOUT_RETRIES + 1, false);
   }
 
   // ── Phase 3: Synthesis ────────────────────────────────────────────────────
