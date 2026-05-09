@@ -7,6 +7,7 @@ const projectRoot = resolve(import.meta.dirname, '..');
 const distDir = join(projectRoot, 'dist');
 const dashboardDir = join(distDir, 'dashboard');
 const promptsDir = join(distDir, 'prompts');
+const cliPromptsDir = join(distDir, 'cli', 'prompts');
 const preservedRoot = join(tmpdir(), `panopticon-dashboard-${process.pid}-${Date.now()}`);
 const preservedDashboardDir = join(preservedRoot, 'dashboard');
 
@@ -37,9 +38,10 @@ try {
   restoreDashboard();
 
   mkdirSync(promptsDir, { recursive: true });
+  mkdirSync(cliPromptsDir, { recursive: true });
   const copyPrompts = spawnSync(
     'sh',
-    ['-lc', 'cp src/lib/cloister/prompts/*.md dist/prompts/'],
+    ['-lc', 'cp src/lib/cloister/prompts/*.md dist/prompts/ && cp src/lib/cloister/prompts/*.md dist/cli/prompts/'],
     { cwd: projectRoot, stdio: 'inherit' },
   );
   if (copyPrompts.status !== 0) {

@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T19:43:02.400Z",
+  "updated": "2026-05-09T19:45:15.756Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "0d86e0ee1",
+    "sha": "914cf8a79",
     "dirty": true
   },
   "decisions": [
@@ -83,6 +83,11 @@
       "id": "D15",
       "summary": "Role model foundation uses type-only Role import in config-yaml.ts to avoid a runtime circular dependency with agents.ts. mergeConfigs remains the config-load validation boundary, while derefWorkhorse/resolveModel are exported for role spawn and settings code.",
       "recordedAt": "2026-05-09T19:43:02.400Z"
+    },
+    {
+      "id": "D16",
+      "summary": "Fixed the CLI build artifact layout instead of working around pan inspect: inspect-agent.ts resolves prompts relative to dist/cli, so build:cli must copy cloister prompts to dist/cli/prompts as well as dist/prompts.",
+      "recordedAt": "2026-05-09T19:45:15.756Z"
     }
   ],
   "hazards": [
@@ -145,16 +150,19 @@
       "id": "H12",
       "summary": "The bd dependency graph for PAN-1048 was materialized in reverse, causing terminal cleanup beads to appear before foundation beads.",
       "mitigation": "Corrected the active bd graph enough for f1-role-config-schema to be the sole ready bead before implementing it; continue checking bd ready against the vBRIEF order and fix dependency edges before executing any bead that appears before its prerequisites."
+    },
+    {
+      "id": "H13",
+      "summary": "`pan inspect` failed when dist/cli/prompts/inspect-agent.md was missing even though dist/prompts/inspect-agent.md existed.",
+      "mitigation": "scripts/build-cli.mjs now copies prompt templates into both locations; run npm run build:cli before requesting inspection if dist is stale."
     }
   ],
   "resumePoint": {
-    "description": "Completed workspace-t6t4/f1-role-config-schema. Next: commit this bead, close it, run pan inspect because requiresInspection=true, then continue with bd ready -l pan-1048.",
+    "description": "Foundation bead is closed; pan inspect initially failed due missing dist/cli prompt template. Build script fix committed next, then rerun pan inspect PAN-1048 --bead workspace-t6t4.",
     "beadId": "workspace-t6t4",
     "filesToRead": [
-      "src/lib/agents.ts",
-      "src/lib/config-yaml.ts",
-      "src/lib/__tests__/config-yaml-roles.test.ts",
-      ".pan/spec.vbrief.json"
+      "scripts/build-cli.mjs",
+      "src/lib/cloister/inspect-agent.ts"
     ]
   },
   "beadsMapping": {},
@@ -183,6 +191,12 @@
       "timestamp": "2026-05-09T19:43:02.400Z",
       "reason": "bead-complete",
       "note": "Implemented Role type plus workhorse/role model config schema, derefWorkhorse, resolveModel, config-load validation through mergeConfigs, and vitest coverage for role resolution, sub-role override, missing-slot and chained-ref errors. Typecheck and targeted role config tests pass.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T19:45:15.756Z",
+      "reason": "tooling-fix",
+      "note": "Fixed build:cli to copy cloister prompt templates to dist/cli/prompts, resolving pan inspect prompt-template lookup failure without manually copying artifacts.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],
