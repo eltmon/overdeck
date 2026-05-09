@@ -4,8 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, List, RefreshCw } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import { useDashboardStore } from '../lib/store';
-import { Issue, type StartAgentResponse } from '../types';
-import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
+import { Issue } from '../types';
 import { XTerminal } from './XTerminal';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { useConfirm } from './DialogProvider';
@@ -356,62 +355,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     },
   });
 
-  const acknowledgeGuardrailWarnings = useCallback(async (data: StartAgentResponse | undefined) => {
-    const warnings = data?.guardrails?.warnings ?? [];
-    if (warnings.length === 0) return false;
-    if (!data?.requiresAcknowledgement) return true;
-    return confirm({
-      title: 'Start agent with warnings?',
-      message: warnings.map((warning) => `• ${warning.message}`).join('\n'),
-      variant: 'destructive',
-      confirmLabel: 'Start anyway',
-    });
-  }, [confirm]);
-
-  // Start agent mutation - spawns work agent and updates status to "In Progress"
-  const startAgentMutation = useMutation({
-    mutationFn: async () => {
-      const requestBody = { issueId: issue.identifier, phase: 'implementation' };
-      let lastRequestBody: Record<string, unknown> = requestBody;
-      let res = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(lastRequestBody),
-      });
-      let data = await res.json().catch(() => ({})) as StartAgentResponse;
-      if (res.status === 409 && data.requiresAcknowledgement) {
-        const confirmed = await acknowledgeGuardrailWarnings(data);
-        if (!confirmed) throw new Error('Agent start canceled');
-        lastRequestBody = { ...requestBody, guardrailAcknowledged: true };
-        res = await fetch('/api/agents', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(lastRequestBody),
-        });
-        data = await res.json().catch(() => ({})) as StartAgentResponse;
-      }
-      if (!res.ok) {
-        if (isCodexBlockedResponse(res, data)) {
-          setPendingCodexSpawn(lastRequestBody);
-          throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
-        }
-        throw new Error(data.error || data.hint || 'Failed to start agent');
-      }
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
-      if (data.guardrails?.warnings?.length) {
-        toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
-      }
-      onComplete();
-      onClose();
-    },
-    onError: (err: Error) => {
-      setError(`Failed to start agent: ${err.message}`);
-    },
-  });
 
   // Track previous issue to detect switches
   const prevIssueRef = useRef<string | null>(null);
