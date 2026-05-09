@@ -2226,12 +2226,21 @@ export async function reconcileMergedButReviewing(): Promise<string[]> {
 
     for (const [issueId, status] of Object.entries(statuses)) {
       if (status.mergeStatus !== 'merged') continue;
-      if (!nonTerminal.has(status.reviewStatus as string | undefined)) continue;
+      const reviewNonTerminal = nonTerminal.has(status.reviewStatus as string | undefined);
+      const testNonTerminal = nonTerminal.has(status.testStatus as string | undefined);
+      if (!reviewNonTerminal && !testNonTerminal) continue;
       if (mergedReviewingReconciled.has(issueId)) continue;
 
-      setReviewStatus(issueId, { reviewStatus: 'passed' });
+      // Set BOTH review and test to 'passed' atomically. Setting only review='passed'
+      // trips the canSkipTests dispatch path in setReviewStatus and spawns a test-agent
+      // for an already-merged issue — pure waste. The merge is terminal, no test needed.
+      setReviewStatus(issueId, {
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        testNotes: status.testNotes ?? 'Skipped: issue is already merged',
+      });
       mergedReviewingReconciled.add(issueId);
-      const msg = `Reconciled review_status=${status.reviewStatus ?? 'null'} → passed for ${issueId} (merge_status=merged is terminal)`;
+      const msg = `Reconciled review_status=${status.reviewStatus ?? 'null'}, test_status=${status.testStatus ?? 'null'} → passed for ${issueId} (merge_status=merged is terminal)`;
       actions.push(msg);
       console.log(`[deacon] ${msg}`);
     }
