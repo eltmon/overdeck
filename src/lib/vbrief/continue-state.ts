@@ -16,6 +16,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { rename, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 import { getContinuesDir } from '../pan-dir/continues.js';
@@ -132,7 +133,54 @@ export interface ContinueState {
   sessionHistory: ContinueSessionEntry[];
   /** Pending specialist feedback for the work agent. Cleared at the start of each review cycle. */
   feedback?: ContinueFeedbackEntry[];
+  /** Swarm dispatch runtime state. Present only for swarm-mode issues. */
+  swarmRuntime?: SwarmRuntime;
 }
+
+// ─── Swarm runtime types ─────────────────────────────────────────────────────
+
+/** Runtime state for a single swarm slot. */
+export interface SwarmSlotRuntime {
+  slotId: number;
+  itemId: string;
+  itemTitle: string;
+  sessionName: string;
+  workspace: string;
+  status: 'pending' | 'running' | 'merged' | 'failed';
+  /** ISO 8601 datetime, set when the slot agent is dispatched. */
+  dispatchedAt?: string;
+  /** ISO 8601 datetime, set when the slot branch is merged into the feature branch. */
+  mergedAt?: string;
+}
+
+/** Context update written by a synthesis agent before a convergence-point item is dispatched. */
+export interface SynthesisOutput {
+  /** Item ID this output targets (the downstream convergence item). */
+  targetItemId: string;
+  /** ISO 8601 datetime when synthesis was written. */
+  writtenAt: string;
+  /** Markdown context update the downstream work agent should read before starting. */
+  contextUpdate: string;
+}
+
+/**
+ * Swarm runtime state stored in the continue vBRIEF. Replaces the
+ * `~/.panopticon/swarms/{issueId}.json` sidecar from PAN-970.
+ */
+export interface SwarmRuntime {
+  /** Model used for slot agents. */
+  model: string;
+  /** All slots dispatched across all dispatch cycles. */
+  slots: SwarmSlotRuntime[];
+  /** Synthesis agent output keyed by target item ID. */
+  synthesisOutputs: Record<string, SynthesisOutput>;
+  /** ISO 8601 datetime of first dispatch. */
+  createdAt: string;
+  /** ISO 8601 datetime of most recent update. */
+  updatedAt: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /** Build the continue filename for a given issue ID (lowercase, no prefix).
  *
@@ -160,7 +208,7 @@ export function writeContinueState(projectRoot: string, issueId: string, state: 
   const now = new Date().toISOString();
   const next: ContinueState = {
     ...state,
-    issueId: canonicalIssueId,
+    issueId,
     version: '1',
     created: state.created || now,
     updated: now,
@@ -264,6 +312,42 @@ export function clearFeedback(projectRoot: string, issueId: string): ContinueSta
   const next: ContinueState = { ...existing, feedback: [] };
   writeContinueState(projectRoot, issueId, next);
   return next;
+}
+
+/**
+ * Async variant of `writeContinueState`. Use this from dashboard server routes
+ * (sync FS calls block the event loop).
+ */
+export async function writeContinueStateAsync(dir: string, issueId: string, state: ContinueState): Promise<void> {
+  const path = continueFilePath(dir, issueId);
+  const now = new Date().toISOString();
+  const next: ContinueState = {
+    ...state,
+    issueId,
+    version: '1',
+    created: state.created || now,
+    updated: now,
+  };
+  const tmp = path + '.tmp';
+  await writeFile(tmp, JSON.stringify(next, null, 2), 'utf-8');
+  await rename(tmp, path);
+}
+
+/**
+ * Async variant of `readContinueState`. Use this from dashboard server routes.
+ */
+export async function readContinueStateAsync(dir: string, issueId: string): Promise<ContinueState | null> {
+  const path = continueFilePath(dir, issueId);
+  if (!existsSync(path)) return null;
+  const raw = await readFile(path, 'utf-8');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Invalid JSON in continue file ${path}: ${(err as Error).message}`);
+  }
+  validateContinueState(parsed, path);
+  return parsed as ContinueState;
 }
 
 function validateContinueState(value: unknown, path: string): asserts value is ContinueState {
