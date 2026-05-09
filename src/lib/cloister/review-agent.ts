@@ -11,7 +11,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync, listPaneValuesAsync, detectTerminalApiError, type TerminalApiError } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync, listPaneValuesAsync, detectTerminalApiError, type TerminalApiError, buildTmuxCommandString } from '../tmux.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { getProviderExportsForModel } from '../agents.js';
 import { resolveSpecialistBaseCommand } from './router.js';
@@ -587,18 +587,30 @@ export async function spawnSingleReviewer(
   console.log(`[claude-invoke] purpose=review-agent | model=${model} | source=review-agent.ts:spawnReviewer | session=${sessionName} | claudeSessionId=${claudeSessionId} | launcher=${launcherPath}`);
   console.log(`[review-agent] Launcher content:\n${launcherContent}`);
 
-  await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`, {
-    env: {
-      ...BLANKED_PROVIDER_ENV,
-      TERM: 'xterm-256color',
-      // Mirror the launcher's PANOPTICON_AGENT_ID into the tmux session env so
-      // the value is visible to processes that inspect the env-from-tmux path
-      // (not just the launcher exec chain).
-      PANOPTICON_AGENT_ID: sessionName,
-      PANOPTICON_ISSUE_ID: '',
-      PANOPTICON_SESSION_TYPE: '',
-    },
-  });
+  // Build the same env that createSessionAsync would have passed
+  const sessionEnv = {
+    ...BLANKED_PROVIDER_ENV,
+    TERM: 'xterm-256color',
+    PANOPTICON_AGENT_ID: sessionName,
+    PANOPTICON_ISSUE_ID: '',
+    PANOPTICON_SESSION_TYPE: '',
+  };
+
+  // Build tmux -e flags for environment variables (same logic as specialists.ts buildTmuxEnvFlags)
+  let envFlags = '';
+  for (const [key, value] of Object.entries(sessionEnv)) {
+    envFlags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
+  }
+
+  // Kill stale session first to prevent "duplicate session" error (matches dispatchSpecialist pattern)
+  await killSessionAsync(sessionName).catch(() => {});
+  // Use the same atomic spawn pattern as dispatchSpecialist: new-session + bash launcher in one execAsync call.
+  // createSessionAsync only created the session — it never executed the launcher, so the bash/claude
+  // process never started and sendKeysAsync had no process to deliver keys to (PAN-1034).
+  await execAsync(
+    `${buildTmuxCommandString(['new-session', '-d', '-s', sessionName, '-c', projectPath])}${envFlags} "bash '${launcherPath}'"`,
+    { encoding: 'utf-8' }
+  );
 
   // Pipe all pane output to a log file so connection errors and Claude output are
   // captured even after the session exits.
