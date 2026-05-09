@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-945",
   "created": "2026-05-07T09:30:00Z",
-  "updated": "2026-05-09T01:41:20Z",
+  "updated": "2026-05-09T01:47:00.668Z",
   "gitState": {
     "branch": "feature/pan-945",
     "sha": "f7e0507d0",
@@ -96,14 +96,9 @@
     }
   ],
   "resumePoint": {
-    "description": "The branch has merged `origin/main`, the `.pan/continue.json` conflict is resolved, and the merged channel bridge typecheck errors are fixed. Commit the typecheck fix, rerun full quality gates, push the branch, and rerun `pan done PAN-945`.",
+    "description": "PAN-945 work is complete. All beads are closed, full quality gates passed after rebuilding the CLI dist, the branch was pushed, and `pan done PAN-945` marked the issue complete; Panopticon reported the issue was already merged and skipped the review pipeline.",
     "beadId": null,
-    "filesToRead": [
-      "src/lib/vbrief/io.ts",
-      "src/cli/commands/start.ts",
-      "src/dashboard/server/routes/agents.ts",
-      ".pan/continue.json"
-    ]
+    "filesToRead": []
   },
   "beadsMapping": {},
   "agentModel": "kc@kimi-k2.6",
@@ -155,6 +150,12 @@
       "reason": "progress",
       "note": "After the merge commit, `npm run typecheck` failed in the newly merged channel bridge code because `timingSafeEqual` and `unlinkSync` were referenced without imports. I added the missing `node:crypto` and `node:fs` imports and reran `npm run typecheck`; it passed. The next step is to commit this merged-main typecheck fix and rerun the full gate.",
       "agentModel": "kc@kimi-k2.6"
+    },
+    {
+      "timestamp": "2026-05-09T01:47:00.668Z",
+      "reason": "end",
+      "note": "Imported PRD-directory vBRIEFs into workspace plans for dashboard and CLI start flows with coverage for discovery, import, and non-overwrite behavior."
     }
-  ]
+  ],
+  "feedback": []
 }
