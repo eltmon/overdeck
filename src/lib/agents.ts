@@ -399,6 +399,8 @@ export interface AgentState {
    * 'claude-code' (see getHarness in @panctl/contracts).
    */
   harness?: 'claude-code' | 'pi';
+  /** Unified role primitive (PAN-1048). Optional until all writers migrate. */
+  role?: Role;
   model: string;
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;

@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T20:19:57.149Z",
+  "updated": "2026-05-09T20:23:41.119Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-u5",
+    "sha": "pending-f2",
     "dirty": true
   },
   "decisions": [
@@ -158,11 +158,11 @@
     }
   ],
   "resumePoint": {
-    "description": "U5 settings API bead implemented: /api/settings returns seeded workhorses and roles, saves them through comment-preserving YAML updates, drops legacy models.overrides from responses/writes, and validates roles/sub-roles/model refs. Close workspace-6fzf and continue with bd ready.",
-    "beadId": "workspace-6fzf",
+    "description": "F2 AgentState role field implemented: AgentState has optional role, state.json round-trip preserves it, and targeted test/typecheck/lint pass. Close workspace-47mw and continue with bd ready.",
+    "beadId": "workspace-47mw",
     "filesToRead": [
-      "src/lib/settings-api.ts",
-      "src/lib/__tests__/settings-api.test.ts"
+      "src/lib/agents.ts",
+      "src/lib/__tests__/agent-state-role.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -209,6 +209,12 @@
       "timestamp": "2026-05-09T20:19:57.149Z",
       "reason": "bead-complete",
       "note": "Implemented U5 Settings API support for top-level workhorses and roles. GET seeds defaults and omits legacy overrides; PUT writes workhorses/roles via yaml.parseDocument to preserve comments and delete models.overrides; validation rejects unknown roles/sub-roles plus invalid, chained, and unresolved model refs. Added settings-api coverage and verified targeted test, typecheck, and lint pass.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T20:23:41.119Z",
+      "reason": "bead-complete",
+      "note": "Implemented F2 AgentState role field as an additive optional Role on AgentState. Existing JSON parse/save path already preserves unknown typed fields, and a new vitest proves role persists through state.json. Verified targeted test, typecheck, and lint pass.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

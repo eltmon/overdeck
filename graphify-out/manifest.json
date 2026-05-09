@@ -1116,8 +1116,8 @@
     "hash": "da862d544a549a96182555b069029dc6"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/agents.ts": {
-    "mtime": 1778355650.4919672,
-    "hash": "e2cc850aa09898236048d5621152ed8f"
+    "mtime": 1778358176.8347042,
+    "hash": "ff2ec8c93d0ac63e707828ffab8664fc"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/git-activity.ts": {
     "mtime": 1778301111.4233627,
@@ -2022,6 +2022,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/__tests__/tracker-priority.test.ts": {
     "mtime": 1778301111.4124203,
     "hash": "115a2b409e072a3f4bdabc90ec66f582"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/__tests__/agent-state-role.test.ts": {
+    "mtime": 1778358187.9991338,
+    "hash": "db812525a5394db01b3f6739176e10d8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/__tests__/permission-mode-leak.test.ts": {
     "mtime": 1778301111.4124203,

@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T20:19:57.149Z"
+    "updated": "2026-05-09T20:23:41.119Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T20:19:57.149Z",
+    "updated": "2026-05-09T20:23:41.119Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -117,7 +117,7 @@
       {
         "id": "f2-agentstate-role-field",
         "title": "Foundation: add `role` field to AgentState (additive, not yet required)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -132,7 +132,7 @@
           {
             "id": "f2-agentstate-role-field.ac1",
             "title": "AgentState interface has `role?: Role` field",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -140,7 +140,7 @@
           {
             "id": "f2-agentstate-role-field.ac2",
             "title": "Round-trip serialization preserves the `role` field",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -148,7 +148,7 @@
           {
             "id": "f2-agentstate-role-field.ac3",
             "title": "Existing typecheck and tests pass with no behavior change for callers that don't set `role`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
