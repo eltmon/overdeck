@@ -1755,7 +1755,9 @@ export async function spawnReviewCoordinatorSession(opts: {
   const logFile = join(logDir, `${logStem}.log`);
   const exitCodeFile = join(logDir, `${logStem}.exit`);
   const panBin = join(dirname(process.execPath), 'pan');
-  const command = `bash -lc 'set -o pipefail; ${panBin} review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; exit "$status"'`;
+  // bash -lc does NOT inherit tmux's -c working directory — it starts in $HOME.
+  // Prepend cd so the coordinator runs from the correct workspace.
+  const command = `bash -lc 'cd "${opts.workspace.replace(/'/g, "'\"'\"'")}" && set -o pipefail; ${panBin} review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; exit "$status"'`;
   const env: Record<string, string> = {
     ...BLANKED_PROVIDER_ENV,
     PANOPTICON_AGENT_ID: '',
