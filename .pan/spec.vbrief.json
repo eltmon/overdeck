@@ -1,29 +1,99 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "author": "agent:claude-opus-4-5",
-    "description": "PAN-1025: Relax localStorage 2MB cap in snapshotCache.ts",
-    "created": "2026-05-07T21:00:00Z",
-    "updated": "2026-05-08T09:22:17.661Z"
+    "author": "agent:claude-code",
+    "description": "PAN-1030: Surface awaiting user input state on kanban, command deck, and inspector",
+    "created": "2026-05-09T00:00:00Z",
+    "updated": "2026-05-09T03:00:00Z"
   },
   "plan": {
-    "title": "PAN-1025: Snapshot localStorage cache — relax 2MB cap",
+    "id": "pan-1030",
+    "title": "Surface awaiting user input state on kanban + command deck",
     "status": "active",
-    "items": [
+    "uid": "pan-1030-awaiting-input-indicators",
+    "author": "agent:claude-code",
+    "sequence": 17,
+    "created": "2026-05-09T00:00:00Z",
+    "updated": "2026-05-09T03:00:00Z",
+    "references": [
       {
-        "id": "workspace-az36",
-        "title": "Bump MAX_BYTES to 8 MB and make issues-stripping a fallback on QuotaExceededError",
-        "status": "completed",
-        "completed": "2026-05-08T09:22:17.661Z"
-      },
-      {
-        "id": "workspace-rad9",
-        "title": "Add tests for snapshotCache QuotaExceededError fallback and 8MB cap",
-        "status": "completed",
-        "completed": "2026-05-08T09:22:17.660Z"
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1030",
+        "label": "PAN-1030",
+        "type": "issue"
       }
     ],
-    "updated": "2026-05-08T09:22:17.661Z",
-    "sequence": 16
+    "tags": [
+      "dashboard",
+      "awaiting-input",
+      "kanban",
+      "command-deck",
+      "inspector"
+    ],
+    "narratives": {
+      "Problem": "Dashboard users need a clear, glanceable indication when work or planning agents are blocked on user input such as Claude Code permission prompts, planning Done prompts, Pi harness prompts, or generic y/n confirmations.",
+      "Approach": "Detect awaiting-input state observationally from existing runtime waiting signals, AskUserQuestion JSONL entries, and read-only tmux pane scans; then flow the state through agent enrichment, contracts, the read model, and existing dashboard surfaces without mutating agent state."
+    },
+    "items": [
+      {
+        "id": "workspace-mla7",
+        "title": "Restore awaiting-input detection and indicators across dashboard surfaces",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-09T00:00:00Z",
+        "completed": "2026-05-09T02:10:38.307Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "PAN-1030",
+          "beadId": "workspace-mla7"
+        },
+        "narrative": {
+          "Action": "Implement read-only awaiting-input detection, expose it through agent enrichment and shared contract types, and render INPUT-style indicators with prompt context in kanban cards, Command Deck issue rows, and the issue inspector."
+        },
+        "subItems": [
+          {
+            "id": "workspace-mla7.ac1",
+            "title": "Kanban issue cards show an awaiting-input badge for blocked primary agents or planning sessions",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "workspace-mla7.ac2",
+            "title": "Command Deck issue rows show the same badge in the agent column with explanatory prompt text",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "workspace-mla7.ac3",
+            "title": "Issue Inspector surfaces exact prompt text and terminal attach path for answering in one click",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "workspace-mla7.ac4",
+            "title": "Awaiting-input badge clears automatically after the agent moves past the prompt",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "workspace-mla7.ac5",
+            "title": "Detection covers Claude Code permission prompts, planning Done prompts, Pi prompts, and generic y/n confirmations",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "workspace-mla7.ac6",
+            "title": "Detection is read-only and uses capture-pane heuristics without agent state mutation",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "workspace-mla7.ac7",
+            "title": "Updates flow through the existing dashboard read-model heartbeat and event stream",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ]
   }
 }
