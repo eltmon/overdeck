@@ -6,7 +6,7 @@ import type { UseMutationResult } from '@tanstack/react-query';
 import { Agent, WorkAgentLifecycle, STATUS_LABELS } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
 import { ReviewPipelineSection } from './ReviewPipelineSection';
-import { isReviewPipelineStuck } from '../../lib/pipeline-state';
+import { isPendingReviewStranded, isReviewPipelineStuck } from '../../lib/pipeline-state';
 import { ResetIssueButton } from '../ResetIssueButton';
 import { StopAgentButton } from '../StopAgentButton';
 import { MergeButton } from '../MergeButton';
@@ -110,15 +110,24 @@ export function ActionsSection({
   const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
 
   const isPipelineStuck = isReviewPipelineStuck(reviewStatus);
+  const pendingReviewStranded = isPendingReviewStranded(reviewStatus);
   const hasVerificationState = !!reviewStatus?.verificationStatus && reviewStatus.verificationStatus !== 'pending';
   const showPipelineStatus = !!reviewStatus && (
-    reviewStatus.reviewStatus !== 'pending'
+    pendingReviewStranded
+    || reviewStatus.reviewStatus !== 'pending'
     || reviewStatus.testStatus !== 'pending'
     || hasVerificationState
   );
   const isReReview = reviewStatus?.readyForMerge
     || (reviewStatus?.reviewStatus === 'passed' && reviewStatus?.testStatus === 'passed' && reviewStatus?.mergeStatus === 'failed');
   const reviewActionHint = !reviewStatus ? null : (() => {
+    if (pendingReviewStranded) {
+      return {
+        label: 'Next: Re-request Review',
+        detail: 'Pending review has exceeded the reviewer timeout recovery window.',
+        title: 'Review is pending with no queued or active specialist — re-request review to restart the pipeline.',
+      };
+    }
     if (reviewStatus.verificationStatus === 'failed') {
       return {
         label: 'Fix build gate errors, then re-run',
@@ -230,7 +239,7 @@ export function ActionsSection({
           >
             {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ?
               <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-            {isReReview ? 'Re-Review' : 'Review & Test'}
+            {pendingReviewStranded ? 'Re-request Review' : isReReview ? 'Re-Review' : 'Review & Test'}
           </button>
 
           {/* Stop Agent — hidden for features (features are planned, not executed) */}

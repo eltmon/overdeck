@@ -5,7 +5,7 @@
  * queuePosition / reviewStatus / testStatus combinations.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { getReviewButtonState } from './InspectorPanel';
 import { shouldForceReviewTrigger } from './inspector/utils';
 
@@ -155,6 +155,30 @@ describe('getReviewButtonState', () => {
     expect(state.disabled).toBe(false);
     expect(state.spinning).toBe(false);
   });
+
+  it('shows "Re-request Review" for a stranded pending review', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-05-09T03:00:00Z'));
+      const state = getReviewButtonState(
+        {
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          queuePosition: null,
+          activeSpecialist: null,
+          readyForMerge: false,
+          reviewSpawnedAt: '2026-05-09T01:59:59Z',
+          updatedAt: '2026-05-09T02:30:00Z',
+        },
+        false
+      );
+      expect(state.label).toBe('Re-request Review');
+      expect(state.disabled).toBe(false);
+      expect(state.spinning).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('shouldForceReviewTrigger', () => {
@@ -181,5 +205,35 @@ describe('shouldForceReviewTrigger', () => {
       testStatus: 'pending',
       readyForMerge: false,
     })).toBe(false);
+  });
+
+  it('forces rerun for a pending review stranded beyond two specialist timeouts', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-05-09T03:00:00Z'));
+      expect(shouldForceReviewTrigger({
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        readyForMerge: false,
+        reviewSpawnedAt: '2026-05-09T01:59:59Z',
+      })).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not force rerun for a pending review inside the timeout window', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-05-09T03:00:00Z'));
+      expect(shouldForceReviewTrigger({
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        readyForMerge: false,
+        reviewSpawnedAt: '2026-05-09T02:10:00Z',
+      })).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

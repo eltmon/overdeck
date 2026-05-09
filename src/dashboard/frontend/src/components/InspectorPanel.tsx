@@ -26,7 +26,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { Agent, Issue, WorkAgentLifecycle, type StartAgentResponse } from '../types';
 import type { ContainerStatus, ReviewStatus, SalvageableStashInfo, WorkspaceInfo } from './inspector/types';
-import { getFriendlyModelName, shouldForceReviewTrigger } from './inspector/utils';
+import { formatRelativeTime, getFriendlyModelName, shouldForceReviewTrigger } from './inspector/utils';
 import { useAlert } from './DialogProvider';
 import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
@@ -34,7 +34,7 @@ import { PlanDialog } from './PlanDialog';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
-import { isReviewPipelineStuck } from '../lib/pipeline-state';
+import { isPendingReviewStranded, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { RecoverButton } from './RecoverButton';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { PanOpenInPicker } from './PanOpenInPicker';
@@ -194,6 +194,13 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
 
   const reviewStatus = reviewStatusProp ?? fetchedReviewStatus;
   const reviewStatusLoading = reviewStatusLoadingProp ?? fetchedReviewStatusLoading ?? false;
+  const pendingReviewStranded = isPendingReviewStranded(reviewStatus);
+  const pendingReviewStrandedSince = pendingReviewStranded
+    ? (reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt)
+    : undefined;
+  const pendingReviewStrandedAge = pendingReviewStrandedSince
+    ? formatRelativeTime(pendingReviewStrandedSince)
+    : 'over an hour ago';
 
   useEffect(() => {
     if (!agentLaunchState) return;
@@ -612,11 +619,16 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
   };
 
   const handleReview = async () => {
+    const strandedPendingReview = isPendingReviewStranded(reviewStatus);
     const forceReview = shouldForceReviewTrigger(reviewStatus);
-    const message = forceReview
-      ? `Re-run review & test pipeline for ${issueId}?`
-      : `Start review & test pipeline for ${issueId}?`;
-    if (await confirm({ title: forceReview ? 'Re-run Review' : 'Start Review', message, confirmLabel: forceReview ? 'Re-run' : 'Start Review' })) {
+    const title = strandedPendingReview ? 'Re-request Review' : forceReview ? 'Re-run Review' : 'Start Review';
+    const message = strandedPendingReview
+      ? `Pending review for ${issueId} appears stranded (${pendingReviewStrandedAge}). Re-request the review now?`
+      : forceReview
+        ? `Re-run review & test pipeline for ${issueId}?`
+        : `Start review & test pipeline for ${issueId}?`;
+    const confirmLabel = strandedPendingReview ? 'Re-request Review' : forceReview ? 'Re-run' : 'Start Review';
+    if (await confirm({ title, message, confirmLabel })) {
       forceReviewRef.current = forceReview;
       reviewMutation.mutate();
     }
@@ -762,7 +774,7 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
         )}
 
         {/* Pipeline stuck banner */}
-        {reviewStatusProp && isReviewPipelineStuck(reviewStatusProp) && (
+        {reviewStatus && isReviewPipelineStuck(reviewStatus) && (
           <div className="px-3 py-2 border-b border-border bg-warning/10">
             <div className="flex items-center gap-2 mb-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
@@ -771,7 +783,29 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
             <p className="text-[10px] text-muted-foreground mb-2">
               Review/test/merge pipeline is stuck and needs recovery.
             </p>
-            <RecoverButton issueId={issueId} reviewStatus={reviewStatusProp} variant="inspector" />
+            <RecoverButton issueId={issueId} reviewStatus={reviewStatus} variant="inspector" />
+          </div>
+        )}
+
+        {/* PAN-1034: pending review stranded beyond 2x reviewer timeout. */}
+        {pendingReviewStranded && (
+          <div className="px-3 py-2 border-b border-border bg-amber-500/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span className="text-xs font-medium text-amber-200">Pending Review Stranded</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              Pending review started {pendingReviewStrandedAge} and no reviewer is queued or active. Re-request review to restart the pipeline.
+            </p>
+            <button
+              onClick={handleReview}
+              disabled={reviewMutation.isPending}
+              className="flex items-center justify-center gap-1 px-2 py-1 rounded text-xs bg-amber-500/20 text-amber-100 hover:bg-amber-500/30 border border-amber-500/40 disabled:opacity-50 w-full"
+              data-testid="stranded-review-request-btn"
+            >
+              {reviewMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              Re-request Review
+            </button>
           </div>
         )}
 
