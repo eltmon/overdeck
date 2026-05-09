@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-08T00:00:00Z",
-  "updated": "2026-05-08T00:00:00Z",
+  "updated": "2026-05-09T16:43:41.950Z",
   "gitState": {
     "branch": "feature/pan-1044",
-    "sha": "4020600df",
-    "dirty": false
+    "sha": "acfc101dc",
+    "dirty": true
   },
   "decisions": [
     {
@@ -77,13 +77,18 @@
     "B4": "workspace-fzdg",
     "B5": "workspace-3udk"
   },
-  "agentModel": "claude-opus-4-5",
+  "agentModel": "gpt-5.5",
   "sessionHistory": [
     {
       "timestamp": "2026-05-08T00:00:00Z",
       "reason": "end",
       "note": "Planning complete. Created PRD at docs/prds/planned/PAN-1044-project-overview-panel.md with codebase corrections (SessionNode.type vs role, Record vs Map, uppercase issueId). Created spec.vbrief.json with 5 beads (B1-B5). Created all 5 beads in beads database labeled pan-1044. Key finding: PRD had s.role === 'work' wrong — must be s.type === 'work' per SessionNode schema.",
       "agentModel": "claude-opus-4-5"
+    },
+    {
+      "timestamp": "2026-05-09T16:43:41.949Z",
+      "reason": "start",
+      "agentModel": "gpt-5.5"
     }
   ]
 }
