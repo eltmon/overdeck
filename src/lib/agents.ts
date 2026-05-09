@@ -2197,19 +2197,25 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       }
     });
 
-    // If there's a message, wait for ready signal then send
-    let messageDelivered = false;
-    if (message) {
-      // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
-      const ready = await waitForReadySignal(normalizedId, 30);
+    // Always wake the resumed agent with a continue prompt — without it, the
+    // re-attached claude session sits silently at its last state, and the user
+    // (or deacon nudge loop) ends up sending one manually anyway. Default
+    // matches restartAgent's wording so behaviour is consistent across both
+    // entry points. Caller-supplied message wins.
+    const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
+    const effectiveMessage =
+      message ??
+      `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
 
-      if (ready) {
-        // Send message
-        await deliverAgentMessage(normalizedId, message, 'recoverAgent:ci-nudge');
-        messageDelivered = true;
-      } else {
-        console.error('Claude SessionStart hook did not fire during resume, message not sent');
-      }
+    let messageDelivered = false;
+    // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
+    const ready = await waitForReadySignal(normalizedId, 30);
+
+    if (ready) {
+      await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue');
+      messageDelivered = true;
+    } else {
+      console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
     }
 
     const resumedAt = new Date().toISOString();
