@@ -56,6 +56,7 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal() as any;
   return {
     ...actual,
+    isClaudeCodeChannelsEnabled: vi.fn().mockReturnValue(false),
     loadConfig: vi.fn().mockReturnValue({
       config: {
         preset: 'balanced',
@@ -63,6 +64,8 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
         apiKeys: { openai: 'test-openai-key', google: 'test-google-key' },
         overrides: {},
         geminiThinkingLevel: 3,
+        claude: { permissionMode: 'bypass' },
+        experimental: { claudeCodeChannels: false },
         caveman: { enabled: false, abTest: false, modes: { work: 'full', review: 'review', test: 'full', merge: 'full' } },
       } as NormalizedConfig,
     }),

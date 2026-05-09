@@ -33,7 +33,6 @@ const DEPRECATED_MODEL_IDS = [
   'gpt-5.2-codex',
   'o3-deep-research',
   'gemini-3-pro-preview',
-  'gemini-3-flash-preview',
   'gemini-2.5-pro',
   'gemini-2.5-flash',
   'kimi-k2',
