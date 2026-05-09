@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { detectAwaitingInputFromPane } from '../agent-input-detection.js'
+import { detectAwaitingInputFromPane, normalizeAwaitingInputPrompt } from '../agent-input-detection.js'
 
 describe('detectAwaitingInputFromPane', () => {
   it('detects Claude Code permission menus and preserves prompt text', () => {
@@ -49,5 +49,27 @@ Planning finalized — click Done in the dashboard to hand off to the implementa
     ]
 
     expect(detectAwaitingInputFromPane(lines.join('\n'))).toBeNull()
+  })
+
+  it('clears answered permission prompts once subsequent output appears', () => {
+    const detection = detectAwaitingInputFromPane(`
+Do you want to proceed?
+❯ 1. Yes
+  2. Yes, allow all Bash commands
+  3. No
+● Bash(git status)
+  ⎿ On branch feature/test
+`)
+
+    expect(detection).toBeNull()
+  })
+})
+
+describe('normalizeAwaitingInputPrompt', () => {
+  it('truncates oversized prompt text from non-pane sources', () => {
+    const normalized = normalizeAwaitingInputPrompt('x'.repeat(2_500))
+
+    expect(normalized.length).toBe(2_000)
+    expect(normalized.endsWith('…')).toBe(true)
   })
 })

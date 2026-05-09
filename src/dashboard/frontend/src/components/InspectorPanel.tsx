@@ -102,7 +102,7 @@ export interface InspectorPanelProps {
   /** Loading state for reviewStatus */
   reviewStatusLoading?: boolean;
   onClose: () => void;
-  onOpenTerminal?: () => void;
+  onOpenTerminal?: (sessionName?: string) => void;
   /** Open the terminal and select the active merge session (PAN-905) */
   onViewMergeLog?: () => void;
   /** When true, render without sidebar chrome (border-r, close btn) for embedded use */
@@ -712,7 +712,7 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
             <div className="flex items-center gap-1 shrink-0">
               {onOpenTerminal && agent && (
                 <button
-                  onClick={onOpenTerminal}
+                  onClick={() => onOpenTerminal()}
                   className="p-1 rounded transition-colors hover:bg-popover text-muted-foreground"
                   title="Open terminal"
                   data-testid={`inspector-open-terminal-${issueId}`}
@@ -826,7 +826,7 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
             )}
             {onOpenTerminal && (
               <button
-                onClick={onOpenTerminal}
+                onClick={() => onOpenTerminal(agent.id)}
                 className="mt-2 inline-flex items-center gap-1.5 rounded border border-warning/40 bg-warning/15 px-2 py-1 text-[10px] font-medium text-warning hover:bg-warning/25"
                 title="Open terminal to answer this prompt"
               >

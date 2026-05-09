@@ -16,7 +16,11 @@ import { encodeClaudeProjectDir } from './paths.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
 import { getAgentRuntimeStateAsync, getAgentDir } from './agents.js'
-import { detectAwaitingInputForAgent, type AwaitingInputDetection } from './agent-input-detection.js'
+import {
+  detectAwaitingInputForAgent,
+  normalizeAwaitingInputPrompt,
+  type AwaitingInputDetection,
+} from './agent-input-detection.js'
 import { resolveProjectFromIssue } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
 import { extractPrefix } from './issue-id.js'
@@ -265,17 +269,21 @@ export async function computeAgentEnrichment(
   const questionDetection: AwaitingInputDetection | null = pendingQuestions.length > 0
     ? {
         reason: 'user_question',
-        prompt: pendingQuestions[0]?.questions
-          .map(q => q.question)
-          .filter(Boolean)
-          .join('\n') || 'Agent is waiting for a user answer',
+        prompt: normalizeAwaitingInputPrompt(
+          pendingQuestions[0]?.questions
+            .map(q => q.question)
+            .filter(Boolean)
+            .join('\n') || 'Agent is waiting for a user answer',
+        ),
       }
     : null
 
   const runtimeDetection: AwaitingInputDetection | null = runtimeState?.state === 'waiting-on-human'
     ? {
         reason: (runtimeState.waitingReason as AwaitingInputDetection['reason']) || 'other',
-        prompt: runtimeState.waitingNotification || 'Agent is waiting for human input',
+        prompt: normalizeAwaitingInputPrompt(
+          runtimeState.waitingNotification || 'Agent is waiting for human input',
+        ),
       }
     : null
 
@@ -286,7 +294,7 @@ export async function computeAgentEnrichment(
   const fallbackDetection: AwaitingInputDetection | null = runtimeState?.resolution === 'needs_input'
     ? {
         reason: 'other',
-        prompt: 'Agent stopped because it needs human input or hit a blocker',
+        prompt: normalizeAwaitingInputPrompt('Agent stopped because it needs human input or hit a blocker'),
       }
     : null
 

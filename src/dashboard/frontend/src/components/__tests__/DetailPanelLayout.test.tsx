@@ -20,7 +20,24 @@ vi.mock('react-resizable-panels', () => ({
 }));
 
 vi.mock('../InspectorPanel', () => ({
-  InspectorPanel: () => <div data-testid="inspector-panel" />,
+  InspectorPanel: ({
+    agent,
+    onOpenTerminal,
+  }: {
+    agent?: { id: string };
+    onOpenTerminal?: (sessionName?: string) => void;
+  }) => (
+    <div data-testid="inspector-panel">
+      {agent && onOpenTerminal && (
+        <button
+          data-testid="mock-attach-input-terminal"
+          onClick={() => onOpenTerminal(agent.id)}
+        >
+          Attach terminal
+        </button>
+      )}
+    </div>
+  ),
 }));
 
 vi.mock('../TerminalPanel', () => ({
@@ -223,6 +240,63 @@ describe('DetailPanelLayout', () => {
         expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', 'agent-pan-509-2');
       });
       expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-agent-id', 'agent-pan-509-2');
+    });
+  });
+
+  describe('awaiting-input terminal attach', () => {
+    it('opens and pins the terminal session that owns the inspector prompt', async () => {
+      const awaitingInputSession = 'agent-pan-509-awaiting-input';
+      const unrelatedSession = 'agent-pan-509-other';
+
+      localStorage.setItem(
+        'pan-panel-state-PAN-509',
+        JSON.stringify({ panelMode: 'inspector-only', inspectorDefaultSize: '35%' }),
+      );
+      localStorage.setItem('pan-terminal-pin-PAN-509', unrelatedSession);
+
+      const awaitingAgent = makeAgent({
+        id: awaitingInputSession,
+        issueId: 'PAN-509',
+        status: 'running',
+        hasPendingQuestion: true,
+        pendingQuestionPrompt: 'Do you want to proceed?',
+        pendingQuestionReason: 'tool_permission',
+      });
+      const unrelatedAgent = makeAgent({ id: unrelatedSession, issueId: 'PAN-509', status: 'running' });
+
+      mockPipelineResult = {
+        phase: 'working' as PipelinePhase,
+        activeSession: unrelatedSession,
+        availableTerminals: [
+          {
+            id: 'working-other',
+            label: 'Other',
+            sessionName: unrelatedSession,
+            isActive: true,
+            disabled: false,
+          } satisfies TerminalTab,
+          {
+            id: 'working-awaiting-input',
+            label: 'Awaiting input',
+            sessionName: awaitingInputSession,
+            isActive: false,
+            disabled: false,
+          } satisfies TerminalTab,
+        ],
+        markSessionDead: vi.fn(),
+      };
+
+      renderLayout(awaitingAgent, makeFetch(), 'PAN-509', [awaitingAgent, unrelatedAgent]);
+
+      expect(screen.queryByTestId('terminal-panel')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('mock-attach-input-terminal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', awaitingInputSession);
+      });
+      expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-agent-id', awaitingInputSession);
+      expect(mockSavePinState).toHaveBeenCalledWith('PAN-509', awaitingInputSession);
     });
   });
 

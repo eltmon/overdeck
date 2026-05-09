@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1030",
   "created": "2026-05-09T00:00:00Z",
-  "updated": "2026-05-09T05:13:42.788Z",
+  "updated": "2026-05-09T05:48:11.631Z",
   "gitState": {
     "branch": "feature/pan-1030",
-    "sha": "e25791ae9",
-    "dirty": false
+    "sha": "4fa85ddc2",
+    "dirty": true
   },
   "decisions": [
     {
@@ -33,6 +33,11 @@
       "id": "D5",
       "summary": "Stopped agents with runtime resolution needs_input must carry a fallback prompt and reason so the stricter frontend pending-question helper still surfaces the blocked state.",
       "recordedAt": "2026-05-09T05:13:42.788Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Review feedback requires the awaiting-input Attach terminal affordance to pin the exact agent session, pane detections to clear once prompt output is no longer current, and all emitted prompt text to be normalized to a bounded 2000-character string.",
+      "recordedAt": "2026-05-09T05:48:11.631Z"
     }
   ],
   "hazards": [
@@ -55,19 +60,24 @@
       "id": "H4",
       "summary": "Review reruns can leave local and remote merge commits divergent when a remote ref is repaired through the GitHub API.",
       "mitigation": "Merged origin/feature/pan-1030 back into the local branch before pushing the review-fix commit, restoring fast-forward push behavior."
+    },
+    {
+      "id": "H5",
+      "summary": "Terminal panes retain scrollback after a permission prompt is answered, so recent-but-stale prompt text can look actionable if detection only checks a broad recent window.",
+      "mitigation": "Require the detected prompt/menu end to be at the current bottom of the captured pane and added regression coverage for answered permission prompts followed by command output."
     }
   ],
   "resumePoint": {
-    "description": "Stopped needs_input prompt feedback fixed locally. Next: commit/push continue state, rerun pan review request PAN-1030 -m \"Fixed verification error\", and monitor the review pipeline.",
+    "description": "Review blockers for exact terminal attach, stale permission prompts, and unbounded prompt text are fixed locally and verified. Next: commit, push, and rerun pan review request PAN-1030 -m \"Fixed verification error\".",
     "beadId": "workspace-mla7",
     "filesToRead": [
-      "src/lib/agent-input-detection.ts",
-      "src/lib/agent-enrichment.ts",
-      "packages/contracts/src/types.ts",
-      "src/dashboard/frontend/src/lib/pipeline-state.ts",
-      "src/dashboard/frontend/src/components/KanbanBoard.tsx",
+      "src/dashboard/frontend/src/components/DetailPanelLayout.tsx",
       "src/dashboard/frontend/src/components/InspectorPanel.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx"
+      "src/dashboard/frontend/src/components/__tests__/DetailPanelLayout.test.tsx",
+      "src/lib/agent-input-detection.ts",
+      "src/lib/__tests__/agent-input-detection.test.ts",
+      "src/lib/agent-enrichment.ts",
+      "src/dashboard/server/routes/agents.ts"
     ]
   },
   "beadsMapping": {
@@ -104,6 +114,12 @@
       "timestamp": "2026-05-09T05:13:42.788Z",
       "reason": "review-fix",
       "note": "Addressed security review feedback by adding fallback prompt and reason fields to stopped agents whose runtime resolution is needs_input. Verified with typecheck, lint, targeted tests, and full npm test.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-09T05:48:11.631Z",
+      "reason": "review-fix",
+      "note": "Addressed latest review blockers by deep-linking Attach terminal to the awaiting-input agent session, rejecting stale answered pane permission prompts, and normalizing JSONL/runtime/stopped prompt text before emission. Verified with focused tests plus npm run typecheck, npm run lint, and full npm test (4572 passed, 62 skipped).",
       "agentModel": "claude-code"
     }
   ],

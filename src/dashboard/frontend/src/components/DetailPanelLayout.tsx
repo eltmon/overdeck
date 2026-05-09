@@ -162,13 +162,18 @@ export function DetailPanelLayout({ agent, workAgents = [], issueId, issueUrl, i
     }
   }, [availableTerminals, pinned, pinnedSession, issueId]);
 
-  const openTerminal = useCallback(() => {
+  const openTerminal = useCallback((sessionName?: string) => {
+    if (sessionName) {
+      handleSelectSession(sessionName);
+      setPinned(true);
+    }
+
     setPanelState(prev => {
       const newState: PanelState = { ...prev, panelMode: 'inspector+terminal' };
       savePanelState(issueId, newState);
       return newState;
     });
-  }, [issueId]);
+  }, [issueId, handleSelectSession]);
 
   const closeTerminal = useCallback(() => {
     setPanelState(prev => {
