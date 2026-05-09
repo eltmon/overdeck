@@ -2664,7 +2664,7 @@ interface IssueCardProps {
   planningState?: PlanningState;
 }
 
-function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp }: IssueCardProps) {
+export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp }: IssueCardProps) {
   const queryClient = useQueryClient();
   const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
@@ -3236,11 +3236,10 @@ function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialis
               <span
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (planningAgent && !activeAgent) onPlan();
-                  else onSelect();
+                  onSelect();
                 }}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-warning text-warning-foreground border border-warning/50 animate-pulse cursor-pointer hover:bg-warning/90 uppercase tracking-wide"
-                title={`${pendingQuestionTitle} — click to open ${planningAgent && !activeAgent ? 'planning' : 'inspector'}`}
+                title={`${pendingQuestionTitle} — click to open inspector`}
                 data-testid={`card-input-${issue.identifier}`}
               >
                 <AlertTriangle className="w-3 h-3" />

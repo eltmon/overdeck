@@ -10,6 +10,7 @@ export interface AwaitingInputDetection {
 const ANSI_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]/g
 const MAX_PROMPT_CHARS = 2_000
 const PANE_DETECTION_CACHE_TTL_MS = 10_000
+const MAX_PANE_DETECTION_CACHE_ENTRIES = 256
 const MAX_CONCURRENT_PANE_DETECTIONS = 4
 
 type PaneDetectionCacheEntry = {
@@ -24,6 +25,20 @@ let activePaneDetections = 0
 
 function getPaneDetectionCacheKey(agentId: string, options: { isPlanning?: boolean; lines?: number }): string {
   return `${agentId}:${options.isPlanning === true ? 'planning' : 'agent'}:${options.lines ?? 90}`
+}
+
+function sweepPaneDetectionCache(now = Date.now()): void {
+  for (const [key, entry] of paneDetectionCache) {
+    if (entry.expiresAt <= now) {
+      paneDetectionCache.delete(key)
+    }
+  }
+
+  while (paneDetectionCache.size > MAX_PANE_DETECTION_CACHE_ENTRIES) {
+    const oldestKey = paneDetectionCache.keys().next().value
+    if (!oldestKey) break
+    paneDetectionCache.delete(oldestKey)
+  }
 }
 
 async function withPaneDetectionSlot<T>(fn: () => Promise<T>): Promise<T> {
@@ -152,8 +167,12 @@ export async function detectAwaitingInputForAgent(
   const now = Date.now()
 
   if (cacheEnabled) {
+    sweepPaneDetectionCache(now)
+
     const cached = paneDetectionCache.get(cacheKey)
     if (cached && cached.expiresAt > now) {
+      paneDetectionCache.delete(cacheKey)
+      paneDetectionCache.set(cacheKey, cached)
       return cached.detection
     }
 
@@ -169,6 +188,7 @@ export async function detectAwaitingInputForAgent(
         expiresAt: Date.now() + PANE_DETECTION_CACHE_TTL_MS,
         detection,
       })
+      sweepPaneDetectionCache()
     }
     return detection
   })
