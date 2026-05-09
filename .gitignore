@@ -97,6 +97,10 @@ temp/
 .playwright-mcp/
 .playwright-mcp/
 
+# Graphify output — track reports/viz, exclude large raw data files
+graphify-out/graph.json
+graphify-out/cache/
+
 # Panopticon runtime artifacts (ephemeral, not tracked)
 .pan/events/
 .pan/convoy/

@@ -1,0 +1,99 @@
+# Dependencies
+node_modules/
+src/dashboard/frontend/node_modules/
+
+# Build output
+dist/
+src/dashboard/frontend/dist/
+src/dashboard/server/dist/
+apps/desktop/server/
+
+# Compiled JS from TypeScript source (not source files)
+src/lib/**/*.js
+src/**/*.js.map
+scripts/*.map
+scripts/record-cost-event.js
+
+# Python / TLDR
+.venv/
+.tldr/
+
+# Graphify's own output
+graphify-out/
+
+# Workspaces (agent git worktrees — huge, separate repos)
+workspaces/
+multica/
+
+# Test / coverage
+coverage/
+test-results/
+src/dashboard/frontend/test-results/
+src/dashboard/frontend/playwright-report/
+.playwright-mcp/
+
+# Caches
+.cache/
+
+# Lock files
+bun.lock
+*.lock
+
+# Generated / runtime artifacts
+.pan/
+.planning/
+.beads/
+.panopticon/
+.dolt/
+*.db
+.release/
+excalidraw.log
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# SSL certs
+templates/traefik/certs/
+
+# Docker / devcontainer (generated per-workspace)
+.devcontainer/
+
+# Claude Code workspace artifacts
+.claude/agents/
+.claude/skills/
+.claude/.caveman-variant
+.claude/.panopticon-manifest.json
+.claude/reviews/
+
+# Completed/historical vBRIEF plans (not architectural)
+vbrief/completed/
+vbrief/cancelled/
+
+# Completed PRDs (historical, same as vbrief/completed)
+docs/prds/completed/
+
+# Non-architectural skill resources
+skills/clear-writing/references/
+
+# Marketing / website assets (not architectural)
+site/
+marketing/
+
+# UI screenshots and bug reports (not architectural)
+src/dashboard/frontend/theme-screenshots/
+src/dashboard/visual-bug/
+docs/screenshots/
+design/screenshots/
+
+# Ephemeral agent state
+.pan/
+.beads/
+.release/
+
+# Sibling project clones
+multica/
