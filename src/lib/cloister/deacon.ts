@@ -645,7 +645,13 @@ function isAgentIdleForNudge(agentId: string, staleActiveThresholdMs = 5 * 60 * 
   }
   if (runtimeState.state === 'suspended' || runtimeState.state === 'stopped') return false;
   if (runtimeState.state === 'idle') return true;
-  // Stale-active: heartbeat hasn't fired in staleActiveThresholdMs (state='active'/'uninitialized')
+  // Stale-active fallback: only fires for 'uninitialized' agents — never for
+  // 'active'. An 'active' state means the pre-tool-hook fired and Stop hasn't,
+  // which by definition is mid-turn work. Nudging an active agent injects
+  // text into the pane mid-Bash and surfaces as `Interrupted · What should
+  // Claude do instead?` (PAN-1024 reproduced this with slow gpt-5 runtimes
+  // where the heartbeat between tool calls easily exceeds 5min).
+  if (runtimeState.state !== 'uninitialized') return false;
   const ageMs = Date.now() - new Date(runtimeState.lastActivity).getTime();
   return ageMs > staleActiveThresholdMs;
 }
