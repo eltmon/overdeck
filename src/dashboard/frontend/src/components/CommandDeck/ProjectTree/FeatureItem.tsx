@@ -635,6 +635,7 @@ interface FeatureContextMenuProps {
   onStopSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
   onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
+  onOpenPlanDialog?: (issueId: string) => void;
 }
 
 function StartModelSubmenu({
@@ -679,6 +680,7 @@ function FeatureContextMenu({
   onStopSession,
   onResumeSession,
   onRestartSession,
+  onOpenPlanDialog,
 }: FeatureContextMenuProps) {
   const queryClient = useQueryClient();
   const { groups } = useAvailableModels();
@@ -869,8 +871,8 @@ function FeatureContextMenu({
         </ContextMenuItem>
       )}
 
-      {/* Plan actions */}
-      {(feature.hasPlanning || feature.resourceDetails?.hasVbrief) && (
+      {/* Plan actions — always available so users can (re-)plan stuck/empty issues */}
+      {onOpenPlanDialog && (
         <>
           <ContextMenuSeparator />
           <ContextMenuSub>
@@ -879,6 +881,10 @@ function FeatureContextMenu({
               Plan
             </ContextMenuSubTrigger>
             <ContextMenuSubContent>
+              <ContextMenuItem onSelect={() => onOpenPlanDialog(feature.issueId)}>
+                <BookText size={12} className="mr-2" />
+                {feature.hasPlanning || feature.resourceDetails?.hasVbrief ? 'Continue Planning…' : 'Start Planning…'}
+              </ContextMenuItem>
               <ContextMenuItem
                 onSelect={() => completePlanningMutation.mutate()}
                 disabled={completePlanningMutation.isPending || !feature.resourceDetails?.hasVbrief || !feature.resourceDetails?.hasBeads}
@@ -1292,6 +1298,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       onStopSession={onStopSession}
       onResumeSession={onResumeSession}
       onRestartSession={onRestartSession}
+      onOpenPlanDialog={onOpenPlanDialog}
     />
   </ContextMenuRoot>
 );

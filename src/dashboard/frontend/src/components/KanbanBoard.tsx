@@ -1015,15 +1015,16 @@ export function ListIssueRow({
 
       {/* Action buttons */}
       <div className="flex items-center gap-1 shrink-0">
-        {/* Plan/Start button for backlog/todo items */}
-        {!isRunning && (canonical === 'backlog' || canonical === 'todo') && (
+        {/* Plan/Start button for backlog/todo, plus in_progress issues with no running
+            agent (e.g. PAN-977 hit the empty-spawn bug and needs re-planning). */}
+        {!isRunning && (canonical === 'backlog' || canonical === 'todo' || canonical === 'in_progress') && (
           <button
             onClick={(e) => {
               e.stopPropagation();
               onPlan(issue);
             }}
             className="p-1 text-muted-foreground hover:text-primary transition-colors"
-            title="Plan issue"
+            title={canonical === 'in_progress' ? 'Re-plan issue' : 'Plan issue'}
           >
             <Play className="w-3.5 h-3.5" />
           </button>
