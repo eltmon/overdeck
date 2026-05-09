@@ -353,6 +353,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       }
     }
 
+    case 'review.specialist.timed_out':
+      // Telemetry-only event. Sequence update lets clients observe the event
+      // stream without mutating the durable review-status snapshot.
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
     case 'review.coordinator_started': {
       const { issueId, sessionName } = event.payload
       const existing = state.reviewStatusByIssueId[issueId]

@@ -5634,6 +5634,7 @@ const getMergeQueueRoute = HttpRouter.add(
 //   { type: 'task_queued', specialist, issueId }
 //   { type: 'reviewer_started', issueId, role, sessionName }
 //   { type: 'reviewer_completed', issueId, role }
+//   { type: 'reviewer_timed_out', issueId, role, sessionName, attempt, maxRetries, willRetry }
 //   { type: 'coordinator_started', issueId, sessionName }
 //     — Forwarded verbatim to the in-process handler.
 
@@ -5706,6 +5707,19 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
           return jsonResponse({ ok: false, error: 'reviewer_completed requires issueId, role' }, 400);
         }
         notifyPipeline({ type: 'reviewer_completed', issueId, role });
+        return jsonResponse({ ok: true });
+      }
+      case 'reviewer_timed_out': {
+        const issueId = event.issueId as string | undefined;
+        const role = event.role as string | undefined;
+        const sessionName = event.sessionName as string | undefined;
+        const attempt = typeof event.attempt === 'number' ? event.attempt : undefined;
+        const maxRetries = typeof event.maxRetries === 'number' ? event.maxRetries : undefined;
+        const willRetry = typeof event.willRetry === 'boolean' ? event.willRetry : undefined;
+        if (!issueId || !role || !sessionName || attempt === undefined || maxRetries === undefined || willRetry === undefined) {
+          return jsonResponse({ ok: false, error: 'reviewer_timed_out requires issueId, role, sessionName, attempt, maxRetries, willRetry' }, 400);
+        }
+        notifyPipeline({ type: 'reviewer_timed_out', issueId, role, sessionName, attempt, maxRetries, willRetry });
         return jsonResponse({ ok: true });
       }
       case 'coordinator_started': {

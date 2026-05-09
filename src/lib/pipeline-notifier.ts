@@ -22,6 +22,7 @@ export type PipelineEvent =
   | { type: 'task_queued'; specialist: string; issueId: string }
   | { type: 'reviewer_started'; issueId: string; role: string; sessionName: string }
   | { type: 'reviewer_completed'; issueId: string; role: string }
+  | { type: 'reviewer_timed_out'; issueId: string; role: string; sessionName: string; attempt: number; maxRetries: number; willRetry: boolean }
   | { type: 'coordinator_started'; issueId: string; sessionName: string };
 
 type Handler = (event: PipelineEvent) => void;

@@ -429,6 +429,26 @@ export const ReviewReviewerCompletedEvent = Schema.Struct({
 export type ReviewReviewerCompletedEvent = typeof ReviewReviewerCompletedEvent.Type
 
 /**
+ * Review specialist timeout telemetry. Emitted once per timed-out reviewer wait
+ * attempt so operators can distinguish transient auto-retries from terminal
+ * review failures.
+ */
+export const ReviewSpecialistTimedOutEvent = Schema.Struct({
+  type: Schema.Literal("review.specialist.timed_out"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    role: Schema.String,
+    sessionName: Schema.String,
+    attempt: Schema.Number,
+    maxRetries: Schema.Number,
+    willRetry: Schema.Boolean,
+  }),
+})
+export type ReviewSpecialistTimedOutEvent = typeof ReviewSpecialistTimedOutEvent.Type
+
+/**
  * PAN-915 — review coordinator session spawned. Surfaces in the dashboard so
  * the kanban card can show "review in progress" the instant the coordinator
  * starts, not after the first reviewer finishes.
@@ -774,6 +794,7 @@ export const DomainEvent = Schema.Union([
   PipelineTestCompletedEvent,
   ReviewReviewerStartedEvent,
   ReviewReviewerCompletedEvent,
+  ReviewSpecialistTimedOutEvent,
   ReviewCoordinatorStartedEvent,
   SpecialistStartedEvent,
   SpecialistCompletedEvent,
