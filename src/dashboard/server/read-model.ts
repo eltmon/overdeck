@@ -497,9 +497,19 @@ export const ReadModelServiceLive = Layer.effect(
       // so the ReadModel layer resolves immediately and the dashboard starts fast.
       void (async () => {
         try {
-          const { listCheckpoints, diffCheckpointFiles, getCheckpointTimestamp } = await import('../../lib/checkpoint/checkpoint-manager.js');
+          const { listCheckpoints, diffCheckpointFiles, getCheckpointTimestamp, deleteLegacyCheckpointRefs } = await import('../../lib/checkpoint/checkpoint-manager.js');
 
           const agents = Object.values(state.agentsById);
+
+          // One-time: clean up unscoped legacy refs from before per-agent namespacing.
+          // Run against the first agent's workspace (all worktrees share the same parent .git).
+          const firstAgentWithWorkspace = agents.find(a => a.workspace);
+          if (firstAgentWithWorkspace?.workspace) {
+            const deleted = await deleteLegacyCheckpointRefs(firstAgentWithWorkspace.workspace);
+            if (deleted > 0) {
+              console.log(`[ReadModel] Deleted ${deleted} legacy unscoped checkpoint refs`);
+            }
+          }
           let reconciled = 0;
           for (const agent of agents) {
             if (shouldSkipCheckpointReconciliation(agent)) continue;
@@ -509,7 +519,7 @@ export const ReadModelServiceLive = Layer.effect(
             if (existingSummaries && existingSummaries.length > 0) continue;
 
             try {
-              const checkpoints = await listCheckpoints(workspace);
+              const checkpoints = await listCheckpoints(workspace, agent.id);
               if (checkpoints.length === 0) continue;
 
               const maxRetainedSummaries = getMaxTurnDiffSummariesPerAgent();
@@ -534,15 +544,15 @@ export const ReadModelServiceLive = Layer.effect(
                 let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = [];
                 if (prevTurnId) {
                   try {
-                    files = await diffCheckpointFiles(workspace, prevTurnId, turnId);
+                    files = await diffCheckpointFiles(workspace, agent.id, prevTurnId, turnId);
                   } catch { /* checkpoint might be stale */ }
                 }
-                const completedAt = await getCheckpointTimestamp(workspace, turnId);
+                const completedAt = await getCheckpointTimestamp(workspace, agent.id, turnId);
                 summaries.push({
                   turnId,
                   completedAt,
                   files,
-                  checkpointRef: `refs/pan/turn/${turnId}`,
+                  checkpointRef: `refs/pan/turn/${agent.id}/${turnId}`,
                   checkpointTurnCount: absoluteIndex + 1,
                 });
               }
