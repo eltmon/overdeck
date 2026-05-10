@@ -2057,31 +2057,10 @@ const getConversationDiffsRoute = HttpRouter.add(
           return jsonResponse({ summaries: [] });
         }
 
-        const cwd = conv.cwd;
-        const isInRepo = existsSync(join(cwd, '.git'));
-
-        if (isInRepo) {
-          // Option B: standalone conversation in a git repo — single diff since conversation start.
-          // Falls through to Option A (JSONL-based) when no base commit exists (e.g. the cwd
-          // is a git repo but has no commits prior to the conversation's createdAt).
-          const baseCommit = await findCommitAtTime(cwd, conv.createdAt);
-          if (baseCommit) {
-            const files = await diffSinceCommit(cwd, baseCommit);
-            if (files.length > 0) {
-              return jsonResponse({
-                summaries: [{
-                  turnId: 'conversation-diff',
-                  completedAt: new Date().toISOString(),
-                  status: 'completed',
-                  files,
-                }],
-              });
-            }
-          }
-          // No base commit or no changes — fall through to per-turn JSONL path.
-        }
-
-        // Option A: devroot conversation — parse JSONL for file-modifying tool_use per turn
+        // Parse JSONL for file-modifying tool_use blocks per turn.
+        // Works for all conversation types: devroot, in-repo, and worktree.
+        // Per-turn git diffs use findCommitAtTime(repoRoot, conv.createdAt) so they
+        // capture committed changes too, not just working-tree modifications.
         const parsed = await getCachedMessages(sessionFile, false);
         const { fileEditsByAssistantId } = parsed;
         if (!fileEditsByAssistantId || fileEditsByAssistantId.size === 0) {
