@@ -2,7 +2,7 @@
 
 # Panopticon CLI
 
-**The IDE for the agent era** <!-- per-turn diffs working as of 2026-05-09 -->
+**The IDE for the agent era** <!-- test edit for live diff badge -->
 
 [![npm version](https://img.shields.io/npm/v/%40panctl%2Fcli.svg)](https://www.npmjs.com/package/@panctl/cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
