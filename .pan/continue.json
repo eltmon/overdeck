@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T12:47:02Z",
+  "updated": "2026-05-10T12:56:10Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "0e11a85b4",
+    "sha": "9acd91e54",
     "dirty": true
   },
   "decisions": [
@@ -91,8 +91,13 @@
     },
     {
       "id": "D17",
-      "summary": "Resolved fork harness blockers by restoring the shared summary ModelHarnessPicker, resolving summaryHarness through canonical policy, accepting Pi summary requests through Pi RPC JSON commands, and synthesizing forkable JSONL sources from Pi terminal transcripts when no Claude session file exists.",
+      "summary": "Resolved fork summary harness picker blockers by restoring the shared summary ModelHarnessPicker, resolving summaryHarness through canonical policy, and accepting Pi summary requests through Pi RPC JSON commands.",
       "recordedAt": "2026-05-10T12:47:02Z"
+    },
+    {
+      "id": "D18",
+      "summary": "Disabled Pi conversation forking until a transcript-faithful Pi session export is available, removing the synthetic tmux-pane JSONL fork source that could silently drop history.",
+      "recordedAt": "2026-05-10T12:56:10Z"
     }
   ],
   "hazards": [
@@ -103,13 +108,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Fixed latest CHANGES_REQUESTED findings for Pi fork/session source handling and shared summary harness picker behavior. typecheck, lint, npm test, and graphify update pass. Next step is commit and invoke /rebase-and-submit PAN-1055.",
+    "description": "Fixed latest CHANGES_REQUESTED blocker by disabling Pi fork actions and returning a clear unsupported error instead of fabricating fork sources from tmux pane scrollback. typecheck, lint, npm test, and graphify update pass. Next step is commit and invoke /rebase-and-submit PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
       ".pan/feedback/001-review-agent-changes-requested.md",
-      "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
-      "src/dashboard/server/routes/conversations.ts",
-      "src/lib/conversations/smart-compaction.ts"
+      "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+      "src/dashboard/server/routes/conversations.ts"
     ]
   },
   "beadsMapping": {
@@ -258,7 +262,13 @@
     {
       "timestamp": "2026-05-10T12:47:02Z",
       "reason": "review-response-verified",
-      "note": "Fixed latest review feedback: Pi conversations now get a synthetic fork source when no Claude JSONL exists, Pi plain forks seed via summary injection instead of dead Claude resume JSONL, ForkModal summary uses ModelHarnessPicker, and summaryHarness is policy-resolved and threaded into generation including Pi RPC JSON command support. Verified npm run typecheck, npm run lint, npm test (379 files / 4615 tests passed), and graphify update.",
+      "note": "Fixed fork summary picker feedback: ForkModal summary uses ModelHarnessPicker, and summaryHarness is policy-resolved and threaded into generation including Pi RPC JSON command support. Verified npm run typecheck, npm run lint, npm test (379 files / 4615 tests passed), and graphify update.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T12:56:10Z",
+      "reason": "review-response-verified",
+      "note": "Fixed Pi fork transcript fidelity blocker by removing synthetic pane-scrollback fork source generation, hiding fork actions for Pi conversations in the dashboard, and returning a clear unsupported error from the fork endpoint for Pi conversations. Verified npm run typecheck, npm run lint, npm test (379 files / 4615 tests passed), and graphify update.",
       "agentModel": "Claude Opus 4.7"
     }
   ],

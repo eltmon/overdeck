@@ -430,39 +430,7 @@ async function resolveForkSourceSessionFile(conv: Conversation): Promise<string 
   if (claudeSessionFile && existsSync(claudeSessionFile)) {
     return claudeSessionFile;
   }
-
-  if (conv.harness !== 'pi') {
-    return claudeSessionFile;
-  }
-
-  const paths = piFifoPaths(conv.tmuxSession);
-  await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
-  const syntheticPath = join(paths.agentDir, 'fork-source.jsonl');
-  const paneText = await capturePaneAsync(conv.tmuxSession, 5000).catch(() => '');
-  const content = paneText.trim()
-    ? `Pi terminal transcript for ${conv.name}:\n\n${paneText.trim()}`
-    : `Pi conversation ${conv.name} has no captured terminal transcript.`;
-  const timestamp = new Date().toISOString();
-  const entries = [
-    {
-      type: 'system',
-      subtype: 'pi_fork_source',
-      cwd: conv.cwd,
-      session_id: conv.claudeSessionId ?? null,
-      timestamp,
-      content: `Synthetic fork source for Pi conversation ${conv.name}`,
-    },
-    {
-      type: 'user',
-      timestamp,
-      message: {
-        role: 'user',
-        content,
-      },
-    },
-  ];
-  await writeFile(syntheticPath, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`, 'utf-8');
-  return syntheticPath;
+  return claudeSessionFile;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1973,11 +1941,10 @@ async function runForkPipeline(
   const parentSessionFile = await resolveForkSourceSessionFile(parentConv);
   if (!parentSessionFile) throw new Error(`Parent has no session file`);
 
-  if (plain && conv.harness !== 'pi') {
+  if (plain) {
     // Plain Claude Code fork: copy JSONL from last compact boundary into the new
     // session file, then spawn with --resume so Claude Code loads the history
-    // directly. Pi sessions do not consume Claude JSONL, so Pi plain forks are
-    // seeded with a local transcript summary below instead of a dead JSONL copy.
+    // directly.
     const forkSessionFile = resolveSessionFile(conv);
     if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
     await copySessionFromCompactBoundary(parentSessionFile, forkSessionFile);
@@ -2047,9 +2014,13 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
+        if (conv.harness === 'pi') {
+          return jsonResponse({ error: 'Forking Pi conversations is not supported until Pi session transcript export is available.' }, { status: 400 });
+        }
+
         const sourceSessionFile = await resolveForkSourceSessionFile(conv);
         if (!sourceSessionFile || !existsSync(sourceSessionFile)) {
-          return jsonResponse({ error: `No forkable session source found for conversation ${conv.name}` }, { status: 400 });
+          return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
         }
 
         const model = typeof body['model'] === 'string'
