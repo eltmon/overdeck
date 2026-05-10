@@ -3285,9 +3285,15 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               return;
             }
 
-            const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
+            // PAN-1048 C1/R3: review now runs as the role primitive via spawnRun
+            // (loads roles/review.md → Agent tool fans out to code-review-* sub-agents).
+            // The wrapper preserves dispatchParallelReview's orchestration concerns
+            // (idempotency, feedback archive, review-temp stash, status flip,
+            // pipeline event) but the review itself is no longer a detached
+            // `pan review run` coordinator process.
+            const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
             const prUrl = getReviewStatus(issueId)?.prUrl;
-            const reviewResult = await dispatchParallelReview({
+            const reviewResult = await spawnReviewRoleForIssue({
               issueId,
               branch: branchName,
               workspace: workspacePath,
@@ -3414,8 +3420,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
             }
 
             const prUrl = getReviewStatus(issueId)?.prUrl;
-            const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
-            const result = await dispatchParallelReview({
+            const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
+            const result = await spawnReviewRoleForIssue({
               issueId,
               workspace: workspacePathRerun,
               branch: branchNameRerun,
@@ -3424,8 +3430,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
             if (result.success) {
               // reviewStatus transitions ('reviewing' → passed/blocked/failed) are
-              // managed entirely inside dispatchParallelReview — do not write here.
-              console.log(`[request-review] Parallel review dispatched for ${issueId}`);
+              // managed by the review role itself via /api/review/:id/status.
+              console.log(`[request-review] Review role spawned for ${issueId}`);
             } else {
               const errorMsg = result.error || result.message || 'Failed to dispatch review';
               console.error(`[request-review] Dispatch failed for ${issueId}: ${errorMsg}`);
@@ -3624,8 +3630,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       }
 
       const result = yield* Effect.promise(async () => {
-        const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
-        return dispatchParallelReview({
+        const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
+        return spawnReviewRoleForIssue({
           issueId,
           workspace: workspacePath,
           branch: branchName,
@@ -3633,8 +3639,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       });
 
       if (result.success) {
-        console.log(`[request-review] Parallel review dispatched for ${issueId}`);
-        // PAN-511: set 'reviewing' only after dispatch succeeds
+        console.log(`[request-review] Review role spawned for ${issueId}`);
+        // PAN-511: set 'reviewing' only after spawn succeeds. spawnReviewRoleForIssue
+        // already flips reviewStatus internally, but we keep this redundant write
+        // to preserve the original ordering invariant for downstream readers.
         setReviewStatus(issueId, { reviewStatus: 'reviewing' });
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-started',
@@ -3799,7 +3807,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     if (rerun) {
       try {
         yield* Effect.promise(async () => {
-          const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
+          const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
           const resolved = resolveProjectFromIssue(issueId);
           if (resolved) {
             const wsInfo = getWorkspaceInfoForIssue(issueId);
@@ -3811,7 +3819,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
               wsInfo.localPath ||
               join(resolved.projectPath, 'workspaces', `feature-${numericSuffix}`);
 
-            const result = await dispatchParallelReview({
+            const result = await spawnReviewRoleForIssue({
               issueId,
               workspace: wsPath,
               branch: branchName,
@@ -5326,64 +5334,22 @@ const postWorkspaceApproveRoute = HttpRouter.add(
 
         console.log(`[approve] Starting role pipeline for ${issueId}...`);
 
-        const pipelinePrompt = `STRICT REVIEW WORKFLOW for ${issueId}
-
-You are a DEMANDING code reviewer. Your job is to find EVERY issue before code can proceed.
-DO NOT BE NICE. BE THOROUGH. The code must be PERFECT before it can proceed to testing.
-
-=== CONTEXT ===
-ISSUE: ${issueId}
-WORKSPACE: ${workspacePath}
-BRANCH: ${branchName}
-PROJECT: ${projectPath}
-
-=== MANDATORY REQUIREMENTS (Block if ANY violated) ===
-1. **Tests Required** - Every new function MUST have test files. No exceptions.
-2. **No In-Memory Only Storage** - Important data MUST persist to files/DB.
-3. **No Dead Code** - Remove unused imports, functions, variables.
-4. **Error Handling** - All async operations must handle errors.
-5. **Type Safety** - No \`any\` without justification.
-
-=== YOUR TASK (EXHAUSTIVE REVIEW) ===
-1. cd ${workspacePath}
-2. Review ALL changes: git diff main...${branchName}
-3. Check EVERY file for:
-   - Missing test FILES (AUTOMATIC REJECTION)
-   - In-memory storage for persistent data (AUTOMATIC REJECTION)
-   - Security vulnerabilities
-   - Performance issues
-   - Code quality problems
-4. List EVERY issue found with file:line references
-
-**IMPORTANT: DO NOT run tests (npm test). You are the REVIEW agent - you only review code.**
-**The TEST agent will run tests in the next step. Just verify test FILES exist.**
-
-=== DECISION ===
-**IF ANY ISSUES FOUND:**
-- Update status: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[detailed list of all issues found]"}'
-- Use /send-feedback-to-agent to send detailed feedback to agent-${issueId.toLowerCase()}
-- DO NOT hand off to test-agent
-
-**ONLY IF CODE IS PERFECT (rare):**
-- Update status: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
-- Queue test-agent (DO NOT use pan specialists wake directly):
-
-curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","customPrompt":"TEST TASK for ${issueId}:\\nWORKSPACE: ${workspacePath}\\nBRANCH: ${branchName}\\n\\n1. cd ${workspacePath}\\n2. Run tests: npm test\\n3. Update status via API:\\n   - PASS: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready."}'
-
-=== REVIEW PHILOSOPHY ===
-- Your default answer is BLOCK, not PASS
-- Missing tests alone is enough to reject
-- In-memory storage for important data is enough to reject
-- "It works" is NOT enough - code must be EXCELLENT
-- Find EVERYTHING. The agent should learn from your feedback.`;
-
+        // PAN-1048 R3: route through the same wrapper every other approve path
+        // uses (idempotency + feedback archive + review-temp stash + status flip
+        // + pipeline event). The role agent loads roles/review.md, fans out the
+        // four code-review-* convoy reviewers via Agent tool, synthesizes, and
+        // posts the verdict via /api/review/:id/status. Test dispatch is NOT
+        // part of the review prompt — reactive Cloister picks up the
+        // review.approved lifecycle event and spawns the test role.
         let reviewResult: { success: boolean; message: string; error?: string };
         try {
-          const reviewRun = await spawnRun(issueId, 'review', {
+          const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
+          reviewResult = await spawnReviewRoleForIssue({
+            issueId,
             workspace: workspacePath,
-            prompt: pipelinePrompt,
+            branch: branchName,
+            prUrl: getReviewStatus(issueId)?.prUrl,
           });
-          reviewResult = { success: true, message: `review role started as ${reviewRun.id}` };
         } catch (err: any) {
           reviewResult = {
             success: false,

@@ -1469,10 +1469,11 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
 
           if (workspace && resolved) {
             const branch = `feature/${issueLower}`;
-            const { dispatchParallelReview } = await import('./review-agent.js');
+            // PAN-1048 R4: deacon recovery routes through the role primitive.
+            const { spawnReviewRoleForIssue } = await import('./review-agent.js');
             try {
-              await dispatchParallelReview({ issueId, workspace, branch });
-              // dispatchParallelReview sets reviewStatus='reviewing' internally;
+              await spawnReviewRoleForIssue({ issueId, workspace, branch });
+              // spawnReviewRoleForIssue sets reviewStatus='reviewing' internally;
               // keep local status in sync so this patrol doesn't re-process the issue.
               status.reviewStatus = 'reviewing';
               actions.push(
@@ -1619,9 +1620,10 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
         continue;
       }
 
-      const { dispatchParallelReview } = await import('./review-agent.js');
+      // PAN-1048 R4: deacon auto-trigger routes through the role primitive.
+      const { spawnReviewRoleForIssue } = await import('./review-agent.js');
       try {
-        await dispatchParallelReview({
+        await spawnReviewRoleForIssue({
           issueId,
           workspace,
           branch: `feature/${issueLower}`,

@@ -987,15 +987,17 @@ describe('reviewStatus type-safety regression', () => {
   });
 });
 
-// ── passed-state rerun uses dispatchParallelReview ───────────────────────────
+// ── passed-state rerun uses spawnReviewRoleForIssue ──────────────────────────
 // Regression: the passed-state rerun path in /api/review/:issueId/request must
-// use dispatchParallelReview so review:* model routing and the parallel pipeline
-// are applied consistently.
+// use the role-primitive review spawner (PAN-1048 R3) so role-routed model
+// resolution and the unified spawnRun pipeline are applied consistently.
+// Replaces the dispatchParallelReview pin from the legacy `pan review run`
+// coordinator era.
 
 describe('passed-state rerun regression', () => {
-  it('workspaces.ts request-review route uses dispatchParallelReview in the rerun path', async () => {
-    // Read the route source and verify the passed-state IIFE uses the parallel
-    // review launcher (the block between shouldTreatAsRerun and the early return).
+  it('workspaces.ts request-review route uses spawnReviewRoleForIssue in the rerun path', async () => {
+    // Read the route source and verify the passed-state IIFE uses the role
+    // primitive (the block between shouldTreatAsRerun and the early return).
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
@@ -1011,7 +1013,9 @@ describe('passed-state rerun regression', () => {
     expect(rerunBlockMatch).not.toBeNull();
     const rerunBlock = rerunBlockMatch![0];
 
-    expect(rerunBlock).toContain('dispatchParallelReview');
+    expect(rerunBlock).toContain('spawnReviewRoleForIssue');
+    // Negative assertion guards against accidental fallback to the legacy path.
+    expect(rerunBlock).not.toContain('dispatchParallelReview');
   });
 });
 

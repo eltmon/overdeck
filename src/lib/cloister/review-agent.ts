@@ -193,6 +193,178 @@ async function cleanupReviewTempStash(issueId: string, workspace: string): Promi
 }
 
 /**
+ * PAN-1048 R3: Build the context-only prompt the review role agent receives
+ * at spawn. Behavior — convoy launch, synthesis, /api/review/:id/status —
+ * lives in roles/review.md and the .claude/agents/code-review-* sub-agent
+ * definitions. This prompt only carries identifiers and a pointer to those
+ * instructions, so review behavior changes are managed in role files (which
+ * version-control with the repo) rather than scattered through prompt strings.
+ */
+function buildReviewRolePrompt(opts: {
+  issueId: string;
+  workspace: string;
+  branch: string;
+  prUrl?: string;
+}): string {
+  const port = process.env.API_PORT || process.env.PORT || '3011';
+  return [
+    `REVIEW TASK for ${opts.issueId}:`,
+    '',
+    `Issue: ${opts.issueId}`,
+    `Branch: ${opts.branch}`,
+    `Workspace: ${opts.workspace}`,
+    opts.prUrl ? `PR: ${opts.prUrl}` : 'PR: (resolve via gh pr view ${branch})',
+    '',
+    'Follow roles/review.md exactly. The four convoy reviewers are launched',
+    'via Agent tool calls (subagent_type: code-review-{security,correctness,',
+    'performance,requirements}). Synthesis is your job — there is no separate',
+    'synthesis sub-agent.',
+    '',
+    'When you have a verdict, post it through the review status API:',
+    '',
+    'APPROVED:',
+    `  curl -s -X POST http://127.0.0.1:${port}/api/review/${opts.issueId}/status \\`,
+    `    -H 'Content-Type: application/json' \\`,
+    `    -d '{"reviewStatus":"passed"}'`,
+    '',
+    'CHANGES REQUESTED:',
+    `  curl -s -X POST http://127.0.0.1:${port}/api/review/${opts.issueId}/status \\`,
+    `    -H 'Content-Type: application/json' \\`,
+    `    -d '{"reviewStatus":"blocked","reviewNotes":"<one-line summary; full details go through /send-feedback-to-agent>"}'`,
+    '',
+    'After posting reviewStatus=passed, reactive Cloister automatically dispatches',
+    'the test role from the resulting review.approved lifecycle event. Do NOT',
+    'queue a test specialist yourself; do NOT run gh pr merge; never edit code.',
+  ].join('\n');
+}
+
+/**
+ * PAN-1048 R3 / C1 / C2: Spawn the `review` role for an issue using the
+ * unified role primitive (spawnRun) instead of the legacy detached
+ * `pan review run` coordinator. Wraps the same orchestration concerns
+ * dispatchParallelReview owned (idempotency check, feedback archive,
+ * review-temp stash, reviewing-status flip, pipeline event) but the review
+ * itself runs as a Claude Code session that loads roles/review.md and uses
+ * the Agent tool to fan out to the four code-review-* sub-agents.
+ *
+ * On failure: cleanup review-temp stash, flip status to failed with the
+ * spawn error in reviewNotes so the dashboard surfaces the breakage.
+ */
+export async function spawnReviewRoleForIssue(
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string },
+): Promise<{ success: boolean; message: string; error?: string }> {
+  const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
+
+  // Idempotency: if a review role agent for this issue already has an alive
+  // tmux pane, treat the current dispatch as a no-op. spawnRun has its own
+  // session-exists check but it throws — we want the soft "already running"
+  // semantics dispatchParallelReview had, so callers can keep their existing
+  // success-path messaging.
+  try {
+    const sessions = await listSessionNamesAsync();
+    if (sessions.includes(reviewSessionName)) {
+      const paneDead = await isPaneDeadAsync(reviewSessionName);
+      if (!paneDead) {
+        console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
+        return { success: true, message: `Review already in progress: ${reviewSessionName}` };
+      }
+      // Session exists but pane is dead — fall through and respawn.
+      console.log(`[review-agent] ${reviewSessionName} pane is dead — killing and respawning`);
+      await killSessionAsync(reviewSessionName).catch(() => {});
+    }
+  } catch (err) {
+    console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
+  }
+
+  // Clear feedback from any previous review cycle so the work agent only
+  // sees current-cycle feedback when it reads .pan/feedback/.
+  try {
+    const { archiveFeedbackFiles } = await import('./feedback-writer.js');
+    await archiveFeedbackFiles(opts.workspace);
+  } catch {
+    // Non-fatal: archiving is best-effort
+  }
+
+  let reviewTempStash: Awaited<ReturnType<typeof ensureReviewTempStash>> = null;
+  try {
+    reviewTempStash = await ensureReviewTempStash(opts.issueId, opts.workspace);
+  } catch (err) {
+    console.error(`[review-agent] Failed to create review-temp stash for ${opts.issueId}:`, err);
+    return {
+      success: false,
+      message: 'Failed to create review-temp stash',
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  // Set reviewing here so callers don't race against the async role spawn.
+  // The review role posts /api/review/:id/status with the terminal verdict
+  // when it finishes, which transitions reviewStatus to passed/blocked/failed
+  // and fires the review.approved lifecycle event for reactive Cloister.
+  try {
+    setReviewStatus(opts.issueId, {
+      reviewStatus: 'reviewing',
+      reviewSpawnedAt: new Date().toISOString(),
+      reviewTempStashRef: reviewTempStash?.ref,
+      reviewTempStashMessage: reviewTempStash?.message,
+      reviewTempStashSequence: reviewTempStash?.sequence,
+    });
+  } catch (err) {
+    console.error(`[review-agent] Failed to set reviewing status for ${opts.issueId}:`, err);
+    if (reviewTempStash) {
+      try { await dropStash(opts.workspace, reviewTempStash.ref); } catch {}
+    }
+    return {
+      success: false,
+      message: 'Failed to initialize review status',
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  try {
+    const { notifyPipeline } = await import('../pipeline-notifier.js');
+    notifyPipeline({ type: 'task_queued', specialist: 'review-agent', issueId: opts.issueId });
+  } catch {
+    // Non-fatal
+  }
+
+  try {
+    const { spawnRun } = await import('../agents.js');
+    const prompt = buildReviewRolePrompt(opts);
+    const run = await spawnRun(opts.issueId, 'review', {
+      workspace: opts.workspace,
+      prompt,
+      ...(opts.model ? { model: opts.model } : {}),
+    });
+    console.log(`[review-agent] Review role spawned for ${opts.issueId}: ${run.id}`);
+    emitActivityEntry({ source: 'review', level: 'info', message: `Review role spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+    return {
+      success: true,
+      message: `Review role spawned: ${run.id}`,
+    };
+  } catch (err) {
+    console.error(`[review-agent] Failed to spawn review role for ${opts.issueId}:`, err);
+    try {
+      await cleanupReviewTempStash(opts.issueId, opts.workspace);
+    } catch (cleanupError) {
+      console.error(`[review-agent] Failed to clean review-temp stash for ${opts.issueId}:`, cleanupError);
+    }
+    setReviewStatus(opts.issueId, {
+      reviewStatus: 'failed',
+      reviewNotes: `Review role spawn failed: ${err instanceof Error ? err.message : String(err)}`,
+      reviewTempStashRef: undefined,
+      reviewTempStashMessage: undefined,
+      reviewTempStashSequence: undefined,
+    });
+    return {
+      success: false,
+      message: 'Failed to spawn review role',
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/**
  * Returns the list of enabled reviewer agents from config, falling back to defaults.
  */
 export function getReviewAgents(): ReviewAgentConfig[] {

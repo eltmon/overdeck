@@ -1503,11 +1503,12 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       branch = stdout.trim() || 'unknown';
     } catch { /* non-fatal */ }
 
-    const { dispatchParallelReview } = yield* Effect.promise(
+    // PAN-1048 R3: review now spawns through the role primitive.
+    const { spawnReviewRoleForIssue } = yield* Effect.promise(
       () => import('../../../lib/cloister/review-agent.js'),
     );
     const prUrl = getReviewStatus(issueId)?.prUrl;
-    const result = yield* Effect.promise(() => dispatchParallelReview({
+    const result = yield* Effect.promise(() => spawnReviewRoleForIssue({
       issueId,
       workspace: workspacePath,
       branch,

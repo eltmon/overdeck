@@ -539,7 +539,6 @@ export class CloisterService {
       const reviewStatuses = loadReviewStatuses();
       const { resolveProjectFromIssue } = await import('../projects.js');
       const { getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
-      const { dispatchParallelReview } = await import('./review-agent.js');
 
       // Build set of issue IDs actively being reviewed by a running specialist
       const activeReviewIssues = new Set<string>();
@@ -599,8 +598,12 @@ export class CloisterService {
           }
 
           const branch = `feature/${issueId.toLowerCase()}`;
-          await dispatchParallelReview({ issueId, workspace, branch });
-          // dispatchParallelReview sets reviewStatus='reviewing' internally
+          // PAN-1048 R4: startup recovery now spawns the review role primitive
+          // (loads roles/review.md → Agent tool fans out to convoy reviewers)
+          // instead of the legacy `pan review run` coordinator.
+          const { spawnReviewRoleForIssue } = await import('./review-agent.js');
+          await spawnReviewRoleForIssue({ issueId, workspace, branch });
+          // spawnReviewRoleForIssue sets reviewStatus='reviewing' internally
           console.log(`  ✓ Re-dispatched recovery review for ${issueId}`);
           emitActivityEntry({ source: 'cloister', level: 'info', message: `Re-dispatched recovery review for ${issueId}`, issueId });
         }
