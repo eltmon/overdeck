@@ -37,6 +37,8 @@ export interface Conversation {
   totalCost?: number;
   /** Model used for this conversation. Null until backfilled from session file. */
   model?: string | null;
+  /** Harness used to spawn this conversation. */
+  harness?: 'claude-code' | 'pi' | null;
   /** Effort level used when spawning this conversation. */
   effort?: string | null;
   /** Async fork provisioning status. Null = not a fork or completed. */
@@ -271,8 +273,8 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
           conversation={mutations.forkTarget}
           isPending={mutations.isForkPending}
           onClose={mutations.closeForkModal}
-          onConfirm={(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title) => {
-            mutations.submitFork(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title);
+          onConfirm={(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness) => {
+            mutations.submitFork(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness);
           }}
         />
       )}

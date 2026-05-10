@@ -16,6 +16,7 @@ import {
 } from './defaultConversationModel';
 import { usePickerPosition } from './usePickerPosition';
 import { CostWarningBadge, costWarningLevel } from '../shared/costWarning';
+import { HarnessSelect, type AuthMode, type Harness, type ModelGroup as SharedModelGroup } from '../shared/ModelPicker';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -90,6 +91,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
 ];
 
 const MODEL_STORAGE_KEY = 'conv-composer-model';
+const HARNESS_STORAGE_KEY = 'conv-composer-harness';
 export const FALLBACK_DEFAULT_MODEL = FALLBACK_DEFAULT_CONVERSATION_MODEL;
 
 let knownModelIds = new Set(FALLBACK_GROUPS.flatMap((group) => group.models.map((model) => model.id)));
@@ -122,6 +124,24 @@ export function saveStoredModel(modelId: string): void {
   }
 }
 
+export function loadStoredHarness(): Harness {
+  try {
+    const stored = localStorage.getItem(HARNESS_STORAGE_KEY);
+    if (stored === 'pi' || stored === 'claude-code') return stored;
+  } catch {
+    // Ignore
+  }
+  return 'claude-code';
+}
+
+export function saveStoredHarness(harness: Harness): void {
+  try {
+    localStorage.setItem(HARNESS_STORAGE_KEY, harness);
+  } catch {
+    // Ignore
+  }
+}
+
 function formatCost(costPer1M: number): string {
   if (costPer1M === 0) return 'FREE';
   if (costPer1M < 1) return `$${costPer1M.toFixed(2)}/1M`;
@@ -134,9 +154,12 @@ interface ModelPickerProps {
   value: string;
   onChange: (modelId: string, effortLevels: readonly string[]) => void;
   disabled?: boolean;
+  harness?: Harness;
+  onHarnessChange?: (harness: Harness) => void;
+  authMode?: AuthMode;
 }
 
-export function ModelPicker({ value, onChange, disabled = false }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, disabled = false, harness, onHarnessChange, authMode }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
   const ref = useRef<HTMLDivElement>(null);
@@ -238,8 +261,20 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
 
   const label = selectedModel?.label ?? value;
   const selectedWarning = costWarningLevel(selectedModel?.costPer1MTokens);
+  const sharedGroups: SharedModelGroup[] = groups.map((group) => ({
+    provider: group.provider,
+    label: group.label,
+    models: group.models.map((model) => ({
+      id: model.id,
+      label: model.label,
+      provider: model.provider,
+      costDisplay: model.costDisplay,
+      costPer1MTokens: model.costPer1MTokens,
+    })),
+  }));
 
   return (
+    <>
     <div ref={ref} className={styles.pickerContainer}>
       <button
         className={styles.pickerBtn}
@@ -289,5 +324,15 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
         </div>
       )}
     </div>
+    {harness && onHarnessChange && (
+      <HarnessSelect
+        value={harness}
+        onChange={onHarnessChange}
+        modelId={value}
+        groups={sharedGroups}
+        authMode={authMode}
+      />
+    )}
+    </>
   );
 }

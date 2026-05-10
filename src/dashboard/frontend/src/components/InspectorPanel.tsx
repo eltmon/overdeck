@@ -45,6 +45,7 @@ import { PHASE_CHIP_COLORS, PHASE_LABELS, type PipelinePhase } from './inspector
 import { SwitchModelModal } from './SwitchModelModal';
 import { useSwitchModel } from '../hooks/useSwitchModel';
 import { SensitiveText } from './SensitiveText';
+import type { Harness } from './shared/ModelPicker';
 import { useActivityQuery, usePrQuery } from './CommandDeck/ZoneCOverviewTabs/queries';
 import { getWorkSessionLabel, isAgentSessionAttachable } from '../lib/swarmSlots';
 
@@ -122,6 +123,7 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
   const [containersStarting, setContainersStarting] = useState(false);
   const [containersStartedAt, setContainersStartedAt] = useState(0);
   const [agentLaunchState, setAgentLaunchState] = useState<'starting' | 'resuming' | null>(null);
+  const [agentLaunchHarness, setAgentLaunchHarness] = useState<Harness>('claude-code');
   const [showSwitchModel, setShowSwitchModel] = useState(false);
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null);
   const [containerMenu, setContainerMenu] = useState<{
@@ -276,7 +278,7 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
         return res.json();
       }
 
-      const requestBody = { issueId, projectId: issue?.project?.id, message: message || undefined };
+      const requestBody = { issueId, projectId: issue?.project?.id, message: message || undefined, harness: agentLaunchHarness };
       let lastRequestBody: Record<string, unknown> = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
@@ -1260,6 +1262,8 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
           onSwitchModel={() => setShowSwitchModel(true)}
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
+          launchHarness={agentLaunchHarness}
+          onLaunchHarnessChange={setAgentLaunchHarness}
           isFeature={issue?.artifactType?.includes('PortfolioItem') ?? false}
           issueStatus={issue?.status}
           onPlan={() => setPlanDialogIssue(issue ?? null)}

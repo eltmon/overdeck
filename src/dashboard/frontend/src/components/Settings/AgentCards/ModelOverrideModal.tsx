@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { WorkTypeId, ModelId, Harness } from '../types';
 import { CostWarningBadge, costWarningLevel } from '../../shared/costWarning';
+import { canUsePickerHarness } from '../../shared/ModelPicker';
+import type { AuthMode } from '../../shared/ModelPicker';
 
 // Model capabilities that can be matched to work types
 export type Capability = 'reasoning' | 'code' | 'vision' | 'fast' | 'cost-efficient' | 'large-context' | 'complex-math' | 'efficiency' | 'agentic';
@@ -242,6 +244,7 @@ export function ModelOverrideModal({
 }: ModelOverrideModalProps) {
   const [selectedModel, setSelectedModel] = useState<ModelId>(currentModel);
   const [selectedHarness, setSelectedHarness] = useState<Harness>(currentHarness);
+  const [anthropicAuthMode, setAnthropicAuthMode] = useState<AuthMode | undefined>(undefined);
   const [openRouterModels, setOpenRouterModels] = useState<ModelDef[]>([]);
 
   const workTypeName = WORK_TYPE_NAMES[workType] || workType;
@@ -324,13 +327,25 @@ export function ModelOverrideModal({
     return bestMatch?.id;
   }, [displayProviders, requiredCapabilities]);
 
+  useEffect(() => {
+    let canceled = false;
+    void fetch('/api/settings/claude-auth')
+      .then((r) => r.json())
+      .then((status: { loggedIn?: boolean; hasAnthropicApiKey?: boolean }) => {
+        if (!canceled) setAnthropicAuthMode(status.hasAnthropicApiKey ? 'api-key' : (status.loggedIn ? 'subscription' : undefined));
+      })
+      .catch(() => undefined);
+    return () => { canceled = true; };
+  }, []);
+
   const handleApply = () => {
     onApply(selectedModel, effectiveHarness);
     onClose();
   };
 
   const selectedProvider = displayProviders.find((provider) => provider.models.some((model) => model.id === selectedModel))?.key;
-  const piBlocked = selectedProvider === 'anthropic';
+  const piDecision = canUsePickerHarness('pi', selectedProvider, selectedProvider === 'anthropic' ? anthropicAuthMode : undefined);
+  const piBlocked = !piDecision.allowed;
   const effectiveHarness = piBlocked && selectedHarness === 'pi' ? 'claude-code' : selectedHarness;
   const hasChanges = selectedModel !== currentModel || effectiveHarness !== currentHarness;
 
@@ -373,7 +388,7 @@ export function ModelOverrideModal({
             <option value="pi" disabled={piBlocked}>Pi RPC{piBlocked ? ' — unavailable for Anthropic subscription' : ''}</option>
           </select>
           {piBlocked && selectedHarness === 'pi' && (
-            <p className="text-xs text-warning mt-1">Pi cannot run Anthropic models with Claude Code subscription auth; Claude Code will be used.</p>
+            <p className="text-xs text-warning mt-1">{piDecision.reason ?? 'Pi is unavailable for this model/auth combination; Claude Code will be used.'}</p>
           )}
         </div>
 

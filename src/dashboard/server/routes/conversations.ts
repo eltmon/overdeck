@@ -50,6 +50,7 @@ import {
   updateConversationTitle,
   updateConversationCost,
   setConversationModel,
+  setConversationHarness,
   backfillConversationModel,
   archiveConversation,
   unarchiveConversation,
@@ -76,7 +77,10 @@ import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
   getProviderEnvForModel,
+  getProviderAuthMode,
 } from '../../../lib/agents.js';
+import { canUseHarness } from '../../../lib/harness-policy.js';
+import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import {
   parseConversationMessages,
@@ -117,6 +121,13 @@ const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
+
+async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
+  const harness: RuntimeName = requested === 'pi' || requested === 'claude-code' ? requested : 'claude-code';
+  if (!model) return harness;
+  const decision = canUseHarness(harness, model, await getProviderAuthMode(model));
+  return decision.allowed ? harness : 'claude-code';
+}
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 
@@ -659,6 +670,7 @@ async function spawnConversationSession(
   effort?: string,
   issueId?: string,
   resume = false,
+  harness: RuntimeName = 'claude-code',
 ): Promise<void> {
   const stateDir = join(homedir(), '.panopticon', 'conversations', tmuxSession);
   await mkdir(stateDir, { recursive: true });
@@ -673,7 +685,7 @@ async function spawnConversationSession(
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
     }
-    runtimeCommand = await getAgentRuntimeBaseCommand(model);
+    runtimeCommand = await getAgentRuntimeBaseCommand(model, undefined, undefined, harness);
     // Defensive permission-flag injection.
     // getAgentRuntimeBaseCommand already emits the correct flags for every code path
     // (direct/CLIProxy/--agent/claudish), so in a healthy build the appends below are
@@ -1000,6 +1012,7 @@ const postConversationRoute = HttpRouter.add(
         const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
         const model = typeof body['model'] === 'string' ? body['model'].trim() : undefined;
         const effort = typeof body['effort'] === 'string' ? body['effort'].trim() : undefined;
+        const harness = await resolveAllowedHarness(body['harness'], model);
         const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
         const projectKey = typeof body['projectKey'] === 'string' ? body['projectKey'].trim() : undefined;
         const applyProviderOverride = body['applyProviderOverride'] === true;
@@ -1041,7 +1054,7 @@ const postConversationRoute = HttpRouter.add(
         console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'} cwd=${cwd}`);
 
         // Spawn tmux session with model + effort + deterministic session ID
-        await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId);
+        await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
         console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
 
         // Wait for Claude Code to reach its prompt before returning.
@@ -1072,6 +1085,7 @@ const postConversationRoute = HttpRouter.add(
           titleSeed: title,
           model,
           effort,
+          harness,
         });
 
         // Generate AI title in background (non-blocking)
@@ -1179,6 +1193,7 @@ const postConversationResumeRoute = HttpRouter.add(
         // Resume must never mutate the JSONL — `claude --resume` loads the full raw
         // transcript. Auto-compaction here would fork the conversation (PAN-802).
         const oldSessionId = conv.claudeSessionId;
+        const harness = await resolveAllowedHarness(body['harness'] ?? conv.harness, model ?? conv.model);
         const modelChanged = !!model && model !== conv.model;
 
         if (!(await validateCwdContainment(conv.cwd))) {
@@ -1190,15 +1205,16 @@ const postConversationResumeRoute = HttpRouter.add(
           return jsonResponse({ error: 'Invalid model' }, { status: 400 });
         }
 
-        // Persist the new model so the dropdown reflects what we're respawning with.
+        // Persist the new model/harness so the dropdown reflects what we're respawning with.
         if (model && modelChanged) setConversationModel(name, model);
+        setConversationHarness(name, harness);
 
-        await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId);
+        await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId, harness);
         await waitForTmuxSession(conv.tmuxSession);
         await waitForClaudePrompt(conv.tmuxSession, 30000).catch(() => false);
 
         markConversationActive(name);
-        return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, reattached: false, sessionAlive: true });
+        return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] resume conversation failed:', msg);
@@ -1235,6 +1251,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const model = typeof body['model'] === 'string' && body['model'].trim()
           ? body['model'].trim()
           : (conv.model ?? undefined);
+        const harness = await resolveAllowedHarness(body['harness'], model);
 
         // Always kill the existing session first (if alive) so the model change takes effect
         await killSessionAsync(conv.tmuxSession).catch(() => {});
@@ -1248,8 +1265,9 @@ const postConversationSwitchModelRoute = HttpRouter.add(
           return jsonResponse({ error: 'Invalid model' }, { status: 400 });
         }
 
-        // Persist the new model
+        // Persist the new model and harness
         if (model) setConversationModel(name, model);
+        setConversationHarness(name, harness);
 
         // Extract the session UUID from the existing session file path
         const oldSessionId = conv.claudeSessionId;
@@ -1265,12 +1283,12 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         // fails with "No conversation found" if the file is missing (e.g., first
         // model switch on a fresh conversation or cross-provider switch).
         const canResume = !!oldSessionId && !!sessionFile && existsSync(sessionFile);
-        await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, canResume);
+        await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, canResume, harness);
         await waitForTmuxSession(tmuxSession);
         await waitForClaudePrompt(tmuxSession, 30000).catch(() => false);
 
         markConversationActive(name);
-        return jsonResponse({ ...conv, status: 'active', model, reattached: false, sessionAlive: true });
+        return jsonResponse({ ...conv, status: 'active', model, harness, reattached: false, sessionAlive: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] switch model failed:', msg);
@@ -1836,6 +1854,7 @@ async function runForkPipeline(
       conv.effort ?? undefined,
       conv.issueId ?? undefined,
       true, // resume — load the copied JSONL history
+      conv.harness ?? 'claude-code',
     );
     await waitForTmuxSession(conv.tmuxSession);
 
@@ -1861,6 +1880,8 @@ async function runForkPipeline(
     conv.model ?? undefined,
     conv.effort ?? undefined,
     conv.issueId ?? undefined,
+    false,
+    conv.harness ?? 'claude-code',
   );
   await waitForTmuxSession(conv.tmuxSession);
 
@@ -1938,6 +1959,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const newName = `${timestamp}-${suffix}`;
         const newTmux = `conv-${newName}`;
         const launchModel = model || conv.model;
+        const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
         const defaultTitle = plain
           ? `Fork: ${conv.title || conv.name}`
           : `Summary Fork: ${conv.title || conv.name}`;
@@ -1955,6 +1977,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           claudeSessionId: sessionId,
           model: launchModel ?? undefined,
           effort: conv.effort ?? undefined,
+          harness: launchHarness,
           forkStatus: plain ? 'spawning' : 'summarizing',
         });
         markConversationActive(newConv.name);

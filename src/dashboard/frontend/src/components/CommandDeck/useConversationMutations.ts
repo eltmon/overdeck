@@ -24,13 +24,14 @@ async function unfavoriteConversation(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to unfavorite conversation');
 }
 
-async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; plain?: boolean; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string }): Promise<void> {
+async function summaryForkConversation(opts: { conv: Conversation; model: string; summaryModel: string; harness?: 'claude-code' | 'pi'; plain?: boolean; localSummaryOnly?: boolean; includeThinkingInSummary?: boolean; title?: string }): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(opts.conv.name)}/summary-fork`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: opts.model,
       summaryModel: opts.summaryModel,
+      harness: opts.harness,
       plain: opts.plain,
       localSummaryOnly: opts.localSummaryOnly,
       includeThinkingInSummary: opts.includeThinkingInSummary,
@@ -49,7 +50,7 @@ export interface ConversationMutations {
   rename: (opts: { name: string; title: string }) => void;
   toggleFavorite: (opts: { name: string; favorited: boolean }) => void;
   openForkModal: (conv: Conversation) => void;
-  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, plainFork: boolean, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string) => void;
+  submitFork: (conv: Conversation, launchModel: string, summaryModel: string, plainFork: boolean, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi') => void;
   forkTarget: Conversation | null;
   closeForkModal: () => void;
   isForkPending: boolean;
@@ -135,11 +136,12 @@ export function useConversationMutations(
     }
   }, [summaryForkMutation.isPending]);
 
-  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, plainFork: boolean, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string) => {
+  const submitFork = useCallback((conv: Conversation, launchModel: string, summaryModel: string, plainFork: boolean, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'pi') => {
     summaryForkMutation.mutate({
       conv,
       model: launchModel,
       summaryModel,
+      harness: launchHarness,
       plain: plainFork,
       localSummaryOnly,
       includeThinkingInSummary,

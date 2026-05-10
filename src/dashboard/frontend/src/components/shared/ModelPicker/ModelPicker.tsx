@@ -79,15 +79,16 @@ export function formatCost(costPer1M: number): string {
   return `$${Math.round(costPer1M)}/1M`;
 }
 
-export function useAvailableModels(): { groups: ModelGroup[]; compactionModel: string; defaultModel: string } {
+export function useAvailableModels(): { groups: ModelGroup[]; compactionModel: string; defaultModel: string; authModes: Partial<Record<string, AuthMode>> } {
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
   const [compactionModel, setCompactionModel] = useState(FALLBACK_COMPACTION_MODEL);
+  const [authModes, setAuthModes] = useState<Partial<Record<string, AuthMode>>>({});
 
   useEffect(() => {
     async function load() {
       try {
         await ensureDefaultConversationModel();
-        const [availRes, orRes, settingsRes] = await Promise.allSettled([
+        const [availRes, orRes, settingsRes, claudeAuthRes] = await Promise.allSettled([
           fetch('/api/settings/available-models').then((r) => r.json()) as Promise<
             Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>
           >,
@@ -98,10 +99,21 @@ export function useAvailableModels(): { groups: ModelGroup[]; compactionModel: s
           fetch('/api/settings').then((r) => r.json()) as Promise<{
             conversations?: { compaction_model?: string };
           }>,
+          fetch('/api/settings/claude-auth').then((r) => r.json()) as Promise<{
+            loggedIn?: boolean;
+            hasAnthropicApiKey?: boolean;
+          }>,
         ]);
 
         if (settingsRes.status === 'fulfilled' && settingsRes.value?.conversations?.compaction_model) {
           setCompactionModel(settingsRes.value.conversations.compaction_model);
+        }
+        if (claudeAuthRes.status === 'fulfilled') {
+          setAuthModes({
+            anthropic: claudeAuthRes.value.hasAnthropicApiKey
+              ? 'api-key'
+              : (claudeAuthRes.value.loggedIn ? 'subscription' : undefined),
+          });
         }
 
         const avail = availRes.status === 'fulfilled' ? availRes.value : {};
@@ -149,7 +161,7 @@ export function useAvailableModels(): { groups: ModelGroup[]; compactionModel: s
   }, []);
 
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
-  return { groups, compactionModel, defaultModel };
+  return { groups, compactionModel, defaultModel, authModes };
 }
 
 export function ModelSelect({

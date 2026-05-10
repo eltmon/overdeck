@@ -8,7 +8,8 @@ import {
 } from '../chat/defaultConversationModel';
 import styles from './styles/command-deck.module.css';
 import pickerStyles from '../shared/ModelPicker/ModelPicker.module.css';
-import { ModelSelect, useAvailableModels } from '../shared/ModelPicker';
+import { ModelHarnessPicker, ModelSelect, useAvailableModels } from '../shared/ModelPicker';
+import type { Harness } from '../shared/ModelPicker';
 import type { Conversation } from './ConversationList';
 
 const FORK_HELP_CONTENT = `## Fork Modes
@@ -105,15 +106,17 @@ interface ForkModalProps {
     localSummaryOnly: boolean,
     includeThinkingInSummary: boolean,
     title?: string,
+    launchHarness?: Harness,
   ) => void;
   onClose: () => void;
   isPending: boolean;
 }
 
 export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkModalProps) {
-  const { groups, compactionModel } = useAvailableModels();
+  const { groups, compactionModel, authModes } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
+  const [launchHarness, setLaunchHarness] = useState<Harness>(conversation.harness || 'claude-code');
   const [summaryModel, setSummaryModel] = useState(compactionModel);
   const [plainFork, setPlainFork] = useState(false);
   const [localSummaryOnly, setLocalSummaryOnly] = useState(false);
@@ -261,11 +264,14 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
               </>
             )}
 
-            <ModelSelect
-              value={launchModel}
-              onChange={setLaunchModel}
+            <ModelHarnessPicker
+              model={launchModel}
+              harness={launchHarness}
+              onModelChange={setLaunchModel}
+              onHarnessChange={setLaunchHarness}
               groups={groups}
-              label="Launch model"
+              authMode={authModes.anthropic}
+              modelLabel="Launch model"
             />
             <span className={pickerStyles.fieldHint}>
               The model the new forked conversation will use
@@ -280,7 +286,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
           <button
             className={styles.forkConfirmBtn}
             disabled={isPending}
-            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, forkTitle.trim() || undefined)}
+            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, forkTitle.trim() || undefined, launchHarness)}
           >
             <GitBranchPlus size={13} />
             {isPending ? 'Forking...' : 'Fork Conversation'}

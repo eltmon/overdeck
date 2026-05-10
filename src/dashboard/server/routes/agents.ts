@@ -2042,9 +2042,7 @@ const postAgentsRoute = HttpRouter.add(
       agentType: (body as any).agentType,
       difficulty: (body as any).difficulty,
     });
-    const providerAuthMode = getProviderForModel(spawnModel).name === 'openai'
-      ? yield* Effect.promise(() => getProviderAuthMode(spawnModel))
-      : undefined;
+    const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
       const codexAuth = yield* Effect.promise(() => checkCodexAuthStatus());
       if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
@@ -2607,8 +2605,21 @@ const postAgentsRoute = HttpRouter.add(
       phase,
       workspacePath,
     }));
-    const requestedHarness = ((body as any).harness === 'pi' || (body as any).harness === 'claude-code') ? (body as any).harness : 'claude-code';
-    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel, '--harness', requestedHarness], workspacePath));
+    const bodyHarness = (body as any).harness;
+    const workType = ((body as any).workType || `issue-agent:${phase}`) as string;
+    const savedHarness = yield* Effect.promise(async () => {
+      const { loadConfig: loadPanConfig } = await import('../../../lib/config-yaml.js');
+      return loadPanConfig().config.harnessOverrides[workType as any];
+    });
+    const requestedHarness = (bodyHarness === 'pi' || bodyHarness === 'claude-code')
+      ? bodyHarness
+      : (savedHarness === 'pi' || savedHarness === 'claude-code' ? savedHarness : 'claude-code');
+    const harnessDecision = yield* Effect.promise(async () => {
+      const { canUseHarness } = await import('../../../lib/harness-policy.js');
+      return canUseHarness(requestedHarness, spawnModel, await getProviderAuthMode(spawnModel));
+    });
+    const effectiveHarness = harnessDecision.allowed ? requestedHarness : 'claude-code';
+    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel, '--harness', effectiveHarness], workspacePath));
 
     // Write early state.json so the dashboard immediately shows agent-<id> as the
     // active agent. Without this there's a race window between spawnPanCommand returning
@@ -2620,8 +2631,8 @@ const postAgentsRoute = HttpRouter.add(
     yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
       id: earlyAgentId,
       issueId,
-      runtime: requestedHarness,
-      harness: requestedHarness,
+      runtime: effectiveHarness,
+      harness: effectiveHarness,
       model: 'pending-work-spawn',
       status: 'starting',
       startedAt: new Date().toISOString(),

@@ -24,6 +24,7 @@ import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
 import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
+import { getClaudeAuthStatus } from './claude-auth.js';
 import { bridgeGeminiAuthToCliproxyAsync, getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
@@ -75,6 +76,12 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
 
 export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
   const provider = getProviderForModel(model);
+  if (provider.name === 'anthropic') {
+    const authStatus = await getClaudeAuthStatus();
+    if (authStatus.hasAnthropicApiKey) return 'api-key';
+    return authStatus.loggedIn ? 'subscription' : undefined;
+  }
+
   if (provider.name === 'openai') {
     const { config } = loadYamlConfig();
     const authStatus = await getOpenAIAuthStatus();

@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-09T21:17:00.000Z",
+  "updated": "2026-05-09T20:20:00.000Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "baba46879",
-    "dirty": false
+    "sha": "31437b2ea",
+    "dirty": true
   },
   "decisions": [
     {
@@ -28,22 +28,32 @@
       "id": "D4",
       "summary": "Fixed CLI build prompt-copy root cause after pan inspect could not find dist/cli/prompts/inspect-agent.md; build-cli now copies prompt templates to both dist/prompts and dist/cli/prompts.",
       "recordedAt": "2026-05-09T21:14:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Review-response fixes now derive Anthropic auth mode from /api/settings/claude-auth on picker surfaces and from getClaudeAuthStatus() on backend spawn paths, so Pi is blocked only for Anthropic subscription auth and allowed for Anthropic API-key auth.",
+      "recordedAt": "2026-05-09T20:20:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Conversation and fork flows now persist the selected harness in SQLite and respawn via the selected runtime instead of silently falling back to Claude Code.",
+      "recordedAt": "2026-05-09T20:20:00.000Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "Frontend ToS gating currently treats Anthropic picker contexts as subscription-auth when auth mode is not exposed to the client.",
-      "mitigation": "The backend pan start and harness-policy gate still enforce the single source of truth; future UI can replace the conservative assumption with an auth-mode endpoint."
+      "summary": "Frontend tests that mock chat ModelPicker or fetch strictly need to include the new harness helpers and /api/settings/claude-auth call.",
+      "mitigation": "Updated affected CommandDeck and ComposerFooter tests; full npm test now passes."
     }
   ],
   "resumePoint": {
-    "description": "Implementation complete: bead workspace-xgc6 closed, inspection passed, typecheck/lint/npm test passed. Ready to push and pan done.",
+    "description": "Review-response implementation complete and verified: typecheck, lint, targeted tests, and full npm test pass. Next step is commit all changes and run /rebase-and-submit for PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
       "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
-      "src/dashboard/frontend/src/components/PlanDialog.tsx",
-      "src/lib/settings-api.ts"
+      "src/dashboard/server/routes/conversations.ts",
+      "src/lib/__tests__/settings-api.test.ts"
     ]
   },
   "beadsMapping": {
@@ -73,6 +83,12 @@
       "timestamp": "2026-05-09T21:17:00.000Z",
       "reason": "inspection-passed",
       "note": "Inspection passed for workspace-xgc6. Reran npm test after build-cli fix; 375 test files / 4570 tests passed.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-09T20:20:00.000Z",
+      "reason": "review-response-verified",
+      "note": "Addressed review blockers: added missing harness selectors and launch payloads for conversation/fork/fresh agent flows, persisted conversation harness, applied canonical Pi policy in planning/work/conversation spawns, restored PAN-1055 vBRIEF, and added Vitest coverage for Pi ToS gating plus settings harness round-trip. npm run typecheck, npm run lint, and npm test passed (377 files / 4584 tests).",
       "agentModel": "Claude Opus 4.7"
     }
   ]
