@@ -306,6 +306,11 @@ function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
 
   if (config.spawnMode === 'conversation') {
+    if (config.harness === 'pi') {
+      return buildPiCommand(config, false);
+    }
+
+
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
       const args: string[] = [];
@@ -436,8 +441,14 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
   }
 
   // stdin redirection from the per-agent fifo. Pi reads JSONL RPC commands
-  // from stdin in --mode rpc.
-  const stdinRedirect = `< ${shellQuote(config.piFifoPath)}`;
+  // from stdin in --mode rpc. Use bash read-write redirection (`<>`) instead
+  // of read-only (`<`): opening a FIFO read-only blocks until a writer is
+  // present, which means Pi could never exec and never write `ready.json`
+  // before any external writer attached, deadlocking conversation/fork
+  // launches. `<>` opens the FIFO without blocking, lets Pi start, emit its
+  // ready marker, and then read JSONL commands as the dashboard writer
+  // pushes them.
+  const stdinRedirect = `<> ${shellQuote(config.piFifoPath)}`;
   const cmd = `${tokens.join(' ')} ${stdinRedirect}`.replace(/\s+/g, ' ').trim();
 
   return [useExec ? `exec ${cmd}` : cmd];

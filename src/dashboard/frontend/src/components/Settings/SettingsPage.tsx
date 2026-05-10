@@ -108,6 +108,7 @@ export function buildMiniMaxFormData(
     models: {
       providers: { ...miniMaxDefaults.models.providers },
       overrides: { ...miniMaxDefaults.models.overrides },
+      harness_overrides: { ...(formData?.models.harness_overrides || {}) },
       gemini_thinking_level: formData?.models.gemini_thinking_level,
     },
     api_keys: { ...(formData?.api_keys || {}) },
@@ -254,6 +255,7 @@ export function SettingsPage() {
   const saveMutation = useMutation({
     mutationFn: saveSettings,
     onSuccess: (response) => {
+      invalidateAvailableModelsCache();
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
 

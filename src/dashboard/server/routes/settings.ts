@@ -27,10 +27,11 @@ import {
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
-import { PROVIDERS } from '../../../lib/providers.js';
+import { getProviderForModel, PROVIDERS } from '../../../lib/providers.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
-import { getProviderEnvForModel } from '../../../lib/agents.js';
+import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
+import { canUseHarness } from '../../../lib/harness-policy.js';
 import {
   detectProviderEnvConflicts,
 } from '../../../lib/claude-settings-overlay.js';
@@ -671,9 +672,53 @@ const postOpenRouterTestKeyRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/settings/provider-env-conflicts ─────────────────────────
+// ─── Route: GET /api/settings/harness-policy ────────────────────────────────
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
+const MAX_HARNESS_POLICY_MODELS = 250;
+const MAX_HARNESS_POLICY_MODEL_LENGTH = 200;
+
+const getHarnessPolicyRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/harness-policy',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(async () => {
+      const url = new URL(request.url, 'http://localhost');
+      const models = (url.searchParams.get('models') ?? '')
+        .split(',')
+        .map((model) => model.trim())
+        .filter(Boolean);
+
+      if (
+        models.length === 0
+        || models.length > MAX_HARNESS_POLICY_MODELS
+        || models.some((model) => model.length > MAX_HARNESS_POLICY_MODEL_LENGTH || !SAFE_MODEL_PATTERN.test(model))
+      ) {
+        return jsonResponse({ error: 'Valid models parameter is required' }, { status: 400 });
+      }
+
+      const decisions: Record<string, Record<string, { allowed: boolean; reason?: string }>> = {};
+      const authModeByProvider = new Map<string, Awaited<ReturnType<typeof getProviderAuthMode>>>();
+      for (const model of Array.from(new Set(models))) {
+        const providerName = getProviderForModel(model).name;
+        let authMode = authModeByProvider.get(providerName);
+        if (!authModeByProvider.has(providerName)) {
+          authMode = await getProviderAuthMode(model);
+          authModeByProvider.set(providerName, authMode);
+        }
+        decisions[model] = {
+          'claude-code': canUseHarness('claude-code', model, authMode),
+          pi: canUseHarness('pi', model, authMode),
+        };
+      }
+      return jsonResponse({ decisions });
+    });
+  })),
+);
+
+// ─── Route: GET /api/settings/provider-env-conflicts ─────────────────────────
+
 
 const getProviderEnvConflictsRoute = HttpRouter.add(
   'GET',
@@ -716,6 +761,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   putOpenRouterFavoritesRoute,
   putOpenRouterApiKeyRoute,
   postOpenRouterTestKeyRoute,
+  getHarnessPolicyRoute,
   getProviderEnvConflictsRoute,
 );
 

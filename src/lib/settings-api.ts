@@ -23,6 +23,7 @@ import {
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
+import type { RuntimeName } from './runtimes/types.js';
 import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 
 /**

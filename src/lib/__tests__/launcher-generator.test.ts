@@ -586,17 +586,38 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(script).toMatch(/pi --mode rpc/);
     expect(script).toMatch(/--no-context-files/);
     expect(script).toMatch(/--extension '\/abs\/packages\/pi-extension\/dist\/index\.js'/);
-    // AC2: stdin redirected from the fifo.
-    expect(script).toMatch(/< '\/home\/u\/\.panopticon\/agents\/agent-pan-636\/rpc\.in'/);
+    // AC2: stdin redirected from the fifo via bash read-write redirection so
+    // opening the FIFO does not block before Pi can write its ready marker.
+    expect(script).toMatch(/<> '\/home\/u\/\.panopticon\/agents\/agent-pan-636\/rpc\.in'/);
+    // Defensive: read-only redirection would deadlock; assert it is NOT used.
+    expect(script).not.toMatch(/[^<]< '\/home\/u\/\.panopticon\/agents\/agent-pan-636\/rpc\.in'/);
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/prompt.txt')
-      exec pi --mode rpc --model anthropic/claude-sonnet-4-6 --session-dir '/home/u/.panopticon/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" < '/home/u/.panopticon/agents/agent-pan-636/rpc.in'
+      exec pi --mode rpc --model anthropic/claude-sonnet-4-6 --session-dir '/home/u/.panopticon/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" <> '/home/u/.panopticon/agents/agent-pan-636/rpc.in'
       "
     `);
+  });
+
+  it('uses non-deadlocking <> FIFO redirection so Pi can emit ready.json before any writer attaches (PAN-1055 regression)', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'work',
+      harness: 'pi',
+      model: 'anthropic/claude-sonnet-4-6',
+      piExtensionPath: '/abs/ext.js',
+      piFifoPath: '/tmp/agent-x/rpc.in',
+      piSessionDir: '/tmp/agent-x/sessions',
+    });
+    // Bash `< fifo` blocks until a writer opens the FIFO. That deadlocked Pi
+    // conversation/fork launches because Pi could not exec — and could not
+    // write ready.json — until something else opened the FIFO for write.
+    // Bash `<> fifo` opens the FIFO read/write and never blocks.
+    expect(script).toMatch(/<> '\/tmp\/agent-x\/rpc\.in'/);
+    expect(script).not.toMatch(/[^<]< '\/tmp\/agent-x\/rpc\.in'/);
   });
 
   it('appends --session for resumeSessionId on pi launchers', () => {

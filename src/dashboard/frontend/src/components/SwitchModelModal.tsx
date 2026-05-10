@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, RefreshCw, Loader2 } from 'lucide-react';
-import { ModelSelect, useAvailableModels } from './shared/ModelPicker';
+import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
 import { getFriendlyModelName } from './inspector/utils';
 
 interface SwitchModelModalProps {
@@ -10,25 +10,28 @@ interface SwitchModelModalProps {
   agentStatus: string;
   hasResumableSession: boolean;
   onClose: () => void;
-  onSwitch: (model: string, message?: string) => void;
+  currentHarness?: Harness | null;
+  onSwitch: (model: string, message?: string, harness?: Harness) => void;
   isPending: boolean;
 }
 
 export function SwitchModelModal({
   currentModel,
+  currentHarness,
   agentStatus,
   hasResumableSession,
   onClose,
   onSwitch,
   isPending,
 }: SwitchModelModalProps) {
-  const { groups } = useAvailableModels();
+  const { groups, harnessPolicy } = useAvailableModels();
   const [selectedModel, setSelectedModel] = useState(currentModel);
+  const [selectedHarness, setSelectedHarness] = useState<Harness>(currentHarness ?? 'claude-code');
   const [message, setMessage] = useState('');
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const isRunning = agentStatus !== 'stopped';
-  const isSameModel = selectedModel === currentModel;
+  const isSameSelection = selectedModel === currentModel && selectedHarness === (currentHarness ?? 'claude-code');
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -66,11 +69,14 @@ export function SwitchModelModal({
             Current: <span className="text-foreground font-medium">{getFriendlyModelName(currentModel)}</span>
           </div>
 
-          <ModelSelect
-            value={selectedModel}
-            onChange={setSelectedModel}
+          <ModelHarnessPicker
+            model={selectedModel}
+            harness={selectedHarness}
+            onModelChange={setSelectedModel}
+            onHarnessChange={setSelectedHarness}
             groups={groups}
-            label="New model"
+            harnessPolicy={harnessPolicy}
+            modelLabel="New model"
           />
 
           {isRunning && (
@@ -108,8 +114,8 @@ export function SwitchModelModal({
             Cancel
           </button>
           <button
-            onClick={() => onSwitch(selectedModel, message || undefined)}
-            disabled={isPending || isSameModel}
+            onClick={() => onSwitch(selectedModel, message || undefined, selectedHarness)}
+            disabled={isPending || isSameSelection}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
             data-testid="switch-model-confirm"
           >

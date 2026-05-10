@@ -26,8 +26,9 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderExportsForModel, roleAgentDefinitionPath } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel, roleAgentDefinitionPath } from '../agents.js';
 import { loadConfig, resolveModel } from '../config-yaml.js';
+import { canUseHarness } from '../harness-policy.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
@@ -448,7 +449,10 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
     }
     const planningModel = modelOverride || settingsModel;
-    console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource})`);
+    const requestedHarness = opts.harness ?? 'claude-code';
+    const harnessDecision = canUseHarness(requestedHarness, planningModel, await getProviderAuthMode(planningModel));
+    const effectiveHarness = harnessDecision.allowed ? requestedHarness : 'claude-code';
+    console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
     // Discover and copy PRD files to workspace
     const prdFiles = await discoverPrdFiles(workspacePath, issue.identifier);
@@ -500,7 +504,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // PAN-636: thread harness through so a planning kickoff with --harness pi
     // produces a `pi --mode rpc --model <id>` line and skips the --agent flag
     // (Pi has no agent-definition system).
-    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, roleAgentDefinitionPath('plan'), opts.harness ?? 'claude-code');
+    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, roleAgentDefinitionPath('plan'), effectiveHarness);
 
     const providerExports = await getProviderExportsForModel(planningModel);
 

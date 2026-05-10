@@ -17,6 +17,7 @@ import { ModelProvider } from './model-fallback.js';
 import { MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
 import type { Role } from './agents.js';
+import type { RuntimeName } from './runtimes/types.js';
 export type { SubscriptionPlan, AuthMode };
 
 /**

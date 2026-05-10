@@ -147,6 +147,8 @@ vi.mock('../chat/ModelPicker', () => ({
   ),
   loadStoredModel: () => 'claude-sonnet',
   saveStoredModel: () => {},
+  loadStoredHarness: () => 'claude-code',
+  saveStoredHarness: () => {},
 }));
 
 vi.mock('../../lib/store', () => ({

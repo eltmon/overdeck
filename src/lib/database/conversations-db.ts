@@ -41,6 +41,8 @@ export interface Conversation {
   forkStatus: string | null;
   /** Error message when forkStatus='failed'. */
   forkError: string | null;
+  /** Coding harness used to spawn this conversation. */
+  harness: 'claude-code' | 'pi' | null;
 }
 
 // ─── Row mapper ───────────────────────────────────────────────────────────────
@@ -66,6 +68,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     effort: (row['effort'] as string | null) ?? null,
     forkStatus: (row['fork_status'] as string | null) ?? null,
     forkError: (row['fork_error'] as string | null) ?? null,
+    harness: (row['harness'] === 'pi' || row['harness'] === 'claude-code') ? row['harness'] : null,
   };
 }
 
@@ -76,7 +79,7 @@ export function listConversations(options?: { limit?: number; offset?: number })
   let sql = `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error
+              fork_status, fork_error, harness
        FROM conversations
        WHERE archived_at IS NULL
        ORDER BY created_at DESC`;
@@ -100,7 +103,7 @@ export function listActiveConversations(): Conversation[] {
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error
+              fork_status, fork_error, harness
        FROM conversations
        WHERE archived_at IS NULL AND status = 'active'
        ORDER BY created_at DESC`,
@@ -116,7 +119,7 @@ export function getConversationByName(name: string): Conversation | null {
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error
+              fork_status, fork_error, harness
        FROM conversations
        WHERE name = ?`,
     )
@@ -131,7 +134,7 @@ export function getConversationById(id: number): Conversation | null {
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error
+              fork_status, fork_error, harness
        FROM conversations
        WHERE id = ?`,
     )
@@ -146,7 +149,7 @@ export function getConversationByClaudeSessionId(claudeSessionId: string): Conve
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error
+              fork_status, fork_error, harness
        FROM conversations
        WHERE claude_session_id = ?`,
     )
@@ -161,7 +164,7 @@ export function listArchivedConversations(): Conversation[] {
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error
+              fork_status, fork_error, harness
        FROM conversations
        WHERE archived_at IS NOT NULL
        ORDER BY archived_at DESC, created_at DESC`,
@@ -194,13 +197,14 @@ export function createConversation(opts: {
   model?: string;
   effort?: string;
   forkStatus?: string;
+  harness?: 'claude-code' | 'pi';
 }): Conversation {
   const db = getDatabase();
   const now = new Date().toISOString();
   const result = db
     .prepare(
-      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_source, title_seed, model, effort, fork_status)
-       VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_source, title_seed, model, effort, fork_status, harness)
+       VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       opts.name,
@@ -215,13 +219,14 @@ export function createConversation(opts: {
       opts.model ?? null,
       opts.effort ?? null,
       opts.forkStatus ?? null,
+      opts.harness ?? null,
     );
   const conv = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error
+              fork_status, fork_error, harness
        FROM conversations WHERE id = ?`,
     )
     .get(result.lastInsertRowid) as Record<string, unknown>;
@@ -301,6 +306,13 @@ export function setConversationModel(name: string, model: string): void {
   db.prepare(
     `UPDATE conversations SET model = ? WHERE name = ?`,
   ).run(model, name);
+}
+
+export function setConversationHarness(name: string, harness: 'claude-code' | 'pi'): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET harness = ? WHERE name = ?`,
+  ).run(harness, name);
 }
 
 /** Backfill the model for a conversation only when currently NULL. */

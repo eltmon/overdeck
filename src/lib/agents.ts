@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
-import { readFile, readdir, writeFile as writeFileAsync, mkdir as mkdirAsync } from 'fs/promises';
+import { mkdir, readFile, readdir, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync } from 'fs/promises';
 import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
@@ -21,6 +21,7 @@ import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
 import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
+import { getClaudeAuthStatus } from './claude-auth.js';
 import { bridgeGeminiAuthToCliproxyAsync, getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
@@ -30,6 +31,9 @@ import { generateLauncherScript } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge-token.js';
+import { canUseHarness } from './harness-policy.js';
+import type { RuntimeName } from './runtimes/types.js';
+import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtimes/pi-fifo.js';
 
 const execAsync = promisify(exec);
 
@@ -72,8 +76,71 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
   return false;
 }
 
+async function getPiLauncherFields(agentId: string): Promise<{
+  harness: 'pi';
+  piExtensionPath: string;
+  piFifoPath: string;
+  piSessionDir: string;
+}> {
+  const paths = piFifoPaths(agentId);
+  await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
+  return {
+    harness: 'pi',
+    piExtensionPath: resolve(process.cwd(), 'packages/pi-extension/dist/index.js'),
+    piFifoPath: await createPiFifo(agentId),
+    piSessionDir: paths.agentDir,
+  };
+}
+
+/**
+ * Wait for the Pi work-agent ready marker (`ready.json`) to appear.
+ * Pi does not produce the Claude SessionStart hook signal, so resume/restart
+ * paths must use this instead of `waitForReadySignal()`.
+ */
+async function waitForPiAgentReady(agentId: string, timeoutSec = 30): Promise<boolean> {
+  const { readyPath } = piFifoPaths(agentId);
+  const deadline = Date.now() + timeoutSec * 1000;
+  while (Date.now() < deadline) {
+    if (existsSync(readyPath)) return true;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
+}
+
+/**
+ * Deliver a prompt to a Pi work agent through the FIFO JSONL command protocol.
+ * Pi never reads tmux input — pasting prompts there is a no-op as far as the
+ * model is concerned. Throws if Pi never reached readiness within the timeout.
+ */
+async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 30): Promise<void> {
+  const ready = await waitForPiAgentReady(agentId, timeoutSec);
+  if (!ready) {
+    throw new Error(`Pi agent ${agentId} did not become ready within ${timeoutSec}s`);
+  }
+  try {
+    writePiCommand(agentId, { cmd: 'prompt', text: prompt });
+  } catch (err) {
+    if (err instanceof PiNotReady) {
+      throw new Error(`Pi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);
+    }
+    throw err;
+  }
+}
+
+async function resolveEffectiveHarness(harness: unknown, model: string): Promise<RuntimeName> {
+  const requested: RuntimeName = harness === 'pi' || harness === 'claude-code' ? harness : 'claude-code';
+  const decision = canUseHarness(requested, model, await getProviderAuthMode(model));
+  return decision.allowed ? requested : 'claude-code';
+}
+
 export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
   const provider = getProviderForModel(model);
+  if (provider.name === 'anthropic') {
+    const authStatus = await getClaudeAuthStatus();
+    if (authStatus.hasAnthropicApiKey) return 'api-key';
+    return authStatus.loggedIn ? 'subscription' : undefined;
+  }
+
   if (provider.name === 'openai') {
     const { config } = loadYamlConfig();
     const authStatus = await getOpenAIAuthStatus();
@@ -1461,6 +1528,13 @@ export async function buildAgentLaunchConfig(opts: {
   // tool permissions) if it always points at roles/work.md.
   const launchRole: Role = opts.isPlanning ? 'plan' : opts.role;
 
+  // PAN-1055: pi harness needs --session-dir + fifo redirect threaded into
+  // the launcher; getPiLauncherFields() resolves them from the agent state
+  // and they're spread into generateLauncherScript() below.
+  const piLauncherFields = opts.harness === 'pi'
+    ? await getPiLauncherFields(opts.agentId)
+    : {};
+
   if (opts.spawnMode === 'resume' && opts.resumeSessionId) {
     // Resume sessions adopt the role definition via --agent.
     // Permissions/model/tools/hooks come from roles/<role>.md frontmatter.
@@ -1488,10 +1562,16 @@ export async function buildAgentLaunchConfig(opts: {
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: `claude ${bypassFlag}--agent ${roleAgentDefinitionPath(launchRole)}`,
+      // PAN-1048 + PAN-1055: claude-code resumes load the role-specific
+      // frontmatter (roleAgentDefinitionPath); pi resumes route through
+      // getAgentRuntimeBaseCommand which short-circuits to the pi rpc form.
+      baseCommand: opts.harness === 'pi'
+        ? await getAgentRuntimeBaseCommand(model, opts.agentId, launchRole, 'pi')
+        : `claude ${bypassFlag}--agent ${roleAgentDefinitionPath(launchRole)}`,
       resumeSessionId: opts.resumeSessionId,
-      model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
-      extraArgs: `--name ${opts.agentId}`,
+      model: opts.harness === 'pi' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+      extraArgs: opts.harness === 'pi' ? undefined : `--name ${opts.agentId}`,
+      ...piLauncherFields,
     });
     return { launcherContent, providerEnv };
   }
@@ -1519,6 +1599,7 @@ export async function buildAgentLaunchConfig(opts: {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code'),
+    ...piLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
@@ -1823,7 +1904,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-  writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+  await writeFile(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=work-agent | model=${state.model} | source=agents.ts:spawnAgent | session=${agentId} | command="${claudeCmd}"`);
 
@@ -2460,6 +2541,8 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       agentState.model = opts.model;
       saveAgentState(agentState);
     }
+    const effectiveHarness = await resolveEffectiveHarness(agentState.harness, model);
+    agentState.harness = effectiveHarness;
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
       model,
@@ -2468,10 +2551,11 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       isPlanning: agentState.role === 'plan',
       spawnMode: 'resume',
       resumeSessionId: sessionId,
+      harness: effectiveHarness,
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
 
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
@@ -2496,14 +2580,25 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
 
     let messageDelivered = false;
-    // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
-    const ready = await waitForReadySignal(normalizedId, 30);
-
-    if (ready) {
-      await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue');
-      messageDelivered = true;
+    if (effectiveHarness === 'pi') {
+      // Pi does not fire the Claude SessionStart hook; wait for ready.json and
+      // deliver the auto-continue prompt through the FIFO JSONL protocol.
+      try {
+        await writePiAgentPrompt(normalizedId, effectiveMessage);
+        messageDelivered = true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[resumeAgent] Pi prompt delivery failed: ${msg}`);
+      }
     } else {
-      console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
+      // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
+      const ready = await waitForReadySignal(normalizedId, 30);
+      if (ready) {
+        await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue');
+        messageDelivered = true;
+      } else {
+        console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
+      }
     }
 
     const resumedAt = new Date().toISOString();
@@ -2575,9 +2670,11 @@ export async function restartAgent(
   await stopAgentAsync(normalizedId);
 
   const effectiveModel = newModel || agentState.model || 'claude-sonnet-4-6';
+  const effectiveHarness = await resolveEffectiveHarness(agentState.harness, effectiveModel);
   if (newModel && newModel !== agentState.model) {
     agentState.model = newModel;
   }
+  agentState.harness = effectiveHarness;
   agentState.status = 'starting';
   saveAgentState(agentState);
 
@@ -2590,10 +2687,11 @@ export async function restartAgent(
       workspace: agentState.workspace,
       role: agentState.role,
       isPlanning: agentState.role === 'plan',
+      harness: effectiveHarness,
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
 
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
@@ -2610,12 +2708,24 @@ export async function restartAgent(
     });
 
     const prompt = message || `You are resuming work on ${agentState.issueId}. Read .pan/continue.json for context and pick up where you left off.`;
-    const ready = await waitForReadySignal(normalizedId, 30);
-    if (ready) {
-      await new Promise(r => setTimeout(r, 500));
-      await sendKeysAsync(normalizedId, prompt);
+    if (effectiveHarness === 'pi') {
+      // Pi does not fire the Claude SessionStart hook and does not read tmux
+      // input — wait for ready.json and write the continue prompt through the
+      // FIFO JSONL protocol.
+      try {
+        await writePiAgentPrompt(normalizedId, prompt);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[restartAgent] Pi prompt delivery failed for ${normalizedId}: ${msg}`);
+      }
     } else {
-      console.error(`[restartAgent] Claude did not become ready within 30s for ${normalizedId}`);
+      const ready = await waitForReadySignal(normalizedId, 30);
+      if (ready) {
+        await new Promise(r => setTimeout(r, 500));
+        await sendKeysAsync(normalizedId, prompt);
+      } else {
+        console.error(`[restartAgent] Claude did not become ready within 30s for ${normalizedId}`);
+      }
     }
 
     markAgentRunning(agentState);
@@ -2734,7 +2844,49 @@ export async function recoverAgent(
   // resurrected as work agents.
   const recoveryRole: Role = state.role
     ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work');
-  const claudeCmd = `${await getRoleRuntimeBaseCommand(state.model, agentId, recoveryRole, state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code')
+    ? state.harness
+    : 'claude-code';
+
+  if (recoveryHarness === 'pi') {
+    // PAN-1055: Pi cannot consume the recovery prompt as a positional shell
+    // argument the way the Claude direct command path does — Pi reads JSONL
+    // commands from its FIFO. Build a real Pi launcher (extension path,
+    // --session-dir, FIFO redirect) via buildAgentLaunchConfig, then deliver
+    // the recovery prompt through the FIFO once Pi reports ready.
+    const { launcherContent, providerEnv: piProviderEnv } = await buildAgentLaunchConfig({
+      agentId: normalizedId,
+      model: state.model,
+      workspace: state.workspace,
+      role: recoveryRole,
+      isPlanning: recoveryRole === 'plan',
+      harness: 'pi',
+    });
+    const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
+    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
+    await createSessionAsync(normalizedId, state.workspace, `bash ${launcherScript}`, {
+      env: {
+        ...BLANKED_PROVIDER_ENV,
+        PANOPTICON_AGENT_ID: normalizedId,
+        PANOPTICON_ISSUE_ID: state.issueId || '',
+        PANOPTICON_SESSION_TYPE: recoveryRole,
+        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+        ...piProviderEnv,
+      },
+    });
+    try {
+      await writePiAgentPrompt(normalizedId, recoveryPrompt);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[recoverAgent] Pi recovery prompt delivery failed for ${normalizedId}: ${msg}`);
+    }
+    markAgentRunning(state);
+    saveAgentState(state);
+    logAgentLifecycle(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (pi)`);
+    return state;
+  }
+
+  const claudeCmd = `${await getRoleRuntimeBaseCommand(state.model, agentId, recoveryRole, recoveryHarness)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,

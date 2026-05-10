@@ -44,6 +44,12 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   clearReviewStatus: vi.fn(),
 }));
 
+vi.mock('@linear/sdk', () => ({
+  LinearClient: vi.fn().mockImplementation(() => ({
+    issues: vi.fn().mockResolvedValue({ nodes: [] }),
+  })),
+}));
+
 import { approve, closeOut, deepWipe, close, __testInternals } from '../../../../src/lib/lifecycle/workflows.js';
 import { AGENTS_DIR, PANOPTICON_HOME } from '../../../../src/lib/paths.js';
 
@@ -57,6 +63,8 @@ describe('workflows', () => {
     mkdirSync(PANOPTICON_HOME, { recursive: true });
 
     vi.clearAllMocks();
+    process.env.HOME = testDir;
+    delete process.env.LINEAR_API_KEY;
     mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
   });
 

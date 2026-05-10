@@ -82,6 +82,7 @@ export interface Agent {
   id: string;
   issueId?: string;
   runtime: string;
+  harness?: 'claude-code' | 'pi' | null;
   model: string;
   status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped' | 'starting' | 'running' | 'failed';
   error?: string;

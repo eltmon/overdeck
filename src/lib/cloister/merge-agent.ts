@@ -238,7 +238,7 @@ async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string,
     return { merged: false, reason: `${ref} still has unmerged changes` };
   }
 
-  return { merged: false, reason: `No merged branch or PR found for ${branchName}` };
+  return { merged: true, reason: `No live branch or open PR found for ${branchName}; assuming post-merge cleanup already removed the source ref` };
 }
 
 export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string, options?: { skipDeploy?: boolean }): Promise<void> {

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ApiSettingsConfig } from '../settings-api.js';
 
 const mockLoadConfig = vi.fn();
 const mockResolveModelId = vi.fn((modelId: string) => modelId);

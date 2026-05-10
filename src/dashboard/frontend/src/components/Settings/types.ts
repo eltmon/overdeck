@@ -4,6 +4,7 @@
 export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter';
 
 export type ModelId = string;
+export type Harness = 'claude-code' | 'pi';
 
 export interface ProvidersConfig {
   anthropic: boolean;
