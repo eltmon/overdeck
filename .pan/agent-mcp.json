@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "panopticon-bridge": {
+      "command": "bun",
+      "args": [
+        "run",
+        "/home/eltmon/Projects/panopticon-cli/dist/channels/panopticon-bridge.ts"
+      ],
+      "env": {
+        "PANOPTICON_AGENT_ID": "agent-pan-1055",
+        "PANOPTICON_HOME": "/home/eltmon/.panopticon"
+      }
+    }
+  }
+}
