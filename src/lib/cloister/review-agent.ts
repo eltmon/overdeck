@@ -1846,7 +1846,22 @@ export async function spawnReviewCoordinatorSession(opts: {
   // bash -lc does NOT inherit tmux's -c working directory — it starts in $HOME.
   // Prepend cd so the coordinator runs from the correct workspace.
   const wsEsc = opts.workspace.replace(/'/g, "'\"'\"'");
-  const command = `bash -lc 'cd "${wsEsc}" && set -o pipefail; ${panBin} review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; if [ "$status" -lt 2 ]; then exit "$status"; fi; printf "\\n[coordinator preserved after failed review exit %s at %s]\\n" "$status" "$(date -Is)" | tee -a "${logFile}"; printf "Inspect the log above, then re-request review from the dashboard or run: pan review request ${opts.issueId} -m \\\"Retry review\\\"\\n"; exec bash -li'`;
+  // EXIT trap: when the coordinator dies (clean exit, crash, or shell exit
+  // after the inspect-on-failure pause), reap orphaned reviewer/synthesis
+  // sessions for this issue. Without this, a coordinator that dies before
+  // dispatching its prompts leaves the 4 reviewer + 1 synthesis sessions
+  // sitting idle at empty Claude prompts forever — synthesis never runs
+  // because synthesis dispatch is gated on the coordinator (PAN-977 stuck
+  // 50min in this exact state). Match `specialist-*-<issueId>-review-*`
+  // and the legacy `review-<issueId>-*` naming, never the coordinator
+  // itself. Targets the panopticon tmux socket (-L panopticon).
+  const issueIdEsc = opts.issueId.replace(/'/g, "'\"'\"'");
+  const reapCmd = [
+    `for s in $(tmux -L panopticon list-sessions -F "#{session_name}" 2>/dev/null | grep -E "^(specialist-.*-${issueIdEsc}-review-|review-${issueIdEsc}-[0-9]+-)" | grep -v "^review-coordinator-"); do`,
+    `  tmux -L panopticon kill-session -t "$s" 2>/dev/null`,
+    `done`,
+  ].join('; ');
+  const command = `bash -lc 'cd "${wsEsc}" && set -o pipefail; trap '\\''${reapCmd}'\\'' EXIT; ${panBin} review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; if [ "$status" -lt 2 ]; then exit "$status"; fi; printf "\\n[coordinator preserved after failed review exit %s at %s]\\n" "$status" "$(date -Is)" | tee -a "${logFile}"; printf "Inspect the log above, then re-request review from the dashboard or run: pan review request ${opts.issueId} -m \\\"Retry review\\\"\\n"; exec bash -li'`;
   const env: Record<string, string> = {
     ...BLANKED_PROVIDER_ENV,
     PANOPTICON_AGENT_ID: '',
