@@ -39,7 +39,13 @@ export function useCodexAutoRetry() {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
-          retryPendingSpawn(pending.requestBody, queryClient);
+          if (pending.requestBody) {
+            retryPendingSpawn(pending.requestBody, queryClient);
+          } else {
+            clearPendingCodexSpawn();
+            toast.success('Codex re-authentication completed');
+            await refreshDashboardState(queryClient);
+          }
         }
       } catch {
         // Ignore polling errors; next tick will retry.
@@ -57,7 +63,7 @@ export function useCodexAutoRetry() {
   // Fallback: retry when auth status becomes valid without a re-auth session.
   useEffect(() => {
     const pending = getPendingCodexSpawn();
-    if (!pending || pending.reauthSessionName) return;
+    if (!pending?.requestBody || pending.reauthSessionName) return;
     if (authStatus?.status !== 'valid') return;
 
     retryPendingSpawn(pending.requestBody, queryClient);
