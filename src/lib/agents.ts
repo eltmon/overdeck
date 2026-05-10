@@ -539,6 +539,9 @@ export interface AgentState {
   costSoFar?: number;
   sessionId?: string; // For resuming sessions after handoff
 
+  // Work type system (PAN-118)
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
+  workType?: WorkTypeId; // Current work type ID
   preSpawnStashRef?: string;
   preSpawnStashMessage?: string;
   preSpawnBaselineHead?: string;
@@ -1465,6 +1468,12 @@ export interface SpawnOptions {
   model?: string;
   prompt?: string;
   role?: 'work';
+  difficulty?: ComplexityLevel;
+  agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
+
+  // Work type system (PAN-118)
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
+  workType?: WorkTypeId; // Explicit work type ID (overrides phase-based detection)
 
   // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
   // and the one-agent-per-issue uniqueness check is scoped to the slot.

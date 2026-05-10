@@ -7,10 +7,10 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
@@ -21,14 +21,14 @@ import { httpHandler } from './http-handler.js';
 import { getSystemHealthSnapshot, getResourceConfig } from '../services/system-health-service.js';
 import { evaluateSpawnGuardrails } from './agents.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { findPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
+import { findPlan, VBriefMergeConflictError } from '../../../lib/vbrief/io.js';
 import { readContinueStateAsync, writeContinueStateAsync, type ContinueState, type SwarmRuntime } from '../../../lib/vbrief/continue-state.js';
 import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, workspacePlanPath, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
 import type { VBriefDocument, VBriefItem } from '../../../lib/vbrief/types.js';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { listSessionNamesAsync, isPaneDeadAsync, killSessionAsync, listPaneValuesAsync } from '../../../lib/tmux.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ─── Swarm state persistence ────────────────────────────────────────────────
 
@@ -70,6 +70,37 @@ interface SwarmDispatchRequest {
   model?: string;
   maxSlots?: number;
   autoAdvance?: boolean;
+}
+
+const ISSUE_KEY_PATTERN = /^[A-Z][A-Z0-9]*-\d+$/;
+
+function canonicalIssueId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const canonical = value.trim().toUpperCase();
+  return ISSUE_KEY_PATTERN.test(canonical) ? canonical : null;
+}
+
+function assertPathInside(parent: string, child: string): void {
+  const rel = relative(parent, child);
+  if (rel.startsWith('..') || rel === '' || rel.includes(`..${'/'}`)) {
+    throw new Error(`Refusing path outside ${parent}: ${child}`);
+  }
+}
+
+async function readWorkspacePlanAsync(workspacePath: string): Promise<VBriefDocument | null> {
+  const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+  try {
+    const raw = await readFile(planPath, 'utf-8');
+    if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
+      throw new VBriefMergeConflictError(planPath);
+    }
+    const parsed = JSON.parse(raw);
+    if (parsed.vBRIEFInfo && parsed.plan) return parsed as VBriefDocument;
+    throw new Error(`Invalid vBRIEF format in ${planPath}`);
+  } catch (err: any) {
+    if (err?.code === 'ENOENT') return null;
+    throw err;
+  }
 }
 
 interface SwarmDispatchResponseBody {
@@ -139,6 +170,33 @@ async function saveRuntimeToContinue(workspacePath: string, issueId: string, run
   await writeContinueStateAsync(continueDir, issueId, { ...cont, swarmRuntime: runtime });
 }
 
+function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
+  const slots: SlotAssignment[] = runtime.slots.map(slot => ({
+    slot: slot.slotId,
+    itemId: slot.itemId,
+    itemTitle: slot.itemTitle,
+    sessionName: slot.sessionName,
+    workspace: slot.workspace,
+    status: slot.status === 'merged' ? 'merged' : slot.status === 'failed' ? 'failed' : 'running',
+    startedAt: slot.dispatchedAt,
+    completedAt: slot.mergedAt,
+  }));
+  return {
+    issueId: issueId.toUpperCase(),
+    currentWave: runtime.currentWave ?? 0,
+    totalWaves: runtime.totalWaves ?? 0,
+    model: runtime.model,
+    autoAdvance: runtime.autoAdvance,
+    autoAdvanceFailureCount: runtime.autoAdvanceFailureCount,
+    autoAdvanceRetryAfter: runtime.autoAdvanceRetryAfter,
+    lastAutoAdvanceError: runtime.lastAutoAdvanceError,
+    slots,
+    deferred: runtime.deferred,
+    createdAt: runtime.createdAt,
+    updatedAt: runtime.updatedAt,
+  };
+}
+
 function runtimeFromState(state: SwarmState, existing?: SwarmRuntime): SwarmRuntime {
   const now = new Date().toISOString();
   return {
@@ -153,6 +211,13 @@ function runtimeFromState(state: SwarmState, existing?: SwarmRuntime): SwarmRunt
       dispatchedAt: slot.startedAt,
       mergedAt: slot.completedAt,
     })),
+    currentWave: state.currentWave,
+    totalWaves: state.totalWaves,
+    autoAdvance: state.autoAdvance,
+    autoAdvanceFailureCount: state.autoAdvanceFailureCount,
+    autoAdvanceRetryAfter: state.autoAdvanceRetryAfter,
+    lastAutoAdvanceError: state.lastAutoAdvanceError,
+    deferred: state.deferred,
     synthesisOutputs: existing?.synthesisOutputs ?? {},
     createdAt: existing?.createdAt ?? state.createdAt ?? now,
     updatedAt: now,
@@ -207,7 +272,7 @@ async function persistSynthesisOutput(
   });
 }
 
-async function loadSwarmState(issueId: string): Promise<SwarmState | null> {
+async function loadLegacySwarmState(issueId: string): Promise<SwarmState | null> {
   const path = getSwarmStatePath(issueId);
   if (!existsSync(path)) return null;
   try {
@@ -216,6 +281,36 @@ async function loadSwarmState(issueId: string): Promise<SwarmState | null> {
   } catch {
     return null;
   }
+}
+
+async function loadSwarmState(issueId: string): Promise<SwarmState | null> {
+  const canonical = canonicalIssueId(issueId);
+  if (!canonical) return null;
+  const project = resolveProjectFromIssue(canonical);
+  if (project) {
+    const workspace = join(project.projectPath, 'workspaces', `feature-${canonical.toLowerCase()}`);
+    const runtime = (await loadWorkspaceContinue(workspace, canonical)).swarmRuntime;
+    const legacy = await loadLegacySwarmState(canonical);
+    const legacyPath = getSwarmStatePath(canonical);
+    const legacyMtime = legacy ? (await stat(legacyPath).catch(() => null))?.mtimeMs : undefined;
+    const runtimeUpdated = runtime ? Date.parse(runtime.updatedAt) : undefined;
+    if (runtime && (!legacy || (runtimeUpdated ?? 0) >= (legacyMtime ?? Date.parse(legacy.updatedAt)))) {
+      return stateFromRuntime(canonical, runtime);
+    }
+    if (legacy) {
+      await persistSwarmRuntime(workspace, legacy).catch(() => undefined);
+      return legacy;
+    }
+  }
+
+  // Backward-compatible one-time import from the PAN-970 sidecar. All writes after
+  // this point go through the continue vBRIEF runtime authority.
+  const legacy = await loadLegacySwarmState(canonical);
+  if (legacy && project) {
+    const workspace = join(project.projectPath, 'workspaces', `feature-${canonical.toLowerCase()}`);
+    await persistSwarmRuntime(workspace, legacy).catch(() => undefined);
+  }
+  return legacy;
 }
 
 async function saveSwarmState(state: SwarmState): Promise<void> {
@@ -364,11 +459,14 @@ async function refreshSwarmSlotStatuses(
 async function dispatchSwarmWave(
   request: SwarmDispatchRequest,
 ): Promise<{ status: number; body: SwarmDispatchResponseBody }> {
-  const { issueId, wave: requestedWave, model: requestedModel, maxSlots, autoAdvance } = request;
-  const issueLower = issueId.toLowerCase();
-  const issueUpper = issueId.toUpperCase();
+  const { wave: requestedWave, model: requestedModel, maxSlots, autoAdvance } = request;
+  const issueUpper = canonicalIssueId(request.issueId);
+  if (!issueUpper) {
+    return { status: 400, body: { error: 'issueId must be a tracker key like PAN-977.' } };
+  }
+  const issueLower = issueUpper.toLowerCase();
 
-  const project = resolveProjectFromIssue(issueId);
+  const project = resolveProjectFromIssue(issueUpper);
   if (!project) {
     return {
       status: 404,
@@ -376,7 +474,9 @@ async function dispatchSwarmWave(
     };
   }
 
-  const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueLower}`);
+  const workspacesDir = join(project.projectPath, 'workspaces');
+  const mainWorkspace = join(workspacesDir, `feature-${issueLower}`);
+  assertPathInside(workspacesDir, mainWorkspace);
   if (!existsSync(mainWorkspace)) {
     return {
       status: 404,
@@ -387,7 +487,7 @@ async function dispatchSwarmWave(
     };
   }
 
-  const doc = readWorkspacePlan(mainWorkspace);
+  let doc = await readWorkspacePlanAsync(mainWorkspace);
   if (!doc) {
     return {
       status: 422,
@@ -398,7 +498,7 @@ async function dispatchSwarmWave(
     };
   }
 
-  const annotatedDoc = deriveSynthesisMetadata(doc);
+  let annotatedDoc = deriveSynthesisMetadata(doc);
   const waves = groupItemsByWave(annotatedDoc);
   const existingState = await loadSwarmState(issueUpper);
   const continueState = await loadWorkspaceContinue(mainWorkspace, issueUpper);
@@ -414,13 +514,35 @@ async function dispatchSwarmWave(
     .filter(slot => slot.status === 'running')
     .map(slot => annotatedDoc.plan.items.find(item => item.id === slot.itemId))
     .filter((item): item is VBriefItem => Boolean(item));
-  const deferredReadyItems = existingState?.deferred?.length
+  let readyItems = existingState?.deferred?.length
     ? existingState.deferred
       .map(deferred => annotatedDoc.plan.items.find(item => item.id === deferred.itemId))
       .filter((item): item is VBriefItem => Boolean(item))
-    : null;
-  const readyItems = deferredReadyItems ?? getDispatchableItems(annotatedDoc, mergedItemIds).filter(item => !mergedItemIds.has(item.id));
-  const candidates = readyItems.filter(item => !hasFileOverlap(runningItems, item));
+    : getDispatchableItems(annotatedDoc, mergedItemIds).filter(item => !mergedItemIds.has(item.id));
+
+  const waveIndex = requestedWave ?? existingState?.currentWave ?? 0;
+  const requestedWaveItems = waves[waveIndex]?.items;
+  if (!requestedWaveItems) {
+    return {
+      status: 400,
+      body: { error: `Wave ${waveIndex} does not exist for ${issueUpper}.`, wavePlan: waves },
+    };
+  }
+  if (requestedWave !== undefined && !existingState?.deferred?.length) {
+    const waveItemIds = new Set(requestedWaveItems.map(item => item.id));
+    readyItems = readyItems.filter(item => waveItemIds.has(item.id));
+  }
+
+  const selectedItems: VBriefItem[] = [];
+  const deferredByOverlap: VBriefItem[] = [];
+  for (const item of readyItems) {
+    if (hasFileOverlap([...runningItems, ...selectedItems], item)) {
+      deferredByOverlap.push(item);
+      continue;
+    }
+    selectedItems.push(item);
+  }
+  const candidates = selectedItems;
   if (candidates.length === 0) {
     return {
       status: 422,
@@ -434,7 +556,6 @@ async function dispatchSwarmWave(
     };
   }
 
-  const waveIndex = requestedWave ?? existingState?.currentWave ?? 0;
   const itemById = new Map(annotatedDoc.plan.items.map((planItem) => [planItem.id, planItem]));
   const pendingItems: WaveItem[] = candidates.map(item => ({
     id: item.id,
@@ -488,7 +609,17 @@ async function dispatchSwarmWave(
 
   const maxConcurrent = Math.min(pendingItems.length, userMax, systemAvailable);
   const itemsToDispatch = pendingItems.slice(0, maxConcurrent);
-  const deferredItems = pendingItems.slice(maxConcurrent);
+  const deferredItems = [
+    ...pendingItems.slice(maxConcurrent),
+    ...deferredByOverlap.map(item => ({
+      id: item.id,
+      title: item.title,
+      difficulty: item.metadata?.difficulty,
+      blockedBy: annotatedDoc.plan.edges
+        .filter(edge => edge.type === 'blocks' && edge.to === item.id)
+        .map(edge => edge.from),
+    })),
+  ];
 
   const existingSessions = await listSessionNamesAsync();
   const existingSwarmSessions = existingSessions.filter(
@@ -537,7 +668,7 @@ async function dispatchSwarmWave(
         } satisfies SlotAssignment;
       }
 
-      const worktreeResult = await createSlotWorktree(project.projectPath, issueId, slotNum);
+      const worktreeResult = await createSlotWorktree(project.projectPath, issueUpper, slotNum);
       if (!worktreeResult.success) {
         return `Slot ${slotNum}: failed to create worktree — ${worktreeResult.error}`;
       }
@@ -555,11 +686,13 @@ async function dispatchSwarmWave(
       }
 
       const fullItem = itemById.get(item.id);
-      if (fullItem && (fullItem.metadata?.requiresSynthesis || blockingParentCount(annotatedDoc, fullItem.id) > 1)) {
-        await persistSynthesisOutput(mainWorkspace, issueUpper, annotatedDoc, fullItem);
-      }
+      const requiresSynthesis = Boolean(fullItem && (fullItem.metadata?.requiresSynthesis || blockingParentCount(annotatedDoc, fullItem.id) > 1));
+      const hasSynthesisOutput = Boolean(continueState.swarmRuntime?.synthesisOutputs?.[item.id]);
+      const dispatchSynthesisFirst = requiresSynthesis && !hasSynthesisOutput;
 
-      const itemPrompt = buildSlotPrompt(
+      const itemPrompt = dispatchSynthesisFirst
+        ? buildSynthesisPrompt(annotatedDoc, issueUpper, item, waveIndex, slotNum)
+        : buildSlotPrompt(
         annotatedDoc,
         issueUpper,
         item,
@@ -572,16 +705,27 @@ async function dispatchSwarmWave(
 
       try {
         const spawnOptions: SpawnOptions = {
-          issueId,
+          issueId: issueUpper,
           workspace: worktreeResult.workspacePath,
           model: swarmModel,
           slotId: slotNum,
           swarmItemId: item.id,
           prompt: itemPrompt,
-          phase: 'implementation',
+          phase: dispatchSynthesisFirst ? 'synthesis' : 'implementation',
         };
 
         await spawnAgent(spawnOptions);
+        if (!dispatchSynthesisFirst) {
+          await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+            type: 'claim',
+            itemId: item.id,
+            reason: `Swarm slot ${slotNum} dispatched`,
+            writerId: `swarm-dispatch-${process.pid}`,
+          });
+        }
+
+        doc = await readWorkspacePlanAsync(mainWorkspace) ?? doc;
+        annotatedDoc = deriveSynthesisMetadata(doc);
 
         return {
           slot: slotNum,
@@ -666,8 +810,9 @@ async function dispatchSwarmWave(
   };
 }
 
-async function onSlotMergeComplete(issueId: string, itemId: string, slotId: number): Promise<void> {
-  const issueUpper = issueId.toUpperCase();
+async function onSlotMergeComplete(issueId: string, itemId: string, slotId: number, synthesisOutput?: string): Promise<void> {
+  const issueUpper = canonicalIssueId(issueId);
+  if (!issueUpper) return;
   const project = resolveProjectFromIssue(issueUpper);
   if (!project) return;
   const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueUpper.toLowerCase()}`);
@@ -680,7 +825,25 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
     const nextState = { ...state, slots, updatedAt: now };
     await saveSwarmState(nextState);
     await persistSwarmRuntime(mainWorkspace, nextState);
-    if (nextState.autoAdvance) ensureSwarmAutoAdvanceLoop();
+    if (synthesisOutput) {
+      const cont = await loadWorkspaceContinue(mainWorkspace, issueUpper);
+      const runtime = cont.swarmRuntime ?? runtimeFromState(nextState);
+      await writeContinueStateAsync(continueDirForWorkspace(mainWorkspace), issueUpper, {
+        ...cont,
+        swarmRuntime: {
+          ...runtime,
+          synthesisOutputs: {
+            ...runtime.synthesisOutputs,
+            [itemId]: { targetItemId: itemId, writtenAt: now, contextUpdate: synthesisOutput },
+          },
+          updatedAt: now,
+        },
+      });
+    }
+    if (nextState.autoAdvance) {
+      const result = await dispatchSwarmWave({ issueId: issueUpper, wave: nextState.deferred?.length ? nextState.currentWave : nextState.currentWave + 1, model: nextState.model, autoAdvance: true });
+      if (result.status >= 400) ensureSwarmAutoAdvanceLoop();
+    }
   }
   await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
     type: 'done',
@@ -810,23 +973,27 @@ async function createSlotWorktree(
   issueId: string,
   slotNum: number,
 ): Promise<{ success: boolean; workspacePath: string; branch: string; parentBranch: string; error?: string }> {
-  const issueLower = issueId.toLowerCase();
+  const issueUpper = canonicalIssueId(issueId);
+  if (!issueUpper) return { success: false, workspacePath: '', branch: '', parentBranch: '', error: 'Invalid issue ID' };
+  const issueLower = issueUpper.toLowerCase();
   const featureBranch = `feature/${issueLower}`;
   const slotBranch = `feature/${issueLower}/slot-${slotNum}`;
   const slotWorkspaceName = `feature-${issueLower}-slot-${slotNum}`;
-  const workspacePath = join(projectPath, 'workspaces', slotWorkspaceName);
+  const workspacesDir = join(projectPath, 'workspaces');
+  const workspacePath = join(workspacesDir, slotWorkspaceName);
+  assertPathInside(workspacesDir, workspacePath);
 
   if (existsSync(workspacePath)) {
     return { success: true, workspacePath, branch: slotBranch, parentBranch: featureBranch };
   }
 
   try {
-    await execAsync('git fetch origin', { cwd: projectPath });
-    await execAsync('git worktree prune', { cwd: projectPath });
+    await execFileAsync('git', ['fetch', 'origin'], { cwd: projectPath });
+    await execFileAsync('git', ['worktree', 'prune'], { cwd: projectPath });
 
     // Create slot worktree branching off the main feature branch
-    const { stdout: localBranches } = await execAsync('git branch --list', { cwd: projectPath });
-    const { stdout: remoteBranches } = await execAsync('git branch -r --list', { cwd: projectPath });
+    const { stdout: localBranches } = await execFileAsync('git', ['branch', '--list'], { cwd: projectPath });
+    const { stdout: remoteBranches } = await execFileAsync('git', ['branch', '-r', '--list'], { cwd: projectPath });
     const localList = localBranches.split('\n').map(b => b.replace(/^[*+\s]+/, '').trim()).filter(Boolean);
     const remoteList = remoteBranches.split('\n').map(b => b.trim()).filter(Boolean);
 
@@ -835,18 +1002,18 @@ async function createSlotWorktree(
       remoteList.includes(`origin/${slotBranch}`);
 
     if (slotBranchExists) {
-      await execAsync(`git worktree add "${workspacePath}" "${slotBranch}"`, { cwd: projectPath });
+      await execFileAsync('git', ['worktree', 'add', workspacePath, slotBranch], { cwd: projectPath });
     } else {
       // Branch off the main feature branch (or main if feature branch doesn't exist)
       const baseBranch = localList.includes(featureBranch) || remoteList.includes(`origin/${featureBranch}`)
         ? featureBranch
         : 'main';
-      await execAsync(`git worktree add "${workspacePath}" -b "${slotBranch}" "${baseBranch}"`, { cwd: projectPath });
+      await execFileAsync('git', ['worktree', 'add', workspacePath, '-b', slotBranch, baseBranch], { cwd: projectPath });
     }
 
     // Restore any unstaged deletions
-    await execAsync('git restore .', { cwd: workspacePath }).catch(() => {});
-    await execAsync('git config beads.role contributor', { cwd: workspacePath }).catch(() => {});
+    await execFileAsync('git', ['restore', '.'], { cwd: workspacePath }).catch(() => {});
+    await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
 
     // Set up beads redirect
     const sourceBeadsDir = join(projectPath, '.beads');
@@ -864,7 +1031,7 @@ async function createSlotWorktree(
 
     // Install dependencies (non-fatal)
     try {
-      await execAsync('bun install', { cwd: workspacePath, timeout: 60000 });
+      await execFileAsync('bun', ['install'], { cwd: workspacePath, timeout: 60000 });
     } catch {}
 
     return { success: true, workspacePath, branch: slotBranch, parentBranch: featureBranch };
@@ -880,10 +1047,20 @@ const postSwarmRoute = HttpRouter.add(
   '/api/swarm',
   httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
-    const { issueId, wave, model, maxSlots, autoAdvance } = body as SwarmDispatchRequest;
+    const { wave, model, maxSlots, autoAdvance } = body as SwarmDispatchRequest;
+    const issueId = canonicalIssueId((body as Record<string, unknown>)['issueId']);
 
     if (!issueId) {
-      return jsonResponse({ error: 'issueId required' }, { status: 400 });
+      return jsonResponse({ error: 'issueId must be a tracker key like PAN-977.' }, { status: 400 });
+    }
+    if (wave !== undefined && (!Number.isInteger(wave) || wave < 0)) {
+      return jsonResponse({ error: 'wave must be a non-negative integer.' }, { status: 400 });
+    }
+    if (maxSlots !== undefined && (!Number.isInteger(maxSlots) || maxSlots <= 0)) {
+      return jsonResponse({ error: 'maxSlots must be a positive integer.' }, { status: 400 });
+    }
+    if (model !== undefined && typeof model !== 'string') {
+      return jsonResponse({ error: 'model must be a string.' }, { status: 400 });
     }
 
     const result = yield* Effect.promise(() => dispatchSwarmWave({
@@ -953,6 +1130,31 @@ function buildStructuredSlotTaskInput(
   };
 }
 
+function buildSynthesisPrompt(
+  doc: VBriefDocument,
+  issueId: string,
+  item: WaveItem,
+  waveIndex: number,
+  slotNum: number,
+): string {
+  const parents = item.blockedBy
+    .map(parentId => doc.plan.items.find(planItem => planItem.id === parentId))
+    .filter((parent): parent is VBriefItem => Boolean(parent));
+
+  return [
+    `You are synthesis slot ${slotNum} for wave ${waveIndex} of plan ${doc.plan.id}.`,
+    `Issue: ${issueId}`,
+    `Convergence target: **${item.id}: ${item.title}**`,
+    '',
+    'Read the merged upstream changes for these completed parent items:',
+    ...parents.map(parent => `- ${parent.id}: ${parent.title}`),
+    '',
+    'Produce a concise markdown synthesis of the upstream decisions, changed files, hazards, and constraints the downstream implementation agent must know.',
+    'When complete, call the production merge-complete path with this synthesis output so Panopticon can persist it into the continue vBRIEF before dispatching downstream work.',
+    'Do not implement the convergence target itself in this synthesis slot.',
+  ].join('\n');
+}
+
 function buildSlotPrompt(
   doc: VBriefDocument,
   issueId: string,
@@ -1001,6 +1203,28 @@ function buildSlotPrompt(
   ].join('\n');
 }
 
+// ─── POST /api/swarm/slot-merged ────────────────────────────────────────────
+
+const postSwarmSlotMergedRoute = HttpRouter.add(
+  'POST',
+  '/api/swarm/slot-merged',
+  httpHandler(Effect.gen(function* () {
+    const body = yield* readJsonBody;
+    const issueId = canonicalIssueId((body as Record<string, unknown>)['issueId']);
+    const itemId = (body as Record<string, unknown>)['itemId'];
+    const slotId = (body as Record<string, unknown>)['slotId'];
+    const synthesisOutput = (body as Record<string, unknown>)['synthesisOutput'];
+
+    if (!issueId) return jsonResponse({ error: 'issueId must be a tracker key like PAN-977.' }, { status: 400 });
+    if (typeof itemId !== 'string' || itemId.length === 0) return jsonResponse({ error: 'itemId required' }, { status: 400 });
+    if (!Number.isInteger(slotId) || (slotId as number) <= 0) return jsonResponse({ error: 'slotId must be a positive integer.' }, { status: 400 });
+    if (synthesisOutput !== undefined && typeof synthesisOutput !== 'string') return jsonResponse({ error: 'synthesisOutput must be a string.' }, { status: 400 });
+
+    yield* Effect.promise(() => onSlotMergeComplete(issueId, itemId, slotId as number, synthesisOutput as string | undefined));
+    return jsonResponse({ success: true });
+  })),
+);
+
 // ─── GET /api/swarm/:issueId ────────────────────────────────────────────────
 
 const getSwarmRoute = HttpRouter.add(
@@ -1008,7 +1232,10 @@ const getSwarmRoute = HttpRouter.add(
   '/api/swarm/:issueId',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
-    const issueId = params['issueId'] ?? '';
+    const issueId = canonicalIssueId(params['issueId'] ?? '');
+    if (!issueId) {
+      return jsonResponse({ error: 'issueId must be a tracker key like PAN-977.' }, { status: 400 });
+    }
 
     const state = yield* Effect.promise(() => loadSwarmState(issueId));
     if (!state) {
@@ -1048,5 +1275,6 @@ export { resumeSwarmAutoAdvanceLoopOnStartup };
 
 export const swarmRouteLayer = Layer.mergeAll(
   postSwarmRoute,
+  postSwarmSlotMergedRoute,
   getSwarmRoute,
 );

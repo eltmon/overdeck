@@ -170,6 +170,17 @@ export interface SynthesisOutput {
 export interface SwarmRuntime {
   /** Model used for slot agents. */
   model: string;
+  /** Current dependency wave being dispatched. */
+  currentWave?: number;
+  /** Total dependency waves in the plan at dispatch time. */
+  totalWaves?: number;
+  /** Whether event/polling auto-advance is enabled. */
+  autoAdvance?: boolean;
+  autoAdvanceFailureCount?: number;
+  autoAdvanceRetryAfter?: string;
+  lastAutoAdvanceError?: string;
+  /** Ready items intentionally held for a later dispatch cycle. */
+  deferred?: Array<{ itemId: string; itemTitle: string }>;
   /** All slots dispatched across all dispatch cycles. */
   slots: SwarmSlotRuntime[];
   /** Synthesis agent output keyed by target item ID. */

@@ -259,8 +259,16 @@ export function blockingParentTotal(doc: VBriefDocument, itemId: string): number
 
 export function deriveSynthesisMetadata(doc: VBriefDocument): VBriefDocument {
   const next = cloneDoc(doc);
+  const itemIds = new Set(next.plan.items.map(item => item.id));
+  const incomingBlockCounts = new Map<string, number>();
+
+  for (const edge of next.plan.edges) {
+    if (edge.type !== 'blocks' || !itemIds.has(edge.from) || !itemIds.has(edge.to)) continue;
+    incomingBlockCounts.set(edge.to, (incomingBlockCounts.get(edge.to) ?? 0) + 1);
+  }
+
   for (const item of next.plan.items) {
-    if (blockingParentTotal(next, item.id) > 1) {
+    if ((incomingBlockCounts.get(item.id) ?? 0) > 1) {
       item.metadata = { ...(item.metadata ?? {}), requiresSynthesis: true };
     }
   }

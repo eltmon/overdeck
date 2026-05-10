@@ -28,6 +28,7 @@ vi.mock('../../../../lib/projects.js', () => ({
 vi.mock('../../../../lib/vbrief/io.js', () => ({
   findPlan: vi.fn(),
   readWorkspacePlan: vi.fn(),
+  VBriefMergeConflictError: class VBriefMergeConflictError extends Error {},
 }));
 
 vi.mock('../../../../lib/agents.js', () => ({
@@ -103,7 +104,8 @@ describe('swarm route helpers', () => {
 
     testHome = mkdtempSync(join(tmpdir(), 'pan-971-swarm-test-'));
     projectPath = join(testHome, 'repo');
-    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-971'), { recursive: true });
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan'), { recursive: true });
+    writeFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), JSON.stringify(PLAN_DOC, null, 2));
     mkdirSync(join(testHome, '.panopticon', 'swarms'), { recursive: true });
 
     process.env.HOME = testHome;
@@ -440,6 +442,7 @@ describe('swarm route helpers', () => {
       updatedAt: '2026-05-07T00:05:00Z',
     }, null, 2));
 
+    rmSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), { force: true });
     vi.mocked(vbriefIo.readWorkspacePlan).mockReturnValue(null);
 
     const { __testInternals } = await import('../swarm.js');
@@ -488,6 +491,7 @@ describe('swarm route helpers', () => {
       },
     };
     vi.mocked(vbriefIo.readWorkspacePlan).mockReturnValue(sameWaveDoc);
+    writeFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), JSON.stringify(sameWaveDoc, null, 2));
 
     const { __testInternals } = await import('../swarm.js');
     const initialDispatch = await __testInternals.dispatchSwarmWave({
@@ -634,6 +638,60 @@ describe('swarm route helpers', () => {
 
     expect(result.status).toBe(500);
     expect(result.body.error).toContain('Failed to dispatch any slots');
+  });
+
+  it('rejects an explicit future wave while earlier dependencies remain pending', async () => {
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 1,
+      maxSlots: 1,
+    });
+
+    expect(result.status).toBe(422);
+    expect(result.body.error).toContain('No dispatchable items');
+    expect(agents.spawnAgent).not.toHaveBeenCalled();
+  });
+
+  it('claims dispatched items in the workspace vBRIEF plan', async () => {
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-971-slot-1'), { recursive: true });
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue([]);
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 0,
+      maxSlots: 1,
+    });
+
+    expect(result.status).toBe(200);
+    const writtenPlan = JSON.parse(readFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), 'utf-8')) as VBriefDocument;
+    expect(writtenPlan.plan.items.find(item => item.id === 'wave-0-item')?.status).toBe('running');
+  });
+
+  it('defers same-batch candidates whose file scopes overlap selected items', async () => {
+    const overlapDoc: VBriefDocument = {
+      ...PLAN_DOC,
+      plan: {
+        ...PLAN_DOC.plan,
+        items: [
+          { id: 'item-a', title: 'Touch shared file first', status: 'pending', metadata: { files_scope: ['src/shared.ts'] } },
+          { id: 'item-b', title: 'Touch shared file second', status: 'pending', metadata: { files_scope: ['src/shared.ts'] } },
+        ],
+        edges: [],
+      },
+    };
+    writeFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), JSON.stringify(overlapDoc, null, 2));
+
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 0,
+      maxSlots: 2,
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body.slots?.map(slot => slot.itemId)).toEqual(['item-a']);
+    expect(result.body.deferred).toEqual([{ itemId: 'item-b', itemTitle: 'Touch shared file second' }]);
   });
 
   it('honors PAN_AGENT_BLOCK_COUNT=0 as an explicit hard stop', async () => {
