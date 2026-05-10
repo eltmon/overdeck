@@ -394,16 +394,27 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                     )}
                     {group.models.map((model) => {
                       const lvl = costWarningLevel(model.costPer1MTokens);
+                      const decision = harness
+                        ? canUsePickerHarness(harness, model.id, harnessPolicy)
+                        : { allowed: true };
+                      const isLocked = !decision.allowed;
                       return (
                         <button
                           key={model.id}
-                          className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
-                          onClick={() => handleSelect(model)}
+                          className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''} ${isLocked ? styles.pickerOptionLocked : ''}`}
+                          onClick={() => { if (!isLocked) handleSelect(model); }}
+                          disabled={isLocked}
+                          title={isLocked ? decision.reason : undefined}
                           type="button"
                         >
                           <span className={styles.pickerOptionContent}>
                             <span className={styles.pickerOptionRow}>
                               <span className={styles.pickerOptionLabel}>{model.label}</span>
+                              {isLocked && (
+                                <span className={styles.pickerOptionLockIcon} title={decision.reason}>
+                                  <Lock size={10} />
+                                </span>
+                              )}
                               {lvl && <CostWarningBadge level={lvl} compact costPer1MTokens={model.costPer1MTokens} />}
                               {model.costDisplay && (
                                 <span className={styles.pickerCostBadge}>{model.costDisplay}</span>

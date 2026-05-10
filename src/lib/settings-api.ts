@@ -513,6 +513,8 @@ export function getAvailableModelsApi(): {
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
+    // Skip deprecated models — they should not appear in user-facing pickers.
+    if (capability.displayName.includes('(deprecated)')) continue;
     const entry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
     switch (capability.provider) {
       case 'anthropic':
@@ -541,6 +543,15 @@ export function getAvailableModelsApi(): {
         break;
     }
   }
+
+  // Order OpenAI models with latest family first: 5.5 (current default) → 5.4 → o-series → gpt-4o legacy.
+  const openaiOrder: Record<string, number> = {
+    'gpt-5.5': 0, 'gpt-5.5-pro': 1, 'gpt-5.5-mini': 2, 'gpt-5.5-nano': 3,
+    'gpt-5.4': 10, 'gpt-5.4-pro': 11, 'gpt-5.4-mini': 12, 'gpt-5.4-nano': 13,
+    'o3': 20, 'o4-mini': 21,
+    'gpt-4o': 30, 'gpt-4o-mini': 31,
+  };
+  result.openai.sort((a, b) => (openaiOrder[a.id] ?? 99) - (openaiOrder[b.id] ?? 99));
 
   return result;
 }

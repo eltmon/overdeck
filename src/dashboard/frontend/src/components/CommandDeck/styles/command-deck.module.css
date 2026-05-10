@@ -3631,6 +3631,22 @@
   background: var(--primary);
 }
 
+.pickerOptionLocked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pickerOptionLocked:hover {
+  background: none;
+}
+
+.pickerOptionLockIcon {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: var(--muted-foreground);
+}
+
 /* Two-row content inside each model row */
 .pickerOptionContent {
   display: flex;
