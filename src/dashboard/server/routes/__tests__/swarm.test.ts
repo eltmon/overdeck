@@ -354,6 +354,54 @@ describe('swarm route helpers', () => {
     expect(registry.has('PAN-971'), 'issue must remain in active poll registry after slot merge').toBe(true);
   });
 
+  // PAN-977 round-13 blocker #1: when the poller observes a final-wave slot
+  // transition to a terminal status, the refreshed status MUST be persisted
+  // to the canonical continue-vBRIEF runtime BEFORE the issue leaves the
+  // active poll registry. Pre-fix the final-wave `continue` short-circuited
+  // above saveSwarmState() and lost the just-observed completed/failed
+  // status, so a dashboard restart could not see the slot finished.
+  it('persists refreshed final-wave slot status before clearing the active registry', async () => {
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    writeFileSync(swarmStatePath, JSON.stringify({
+      issueId: 'PAN-971',
+      // currentWave === totalWaves - 1 — the final wave.
+      currentWave: 1,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-1-item',
+          itemTitle: 'Dispatch next wave',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'running',
+          startedAt: '2026-05-07T00:00:00Z',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    }, null, 2));
+
+    // The slot's tmux pane has exited cleanly (exit 0) so refreshSwarmSlotStatuses
+    // will flip the slot from 'running' to 'completed'.
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue(['agent-pan-971-1']);
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(true);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['0']);
+
+    const { __testInternals } = await import('../swarm.js');
+    __testInternals.addActiveSwarmIssueId('PAN-971');
+    await __testInternals.pollSwarmAutoAdvance();
+
+    const persisted = (await __testInternals.loadSwarmState('PAN-971'))!;
+    const slot = persisted.slots.find((s) => s.slot === 1);
+    expect(slot?.status, 'final-wave terminal status must be persisted to continue-vBRIEF').toBe('completed');
+
+    // And only AFTER persistence does the issue leave the active registry.
+    expect(__testInternals.getActiveSwarmIssueIds().has('PAN-971')).toBe(false);
+  });
+
   it('does not advance while current wave still has running slots', async () => {
     const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
     writeFileSync(swarmStatePath, JSON.stringify({

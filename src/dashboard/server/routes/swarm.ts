@@ -1249,19 +1249,12 @@ async function pollSwarmAutoAdvance(): Promise<void> {
     if (isAutoAdvanceCoolingDown(loadedState)) continue;
 
     const { state, changed } = await refreshSwarmSlotStatuses(loadedState, sessions);
-    // PAN-977 round-12 high-1: final-wave cleanup must consult observed
-    // post-refresh state, not the pre-refresh wave index. If the swarm is on
-    // the final wave AND no slots are still running/pending AND no deferred
-    // work remains, drop it from the active registry so the poll loop can
-    // converge to empty. Doing this *after* refreshSwarmSlotStatuses ensures
-    // freshly-terminated slots are observed before we bail.
-    if (state.currentWave >= state.totalWaves - 1 && !state.deferred?.length) {
-      const stillActive = state.slots.some(s => s.status === 'running' || s.status === 'pending');
-      if (!stillActive) {
-        activeSwarmIssueIds.delete(state.issueId);
-      }
-      continue;
-    }
+    // PAN-977 round-13 blocker #1: persistence MUST run before any final-wave
+    // cleanup so a freshly-observed completed/failed slot status survives a
+    // dashboard restart, even on the very last polling tick. Previously the
+    // final-wave `continue` short-circuited above this block and we lost the
+    // refreshed status (and the registry entry that would have repaired it).
+    // Order is now: refresh → persist → failure handling → final-wave cleanup.
     if (changed) {
       // PAN-977 round-11 blocker #2 / high-2: saveSwarmState is now the single
       // canonical writer; if it throws the auto-advance loop records the
@@ -1277,6 +1270,28 @@ async function pollSwarmAutoAdvance(): Promise<void> {
     if (state.slots.some((slot) => slot.status === 'failed')) {
       if (!state.autoAdvanceRetryAfter && !state.lastAutoAdvanceError) {
         await saveSwarmState(recordAutoAdvanceFailure(state, 'One or more swarm slots failed before completion was confirmed.'));
+      }
+      // Failed-slot handling runs BEFORE final-wave registry cleanup so the
+      // operator sees the recorded failure before the swarm leaves the active
+      // poll registry.
+      if (state.currentWave >= state.totalWaves - 1 && !state.deferred?.length) {
+        const stillActive = state.slots.some(s => s.status === 'running' || s.status === 'pending');
+        if (!stillActive) {
+          activeSwarmIssueIds.delete(state.issueId);
+        }
+      }
+      continue;
+    }
+
+    // PAN-977 round-12 high-1 / round-13 blocker #1: final-wave cleanup
+    // consults observed post-refresh state and runs AFTER persistence. If
+    // the swarm is on the final wave AND no slots are still running/pending
+    // AND no deferred work remains, drop it from the active registry so the
+    // poll loop can converge to empty.
+    if (state.currentWave >= state.totalWaves - 1 && !state.deferred?.length) {
+      const stillActive = state.slots.some(s => s.status === 'running' || s.status === 'pending');
+      if (!stillActive) {
+        activeSwarmIssueIds.delete(state.issueId);
       }
       continue;
     }
