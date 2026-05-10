@@ -160,7 +160,7 @@ function workhorseSlotLabel(slot: WorkhorseSlot): string {
   return WORKHORSE_SLOTS.find((candidate) => candidate.id === slot)?.label ?? slot;
 }
 
-function displayModelRef(value: ModelRef, workhorses: Required<Record<WorkhorseSlot, ModelRef>>): string {
+function displayModelRef(value: ModelRef): string {
   if (!isWorkhorseRef(value)) return value;
   const slot = value.replace('workhorse:', '') as WorkhorseSlot;
   return `Workhorse: ${workhorseSlotLabel(slot)}`;
@@ -169,7 +169,7 @@ function displayModelRef(value: ModelRef, workhorses: Required<Record<WorkhorseS
 function modelRefTooltip(value: ModelRef, workhorses: Required<Record<WorkhorseSlot, ModelRef>>): string | undefined {
   if (!isWorkhorseRef(value)) return undefined;
   const slot = value.replace('workhorse:', '') as WorkhorseSlot;
-  return `${displayModelRef(value, workhorses)} = ${workhorses[slot]}`;
+  return `${displayModelRef(value)} = ${workhorses[slot]}`;
 }
 
 function modelExists(value: ModelRef, groups: Array<{ models: AvailableModel[] }>): boolean {
@@ -343,7 +343,7 @@ export function RolesPanel() {
                           className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
                           title={tooltip}
                         >
-                          Default: {displayModelRef(roleModel, workhorses)}
+                          Default: {displayModelRef(roleModel)}
                         </span>
                       </div>
                       <p className="mt-1 text-xs leading-snug text-muted-foreground">{role.description}</p>
@@ -390,7 +390,7 @@ export function RolesPanel() {
                                 className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
                                 title={subTooltip}
                               >
-                                Default: {displayModelRef(subModel, workhorses)}
+                                Default: {displayModelRef(subModel)}
                               </span>
                             </div>
                             <p className="mb-3 text-[11px] leading-snug text-muted-foreground">{subRole.description}</p>
