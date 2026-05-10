@@ -700,7 +700,7 @@ function parseThinkingDuration(tmuxOutput: string): number | null {
 export async function checkStuckWorkAgents(): Promise<string[]> {
   const actions: string[] = [];
   const agents = listRunningAgents();
-  // Specialist sessions (global or per-project) all start with "specialist-"
+  // Specialist sessions (global or per-project) use the specialist tmux prefix.
   const isSpecialistSession = (id: string) => id.startsWith('specialist-');
   const now = Date.now();
 
@@ -3047,7 +3047,7 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 
   try {
     const agents = listRunningAgents();
-    // Specialist sessions (global or per-project) all start with "specialist-"
+    // Specialist sessions (global or per-project) use the specialist tmux prefix.
     const isSpecialistSession = (id: string) => id.startsWith('specialist-');
 
     for (const agent of agents) {

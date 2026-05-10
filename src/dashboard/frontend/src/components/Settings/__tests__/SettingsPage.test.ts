@@ -3,8 +3,6 @@ import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { buildMiniMaxFormData } from '../SettingsPage';
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
-import { getEffectiveModelId, DEFAULT_MODELS_BY_WORK_TYPE, FALLBACK_DEFAULT_MODEL } from '../modelDefaults';
-import { WORK_TYPE_CATEGORIES } from '../types';
 import type { SettingsConfig } from '../types';
 
 const MINIMAX_DEFAULTS: SettingsConfig = {
@@ -19,7 +17,7 @@ const MINIMAX_DEFAULTS: SettingsConfig = {
       openrouter: false,
     },
     overrides: {
-      'issue-agent:implementation': 'minimax-m2.7-highspeed',
+      'legacy.route': 'minimax-m2.7-highspeed',
     },
     gemini_thinking_level: 3,
   },
@@ -68,36 +66,13 @@ describe('MODELS_BY_PROVIDER', () => {
   });
 });
 
-describe('getEffectiveModelId', () => {
-  it('returns the override when one is set', () => {
-    const result = getEffectiveModelId('issue-agent:implementation', {
-      'issue-agent:implementation': 'minimax-m2.7-highspeed',
-    });
-    expect(result).toBe('minimax-m2.7-highspeed');
-  });
-
-  it('returns the backend optimal default when no override is set', () => {
-    // Without an override, the settings page must show the backend default — NOT
-    // the generic FALLBACK_DEFAULT_MODEL. Regression for the bug where any
-    // unoverridden card showed gpt-4o-mini regardless of actual routing defaults.
-    const result = getEffectiveModelId('issue-agent:exploration', {});
-    expect(result).toBe(DEFAULT_MODELS_BY_WORK_TYPE['issue-agent:exploration']);
-    expect(result).not.toBe(FALLBACK_DEFAULT_MODEL);
-  });
-
-  it('returns FALLBACK_DEFAULT_MODEL only for model routes with no backend default', () => {
-    // A model route unknown to the router should fall through to the generic fallback.
-    const result = getEffectiveModelId('unknown-work-type' as never, {});
-    expect(result).toBe(FALLBACK_DEFAULT_MODEL);
-  });
-});
 
 describe('buildMiniMaxFormData', () => {
   it('applies MiniMax providers and overrides', () => {
     const result = buildMiniMaxFormData(null, MINIMAX_DEFAULTS);
     expect(result.models.providers.minimax).toBe(true);
     expect(result.models.providers.anthropic).toBe(false);
-    expect(result.models.overrides['issue-agent:implementation']).toBe('minimax-m2.7-highspeed');
+    expect(result.models.overrides['legacy.route']).toBe('minimax-m2.7-highspeed');
   });
 
   it('preserves existing conversations settings from formData', () => {
@@ -157,50 +132,4 @@ describe('buildMiniMaxFormData', () => {
     expect(result.models.providers.minimax).toBe(true);
   });
 
-  it('review:lightweight can be expressed as a model override in SettingsConfig', () => {
-    // review:lightweight is a real routable backend model route used by the haiku
-    // reviewer alias. The ModelRouteId type must include it so the settings form
-    // can represent and submit overrides — without this, config becomes lossy.
-    const config: SettingsConfig = {
-      ...MINIMAX_DEFAULTS,
-      models: {
-        ...MINIMAX_DEFAULTS.models,
-        overrides: { 'review:lightweight': 'minimax-m2.7-highspeed' },
-      },
-    };
-    expect(config.models.overrides['review:lightweight']).toBe('minimax-m2.7-highspeed');
-  });
-});
-
-describe('WORK_TYPE_CATEGORIES — review:lightweight registration', () => {
-  it('includes review:lightweight in the review category', () => {
-    // review:lightweight is used by the haiku alias in the review pipeline.
-    // It must be listed in the frontend registry so the settings UI can display
-    // and override it — otherwise overrides set by the backend would be silently
-    // dropped by the settings form.
-    const reviewTypes = WORK_TYPE_CATEGORIES['review'];
-    const ids = reviewTypes.map(t => t.id);
-    expect(ids).toContain('review:lightweight');
-  });
-});
-
-describe('DEFAULT_MODELS_BY_WORK_TYPE — review:lightweight default', () => {
-  it('has a haiku-tier default for review:lightweight', () => {
-    const model = DEFAULT_MODELS_BY_WORK_TYPE['review:lightweight'];
-    expect(model).toBeDefined();
-    expect(model).toMatch(/haiku/i);
-  });
-
-  it('getEffectiveModelId returns haiku-tier for review:lightweight with no override', () => {
-    const model = getEffectiveModelId('review:lightweight', {});
-    expect(model).toMatch(/haiku/i);
-    expect(model).not.toBe(FALLBACK_DEFAULT_MODEL);
-  });
-
-  it('getEffectiveModelId returns override when review:lightweight override is set', () => {
-    const result = getEffectiveModelId('review:lightweight', {
-      'review:lightweight': 'minimax-m2.7-highspeed',
-    });
-    expect(result).toBe('minimax-m2.7-highspeed');
-  });
 });

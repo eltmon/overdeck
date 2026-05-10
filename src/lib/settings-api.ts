@@ -26,66 +26,6 @@ import type { Role } from './agents.js';
 import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 
 /**
- * Optimal model defaults — multi-provider distribution (see docs/research/)
- * - Kimi K2.6: Exploration, testing, docs, UAT, general-purpose subagent
- * - GLM-5.1: Implementation, review-response (SWE-Bench Pro #1)
- * - GPT-5.5: Specialist review agent (high-stakes code review)
- * - MiniMax M2.7: Procedural specialists — test, merge, inspect
- * - Claude Opus/Sonnet: All parallel review agents (security, correctness, etc.)
- * - GPT-5.5 Nano/Mini: Subagents and CLI (fastest, cheapest, strong tool use)
- *
- * NOTE: All model IDs are automatically resolved through deprecation mapping
- * to ensure this function never returns deprecated models.
- */
-export function getOptimalModelDefaults(): Partial<Record<string, ModelId>> {
-  const rawDefaults: Partial<Record<string, string>> = {
-    // Planning & high-stakes review — GPT-5.5
-    'issue-agent:exploration': 'kimi-k2.6',
-
-    // Implementation — GLM-5.1 (SWE-Bench Pro #1, 8-hour autonomous sessions)
-    'issue-agent:implementation': 'glm-5.1',
-    'issue-agent:testing': 'kimi-k2.6',
-    'issue-agent:documentation': 'kimi-k2.6',
-    'issue-agent:review-response': 'glm-5.1',
-
-    // Specialist agents
-    'specialist-review-agent': 'gpt-5.5',
-    'specialist-test-agent': 'minimax-m2.7',
-    'specialist-merge-agent': 'minimax-m2.7',
-    'specialist-inspect-agent': 'minimax-m2.7-highspeed',
-    'specialist-uat-agent': 'kimi-k2.6',
-
-    // Review agents - mixed based on criticality
-    'review:security': 'claude-opus-4-6', // SAFETY CRITICAL
-    'review:performance': 'claude-sonnet-4-6',
-    'review:correctness': 'claude-sonnet-4-6',
-    'review:requirements': 'claude-sonnet-4-6',
-    'review:synthesis': 'claude-sonnet-4-6',
-
-    // Subagents — GPT-5.5 Nano (fastest, cheapest, strong tool use)
-    'subagent:explore': 'gpt-5.5-nano',
-    'subagent:plan': 'gpt-5.5-nano',
-    'subagent:bash': 'gpt-5.5-nano',
-    'subagent:general-purpose': 'kimi-k2.6',
-
-    // Workflow jobs
-    'status-review': 'gpt-5.5-nano',
-
-    // CLI modes
-    'cli:interactive': 'gpt-5.5-mini',
-    'cli:quick-command': 'gpt-5.5-nano',
-  };
-
-  // Apply deprecation resolution to all model IDs
-  const resolved: Partial<Record<string, ModelId>> = {};
-  for (const [workType, modelId] of Object.entries(rawDefaults)) {
-    if (modelId) resolved[workType] = resolveModelId(modelId);
-  }
-
-  return resolved;
-}
-
-/**
  * Deprecation warning in API format
  */
 export interface ApiDeprecationWarning {
@@ -184,14 +124,6 @@ export function getDefaultConversationModelApi(): ModelId {
   }
   return resolveModelId('claude-sonnet-4-6');
 }
-
-const CONVOY_TO_REVIEW_MAP: Record<string, string> = {
-  'convoy:security-reviewer': 'review:security',
-  'convoy:performance-reviewer': 'review:performance',
-  'convoy:correctness-reviewer': 'review:correctness',
-  'convoy:requirements-reviewer': 'review:requirements',
-  'convoy:synthesis-agent': 'review:synthesis',
-};
 
 const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship'];
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
@@ -379,20 +311,10 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
 export function loadSettingsApi(): ApiSettingsConfig {
   const { config } = loadConfig();
 
-  // Migrate convoy:* override keys to review:* equivalents (PAN-540)
-  // Iterate convoy map first so convoy values win when both old+new keys exist,
-  // matching original semantics.
-  const migratedOverrides: Record<string, ModelId | undefined> = { ...config.overrides };
-  for (const [oldKey, newKey] of Object.entries(CONVOY_TO_REVIEW_MAP)) {
-    if (oldKey in migratedOverrides) {
-      migratedOverrides[newKey] = migratedOverrides[oldKey]!;
-      delete migratedOverrides[oldKey];
-    }
-  }
-
-  // Detect deprecated models in current overrides
+  // Detect deprecated models in current overrides. Overrides are no longer
+  // surfaced by GET /api/settings, but warnings help users clean stale config.
   const deprecationWarnings: ApiDeprecationWarning[] = [];
-  for (const [workType, modelId] of Object.entries(migratedOverrides)) {
+  for (const [workType, modelId] of Object.entries(config.overrides)) {
     if (modelId && MODEL_DEPRECATIONS[modelId]) {
       deprecationWarnings.push({
         workType,

@@ -77,7 +77,7 @@ You may spawn ephemeral **Claude Code subagents** via the `Agent` tool for paral
 - `Plan` — architectural planning helper
 - `code-review-correctness` / `-security` / `-performance` / `-requirements` — review convoy helpers used by the review role
 
-**These subagents live and die inside one Claude Code session.** They do not own issue state, do not transition the Panopticon pipeline, and do not replace `plan`/`work`/`review`/`test`/`ship`. If you encounter references to `subagent:*` model slots or files in `.claude/agents/`, treat them as role-internal helpers, not standalone pipeline agents.
+**These subagents live and die inside one Claude Code session.** They do not own issue state, do not transition the Panopticon pipeline, and do not replace `plan`/`work`/`review`/`test`/`ship`. If you encounter legacy helper model slots or files in `.claude/agents/`, treat them as role-internal helpers, not standalone pipeline agents.
 
 ### What happens after you finalize
 

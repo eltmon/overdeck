@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MODEL_DEPRECATIONS, resolveModelId } from '../../src/lib/model-capabilities.js';
-import { validateSettingsApi, getOptimalModelDefaults } from '../../src/lib/settings-api.js';
+import { validateSettingsApi } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
 
 describe('Model Deprecation System', () => {
@@ -64,8 +64,8 @@ describe('Model Deprecation System', () => {
             kimi: false,
           },
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-5', // deprecated
-            'issue-agent:implementation': 'kimi-k2.5', // not deprecated
+            'role.plan': 'claude-opus-4-5', // deprecated
+            'role.work': 'kimi-k2.5', // not deprecated
           },
         },
         api_keys: {},
@@ -89,8 +89,8 @@ describe('Model Deprecation System', () => {
             kimi: false,
           },
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-6',
-            'issue-agent:implementation': 'claude-sonnet-4-6',
+            'role.plan': 'claude-opus-4-6',
+            'role.work': 'claude-sonnet-4-6',
           },
         },
         api_keys: {},
@@ -112,8 +112,8 @@ describe('Model Deprecation System', () => {
             kimi: false,
           },
           overrides: {
-            'issue-agent:planning': 'claude-opus-4-5', // deprecated
-            'issue-agent:implementation': 'claude-sonnet-4-5', // deprecated
+            'role.plan': 'claude-opus-4-5', // deprecated
+            'role.work': 'claude-sonnet-4-5', // deprecated
           },
         },
         api_keys: {},
@@ -135,7 +135,7 @@ describe('Model Deprecation System', () => {
             kimi: false,
           },
           overrides: {
-            'issue-agent:planning': 'nonexistent-model' as any,
+            'role.plan': 'nonexistent-model' as any,
           },
         },
         api_keys: {},
@@ -148,30 +148,4 @@ describe('Model Deprecation System', () => {
     });
   });
 
-  describe('getOptimalModelDefaults() deprecation resolution', () => {
-    it('should never return deprecated model IDs', () => {
-      const defaults = getOptimalModelDefaults();
-      const allModelIds = Object.values(defaults);
-      const deprecatedIds = Object.keys(MODEL_DEPRECATIONS);
-
-      // Check that no default uses a deprecated model ID
-      for (const modelId of allModelIds) {
-        expect(deprecatedIds).not.toContain(modelId);
-      }
-    });
-
-    it('should return current model IDs for all work types', () => {
-      const defaults = getOptimalModelDefaults();
-
-      // Verify some key work types have current models
-      expect(defaults['issue-agent:exploration']).toBeDefined();
-      expect(defaults['issue-agent:implementation']).toBeDefined();
-      expect(defaults['specialist-review-agent']).toBeDefined();
-
-      // Verify they're not deprecated
-      const deprecatedIds = Object.keys(MODEL_DEPRECATIONS);
-      expect(deprecatedIds).not.toContain(defaults['issue-agent:exploration']);
-      expect(deprecatedIds).not.toContain(defaults['issue-agent:implementation']);
-    });
-  });
 });

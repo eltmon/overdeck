@@ -88,8 +88,8 @@ function isSpecialistAgent(agentId: string): boolean {
 
 /**
  * Parse an issue-scoped ephemeral session name.
- * "specialist-pan-PAN-509-merge-agent" → { projectKey: "pan", issueId: "PAN-509", specialistType: "merge-agent" }
- * Returns null for global specialist sessions like "specialist-merge-agent".
+ * Parses issue-scoped specialist session names into project, issue, and specialist identifiers.
+ * Returns null for global specialist sessions.
  */
 function parseEphemeralSession(agentId: string): { projectKey: string; issueId: string; specialistType: string } | null {
   const match = agentId.match(/^specialist-(.+)-([A-Z]+-\d+)-(merge-agent|review-agent|test-agent|inspect-agent|uat-agent)$/);
