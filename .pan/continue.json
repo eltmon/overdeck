@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T01:19:43.564Z",
+  "updated": "2026-05-10T01:25:17.155Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "6a16073b7",
+    "sha": "ec85d7d54",
     "dirty": true
   },
   "decisions": [
@@ -58,7 +58,7 @@
     }
   ],
   "resumePoint": {
-    "description": "Latest review blockers fixed and verified: work-agent resume/restart preserve harness, conversation restart-all preserves harness, remaining model-selection surfaces use combined model/harness picker, frontend policy comes from canonical route, and typecheck/lint/npm test pass. Next step is commit and invoke /rebase-and-submit for PAN-1055.",
+    "description": "Merged origin/main, resolved merge-agent conflict, and re-verified typecheck, lint, and npm test. Next step is rerun pan done for PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
       "src/lib/agents.ts",
@@ -112,6 +112,12 @@
       "timestamp": "2026-05-10T01:19:43.564Z",
       "reason": "review-response-verified",
       "note": "Fixed latest CHANGES_REQUESTED blockers: preserved persisted harness across work-agent resume/restart and conversation restart-all, added canonical harness policy route and frontend policy cache, added harness selectors to conversation/switch/start flows, updated tests. npm run typecheck, npm run lint, and npm test passed (377 files / 4584 tests).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T01:25:17.155Z",
+      "reason": "main-merge-verified",
+      "note": "pan done reported a rebase conflict in src/lib/cloister/merge-agent.ts. Merged origin/main, kept the origin/main rev-parse handling with the existing lifecycle verification flow, then reran npm run typecheck, npm run lint, and npm test (378 files / 4595 tests passed).",
       "agentModel": "Claude Opus 4.7"
     }
   ],
