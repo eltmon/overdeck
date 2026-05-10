@@ -39,6 +39,9 @@ import { DesktopSettingsSection } from './DesktopSettingsSection';
 import { WorkhorsePanel } from './WorkhorsePanel';
 import { RolesPanel } from './RolesPanel';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
+// PAN-1055: drop the cached available-models response when Settings is saved
+// so subsequent picker renders see the new provider/keys mix immediately.
+import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
 import {
   SettingsLayout,
   SettingsHeader,
@@ -108,7 +111,6 @@ export function buildMiniMaxFormData(
     models: {
       providers: { ...miniMaxDefaults.models.providers },
       overrides: { ...miniMaxDefaults.models.overrides },
-      harness_overrides: { ...(formData?.models.harness_overrides || {}) },
       gemini_thinking_level: formData?.models.gemini_thinking_level,
     },
     api_keys: { ...(formData?.api_keys || {}) },
