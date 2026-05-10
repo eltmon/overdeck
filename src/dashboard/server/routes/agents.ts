@@ -2016,10 +2016,24 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (!hasBeads) {
+      // PAN-1048 C6: Beads are a hard requirement for the work role — without
+      // them the agent has nothing to claim, no Jidoka inspection scope, and
+      // commits would batch across multiple beads. Recovery already attempted
+      // above via createBeadsFromVBrief; if that failed the workspace's vBRIEF
+      // is missing or malformed, which is a planning bug that must surface to
+      // the operator. Refuse the spawn with 422 instead of starting a half-
+      // configured work agent that will silently misbehave.
       const detail = recoveryError
         ? ` Beads recovery failed: ${recoveryError}.`
         : ' No beads exist for this issue.';
-      console.warn(`[agents] Starting direct work agent for ${issueId} without beads.${detail}`);
+      console.warn(`[agents] Refusing to start work agent for ${issueId} without beads.${detail}`);
+      return jsonResponse({
+        success: false,
+        error: 'beads_required',
+        message: `Cannot start work agent for ${issueId} without beads.${detail} `
+          + 'Re-run planning so beads can be materialized from the vBRIEF plan, then retry.',
+        ...(recoveryError ? { recoveryError } : {}),
+      }, { status: 422 });
     }
 
     const health = yield* readModel.getSnapshot.pipe(
@@ -2456,7 +2470,10 @@ const postAgentsRoute = HttpRouter.add(
           yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
             id: earlyAgentId,
             issueId,
-            runtime: 'claude',
+            // PAN-1048 R2: legacy `runtime` field removed from state.json writes;
+            // AgentState shape carries `harness` instead and parseAgentState drops
+            // unknown fields. Harness is unknown at this point (containers not
+            // ready) so we omit it; saveAgentState will set it on the next write.
             model: 'pending-container-start',
             status: 'starting',
             startedAt: new Date().toISOString(),
@@ -2525,7 +2542,7 @@ const postAgentsRoute = HttpRouter.add(
                     await writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
                       id: earlyAgentId,
                       issueId,
-                      runtime: 'claude',
+                      // PAN-1048 R2: legacy `runtime` removed from state.json writes.
                       model: 'pending-container-start',
                       status: 'failed',
                       startedAt: new Date().toISOString(),
@@ -2573,7 +2590,7 @@ const postAgentsRoute = HttpRouter.add(
                   await writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
                     id: earlyAgentId,
                     issueId,
-                    runtime: 'claude',
+                    // PAN-1048 R2: legacy `runtime` removed from state.json writes.
                     model: 'pending-container-start',
                     status: 'failed',
                     startedAt: new Date().toISOString(),
@@ -2627,7 +2644,7 @@ const postAgentsRoute = HttpRouter.add(
     yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
       id: earlyAgentId,
       issueId,
-      runtime: 'claude',
+      // PAN-1048 R2: legacy `runtime` removed from state.json writes.
       model: 'pending-work-spawn',
       status: 'starting',
       startedAt: new Date().toISOString(),

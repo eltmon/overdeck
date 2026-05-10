@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
-import { readFile, readdir } from 'fs/promises';
+import { readFile, readdir, writeFile as writeFileAsync, mkdir as mkdirAsync } from 'fs/promises';
 import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
@@ -511,6 +511,38 @@ export function saveAgentState(state: AgentState): void {
 
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
+  }
+}
+
+/**
+ * PAN-1048 P1: Async variant of saveAgentState for hot paths reachable from
+ * the dashboard event loop (spawnRun is invoked by Effect routes and the
+ * reactive Cloister scheduler). Uses fs/promises so we never block the
+ * Node event loop on disk I/O. Status-transition audit logging is preserved
+ * — `getAgentState` is still synchronous because it's called from synchronous
+ * read paths elsewhere; reading once before the write is acceptable here
+ * (small file, infrequent transitions).
+ */
+export async function saveAgentStateAsync(state: AgentState): Promise<void> {
+  const dir = getAgentDir(state.id);
+  await mkdirAsync(dir, { recursive: true });
+
+  const oldState = getAgentState(state.id);
+  const oldStatus = oldState?.status;
+
+  if (state.status === 'running' || state.status === 'starting') {
+    delete state.stoppedAt;
+  } else if (state.status === 'stopped' && !state.stoppedAt) {
+    state.stoppedAt = new Date().toISOString();
+  }
+
+  await writeFileAsync(
+    join(dir, 'state.json'),
+    JSON.stringify(cleanAgentState(state), null, 2),
+  );
+
+  if (oldStatus && oldStatus !== state.status) {
+    logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateAsync)`);
   }
 }
 
@@ -1538,6 +1570,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   initHook(agentId);
   const selectedModel = determineModel({ model: options.model, role });
 
+  // PAN-1048 C5: Resolve the harness for this role from config.roles[role].harness
+  // before falling back to claude-code. Explicit options.harness takes precedence
+  // (used by the dashboard run picker), then config, then default. Without this
+  // step, every role spawned through spawnRun ignored the per-role harness slot
+  // surfaced in the Settings UI.
+  const resolvedHarness: 'claude-code' | 'pi' = options.harness
+    ?? loadYamlConfig().config.roles?.[role]?.harness
+    ?? 'claude-code';
+
   if (
     getProviderForModel(selectedModel).name === 'openai'
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
@@ -1556,19 +1597,22 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     id: agentId,
     issueId,
     workspace,
-    harness: options.harness ?? 'claude-code',
+    harness: resolvedHarness,
     role,
     model: selectedModel,
     status: 'starting',
     startedAt: new Date().toISOString(),
     costSoFar: 0,
   };
-  saveAgentState(state);
+  // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
+  // reactive Cloister scheduler). All disk I/O here uses async fs/promises
+  // so we never block the Node event loop.
+  await saveAgentStateAsync(state);
 
   let promptFile: string | undefined;
   if (options.prompt) {
     promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
-    writeFileSync(promptFile, options.prompt);
+    await writeFileAsync(promptFile, options.prompt);
   }
 
   checkAndSetupHooks();
@@ -1591,11 +1635,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     providerExports,
     promptFile,
     panopticonEnv: { agentId, issueId, sessionType: role },
-    baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, state.harness ?? 'claude-code'),
+    baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness),
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-  writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+  await writeFileAsync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=role-run | role=${role} | model=${state.model} | source=agents.ts:spawnRun | session=${agentId} | command="${claudeCmd}"`);
 
@@ -1619,7 +1663,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
-  saveAgentState(state);
+  await saveAgentStateAsync(state);
 
   emitActivityEntry({
     source: role,
@@ -2214,16 +2258,22 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
 
     const providerExports = await getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
+    // PAN-1048 C4: resume must relaunch with the agent's actual role, not
+    // hardcoded 'work'. A stopped review/test/ship run was previously
+    // resurrected as a work agent because launcher generation ignored the
+    // saved role. Use agentState.role and route through getRoleRuntimeBaseCommand
+    // so the role-specific .claude/agents/* definition file is loaded.
+    const resumeRole: Role = agentState.role ?? 'work';
     const fallbackContent = generateLauncherScript({
-      role: 'work',
+      role: resumeRole,
       workingDir: agentState.workspace,
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: await getAgentRuntimeBaseCommand(
+      baseCommand: await getRoleRuntimeBaseCommand(
         agentState.model || 'claude-sonnet-4-6',
         normalizedId,
-        roleAgentDefinitionPath('work'),
+        resumeRole,
         agentState.harness ?? 'claude-code',
       ),
     });
@@ -2678,12 +2728,13 @@ export async function recoverAgent(
     }
   }
 
-  // Restart the agent with recovery context. Agent definition is derived from the session id:
-  // planning sessions use the planner definition; everything else uses the work definition.
-  const recoveryAgentDefinition = normalizedId.startsWith('planning-')
-    ? roleAgentDefinitionPath('plan')
-    : roleAgentDefinitionPath('work');
-  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, recoveryAgentDefinition, state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  // Restart the agent with recovery context. PAN-1048 C4: derive the role from
+  // the saved AgentState (or the session-id heuristic for legacy planning-* IDs)
+  // and route through getRoleRuntimeBaseCommand so review/test/ship don't get
+  // resurrected as work agents.
+  const recoveryRole: Role = state.role
+    ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work');
+  const claudeCmd = `${await getRoleRuntimeBaseCommand(state.model, agentId, recoveryRole, state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,

@@ -431,14 +431,21 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     progress(3, 'Loading specs & PRDs', `Searching for ${issue.identifier} specs`);
 
     // Determine planning model — explicit override takes precedence over role routing.
-    let settingsModel = 'claude-opus-4-7';
-    let modelSource = 'roles.plan.model';
-    try {
+    // PAN-1048 R1: resolveModel must NOT be wrapped in try/catch with a silent
+    // fallback. If the user's roles.plan.model points at a missing workhorse
+    // slot, an unknown model id, or a chained reference we can't dereference,
+    // we want spawn to fail loudly with the precise error so the operator can
+    // fix their config. The previous fallback to claude-opus-4-7 hid those
+    // bugs and silently overrode their explicit configuration.
+    let settingsModel: string;
+    let modelSource: string;
+    if (modelOverride) {
+      settingsModel = 'claude-opus-4-7'; // unused — modelOverride wins
+      modelSource = 'modelOverride';
+    } else {
       settingsModel = resolveModel('plan', undefined, loadConfig().config);
+      modelSource = 'roles.plan.model';
       console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
-    } catch (err: any) {
-      modelSource = 'fallback';
-      console.warn(`[start-planning] Role model resolution failed for plan, falling back to ${settingsModel}: ${err.message}`);
     }
     const planningModel = modelOverride || settingsModel;
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource})`);
@@ -548,11 +555,11 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // See PAN-417 for the full forensic timeline.
 
     // ── Update agent state to running ──────────────────────────────────────
+    // PAN-1048 R2: legacy `runtime` field removed; AgentState carries `harness`.
     await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
       id: sessionName,
       issueId: issue.identifier,
       workspace: workspacePath,
-      runtime: 'claude',
       model: planningModel,
       status: 'running',
       startedAt: new Date().toISOString(),
