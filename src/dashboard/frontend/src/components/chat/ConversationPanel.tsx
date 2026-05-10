@@ -140,17 +140,11 @@ export function ConversationPanel({
   // Theme for diff tree icons
   const { resolvedTheme } = useTheme();
 
-  // Fetch turn diff summaries — agent diffs (checkpoint-based) or conversation diffs (JSONL-based)
+  // Fetch turn diff summaries — always use JSONL-based conversation diffs
+  // (the checkpoint-based agent diffs path doesn't populate assistantMessageId)
   const { data: diffData } = useQuery({
-    queryKey: agentId
-      ? ['agent-diffs', agentId]
-      : ['conversation-diffs', conversation.name],
+    queryKey: ['conversation-diffs', conversation.name],
     queryFn: async () => {
-      if (agentId) {
-        const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/diffs`)
-        if (!res.ok) return null
-        return res.json() as Promise<{ summaries: TurnDiffSummary[] }>
-      }
       const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/diffs`)
       if (!res.ok) return null
       return res.json() as Promise<{ summaries: TurnDiffSummary[] }>
