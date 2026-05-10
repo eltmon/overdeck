@@ -688,25 +688,46 @@ function assertSingleWriter(planPath: string, writerId: string): void {
   activePlanWriters.set(planPath, writerId);
 }
 
+// PAN-977 round-16 blocker #2: bounded retry/wait around the writer lock so
+// concurrent same-cycle dispatch claims (parallel slot spawns mutating the
+// same .pan/spec.vbrief.json) wait for the previous atomic write rather than
+// failing the item outright. Total wait budget ≈ 1s — long enough to absorb
+// many sub-millisecond same-process claims, short enough that a genuinely
+// stuck lock surfaces quickly.
+const WRITER_LOCK_RETRY_DELAYS_MS = [5, 10, 20, 40, 80, 160, 320, 360];
+
 async function assertSingleWriterAsync(planPath: string, writerId: string): Promise<void> {
-  const owner = activePlanWriters.get(planPath);
-  if (owner && owner !== writerId) {
-    throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${owner} already owns the worktree`);
-  }
   const lockPath = lockPathForPlan(planPath);
-  try {
-    await mkdir(lockPath, { mode: 0o700 });
-    await writeFile(lockOwnerPath(planPath), JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2), 'utf-8');
-  } catch (err: any) {
-    if (err?.code !== 'EEXIST') throw err;
-    let lockOwner = 'unknown writer';
-    try {
-      const ownerData = JSON.parse(await readFile(lockOwnerPath(planPath), 'utf-8')) as { writerId?: string; pid?: number; acquiredAt?: string };
-      lockOwner = `${ownerData.writerId ?? 'unknown writer'} pid=${ownerData.pid ?? 'unknown'} acquiredAt=${ownerData.acquiredAt ?? 'unknown'}`;
-    } catch { /* ignore malformed owner file */ }
-    throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lockOwner} already owns the worktree`);
+  let lastOwnerDescription = 'unknown writer';
+  for (let attempt = 0; attempt <= WRITER_LOCK_RETRY_DELAYS_MS.length; attempt += 1) {
+    const owner = activePlanWriters.get(planPath);
+    if (!owner || owner === writerId) {
+      try {
+        await mkdir(lockPath, { mode: 0o700 });
+        await writeFile(
+          lockOwnerPath(planPath),
+          JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2),
+          'utf-8',
+        );
+        activePlanWriters.set(planPath, writerId);
+        return;
+      } catch (err: any) {
+        if (err?.code !== 'EEXIST') throw err;
+        // On-disk lock exists but in-memory map says owner-or-empty — record
+        // the on-disk owner for diagnostics, then fall through to retry.
+        try {
+          const ownerData = JSON.parse(await readFile(lockOwnerPath(planPath), 'utf-8')) as { writerId?: string; pid?: number; acquiredAt?: string };
+          lastOwnerDescription = `${ownerData.writerId ?? 'unknown writer'} pid=${ownerData.pid ?? 'unknown'} acquiredAt=${ownerData.acquiredAt ?? 'unknown'}`;
+        } catch { /* ignore malformed owner file */ }
+      }
+    } else {
+      lastOwnerDescription = owner;
+    }
+    const delay = WRITER_LOCK_RETRY_DELAYS_MS[attempt];
+    if (delay === undefined) break;
+    await new Promise<void>((resolve) => { setTimeout(resolve, delay); });
   }
-  activePlanWriters.set(planPath, writerId);
+  throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lastOwnerDescription} already owns the worktree`);
 }
 
 export function releasePlanWriter(planPath: string, writerId: string): void {

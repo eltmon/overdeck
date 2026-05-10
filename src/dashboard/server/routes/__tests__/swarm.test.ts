@@ -545,19 +545,80 @@ describe('swarm route helpers', () => {
       autoAdvance: true,
     });
 
-    // Dispatch must REFUSE to alias the live completed-synthesis session as
-    // the implementation slot. With only one item and slot-1 occupied, the
-    // dispatcher returns 500 (no slots dispatched) rather than silently
-    // returning the synthesis assignment as if it were implementation.
-    expect(result.status).toBe(500);
-    expect(agents.spawnAgent).not.toHaveBeenCalled();
-
-    // Ensure no implementation-phase slot was recorded for wave-1-item.
+    // Dispatch must NOT alias the live completed-synthesis session in slot
+    // 1. Round-15 + round-16 fix together: the phase-aware reuse guard
+    // refuses to alias, and the new free-slot allocator hands out the
+    // lowest unoccupied slot id (slot 2 here, since slot 1 is alive) so
+    // the implementation work still dispatches on a fresh slot rather than
+    // stalling.
+    expect(result.status).toBe(200);
     const after = (await __testInternals.loadSwarmState('PAN-971'))!;
     const implSlot = after.slots.find(
       (s) => s.itemId === 'wave-1-item' && s.phase === 'implementation',
     );
-    expect(implSlot).toBeUndefined();
+    expect(implSlot, 'implementation slot must be dispatched on a fresh slot id').toBeTruthy();
+    expect(implSlot?.slot, 'must NOT alias the live synthesis slot 1').not.toBe(1);
+
+    // The original synthesis slot record stays in the cumulative history
+    // untouched — its status remains 'completed' (it was the synthesis-phase
+    // dispatch, never aliased).
+    const synthSlot = after.slots.find(
+      (s) => s.itemId === 'wave-1-item' && s.phase === 'synthesis',
+    );
+    expect(synthSlot?.status).toBe('completed');
+  });
+
+  // PAN-977 round-16 blocker #1: slot allocation must hand out the LOWEST
+  // FREE slot id, not the positional batch index. Pre-fix, dispatch reused
+  // `index + 1` and stalled whenever slot-1 was already occupied even though
+  // higher slot ids were free — auto-advance would silently fail to dispatch
+  // valid ready work.
+  it('allocates the lowest free slot when slot-1 is occupied by a running prior dispatch', async () => {
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    writeFileSync(swarmStatePath, JSON.stringify({
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      // Slot 1 is still running from a prior dispatch (an unrelated parallel
+      // item working on its own scope). The new ready item MUST be assigned
+      // slot 2, not stall on slot 1.
+      slots: [
+        {
+          slot: 1,
+          itemId: 'unrelated-running',
+          itemTitle: 'Unrelated running work',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'running',
+          phase: 'implementation',
+          startedAt: '2026-05-07T00:00:00Z',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    }, null, 2));
+
+    // The slot-1 tmux session is alive; slot-2 is free.
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue(['agent-pan-971-1']);
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(false);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['12345']);
+
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 0,
+      autoAdvance: true,
+    });
+
+    expect(result.status).toBe(200);
+    const after = (await __testInternals.loadSwarmState('PAN-971'))!;
+    const newDispatch = after.slots.find((s) => s.itemId === 'wave-0-item');
+    expect(newDispatch, 'wave-0-item must be dispatched even though slot 1 is occupied').toBeTruthy();
+    expect(newDispatch?.slot, 'must allocate slot 2 (lowest free) instead of stalling on slot 1').toBe(2);
+    expect(newDispatch?.sessionName).toBe('agent-pan-971-2');
+    expect(newDispatch?.status).toBe('running');
   });
 
   it('does not advance while current wave still has running slots', async () => {

@@ -744,15 +744,54 @@ async function dispatchSwarmWave(
     }
   }
 
+  // PAN-977 round-16 blocker #1: allocate slot numbers from the set of free
+  // slots, NOT from the positional index in itemsToDispatch. Reusing
+  // `index + 1` failed to dispatch valid ready work whenever a low-numbered
+  // slot was still occupied by a running/pending dispatch from a prior wave
+  // even when higher slot ids were free, stalling auto-advance despite
+  // available capacity.
+  //
+  // Occupied set = live tmux sessions ∪ existingState slots whose status
+  // is `running` or `pending`. The dispatcher walks slot ids 1..∞ and hands
+  // out the lowest free id to each item. Inside the per-item closure the
+  // live-session collision check still fires if the chosen slot becomes
+  // alive between allocation and spawn (race-only path, surfaced as an
+  // error rather than silent aliasing).
+  const occupiedSlotIds = new Set<number>();
+  for (const sessionName of aliveSlots) {
+    const match = /-(\d+)$/.exec(sessionName);
+    if (match) {
+      const n = Number.parseInt(match[1]!, 10);
+      if (Number.isInteger(n) && n > 0) occupiedSlotIds.add(n);
+    }
+  }
+  for (const slot of (existingState?.slots ?? [])) {
+    if (slot.status === 'running' || slot.status === 'pending') {
+      occupiedSlotIds.add(slot.slot);
+    }
+  }
+  const allocateNextFreeSlot = (): number => {
+    for (let candidate = 1; ; candidate += 1) {
+      if (!occupiedSlotIds.has(candidate)) {
+        occupiedSlotIds.add(candidate);
+        return candidate;
+      }
+    }
+  };
+  const itemSlotAssignments = itemsToDispatch.map((item) => ({
+    item,
+    slotNum: allocateNextFreeSlot(),
+  }));
+
   const dispatched: SlotAssignment[] = [];
   const errors: string[] = [];
   const planPath = findPlan(mainWorkspace);
 
   const slotResults = await runWithConcurrencyLimit(
-    itemsToDispatch,
+    itemSlotAssignments,
     SWARM_SLOT_SPAWN_CONCURRENCY,
-    async (item, index) => {
-      const slotNum = index + 1;
+    async (assignment) => {
+      const { item, slotNum } = assignment;
       const sessionName = `agent-${issueLower}-${slotNum}`;
 
       // PAN-977 round-15 blocker: compute the phase BEFORE the live-session
