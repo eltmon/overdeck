@@ -1688,25 +1688,31 @@
           {
             "id": "x1-delete-old-pan-agent-md.ac1",
             "title": "All 7 .claude/agents/pan-*-agent.md files deleted",
-            "status": "pending",
+            "status": "cancelled",
             "metadata": {
-              "kind": "acceptance_criterion"
+              "kind": "acceptance_criterion",
+              "deferred": true,
+              "cancelledReason": "Deferred out of PAN-1048 scope; legacy agent files must remain until follow-up cleanup."
             }
           },
           {
             "id": "x1-delete-old-pan-agent-md.ac2",
             "title": "grep -r 'pan-\\(work\\|planning\\|review\\|test\\|inspect\\|uat\\|merge\\)-agent' src/ returns zero hits in non-comment code",
-            "status": "pending",
+            "status": "cancelled",
             "metadata": {
-              "kind": "acceptance_criterion"
+              "kind": "acceptance_criterion",
+              "deferred": true,
+              "cancelledReason": "Deferred out of PAN-1048 scope; legacy agent files must remain until follow-up cleanup."
             }
           },
           {
             "id": "x1-delete-old-pan-agent-md.ac3",
             "title": "End-to-end: a fresh planning + work + review + test + ship cycle succeeds against a test issue",
-            "status": "pending",
+            "status": "cancelled",
             "metadata": {
-              "kind": "acceptance_criterion"
+              "kind": "acceptance_criterion",
+              "deferred": true,
+              "cancelledReason": "Deferred out of PAN-1048 scope; legacy agent files must remain until follow-up cleanup."
             }
           }
         ]
