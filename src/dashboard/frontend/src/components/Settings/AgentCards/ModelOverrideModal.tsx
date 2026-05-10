@@ -14,8 +14,8 @@ import {
 } from 'lucide-react';
 import { WorkTypeId, ModelId, Harness } from '../types';
 import { CostWarningBadge, costWarningLevel } from '../../shared/costWarning';
-import { canUsePickerHarness } from '../../shared/ModelPicker';
-import type { HarnessPolicyDecisions } from '../../shared/ModelPicker';
+import { canUsePickerHarness, HarnessSelect } from '../../shared/ModelPicker';
+import type { HarnessPolicyDecisions, ModelGroup } from '../../shared/ModelPicker';
 
 // Model capabilities that can be matched to work types
 export type Capability = 'reasoning' | 'code' | 'vision' | 'fast' | 'cost-efficient' | 'large-context' | 'complex-math' | 'efficiency' | 'agentic';
@@ -346,9 +346,18 @@ export function ModelOverrideModal({
     onClose();
   };
 
-  const piDecision = canUsePickerHarness('pi', selectedModel, harnessPolicy);
-  const piBlocked = !piDecision.allowed;
-  const effectiveHarness = piBlocked && selectedHarness === 'pi' ? 'claude-code' : selectedHarness;
+  const pickerGroups: ModelGroup[] = displayProviders.map((provider) => ({
+    provider: provider.key,
+    label: provider.name,
+    models: provider.models.map((model) => ({
+      id: model.id,
+      label: model.name,
+      provider: provider.key,
+      costPer1MTokens: model.costPer1MTokens,
+    })),
+  }));
+  const selectedHarnessDecision = canUsePickerHarness(selectedHarness, selectedModel, harnessPolicy);
+  const effectiveHarness = selectedHarnessDecision.allowed ? selectedHarness : 'claude-code';
   const hasChanges = selectedModel !== currentModel || effectiveHarness !== currentHarness;
 
 
@@ -380,17 +389,15 @@ export function ModelOverrideModal({
         </div>
 
         <div className="px-6 py-4 border-b border-border bg-card">
-          <label className="text-sm font-medium text-foreground mb-1.5 block">Harness</label>
-          <select
+          <HarnessSelect
             value={effectiveHarness}
-            onChange={(e) => setSelectedHarness(e.target.value as Harness)}
-            className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="claude-code">Claude Code (default)</option>
-            <option value="pi" disabled={piBlocked}>Pi RPC{piBlocked ? ' — unavailable for Anthropic subscription' : ''}</option>
-          </select>
-          {piBlocked && selectedHarness === 'pi' && (
-            <p className="text-xs text-warning mt-1">{piDecision.reason ?? 'Pi is unavailable for this model/auth combination; Claude Code will be used.'}</p>
+            onChange={setSelectedHarness}
+            modelId={selectedModel}
+            groups={pickerGroups}
+            harnessPolicy={harnessPolicy}
+          />
+          {!selectedHarnessDecision.allowed && (
+            <p className="text-xs text-warning mt-1">{selectedHarnessDecision.reason ?? 'Pi is unavailable for this model/auth combination; Claude Code will be used.'}</p>
           )}
         </div>
 

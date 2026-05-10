@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T01:29:29.380Z",
+  "updated": "2026-05-10T01:44:26.923Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "4d8896ad5",
+    "sha": "2fd70b5bc",
     "dirty": true
   },
   "decisions": [
@@ -48,6 +48,11 @@
       "id": "D8",
       "summary": "Work-agent resume/restart and conversation restart-all now resolve and pass persisted harness values, preserving Pi sessions where policy allows them.",
       "recordedAt": "2026-05-10T01:19:43.564Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Resolved latest review blockers by calculating effective work-agent harness before Docker-delayed starts, enforcing planning harness policy after final model resolution, and replacing the Settings override native select with shared HarnessSelect.",
+      "recordedAt": "2026-05-10T01:43:28.352Z"
     }
   ],
   "hazards": [
@@ -58,12 +63,14 @@
     }
   ],
   "resumePoint": {
-    "description": "Fixed frontend-typecheck errors from feedback 003 by narrowing string runtime fallbacks to Harness literals before passing currentHarness. npm run typecheck passes. Next step is commit and invoke /rebase-and-submit PAN-1055.",
+    "description": "Latest CHANGES_REQUESTED blockers fixed and verified: Docker-delayed work-agent starts preserve selected harness in all placeholder states and pan start invocation, planning sessions enforce harness policy after final model resolution, Settings per-role override uses shared HarnessSelect, and harness-policy route is bounded. typecheck, lint, targeted tests, and full npm test pass. Next step is commit and invoke /rebase-and-submit PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
-      ".pan/feedback/003-verification-gate-failed.md",
-      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx"
+      ".pan/feedback/001-review-agent-changes-requested.md",
+      "src/dashboard/server/routes/agents.ts",
+      "src/lib/planning/spawn-planning-session.ts",
+      "src/dashboard/frontend/src/components/Settings/AgentCards/ModelOverrideModal.tsx",
+      "src/dashboard/server/routes/settings.ts"
     ]
   },
   "beadsMapping": {
@@ -138,6 +145,12 @@
       "timestamp": "2026-05-10T01:29:29.380Z",
       "reason": "verification-fix",
       "note": "Fixed frontend-typecheck failures from .pan/feedback/003-verification-gate-failed.md by converting agent.runtime fallback to Harness literals for SwitchModelModal currentHarness. Verified with npm run typecheck.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T01:44:26.923Z",
+      "reason": "review-response-verified",
+      "note": "Fixed review blockers for Docker-delayed harness preservation, planning policy enforcement after default/settings model resolution, and Settings shared picker usage. Also capped harness-policy request size. Verified npm run typecheck, npm run lint, targeted harness tests, and npm test (378 files / 4595 tests passed).",
       "agentModel": "Claude Opus 4.7"
     }
   ],

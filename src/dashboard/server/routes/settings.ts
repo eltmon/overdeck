@@ -674,6 +674,8 @@ const postOpenRouterTestKeyRoute = HttpRouter.add(
 // ─── Route: GET /api/settings/harness-policy ────────────────────────────────
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
+const MAX_HARNESS_POLICY_MODELS = 250;
+const MAX_HARNESS_POLICY_MODEL_LENGTH = 200;
 
 const getHarnessPolicyRoute = HttpRouter.add(
   'GET',
@@ -687,7 +689,11 @@ const getHarnessPolicyRoute = HttpRouter.add(
         .map((model) => model.trim())
         .filter(Boolean);
 
-      if (models.length === 0 || models.some((model) => !SAFE_MODEL_PATTERN.test(model))) {
+      if (
+        models.length === 0
+        || models.length > MAX_HARNESS_POLICY_MODELS
+        || models.some((model) => model.length > MAX_HARNESS_POLICY_MODEL_LENGTH || !SAFE_MODEL_PATTERN.test(model))
+      ) {
         return jsonResponse({ error: 'Valid models parameter is required' }, { status: 400 });
       }
 
