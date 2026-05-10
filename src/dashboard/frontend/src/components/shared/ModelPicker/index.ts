@@ -10,4 +10,11 @@ export {
   FALLBACK_GROUPS,
   FALLBACK_COMPACTION_MODEL,
 } from './ModelPicker';
-export type { PickerModel, ModelGroup, Harness, AuthMode } from './ModelPicker';
+export type {
+  PickerModel,
+  ModelGroup,
+  Harness,
+  AuthMode,
+  HarnessDecision,
+  HarnessPolicyDecisions,
+} from './ModelPicker';

@@ -16,8 +16,11 @@ import {
 } from './defaultConversationModel';
 import { usePickerPosition } from './usePickerPosition';
 import { CostWarningBadge, costWarningLevel } from '../shared/costWarning';
-import { HarnessSelect, type Harness, type HarnessPolicyDecisions, type ModelGroup as SharedModelGroup } from '../shared/ModelPicker';
+import { HarnessSelect, type HarnessPolicyDecisions, type ModelGroup as SharedModelGroup } from '../shared/ModelPicker';
+import type { Harness } from '../shared/ModelPicker';
 import styles from '../CommandDeck/styles/command-deck.module.css';
+
+export type { Harness } from '../shared/ModelPicker';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

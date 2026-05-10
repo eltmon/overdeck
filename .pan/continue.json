@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T01:25:17.155Z",
+  "updated": "2026-05-10T01:27:39.844Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "ec85d7d54",
+    "sha": "f766fdb52",
     "dirty": true
   },
   "decisions": [
@@ -58,14 +58,13 @@
     }
   ],
   "resumePoint": {
-    "description": "Merged origin/main, resolved merge-agent conflict, and re-verified typecheck, lint, and npm test. Next step is rerun pan done for PAN-1055.",
+    "description": "Fixed frontend-typecheck errors from verification feedback by exporting harness policy types from the shared picker barrel, exporting the chat Harness type, adding Agent.harness to frontend types, and removing an unused HarnessSelect destructured prop. npm run typecheck passes. Next step is commit and invoke /rebase-and-submit PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
-      "src/lib/agents.ts",
-      "src/dashboard/server/routes/settings.ts",
-      "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
-      "src/dashboard/frontend/src/components/KanbanBoard.tsx",
-      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx"
+      ".pan/feedback/002-verification-gate-failed.md",
+      "src/dashboard/frontend/src/components/shared/ModelPicker/index.ts",
+      "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+      "src/dashboard/frontend/src/types.ts"
     ]
   },
   "beadsMapping": {
@@ -118,6 +117,17 @@
       "timestamp": "2026-05-10T01:25:17.155Z",
       "reason": "main-merge-verified",
       "note": "pan done reported a rebase conflict in src/lib/cloister/merge-agent.ts. Merged origin/main, kept the origin/main rev-parse handling with the existing lifecycle verification flow, then reran npm run typecheck, npm run lint, and npm test (378 files / 4595 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T01:25:36.810Z",
+      "reason": "end",
+      "note": "Fixed remaining harness picker review blockers: persisted harness across resume/restart paths, canonicalized frontend harness policy, and added missing combined picker flows."
+    },
+    {
+      "timestamp": "2026-05-10T01:27:39.844Z",
+      "reason": "verification-fix",
+      "note": "Fixed frontend-typecheck failures reported in .pan/feedback/002-verification-gate-failed.md and verified with npm run typecheck.",
       "agentModel": "Claude Opus 4.7"
     }
   ],

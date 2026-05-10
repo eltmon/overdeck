@@ -294,7 +294,6 @@ export function HarnessSelect({
   value,
   onChange,
   modelId,
-  groups,
   harnessPolicy,
   label = 'Harness',
 }: {
