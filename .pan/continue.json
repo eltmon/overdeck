@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T10:43:45.000Z",
+  "updated": "2026-05-10T12:10:03Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "dc02bd740",
+    "sha": "6c4848c67",
     "dirty": true
   },
   "decisions": [
@@ -73,6 +73,11 @@
       "id": "D13",
       "summary": "Resolved latest review blockers by forcing conversation harness resolution to claude-code when no concrete model is available, threading summaryHarness into fork summary generation so Pi launches use the Pi runtime, and initializing PlanDialog from models.harness_overrides[planning-agent].",
       "recordedAt": "2026-05-10T10:43:45.000Z"
+    },
+    {
+      "id": "D14",
+      "summary": "Fixed verification test failures by isolating lifecycle tests from host Linear credentials, mocking Linear SDK in CLI state cleanup tests, and preserving fs/promises APIs in post-merge lifecycle tests so fallthrough cleanup does not time out under the full suite.",
+      "recordedAt": "2026-05-10T12:10:03Z"
     }
   ],
   "hazards": [
@@ -83,14 +88,14 @@
     }
   ],
   "resumePoint": {
-    "description": "Fixed latest CHANGES_REQUESTED blockers: conversation create/resume/switch no longer persist Pi without a concrete model, summary fork generation now receives and uses summaryHarness, and planning kickoff initializes harness from the saved planning-agent override. typecheck and lint pass; full npm test had one unrelated flake that passed when targeted and should be rerun before submit.",
+    "description": "Fixed verification-gate test failures from feedback 002/003. Full npm test now passes (378 files / 4595 tests). Next step is commit and invoke /rebase-and-submit PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
-      ".pan/feedback/001-review-agent-changes-requested.md",
-      "src/dashboard/server/routes/conversations.ts",
-      "src/lib/conversations/summary-fork.ts",
-      "src/lib/conversations/smart-compaction.ts",
-      "src/dashboard/frontend/src/components/PlanDialog.tsx"
+      ".pan/feedback/002-verification-gate-failed.md",
+      ".pan/feedback/003-verification-gate-failed.md",
+      "tests/cli/commands/work/linear-states.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts",
+      "tests/unit/lib/pan-444-post-merge-step0.test.ts"
     ]
   },
   "beadsMapping": {
@@ -205,6 +210,17 @@
       "timestamp": "2026-05-10T10:43:45.000Z",
       "reason": "review-response-in-progress",
       "note": "Fixed three latest review blockers for harness launch-state consistency, fork summary runtime selection, and saved planning-agent harness override. npm run typecheck and npm run lint pass; full npm test encountered one deep-wipe test flake that passed when rerun targeted.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T11:36:45.371Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-10T12:10:03Z",
+      "reason": "verification-fix",
+      "note": "Fixed test verification failures by preventing Linear SDK/network access from unit tests and restoring partial fs/promises mocks. Verified npm run typecheck, npm run lint, targeted tests, and full npm test (378 files / 4595 tests passed).",
       "agentModel": "Claude Opus 4.7"
     }
   ],

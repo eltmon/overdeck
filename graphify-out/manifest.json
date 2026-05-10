@@ -176,8 +176,8 @@
     "hash": "0b266dc3f17930bc3de58b23f5575a12"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/tests/unit/lib/pan-444-post-merge-step0.test.ts": {
-    "mtime": 1778376102.8602848,
-    "hash": "a34b2c1eaf75904c35e381424d30f849"
+    "mtime": 1778414419.298926,
+    "hash": "adda6c7889c4f983f67533234db61b6a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/tests/unit/lib/platform-lifecycle.test.ts": {
     "mtime": 1778359583.3253849,
@@ -252,8 +252,8 @@
     "hash": "27bd042c84b2436554b15a0965e4a7fd"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/tests/unit/lib/lifecycle/workflows.test.ts": {
-    "mtime": 1778359583.3253849,
-    "hash": "da131a9b2b3292cc58187966e04e0351"
+    "mtime": 1778414819.950196,
+    "hash": "af7282782b2cc85e53d2965e5421345b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/tests/unit/lib/lifecycle/teardown-workspace.test.ts": {
     "mtime": 1778359583.3253849,
@@ -808,8 +808,8 @@
     "hash": "b7c8893bedb903137c1bc0c75672e91a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/tests/cli/commands/work/linear-states.test.ts": {
-    "mtime": 1778359583.3195624,
-    "hash": "7e1185b4da03150502c047f6bd75d9d0"
+    "mtime": 1778414383.7804568,
+    "hash": "cf108fe49626775e93705bca9793b3cb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/tests/cli/commands/work/reopen.test.ts": {
     "mtime": 1778359583.3195624,
@@ -896,7 +896,7 @@
     "hash": "912dd048fc5f1898876a9d587eeafcc0"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/scripts/record-cost-event.d.ts": {
-    "mtime": 1778407860.1579862,
+    "mtime": 1778413087.8380244,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/scripts/notify-complete": {
