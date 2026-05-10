@@ -156,7 +156,7 @@ async function ensureReviewTempStash(issueId: string, workspace: string): Promis
   return { ref, message, sequence };
 }
 
-async function cleanupReviewTempStash(issueId: string, workspace: string): Promise<void> {
+export async function cleanupReviewTempStash(issueId: string, workspace: string): Promise<void> {
   const status = getReviewStatus(issueId);
   if (!status?.reviewTempStashRef) return;
 

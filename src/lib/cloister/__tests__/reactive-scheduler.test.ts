@@ -11,6 +11,24 @@ vi.mock('../../agents.js', () => ({
   spawnRun: vi.fn(async (issueId: string, role: string) => ({ id: `agent-${issueId.toLowerCase()}-${role}` })),
 }));
 
+vi.mock('../../projects.js', () => ({
+  resolveProjectFromIssue: vi.fn(() => ({
+    projectKey: 'pan',
+    projectPath: '/tmp/pan',
+  })),
+}));
+
+// PAN-1048 review feedback 003: review and test go through their dedicated
+// wrappers instead of bare spawnRun(). The scheduler dynamically imports
+// these modules, so we mock them at the module factory layer.
+vi.mock('../review-agent.js', () => ({
+  spawnReviewRoleForIssue: vi.fn(async () => ({ success: true, message: 'mock review spawned' })),
+}));
+
+vi.mock('../test-agent-queue.js', () => ({
+  dispatchTestAgentAndNotify: vi.fn(async () => undefined),
+}));
+
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
 }));
@@ -21,6 +39,8 @@ vi.mock('../../review-status.js', () => ({
 }));
 
 import { listRunningAgents, listRunningAgentsAsync, spawnRun } from '../../agents.js';
+import { spawnReviewRoleForIssue } from '../review-agent.js';
+import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 import {
   handleCloisterDomainEvent,
   issueStateChangeFromDomainEvent,
@@ -46,12 +66,16 @@ describe('reactive Cloister scheduler', () => {
     expect(stateToRole('canceled')).toBeNull();
   });
 
-  it('starts the role for an issue state transition', async () => {
+  it('starts the review role for an issue state transition via the wrapper', async () => {
     await onIssueStateChange('pan-503', 'in_review');
 
-    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'review', expect.objectContaining({
-      prompt: expect.stringContaining('REVIEW TASK for PAN-503'),
+    // Review dispatches through spawnReviewRoleForIssue so the wrapper carries
+    // review-temp stash + reviewSpawnedAt + status-posting prompt + idempotency.
+    expect(spawnReviewRoleForIssue).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-503',
+      branch: 'feature/pan-503',
     }));
+    expect(spawnRun).not.toHaveBeenCalled();
   });
 
   it('skips spawning when an active run already exists for the issue and role', async () => {
@@ -99,13 +123,51 @@ describe('reactive Cloister scheduler', () => {
     })).toEqual({ issueId: 'PAN-503', state: 'shipping' });
   });
 
-  it('reacts to work, review, and test completion events by spawning the next role', async () => {
+  it('reacts to work, review, and test completion events by routing each role through its dispatcher', async () => {
     await handleCloisterDomainEvent({ type: 'work.completed', payload: { issueId: 'PAN-503' } });
     await handleCloisterDomainEvent({ type: 'review.approved', payload: { issueId: 'PAN-503' } });
     await handleCloisterDomainEvent({ type: 'test.passed', payload: { issueId: 'PAN-503' } });
 
-    expect(spawnRun).toHaveBeenNthCalledWith(1, 'PAN-503', 'review', expect.any(Object));
-    expect(spawnRun).toHaveBeenNthCalledWith(2, 'PAN-503', 'test', expect.any(Object));
-    expect(spawnRun).toHaveBeenNthCalledWith(3, 'PAN-503', 'ship', expect.any(Object));
+    // PAN-1048 review feedback 003: review/test go through dedicated wrappers,
+    // ship still uses bare spawnRun().
+    expect(spawnReviewRoleForIssue).toHaveBeenCalledTimes(1);
+    expect(spawnReviewRoleForIssue).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-503',
+      branch: 'feature/pan-503',
+    }));
+    expect(dispatchTestAgentAndNotify).toHaveBeenCalledTimes(1);
+    expect(dispatchTestAgentAndNotify).toHaveBeenCalledWith(
+      'PAN-503',
+      expect.any(String),
+      'feature/pan-503',
+    );
+    expect(spawnRun).toHaveBeenCalledTimes(1);
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'ship', expect.any(Object));
+  });
+
+  it('ignores agent.completed events for non-work roles so review/test cycles do not loop', () => {
+    // Without role-branching, agent.completed from the review or test role
+    // would re-enter onIssueStateChange with state='in_review' and double-dispatch.
+    expect(issueStateChangeFromDomainEvent({
+      type: 'agent.completed',
+      payload: { issueId: 'PAN-503', role: 'review' },
+    })).toBeNull();
+
+    expect(issueStateChangeFromDomainEvent({
+      type: 'agent.completed',
+      payload: { issueId: 'PAN-503', role: 'test' },
+    })).toBeNull();
+
+    // work.completed-style agent.completed events still drive the work → review hop.
+    expect(issueStateChangeFromDomainEvent({
+      type: 'agent.completed',
+      payload: { issueId: 'PAN-503', role: 'work' },
+    })).toEqual({ issueId: 'PAN-503', state: 'in_review' });
+
+    // Legacy events without role still fall through to the work mapping.
+    expect(issueStateChangeFromDomainEvent({
+      type: 'agent.completed',
+      payload: { issueId: 'PAN-503' },
+    })).toEqual({ issueId: 'PAN-503', state: 'in_review' });
   });
 });

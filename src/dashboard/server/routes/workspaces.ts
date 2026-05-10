@@ -2948,6 +2948,24 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
       });
       console.log(`[review-status] Set review-agent (${tmuxSession}) to idle`);
 
+      // PAN-1048 review feedback 003: drop the review-temp stash on terminal
+      // review status. spawnReviewRoleForIssue() persists the stash ref before
+      // dispatching the review role; without this symmetric cleanup, every
+      // successful review leaves a stale review-temp:* stash and dangling
+      // reviewTempStashRef metadata. cleanupReviewTempStash is a no-op when
+      // no stash ref is set, so it's safe across all terminal verdicts.
+      try {
+        const wsInfo = getWorkspaceInfoForIssue(issueId);
+        if (wsInfo.exists && !wsInfo.isRemote && wsInfo.localPath) {
+          const { cleanupReviewTempStash } = yield* Effect.promise(() =>
+            import('../../../lib/cloister/review-agent.js')
+          );
+          yield* Effect.promise(() => cleanupReviewTempStash(issueId, wsInfo.localPath!));
+        }
+      } catch (err) {
+        console.error(`[review-status] Failed to drop review-temp stash for ${issueId}:`, err);
+      }
+
       if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
         const agentId = `agent-${issueId.toLowerCase()}`;
         const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\n## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests locally to verify your fixes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.`;

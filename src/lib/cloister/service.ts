@@ -27,6 +27,7 @@ import { getDatabase, closeDatabase } from '../database/index.js';
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgents, getAgentState, getAgentRuntimeState, saveAgentRuntimeState } from '../agents.js';
 import type { Role } from '../agents.js';
+import { resolveProjectFromIssue } from '../projects.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEvent, createHandoffEvent } from './handoff-logger.js';
@@ -211,7 +212,30 @@ Required steps:
 }
 
 /**
+ * Resolve the workspace path for an issue from agent state, then fall back
+ * to the canonical `<projectPath>/workspaces/feature-<issueLower>` layout.
+ * Mirrors the resolution used by startup recovery (service.ts:583-609) so
+ * the reactive scheduler dispatches review/test wrappers with the same
+ * workspace contract those wrappers receive on the manual code path.
+ */
+function resolveWorkspaceForIssue(issueId: string): string | null {
+  const issueLower = issueId.toLowerCase();
+  const agentState = getAgentState(`agent-${issueLower}`);
+  if (agentState?.workspace) return agentState.workspace;
+  const resolved = resolveProjectFromIssue(issueId);
+  if (!resolved) return null;
+  return `${resolved.projectPath}/workspaces/feature-${issueLower}`;
+}
+
+/**
  * Reactive Cloister entrypoint: start the role that owns a new issue state.
+ *
+ * PAN-1048 review feedback 003: review and test roles dispatch through their
+ * dedicated wrappers (spawnReviewRoleForIssue, dispatchTestAgentAndNotify)
+ * instead of bare spawnRun(). The wrappers carry the contract pieces the
+ * reactive path was previously dropping — review-temp stash, reviewSpawnedAt,
+ * feedback archival, status-posting prompt, idempotency guards, and the
+ * `/api/review/:issueId/status` integration that flips readyForMerge.
  */
 export async function onIssueStateChange(issueId: string, newState: string): Promise<void> {
   const normalizedIssueId = normalizeIssueId(issueId);
@@ -229,15 +253,38 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
   }
 
   try {
+    if (role === 'review') {
+      const workspace = resolveWorkspaceForIssue(normalizedIssueId);
+      if (!workspace) {
+        const failure = `${normalizedIssueId}: cannot dispatch review role — no workspace or project resolved`;
+        console.error(`[cloister] ${failure}`);
+        emitActivityEntry({ source: 'cloister', level: 'error', message: failure, issueId: normalizedIssueId });
+        return;
+      }
+      const branch = `feature/${normalizedIssueId.toLowerCase()}`;
+      const { spawnReviewRoleForIssue } = await import('./review-agent.js');
+      const result = await spawnReviewRoleForIssue({ issueId: normalizedIssueId, workspace, branch });
+      const message = `${normalizedIssueId}: review role dispatched from lifecycle state '${newState}' (${result.message})`;
+      console.log(`[cloister] ${message}`);
+      emitActivityEntry({ source: 'cloister', level: result.success ? 'info' : 'error', message, issueId: normalizedIssueId });
+      return;
+    }
+
+    if (role === 'test') {
+      const workspace = resolveWorkspaceForIssue(normalizedIssueId) ?? undefined;
+      const branch = `feature/${normalizedIssueId.toLowerCase()}`;
+      const { dispatchTestAgentAndNotify } = await import('./test-agent-queue.js');
+      await dispatchTestAgentAndNotify(normalizedIssueId, workspace, branch);
+      const message = `${normalizedIssueId}: test role dispatched from lifecycle state '${newState}'`;
+      console.log(`[cloister] ${message}`);
+      emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+      return;
+    }
+
     const { spawnRun } = await import('../agents.js');
     const run = await spawnRun(normalizedIssueId, role, {
       prompt: buildReactiveRolePrompt(normalizedIssueId, newState, role),
     });
-    if (role === 'review') {
-      setReviewStatus(normalizedIssueId, { reviewStatus: 'reviewing' });
-    } else if (role === 'test') {
-      setReviewStatus(normalizedIssueId, { testStatus: 'testing' });
-    }
     const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
     console.log(`[cloister] ${message}`);
     emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
@@ -270,7 +317,17 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
       return typeof payload.canonicalStatus === 'string' ? { issueId, state: payload.canonicalStatus } : null;
     case 'issue.closed':
       return { issueId, state: 'closed' };
-    case 'agent.completed':
+    case 'agent.completed': {
+      // PAN-1048 review feedback 003: agent.completed is emitted by every
+      // role's lifecycle (work, review, test, ship). Map it to in_review only
+      // when the work role completes — letting other roles land here would
+      // ricochet back into review the moment a review or test role finished.
+      const role = typeof payload.role === 'string' ? payload.role : undefined;
+      if (role === undefined || role === 'work') {
+        return { issueId, state: 'in_review' };
+      }
+      return null;
+    }
     case 'work.completed':
       return { issueId, state: 'in_review' };
     case 'review.approved':
