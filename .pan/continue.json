@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T23:58:01.261Z",
+  "updated": "2026-05-10T00:12:51.808Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "bc21d608c",
+    "sha": "b3db3febf",
     "dirty": true
   },
   "decisions": [
@@ -163,12 +163,15 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-3mhb/U4 Settings legacy AgentCards cleanup is implemented and verified: deleted AgentCardsPanel, AgentCard, ModelOverrideModal, AgentCards index, and WorkTypeOverrides; moved shared model catalog data to modelCatalog.ts so remaining Settings conversation/provider selectors do not depend on the deleted modal; removed SettingsPage legacy override UI imports/state/handlers/rendering; and updated SettingsPage tests to import MODELS_BY_PROVIDER from modelCatalog. Validation passed: npx tsc --noEmit, npx eslint . --max-warnings=0, npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), deleted-component reference grep, and graphify update.",
-    "beadId": "workspace-3mhb",
+    "description": "workspace-afb9/E1 PanopticonAgentType cleanup is implemented and verified: removed the exported PanopticonAgentType union and panopticonAgentName helper from src/lib/agents.ts, changed getAgentRuntimeBaseCommand to accept a direct Claude Code agent definition string, updated planning/work recovery/review/specialist callsites to pass role paths or legacy pan-* agent names explicitly, and updated command-builder tests. Validation passed: legacy symbol grep, npx tsc --noEmit, npx eslint . --max-warnings=0, targeted agent runtime tests (31 passed), full npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), and graphify update.",
+    "beadId": "workspace-afb9",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
-      "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
-      "src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts"
+      "src/lib/agents.ts",
+      "src/lib/planning/spawn-planning-session.ts",
+      "src/lib/cloister/review-agent.ts",
+      "src/lib/cloister/specialists.ts",
+      "src/lib/__tests__/permission-mode-leak.test.ts",
+      "tests/lib/agents-auth-routing.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -341,6 +344,12 @@
       "timestamp": "2026-05-09T23:58:01.261Z",
       "reason": "bead-complete",
       "note": "Implemented workspace-3mhb/U4: deleted the legacy Settings AgentCards override UI components (AgentCardsPanel, AgentCard, ModelOverrideModal, AgentCards index) and WorkTypeOverrides, removed SettingsPage legacy route-card override UI code, preserved reusable provider/model catalog data in modelCatalog.ts for remaining Settings selectors, updated tests to use the new catalog module, verified deleted-component references are gone except guard assertions, and ran npx tsc --noEmit, npx eslint . --max-warnings=0, full npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-10T00:12:51.808Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-afb9/E1: deleted the PanopticonAgentType export and panopticonAgentName helper from agents.ts, made getAgentRuntimeBaseCommand accept direct agent definition strings instead of translating an agent enum, updated work/planning recovery, planning spawn, review-agent, and specialist command callsites to pass roles/work.md, roles/plan.md, or explicit pan-* agent names, and updated command-builder tests. Verified no PanopticonAgentType/panopticonAgentName references remain, npx tsc --noEmit, npx eslint . --max-warnings=0, targeted runtime-command tests (31 passed), full npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

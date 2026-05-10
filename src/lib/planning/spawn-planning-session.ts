@@ -26,7 +26,7 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getProviderExportsForModel, roleAgentDefinitionPath } from '../agents.js';
 import { loadConfig, resolveModel } from '../config-yaml.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
@@ -493,7 +493,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // PAN-636: thread harness through so a planning kickoff with --harness pi
     // produces a `pi --mode rpc --model <id>` line and skips the --agent flag
     // (Pi has no agent-definition system).
-    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, 'planning', opts.harness ?? 'claude-code');
+    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, roleAgentDefinitionPath('plan'), opts.harness ?? 'claude-code');
 
     const providerExports = await getProviderExportsForModel(planningModel);
 

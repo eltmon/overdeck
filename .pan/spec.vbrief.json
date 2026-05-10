@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T23:58:01.261Z"
+    "updated": "2026-05-10T00:12:51.808Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 29,
+    "sequence": 30,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T23:58:01.261Z",
+    "updated": "2026-05-10T00:12:51.808Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -1295,7 +1295,7 @@
       {
         "id": "e1-delete-panopticon-agent-type",
         "title": "Delete PanopticonAgentType + panopticonAgentName()",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -1310,20 +1310,23 @@
           {
             "id": "e1-delete-panopticon-agent-type.ac1",
             "title": "PanopticonAgentType type and panopticonAgentName function deleted from src/lib/agents.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T00:12:51.808Z"
           },
           {
             "id": "e1-delete-panopticon-agent-type.ac2",
             "title": "No remaining imports of PanopticonAgentType or panopticonAgentName anywhere; typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T00:12:51.808Z"
           }
-        ]
+        ],
+        "completed": "2026-05-10T00:12:51.808Z"
       },
       {
         "id": "e2-delete-specialist-type",
@@ -2041,5 +2044,5 @@
       "canonicalFilename": "2026-05-09-PAN-1048-unify-agent-type-system-5-enums-role-primitive-with-reactive-cloister.vbrief.json"
     }
   },
-  "updated": "2026-05-09T23:58:01.261Z"
+  "updated": "2026-05-10T00:12:51.808Z"
 }

@@ -156,10 +156,12 @@ async function buildSpecialistBaseCommand(
       `[specialist] ${specialistType}: canUseHarness(${requestedHarness},${model},${authMode}) blocked — ${decision.reason}. Falling back to claude-code.`,
     );
   }
-  const agentType = specialistType.endsWith('-agent')
-    ? specialistType.slice(0, -'-agent'.length)
-    : specialistType;
-  return getAgentRuntimeBaseCommand(model, sessionName, agentType as any, harness);
+  const agentDefinition = specialistType.startsWith('pan-')
+    ? specialistType
+    : `pan-${specialistType.endsWith('-agent')
+      ? specialistType.slice(0, -'-agent'.length)
+      : specialistType}-agent`;
+  return getAgentRuntimeBaseCommand(model, sessionName, agentDefinition, harness);
 }
 
 function readRecordedClaudeSessionId(tmuxSession: string): string | null {

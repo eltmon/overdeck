@@ -42,7 +42,7 @@ async function buildReviewBaseCommand(model: string, sessionName: string): Promi
       `[review-agent] canUseHarness(${requestedHarness},${model},${authMode}) blocked — ${decision.reason}. Falling back to claude-code.`,
     );
   }
-  return getAgentRuntimeBaseCommand(model, sessionName, 'review', harness);
+  return getAgentRuntimeBaseCommand(model, sessionName, 'pan-review-agent', harness);
 }
 
 /**

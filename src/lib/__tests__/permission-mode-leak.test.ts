@@ -32,7 +32,7 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
   })
 
   it('Anthropic + Auto + work role: uses roles/work.md and no DSP or permission flag', async () => {
-    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'work')
+    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'roles/work.md')
     expect(cmd).toMatch(/--agent roles\/work\.md/)
     expect(cmd).not.toMatch(/--agent pan-work-agent/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
@@ -40,7 +40,7 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
   })
 
   it('Anthropic + Auto + plan role: uses roles/plan.md and no DSP or permission flag', async () => {
-    const cmd = await getAgentRuntimeBaseCommand('claude-opus-4-7', 'planning-pan-1', 'planning')
+    const cmd = await getAgentRuntimeBaseCommand('claude-opus-4-7', 'planning-pan-1', 'roles/plan.md')
     expect(cmd).toMatch(/--agent roles\/plan\.md/)
     expect(cmd).not.toMatch(/--agent pan-planning-agent/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
@@ -105,7 +105,7 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
 
   it('Anthropic + PAN_YOLO=true + --agent: DSP present alongside --agent', async () => {
     process.env.PAN_YOLO = 'true'
-    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'work')
+    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'roles/work.md')
     expect(cmd).toMatch(/--dangerously-skip-permissions/)
     expect(cmd).toMatch(/--agent roles\/work\.md/)
   })
@@ -116,10 +116,10 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     const shapes = await Promise.all([
       getAgentRuntimeBaseCommand('claude-sonnet-4-6'),
       getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1'),
-      getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'work'),
-      getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'planning'),
-      getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'review'),
-      getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'planning-pan-1', 'planning'),
+      getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'roles/work.md'),
+      getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'roles/plan.md'),
+      getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'pan-review-agent'),
+      getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'planning-pan-1', 'roles/plan.md'),
     ])
     for (const cmd of shapes) {
       expect(cmd, `cmd should not contain DSP under Auto: ${cmd}`).not.toMatch(/--dangerously-skip-permissions/)

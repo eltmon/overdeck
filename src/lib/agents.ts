@@ -99,29 +99,6 @@ const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
 };
 
 /**
- * Panopticon pipeline agent types that map 1:1 to .claude/agents/pan-<type>-agent.md
- * definitions. Bead workspace-7if (modify-base-command) consumes this to emit
- * `claude --agent pan-<type>-agent` instead of inline --model/--permission flags.
- * Bead workspace-eet wires the parameter through; bead workspace-7if turns the
- * parameter into the --agent flag emission.
- */
-export type PanopticonAgentType =
-  | 'work'
-  | 'planning'
-  | 'review'
-  | 'test'
-  | 'inspect'
-  | 'uat'
-  | 'merge';
-
-/** Plan/work role definitions live under roles/; legacy pipeline agents remain under .claude/agents/. */
-export function panopticonAgentName(type: PanopticonAgentType): string {
-  if (type === 'work') return 'roles/work.md';
-  if (type === 'planning') return 'roles/plan.md';
-  return `pan-${type}-agent`;
-}
-
-/**
  * Build the base command that the launcher will exec for an agent.
  *
  * The `harness` parameter (PAN-636) selects between Claude Code (default)
@@ -129,13 +106,13 @@ export function panopticonAgentName(type: PanopticonAgentType): string {
  * `pi --mode rpc --model <model>` line; the launcher generator then layers
  * --session-dir, --extension, --no-context-files, and the stdin-from-fifo
  * redirect on top via generateLauncherScript. The `agentName` (PAN-982:
- * --name) and `agentType` (PAN-982: --agent) parameters only apply to the
+ * --name) and `agentDefinition` (PAN-982: --agent) parameters only apply to the
  * Claude Code path — Pi has no agent-definition system.
  */
 export async function getAgentRuntimeBaseCommand(
   model: string,
   agentName?: string,
-  agentType?: PanopticonAgentType,
+  agentDefinition?: string,
   harness: 'claude-code' | 'pi' = 'claude-code',
 ): Promise<string> {
   if (harness === 'pi') {
@@ -148,19 +125,19 @@ export async function getAgentRuntimeBaseCommand(
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
-  // PAN-982: When agentType is provided, select the matching .claude/agents/pan-<type>-agent.md
-  // definition. The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
+  // PAN-982: When agentDefinition is provided, pass it directly to --agent.
+  // The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
   // so we usually omit --permission-mode and (for Anthropic models) --model.
   // Non-Anthropic providers still need --model to pin the routed model id, since the
   // frontmatter `model:` only accepts Anthropic identifiers.
-  const agentFlag = agentType ? ` --agent ${panopticonAgentName(agentType)}` : '';
+  const agentFlag = agentDefinition ? ` --agent ${agentDefinition}` : '';
   // When the user has opted into full bypass (PAN_YOLO=true or claude.permissionMode=bypass
   // in config), --dangerously-skip-permissions is added on top of --agent. The agent
   // frontmatter's permissionMode: bypassPermissions only bypasses prompts INSIDE cwd —
   // cross-directory reads (e.g. ~/.panopticon/cliproxy/, ~/pan-tts/) still prompt without
   // DSP. The flag is passed through ahead of --agent so it applies before frontmatter is
   // resolved.
-  const bypassWithAgent = agentType && resolvePermissionMode() === 'bypass'
+  const bypassWithAgent = agentDefinition && resolvePermissionMode() === 'bypass'
     ? ' --dangerously-skip-permissions'
     : '';
 
@@ -171,14 +148,14 @@ export async function getAgentRuntimeBaseCommand(
   if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
-    if (agentType) {
+    if (agentDefinition) {
       // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
       return `claude${bypassWithAgent}${agentFlag} --model ${resolvedModel}${nameFlag}`;
     }
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  if (agentType) {
+  if (agentDefinition) {
     // Anthropic direct: --agent fully replaces --model. Non-Anthropic
     // direct providers still need --model because agent frontmatter model:
     // only accepts Anthropic identifiers.
@@ -1441,7 +1418,7 @@ export async function buildAgentLaunchConfig(opts: {
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: `claude --agent ${panopticonAgentName('work')}`,
+      baseCommand: `claude --agent ${roleAgentDefinitionPath('work')}`,
       resumeSessionId: opts.resumeSessionId,
       model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: `--name ${opts.agentId}`,
@@ -1456,13 +1433,13 @@ export async function buildAgentLaunchConfig(opts: {
     opts.isPlanning ?? false,
   );
 
-  // PAN-982: pass agentType + agentId through getAgentRuntimeBaseCommand so it
-  // emits 'claude --agent pan-<work|planning>-agent --name <agentId>'.
+  // PAN-982: pass the role definition path + agentId through getAgentRuntimeBaseCommand so it
+  // emits 'claude --agent roles/<plan|work>.md --name <agentId>'.
   // PAN-636: when harness === 'pi' the helper short-circuits to a pi --mode rpc
-  // line and the agentName/panAgentType arguments are ignored (Pi has no agent
+  // line and the agentName/agentDefinition arguments are ignored (Pi has no agent
   // definitions). The launcher generator's pi branch then layers --session-dir
   // and the fifo redirect on top.
-  const panAgentType: PanopticonAgentType = opts.isPlanning ? 'planning' : 'work';
+  const agentDefinition = opts.isPlanning ? roleAgentDefinitionPath('plan') : roleAgentDefinitionPath('work');
   const launcherContent = generateLauncherScript({
     agentType: 'work',
     workingDir: opts.workspace,
@@ -1471,7 +1448,7 @@ export async function buildAgentLaunchConfig(opts: {
     setTerminalEnv: true,
     providerExports,
     cavemanExports,
-    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, panAgentType, opts.harness ?? 'claude-code'),
+    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, agentDefinition, opts.harness ?? 'claude-code'),
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
@@ -2122,7 +2099,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       baseCommand: await getAgentRuntimeBaseCommand(
         agentState.model || 'claude-sonnet-4-6',
         normalizedId,
-        'work',
+        roleAgentDefinitionPath('work'),
         agentState.harness ?? 'claude-code',
       ),
     });
@@ -2575,10 +2552,12 @@ export async function recoverAgent(
     }
   }
 
-  // Restart the agent with recovery context. Agent type is derived from the session id:
+  // Restart the agent with recovery context. Agent definition is derived from the session id:
   // planning sessions use the planner definition; everything else uses the work definition.
-  const recoveryAgentType: PanopticonAgentType = normalizedId.startsWith('planning-') ? 'planning' : 'work';
-  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, recoveryAgentType, state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  const recoveryAgentDefinition = normalizedId.startsWith('planning-')
+    ? roleAgentDefinitionPath('plan')
+    : roleAgentDefinitionPath('work');
+  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, recoveryAgentDefinition, state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,
