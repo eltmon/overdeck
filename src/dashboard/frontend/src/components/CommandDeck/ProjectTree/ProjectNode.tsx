@@ -68,6 +68,8 @@ interface ProjectNodeProps {
   features: ProjectFeature[];
   selectedFeature: string | null;
   onSelectFeature: (issueId: string) => void;
+  onSelectProject?: (projectName: string) => void;
+  selectedProject?: string | null;
   selectedSessionId?: string | null;
   onSelectSession?: (issueId: string, sessionId: string) => void;
   issueTitles?: Record<string, string>;
@@ -171,7 +173,7 @@ function ProjectNodeMenu({
   );
 }
 
-export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, onNewConversation, conversations = [], selectedConversation, onSelectConversation, conversationMutations, containerStats }: ProjectNodeProps) {
+export function ProjectNode({ name, features, selectedFeature, onSelectFeature, onSelectProject, selectedProject, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, onNewConversation, conversations = [], selectedConversation, onSelectConversation, conversationMutations, containerStats }: ProjectNodeProps) {
   const visibleFeatures = useMemo(() => {
     if (filter === 'all') return features;
     return features.filter((feature) =>
@@ -191,17 +193,33 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
     setMenu((m) => ({ ...m, open: false }));
   }, []);
 
+  const handleSelectProject = useCallback(() => {
+    onSelectProject?.(name);
+    if (!expanded) setExpanded(true);
+  }, [expanded, name, onSelectProject]);
+
+  const handleToggleExpanded = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
+    e.stopPropagation();
+    setExpanded(current => !current);
+  }, []);
+
   return (
     <div className={styles.projectNode}>
       <button
         className={styles.projectHeader}
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleSelectProject}
         onContextMenu={handleContextMenu}
+        style={{ background: selectedProject === name ? 'var(--accent)' : undefined }}
       >
-        <ChevronRight
-          className={`${styles.chevron} ${expanded ? styles.chevronOpen : ''}`}
-          size={14}
-        />
+        <span
+          onClick={handleToggleExpanded}
+          style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
+        >
+          <ChevronRight
+            className={`${styles.chevron} ${expanded ? styles.chevronOpen : ''}`}
+            size={14}
+          />
+        </span>
         <span className={styles.projectName}>{name}</span>
         <span className={styles.featureCount}>{visibleFeatures.length}</span>
         {onNewConversation && (

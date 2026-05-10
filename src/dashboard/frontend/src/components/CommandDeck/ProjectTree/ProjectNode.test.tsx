@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { ProjectNode, type ProjectFeature } from './ProjectNode';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 
@@ -42,6 +42,7 @@ vi.mock('../styles/command-deck.module.css', () => ({
     chevronOpen: 'chevronOpen',
     projectName: 'projectName',
     featureCount: 'featureCount',
+    projectAddConvBtn: 'projectAddConvBtn',
     emptyProject: 'emptyProject',
   },
 }));
@@ -113,5 +114,69 @@ describe('ProjectNode', () => {
     expect(screen.getByText('1')).toBeInTheDocument();
     expect(screen.getByTestId('feature-PAN-855')).toBeInTheDocument();
     expect(screen.queryByTestId('feature-PAN-854')).not.toBeInTheDocument();
+  });
+
+  it('clicking the chevron toggles expansion without selecting the project', () => {
+    const onSelectProject = vi.fn();
+
+    render(
+      <ProjectNode
+        name="panopticon-cli"
+        features={[makeFeature('PAN-854')]}
+        selectedFeature={null}
+        onSelectFeature={() => {}}
+        onSelectProject={onSelectProject}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('project-chevron'));
+
+    expect(onSelectProject).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('feature-PAN-854')).not.toBeInTheDocument();
+  });
+
+  it('clicking the project row selects the project and expands if collapsed', () => {
+    const onSelectProject = vi.fn();
+
+    render(
+      <ProjectNode
+        name="panopticon-cli"
+        features={[]}
+        selectedFeature={null}
+        onSelectFeature={() => {}}
+        onSelectProject={onSelectProject}
+      />,
+    );
+
+    expect(screen.queryByText('(no active features)')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /panopticon-cli/i }));
+
+    expect(onSelectProject).toHaveBeenCalledWith('panopticon-cli');
+    expect(screen.getByText('(no active features)')).toBeInTheDocument();
+  });
+
+  it('applies selected project background and preserves MessageSquarePlus stopPropagation', () => {
+    const onSelectProject = vi.fn();
+    const onNewConversation = vi.fn();
+
+    render(
+      <ProjectNode
+        name="panopticon-cli"
+        features={[makeFeature('PAN-854')]}
+        selectedFeature={null}
+        selectedProject="panopticon-cli"
+        onSelectFeature={() => {}}
+        onSelectProject={onSelectProject}
+        onNewConversation={onNewConversation}
+      />,
+    );
+
+    const row = screen.getAllByRole('button', { name: /panopticon-cli/i })[0];
+    expect(row).toHaveStyle({ background: 'var(--accent)' });
+
+    fireEvent.click(screen.getByRole('button', { name: /new conversation/i }));
+
+    expect(onNewConversation).toHaveBeenCalledWith('panopticon-cli');
+    expect(onSelectProject).not.toHaveBeenCalled();
   });
 });
