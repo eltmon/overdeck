@@ -117,14 +117,19 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
   const { groups, compactionModel, harnessPolicy } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
-  // Forks always launch under Claude Code: plain forks copy a Claude-format JSONL
-  // and resume, and summary forks inject via Claude prompt. Pi cannot consume Claude
-  // session history, so we lock the launch harness here and the server rejects Pi
-  // launchHarness explicitly.
-  const launchHarness: Harness = 'claude-code';
+  // Plain forks copy Claude JSONL and resume — Pi cannot consume that history,
+  // so plainFork forces launchHarness back to claude-code. Summary forks inject
+  // a generated summary through the Pi FIFO after spawn, so Pi launch is fine
+  // there subject to the canonical harness policy (ToS gate).
+  const [launchHarness, setLaunchHarness] = useState<Harness>(conversation.harness || 'claude-code');
   const [summaryModel, setSummaryModel] = useState(compactionModel);
   const [summaryHarness, setSummaryHarness] = useState<Harness>('claude-code');
   const [plainFork, setPlainFork] = useState(false);
+  useEffect(() => {
+    if (plainFork && launchHarness !== 'claude-code') {
+      setLaunchHarness('claude-code');
+    }
+  }, [plainFork, launchHarness]);
   const [localSummaryOnly, setLocalSummaryOnly] = useState(false);
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -273,16 +278,35 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
               </>
             )}
 
-            <ModelSelect
-              value={launchModel}
-              onChange={setLaunchModel}
-              groups={groups}
-              label="Launch model"
-            />
-            <span className={pickerStyles.fieldHint}>
-              The model the new forked conversation will use. Forks always launch under
-              Claude Code — Pi cannot import Claude session history yet.
-            </span>
+            {plainFork ? (
+              <>
+                <ModelSelect
+                  value={launchModel}
+                  onChange={setLaunchModel}
+                  groups={groups}
+                  label="Launch model"
+                />
+                <span className={pickerStyles.fieldHint}>
+                  Plain forks always launch under Claude Code — Pi cannot consume the
+                  copied Claude session history.
+                </span>
+              </>
+            ) : (
+              <>
+                <ModelHarnessPicker
+                  model={launchModel}
+                  harness={launchHarness}
+                  onModelChange={setLaunchModel}
+                  onHarnessChange={setLaunchHarness}
+                  groups={groups}
+                  harnessPolicy={harnessPolicy}
+                  modelLabel="Launch model"
+                />
+                <span className={pickerStyles.fieldHint}>
+                  The model and harness the new forked conversation will use.
+                </span>
+              </>
+            )}
           </div>
         </div>
 

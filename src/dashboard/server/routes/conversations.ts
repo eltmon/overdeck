@@ -2080,14 +2080,13 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const effectiveSummaryModel = summaryModel || 'claude-sonnet-4-6';
         const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
         const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
-        if (launchHarness === 'pi') {
-          // Plain forks copy a Claude-format JSONL session file and spawn with --resume,
-          // and summary forks inject via the Pi FIFO; Pi cannot consume Claude JSONL
-          // history, so launching a Pi fork from a Claude conversation would silently
-          // drop the parent transcript. Reject until Pi exposes a transcript-faithful
-          // import path.
+        if (plain && launchHarness === 'pi') {
+          // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
+          // Pi cannot consume Claude JSONL history, so a Pi plain fork would silently
+          // start an empty session. Summary forks are fine because they inject the
+          // generated summary through the Pi FIFO after spawn (see injectForkSummary).
           return jsonResponse({
-            error: 'Launching forks under the Pi harness is not supported until Pi can consume Claude session history.',
+            error: 'Plain forks cannot launch under Pi — Pi cannot consume Claude session history. Use a summary fork to launch under Pi.',
           }, { status: 400 });
         }
         const defaultTitle = plain

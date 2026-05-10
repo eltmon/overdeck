@@ -36,7 +36,7 @@ import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge-token.js';
 import { canUseHarness } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
-import { createPiFifo, piFifoPaths } from './runtimes/pi-fifo.js';
+import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtimes/pi-fifo.js';
 
 const execAsync = promisify(exec);
 
@@ -91,6 +91,41 @@ async function getPiLauncherFields(agentId: string): Promise<{
     piFifoPath: await createPiFifo(agentId),
     piSessionDir: paths.agentDir,
   };
+}
+
+/**
+ * Wait for the Pi work-agent ready marker (`ready.json`) to appear.
+ * Pi does not produce the Claude SessionStart hook signal, so resume/restart
+ * paths must use this instead of `waitForReadySignal()`.
+ */
+async function waitForPiAgentReady(agentId: string, timeoutSec = 30): Promise<boolean> {
+  const { readyPath } = piFifoPaths(agentId);
+  const deadline = Date.now() + timeoutSec * 1000;
+  while (Date.now() < deadline) {
+    if (existsSync(readyPath)) return true;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
+}
+
+/**
+ * Deliver a prompt to a Pi work agent through the FIFO JSONL command protocol.
+ * Pi never reads tmux input — pasting prompts there is a no-op as far as the
+ * model is concerned. Throws if Pi never reached readiness within the timeout.
+ */
+async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 30): Promise<void> {
+  const ready = await waitForPiAgentReady(agentId, timeoutSec);
+  if (!ready) {
+    throw new Error(`Pi agent ${agentId} did not become ready within ${timeoutSec}s`);
+  }
+  try {
+    writePiCommand(agentId, { cmd: 'prompt', text: prompt });
+  } catch (err) {
+    if (err instanceof PiNotReady) {
+      throw new Error(`Pi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);
+    }
+    throw err;
+  }
 }
 
 async function resolveEffectiveHarness(harness: unknown, model: string): Promise<RuntimeName> {
@@ -2281,14 +2316,25 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
 
     let messageDelivered = false;
-    // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
-    const ready = await waitForReadySignal(normalizedId, 30);
-
-    if (ready) {
-      await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue');
-      messageDelivered = true;
+    if (effectiveHarness === 'pi') {
+      // Pi does not fire the Claude SessionStart hook; wait for ready.json and
+      // deliver the auto-continue prompt through the FIFO JSONL protocol.
+      try {
+        await writePiAgentPrompt(normalizedId, effectiveMessage);
+        messageDelivered = true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[resumeAgent] Pi prompt delivery failed: ${msg}`);
+      }
     } else {
-      console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
+      // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
+      const ready = await waitForReadySignal(normalizedId, 30);
+      if (ready) {
+        await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue');
+        messageDelivered = true;
+      } else {
+        console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
+      }
     }
 
     const resumedAt = new Date().toISOString();
@@ -2398,12 +2444,24 @@ export async function restartAgent(
     });
 
     const prompt = message || `You are resuming work on ${agentState.issueId}. Read .pan/continue.json for context and pick up where you left off.`;
-    const ready = await waitForReadySignal(normalizedId, 30);
-    if (ready) {
-      await new Promise(r => setTimeout(r, 500));
-      await sendKeysAsync(normalizedId, prompt);
+    if (effectiveHarness === 'pi') {
+      // Pi does not fire the Claude SessionStart hook and does not read tmux
+      // input — wait for ready.json and write the continue prompt through the
+      // FIFO JSONL protocol.
+      try {
+        await writePiAgentPrompt(normalizedId, prompt);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[restartAgent] Pi prompt delivery failed for ${normalizedId}: ${msg}`);
+      }
     } else {
-      console.error(`[restartAgent] Claude did not become ready within 30s for ${normalizedId}`);
+      const ready = await waitForReadySignal(normalizedId, 30);
+      if (ready) {
+        await new Promise(r => setTimeout(r, 500));
+        await sendKeysAsync(normalizedId, prompt);
+      } else {
+        console.error(`[restartAgent] Claude did not become ready within 30s for ${normalizedId}`);
+      }
     }
 
     markAgentRunning(agentState);
@@ -2519,7 +2577,49 @@ export async function recoverAgent(
   // Restart the agent with recovery context. Agent type is derived from the session id:
   // planning sessions use the planner definition; everything else uses the work definition.
   const recoveryAgentType: PanopticonAgentType = normalizedId.startsWith('planning-') ? 'planning' : 'work';
-  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, recoveryAgentType, state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code')
+    ? state.harness
+    : 'claude-code';
+
+  if (recoveryHarness === 'pi') {
+    // Pi cannot consume the recovery prompt as a positional shell argument the
+    // way the Claude direct command path does — Pi reads JSONL commands from
+    // its FIFO. Build a real Pi launcher (extension path, --session-dir, FIFO
+    // redirect) via buildAgentLaunchConfig, then deliver the recovery prompt
+    // through the FIFO once Pi reports ready.
+    const { launcherContent, providerEnv: piProviderEnv } = await buildAgentLaunchConfig({
+      agentId: normalizedId,
+      model: state.model,
+      workspace: state.workspace,
+      agentType: 'work',
+      isPlanning: recoveryAgentType === 'planning',
+      harness: 'pi',
+    });
+    const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
+    writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+    await createSessionAsync(normalizedId, state.workspace, `bash ${launcherScript}`, {
+      env: {
+        ...BLANKED_PROVIDER_ENV,
+        PANOPTICON_AGENT_ID: normalizedId,
+        PANOPTICON_ISSUE_ID: state.issueId || '',
+        PANOPTICON_SESSION_TYPE: state.phase || 'implementation',
+        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+        ...piProviderEnv,
+      },
+    });
+    try {
+      await writePiAgentPrompt(normalizedId, recoveryPrompt);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[recoverAgent] Pi recovery prompt delivery failed for ${normalizedId}: ${msg}`);
+    }
+    markAgentRunning(state);
+    saveAgentState(state);
+    logAgentLifecycle(normalizedId, `recoverAgent SUCCESS: recoveryCount=${health.recoveryCount} (pi)`);
+    return state;
+  }
+
+  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, recoveryAgentType, recoveryHarness)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,
