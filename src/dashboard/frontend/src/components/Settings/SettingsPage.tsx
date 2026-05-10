@@ -90,10 +90,43 @@ interface SaveSettingsResponse {
 }
 
 async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsResponse> {
+  // PAN-1048 review feedback 004 (C4): WorkhorsePanel and RolesPanel save
+  // workhorses + roles via their own PUTs. SettingsPage's parent formData is
+  // populated once on mount and never refreshed, so a top-level save would
+  // ship a stale workhorses/roles snapshot and silently undo every model-routing
+  // change the user made through the child panels in this session.
+  // Refetch before each PUT and overlay the latest workhorses/roles on top
+  // of the parent's edits — those are the two slices the child panels own.
+  let merged: SettingsConfig = settings;
+  try {
+    const latest = await fetchSettings();
+    // workhorses + roles live on the API payload but are not modelled on
+    // SettingsConfig — child panels (WorkhorsePanel, RolesPanel) own those
+    // slices and PUT them directly through their own typed payloads, so the
+    // parent only needs to carry them through opaquely without losing them.
+    const latestRouting = latest as unknown as {
+      workhorses?: unknown;
+      roles?: unknown;
+    };
+    merged = {
+      ...settings,
+      ...(latestRouting.workhorses !== undefined
+        ? { workhorses: latestRouting.workhorses }
+        : {}),
+      ...(latestRouting.roles !== undefined
+        ? { roles: latestRouting.roles }
+        : {}),
+    } as SettingsConfig;
+  } catch (err) {
+    // Non-fatal — fall back to the parent's payload rather than blocking the
+    // save. The user gets the same overwrite semantics the bug surfaced, but
+    // only when the GET also fails (which would already be a bigger problem).
+    console.warn('[settings] Pre-save refetch failed; saving parent payload as-is:', err);
+  }
   const res = await fetch('/api/settings', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(settings),
+    body: JSON.stringify(merged),
   });
   if (!res.ok) {
     const error = await res.text();

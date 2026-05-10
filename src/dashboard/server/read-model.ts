@@ -319,7 +319,14 @@ export const ReadModelServiceLive = Layer.effect(
               id: a.id,
               issueId: a.issueId,
               workspace: a.workspace || undefined,
-              runtime: a.runtime || undefined,
+              // PAN-1048 review feedback 004 (C3): AgentState carries `harness`,
+              // not `runtime`. The snapshot field consumed by getHarness() is
+              // `runtime` (packages/contracts/src/types.ts:54-60). Without this
+              // mapping, every Pi agent rendered as Claude Code in the
+              // dashboard because runtime defaulted to undefined → claude-code.
+              // The legacy `runtime` field is read first for backward compat
+              // with state.json files written before the rename.
+              runtime: (a as { runtime?: string }).runtime || a.harness || undefined,
               model: a.model || undefined,
               status: toAgentStatus(reconciled),
               startedAt: a.startedAt || undefined,
@@ -412,7 +419,11 @@ export const ReadModelServiceLive = Layer.effect(
             id: a.id,
             issueId: a.issueId,
             workspace: a.workspace || undefined,
-            runtime: a.runtime || undefined,
+            // PAN-1048 review feedback 004 (C3): same mapping as the cached
+            // path above — surface AgentState.harness as snapshot.runtime so
+            // getHarness() returns the actual harness instead of defaulting
+            // every agent to claude-code.
+            runtime: (a as { runtime?: string }).runtime || a.harness || undefined,
             model: a.model || undefined,
             // Reconcile on-disk status with live tmux state:
             // - tmux active but state.json says 'stopped' → actually running (resumed outside API)

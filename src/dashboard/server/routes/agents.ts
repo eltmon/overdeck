@@ -426,7 +426,12 @@ const getAgentsRoute = HttpRouter.add(
                   const state = JSON.parse(yield* Effect.promise(() => readFile(localStateFile, 'utf-8')));
                   if (state.status === 'starting') {
                     startingAgentIds.push(dir);
-                  } else if (state.status === 'failed') {
+                  } else if (state.status === 'error' || state.status === 'failed') {
+                    // PAN-1048 review feedback 004 (C2): contract AgentStatus
+                    // is starting | running | stopped | error | unknown. Writers
+                    // now persist 'error'; the legacy 'failed' literal is
+                    // accepted here for backward compatibility with state.json
+                    // files written by older builds.
                     failedAgentIds.push(dir);
                   }
                 } catch {}
@@ -653,7 +658,7 @@ const getAgentsRoute = HttpRouter.add(
               issueId,
               runtime: 'claude',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
-              status: 'failed' as const,
+              status: 'error' as const,
               startedAt: state.startedAt || new Date().toISOString(),
               consecutiveFailures: 0,
               killCount: 0,
@@ -828,10 +833,14 @@ const deleteAgentRoute = HttpRouter.add(
     const stateBeforeStop = yield* Effect.promise(() => getAgentStateAsync(id));
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.delete_requested'));
     yield* Effect.promise(() => stopAgentAsync(id));
+    // PAN-1048 review feedback 004 (C1): AgentStoppedEvent requires both
+    // agentId AND issueId on the payload (packages/contracts/src/events.ts:36);
+    // ws-rpc drops events that fail Schema validation, so emits without issueId
+    // never reach subscribers and the dashboard misses the stop transition.
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.stopped',
       timestamp: new Date().toISOString(),
-      payload: { agentId: id },
+      payload: { agentId: id, issueId: stateBeforeStop?.issueId ?? '' },
     })));
     const issueId = stateBeforeStop?.issueId;
     // PAN-1048: derive label from role; legacy state.phase no longer exists.
@@ -1437,6 +1446,9 @@ const postAgentSuspendRoute = HttpRouter.add(
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.suspend_requested', { sessionId: effectiveSessionId }));
     saveSessionId(id, effectiveSessionId);
+    // PAN-1048 review feedback 004 (C1): resolve issueId before kill so we can
+    // include it on the agent.stopped payload (the contract requires it).
+    const suspendIssueId = (yield* Effect.promise(() => getAgentStateAsync(id)))?.issueId ?? '';
     yield* Effect.promise(() => killSessionAsync(id).catch(() => { /* no tmux session to kill */ }));
     saveAgentRuntimeState(id, {
       state: 'suspended',
@@ -1446,7 +1458,7 @@ const postAgentSuspendRoute = HttpRouter.add(
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.stopped',
       timestamp: new Date().toISOString(),
-      payload: { agentId: id },
+      payload: { agentId: id, issueId: suspendIssueId },
     })));
 
     invalidateAgentsCache();
@@ -1569,7 +1581,7 @@ const postAgentRestartRoute = HttpRouter.add(
           await Effect.runPromise(eventStore.append({
             type: 'agent.stopped',
             timestamp: new Date().toISOString(),
-            payload: { agentId: id },
+            payload: { agentId: id, issueId: agentState.issueId },
           }));
 
           const result = await restartAgent(id, { model, graceful: true, message });
@@ -1587,7 +1599,10 @@ const postAgentRestartRoute = HttpRouter.add(
                   id,
                   issueId: updatedState?.issueId || agentState.issueId,
                   workspace: updatedState?.workspace || agentState.workspace,
-                  runtime: 'claude',
+                  // PAN-1048 review feedback 004 (C3): same as quick-restart
+                  // below — surface the actual harness so Pi agents do not
+                  // get mis-labelled as Claude Code on graceful restart.
+                  runtime: updatedState?.harness ?? agentState.harness ?? 'claude-code',
                   model: model || updatedState?.model || agentState.model,
                   status: 'running',
                   startedAt: updatedState?.startedAt || agentState.startedAt,
@@ -1620,7 +1635,7 @@ const postAgentRestartRoute = HttpRouter.add(
       yield* Effect.promise(() => Effect.runPromise(eventStore.append({
         type: 'agent.stopped',
         timestamp: new Date().toISOString(),
-        payload: { agentId: id },
+        payload: { agentId: id, issueId: updatedState?.issueId || agentState.issueId },
       })));
       yield* Effect.promise(() => Effect.runPromise(eventStore.append({
         type: 'agent.started',
@@ -1633,7 +1648,11 @@ const postAgentRestartRoute = HttpRouter.add(
             id,
             issueId: updatedState?.issueId || agentState.issueId,
             workspace: updatedState?.workspace || agentState.workspace,
-            runtime: 'claude',
+            // PAN-1048 review feedback 004 (C3): preserve the agent's actual
+            // harness instead of hard-coding 'claude'. AgentSnapshot.runtime
+            // is what getHarness() reads, so a Pi agent restarted through
+            // this path was being mis-labelled as Claude Code.
+            runtime: updatedState?.harness ?? agentState.harness ?? 'claude-code',
             model: model || updatedState?.model || agentState.model,
             status: 'running',
             startedAt: updatedState?.startedAt || agentState.startedAt,
@@ -2584,7 +2603,7 @@ const postAgentsRoute = HttpRouter.add(
                       // the user-picked harness only when set (see comment above).
                       ...(effectiveHarness ? { harness: effectiveHarness } : {}),
                       model: 'pending-container-start',
-                      status: 'failed',
+                      status: 'error',
                       startedAt: new Date().toISOString(),
                       workspace: workspacePath,
                       role,
@@ -2637,7 +2656,7 @@ const postAgentsRoute = HttpRouter.add(
                     issueId,
                     // PAN-1048 R2: legacy `runtime` removed from state.json writes.
                     model: 'pending-container-start',
-                    status: 'failed',
+                    status: 'error',
                     startedAt: new Date().toISOString(),
                     workspace: workspacePath,
                     role,
@@ -2882,11 +2901,12 @@ const postAgentResetSessionRoute = HttpRouter.add(
         .catch(() => { /* no session to kill */ })
     );
 
-    // Emit event so dashboard updates
+    // Emit event so dashboard updates. PAN-1048 review feedback 004 (C1):
+    // include issueId — without it AgentStoppedEvent fails Schema validation.
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.stopped',
       timestamp: new Date().toISOString(),
-      payload: { agentId: id },
+      payload: { agentId: id, issueId: agentState.issueId },
     })));
 
     console.log(`[reset-session] Cleared session for ${id} (was: ${previousSessionId.slice(0, 8)}...)`);
@@ -2930,7 +2950,7 @@ const postAgentSwitchModelRoute = HttpRouter.add(
       yield* Effect.promise(() => Effect.runPromise(eventStore.append({
         type: 'agent.stopped',
         timestamp: new Date().toISOString(),
-        payload: { agentId: id },
+        payload: { agentId: id, issueId: agentState.issueId },
       })));
     }
 

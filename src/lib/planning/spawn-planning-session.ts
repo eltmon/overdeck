@@ -387,7 +387,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         progress(1, 'Creating workspace', errorMsg, 'error');
         await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
           id: sessionName, issueId: issue.identifier, workspace: workspacePath,
-          status: 'failed', error: errorMsg,
+          status: 'error', error: errorMsg,
           startedAt: new Date().toISOString(), role: 'plan', location: workspaceLocation,
         }, null, 2));
         return { success: false, error: errorMsg };
@@ -584,7 +584,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         id: sessionName,
         issueId: issue.identifier,
         workspace: workspacePath,
-        status: 'failed',
+        status: 'error',
         error: err.message,
         startedAt: new Date().toISOString(),
         role: 'plan',
