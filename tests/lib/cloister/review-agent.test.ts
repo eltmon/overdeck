@@ -1,87 +1,33 @@
 /**
- * Tests for parallel review-agent pure functions (PAN-540).
+ * Tests for the surviving review-agent.ts surface area.
  *
- * Covers the functions extracted from convoy and inlined into review-agent.ts:
- *   - parseReviewerTemplate: YAML frontmatter parsing (async)
- *   - resolveReviewerModel: work-type routing with agent/template overrides
- *   - parseReviewSynthesis: REVIEW_RESULT marker extraction from synthesis output (async)
- *   - getReviewAgents: falls back to DEFAULT_REVIEW_AGENTS when config missing
- *   - reviewResultToReviewStatus: maps review outcome to reviewStatus (CHANGES_REQUESTED → 'blocked')
+ * PAN-1048 R7 retired every legacy convoy helper (parseReviewerTemplate,
+ * resolveReviewerModel, parseReviewSynthesis, getReviewAgents,
+ * reviewResultToReviewStatus, getFilesChangedFromPR, buildReviewFeedbackBody,
+ * resolvePromptTemplatePath, spawnSingleReviewer, waitForReviewer,
+ * selectCompletedReviewers, archiveReviewerRound, parseAgentOutput,
+ * buildReviewBaseCommand, ReviewerOutcome / ReviewerWaitResult /
+ * ReviewerFailureReason / ReviewContext / ReviewResult / ReviewerTemplate /
+ * ReviewerRoundArtifact / ReviewHistoryEntry types, DEFAULT_REVIEW_AGENTS,
+ * REVIEW_TIMEOUT_MS, REVIEW_HISTORY_DIR / FILE, SPECIALISTS_DIR). Their
+ * tests went with them. The reviewer/dispatcher behavior they used to model
+ * now lives inside the review role itself (roles/review.md plus the four
+ * .claude/agents/code-review-*.md sub-agent definitions).
+ *
+ * What remains here:
+ *   - killAllReviewSessions: pan-down review session reaper
+ *   - pan-down integration: cli/index.ts wires the reaper at the right point
+ *   - passed-state rerun: workspaces.ts rerun route uses spawnReviewRoleForIssue
+ *   - dispatch failure / type-safety regressions on the rerun route
+ *   - template/output contract for the four code-review-* sub-agent definitions
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import {
-  parseReviewerTemplate,
-  resolveReviewerModel,
-  parseReviewSynthesis,
-  getReviewAgents,
-  reviewResultToReviewStatus,
-  // PAN-1048 R5: getActiveParallelReviewIssues was deleted along with the
-  // `pan review run` coordinator. Its callers (deacon, service startup
-  // recovery) now scan listRunningAgentsAsync for role==='review' agents
-  // directly, which covers the agent-<id>-review session naming the role
-  // primitive uses. Tests for the helper went with it.
-  // PAN-1048 R6 (REQ-17): dispatchParallelReview, runParallelReview, and
-  // spawnReviewCoordinatorSession have been retired. Convoy reviewers now
-  // run as Agent-tool subagents inside the review role launched by
-  // spawnReviewRoleForIssue.
-  buildReviewFeedbackBody,
-  waitForReviewer,
-  getFilesChangedFromPR,
-  selectCompletedReviewers,
-  resolveTemplatePath,
-  killAllReviewSessions,
-  type ReviewResult,
-} from '../../../src/lib/cloister/review-agent.js';
+import { killAllReviewSessions } from '../../../src/lib/cloister/review-agent.js';
 
-// ── shared test fixtures ──────────────────────────────────────────────────────
-// vi.mock is hoisted, so mock fns must be defined with vi.hoisted() before they
-// are referenced in the factory.
-
-const execMock = vi.hoisted(() => vi.fn());
-
-const { mockSetReviewStatus, mockGetReviewStatus, mockLoadCloisterConfig } = vi.hoisted(() => ({
-  mockSetReviewStatus: vi.fn(),
-  mockGetReviewStatus: vi.fn().mockReturnValue(null),
-  // Throws by default so getReviewAgents() falls back to DEFAULT_REVIEW_AGENTS (same as real missing config)
-  mockLoadCloisterConfig: vi.fn().mockImplementation(() => { throw new Error('no config'); }),
-}));
-
-vi.mock('child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('child_process')>();
-  return { ...actual, exec: execMock };
-});
-
-vi.mock('../../../src/lib/review-status.js', () => ({
-  setReviewStatus: mockSetReviewStatus,
-  getReviewStatus: mockGetReviewStatus,
-}));
-
-vi.mock('../../../src/lib/cloister/config.js', () => ({
-  loadCloisterConfig: mockLoadCloisterConfig,
-}));
-
-const { mockKillSessionAsync, mockResolveProjectFromIssue, mockListStashes, mockCreateNamedStash, mockDropStash, mockIsPaneDeadAsync, mockListPaneValuesAsync } = vi.hoisted(() => ({
+const { mockKillSessionAsync } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
-  mockResolveProjectFromIssue: vi.fn().mockReturnValue({
-    projectKey: 'panopticon-cli',
-    projectName: 'Panopticon CLI',
-    projectPath: '/tmp/panopticon-cli',
-    linearTeam: 'PAN',
-  }),
-  mockListStashes: vi.fn().mockResolvedValue([]),
-  mockCreateNamedStash: vi.fn().mockResolvedValue(null),
-  mockDropStash: vi.fn().mockResolvedValue(undefined),
-  mockIsPaneDeadAsync: vi.fn().mockResolvedValue(false),
-  mockListPaneValuesAsync: vi.fn().mockResolvedValue([]),
-}));
-
-vi.mock('../../../src/lib/projects.js', () => ({
-  resolveProjectFromIssue: mockResolveProjectFromIssue,
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -92,26 +38,16 @@ vi.mock('../../../src/lib/tmux.js', async () => {
     sessionExistsAsync: vi.fn().mockResolvedValue(false),
     killSessionAsync: mockKillSessionAsync,
     setOptionAsync: vi.fn().mockResolvedValue(undefined),
-    isPaneDeadAsync: mockIsPaneDeadAsync,
-    listPaneValuesAsync: mockListPaneValuesAsync,
+    isPaneDeadAsync: vi.fn().mockResolvedValue(false),
+    listPaneValuesAsync: vi.fn().mockResolvedValue([]),
   };
 });
 
-vi.mock('../../../src/lib/stashes.js', () => ({
-  buildStashMessage: vi.fn((kind: string, issueId: string, arg: number | Date) => {
-    if (typeof arg === 'number') return `${kind}:${issueId.toUpperCase()}:${arg}`;
-    return `${kind}:${issueId.toUpperCase()}:2026-04-27T14:15:16Z`;
-  }),
-  createNamedStash: mockCreateNamedStash,
-  dropStash: mockDropStash,
-  getNextReviewTempSequence: vi.fn(() => 1),
-  listStashes: mockListStashes,
-}));
-
-
 // ── killAllReviewSessions ─────────────────────────────────────────────────────
 // PAN-931: pan down must kill review sessions so they don't survive dashboard
-// restart and block new review dispatch.
+// restart and block new review dispatch. The legacy coordinator naming pattern
+// (review-coordinator-*) and reviewer naming patterns (canonical PAN-830 +
+// legacy timestamp form) all need to be reaped.
 
 describe('killAllReviewSessions', () => {
   beforeEach(() => {
@@ -247,517 +183,6 @@ describe('pan down integration (PAN-931)', () => {
   });
 });
 
-
-// PAN-1048 R5: getActiveParallelReviewIssues describe block removed along
-// with the helper. Equivalent regression coverage now lives where it belongs
-// — in tests/lib/cloister/deacon-orphan-recovery.test.ts, which exercises
-// the listRunningAgentsAsync-based detection that replaced the helper.
-
-// ── buildReviewFeedbackBody ───────────────────────────────────────────────────
-// Regression coverage: verifies the resubmit command emitted to work agents
-// points at the real resubmit flow, not a non-existent route.
-
-describe('buildReviewFeedbackBody', () => {
-  const changesRequested: ReviewResult = {
-    success: true,
-    reviewResult: 'CHANGES_REQUESTED',
-    notes: 'Fix the linting issues.',
-  };
-
-  it('CHANGES_REQUESTED body instructs agent to use pan done (not a curl URL)', () => {
-    const body = buildReviewFeedbackBody('PAN-999', changesRequested);
-    expect(body).toMatch(/pan done|rebase-and-submit/);
-  });
-
-  it('CHANGES_REQUESTED body does NOT reference the non-existent /api/workspaces request-review route', () => {
-    const body = buildReviewFeedbackBody('PAN-999', changesRequested);
-    expect(body).not.toContain('/api/workspaces/');
-    expect(body).not.toContain('request-review');
-  });
-
-  it('CHANGES_REQUESTED body includes the issue ID', () => {
-    const body = buildReviewFeedbackBody('PAN-999', changesRequested);
-    expect(body).toContain('PAN-999');
-  });
-
-  it('APPROVED body includes completion notice and warns against resubmit', () => {
-    const approved: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
-    const body = buildReviewFeedbackBody('PAN-999', approved);
-    expect(body).toContain('APPROVED');
-    expect(body).toContain('CODE APPROVED');
-    expect(body).toContain('Do NOT run `pan done` again');
-    expect(body).toContain('Do NOT run `pan review request`');
-  });
-
-  it('uses full synthesis output when available, stripping tail markers', () => {
-    const withOutput: ReviewResult = {
-      success: true,
-      reviewResult: 'CHANGES_REQUESTED',
-      notes: 'Short summary.',
-      output: '# Verdict: CHANGES_REQUESTED\n\n## Blockers\n\n### 1. Missing CSRF guard\nFix: add validateOrigin()\n\nREVIEW_RESULT: CHANGES_REQUESTED\nNOTES: Short summary.\nFILES_REVIEWED: foo.ts,bar.ts\nSECURITY_ISSUES: Missing CSRF guard',
-    };
-    const body = buildReviewFeedbackBody('PAN-999', withOutput);
-    // Full synthesis body is present
-    expect(body).toContain('## Blockers');
-    expect(body).toContain('Missing CSRF guard');
-    expect(body).toContain('add validateOrigin()');
-    // Tail markers are stripped
-    expect(body).not.toContain('REVIEW_RESULT:');
-    expect(body).not.toContain('FILES_REVIEWED:');
-    // Action block is appended
-    expect(body).toMatch(/rebase-and-submit/);
-  });
-
-  it('falls back to tail-marker reconstruction when output is absent', () => {
-    const body = buildReviewFeedbackBody('PAN-999', changesRequested);
-    expect(body).toContain('# Review: CHANGES_REQUESTED');
-    expect(body).toContain('Fix the linting issues.');
-  });
-});
-
-// ── waitForReviewer ───────────────────────────────────────────────────────────
-
-describe('waitForReviewer', () => {
-  it('returns completed when output file appears while session still running', async () => {
-    // This is the normal case: Claude writes the file but does not exit.
-    // Session is kept alive so the dashboard can show reviewer tabs after completion.
-    const sessionExists = vi.fn().mockResolvedValue(true); // session still running
-    const fileExists = vi.fn().mockReturnValue(true);       // output file written
-    const killSession = vi.fn().mockResolvedValue(undefined);
-
-    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
-      sessionExists, fileExists, killSession,
-    });
-
-    expect(result).toEqual({ status: 'completed' });
-    expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
-    expect(killSession).not.toHaveBeenCalled();
-  });
-
-  it('returns completed when session exits with output file present', async () => {
-    const sessionExists = vi.fn().mockResolvedValue(false); // session already gone
-    const fileExists = vi.fn().mockReturnValue(true);       // output file written
-    const killSession = vi.fn().mockResolvedValue(undefined);
-
-    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
-      sessionExists, fileExists, killSession,
-    });
-
-    expect(result).toEqual({ status: 'completed' });
-    expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
-    // Session is kept alive post-completion for dashboard visibility; no killSession call
-    expect(killSession).not.toHaveBeenCalled();
-  });
-
-  it('returns failed (session_exited) when session exits without output file', async () => {
-    const sessionExists = vi.fn().mockResolvedValue(false);
-    const fileExists = vi.fn().mockReturnValue(false);
-    const killSession = vi.fn().mockResolvedValue(undefined);
-
-    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
-      sessionExists, fileExists, killSession,
-    });
-
-    expect(result).toEqual({ status: 'failed', reason: 'session_exited' });
-    expect(killSession).not.toHaveBeenCalled();
-  });
-
-  it('kills session and returns failed (timeout) on timeout', async () => {
-    const sessionExists = vi.fn().mockResolvedValue(true); // session always running
-    const fileExists = vi.fn().mockReturnValue(false);
-    const killSession = vi.fn().mockResolvedValue(undefined);
-
-    // timeoutMs = 0 → deadline already passed → loop never enters → timeout path
-    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 0, {
-      sessionExists, fileExists, killSession,
-    });
-
-    expect(result).toEqual({ status: 'failed', reason: 'timeout' });
-    expect(sessionExists).not.toHaveBeenCalled(); // never entered loop
-    expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
-  });
-
-  it('returns failed (pane_dead) immediately when pane is dead', async () => {
-    mockIsPaneDeadAsync.mockResolvedValueOnce(true);
-    const sessionExists = vi.fn().mockResolvedValue(true); // session still alive due to remain-on-exit
-    const fileExists = vi.fn().mockReturnValue(false);
-    const killSession = vi.fn().mockResolvedValue(undefined);
-    const capturePane = vi.fn().mockResolvedValue('dead pane output');
-
-    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
-      sessionExists, fileExists, killSession, capturePane,
-    });
-
-    expect(result).toEqual({ status: 'failed', reason: 'pane_dead' });
-    expect(sessionExists).toHaveBeenCalled();
-    expect(capturePane).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
-    expect(killSession).not.toHaveBeenCalled();
-  });
-
-  it('fails fast with terminal_api_error + structured TerminalApiError when reviewer hits a 403 quota error', async () => {
-    // Repro of the PAN-1015 silent-30-min-timeout: Kimi quota exhausted, the
-    // pane stays alive at the prompt because Claude Code doesn't exit on API
-    // errors — it just prints the message and waits for input. Without
-    // detection this would hit the 30-minute timeout.
-    const sessionExists = vi.fn().mockResolvedValue(true);
-    const fileExists = vi.fn().mockReturnValue(false);
-    const killSession = vi.fn().mockResolvedValue(undefined);
-    const capturePane = vi.fn().mockResolvedValue([
-      '  Please run /login · API Error: 403',
-      '  {"error":{"type":"permission_error","message":"You\'ve reached your usage',
-      '  limit for this billing cycle. Your quota will be refreshed in the next',
-      '  cycle. Upgrade to get more: https://www.kimi.com/code/console"}}',
-      '❯ ',
-    ].join('\n'));
-
-    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
-      sessionExists, fileExists, killSession, capturePane,
-    });
-
-    expect(result.status).toBe('failed');
-    if (result.status === 'failed') {
-      expect(result.reason).toBe('terminal_api_error');
-      expect(result.apiError).toBeDefined();
-      expect(result.apiError!.kind).toBe('quota_exhausted');
-      expect(result.apiError!.summary).toMatch(/quota|usage limit/i);
-    }
-    expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
-  });
-
-  it('detects login_required terminal error from "Please run /login" pattern when no quota line is present', async () => {
-    const sessionExists = vi.fn().mockResolvedValue(true);
-    const fileExists = vi.fn().mockReturnValue(false);
-    const killSession = vi.fn().mockResolvedValue(undefined);
-    const capturePane = vi.fn().mockResolvedValue('  Please run /login\n❯ ');
-
-    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
-      sessionExists, fileExists, killSession, capturePane,
-    });
-
-    expect(result.status).toBe('failed');
-    if (result.status === 'failed') {
-      expect(result.reason).toBe('terminal_api_error');
-      expect(result.apiError!.kind).toBe('login_required');
-    }
-  });
-});
-
-// ── getFilesChangedFromPR ─────────────────────────────────────────────────────
-
-describe('getFilesChangedFromPR', () => {
-  it('parses gh CLI output into file list', async () => {
-    const execFn = vi.fn().mockResolvedValue({
-      stdout: 'src/foo.ts\nsrc/bar.ts\n',
-      stderr: '',
-    });
-
-    const files = await getFilesChangedFromPR('https://github.com/org/repo/pull/1', '/proj', { execFn });
-
-    expect(files).toEqual(['src/foo.ts', 'src/bar.ts']);
-    expect(execFn).toHaveBeenCalledWith(
-      expect.stringContaining('gh pr view'),
-      expect.objectContaining({ cwd: '/proj' }),
-    );
-  });
-
-  it('returns empty array when gh CLI fails', async () => {
-    const execFn = vi.fn().mockRejectedValue(new Error('gh: command not found'));
-
-    const files = await getFilesChangedFromPR('https://github.com/org/repo/pull/1', '/proj', { execFn });
-
-    expect(files).toEqual([]);
-  });
-
-  it('filters blank lines from gh output', async () => {
-    const execFn = vi.fn().mockResolvedValue({ stdout: '\nsrc/a.ts\n\nsrc/b.ts\n\n', stderr: '' });
-
-    const files = await getFilesChangedFromPR('https://github.com/org/repo/pull/1', '/proj', { execFn });
-
-    expect(files).toEqual(['src/a.ts', 'src/b.ts']);
-  });
-});
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-function makeTempDir(): string {
-  const dir = join(tmpdir(), `review-agent-test-${Date.now()}-${Math.random().toString(36).slice(7)}`);
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
-// ── reviewResultToReviewStatus ────────────────────────────────────────────────
-// This is the status mapping used by dispatchParallelReview.
-// CHANGES_REQUESTED must map to 'blocked' (not 'pending') — with 'pending' the
-// deacon patrol immediately re-dispatches the review in an infinite loop before
-// the work agent has a chance to address the feedback.
-
-describe('reviewResultToReviewStatus', () => {
-  it('maps CHANGES_REQUESTED to blocked', () => {
-    expect(reviewResultToReviewStatus({ reviewResult: 'CHANGES_REQUESTED', success: true })).toBe('blocked');
-  });
-
-  it('maps APPROVED to passed', () => {
-    expect(reviewResultToReviewStatus({ reviewResult: 'APPROVED', success: true })).toBe('passed');
-  });
-
-  // PAN-869: COMMENTED with success=true means review completed with no blockers → 'passed'
-  it('maps COMMENTED (success=true) to passed', () => {
-    expect(reviewResultToReviewStatus({ reviewResult: 'COMMENTED', success: true })).toBe('passed');
-  });
-
-  // COMMENTED with success=false means synthesis/protocol failure — must not re-queue
-  it('maps COMMENTED (success=false) to failed', () => {
-    expect(reviewResultToReviewStatus({ reviewResult: 'COMMENTED', success: false })).toBe('failed');
-  });
-});
-
-// ── parseReviewerTemplate ─────────────────────────────────────────────────────
-
-describe('parseReviewerTemplate', () => {
-  let tmpDir: string;
-
-  beforeEach(() => { tmpDir = makeTempDir(); });
-  afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
-
-  it('parses model from YAML frontmatter and returns body content', async () => {
-    const templatePath = join(tmpDir, 'code-review-correctness.md');
-    writeFileSync(templatePath, [
-      '---',
-      'model: claude-opus-4-6',
-      '---',
-      'Review the code for correctness.',
-    ].join('\n'));
-
-    const result = await parseReviewerTemplate(templatePath);
-    expect(result.model).toBe('claude-opus-4-6');
-    expect(result.content).toBe('Review the code for correctness.');
-  });
-
-  it('falls back to "sonnet" when frontmatter has no model field', async () => {
-    const templatePath = join(tmpDir, 'code-review-security.md');
-    writeFileSync(templatePath, [
-      '---',
-      'focus: OWASP',
-      '---',
-      'Check for security issues.',
-    ].join('\n'));
-
-    const result = await parseReviewerTemplate(templatePath);
-    expect(result.model).toBe('sonnet');
-  });
-
-  it('rejects when template file does not exist', async () => {
-    await expect(
-      parseReviewerTemplate(join(tmpDir, 'nonexistent.md'))
-    ).rejects.toThrow('Reviewer template not found');
-  });
-
-  it('rejects when template has no YAML frontmatter', async () => {
-    const templatePath = join(tmpDir, 'bad-template.md');
-    writeFileSync(templatePath, 'Just content, no frontmatter.');
-
-    await expect(parseReviewerTemplate(templatePath)).rejects.toThrow('Invalid template format');
-  });
-});
-
-// ── resolveReviewerModel ──────────────────────────────────────────────────────
-
-describe('resolveReviewerModel', () => {
-  it('returns agent.model when set (highest precedence)', () => {
-    const model = resolveReviewerModel(
-      { name: 'correctness', focus: [], model: 'claude-opus-4-6' },
-      'claude-sonnet-4-5',
-    );
-    expect(model).toBe('claude-opus-4-6');
-  });
-
-  it('falls back to review role routing for unknown roles when no sub-role applies', () => {
-    // Unknown roles with no explicit model use the review role default rather
-    // than the caller's defaultModel. This keeps model selection centralized in
-    // role configuration. See resolveReviewerModel for rationale.
-    const model = resolveReviewerModel(
-      { name: 'unknown-role', focus: [] },
-      'claude-haiku-4-5',
-    );
-    // The returned model comes from role routing, not the defaultModel.
-    // Exact ID depends on user config but it MUST be a non-empty string.
-    expect(typeof model).toBe('string');
-    expect(model.length).toBeGreaterThan(0);
-  });
-
-  it('returns a non-empty string for known roles (routing or fallback)', () => {
-    const model = resolveReviewerModel(
-      { name: 'synthesis', focus: [] },
-      'claude-sonnet-4-5',
-    );
-    expect(typeof model).toBe('string');
-    expect(model.length).toBeGreaterThan(0);
-  });
-
-  // Regression for alias → concrete model ID resolution:
-  // Template frontmatter uses "haiku"/"sonnet"/"opus" as shorthand. Aliases must
-  // be resolved through review role model settings — NOT hard-coded to Anthropic
-  // model IDs — so the returned ID is provider-correct when using OpenAI,
-  // Gemini, or other routed providers.
-  it('resolves "haiku" alias via review role routing (not passed through verbatim)', () => {
-    const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'haiku');
-    expect(model).not.toBe('haiku');
-    expect(model.length).toBeGreaterThan(0);
-    // haiku must route through the review role, not an unrelated subagent route.
-    // Defaults can change under user config but the alias must not leak through.
-    expect(model).not.toBe('gpt-5.4-nano');
-  });
-
-  it('resolves "sonnet" alias via review role routing (not passed through verbatim)', () => {
-    const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'sonnet');
-    expect(model).not.toBe('sonnet');
-    expect(model.length).toBeGreaterThan(0);
-  });
-
-  it('resolves "opus" alias via review role routing (not passed through verbatim)', () => {
-    const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'opus');
-    expect(model).not.toBe('opus');
-    expect(model.length).toBeGreaterThan(0);
-  });
-
-  it('passes through agent.model concrete IDs unchanged (highest precedence)', () => {
-    // The only way to force a specific concrete model is via agent.model.
-    // defaultModel is last-resort fallback used only when work-type routing fails.
-    const model = resolveReviewerModel(
-      { name: 'unknown-role', focus: [], model: 'claude-haiku-4-5' },
-      'claude-sonnet-4-5',
-    );
-    expect(model).toBe('claude-haiku-4-5');
-  });
-
-  // All reviewer aliases (opus/sonnet/haiku) resolve to specialist-review-agent
-  // so they consistently respect the user's configured reviewer model override.
-  it('all reviewer aliases resolve to the same configured reviewer model', () => {
-    const opus = resolveReviewerModel({ name: 'correctness', model: 'opus', focus: [] }, 'any-default');
-    const sonnet = resolveReviewerModel({ name: 'correctness', model: 'sonnet', focus: [] }, 'any-default');
-    const haiku = resolveReviewerModel({ name: 'correctness', model: 'haiku', focus: [] }, 'any-default');
-    expect(opus).not.toBe('opus');
-    expect(sonnet).not.toBe('sonnet');
-    expect(haiku).not.toBe('haiku');
-    expect(opus).toBe(sonnet);
-    expect(sonnet).toBe(haiku);
-  });
-
-  it('opus alias is resolved (not passed through verbatim) for a real reviewer role', () => {
-    const model = resolveReviewerModel({ name: 'correctness', model: 'opus', focus: [] }, 'any-default');
-    expect(model).not.toBe('opus');
-    expect(model.length).toBeGreaterThan(0);
-  });
-});
-
-// ── parseReviewSynthesis ──────────────────────────────────────────────────────
-
-describe('parseReviewSynthesis', () => {
-  let tmpDir: string;
-
-  beforeEach(() => { tmpDir = makeTempDir(); });
-  afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
-
-  it('extracts APPROVED result from synthesis.md', async () => {
-    writeFileSync(join(tmpDir, 'synthesis.md'), [
-      '## Review Summary',
-      '',
-      'All checks passed.',
-      '',
-      'REVIEW_RESULT: APPROVED',
-      'NOTES: Looks good',
-    ].join('\n'));
-
-    const result = await parseReviewSynthesis(tmpDir);
-    expect(result.success).toBe(true);
-    expect(result.reviewResult).toBe('APPROVED');
-    expect(result.notes).toBe('Looks good');
-  });
-
-  it('extracts CHANGES_REQUESTED result from synthesis.md', async () => {
-    writeFileSync(join(tmpDir, 'synthesis.md'), [
-      'Found critical issues.',
-      '',
-      'REVIEW_RESULT: CHANGES_REQUESTED',
-      'SECURITY_ISSUES: SQL injection in query builder',
-      'NOTES: Fix the SQL injection',
-    ].join('\n'));
-
-    const result = await parseReviewSynthesis(tmpDir);
-    expect(result.success).toBe(true);
-    expect(result.reviewResult).toBe('CHANGES_REQUESTED');
-    expect(result.securityIssues).toContain('SQL injection in query builder');
-  });
-
-  it('returns COMMENTED/failure when synthesis.md is missing', async () => {
-    const result = await parseReviewSynthesis(tmpDir);
-    expect(result.success).toBe(false);
-    expect(result.reviewResult).toBe('COMMENTED');
-    expect(result.notes).toMatch(/synthesis/i);
-  });
-
-  it('returns COMMENTED/failure when synthesis.md has no result markers', async () => {
-    writeFileSync(join(tmpDir, 'synthesis.md'), 'Agent ran but produced no structured output.');
-
-    const result = await parseReviewSynthesis(tmpDir);
-    expect(result.success).toBe(false);
-    expect(result.reviewResult).toBe('COMMENTED');
-  });
-
-  it('collects file references from reviewer output files alongside synthesis', async () => {
-    writeFileSync(join(tmpDir, 'synthesis.md'), 'REVIEW_RESULT: APPROVED\nNOTES: ok');
-    writeFileSync(join(tmpDir, 'correctness.md'), 'Reviewed src/lib/foo.ts and src/lib/bar.ts');
-    writeFileSync(join(tmpDir, 'security.md'), 'Checked src/lib/auth.ts');
-
-    const result = await parseReviewSynthesis(tmpDir);
-    expect(result.filesReviewed).toBeDefined();
-    expect(result.filesReviewed!.some(f => f.includes('foo.ts'))).toBe(true);
-    expect(result.filesReviewed!.some(f => f.includes('auth.ts'))).toBe(true);
-  });
-});
-
-// ── selectCompletedReviewers ──────────────────────────────────────────────────
-// Regression: any reviewer failure must abort synthesis (not produce partial results).
-// selectCompletedReviewers is the hard gate between phase 2 and phase 3.
-
-describe('selectCompletedReviewers', () => {
-  it('returns null when any reviewer failed — synthesis must not run', () => {
-    const results = [
-      { role: 'correctness', status: 'completed' as const, outputFile: '/a/correctness.md' },
-      { role: 'security', status: 'failed' as const, outputFile: '/a/security.md' },
-      { role: 'performance', status: 'completed' as const, outputFile: '/a/performance.md' },
-    ];
-    expect(selectCompletedReviewers(results)).toBeNull();
-  });
-
-  it('returns null when all reviewers failed', () => {
-    const results = [
-      { role: 'correctness', status: 'failed' as const, outputFile: '/a/correctness.md' },
-      { role: 'security', status: 'failed' as const, outputFile: '/a/security.md' },
-    ];
-    expect(selectCompletedReviewers(results)).toBeNull();
-  });
-
-  it('returns completed outputs when all reviewers succeeded', () => {
-    const results = [
-      { role: 'correctness', status: 'completed' as const, outputFile: '/a/correctness.md' },
-      { role: 'security', status: 'completed' as const, outputFile: '/a/security.md' },
-    ];
-    const selected = selectCompletedReviewers(results);
-    expect(selected).not.toBeNull();
-    expect(selected!.map(r => r.role)).toEqual(['correctness', 'security']);
-    expect(selected!.map(r => r.outputFile)).toEqual(['/a/correctness.md', '/a/security.md']);
-  });
-
-  it('returned list omits the status field (synthesis only needs role + outputFile)', () => {
-    const results = [
-      { role: 'correctness', status: 'completed' as const, outputFile: '/a/correctness.md' },
-    ];
-    const selected = selectCompletedReviewers(results)!;
-    expect(Object.keys(selected[0])).not.toContain('status');
-  });
-});
-
 // ── reviewStatus type-safety: 'dispatch_failed' must not appear ──────────────
 // Regression: the request-review route previously wrote reviewStatus='dispatch_failed',
 // which is not in the ReviewStatus.reviewStatus union (only testStatus permits it).
@@ -772,7 +197,6 @@ describe('reviewStatus type-safety regression', () => {
       'utf-8',
     );
 
-    // Find the request-review route (between the route definition and the reset route)
     const requestReviewMatch = routeSrc.match(
       /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
     );
@@ -797,8 +221,6 @@ describe('reviewStatus type-safety regression', () => {
 
 describe('passed-state rerun regression', () => {
   it('workspaces.ts request-review route uses spawnReviewRoleForIssue in the rerun path', async () => {
-    // Read the route source and verify the passed-state IIFE uses the role
-    // primitive (the block between shouldTreatAsRerun and the early return).
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
@@ -815,22 +237,24 @@ describe('passed-state rerun regression', () => {
     const rerunBlock = rerunBlockMatch![0];
 
     expect(rerunBlock).toContain('spawnReviewRoleForIssue');
-    // Negative assertion guards against accidental fallback to the legacy path.
+    // Negative assertion guards against accidental fallback to the legacy paths.
     expect(rerunBlock).not.toContain('dispatchParallelReview');
+    expect(rerunBlock).not.toContain('runParallelReview');
+    expect(rerunBlock).not.toContain('pan review run');
   });
 });
 
 // ── template/output contract ──────────────────────────────────────────────────
-// Regression coverage for PAN-540: reviewer templates must write to the **Output file**
-// injected by runParallelReview, NOT to hardcoded .claude/reviews/ paths.
-// The synthesis template must instruct the agent to emit REVIEW_RESULT markers
-// so parseAgentOutput can parse a real review result instead of falling back to COMMENTED.
+// The four code-review-* sub-agent definitions are read-only (no Write tool
+// in their frontmatter) and must NOT instruct the agent to write to any output
+// file. They surface findings as their agent response, which the review role
+// synthesizes programmatically. PAN-1048 R5 C1 superseded the older PAN-540
+// "write to **Output file**" contract.
 
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 function readTemplate(name: string): string {
-  // Review prompts now live as Claude Code agent definitions.
   const templatePath = resolve(
     import.meta.dirname,
     '../../../.claude/agents',
@@ -848,9 +272,6 @@ describe('template/output contract', () => {
   ];
 
   describe('reviewer templates return findings as agent response (PAN-1048 R5 C1)', () => {
-    // PAN-1048 R5 C1 superseded PAN-540 — reviewer sub-agents are now read-only
-    // and return their findings as the agent's response (synthesized
-    // programmatically by runParallelReview). They MUST NOT write to a file.
     for (const { name, role } of reviewerTemplates) {
       it(`${role}: does NOT hardcode .claude/reviews/ path`, () => {
         const content = readTemplate(name);
@@ -870,84 +291,7 @@ describe('template/output contract', () => {
       });
     }
   });
-
-  // PAN-1048 R2: code-review-synthesis sub-agent is removed. Synthesis is
-  // performed programmatically by runParallelReview itself — there is no
-  // standalone synthesis prompt template to assert against. The previous
-  // template-shape tests have been replaced by the
-  // 'runParallelReview programmatic synthesis (PAN-1048 R2)' suite below.
 });
-
-// ── getReviewAgents ───────────────────────────────────────────────────────────
-
-describe('getReviewAgents', () => {
-  it('returns a non-empty array', () => {
-    const agents = getReviewAgents();
-    expect(Array.isArray(agents)).toBe(true);
-    expect(agents.length).toBeGreaterThan(0);
-  });
-
-  it('each agent has a name and focus array', () => {
-    const agents = getReviewAgents();
-    for (const agent of agents) {
-      expect(typeof agent.name).toBe('string');
-      expect(Array.isArray(agent.focus)).toBe(true);
-    }
-  });
-
-  it('includes correctness, security, and performance reviewers by default', () => {
-    const agents = getReviewAgents();
-    const names = agents.map(a => a.name);
-    expect(names).toContain('correctness');
-    expect(names).toContain('security');
-    expect(names).toContain('performance');
-  });
-
-  it('falls back to defaults when all configured review_agents are disabled', () => {
-    mockLoadCloisterConfig.mockReturnValueOnce({
-      specialists: {
-        review_agents: [
-          { name: 'correctness', enabled: false },
-          { name: 'security', enabled: false },
-          { name: 'performance', enabled: false },
-        ],
-      },
-    });
-    const agents = getReviewAgents();
-    // All configured agents are disabled → must fall back to the 4 built-in defaults
-    const names = agents.map(a => a.name);
-    expect(names).toContain('correctness');
-    expect(names).toContain('security');
-    expect(names).toContain('performance');
-    expect(names).toContain('requirements');
-    expect(agents.length).toBe(4);
-  });
-
-  it('returns only enabled agents when some are disabled', () => {
-    mockLoadCloisterConfig.mockReturnValueOnce({
-      specialists: {
-        review_agents: [
-          { name: 'correctness', enabled: true, focus: ['logic'] },
-          { name: 'security', enabled: false, focus: ['injection'] },
-        ],
-      },
-    });
-    const agents = getReviewAgents();
-    expect(agents.length).toBe(1);
-    expect(agents[0].name).toBe('correctness');
-  });
-});
-
-
-// ── resolvePromptTemplatePath (legacy alias: resolveTemplatePath) ────────────
-
-describe('resolvePromptTemplatePath', () => {
-  it('returns the repo Claude agent definition when present', () => {
-    const result = resolveTemplatePath('code-review-correctness', '/any/workspace');
-    expect(result).toContain('.claude/agents/code-review-correctness.md');
-  });
-});
-
 
 // ── dispatch failure sets 'pending' not 'failed' ─────────────────────────────
 // Regression: dispatch failures must set reviewStatus='pending' so the deacon
@@ -972,7 +316,6 @@ describe('dispatch failure reviewStatus regression', () => {
     const requestReviewBlock = requestReviewMatch![0];
 
     // reviewStatus must never be set to 'failed' in a dispatch error/catch path
-    // (it may still be set to 'failed' for explicit semantic failures like blocked)
     const dispatchFailedMatches = requestReviewBlock.match(
       /(?:Dispatch failed|Dispatch error|Failed to start review)[\s\S]{0,200}reviewStatus\s*:\s*['"]failed['"]/g,
     );
@@ -984,78 +327,5 @@ describe('dispatch failure reviewStatus regression', () => {
     );
     expect(pendingMatches).not.toBeNull();
     expect(pendingMatches!.length).toBeGreaterThanOrEqual(4);
-  });
-});
-
-// ── spawnReviewer provider-routing regression (PAN-540) ───────────────────────
-// Verifies that spawnReviewer uses getAgentRuntimeBaseCommand() so routed
-// providers (OpenAI, Google, direct Anthropic-compatible providers) get the same
-// command construction as work agents instead of using a hardcoded `claude --model`.
-describe('spawnReviewer runtime command routing regression', () => {
-  it('review-agent.ts no longer imports the legacy specialist router helper', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const src = readFileSync(
-      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
-      'utf-8',
-    );
-    expect(src).not.toContain('resolveSpecialistBaseCommand');
-    expect(src).toMatch(/getAgentRuntimeBaseCommand/);
-  });
-
-  it('spawnReviewer body uses the local review base-command helper, not a hardcoded claude --model string', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const src = readFileSync(
-      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
-      'utf-8',
-    );
-
-    // Isolate the spawnReviewer function body
-    const spawnReviewerMatch = src.match(/async function spawnSingleReviewer[\s\S]*?^}/m);
-    expect(spawnReviewerMatch).not.toBeNull();
-    const fn = spawnReviewerMatch![0];
-
-    // Must use the harness-aware routing helper — not a bare `claude --model` string.
-    expect(fn).toContain('buildReviewBaseCommand(');
-    expect(fn).not.toMatch(/`claude\s+--(?:dangerously-skip-permissions|model)/);
-  });
-
-  it('review-agent.ts uses launcher exports for provider env isolation', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const src = readFileSync(
-      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
-      'utf-8',
-    );
-    expect(src).toMatch(/getProviderExportsForModel/);
-    expect(src).toMatch(/generateLauncherScript/);
-    expect(src).toMatch(/BLANKED_PROVIDER_ENV/);
-  });
-
-  it('spawnReviewer uses a bash launcher script, not tmux -e env flags', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const src = readFileSync(
-      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
-      'utf-8',
-    );
-
-    const spawnReviewerMatch = src.match(/async function spawnSingleReviewer[\s\S]*?^}/m);
-    expect(spawnReviewerMatch).not.toBeNull();
-    const fn = spawnReviewerMatch![0];
-
-    // Must write a launcher script file and run it via bash
-    expect(fn).toContain('getProviderExportsForModel(');
-    expect(fn).toContain('generateLauncherScript(');
-    expect(fn).toContain('writeFile(');
-    expect(fn).toMatch(/bash\s+.*launcherPath/);
-
-    // Provider env flows through launcher exports — must avoid old tmux `-e KEY=value` transport.
-    expect(fn).not.toMatch(/createSessionAsync\([\s\S]*-e\s/);
-    const envMatch = fn.match(/\{\s*env\s*:[\s\S]*?\}/);
-    if (envMatch) {
-      expect(envMatch[0]).not.toMatch(/ANTHROPIC_BASE_URL|OPENAI_API_KEY|providerEnv/);
-    }
   });
 });

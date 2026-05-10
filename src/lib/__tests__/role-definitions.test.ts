@@ -93,10 +93,16 @@ describe('role definitions', () => {
     expect(body).toContain('Approve');
     expect(body).toContain('Request changes');
     expect(body).toContain('Review NEVER merges');
-    expect(body).toContain("resolveModel('review', 'security')");
-    expect(body).toContain("resolveModel('review', 'correctness')");
-    expect(body).toContain("resolveModel('review', 'performance')");
-    expect(body).toContain("resolveModel('review', 'requirements')");
+    // PAN-1048 R7: roles/review.md no longer claims that each convoy
+    // reviewer is dispatched through resolveModel('review', '<sub-role>') —
+    // that wiring is deferred to PAN-1059. Today the Agent-tool subagents
+    // use the static model in each .claude/agents/code-review-*.md
+    // frontmatter. The stale per-sub-role expectations are replaced with a
+    // single assertion that the doc points the future routing path at
+    // PAN-1059, so the next round of review changes can't silently
+    // re-introduce the misleading claim.
+    expect(body).toMatch(/PAN-1059/);
+    expect(body).toMatch(/static frontmatter model/i);
   });
 
   it('defines the test role as suite verification plus browser UAT', () => {
