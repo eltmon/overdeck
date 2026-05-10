@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
-import { mkdir, readFile, readdir } from 'fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
 import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
@@ -1733,7 +1733,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-  writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+  await writeFile(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=work-agent | model=${state.model} | source=agents.ts:spawnAgent | session=${agentId} | command="${claudeCmd}"`);
 
@@ -2291,7 +2291,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
 
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
@@ -2427,7 +2427,7 @@ export async function restartAgent(
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
 
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
@@ -2596,7 +2596,7 @@ export async function recoverAgent(
       harness: 'pi',
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
     await createSessionAsync(normalizedId, state.workspace, `bash ${launcherScript}`, {
       env: {
         ...BLANKED_PROVIDER_ENV,
