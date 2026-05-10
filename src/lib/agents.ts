@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
-import { readFile, readdir } from 'fs/promises';
+import { mkdir, readFile, readdir } from 'fs/promises';
 import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
@@ -84,7 +84,7 @@ async function getPiLauncherFields(agentId: string): Promise<{
   piSessionDir: string;
 }> {
   const paths = piFifoPaths(agentId);
-  mkdirSync(paths.agentDir, { recursive: true, mode: 0o700 });
+  await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
   return {
     harness: 'pi',
     piExtensionPath: resolve(process.cwd(), 'packages/pi-extension/dist/index.js'),

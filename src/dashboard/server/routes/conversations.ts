@@ -1966,13 +1966,14 @@ async function runForkPipeline(
   await waitForTmuxSession(conv.tmuxSession);
 
   updateForkStatus(convName, 'injecting');
-  const ready = await waitForClaudePrompt(conv.tmuxSession, 60000).catch(() => false);
-  if (!ready) {
-    console.warn(`[summary-fork] Prompt not detected in time for ${convName}, sending summary anyway`);
-  }
   if (conv.harness === 'pi') {
+    await waitForPiReady(conv.tmuxSession);
     await writePiConversationCommand(conv.tmuxSession, summary);
   } else {
+    const ready = await waitForClaudePrompt(conv.tmuxSession, 60000).catch(() => false);
+    if (!ready) {
+      console.warn(`[summary-fork] Prompt not detected in time for ${convName}, sending summary anyway`);
+    }
     await sendKeysAsync(conv.tmuxSession, summary, 'summary-fork');
   }
 

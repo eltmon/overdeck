@@ -896,7 +896,7 @@
     "hash": "912dd048fc5f1898876a9d587eeafcc0"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/scripts/record-cost-event.d.ts": {
-    "mtime": 1778415356.0304034,
+    "mtime": 1778416058.3494716,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/scripts/notify-complete": {
@@ -1116,8 +1116,8 @@
     "hash": "da862d544a549a96182555b069029dc6"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/lib/agents.ts": {
-    "mtime": 1778415093.9951882,
-    "hash": "39669199847c2032fe13d5191cb9ebc1"
+    "mtime": 1778416416.7428467,
+    "hash": "762077bd7d91ebd876a407eb63687112"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/lib/git-activity.ts": {
     "mtime": 1778359583.3116348,
@@ -2796,8 +2796,8 @@
     "hash": "f26af3016171b73d48a3a418d31c99f2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx": {
-    "mtime": 1778415110.3415158,
-    "hash": "3c2762c94acd4c418c2664b4f07a5bea"
+    "mtime": 1778416433.6583958,
+    "hash": "40d781a9dbf61be7cd89dd9e1fe6d9b5"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/frontend/src/components/CommandDeck/GeneralSection.tsx": {
     "mtime": 1778359583.2589862,
@@ -3788,8 +3788,8 @@
     "hash": "07ce61728663c7c8d2809b1c64c6f0e3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/server/routes/conversations.ts": {
-    "mtime": 1778415789.9158895,
-    "hash": "7656aa8039bc44401897ef16e9105e47"
+    "mtime": 1778416416.4168258,
+    "hash": "a2a09fd65c18d35bcbcfe419e4d3f778"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/server/routes/codex-auth.ts": {
     "mtime": 1778359583.279561,

@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T12:26:27Z",
+  "updated": "2026-05-10T12:36:38Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "95699d9a6",
+    "sha": "f3b7fa704",
     "dirty": true
   },
   "decisions": [
@@ -83,6 +83,11 @@
       "id": "D15",
       "summary": "Fixed Pi execution-path blockers by routing conversation launchers through generateLauncherScript harness=pi with FIFO/session-dir/extension wiring, using Pi FIFO prompt delivery for conversation injections, and rejecting Pi summary generation until a real Pi prompt RPC path exists.",
       "recordedAt": "2026-05-10T12:26:27Z"
+    },
+    {
+      "id": "D16",
+      "summary": "Resolved latest review feedback by making fork summary generation Claude Code-only in the UI/API contract, using Pi readiness before FIFO summary injection, and replacing getPiLauncherFields sync mkdir with async fs/promises mkdir.",
+      "recordedAt": "2026-05-10T12:36:38Z"
     }
   ],
   "hazards": [
@@ -93,13 +98,13 @@
     }
   ],
   "resumePoint": {
-    "description": "Fixed latest CHANGES_REQUESTED blockers for Pi conversation launch/protocol paths and Pi summary prompt misuse. typecheck, lint, and full npm test pass. Next step is commit and invoke /rebase-and-submit PAN-1055.",
+    "description": "Fixed latest CHANGES_REQUESTED findings for summary fork UI/API agreement, Pi fork injection readiness, and async Pi launcher directory creation. typecheck, lint, npm test, and graphify update pass. Next step is commit and invoke /rebase-and-submit PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
       ".pan/feedback/001-review-agent-changes-requested.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
       "src/dashboard/server/routes/conversations.ts",
-      "src/lib/launcher-generator.ts",
-      "src/lib/conversations/smart-compaction.ts"
+      "src/lib/agents.ts"
     ]
   },
   "beadsMapping": {
@@ -237,6 +242,12 @@
       "timestamp": "2026-05-10T12:26:27Z",
       "reason": "review-response-verified",
       "note": "Fixed correctness blockers: conversation Pi launches now use Pi launcher config/FIFO/session-dir/extension wiring and Pi-specific prompt delivery; summary generation no longer invokes pi --mode rpc with raw prompt stdin and rejects unsupported Pi summary requests. Verified npm run typecheck, npm run lint, and npm test (379 files / 4615 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T12:36:38Z",
+      "reason": "review-response-verified",
+      "note": "Fixed latest review feedback: ForkModal no longer exposes Pi for summary generation and submits claude-code, summary fork injection waits for Pi readiness before FIFO writes, and getPiLauncherFields uses async mkdir. Verified npm run typecheck, npm run lint, npm test (379 files / 4615 tests passed), and graphify update.",
       "agentModel": "Claude Opus 4.7"
     }
   ],
