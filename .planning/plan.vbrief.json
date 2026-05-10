@@ -250,12 +250,12 @@
           "issueLabel": "pan-913"
         },
         "narrative": {
-          "Action": "Add GET /api/settings/codex-reauth/status that checks if the codex-reauth tmux session has exited. When it has, call bridgeCodexAuthToCliproxy() to re-bridge the fresh tokens, then return {completed: true, authStatus: <fresh check>}. The frontend polls this endpoint after spawning the reauth session. bridgeCodexAuthToCliproxy() currently uses sync FS — create an async wrapper or use fs/promises for the server-reachable path."
+          "Action": "Add POST /api/settings/codex-reauth/status that accepts the generated re-auth session name and status token in a JSON body, then checks if the codex-reauth tmux session has exited. When it has, call bridgeCodexAuthToCliproxy() to re-bridge the fresh tokens, then return {completed: true, authStatus: <fresh check>}. The frontend polls this endpoint after spawning the reauth session. bridgeCodexAuthToCliproxy() currently uses sync FS — create an async wrapper or use fs/promises for the server-reachable path."
         },
         "subItems": [
           {
             "id": "reauth-completion.ac1",
-            "title": "GET /api/settings/codex-reauth/status returns {completed: false} while tmux session is alive",
+            "title": "POST /api/settings/codex-reauth/status returns {completed: false} while tmux session is alive",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"

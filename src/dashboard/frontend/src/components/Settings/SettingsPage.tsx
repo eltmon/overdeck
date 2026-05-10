@@ -796,7 +796,7 @@ export function SettingsPage() {
                 return { text: 'Not authenticated', variant: 'warning' as const };
               }
               if (provider.id === 'openai') {
-                if (codexAuth?.status === 'valid') return { text: 'OAuth', variant: 'success' as const };
+                if (codexAuth?.status === 'valid') return { text: 'Subscription OAuth', variant: 'success' as const };
                 if (codexAuth?.status === 'expired' || codexAuth?.status === 'burned') return { text: codexAuth.status, variant: 'warning' as const };
               }
               if (apiKey && !apiKey.startsWith('$')) return { text: 'Key configured', variant: 'success' as const };
@@ -881,7 +881,7 @@ export function SettingsPage() {
                         {codexAuth?.status === 'valid' ? (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                            <span>OAuth active</span>
+                            <span>Subscription OAuth active</span>
                             {codexAuth.email && (
                               <SensitiveText value={codexAuth.email} className="text-[10px] text-muted-foreground" />
                             )}
