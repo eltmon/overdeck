@@ -307,6 +307,61 @@ export async function deleteAllCheckpoints(cwd: string, agentId: string): Promis
 }
 
 /**
+ * Delete all checkpoint refs for a set of agent IDs.
+ * Used at workspace teardown (merge/close-out) to clean up refs for specific agents.
+ */
+export async function pruneCheckpointRefsForAgents(cwd: string, agentIds: string[]): Promise<number> {
+  let deleted = 0
+  for (const agentId of agentIds) {
+    try {
+      assertSafeAgentId(agentId)
+      await deleteAllCheckpoints(cwd, agentId)
+      deleted++
+    } catch {
+      // Best-effort — non-fatal
+    }
+  }
+  return deleted
+}
+
+/**
+ * Delete all checkpoint refs older than olderThanDays days across all agents.
+ * Safety net for abandoned workspaces whose postMergeLifecycle was never called.
+ */
+export async function pruneStaleCheckpointRefs(cwd: string, olderThanDays: number): Promise<number> {
+  try {
+    const { stdout } = await execFileAsync('git', [
+      'for-each-ref',
+      '--format=%(creatordate:unix) %(refname)',
+      `${CHECKPOINT_REF_PREFIX}/`,
+    ], { cwd, encoding: 'utf-8' })
+
+    const cutoff = Math.floor(Date.now() / 1000) - olderThanDays * 86400
+    const staleRefs = stdout
+      .split('\n')
+      .filter(Boolean)
+      .flatMap(line => {
+        const spaceIdx = line.indexOf(' ')
+        if (spaceIdx === -1) return []
+        const ts = parseInt(line.slice(0, spaceIdx), 10)
+        const ref = line.slice(spaceIdx + 1).trim()
+        return ts < cutoff && ref ? [ref] : []
+      })
+
+    for (const ref of staleRefs) {
+      try {
+        await execFileAsync('git', ['update-ref', '-d', ref], { cwd, encoding: 'utf-8' })
+      } catch {
+        // Best-effort
+      }
+    }
+    return staleRefs.length
+  } catch {
+    return 0
+  }
+}
+
+/**
  * One-time migration: delete legacy unscoped checkpoint refs (refs/pan/turn/<turnId>)
  * that were created before per-agent namespacing was introduced.
  * Safe to run multiple times (no-op if already migrated).

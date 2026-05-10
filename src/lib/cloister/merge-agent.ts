@@ -522,6 +522,22 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     console.warn(`[merge-agent] Workspace teardown failed (non-fatal): ${err}`);
   }
 
+  // 7b. Prune checkpoint refs for this issue's agents (non-fatal)
+  // Refs are written per-turn into refs/pan/turn/<agentId>/<turnId> and accumulate in the
+  // main repo's ref store (worktrees share the parent .git). Delete them on merge so they
+  // don't pile up indefinitely.
+  try {
+    const { pruneCheckpointRefsForAgents } = await import('../checkpoint/checkpoint-manager.js');
+    const issueLower = issueId.toLowerCase();
+    const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`];
+    const pruned = await pruneCheckpointRefsForAgents(projectPath, agentIds);
+    if (pruned > 0) {
+      console.log(`[merge-agent] ✓ Pruned checkpoint refs for ${pruned} agent(s) on ${issueId}`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Checkpoint ref pruning failed (non-fatal): ${err}`);
+  }
+
   // 8. Apply 'needs-close-out' label to signal the user that close-out ceremony is pending (PAN-925)
   // The close-out ceremony is human-gated — it verifies PRD preservation, branch merge status,
   // and applies the final 'closed-out' label. We don't auto-trigger it because the user must
