@@ -12,14 +12,14 @@ interface CostDonutProps {
 export function CostDonut({ agents, width = 120, height = 120 }: CostDonutProps) {
   const activeAgents = agents.filter((a) => a.status !== 'stopped' && a.status !== 'dead');
 
-  // Group agents by phase for donut segments
-  const phaseCounts: Record<string, number> = {};
+  // PAN-1048: group by role (replaces legacy phase-based donut segments).
+  const roleCounts: Record<string, number> = {};
   for (const agent of activeAgents) {
-    const phase = agent.agentPhase || 'other';
-    phaseCounts[phase] = (phaseCounts[phase] || 0) + 1;
+    const role = agent.role || 'other';
+    roleCounts[role] = (roleCounts[role] || 0) + 1;
   }
 
-  const data = Object.entries(phaseCounts).map(([label, value]) => ({ label, value }));
+  const data = Object.entries(roleCounts).map(([label, value]) => ({ label, value }));
   const total = data.reduce((s, d) => s + d.value, 0);
 
   const colors = ['var(--gv-blue)', 'var(--gv-green)', 'var(--gv-amber)', 'var(--gv-pink)', 'var(--gv-purple)'];

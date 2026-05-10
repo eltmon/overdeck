@@ -169,13 +169,32 @@ function roleFromAgentId(agentId: string, issueId: string): Role | null {
   return ['plan', 'review', 'test', 'ship'].includes(role) ? role as Role : null;
 }
 
-function activeRoleRunExists(issueId: string, role: Role): boolean {
+/**
+ * PAN-1048 P1 + C2 race fix.
+ *
+ * Async because this is on the reactive scheduler hot path (called from
+ * onIssueStateChange → subscribed to every domain event). The legacy
+ * synchronous version shelled out to tmux + readdir/readFileSync inside
+ * `listRunningAgents()`, which blocked the Node event loop on every
+ * lifecycle event.
+ *
+ * The "active" check intentionally does NOT require tmuxActive. The
+ * spawn routes (POST /api/agents start-agent and start-planning) write
+ * state.json with role + status:'starting' BEFORE the tmux session is
+ * fully attached. If we filtered on tmuxActive here, reactive Cloister
+ * would see `state === 'in_progress'` from the spawn, fail to find
+ * the in-flight run, and race-spawn a second one. Treat any non-stopped
+ * agent state file with the matching role as "in-flight" and skip.
+ */
+async function activeRoleRunExists(issueId: string, role: Role): Promise<boolean> {
+  const { listRunningAgentsAsync } = await import('../agents.js');
   const normalizedIssueId = normalizeIssueId(issueId);
-  return listRunningAgents().some((agent) => {
-    if (!agent.tmuxActive) return false;
+  const agents = await listRunningAgentsAsync();
+  return agents.some((agent) => {
     if (normalizeIssueId(agent.issueId ?? '') !== normalizedIssueId) return false;
     const agentRole = agent.role ?? roleFromAgentId(agent.id, normalizedIssueId);
-    return agentRole === role && agent.status !== 'stopped' && agent.status !== 'error';
+    if (agentRole !== role) return false;
+    return agent.status !== 'stopped' && agent.status !== 'error';
   });
 }
 
@@ -202,7 +221,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
     return;
   }
 
-  if (activeRoleRunExists(normalizedIssueId, role)) {
+  if (await activeRoleRunExists(normalizedIssueId, role)) {
     const message = `${normalizedIssueId}: ${role} role already active; skipping lifecycle spawn`;
     console.log(`[cloister] ${message}`);
     emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });

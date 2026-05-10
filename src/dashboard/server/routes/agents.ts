@@ -489,7 +489,7 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation,
               git: gitStatus,
               type: 'agent',
-              agentPhase: enrichment.agentPhase || (isPlanning || state.role === 'plan' ? 'planning' : 'implementation'),
+              role: state.role,
               hasPendingQuestion: enrichment.hasPendingQuestion,
               pendingQuestionCount: enrichment.pendingQuestionCount,
               pendingQuestionPrompt: enrichment.pendingQuestionPrompt,
@@ -524,7 +524,7 @@ const getAgentsRoute = HttpRouter.add(
                 vmName: state.vmName,
                 git: null,
                 type: 'agent',
-                agentPhase: isPlanning ? 'planning' : 'implementation',
+                role: state.role ?? (isPlanning ? 'plan' : 'work'),
                 hasPendingQuestion: false,
                 pendingQuestionCount: 0,
                 remote: true,
@@ -598,7 +598,7 @@ const getAgentsRoute = HttpRouter.add(
                 workspaceLocation: 'local',
                 git: null,
                 type: 'agent',
-                agentPhase: isPlanning || state.role === 'plan' ? 'planning' : 'implementation',
+                role: state.role ?? (isPlanning ? 'plan' : 'work'),
                 hasPendingQuestion: needsInput,
                 pendingQuestionCount: 0,
                 pendingQuestionPrompt,
@@ -632,7 +632,7 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation: 'local',
               git: null,
               type: 'agent',
-              agentPhase: isPlanning || state.role === 'plan' ? 'planning' : 'implementation',
+              role: state.role ?? (isPlanning ? 'plan' : 'work'),
               hasPendingQuestion: false,
               pendingQuestionCount: 0,
               message: state.message || 'Starting...',
@@ -660,7 +660,7 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation: state.location || 'local',
               git: null,
               type: 'agent',
-              agentPhase: isPlanning || state.role === 'plan' ? 'planning' : 'implementation',
+              role: state.role ?? (isPlanning ? 'plan' : 'work'),
               hasPendingQuestion: false,
               pendingQuestionCount: 0,
               error: state.error || 'Unknown error',
@@ -833,7 +833,8 @@ const deleteAgentRoute = HttpRouter.add(
       payload: { agentId: id },
     })));
     const issueId = stateBeforeStop?.issueId;
-    const phaseLabel = stateBeforeStop?.phase === 'planning' ? 'planning' : 'work';
+    // PAN-1048: derive label from role; legacy state.phase no longer exists.
+    const phaseLabel = stateBeforeStop?.role === 'plan' ? 'planning' : 'work';
     emitActivityEntry({
       source: 'dashboard',
       level: 'info',
@@ -1495,7 +1496,6 @@ const postAgentResumeRoute = HttpRouter.add(
             id,
             issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
             workspace: agentState?.workspace,
-            runtime: agentState?.runtime,
             model: agentState?.model,
             status: 'running',
             startedAt: agentState?.startedAt,
@@ -2222,7 +2222,12 @@ const postAgentsRoute = HttpRouter.add(
         prompt: agentPrompt,
       }));
 
-      // Update issue status via IssueLifecycle service (PAN-449)
+      // PAN-1048: lifecycle.transitionTo() is the single source of issue.transitioned.
+      // The redundant issue.statusChanged emit was racing with reactive Cloister:
+      // Cloister mapped 'in_progress' → 'work' role and tried to spawn a second
+      // run while activeRoleRunExists() still saw no tmux session for the
+      // in-flight spawn above. Single emit + state.json already written by
+      // spawnRemoteAgent makes the spawn the single source of truth.
       yield* Effect.promise(() => Effect.runPromise(
         lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catch(() => Effect.void))
       ));
@@ -2231,11 +2236,6 @@ const postAgentsRoute = HttpRouter.add(
         type: 'agent.started',
         timestamp: new Date().toISOString(),
         payload: { agentId: issueId, issueId },
-      })));
-      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-        type: 'issue.statusChanged',
-        timestamp: new Date().toISOString(),
-        payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
       })));
       try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
       invalidateAgentsCache();
@@ -2647,15 +2647,16 @@ const postAgentsRoute = HttpRouter.add(
 
     yield* Effect.promise(() => updateIssueStatus());
 
+    // PAN-1048: lifecycle.transitionTo() inside updateIssueStatus() is the
+    // single source of issue.transitioned. The duplicate issue.statusChanged
+    // emit raced with reactive Cloister: the early state.json above (with
+    // role: 'work', status: 'starting') is already on disk, so any code path
+    // that wants to know about the in-flight spawn can read it. Removing the
+    // redundant emit collapses two-source-of-truth into one.
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.started',
       timestamp: new Date().toISOString(),
       payload: { agentId: issueId, issueId },
-    })));
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-      type: 'issue.statusChanged',
-      timestamp: new Date().toISOString(),
-      payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
     })));
     try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
     invalidateAgentsCache();

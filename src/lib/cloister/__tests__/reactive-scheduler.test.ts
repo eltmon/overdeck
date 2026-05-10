@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../agents.js', () => ({
   listRunningAgents: vi.fn(() => []),
+  // PAN-1048 P1: activeRoleRunExists is now async and uses listRunningAgentsAsync
+  // on the reactive scheduler hot path.
+  listRunningAgentsAsync: vi.fn(async () => []),
   getAgentState: vi.fn(() => null),
   getAgentRuntimeState: vi.fn(() => null),
   saveAgentRuntimeState: vi.fn(),
@@ -17,7 +20,7 @@ vi.mock('../../review-status.js', () => ({
   setReviewStatus: vi.fn(),
 }));
 
-import { listRunningAgents, spawnRun } from '../../agents.js';
+import { listRunningAgents, listRunningAgentsAsync, spawnRun } from '../../agents.js';
 import {
   handleCloisterDomainEvent,
   issueStateChangeFromDomainEvent,
@@ -29,6 +32,7 @@ describe('reactive Cloister scheduler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listRunningAgents).mockReturnValue([]);
+    vi.mocked(listRunningAgentsAsync).mockResolvedValue([]);
     vi.mocked(spawnRun).mockResolvedValue({ id: 'agent-pan-503-review' } as any);
   });
 
@@ -51,7 +55,10 @@ describe('reactive Cloister scheduler', () => {
   });
 
   it('skips spawning when an active run already exists for the issue and role', async () => {
-    vi.mocked(listRunningAgents).mockReturnValue([
+    // PAN-1048 P1 + C2: activeRoleRunExists no longer requires tmuxActive — any
+    // non-stopped state.json with the matching role counts as in-flight, which
+    // closes the spawn-route race against the reactive scheduler.
+    vi.mocked(listRunningAgentsAsync).mockResolvedValue([
       {
         id: 'agent-pan-503-review',
         issueId: 'PAN-503',

@@ -38,7 +38,7 @@ interface EnrichmentServiceState {
 function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichment): boolean {
   if (!prev) return true
   return (
-    prev.agentPhase !== next.agentPhase ||
+    prev.role !== next.role ||
     prev.hasPendingQuestion !== next.hasPendingQuestion ||
     prev.pendingQuestionCount !== next.pendingQuestionCount ||
     prev.pendingQuestionPrompt !== next.pendingQuestionPrompt ||

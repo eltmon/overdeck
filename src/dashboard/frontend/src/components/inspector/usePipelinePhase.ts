@@ -90,15 +90,20 @@ export function derivePipelinePhase(
   } else if ((rs === 'failed' || rs === 'blocked') && activeWorkSession && liveWorkAgents.some(isAgentSessionActive)) {
     phase = 'review-feedback';
     activeSession = activeWorkSession;
-  } else if (primaryAgent?.agentPhase === 'planning' && isAgentSessionActive(primaryAgent)) {
+  } else if (primaryAgent?.role === 'plan' && isAgentSessionActive(primaryAgent)) {
     phase = 'planning';
     activeSession = primaryWorkSession;
   } else if (activeWorkSession && liveWorkAgents.some(isAgentSessionActive)) {
     phase = 'working';
     activeSession = activeWorkSession;
   } else {
+    // PAN-1048: standby = stopped work agent with a live tmux session
+    // (post-pan-done, awaiting review/UAT response).
     const standbyAgent = liveWorkAgents.find(
-      (workAgent) => workAgent.status === 'stopped' && workAgent.agentPhase === 'review-response',
+      (workAgent) =>
+        workAgent.status === 'stopped' &&
+        (workAgent.role ?? 'work') === 'work' &&
+        !!workAgent.lifecycle?.hasLiveTmuxSession,
     );
     if (standbyAgent) {
       phase = 'standby';
@@ -112,7 +117,7 @@ export function derivePipelinePhase(
   // Build available tabs — only include tabs that are relevant to the current state
   const tabs: TerminalTab[] = [];
 
-  const isPlanningAgent = primaryAgent?.agentPhase === 'planning';
+  const isPlanningAgent = primaryAgent?.role === 'plan';
 
   if (isPlanningAgent && primaryWorkSession) {
     tabs.push({
@@ -273,7 +278,12 @@ export function usePipelinePhase(input: PipelinePhaseInput): PipelinePhaseResult
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const workAgentKey = (effectiveInput.workAgents ?? [])
-    .map((workAgent) => `${workAgent.id}:${workAgent.status}:${workAgent.agentPhase ?? ''}`)
+    .map((workAgent) =>
+      // PAN-1048: include lifecycle.hasLiveTmuxSession so transitions into
+      // standby (stopped work agent + live tmux) recompute the phase even
+      // when no other field changed.
+      `${workAgent.id}:${workAgent.status}:${workAgent.role ?? ''}:${workAgent.lifecycle?.hasLiveTmuxSession ? 'live' : ''}`,
+    )
     .join('|');
 
   const immediateResult = useMemo(
@@ -281,7 +291,7 @@ export function usePipelinePhase(input: PipelinePhaseInput): PipelinePhaseResult
     [
       effectiveInput.agent?.id,
       effectiveInput.agent?.status,
-      effectiveInput.agent?.agentPhase,
+      effectiveInput.agent?.role,
       workAgentKey,
       effectiveInput.reviewStatus,
       effectiveInput.projectKey,

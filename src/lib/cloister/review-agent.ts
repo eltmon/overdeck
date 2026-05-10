@@ -1354,44 +1354,64 @@ export async function runParallelReview(
     return { result: abortResult, reviewId };
   }
 
-  const synthTemplatePath = resolvePromptTemplateFn('code-review-synthesis', context.projectPath);
-  const synthTemplate = await parseReviewerTemplate(synthTemplatePath);
-  const synthModel = resolveReviewerModel({ name: 'synthesis' }, synthTemplate.model);
+  // PAN-1048 R2: programmatic synthesis. The legacy "code-review-synthesis"
+  // sub-agent and its .claude/agents/code-review-synthesis.md definition
+  // are removed — the review role IS synthesis, and runParallelReview
+  // synthesizes reviewer outputs in-process.
+  //
+  // Aggregation:
+  // - Any CHANGES_REQUESTED → CHANGES_REQUESTED (concatenate findings).
+  // - Else if any COMMENTED  → COMMENTED.
+  // - Else (all APPROVED)    → APPROVED.
+  // The output is still written to synthesis.md so parseReviewSynthesis()
+  // and the dashboard's review history view stay byte-compatible.
   const synthOutputFile = join(outputDir, 'synthesis.md');
-  const synthSessionName = getReviewerSessionName('synthesis', projectKey, context.issueId);
+  const reviewerOutcomes = await Promise.all(
+    completedReviewers.map(async (reviewer) => {
+      const content = existsSync(reviewer.outputFile)
+        ? await readFile(reviewer.outputFile, 'utf-8')
+        : '';
+      return { reviewer, content, parsed: parseAgentOutput(content) };
+    }),
+  );
 
-  // Build synthesis context with paths to all reviewer outputs
-  const reviewerOutputsList = completedReviewers
-    .map(r => `- **${r.role}**: ${r.outputFile}`)
-    .join('\n');
-
-  const synthContextHeader = [
-    `# Synthesis Context\n`,
-    reviewerContext,
-    `**Output file**: ${synthOutputFile}`,
-    `\n## Reviewer Output Files\n${reviewerOutputsList}`,
-    `\n---\n`,
-  ].join('\n');
-
-  const synthPrompt = synthContextHeader + synthTemplate.content;
-  const synthPromptFile = join(outputDir, 'synthesis-prompt.md');
-  await writeFile(synthPromptFile, synthPrompt);
-
-  // Resume-or-spawn for synthesis (PAN-830). Same canonical-session lifetime
-  // as the role reviewers above.
-  if (await sessionExistsAsync(synthSessionName)) {
-    console.log(`[review-agent] Resuming synthesis ${synthSessionName} for new round`);
-    await sendKeysAsync(synthSessionName, synthPrompt, 'runParallelReview-synthesis-resume');
+  const verdicts = reviewerOutcomes.map((o) => o.parsed.reviewResult);
+  let aggregateVerdict: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED';
+  if (verdicts.includes('CHANGES_REQUESTED')) {
+    aggregateVerdict = 'CHANGES_REQUESTED';
+  } else if (verdicts.includes('COMMENTED')) {
+    aggregateVerdict = 'COMMENTED';
   } else {
-    await spawnFn(synthSessionName, synthModel, synthPromptFile, context.projectPath);
-    try {
-      await setOptionAsync(synthSessionName, 'remain-on-exit', 'on');
-    } catch (err) {
-      console.warn(`[review-agent] Failed to set remain-on-exit on ${synthSessionName}: ${err instanceof Error ? err.message : err}`);
-    }
+    aggregateVerdict = 'APPROVED';
   }
-  emitActivityEntry({ source: 'review', level: 'info', message: `${context.issueId} — synthesis started`, issueId: context.issueId });
-  await waitSynthesisFn(synthSessionName, synthOutputFile, REVIEW_TIMEOUT_MS);
+
+  const reviewedFiles = Array.from(
+    new Set(reviewerOutcomes.flatMap((o) => o.parsed.filesReviewed ?? [])),
+  );
+  const findingsBlocks = reviewerOutcomes
+    .map((o) => {
+      const head = `## ${o.reviewer.role} — ${o.parsed.reviewResult ?? 'NO VERDICT'}`;
+      const body = o.content.trim() || '_(empty)_';
+      return `${head}\n\n${body}`;
+    })
+    .join('\n\n');
+
+  const synthesisContent = [
+    `# Synthesis (programmatic — PAN-1048)`,
+    `REVIEW_RESULT: ${aggregateVerdict}`,
+    `FILES_REVIEWED: ${reviewedFiles.join(', ') || 'none'}`,
+    '',
+    `Aggregated from ${completedReviewers.length} reviewers: ${completedReviewers.map(r => r.role).join(', ')}.`,
+    '',
+    findingsBlocks,
+  ].join('\n');
+  await writeFile(synthOutputFile, synthesisContent);
+  emitActivityEntry({
+    source: 'review',
+    level: 'info',
+    message: `${context.issueId} — synthesis ${aggregateVerdict.toLowerCase()} (programmatic)`,
+    issueId: context.issueId,
+  });
 
   // ── Phase 4: Parse result ─────────────────────────────────────────────────
   const result = await parseSynthesisFn(outputDir, agents);

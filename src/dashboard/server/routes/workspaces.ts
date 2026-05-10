@@ -3449,7 +3449,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
       if (existingStatus.testStatus === 'failed' || existingStatus.testStatus === 'pending' || existingStatus.testStatus === 'dispatch_failed') {
         console.log(
-          `[request-review] ${issueId}: review passed but tests ${existingStatus.testStatus} — dispatching test specialist`
+          `[request-review] ${issueId}: review passed but tests ${existingStatus.testStatus} — dispatching test role`
         );
         setReviewStatus(issueId, { testStatus: 'pending' });
 
@@ -3457,7 +3457,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           const resolved = resolveProjectFromIssue(issueId);
           if (!resolved) {
             console.error(
-              `[request-review] No project configured for ${issueId} — cannot spawn test specialist`
+              `[request-review] No project configured for ${issueId} — cannot spawn test role`
             );
             setReviewStatus(issueId, {
               testStatus: 'dispatch_failed',
@@ -3469,29 +3469,33 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               'workspaces',
               `feature-${issueId.toLowerCase()}`
             );
-            const branchName = `feature/${issueId.toLowerCase()}`;
             setReviewStatus(issueId, { testStatus: 'testing' });
-            const { spawnEphemeralSpecialist } = yield* Effect.promise(() => import(
-              '../../../lib/cloister/specialists.js'
-            ));
-            const testResult = yield* Effect.promise(() => spawnEphemeralSpecialist(
-              resolved.projectKey,
-              'test-agent',
-              { issueId, workspace: workspacePath, branch: branchName }
-            ));
-            console.log(
-              `[request-review] Test specialist ${testResult.success ? 'spawned' : 'failed'} for ${issueId}`
-            );
-            if (!testResult.success) {
+            // PAN-1048 R1: spawn the test role via the role primitive instead
+            // of the legacy spawnEphemeralSpecialist machinery. Reactive
+            // Cloister normally drives this on lifecycle transitions; this
+            // path is a manual re-dispatch for already-approved reviews.
+            const { spawnRun } = yield* Effect.promise(() => import('../../../lib/agents.js'));
+            try {
+              const testRun = yield* Effect.promise(() => spawnRun(issueId, 'test', {
+                workspace: workspacePath,
+              }));
+              console.log(
+                `[request-review] Test role spawned for ${issueId} as ${testRun.id}`
+              );
+            } catch (testErr) {
+              const msg = testErr instanceof Error ? testErr.message : String(testErr);
+              console.error(
+                `[request-review] Test role spawn failed for ${issueId}: ${msg}`
+              );
               setReviewStatus(issueId, {
                 testStatus: 'dispatch_failed',
-                testNotes: `Test dispatch failed: ${testResult.error || testResult.message}`,
+                testNotes: `Test dispatch failed: ${msg}`,
               });
             }
           }
         } catch (err: any) {
           console.warn(
-            `[request-review] Failed to queue test specialist for ${issueId}: ${err.message}`
+            `[request-review] Failed to queue test role for ${issueId}: ${err.message}`
           );
         }
         return jsonResponse({

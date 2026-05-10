@@ -57,5 +57,13 @@ export function isAgentSessionActive(agent: Agent): boolean {
 }
 
 export function isAgentSessionAttachable(agent: Agent): boolean {
-  return isAgentSessionActive(agent) || (agent.status === 'stopped' && agent.agentPhase === 'review-response');
+  // PAN-1048: a stopped work agent whose tmux session is still alive is in
+  // standby (post-pan-done, awaiting review/UAT response). Replaces the
+  // legacy agentPhase === 'review-response' check.
+  return (
+    isAgentSessionActive(agent) ||
+    (agent.status === 'stopped' &&
+      (agent.role ?? 'work') === 'work' &&
+      !!agent.lifecycle?.hasLiveTmuxSession)
+  );
 }

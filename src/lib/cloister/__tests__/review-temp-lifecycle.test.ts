@@ -232,11 +232,18 @@ describe('review-temp stash lifecycle', () => {
     vi.useFakeTimers();
     try {
       const spawnFn = vi.fn(async () => {});
+      // PAN-1048 R2: programmatic synthesis reads reviewer output files, so
+      // a successful waitFn must materialize a REVIEW_RESULT marker on disk.
+      const { writeFileSync, mkdirSync } = await import('fs');
+      const { dirname } = await import('path');
       const waitFn = vi.fn()
         .mockResolvedValueOnce({ status: 'failed' as const, reason: 'timeout' as const })
         .mockResolvedValueOnce({ status: 'failed' as const, reason: 'timeout' as const })
-        .mockResolvedValueOnce({ status: 'completed' as const });
-      const waitSynthesisFn = vi.fn(async () => ({ status: 'completed' as const }));
+        .mockImplementationOnce(async (_session: string, outputFile: string) => {
+          mkdirSync(dirname(outputFile), { recursive: true });
+          writeFileSync(outputFile, 'REVIEW_RESULT: APPROVED\nNOTES: ok\nFILES_REVIEWED: src/file.ts');
+          return { status: 'completed' as const };
+        });
       const resultPromise = runParallelReview(
         {
           issueId: 'PAN-3',
@@ -249,7 +256,6 @@ describe('review-temp stash lifecycle', () => {
         {
           spawnFn,
           waitFn,
-          waitSynthesisFn,
           parseSynthesisFn: vi.fn(async () => ({ success: true, reviewResult: 'APPROVED' as const })),
           postReviewFn: vi.fn(async () => {}),
           resolvePromptTemplateFn: vi.fn(() => '/tmp/template.md'),
@@ -261,9 +267,11 @@ describe('review-temp stash lifecycle', () => {
 
       expect(result.success).toBe(true);
       expect(waitFn).toHaveBeenCalledTimes(3);
-      expect(spawnFn).toHaveBeenCalledTimes(4);
+      // PAN-1048 R2: synthesis is now programmatic. spawnFn used to be called
+      // 4 times (3 reviewer attempts + 1 synthesis spawn); after removing the
+      // separate synthesis Claude session, only the 3 reviewer spawns remain.
+      expect(spawnFn).toHaveBeenCalledTimes(3);
       expect(spawnFn.mock.calls.filter(([session]) => String(session).endsWith('-security'))).toHaveLength(3);
-      expect(waitSynthesisFn).toHaveBeenCalledTimes(1);
       expect(notifyPipeline).toHaveBeenCalledWith(expect.objectContaining({
         type: 'reviewer_timed_out',
         issueId: 'PAN-3',

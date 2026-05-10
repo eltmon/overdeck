@@ -257,7 +257,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           ...state.agentsById,
           [event.payload.agentId]: {
             ...agent,
-            role: event.payload.role,
+            role: event.payload.role ?? agent.role,
             hasPendingQuestion: event.payload.hasPendingQuestion,
             pendingQuestionCount: event.payload.pendingQuestionCount,
             pendingQuestionPrompt: event.payload.pendingQuestionPrompt,

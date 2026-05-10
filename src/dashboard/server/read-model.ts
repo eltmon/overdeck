@@ -371,8 +371,10 @@ export const ReadModelServiceLive = Layer.effect(
             Effect.promise(() => import('../../lib/agent-enrichment.js')),
           ]);
 
-        // Warn on legacy state files with bare numeric issueIds (PAN-489)
-        warnOnBareNumericIssueIds();
+        // Warn on legacy state files with bare numeric issueIds (PAN-489).
+        // PAN-1048 P2: async to avoid blocking the dashboard event loop on
+        // startup while it scans agent state files and kills stale tmux.
+        yield* Effect.promise(() => warnOnBareNumericIssueIds());
 
         // ── Agents ────────────────────────────────────────────────────────────
         const running = yield* Effect.promise(() => listRunningAgentsAsync());

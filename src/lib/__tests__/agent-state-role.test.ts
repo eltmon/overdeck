@@ -23,7 +23,8 @@ describe('AgentState role persistence', () => {
   it('resolves the work role model through role config defaults', async () => {
     const { determineModel } = await import('../agents.js');
 
-    expect(determineModel({ role: 'work' })).toBe('claude-sonnet-4-6');
+    // PAN-1048 R4: default workhorse:mid is claude-sonnet-4-7.
+    expect(determineModel({ role: 'work' })).toBe('claude-sonnet-4-7');
     expect(determineModel({ role: 'work', model: 'claude-opus-4-7' })).toBe('claude-opus-4-7');
   });
 
@@ -152,7 +153,7 @@ describe('AgentState role persistence', () => {
       startedAt: '2026-05-09T00:00:00.000Z',
     }));
 
-    warnOnBareNumericIssueIds();
+    await warnOnBareNumericIssueIds();
 
     expect(existsSync(legacyDir)).toBe(false);
     expect(existsSync(validDir)).toBe(true);

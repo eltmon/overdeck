@@ -917,8 +917,14 @@ export function ListIssueRow({
     }
     return getIssueWorkAgentMap(agents).get(issueIdLower) ?? [];
   }, [agents, issueWorkAgentsById, issueIdLower]);
+  // PAN-1048: standby = work agent that finished its run but kept its tmux session
+  // alive for review/UAT response. Replaces the legacy agentPhase === 'review-response'
+  // signal — agentPhase no longer exists after the role primitive hard cut.
   const standbyAgent = workAgents.find(
-    (workAgent) => workAgent.status === 'stopped' && workAgent.agentPhase === 'review-response',
+    (workAgent) =>
+      workAgent.status === 'stopped' &&
+      (workAgent.role ?? 'work') === 'work' &&
+      !!workAgent.lifecycle?.hasLiveTmuxSession,
   );
   const isRunning = workAgents.some(isAgentSessionAttachable) || !!standbyAgent;
   const hasMultipleWorkAgents = workAgents.length > 1;
@@ -2710,8 +2716,12 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   // Determine which agent is relevant based on issue status
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
   const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0];
+  // PAN-1048: see comment on the earlier standbyAgent — derive from role + live tmux.
   const standbyAgent = issueWorkAgents.find(
-    (candidate) => candidate.status === 'stopped' && candidate.agentPhase === 'review-response' && !!candidate.lifecycle?.hasLiveTmuxSession,
+    (candidate) =>
+      candidate.status === 'stopped' &&
+      (candidate.role ?? 'work') === 'work' &&
+      !!candidate.lifecycle?.hasLiveTmuxSession,
   );
   const isStandby = !!standbyAgent;
   const isRunning = issueWorkAgents.some(isAgentSessionAttachable) || isStandby;

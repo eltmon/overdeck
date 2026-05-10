@@ -988,52 +988,20 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
 );
 
 // ─── Route: POST /api/specialists/:project/:type/spawn ───────────────────────
-
-const postProjectSpecialistSpawnRoute = HttpRouter.add(
-  'POST',
-  '/api/specialists/:project/:type/spawn',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-    const body = yield* readJsonBody;
-    const { issueId, branch, workspace, prUrl, context, model } = body as {
-      issueId?: string;
-      branch?: string;
-      workspace?: string;
-      prUrl?: string;
-      context?: unknown;
-      model?: string;
-    };
-
-    if (!issueId) {
-      return jsonResponse({ error: 'issueId is required' }, { status: 400 });
-    }
-
-    if (!validateSpecialistAgentName(type)) {
-      return jsonResponse(
-        { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
-        { status: 400 },
-      );
-    }
-
-    const { spawnEphemeralSpecialist } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const result = yield* Effect.promise(() => spawnEphemeralSpecialist(project, type, {
-      issueId,
-      branch,
-      workspace,
-      prUrl,
-      context,
-      model,
-    }));
-
-    if (result.success) {
-      return jsonResponse(result);
-    } else {
-      return jsonResponse({ error: result.message }, { status: 500 });
-    }
-  })),
-);
+//
+// PAN-1048 R1: removed. The legacy /spawn endpoint dispatched arbitrary
+// "specialist types" (review-agent, test-agent, merge-agent) by issuing a
+// generic spawnEphemeralSpecialist call. Under the role primitive this is
+// expressed as spawnRun(issueId, role, opts) — review/test/ship are first-
+// class roles, not opaque specialist names. The endpoint had no remaining
+// in-tree caller and is replaced by reactive Cloister scheduling on issue
+// state transitions plus the role spawn primitive.
+//
+// Old shape (removed):
+//   POST /api/specialists/:project/:type/spawn { issueId, branch, ... }
+//
+// Replacement: drive role spawns via lifecycle.transitionTo() and the
+// reactive scheduler in src/lib/cloister/service.ts.
 
 // ─── Route: GET /api/specialists/:project/:type/runs ──────────────────────────
 
@@ -1709,9 +1677,9 @@ export const specialistsRouteLayer = Layer.mergeAll(
   postSpecialistAutoCompleteRoute,
 
   // ── Per-project /api/specialists/:project/:type/* routes ──
+  // PAN-1048 R1: postProjectSpecialistSpawnRoute removed (see above).
   getProjectSpecialistStatusRoute,
   postProjectSpecialistKillRoute,
-  postProjectSpecialistSpawnRoute,
   getProjectSpecialistRunsRoute,
   getProjectSpecialistRunStreamRoute,       // /runs/:runId/stream — before /runs/:runId
   getProjectSpecialistRunRoute,             // /runs/:runId

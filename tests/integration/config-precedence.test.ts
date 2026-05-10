@@ -49,9 +49,10 @@ describe('configuration precedence for role model routing', () => {
     const { config } = mergeConfigs(null);
 
     expect(resolveModel('plan', undefined, config)).toBe('claude-opus-4-7');
-    expect(resolveModel('work', undefined, config)).toBe('claude-sonnet-4-6');
+    // PAN-1048 R4: default workhorse:mid is claude-sonnet-4-7.
+    expect(resolveModel('work', undefined, config)).toBe('claude-sonnet-4-7');
     expect(resolveModel('work', 'inspect', config)).toBe('claude-haiku-4-5');
-    expect(resolveModel('review', 'requirements', config)).toBe('claude-sonnet-4-6');
+    expect(resolveModel('review', 'requirements', config)).toBe('claude-sonnet-4-7');
   });
 
   it('uses configured workhorse slots for roles and sub-roles', () => {

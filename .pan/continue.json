@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-10T06:26:54.929Z",
+  "updated": "2026-05-10T13:30:00.000Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "merge-origin-main-pending",
+    "sha": "review-feedback-001-fixes-pending-commit",
     "dirty": true
   },
   "decisions": [
@@ -93,6 +93,11 @@
       "id": "D17",
       "summary": "C2 hard-deleted legacy specialist wake/session/queue machinery while preserving on-demand ephemeral specialists required for inspect/reviewer flows. Review prompt sources now live exclusively as Claude Code agent definitions under .claude/agents/code-review-*.md; code-review-synthesis.md must be force-added because .claude/agents/ is ignored by default.",
       "recordedAt": "2026-05-09T22:32:50.345Z"
+    },
+    {
+      "id": "D18",
+      "summary": "Review feedback 001 fixes (correctness/performance/requirements). The previous D17 stance — preserving on-demand ephemeral specialists for inspect/reviewer flows — is reversed. spawnEphemeralSpecialist is fully deleted: POST /api/specialists/:project/:type/spawn route removed; routes/workspaces.ts test re-dispatch migrated to spawnRun(issueId, 'test'); inspect-agent now spawns its own minimal Claude session against .claude/agents/inspect.md (or inspect-deep.md) with model resolved through resolveModel('work', 'inspect[-deep]'). code-review-synthesis.md and the synthesis sub-agent spawn are gone — runParallelReview synthesizes reviewer outputs programmatically (any CHANGES_REQUESTED → CHANGES_REQUESTED, else any COMMENTED → COMMENTED, else APPROVED) and writes synthesis.md so parseReviewSynthesis stays byte-compatible. Other fixes in this batch: determineModel no longer silently falls back (resolveModel errors propagate); resume/restart launchers honor agentState.role instead of hardcoding 'work' (review/test/ship runs now resume with the right roles/<role>.md); start-planning + start-agent + remote-start collapse the duplicate issue.statusChanged emit to lifecycle.transitionTo's single issue.transitioned; planning state.json writes role:'plan' instead of legacy type/agentPhase; activeRoleRunExists is async and no longer requires tmuxActive (closes the spawn-route race); warnOnBareNumericIssueIds + dropLegacyAgentStatesMissingRole are async (no blocking sync FS at dashboard startup); agentPhase is removed from the API response and UI; standby is derived from role==='work' && status==='stopped' && lifecycle.hasLiveTmuxSession; default workhorse:mid is claude-sonnet-4-7; AgentEnrichmentChangedEvent role overwrite preserves the existing role when payload omits it.",
+      "recordedAt": "2026-05-10T13:30:00.000Z"
     }
   ],
   "hazards": [
@@ -162,7 +167,7 @@
       "mitigation": "scripts/build-cli.mjs now copies prompt templates into both locations; run npm run build:cli before requesting inspection if dist is stale."
     }
   ],
-  "resumePoint": "Resolved origin/main merge conflict in src/lib/agents.ts, preserved explicit --model overrides for agentDefinition and role runtime commands, verified typecheck/lint/test/build, and prepared to commit/push then request review.",
+  "resumePoint": "Addressed all blocking findings from review feedback 001 (7 correctness, 2 performance, 5 requirements; security approved). All quality gates pass (typecheck, lint, test 384/389, build). Ready to commit and push for re-review via pan done.",
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
   "sessionHistory": [
@@ -397,6 +402,12 @@
       "timestamp": "2026-05-10T06:26:54.929Z",
       "reason": "verification-fix",
       "note": "Handled verification feedback 001 sync-target-branch failure by merging origin/main, resolving src/lib/agents.ts semantic conflict in favor of direct agentDefinition strings plus origin/main explicit --model override behavior, extending role-runtime coverage, and running bun install, npm run typecheck, npm run lint, npm test, npm run build, and graphify update successfully.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-10T13:30:00.000Z",
+      "reason": "review-feedback-fixes",
+      "note": "Addressed all blocking findings from review feedback 001 (7 correctness, 2 performance, 5 requirements). Highlights: deleted spawnEphemeralSpecialist + the legacy POST /api/specialists/:project/:type/spawn route; migrated workspaces.ts test re-dispatch and inspect-agent to spawnRun / minimal launcher paths; removed code-review-synthesis sub-agent in favor of programmatic synthesis inside runParallelReview; collapsed duplicate issue.statusChanged emits to a single lifecycle.transitionTo on planning + start-agent + remote-start; planning state.json now writes role:'plan'; resume/restart launchers honor agentState.role; determineModel no longer swallows resolveModel errors; activeRoleRunExists is async and skips when any non-stopped state.json with the role exists (closes spawn-route race); warnOnBareNumericIssueIds + dropLegacyAgentStatesMissingRole are async (no blocking sync FS at dashboard startup); agentPhase removed from API responses and UI; standby derived from role + lifecycle.hasLiveTmuxSession; default workhorse:mid bumped to claude-sonnet-4-7; agent.enrichment_changed reducer preserves existing role on undefined payload. typecheck, lint, full test (384 files, 4562 passed), and build all green.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

@@ -8,8 +8,9 @@ vi.mock('child_process', async (importOriginal) => {
 });
 
 vi.mock('../specialists.js', () => ({
+  // PAN-1048 R1: spawnEphemeralSpecialist is gone; merge-agent now spawns
+  // the ship role via spawnRun. The mock keeps only the still-used helpers.
   getTmuxSessionName: vi.fn(() => 'merge-session'),
-  spawnEphemeralSpecialist: vi.fn(async () => ({ success: true })),
   isRunning: vi.fn(async () => true),
   REVIEWER_ROLES: ['security', 'correctness', 'performance', 'requirements'],
 }));

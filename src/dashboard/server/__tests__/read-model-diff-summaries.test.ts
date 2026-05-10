@@ -293,7 +293,8 @@ describe('ReadModel checkpoint reconciliation', () => {
                 role: 'work',
               },
             ]),
-            warnOnBareNumericIssueIds: vi.fn(),
+            // PAN-1048 P2: now async.
+            warnOnBareNumericIssueIds: vi.fn(async () => {}),
           }))
         },
       },

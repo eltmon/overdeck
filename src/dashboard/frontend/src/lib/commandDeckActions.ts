@@ -82,7 +82,7 @@ export interface ActionLayout {
 
 export interface ZoneAInput {
   reviewStatus?: ReviewStatus | null;
-  agent?: Pick<Agent, 'status' | 'agentPhase' | 'git'> | null;
+  agent?: Pick<Agent, 'status' | 'role' | 'agentPhase' | 'git'> | null;
   lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
   workspace?: Pick<WorkspaceInfo, 'exists'> | null;
   hasPlan: boolean;
@@ -142,7 +142,7 @@ function derivePipelineState(input: ZoneAInput): PipelineState {
   if (reviewStatus?.testStatus === 'testing') return 'testing_running';
   if (reviewStatus?.testStatus === 'failed' || reviewStatus?.testStatus === 'dispatch_failed') return 'testing_failures';
   if (reviewStatus?.verificationStatus === 'failed') return 'verification_failing';
-  if (agentRunning && agent?.agentPhase === 'planning') return 'planning_active';
+  if (agentRunning && agent?.role === 'plan') return 'planning_active';
   if (!agentRunning && input.hasPlan && (issueCanonicalState === 'todo' || issueCanonicalState === 'backlog')) return 'planning_done_awaiting_work';
   if (agentRunning && issueCanonicalState === 'in_progress') return 'in_progress_work_running';
   if (!agentRunning && issueCanonicalState === 'in_progress') return 'in_progress_work_idle';

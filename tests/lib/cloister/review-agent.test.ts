@@ -1056,46 +1056,11 @@ describe('template/output contract', () => {
     }
   });
 
-  describe('synthesis template reads from Reviewer Output Files context', () => {
-    it('does NOT reference .claude/reviews/ glob for input', () => {
-      const content = readTemplate('code-review-synthesis');
-      expect(content).not.toContain('.claude/reviews/');
-    });
-
-    it('instructs agent to read from ## Reviewer Output Files context section', () => {
-      const content = readTemplate('code-review-synthesis');
-      expect(content).toContain('Reviewer Output Files');
-    });
-
-    it('instructs agent to write to the **Output file** from Synthesis Context', () => {
-      const content = readTemplate('code-review-synthesis');
-      expect(content).toMatch(/\*\*Output file\*\*/);
-    });
-  });
-
-  describe('synthesis template output markers (enables parseAgentOutput to return real result)', () => {
-    it('instructs agent to emit REVIEW_RESULT marker', () => {
-      const content = readTemplate('code-review-synthesis');
-      expect(content).toContain('REVIEW_RESULT:');
-    });
-
-    it('instructs agent to emit NOTES marker', () => {
-      const content = readTemplate('code-review-synthesis');
-      expect(content).toContain('NOTES:');
-    });
-
-    it('instructs agent to emit FILES_REVIEWED marker', () => {
-      const content = readTemplate('code-review-synthesis');
-      expect(content).toContain('FILES_REVIEWED:');
-    });
-
-    it('REVIEW_RESULT options cover all three outcomes parseAgentOutput expects', () => {
-      const content = readTemplate('code-review-synthesis');
-      expect(content).toContain('APPROVED');
-      expect(content).toContain('CHANGES_REQUESTED');
-      expect(content).toContain('COMMENTED');
-    });
-  });
+  // PAN-1048 R2: code-review-synthesis sub-agent is removed. Synthesis is
+  // performed programmatically by runParallelReview itself — there is no
+  // standalone synthesis prompt template to assert against. The previous
+  // template-shape tests have been replaced by the
+  // 'runParallelReview programmatic synthesis (PAN-1048 R2)' suite below.
 });
 
 // ── getReviewAgents ───────────────────────────────────────────────────────────
@@ -1203,7 +1168,8 @@ describe('runParallelReview', () => {
     mkdirSync(join(tmpDir, 'agents'), { recursive: true });
     const frontmatter = '---\nmodel: sonnet\n---\nReview the code.\n';
     writeFileSync(join(tmpDir, 'agents', 'code-review-correctness.md'), frontmatter);
-    writeFileSync(join(tmpDir, 'agents', 'code-review-synthesis.md'), frontmatter);
+    // PAN-1048 R2: synthesis is programmatic in runParallelReview;
+    // no .claude/agents/code-review-synthesis.md is required.
   });
 
   afterEach(() => {
@@ -1217,10 +1183,14 @@ describe('runParallelReview', () => {
     branch: 'feature/pan-999',
   });
 
-  it('happy path: all reviewers succeed → synthesis runs → result returned', async () => {
+  it('happy path: all reviewers succeed → programmatic synthesis writes result (PAN-1048 R2)', async () => {
     const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue({ status: 'completed' });
-    const waitSynthesisFn = vi.fn().mockResolvedValue({ status: 'completed' });
+    // PAN-1048 R2: synthesis runs in-process. waitFn must mark each reviewer
+    // output present so runParallelReview can read it for aggregation.
+    const waitFn = vi.fn().mockImplementation(async (_session: string, outputFile: string) => {
+      writeFileSync(outputFile, 'REVIEW_RESULT: APPROVED\nNOTES: LGTM\nFILES_REVIEWED: src/foo.ts');
+      return { status: 'completed' as const };
+    });
     const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
     const postReviewFn = vi.fn().mockResolvedValue(undefined);
@@ -1230,12 +1200,12 @@ describe('runParallelReview', () => {
       baseContext(),
       ['src/foo.ts'],
       [{ name: 'correctness', focus: ['logic'] }],
-      { spawnFn, waitFn, waitSynthesisFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
     );
 
-    expect(spawnFn).toHaveBeenCalledTimes(2); // 1 reviewer + 1 synthesis
-    expect(waitFn).toHaveBeenCalledOnce(); // reviewer only
-    expect(waitSynthesisFn).toHaveBeenCalledOnce(); // synthesis (separate fn, requires REVIEW_RESULT marker)
+    // Only the convoy reviewers spawn now — synthesis is no longer a Claude session.
+    expect(spawnFn).toHaveBeenCalledTimes(1);
+    expect(waitFn).toHaveBeenCalledOnce();
     expect(parseSynthesisFn).toHaveBeenCalledOnce();
     expect(postReviewFn).toHaveBeenCalledOnce();
     expect(result.reviewResult).toBe('APPROVED');
@@ -1271,8 +1241,10 @@ describe('runParallelReview', () => {
     mockKillSessionAsync.mockClear();
 
     const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue({ status: 'completed' });
-    const waitSynthesisFn = vi.fn().mockResolvedValue({ status: 'completed' });
+    const waitFn = vi.fn().mockImplementation(async (_session: string, outputFile: string) => {
+      writeFileSync(outputFile, 'REVIEW_RESULT: APPROVED\nNOTES: LGTM\nFILES_REVIEWED: src/foo.ts');
+      return { status: 'completed' as const };
+    });
     const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
     const postReviewFn = vi.fn().mockResolvedValue(undefined);
@@ -1282,19 +1254,16 @@ describe('runParallelReview', () => {
       baseContext(),
       ['src/foo.ts'],
       [{ name: 'correctness', focus: ['logic'] }],
-      { spawnFn, waitFn, waitSynthesisFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
     );
 
     expect(result.reviewResult).toBe('APPROVED');
 
-    // killSessionAsync must NOT be called for the canonical reviewer / synthesis
-    // sessions on a successful round — they live on for the next round to
-    // resume into the same Claude process via sendKeysAsync.
+    // PAN-1048 R2: synthesis is now programmatic (no synthesis tmux session
+    // exists), so we only need to confirm the canonical reviewer session is
+    // not torn down on a successful round.
     expect(mockKillSessionAsync).not.toHaveBeenCalledWith(
       'specialist-panopticon-cli-PAN-999-review-correctness',
-    );
-    expect(mockKillSessionAsync).not.toHaveBeenCalledWith(
-      'specialist-panopticon-cli-PAN-999-review-synthesis',
     );
   });
 

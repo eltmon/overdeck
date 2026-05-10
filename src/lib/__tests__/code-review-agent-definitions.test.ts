@@ -3,7 +3,10 @@ import { join } from 'path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
-const REVIEW_FLAVORS = ['security', 'correctness', 'performance', 'requirements', 'synthesis'] as const;
+// PAN-1048 R2: synthesis is the review role itself — there is no
+// .claude/agents/code-review-synthesis.md sub-agent to validate.
+const REVIEW_FLAVORS = ['security', 'correctness', 'performance', 'requirements'] as const;
+const LEGACY_TEMPLATE_FLAVORS = [...REVIEW_FLAVORS, 'synthesis'] as const;
 
 function readRepoFile(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf-8');
@@ -32,8 +35,12 @@ describe('code review Claude Code agent definitions', () => {
   }
 
   it('does not keep legacy source prompt-template files', () => {
-    for (const flavor of REVIEW_FLAVORS) {
+    for (const flavor of LEGACY_TEMPLATE_FLAVORS) {
       expect(existsSync(join(process.cwd(), `src/lib/cloister/prompts/review/code-review-${flavor}.prompt-template.md`))).toBe(false);
     }
+  });
+
+  it('does not ship a separate code-review-synthesis sub-agent (PAN-1048 R2)', () => {
+    expect(existsSync(join(process.cwd(), '.claude/agents/code-review-synthesis.md'))).toBe(false);
   });
 });

@@ -1262,7 +1262,13 @@ export async function buildCavemanExports(
  * Priority:
  * 1. Explicitly provided model (options.model)
  * 2. Role routing via config.yaml roles/workhorses (defaults to work)
- * 3. Safe fallback (claude-sonnet-4-6)
+ *
+ * Resolution failures propagate as spawn-time errors. Per PAN-1048 PRD:
+ * invalid workhorse references and unresolved role configs must fail loudly
+ * at config-load/spawn time, not silently fall back to a hidden default
+ * model. Defaults are seeded into the config when entries are absent
+ * (DEFAULT_WORKHORSES / DEFAULT_ROLES) — anything that still raises here
+ * is a real configuration bug the user must see.
  */
 export function determineModel(options: { model?: string; role?: Role } = {}): string {
   console.log(`[DEBUG] determineModel called with:`, { model: options.model, role: options.role ?? 'work' });
@@ -1272,12 +1278,7 @@ export function determineModel(options: { model?: string; role?: Role } = {}): s
     return options.model;
   }
 
-  try {
-    return resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config);
-  } catch (error) {
-    console.warn('Warning: Could not resolve model using role router, using default');
-    return 'claude-sonnet-4-6';
-  }
+  return resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config);
 }
 
 /**
@@ -1423,9 +1424,14 @@ export async function buildAgentLaunchConfig(opts: {
 
   const providerExports = await getProviderExportsForModel(model);
 
+  // PAN-1048: resume/restart launchers must respect the agent's role.
+  // A resumed review/test/ship run loads the wrong frontmatter (and wrong
+  // tool permissions) if it always points at roles/work.md.
+  const launchRole: Role = opts.isPlanning ? 'plan' : opts.role;
+
   if (opts.spawnMode === 'resume' && opts.resumeSessionId) {
-    // Resume sessions adopt the work role definition via --agent.
-    // Permissions/model/tools/hooks come from roles/work.md frontmatter.
+    // Resume sessions adopt the role definition via --agent.
+    // Permissions/model/tools/hooks come from roles/<role>.md frontmatter.
     // --name <agentId> gives the resumed Claude session a human-readable handle.
     //
     // The frontmatter's permissionMode: bypassPermissions only bypasses prompts
@@ -1444,13 +1450,13 @@ export async function buildAgentLaunchConfig(opts: {
       ? '--dangerously-skip-permissions '
       : '';
     const launcherContent = generateLauncherScript({
-      role: 'work',
+      role: launchRole,
       spawnMode: 'resume',
       workingDir: opts.workspace,
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: `claude ${bypassFlag}--agent ${roleAgentDefinitionPath('work')}`,
+      baseCommand: `claude ${bypassFlag}--agent ${roleAgentDefinitionPath(launchRole)}`,
       resumeSessionId: opts.resumeSessionId,
       model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: `--name ${opts.agentId}`,
@@ -1466,14 +1472,14 @@ export async function buildAgentLaunchConfig(opts: {
   );
 
   // PAN-982: pass the role definition path + agentId through getAgentRuntimeBaseCommand so it
-  // emits 'claude --agent roles/<plan|work>.md --name <agentId>'.
+  // emits 'claude --agent roles/<role>.md --name <agentId>'.
   // PAN-636: when harness === 'pi' the helper short-circuits to a pi --mode rpc
   // line and the agentName/agentDefinition arguments are ignored (Pi has no agent
   // definitions). The launcher generator's pi branch then layers --session-dir
   // and the fifo redirect on top.
-  const agentDefinition = opts.isPlanning ? roleAgentDefinitionPath('plan') : roleAgentDefinitionPath('work');
+  const agentDefinition = roleAgentDefinitionPath(launchRole);
   const launcherContent = generateLauncherScript({
-    role: opts.isPlanning ? 'plan' : 'work',
+    role: launchRole,
     workingDir: opts.workspace,
     changeDir: false,
     setCi: true,
@@ -1937,34 +1943,64 @@ export async function listRunningAgentsAsync(): Promise<(AgentState & { tmuxActi
   return agents;
 }
 
-function dropLegacyAgentStatesMissingRole(): number {
+/**
+ * PAN-1048 P2: async startup migration.
+ *
+ * The previous synchronous version used readdirSync, readFileSync,
+ * killSession (sync tmux subprocess), and rmSync — all on the Node
+ * event loop. Called from warnOnBareNumericIssueIds() during dashboard
+ * read-model bootstrap, this blocked all HTTP/WebSocket/PTY traffic on
+ * server startup while it scanned every agent dir, killed stale tmux
+ * sessions, and recursively deleted directories.
+ *
+ * This async variant does the same work using fs/promises and the
+ * already-async killSessionAsync() so the bootstrap path no longer
+ * stalls the event loop.
+ */
+async function dropLegacyAgentStatesMissingRoleAsync(): Promise<number> {
   if (!existsSync(AGENTS_DIR)) return 0;
 
-  const dirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory());
+  const fsp = await import('fs/promises');
+  let entries: string[];
+  try {
+    entries = await fsp.readdir(AGENTS_DIR);
+  } catch {
+    return 0;
+  }
 
   let dropped = 0;
-  for (const dir of dirs) {
-    const agentId = normalizeAgentId(dir.name);
-    const stateFile = join(AGENTS_DIR, dir.name, 'state.json');
-    if (!existsSync(stateFile)) continue;
+  await Promise.all(
+    entries.map(async (entry) => {
+      const dirPath = join(AGENTS_DIR, entry);
+      let stat;
+      try {
+        stat = await fsp.stat(dirPath);
+      } catch {
+        return;
+      }
+      if (!stat.isDirectory()) return;
 
-    try {
-      const raw = JSON.parse(readFileSync(stateFile, 'utf8')) as { role?: unknown };
-      if (isRole(raw.role)) continue;
-    } catch {
-      continue;
-    }
+      const agentId = normalizeAgentId(entry);
+      const stateFile = join(dirPath, 'state.json');
+      let raw: { role?: unknown };
+      try {
+        const contents = await fsp.readFile(stateFile, 'utf8');
+        raw = JSON.parse(contents) as { role?: unknown };
+      } catch {
+        return;
+      }
+      if (isRole(raw.role)) return;
 
-    try { killSession(agentId); } catch { /* best effort */ }
-    try {
-      rmSync(join(AGENTS_DIR, dir.name), { recursive: true, force: true });
-      dropped++;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[agents] Failed to drop legacy agent state ${agentId}: ${msg}`);
-    }
-  }
+      try { await killSessionAsync(agentId); } catch { /* best effort */ }
+      try {
+        await fsp.rm(dirPath, { recursive: true, force: true });
+        dropped++;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[agents] Failed to drop legacy agent state ${agentId}: ${msg}`);
+      }
+    }),
+  );
 
   return dropped;
 }
@@ -1977,24 +2013,47 @@ function dropLegacyAgentStatesMissingRole(): number {
  * cause cross-tracker pollution if their in_review transition is triggered.
  * Called once at server startup to surface legacy state files.
  */
-export function warnOnBareNumericIssueIds(): void {
-  const droppedLegacyAgents = dropLegacyAgentStatesMissingRole();
+/**
+ * PAN-1048 P2: bootstrap-path migration is async.
+ *
+ * Sweeps legacy state files missing a `role` field and warns on bare
+ * numeric issueIds. Both passes used to be synchronous (readdirSync,
+ * readFileSync, killSession, rmSync), which blocked the dashboard
+ * server's event loop on startup. The async version scans the same
+ * directory once per concern and uses fs/promises throughout.
+ */
+export async function warnOnBareNumericIssueIds(): Promise<void> {
+  const droppedLegacyAgents = await dropLegacyAgentStatesMissingRoleAsync();
   if (droppedLegacyAgents > 0) {
     console.warn(`[agents] Dropped ${droppedLegacyAgents} legacy agent state file(s) missing role`);
   }
 
   if (!existsSync(AGENTS_DIR)) return;
 
-  const dirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory());
+  const fsp = await import('fs/promises');
+  let entries: string[];
+  try {
+    entries = await fsp.readdir(AGENTS_DIR);
+  } catch {
+    return;
+  }
 
   const legacy: string[] = [];
-  for (const dir of dirs) {
-    const state = getAgentState(dir.name);
-    if (state?.issueId && /^\d+$/.test(state.issueId)) {
-      legacy.push(`${dir.name} (issueId: "${state.issueId}")`);
-    }
-  }
+  await Promise.all(
+    entries.map(async (entry) => {
+      const dirPath = join(AGENTS_DIR, entry);
+      try {
+        const stat = await fsp.stat(dirPath);
+        if (!stat.isDirectory()) return;
+      } catch {
+        return;
+      }
+      const state = await getAgentStateAsync(entry);
+      if (state?.issueId && /^\d+$/.test(state.issueId)) {
+        legacy.push(`${entry} (issueId: "${state.issueId}")`);
+      }
+    }),
+  );
 
   if (legacy.length > 0) {
     console.warn(
@@ -2355,7 +2414,8 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       agentId: normalizedId,
       model,
       workspace: agentState.workspace,
-      role: 'work',
+      role: agentState.role,
+      isPlanning: agentState.role === 'plan',
       spawnMode: 'resume',
       resumeSessionId: sessionId,
     });
@@ -2478,7 +2538,7 @@ export async function restartAgent(
       agentId: normalizedId,
       model: effectiveModel,
       workspace: agentState.workspace,
-      role: 'work',
+      role: agentState.role,
       isPlanning: agentState.role === 'plan',
     });
 
