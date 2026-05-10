@@ -1195,7 +1195,7 @@ Continue the PLANNING session. Do NOT implement anything.
         await writeFile(
           launcherScript,
           generateLauncherScript({
-            agentType: 'work',
+            role: 'plan',
             workingDir: agentCwd,
             baseCommand: msgCmdWithArgs,
             promptInline: `Please read the continuation prompt at ${continuationPromptPath} and continue the planning session.`,

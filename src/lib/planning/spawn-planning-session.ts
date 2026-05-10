@@ -506,7 +506,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     await writeFile(
       launcherScript,
       generateLauncherScript({
-        agentType: 'planning',
+        role: 'plan',
         workingDir: workspacePath,
         setCi: true,
         setTerminalEnv: true,

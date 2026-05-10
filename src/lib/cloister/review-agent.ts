@@ -554,7 +554,7 @@ export async function spawnSingleReviewer(
   // session's ANTHROPIC_BASE_URL pointing at a proxy would leak through.
   const launcherPath = join(tmpdir(), `pan-reviewer-${sessionName}.sh`);
   const launcherContent = generateLauncherScript({
-    agentType: 'review',
+    role: 'review',
     workingDir: projectPath,
     setPipefail: true,
     setTerminalEnv: true,

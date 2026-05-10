@@ -1027,7 +1027,7 @@ ${basePrompt}`;
     writeFileSync(
       innerScript,
       generateLauncherScript({
-        agentType: 'specialist-dispatch',
+        role: roleForSpecialistModel(specialistType).role,
         workingDir: cwd,
         setPipefail: true,
         setTerminalEnv: true,
@@ -1060,7 +1060,7 @@ ${basePrompt}`;
     // -q quiet (no Script started/done banners), -f flush on every write, -a append,
     // -e propagate child exit code, -c run command.
     const wrapper = generateLauncherWrapper({
-      agentType: 'specialist-dispatch',
+      role: roleForSpecialistModel(specialistType).role,
       workingDir: cwd,
       useScriptWrapper: true,
       scriptLogFile: logFilePath,
@@ -2231,7 +2231,7 @@ export async function initializeSpecialist(name: SpecialistAgentName): Promise<{
     writeFileSync(
       launcherScript,
       generateLauncherScript({
-        agentType: 'specialist-init',
+        role: roleForSpecialistModel(name).role,
         workingDir: cwd,
         unsetProviderEnv: true,
         providerExports: initProviderExportLines,

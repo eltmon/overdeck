@@ -714,7 +714,8 @@ async function spawnConversationSession(
   await writeFile(
     launcherScript,
     generateLauncherScript({
-      agentType: 'conversation',
+      role: 'work',
+      spawnMode: 'conversation',
       workingDir: cwd,
       setTerminalEnv: true,
       unsetProviderEnv: true,

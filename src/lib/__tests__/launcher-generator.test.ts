@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateLauncherScript, generateLauncherWrapper, type LauncherConfig } from '../launcher-generator.js';
 
 const DEFAULT_CONFIG: LauncherConfig = {
-  agentType: 'work',
+  role: 'work',
   workingDir: '/workspace/project',
 };
 
@@ -10,7 +10,7 @@ describe('generateLauncherScript', () => {
   it('work agent spawn (basic)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'work',
+      role: 'work',
       setCi: true,
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
@@ -28,7 +28,7 @@ describe('generateLauncherScript', () => {
   it('work agent with provider and caveman exports', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'work',
+      role: 'work',
       setCi: true,
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"\nexport ANTHROPIC_AUTH_TOKEN="tok"',
       cavemanExports: 'export CAVEMAN_DEFAULT_MODE="active"\n',
@@ -51,7 +51,8 @@ describe('generateLauncherScript', () => {
   it('work agent resume (PAN-982: permissions via --agent frontmatter)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'resume',
+      role: 'work',
+      spawnMode: 'resume',
       setCi: true,
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
       baseCommand: 'claude --agent pan-work-agent',
@@ -73,7 +74,7 @@ describe('generateLauncherScript', () => {
   it('planning agent spawn', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'planning',
+      role: 'plan',
       workingDir: '/workspace/project',
       setCi: true,
       setTerminalEnv: true,
@@ -114,10 +115,10 @@ describe('generateLauncherScript', () => {
     `);
   });
 
-  it('specialist dispatch inner script', () => {
+  it('review role script supports specialist-style prompt launch', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'specialist-dispatch',
+      role: 'review',
       workingDir: '/workspace/project',
       setPipefail: true,
       unsetProviderEnv: true,
@@ -151,17 +152,15 @@ describe('generateLauncherScript', () => {
       export ANTHROPIC_BASE_URL="http://proxy"
       export CAVEMAN_DEFAULT_MODE="active"
       prompt=$(cat '/tmp/prompt.md')
-      claude --session-id 'sess-abc' --model claude-sonnet-4-6 --dangerously-skip-permissions --permission-mode bypassPermissions "$prompt"
-      echo ""
-      echo "## Specialist completed task"
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-abc' --model claude-sonnet-4-6 "$prompt"
       "
     `);
   });
 
-  it('specialist init/wake', () => {
+  it('work role identity prompt launch', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'specialist-init',
+      role: 'work',
       workingDir: '/workspace/project',
       unsetProviderEnv: true,
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
@@ -193,7 +192,7 @@ describe('generateLauncherScript', () => {
   it('review agent', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'review',
+      role: 'review',
       workingDir: '/workspace/project',
       setPipefail: true,
       unsetPanopticonEnv: true,
@@ -216,7 +215,8 @@ describe('generateLauncherScript', () => {
   it('conversation panel (new session)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'conversation',
+      role: 'work',
+      spawnMode: 'conversation',
       workingDir: '/workspace/project',
       setTerminalEnv: true,
       panopticonEnv: { issueId: 'PAN-824' },
@@ -250,7 +250,8 @@ describe('generateLauncherScript', () => {
   it('conversation panel (resume)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'conversation',
+      role: 'work',
+      spawnMode: 'conversation',
       workingDir: '/workspace/project',
       setTerminalEnv: true,
       trapHup: true,
@@ -279,7 +280,8 @@ describe('generateLauncherScript', () => {
   it('remote agent', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'remote',
+      role: 'work',
+      spawnMode: 'remote',
       workingDir: '/workspace/project',
       setRemotePath: true,
       promptFile: '/workspace/.pan/prompts/agent.md',
@@ -300,7 +302,7 @@ describe('generateLauncherScript', () => {
   it('runtime adapter', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'runtime',
+      role: 'work',
       workingDir: '/workspace/project',
       promptFile: '/tmp/init-prompt.txt',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions',
@@ -319,7 +321,7 @@ describe('generateLauncherScript', () => {
   it('planning continuation', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'work',
+      role: 'work',
       workingDir: '/workspace/project',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
       promptInline: 'Please read the continuation prompt and continue.',
@@ -337,7 +339,8 @@ describe('generateLauncherScript', () => {
   it('escapeForBase64 escapes $ characters', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'remote',
+      role: 'work',
+      spawnMode: 'remote',
       workingDir: '/workspace/project',
       setRemotePath: true,
       promptFile: '/workspace/.pan/prompts/agent.md',
@@ -356,7 +359,7 @@ describe('generateLauncherScript', () => {
   it('work agent without changeDir', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'work',
+      role: 'work',
       setCi: true,
       changeDir: false,
       baseCommand: 'claude --model claude-sonnet-4-6',
@@ -378,7 +381,7 @@ describe('generateLauncherScript', () => {
   it('work agent with --agent flag (Anthropic model — no --model, no permission flags)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'work',
+      role: 'work',
       setCi: true,
       baseCommand: 'claude --agent pan-work-agent',
     });
@@ -391,7 +394,7 @@ describe('generateLauncherScript', () => {
   it('work agent with --agent flag and --model override (non-Anthropic)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'work',
+      role: 'work',
       setCi: true,
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
       baseCommand: 'claude --agent pan-work-agent --model gpt-5.4',
@@ -404,7 +407,7 @@ describe('generateLauncherScript', () => {
   it('planning agent with --agent flag', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'planning',
+      role: 'plan',
       setCi: true,
       promptFile: '/tmp/init-prompt.txt',
       baseCommand: 'claude --agent pan-planning-agent',
@@ -417,7 +420,8 @@ describe('generateLauncherScript', () => {
   it('resume agent preserves --agent across --resume', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'resume',
+      role: 'work',
+      spawnMode: 'resume',
       setCi: true,
       baseCommand: 'claude --agent pan-work-agent',
       resumeSessionId: 'sess-123',
@@ -428,10 +432,10 @@ describe('generateLauncherScript', () => {
     expect(script).not.toMatch(/--permission-mode/);
   });
 
-  it('specialist-dispatch with --agent (review)', () => {
+  it('review role with --agent flag', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'specialist-dispatch',
+      role: 'review',
       promptFile: '/tmp/prompt.md',
       baseCommand: 'claude --agent pan-review-agent',
       sessionId: 'sess-abc',
@@ -444,7 +448,7 @@ describe('generateLauncherScript', () => {
   it('--agent with --name produces both flags', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'work',
+      role: 'work',
       setCi: true,
       baseCommand: 'claude --agent pan-work-agent --name agent-pan-982',
     });
@@ -500,7 +504,7 @@ describe('generateLauncherWrapper', () => {
   describe('channels bridge args', () => {
     const FIXTURE_CONFIG: LauncherConfig = {
       ...DEFAULT_CONFIG,
-      agentType: 'work',
+      role: 'work',
       setCi: true,
       baseCommand:
         'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
@@ -544,10 +548,10 @@ describe('generateLauncherWrapper', () => {
       expect(script).not.toContain('server:panopticon-bridge');
     });
 
-    it('flag-on for specialist-dispatch: same flags applied before session/model', () => {
+    it('flag-on for review role: same flags applied before session/model', () => {
       const script = generateLauncherScript({
         ...DEFAULT_CONFIG,
-        agentType: 'specialist-dispatch',
+        role: 'review',
         baseCommand: 'claude',
         sessionId: 'sess-spec',
         model: 'claude-sonnet-4-6',
@@ -565,7 +569,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
   it('emits pi --mode rpc with --no-context-files, --extension, and stdin from fifo (AC1, AC2, AC4)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'work',
+      role: 'work',
       harness: 'pi',
       model: 'anthropic/claude-sonnet-4-6',
       piExtensionPath: '/abs/packages/pi-extension/dist/index.js',
@@ -598,7 +602,8 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
   it('appends --session for resumeSessionId on pi launchers', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'resume',
+      role: 'work',
+      spawnMode: 'resume',
       harness: 'pi',
       model: 'gpt-5.5-mini',
       piExtensionPath: '/x/dist/index.js',
@@ -614,7 +619,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     expect(() =>
       generateLauncherScript({
         ...DEFAULT_CONFIG,
-        agentType: 'work',
+        role: 'work',
         harness: 'pi',
         model: 'gpt-5.5-mini',
         // missing piExtensionPath
@@ -625,13 +630,13 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
   it('claude-code (default) output is bit-for-bit unchanged when harness is unset (AC3)', () => {
     const a = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'work',
+      role: 'work',
       setCi: true,
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
     const b = generateLauncherScript({
       ...DEFAULT_CONFIG,
-      agentType: 'work',
+      role: 'work',
       setCi: true,
       harness: 'claude-code',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',

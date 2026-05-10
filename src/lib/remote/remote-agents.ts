@@ -160,7 +160,8 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
     // Create launcher script using base64 to avoid shell interpretation
     const launcherScript = `/workspace/.pan/prompts/${agentId}-launcher.sh`;
     const launcherContent = generateLauncherScript({
-      agentType: 'remote',
+      role: 'work',
+      spawnMode: 'remote',
       workingDir: '/workspace',
       changeDir: false,
       setRemotePath: true,

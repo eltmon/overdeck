@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-10T00:57:06.782Z",
+  "updated": "2026-05-10T01:10:30.000Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "8571754ca",
+    "sha": "f8fcfbcec",
     "dirty": true
   },
   "decisions": [
@@ -163,14 +163,13 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-d07q/E5 ActivitySource cleanup is implemented and verified: the ActivitySource union was removed from activity-logger; emitActivityEntry now accepts Role plus cloister/dashboard; planning/work/review/test/ship activity callers use role sources; deploy-script and legacy specialist/merge/planning/work agent source values are no longer emitted; ActivityPanel renders role source colors/categories; typecheck, lint, tests, and graphify update passed.",
-    "beadId": "workspace-d07q",
+    "description": "workspace-tgba/E3 LauncherAgentType cleanup is implemented and verified: launcher-generator now uses role: Role plus optional spawnMode for conversation/remote/resume, deleted the specialist-dispatch and specialist-init command branches, migrated launcher call sites and tests to role/spawnMode, and verified typecheck, lint, full tests, and graphify update pass.",
+    "beadId": "workspace-tgba",
     "filesToRead": [
-      "src/lib/activity-logger.ts",
-      "src/lib/review-status.ts",
+      "src/lib/launcher-generator.ts",
       "src/lib/agents.ts",
-      "src/dashboard/frontend/src/components/ActivityPanel.tsx",
-      "src/dashboard/server/services/domain-services.ts"
+      "src/lib/cloister/specialists.ts",
+      "src/lib/__tests__/launcher-generator.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -367,6 +366,12 @@
       "timestamp": "2026-05-10T00:57:06.782Z",
       "reason": "bead-complete",
       "note": "Implemented workspace-d07q/E5: deleted the ActivitySource union from activity-logger, constrained normal activity sources to Role plus cloister/dashboard, migrated plan/work/review/test/ship activity emitters and detailed activity mapping to role source names, removed deploy-script/legacy specialist source rendering from ActivityPanel, and updated tests. Verified npm run typecheck, npm run lint, full npm test (381 passed/5 skipped test files; 4518 passed/62 skipped tests), and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-10T01:10:30.000Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-tgba/E3: deleted LauncherAgentType, refactored LauncherConfig to require role: Role plus optional spawnMode for conversation/remote/resume, removed specialist-dispatch and specialist-init branches from launcher-generator, migrated launcher call sites/tests to role/spawnMode, and verified npm run typecheck, npm run lint, full npm test (381 passed/5 skipped test files; 4518 passed/62 skipped tests), and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

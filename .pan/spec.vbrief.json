@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system \u2014 5 enums \u2192 Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-10T00:57:06.782Z"
+    "updated": "2026-05-10T01:10:30.000Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 33,
+    "sequence": 34,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-10T00:57:06.782Z",
+    "updated": "2026-05-10T01:10:30.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -1385,7 +1385,7 @@
       {
         "id": "e3-delete-launcher-agent-type",
         "title": "Delete LauncherAgentType (replace with Role + spawnMode field)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -1400,36 +1400,41 @@
           {
             "id": "e3-delete-launcher-agent-type.ac1",
             "title": "LauncherAgentType deleted from src/lib/launcher-generator.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T01:10:30.000Z"
           },
           {
             "id": "e3-delete-launcher-agent-type.ac2",
             "title": "LauncherConfig has `role: Role` and optional `spawnMode?: 'conversation' | 'remote' | 'resume'` fields",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T01:10:30.000Z"
           },
           {
             "id": "e3-delete-launcher-agent-type.ac3",
             "title": "specialist-dispatch and specialist-init branches deleted from launcher-generator.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T01:10:30.000Z"
           },
           {
             "id": "e3-delete-launcher-agent-type.ac4",
             "title": "2 callers updated; typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T01:10:30.000Z"
           }
-        ]
+        ],
+        "completed": "2026-05-10T01:10:30.000Z"
       },
       {
         "id": "e4-confirm-work-type-id-gone",

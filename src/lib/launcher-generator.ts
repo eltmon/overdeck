@@ -1,20 +1,12 @@
-export type LauncherAgentType =
-  | 'work'
-  | 'planning'
-  | 'specialist-dispatch'
-  | 'specialist-init'
-  | 'review'
-  | 'test'
-  | 'ship'
-  | 'conversation'
-  | 'remote'
-  | 'runtime'
-  | 'resume';
+import type { Role } from './agents.js';
+
+export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
 export type LauncherHarness = 'claude-code' | 'pi';
 
 export interface LauncherConfig {
-  agentType: LauncherAgentType;
+  role: Role;
+  spawnMode?: LauncherSpawnMode;
   workingDir: string;
 
   /**
@@ -258,7 +250,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   }
 
   // Post-exit echo messages
-  if (config.agentType === 'planning') {
+  if (config.role === 'plan') {
     lines.push('echo ""');
     lines.push('echo "Planning agent has exited. Session kept alive for review."');
     lines.push('echo "Click \'Done\' in the dashboard when ready to hand off to implementation."');
@@ -267,15 +259,9 @@ export function generateLauncherScript(config: LauncherConfig): string {
     }
   }
 
-  if (config.agentType === 'conversation') {
+  if (config.spawnMode === 'conversation') {
     lines.push('echo ""');
     lines.push('echo "Conversation session ended. Close this panel or click Resume to start a new session."');
-  }
-
-  // Specialist completion signal
-  if (config.agentType === 'specialist-dispatch') {
-    lines.push('echo ""');
-    lines.push('echo "## Specialist completed task"');
   }
 
   // Keep-alive loop
@@ -293,7 +279,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
 }
 
 /**
- * Generate the outer `script -qfaec` wrapper for specialist dispatch.
+ * Generate the outer `script -qfaec` wrapper for launchers that need tty logging.
  * Returns null if useScriptWrapper is false.
  */
 export function generateLauncherWrapper(config: LauncherConfig): string | null {
@@ -319,7 +305,7 @@ const PROVIDER_ENV_UNSETS = [
 function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
 
-  if (config.agentType === 'conversation') {
+  if (config.spawnMode === 'conversation') {
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
       const args: string[] = [];
@@ -336,40 +322,11 @@ function buildCommand(config: LauncherConfig): string[] {
     return parts;
   }
 
-  if (config.agentType === 'specialist-dispatch') {
-    // Inner script: no exec, runs claude directly then echoes completion
-    if (config.baseCommand) {
-      let cmd = config.baseCommand;
-
-      cmd += buildChannelsArgs(config);
-      if (config.sessionId) {
-        cmd += ` --session-id ${shellQuote(config.sessionId)}`;
-      }
-      if (config.model) {
-        cmd += ` --model ${config.model}`;
-      }
-      if (config.permissionFlags && config.permissionFlags.length > 0) {
-        const cmdTokens = cmd.split(/\s+/);
-        for (const flag of config.permissionFlags) {
-          if (!cmdTokens.includes(flag)) {
-            cmd += ` ${flag}`;
-          }
-        }
-      }
-      if (config.promptFile) {
-        cmd += ' "$prompt"';
-      }
-
-      parts.push(cmd.trim().replace(/\s+/g, ' '));
-    }
-    return parts;
-  }
-
-  if (config.agentType === 'planning') {
+  if (config.role === 'plan') {
     return buildNonConversationCommand(config, false);
   }
 
-  // All other types use exec
+  // All other launchers use exec
   return buildNonConversationCommand(config, true);
 }
 
@@ -380,8 +337,6 @@ function buildCommand(config: LauncherConfig): string[] {
  * PAN-982: When `baseCommand` contains `--agent` (i.e. an agent definition
  * is selecting permissions, model, and tools via `.claude/agents/pan-*.md`
  * frontmatter), permission flags are skipped — the frontmatter handles them.
- * Specialists not yet migrated to --agent (e.g. specialist-init for review
- * canonical sessions) still pass permissionFlags and get them emitted.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (config.harness === 'pi') {

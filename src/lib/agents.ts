@@ -27,7 +27,7 @@ import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
-import { generateLauncherScript, type LauncherAgentType } from './launcher-generator.js';
+import { generateLauncherScript } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge-token.js';
@@ -1379,7 +1379,8 @@ export async function buildAgentLaunchConfig(opts: {
   agentId: string;
   model: string;
   workspace: string;
-  agentType: 'work' | 'resume';
+  role: Role;
+  spawnMode?: 'resume';
   resumeSessionId?: string;
   isPlanning?: boolean;
   /** Per-agent .mcp.json path for the experimental Channels bridge. */
@@ -1408,12 +1409,13 @@ export async function buildAgentLaunchConfig(opts: {
 
   const providerExports = await getProviderExportsForModel(model);
 
-  if (opts.agentType === 'resume' && opts.resumeSessionId) {
+  if (opts.spawnMode === 'resume' && opts.resumeSessionId) {
     // Resume sessions adopt the work role definition via --agent.
     // Permissions/model/tools/hooks come from roles/work.md frontmatter.
     // --name <agentId> gives the resumed Claude session a human-readable handle.
     const launcherContent = generateLauncherScript({
-      agentType: 'resume',
+      role: 'work',
+      spawnMode: 'resume',
       workingDir: opts.workspace,
       changeDir: false,
       setCi: true,
@@ -1441,7 +1443,7 @@ export async function buildAgentLaunchConfig(opts: {
   // and the fifo redirect on top.
   const agentDefinition = opts.isPlanning ? roleAgentDefinitionPath('plan') : roleAgentDefinitionPath('work');
   const launcherContent = generateLauncherScript({
-    agentType: 'work',
+    role: opts.isPlanning ? 'plan' : 'work',
     workingDir: opts.workspace,
     changeDir: false,
     setCi: true,
@@ -1546,9 +1548,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   const providerExports = await getProviderExportsForModel(selectedModel);
   const providerEnv = await getProviderEnvForModel(selectedModel);
-  const launcherAgentType: LauncherAgentType = role === 'plan' ? 'planning' : role;
   const launcherContent = generateLauncherScript({
-    agentType: launcherAgentType,
+    role,
     workingDir: workspace,
     changeDir: false,
     setCi: true,
@@ -1738,7 +1739,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     agentId,
     model: selectedModel,
     workspace: options.workspace,
-    agentType: 'work',
+    role: 'work',
     isPlanning: false,
     channelsBridgeMcpConfig,
     harness: state.harness ?? 'claude-code',
@@ -2091,7 +2092,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     const providerExports = await getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
     const fallbackContent = generateLauncherScript({
-      agentType: 'work',
+      role: 'work',
       workingDir: agentState.workspace,
       changeDir: false,
       setCi: true,
@@ -2290,7 +2291,8 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       agentId: normalizedId,
       model,
       workspace: agentState.workspace,
-      agentType: 'resume',
+      role: 'work',
+      spawnMode: 'resume',
       resumeSessionId: sessionId,
     });
 
@@ -2412,7 +2414,7 @@ export async function restartAgent(
       agentId: normalizedId,
       model: effectiveModel,
       workspace: agentState.workspace,
-      agentType: 'work',
+      role: 'work',
       isPlanning: agentState.phase === 'planning',
     });
 
