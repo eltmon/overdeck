@@ -8,7 +8,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Check } from 'lucide-react';
 import {
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
   getDefaultConversationModel,
@@ -16,7 +16,7 @@ import {
 } from './defaultConversationModel';
 import { usePickerPosition } from './usePickerPosition';
 import { CostWarningBadge, costWarningLevel } from '../shared/costWarning';
-import { HarnessSelect, type HarnessPolicyDecisions, type ModelGroup as SharedModelGroup } from '../shared/ModelPicker';
+import { HARNESS_OPTIONS, canUsePickerHarness, type HarnessPolicyDecisions } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -268,20 +268,8 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
 
   const label = selectedModel?.label ?? value;
   const selectedWarning = costWarningLevel(selectedModel?.costPer1MTokens);
-  const sharedGroups: SharedModelGroup[] = groups.map((group) => ({
-    provider: group.provider,
-    label: group.label,
-    models: group.models.map((model) => ({
-      id: model.id,
-      label: model.label,
-      provider: model.provider,
-      costDisplay: model.costDisplay,
-      costPer1MTokens: model.costPer1MTokens,
-    })),
-  }));
 
   return (
-    <>
     <div ref={ref} className={styles.pickerContainer}>
       <button
         className={styles.pickerBtn}
@@ -290,6 +278,9 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
         type="button"
       >
         <span className={styles.pickerLabel}>{label}</span>
+        {harness === 'pi' && (
+          <span className={styles.harnessIndicator} title="Pi harness active">π</span>
+        )}
         {selectedWarning && (
           <CostWarningBadge level={selectedWarning} compact costPer1MTokens={selectedModel?.costPer1MTokens} />
         )}
@@ -298,48 +289,69 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
 
       {open && (
         <div
-          className={`${styles.pickerDropdown} ${openUp ? styles.pickerDropdownUp : ''}`}
+          className={`${styles.pickerDropdown} ${harness !== undefined ? styles.pickerDropdownSplit : ''} ${openUp ? styles.pickerDropdownUp : ''}`}
           style={{
             maxHeight: `${maxHeight}px`,
             ...(align === 'right' ? { left: 'auto', right: 0 } : {}),
           }}
         >
-          {groups.map((group) => (
-            <div key={group.provider}>
-              {groups.length > 1 && (
-                <div className={styles.pickerGroupHeader}>{group.label}</div>
-              )}
-              {group.models.map((model) => {
-                const lvl = costWarningLevel(model.costPer1MTokens);
+          {/* Harness section — pinned at top, always visible without scrolling */}
+          {harness !== undefined && onHarnessChange && (
+            <>
+              <div className={styles.pickerGroupHeader}>Harness</div>
+              {HARNESS_OPTIONS.map((opt: { id: Harness; label: string; description: string }) => {
+                const decision = canUsePickerHarness(opt.id, value, harnessPolicy);
+                const isActive = harness === opt.id;
                 return (
                   <button
-                    key={model.id}
-                    className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
-                    onClick={() => handleSelect(model)}
+                    key={opt.id}
                     type="button"
+                    className={`${styles.pickerOption} ${isActive ? styles.pickerOptionActive : ''}`}
+                    disabled={!decision.allowed}
+                    title={decision.allowed ? opt.description : (decision.reason ?? '')}
+                    onClick={() => { if (decision.allowed) onHarnessChange(opt.id); }}
                   >
-                    <span className={styles.pickerOptionLabel}>{model.label}</span>
-                    {lvl && <CostWarningBadge level={lvl} compact costPer1MTokens={model.costPer1MTokens} />}
-                    {model.costDisplay && (
-                      <span className={styles.pickerCostBadge}>{model.costDisplay}</span>
+                    <span className={styles.pickerOptionLabel}>{opt.label}</span>
+                    {!decision.allowed && (
+                      <span className={styles.pickerGroupNoKey}>ToS</span>
                     )}
+                    {isActive && <Check size={12} className="flex-shrink-0" style={{ color: 'var(--primary)' }} />}
                   </button>
                 );
               })}
-            </div>
-          ))}
+              <div className={styles.pickerSectionDivider} />
+            </>
+          )}
+
+          {/* Scrollable model list */}
+          <div className={harness !== undefined ? styles.pickerScrollArea : undefined}>
+            {groups.map((group) => (
+              <div key={group.provider}>
+                {groups.length > 1 && (
+                  <div className={styles.pickerGroupHeader}>{group.label}</div>
+                )}
+                {group.models.map((model) => {
+                  const lvl = costWarningLevel(model.costPer1MTokens);
+                  return (
+                    <button
+                      key={model.id}
+                      className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
+                      onClick={() => handleSelect(model)}
+                      type="button"
+                    >
+                      <span className={styles.pickerOptionLabel}>{model.label}</span>
+                      {lvl && <CostWarningBadge level={lvl} compact costPer1MTokens={model.costPer1MTokens} />}
+                      {model.costDisplay && (
+                        <span className={styles.pickerCostBadge}>{model.costDisplay}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
-    {harness && onHarnessChange && (
-      <HarnessSelect
-        value={harness}
-        onChange={onHarnessChange}
-        modelId={value}
-        groups={sharedGroups}
-        harnessPolicy={harnessPolicy}
-      />
-    )}
-    </>
   );
 }

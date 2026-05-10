@@ -388,19 +388,6 @@ export function ModelOverrideModal({
           </div>
         </div>
 
-        <div className="px-6 py-4 border-b border-border bg-card">
-          <HarnessSelect
-            value={effectiveHarness}
-            onChange={setSelectedHarness}
-            modelId={selectedModel}
-            groups={pickerGroups}
-            harnessPolicy={harnessPolicy}
-          />
-          {!selectedHarnessDecision.allowed && (
-            <p className="text-xs text-warning mt-1">{selectedHarnessDecision.reason ?? 'Pi is unavailable for this model/auth combination; Claude Code will be used.'}</p>
-          )}
-        </div>
-
         {/* Model List */}
         <div className="flex-1 overflow-y-auto custom-scrollbar max-h-[450px]">
           {displayProviders.map((provider, providerIndex) => (
@@ -506,6 +493,20 @@ export function ModelOverrideModal({
               })}
             </div>
           ))}
+        </div>
+
+        {/* Harness strip — pick model first, then adjust harness */}
+        <div className="px-6 py-3 border-t border-border bg-card">
+          <HarnessSelect
+            value={effectiveHarness}
+            onChange={setSelectedHarness}
+            modelId={selectedModel}
+            groups={pickerGroups}
+            harnessPolicy={harnessPolicy}
+          />
+          {!selectedHarnessDecision.allowed && (
+            <p className="text-xs text-warning mt-1">{selectedHarnessDecision.reason ?? 'Pi is unavailable for this model/auth combination; Claude Code will be used.'}</p>
+          )}
         </div>
 
         {/* Modal Footer */}

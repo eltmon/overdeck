@@ -3512,6 +3512,37 @@
   pointer-events: none;
 }
 
+/* Thin rule separating harness section from model list inside the dropdown */
+.pickerSectionDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 8px;
+  flex-shrink: 0;
+}
+
+/* π indicator shown in the trigger button when Pi harness is active */
+.harnessIndicator {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary);
+  opacity: 0.85;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Applied to the model picker dropdown to pin the harness section at top
+   and make only the model list scroll */
+.pickerDropdownSplit {
+  overflow: hidden;
+}
+
+.pickerScrollArea {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex: 1;
+  min-height: 0;
+}
+
 .pickerOptionLabel {
   flex: 1;
   text-align: left;

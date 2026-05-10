@@ -85,9 +85,15 @@ async function getPiLauncherFields(agentId: string): Promise<{
 }> {
   const paths = piFifoPaths(agentId);
   await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
+  const piExtensionPath = resolve(process.cwd(), 'packages/pi-extension/dist/index.js');
+  if (!existsSync(piExtensionPath)) {
+    throw new Error(
+      `Pi extension not built. Run: cd packages/pi-extension && npm run build\n(expected: ${piExtensionPath})`
+    );
+  }
   return {
     harness: 'pi',
-    piExtensionPath: resolve(process.cwd(), 'packages/pi-extension/dist/index.js'),
+    piExtensionPath,
     piFifoPath: await createPiFifo(agentId),
     piSessionDir: paths.agentDir,
   };
