@@ -23,7 +23,28 @@ vi.mock('../../services/system-health-service.js', () => ({
 
 vi.mock('../../../../lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(),
+  // PAN-977: pollSwarmAutoAdvance enumerates active swarms via listProjects;
+  // the tests stub it to an empty list and rely on the legacy sidecar fallback.
+  listProjects: vi.fn(() => []),
 }));
+
+// PAN-977: createSlotWorktree shells out to `git fetch`/`git worktree add`. The
+// test temp directories are not git repos, so stub child_process.execFile to
+// resolve successfully — the alternative (running real git) was never the
+// behavior under test.
+vi.mock('node:child_process', async () => {
+  const actual = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+  return {
+    ...actual,
+    execFile: ((...args: any[]) => {
+      const cb = args[args.length - 1] as (err: null, out: { stdout: string; stderr: string }) => void;
+      if (typeof cb === 'function') {
+        cb(null, { stdout: '', stderr: '' });
+      }
+      return undefined;
+    }) as any,
+  };
+});
 
 vi.mock('../../../../lib/vbrief/io.js', () => ({
   findPlan: vi.fn(),
@@ -242,6 +263,12 @@ describe('swarm route helpers', () => {
       updatedAt: '2026-05-07T00:05:00Z',
     }, null, 2));
 
+    // The previous wave's slot agent has exited — pane is dead — so the slot-1
+    // tmux session can be reaped and re-spawned for the next wave's item. PAN-977
+    // forbids silently aliasing a *live* session for a different item.
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(true);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['0']);
+
     const { __testInternals } = await import('../swarm.js');
     await __testInternals.pollSwarmAutoAdvance();
 
@@ -253,17 +280,11 @@ describe('swarm route helpers', () => {
 
     expect(nextState.currentWave).toBe(1);
     expect(nextState.autoAdvance).toBe(true);
-    expect(nextState.slots).toEqual([
-      {
-        slot: 1,
-        itemId: 'wave-1-item',
-        itemTitle: 'Dispatch next wave',
-        sessionName: 'agent-pan-971-1',
-        workspace: '',
-        status: 'running',
-      },
-    ]);
-    expect(agents.spawnAgent).not.toHaveBeenCalled();
+    expect(nextState.slots[0]?.itemId).toBe('wave-1-item');
+    expect(nextState.slots[0]?.itemTitle).toBe('Dispatch next wave');
+    expect(nextState.slots[0]?.sessionName).toBe('agent-pan-971-1');
+    expect(nextState.slots[0]?.status).toBe('running');
+    expect(agents.spawnAgent).toHaveBeenCalledTimes(1);
   });
 
   it('does not advance while current wave still has running slots', async () => {
@@ -492,6 +513,10 @@ describe('swarm route helpers', () => {
     };
     vi.mocked(vbriefIo.readWorkspacePlan).mockReturnValue(sameWaveDoc);
     writeFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), JSON.stringify(sameWaveDoc, null, 2));
+    // Default mock has slot-1 session present; mark it dead so the dispatcher
+    // reaps it and reuses the slot id (PAN-977 no-alias-onto-live-session rule).
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(true);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['0']);
 
     const { __testInternals } = await import('../swarm.js');
     const initialDispatch = await __testInternals.dispatchSwarmWave({
@@ -530,16 +555,12 @@ describe('swarm route helpers', () => {
     };
     expect(nextState.currentWave).toBe(0);
     expect(nextState.deferred).toBeUndefined();
-    expect(nextState.slots).toEqual([
-      {
-        slot: 1,
-        itemId: 'wave-0-item-b',
-        itemTitle: 'Deferred slot item',
-        sessionName: 'agent-pan-971-1',
-        workspace: '',
-        status: 'running',
-      },
-    ]);
+    expect(nextState.slots.length).toBe(1);
+    expect(nextState.slots[0]?.slot).toBe(1);
+    expect(nextState.slots[0]?.itemId).toBe('wave-0-item-b');
+    expect(nextState.slots[0]?.itemTitle).toBe('Deferred slot item');
+    expect(nextState.slots[0]?.sessionName).toBe('agent-pan-971-1');
+    expect(nextState.slots[0]?.status).toBe('running');
   });
 
   it('records failed slots and blocks auto-advance when tmux exits non-zero', async () => {
@@ -681,6 +702,10 @@ describe('swarm route helpers', () => {
       },
     };
     writeFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), JSON.stringify(overlapDoc, null, 2));
+    // Pre-existing slot session is dead, so the dispatcher reaps it and re-uses
+    // the slot id without violating PAN-977's no-alias-onto-live-session rule.
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(true);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['0']);
 
     const { __testInternals } = await import('../swarm.js');
     const result = await __testInternals.dispatchSwarmWave({

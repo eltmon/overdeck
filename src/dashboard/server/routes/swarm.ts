@@ -16,11 +16,13 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { timingSafeEqual } from 'node:crypto';
+
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { getSystemHealthSnapshot, getResourceConfig } from '../services/system-health-service.js';
 import { evaluateSpawnGuardrails } from './agents.js';
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { findPlan, VBriefMergeConflictError } from '../../../lib/vbrief/io.js';
 import { readContinueStateAsync, writeContinueStateAsync, type ContinueState, type SwarmRuntime } from '../../../lib/vbrief/continue-state.js';
 import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, workspacePlanPath, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
@@ -39,10 +41,22 @@ interface SlotAssignment {
   sessionName: string;
   workspace: string;
   status: 'pending' | 'running' | 'completed' | 'merged' | 'failed';
+  /**
+   * Distinguishes a synthesis dispatch (the slot only produces a synthesis context
+   * for downstream consumers) from a normal implementation dispatch. Recorded so
+   * onSlotMergeComplete can keep convergence items dispatchable for the real
+   * implementation slot instead of marking them done after the synthesis pass.
+   */
+  phase?: 'synthesis' | 'implementation';
   startedAt?: string;
   completedAt?: string;
   failureReason?: string;
 }
+
+// Cap synthesis output that we persist into the continue vBRIEF and forward into
+// downstream agent prompts. Anything past this is rejected by the API to keep
+// prompt-context blast radius bounded if the route is reached by an attacker.
+const MAX_SYNTHESIS_OUTPUT_BYTES = 64 * 1024;
 
 interface DeferredSwarmItem {
   itemId: string;
@@ -194,6 +208,7 @@ function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
     sessionName: slot.sessionName,
     workspace: slot.workspace,
     status: slot.status === 'merged' ? 'merged' : slot.status === 'failed' ? 'failed' : 'running',
+    phase: (slot as unknown as { phase?: 'synthesis' | 'implementation' }).phase,
     startedAt: slot.dispatchedAt,
     completedAt: slot.mergedAt,
   }));
@@ -224,9 +239,10 @@ function runtimeFromState(state: SwarmState, existing?: SwarmRuntime): SwarmRunt
       sessionName: slot.sessionName,
       workspace: slot.workspace,
       status: slot.status === 'completed' ? 'merged' : slot.status === 'merged' ? 'merged' : slot.status === 'failed' ? 'failed' : 'running',
+      phase: slot.phase,
       dispatchedAt: slot.startedAt,
       mergedAt: slot.completedAt,
-    })),
+    } as unknown as SwarmRuntime['slots'][number])),
     currentWave: state.currentWave,
     totalWaves: state.totalWaves,
     autoAdvance: state.autoAdvance,
@@ -329,6 +345,16 @@ async function loadSwarmState(issueId: string): Promise<SwarmState | null> {
   return legacy;
 }
 
+/**
+ * PAN-977: the swarm sidecar `~/.panopticon/swarms/<issue>.json` is no longer
+ * the canonical runtime store — `loadSwarmState` reads the continue vBRIEF
+ * (`continue-<issueId>.vbrief.json`) first and falls back to the sidecar only
+ * for one-time import. We continue to write the sidecar as a non-authoritative
+ * legacy mirror so external observers (dashboards, tests, ad-hoc tooling) that
+ * still inspect the file see a consistent shadow until that consumer side is
+ * migrated. Callers MUST also call `persistSwarmRuntime(workspace, state)` —
+ * the durable authority for runtime state — which most call sites do.
+ */
 async function saveSwarmState(state: SwarmState): Promise<void> {
   const dir = getSwarmDir();
   await mkdir(dir, { recursive: true });
@@ -681,14 +707,33 @@ async function dispatchSwarmWave(
       const sessionName = `agent-${issueLower}-${slotNum}`;
 
       if (aliveSlots.has(sessionName)) {
-        return {
-          slot: slotNum,
-          itemId: item.id,
-          itemTitle: item.title,
-          sessionName,
-          workspace: '',
-          status: 'running' as const,
-        } satisfies SlotAssignment;
+        // PAN-977 blocker #3: a live session-name collision MUST NOT be silently
+        // counted as a successful dispatch for a *different* item — the prompt
+        // for the new item would never reach the running agent.
+        const existingSlot = existingState?.slots?.find(s => s.sessionName === sessionName);
+        if (existingSlot && existingSlot.itemId === item.id) {
+          // Same item already assigned to this slot. Safe to keep the existing
+          // assignment — this is typically a re-dispatch poll racing an agent
+          // that is still in-flight.
+          return {
+            slot: slotNum,
+            itemId: item.id,
+            itemTitle: item.title,
+            sessionName,
+            workspace: existingSlot.workspace ?? '',
+            status: 'running' as const,
+            phase: existingSlot.phase,
+            startedAt: existingSlot.startedAt,
+          } satisfies SlotAssignment;
+        }
+        // The session is alive but tied to a *different* item, OR the previous
+        // occupant has already reported `completed`/`merged`/`failed` and is
+        // just waiting on tmux teardown. Either way, refuse to alias — the
+        // next dispatch must reap the lingering session first or pick a fresh
+        // slot id. Surface a clear error rather than silently mis-routing work.
+        const previousStatus = existingSlot?.status ?? 'unknown';
+        const previousItemId = existingSlot?.itemId ?? 'an unknown item';
+        return `Slot ${slotNum} (${item.id}): tmux session ${sessionName} is already alive (previous occupant ${previousItemId}, status=${previousStatus}); refusing to alias a different item onto a live slot. Reap the session (kill or let the agent exit) before re-dispatching.`;
       }
 
       const worktreeResult = await createSlotWorktree(project.projectPath, issueUpper, slotNum);
@@ -764,6 +809,7 @@ async function dispatchSwarmWave(
           sessionName,
           workspace: worktreeResult.workspacePath,
           status: 'running' as const,
+          phase: dispatchSynthesisFirst ? ('synthesis' as const) : ('implementation' as const),
           startedAt: new Date().toISOString(),
         } satisfies SlotAssignment;
       } catch (err: any) {
@@ -852,13 +898,28 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
   // resolve it from runtime state. This is required so the canonical vBRIEF plan
   // gets the matching `done` task operation below.
   let resolvedItemId = itemId;
-  if (state && (!resolvedItemId || resolvedItemId.length === 0)) {
-    const matched = state.slots.find(slot => slot.slot === slotId);
-    if (matched) resolvedItemId = matched.itemId;
+  let matchedSlot: SlotAssignment | undefined;
+  if (state) {
+    matchedSlot = state.slots.find(slot => slot.slot === slotId);
+    if (matchedSlot && (!resolvedItemId || resolvedItemId.length === 0)) {
+      resolvedItemId = matchedSlot.itemId;
+    }
   }
+  // PAN-977 blocker #2: a synthesis-phase slot only generates context for the
+  // downstream implementation slot. Marking the convergence item `done` here
+  // would skip implementation entirely. Detect synthesis via either the recorded
+  // slot.phase OR the presence of `synthesisOutput` in the request, persist the
+  // synthesis context, and release (`unblock`) the item so the next dispatch
+  // call picks it up as an implementation slot (hasSynthesisOutput=true ⇒
+  // buildSlotPrompt receives the persisted context).
+  const isSynthesisCompletion = Boolean(synthesisOutput) || matchedSlot?.phase === 'synthesis';
   if (state) {
     const slots = state.slots.map(slot => slot.slot === slotId || slot.itemId === resolvedItemId
-      ? { ...slot, status: 'merged' as const, completedAt: slot.completedAt ?? now }
+      ? {
+          ...slot,
+          status: isSynthesisCompletion ? ('completed' as const) : ('merged' as const),
+          completedAt: slot.completedAt ?? now,
+        }
       : slot);
     const nextState = { ...state, slots, updatedAt: now };
     await saveSwarmState(nextState);
@@ -884,25 +945,64 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
     }
   }
   if (resolvedItemId) {
-    await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
-      type: 'done',
-      itemId: resolvedItemId,
-      reason: `Swarm slot ${slotId} merged into feature branch`,
-      writerId: `swarm-merge-${process.pid}`,
-    }).catch(() => undefined);
+    if (isSynthesisCompletion) {
+      // Release the convergence item back to dispatchable so the next swarm
+      // wave can spawn the implementation slot. Do NOT mark it done.
+      await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+        type: 'unblock',
+        itemId: resolvedItemId,
+        reason: `Synthesis context delivered by slot ${slotId}; released for implementation dispatch`,
+        writerId: `swarm-synth-${process.pid}`,
+      }).catch(() => undefined);
+    } else {
+      await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+        type: 'done',
+        itemId: resolvedItemId,
+        reason: `Swarm slot ${slotId} merged into feature branch`,
+        writerId: `swarm-merge-${process.pid}`,
+      }).catch(() => undefined);
+    }
   }
 }
 
+/**
+ * Discover active swarms by scanning every registered project's `workspaces/feature-*`
+ * directory for a continue vBRIEF carrying a `swarmRuntime`. The legacy sidecar
+ * (`~/.panopticon/swarms/*.json`) is included only for one-time backward-compat.
+ */
+async function discoverActiveSwarmIssueIds(): Promise<string[]> {
+  const ids = new Set<string>();
+  // Continue-state authority: enumerate workspaces under each project.
+  try {
+    const projects = listProjects();
+    for (const { config } of projects) {
+      const workspacesDir = join(config.path, 'workspaces');
+      const entries = await readdir(workspacesDir).catch(() => [] as string[]);
+      for (const entry of entries) {
+        const match = /^feature-([a-z][a-z0-9]*-\d+)$/.exec(entry);
+        if (!match) continue;
+        ids.add(match[1].toUpperCase());
+      }
+    }
+  } catch { /* projects may be unconfigured in tests */ }
+  // One-time legacy sidecar discovery (post-PAN-977 the sidecar is no longer
+  // written; this loop helps drain pre-existing runtime files into the continue
+  // authority during the migration window).
+  const legacy = await readdir(getSwarmDir()).catch(() => [] as string[]);
+  for (const entry of legacy) {
+    if (!entry.endsWith('.json')) continue;
+    ids.add(entry.replace(/\.json$/, '').toUpperCase());
+  }
+  return Array.from(ids);
+}
+
 async function pollSwarmAutoAdvance(): Promise<void> {
-  const entries = await readdir(getSwarmDir()).catch(() => [] as string[]);
-  if (entries.length === 0) return;
+  const issueIds = await discoverActiveSwarmIssueIds();
+  if (issueIds.length === 0) return;
 
   const sessions = await listSessionNamesAsync().catch(() => [] as string[]);
 
-  for (const entry of entries) {
-    if (!entry.endsWith('.json')) continue;
-
-    const issueId = entry.replace(/\.json$/, '').toUpperCase();
+  for (const issueId of issueIds) {
     const loadedState = await loadSwarmState(issueId);
     if (!loadedState?.autoAdvance) continue;
     if (loadedState.currentWave >= loadedState.totalWaves - 1 && !loadedState.deferred?.length) continue;
@@ -980,11 +1080,9 @@ function ensureSwarmAutoAdvanceLoop(): void {
 }
 
 async function resumeSwarmAutoAdvanceLoopOnStartup(): Promise<void> {
-  const entries = await readdir(getSwarmDir()).catch(() => [] as string[]);
-  for (const entry of entries) {
-    if (!entry.endsWith('.json')) continue;
-
-    const state = await loadSwarmState(entry.replace(/\.json$/, '').toUpperCase());
+  const issueIds = await discoverActiveSwarmIssueIds();
+  for (const issueId of issueIds) {
+    const state = await loadSwarmState(issueId);
     if (!state?.autoAdvance) continue;
     if (state.currentWave >= state.totalWaves - 1 && !state.deferred?.length) continue;
 
@@ -1194,13 +1292,17 @@ function buildSynthesisPrompt(
     'markdown synthesis covering: upstream decisions, changed files, hazards/risks, and',
     'constraints the downstream implementation agent must respect.',
     '',
-    'When the synthesis is ready, deliver it by POSTing to the dashboard:',
+    'When the synthesis is ready, deliver it by POSTing to the dashboard with',
+    'the internal token from `~/.panopticon/internal-token`. Unauthenticated',
+    'requests are rejected with 403.',
     '',
     '```bash',
+    `TOKEN=$(cat ~/.panopticon/internal-token)`,
     `curl -fsS -X POST http://localhost:7878/api/swarm/slot-merged \\`,
     `  -H 'Content-Type: application/json' \\`,
+    `  -H "x-panopticon-internal-token: $TOKEN" \\`,
     `  -d @- <<'JSON'`,
-    JSON.stringify({ issueId, itemId: item.id, slotId: slotNum, synthesisOutput: '<your markdown here>' }, null, 2),
+    JSON.stringify({ issueId, itemId: item.id, slotId: slotNum, synthesisOutput: '<your markdown here, ≤64KB>' }, null, 2),
     'JSON',
     '```',
     '',
@@ -1262,10 +1364,38 @@ function buildSlotPrompt(
 
 // ─── POST /api/swarm/slot-merged ────────────────────────────────────────────
 
+function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
+  if (!provided) return false;
+  const a = Buffer.from(provided, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
 const postSwarmSlotMergedRoute = HttpRouter.add(
   'POST',
   '/api/swarm/slot-merged',
   httpHandler(Effect.gen(function* () {
+    // PAN-977 blocker #1: this route mutates swarm runtime + canonical vBRIEF
+    // task state and persists attacker-controlled context into future agent
+    // prompts. Require the unforgeable internal token before any state read,
+    // and cap synthesisOutput size so a malicious caller cannot bloat the
+    // continue vBRIEF or downstream prompts.
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
+      import('../../../lib/internal-token.js'),
+    );
+    const expected = getInternalToken();
+    if (!expected) {
+      return jsonResponse({ error: 'internal token not configured' }, { status: 503 });
+    }
+    const headers = request.headers as Record<string, string | string[] | undefined>;
+    const rawHeader = headers[INTERNAL_TOKEN_HEADER];
+    const provided = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    if (!constantTimeTokenEqual(provided, expected)) {
+      return jsonResponse({ error: 'forbidden' }, { status: 403 });
+    }
+
     const body = yield* readJsonBody;
     const issueId = canonicalIssueId((body as Record<string, unknown>)['issueId']);
     const itemId = (body as Record<string, unknown>)['itemId'];
@@ -1279,6 +1409,9 @@ const postSwarmSlotMergedRoute = HttpRouter.add(
     if (typeof itemId !== 'string') return jsonResponse({ error: 'itemId must be a string (may be empty when called by merge-agent loopback)' }, { status: 400 });
     if (!Number.isInteger(slotId) || (slotId as number) <= 0) return jsonResponse({ error: 'slotId must be a positive integer.' }, { status: 400 });
     if (synthesisOutput !== undefined && typeof synthesisOutput !== 'string') return jsonResponse({ error: 'synthesisOutput must be a string.' }, { status: 400 });
+    if (typeof synthesisOutput === 'string' && Buffer.byteLength(synthesisOutput, 'utf8') > MAX_SYNTHESIS_OUTPUT_BYTES) {
+      return jsonResponse({ error: `synthesisOutput exceeds ${MAX_SYNTHESIS_OUTPUT_BYTES} bytes.` }, { status: 413 });
+    }
 
     yield* Effect.promise(() => onSlotMergeComplete(issueId, itemId, slotId as number, synthesisOutput as string | undefined));
     return jsonResponse({ success: true });

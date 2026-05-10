@@ -275,9 +275,14 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     const apiPort = process.env.API_PORT || process.env.PORT || '3011';
     const url = `http://127.0.0.1:${apiPort}/api/swarm/slot-merged`;
     try {
+      const { INTERNAL_TOKEN_HEADER, ensureInternalToken } = await import('../internal-token.js');
+      const token = ensureInternalToken();
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          [INTERNAL_TOKEN_HEADER]: token,
+        },
         body: JSON.stringify({ issueId, itemId: '', slotId: slotInfo.itemSlot }),
         signal: AbortSignal.timeout(5000),
       });
