@@ -452,6 +452,114 @@ describe('swarm route helpers', () => {
     expect(nextState.slots.some((s) => s.itemId === 'wave-1-item')).toBe(false);
   });
 
+  // PAN-977 round-15 blocker: when a synthesis slot for itemX has completed
+  // but its tmux session is still alive (pane teardown lagging), a dispatch
+  // for itemX as an implementation slot MUST NOT silently alias the
+  // completed synthesis session — that would skip the implementation work
+  // entirely. The reuse guard now requires same-item AND same-phase AND
+  // status='running' before keeping an existing assignment.
+  it('does not alias a completed synthesis slot whose tmux session is still alive as the implementation dispatch', async () => {
+    // Build a plan where wave-1-item is a DAG convergence point requiring
+    // synthesis: two parents block it, so blockingParentCount > 1 and the
+    // dispatcher picks the synthesis-first phase by default.
+    const synthesisDoc: VBriefDocument = {
+      ...PLAN_DOC,
+      plan: {
+        ...PLAN_DOC.plan,
+        items: [
+          // Parents already finished — marking them 'completed' in the plan
+          // makes wave-1-item DAG-ready via getDispatchableItems().
+          { id: 'wave-0-a', title: 'Parent A', status: 'completed' },
+          { id: 'wave-0-b', title: 'Parent B', status: 'completed' },
+          { id: 'wave-1-item', title: 'Convergence work', status: 'pending' },
+        ],
+        edges: [
+          { from: 'wave-0-a', to: 'wave-1-item', type: 'blocks' },
+          { from: 'wave-0-b', to: 'wave-1-item', type: 'blocks' },
+        ],
+      },
+    };
+    writeFileSync(
+      join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'),
+      JSON.stringify(synthesisDoc, null, 2),
+    );
+    vi.mocked(vbriefIo.readWorkspacePlan).mockReturnValue(synthesisDoc);
+
+    // Both parents are merged so wave-1-item is DAG-ready, AND the synthesis
+    // slot for wave-1-item has already completed (output persisted) but its
+    // tmux session is still alive — pane teardown lagging.
+    const initialState = {
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 1,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-1-item',
+          itemTitle: 'Convergence work',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'completed' as const,
+          phase: 'synthesis' as const,
+          startedAt: '2026-05-07T00:00:00Z',
+          completedAt: '2026-05-07T00:05:00Z',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    };
+    const featureWorkspace = join(projectPath, 'workspaces', 'feature-pan-971');
+
+    const { __testInternals } = await import('../swarm.js');
+    // persistSwarmRuntime writes via runtimeFromState which uses the canonical
+    // slotId/itemId/sessionName/workspace shape — no manual continue-state
+    // surgery needed for the slot list. Then patch synthesisOutputs in-place.
+    await __testInternals.persistSwarmRuntime(featureWorkspace, initialState as any);
+
+    const continueDir = join(featureWorkspace, '.pan');
+    const cont = await import('../../../../lib/vbrief/continue-state.js');
+    const existingCont = (await cont.readContinueStateAsync(continueDir, 'PAN-971'))!;
+    await cont.writeContinueStateAsync(continueDir, 'PAN-971', {
+      ...existingCont,
+      swarmRuntime: {
+        ...(existingCont.swarmRuntime!),
+        synthesisOutputs: {
+          'wave-1-item': {
+            targetItemId: 'wave-1-item',
+            writtenAt: '2026-05-07T00:05:00Z',
+            contextUpdate: 'synthesis context for downstream implementation',
+          },
+        },
+      },
+    });
+
+    // The slot-1 tmux session is still alive — pane has not yet torn down.
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue(['agent-pan-971-1']);
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(false);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['12345']);
+
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      autoAdvance: true,
+    });
+
+    // Dispatch must REFUSE to alias the live completed-synthesis session as
+    // the implementation slot. With only one item and slot-1 occupied, the
+    // dispatcher returns 500 (no slots dispatched) rather than silently
+    // returning the synthesis assignment as if it were implementation.
+    expect(result.status).toBe(500);
+    expect(agents.spawnAgent).not.toHaveBeenCalled();
+
+    // Ensure no implementation-phase slot was recorded for wave-1-item.
+    const after = (await __testInternals.loadSwarmState('PAN-971'))!;
+    const implSlot = after.slots.find(
+      (s) => s.itemId === 'wave-1-item' && s.phase === 'implementation',
+    );
+    expect(implSlot).toBeUndefined();
+  });
+
   it('does not advance while current wave still has running slots', async () => {
     const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
     writeFileSync(swarmStatePath, JSON.stringify({

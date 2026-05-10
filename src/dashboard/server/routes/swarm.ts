@@ -755,15 +755,39 @@ async function dispatchSwarmWave(
       const slotNum = index + 1;
       const sessionName = `agent-${issueLower}-${slotNum}`;
 
+      // PAN-977 round-15 blocker: compute the phase BEFORE the live-session
+      // alias check so the reuse guard can compare phases, not just itemIds.
+      // A completed synthesis slot for `item.id` whose tmux session is still
+      // alive must NOT be aliased as the implementation dispatch for the same
+      // item — that silently skips the implementation work entirely.
+      const fullItemForPhase = itemById.get(item.id);
+      const requiresSynthesis = Boolean(fullItemForPhase && (fullItemForPhase.metadata?.requiresSynthesis || blockingParentCount(annotatedDoc, fullItemForPhase.id) > 1));
+      const persistedSynthesis = continueState.swarmRuntime?.synthesisOutputs?.[item.id];
+      const hasSynthesisOutput = Boolean(persistedSynthesis);
+      const dispatchSynthesisFirst = requiresSynthesis && !hasSynthesisOutput;
+      const requestedPhase: 'synthesis' | 'implementation' = dispatchSynthesisFirst ? 'synthesis' : 'implementation';
+
       if (aliveSlots.has(sessionName)) {
         // PAN-977 blocker #3: a live session-name collision MUST NOT be silently
         // counted as a successful dispatch for a *different* item — the prompt
         // for the new item would never reach the running agent.
         const existingSlot = existingState?.slots?.find(s => s.sessionName === sessionName);
-        if (existingSlot && existingSlot.itemId === item.id) {
-          // Same item already assigned to this slot. Safe to keep the existing
-          // assignment — this is typically a re-dispatch poll racing an agent
-          // that is still in-flight.
+        // PAN-977 round-15 blocker: only reuse the slot when the in-flight
+        // dispatch matches BOTH the same item AND the same phase AND is still
+        // 'running'. A 'completed' synthesis slot whose tmux pane has not yet
+        // torn down looks "alive" to listSessionNames, but the synthesis is
+        // done — aliasing it as the implementation dispatch would skip the
+        // real implementation. Same item + different phase, or any non-running
+        // status, falls through to the surface-collision branch below.
+        if (
+          existingSlot
+          && existingSlot.itemId === item.id
+          && existingSlot.status === 'running'
+          && existingSlot.phase === requestedPhase
+        ) {
+          // Same item, same phase, still running — re-dispatch poll racing
+          // an agent that is genuinely in-flight. Safe to keep the existing
+          // assignment.
           return {
             slot: slotNum,
             itemId: item.id,
@@ -775,14 +799,16 @@ async function dispatchSwarmWave(
             startedAt: existingSlot.startedAt,
           } satisfies SlotAssignment;
         }
-        // The session is alive but tied to a *different* item, OR the previous
-        // occupant has already reported `completed`/`merged`/`failed` and is
-        // just waiting on tmux teardown. Either way, refuse to alias — the
-        // next dispatch must reap the lingering session first or pick a fresh
-        // slot id. Surface a clear error rather than silently mis-routing work.
+        // The session is alive but tied to a *different* item, a *different*
+        // phase, OR the previous occupant has already reported
+        // `completed`/`merged`/`failed` and is just waiting on tmux teardown.
+        // Either way, refuse to alias — the next dispatch must reap the
+        // lingering session first or pick a fresh slot id. Surface a clear
+        // error rather than silently mis-routing work.
         const previousStatus = existingSlot?.status ?? 'unknown';
         const previousItemId = existingSlot?.itemId ?? 'an unknown item';
-        return `Slot ${slotNum} (${item.id}): tmux session ${sessionName} is already alive (previous occupant ${previousItemId}, status=${previousStatus}); refusing to alias a different item onto a live slot. Reap the session (kill or let the agent exit) before re-dispatching.`;
+        const previousPhase = existingSlot?.phase ?? 'unknown';
+        return `Slot ${slotNum} (${item.id}): tmux session ${sessionName} is already alive (previous occupant ${previousItemId}, phase=${previousPhase}, status=${previousStatus}); refusing to alias onto a live slot whose dispatch does not match the requested phase=${requestedPhase}. Reap the session (kill or let the agent exit) before re-dispatching.`;
       }
 
       const worktreeResult = await createSlotWorktree(project.projectPath, issueUpper, slotNum);
@@ -802,12 +828,9 @@ async function dispatchSwarmWave(
         }
       }
 
-      const fullItem = itemById.get(item.id);
-      const requiresSynthesis = Boolean(fullItem && (fullItem.metadata?.requiresSynthesis || blockingParentCount(annotatedDoc, fullItem.id) > 1));
-      const persistedSynthesis = continueState.swarmRuntime?.synthesisOutputs?.[item.id];
-      const hasSynthesisOutput = Boolean(persistedSynthesis);
-      const dispatchSynthesisFirst = requiresSynthesis && !hasSynthesisOutput;
-
+      // requiresSynthesis / persistedSynthesis / hasSynthesisOutput /
+      // dispatchSynthesisFirst / requestedPhase are computed above so the
+      // live-session reuse guard can compare phases. Reuse them here.
       const itemPrompt = dispatchSynthesisFirst
         ? buildSynthesisPrompt(annotatedDoc, issueUpper, item, waveIndex, slotNum, continueState.swarmRuntime?.slots ?? [])
         : buildSlotPrompt(
