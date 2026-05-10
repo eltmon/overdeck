@@ -93,6 +93,11 @@ type AvailableModelsState = {
 let availableModelsCache: AvailableModelsState | null = null;
 let availableModelsPromise: Promise<AvailableModelsState> | null = null;
 
+export function invalidateAvailableModelsCache(): void {
+  availableModelsCache = null;
+  availableModelsPromise = null;
+}
+
 async function loadAvailableModelsState(): Promise<AvailableModelsState> {
   if (availableModelsCache) return availableModelsCache;
   if (availableModelsPromise) return availableModelsPromise;
@@ -153,8 +158,8 @@ async function loadAvailableModelsState(): Promise<AvailableModelsState> {
         });
       }
 
-      const orFavorites: string[] = orData.favorites ?? [];
-      const orFavoriteModels = (orData.models ?? []).filter((m) => orFavorites.includes(m.id));
+      const orFavorites = new Set(orData.favorites ?? []);
+      const orFavoriteModels = (orData.models ?? []).filter((m) => orFavorites.has(m.id));
       if (orFavoriteModels.length > 0) {
         newGroups.push({
           provider: 'openrouter',

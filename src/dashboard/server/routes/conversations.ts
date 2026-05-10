@@ -1251,7 +1251,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const model = typeof body['model'] === 'string' && body['model'].trim()
           ? body['model'].trim()
           : (conv.model ?? undefined);
-        const harness = await resolveAllowedHarness(body['harness'], model);
+        const harness = await resolveAllowedHarness(body['harness'] ?? conv.harness, model);
 
         // Always kill the existing session first (if alive) so the model change takes effect
         await killSessionAsync(conv.tmuxSession).catch(() => {});

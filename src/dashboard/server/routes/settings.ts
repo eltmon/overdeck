@@ -27,7 +27,7 @@ import {
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
-import { PROVIDERS } from '../../../lib/providers.js';
+import { getProviderForModel, PROVIDERS } from '../../../lib/providers.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
@@ -698,8 +698,14 @@ const getHarnessPolicyRoute = HttpRouter.add(
       }
 
       const decisions: Record<string, Record<string, { allowed: boolean; reason?: string }>> = {};
+      const authModeByProvider = new Map<string, Awaited<ReturnType<typeof getProviderAuthMode>>>();
       for (const model of Array.from(new Set(models))) {
-        const authMode = await getProviderAuthMode(model);
+        const providerName = getProviderForModel(model).name;
+        let authMode = authModeByProvider.get(providerName);
+        if (!authModeByProvider.has(providerName)) {
+          authMode = await getProviderAuthMode(model);
+          authModeByProvider.set(providerName, authMode);
+        }
         decisions[model] = {
           'claude-code': canUseHarness('claude-code', model, authMode),
           pi: canUseHarness('pi', model, authMode),

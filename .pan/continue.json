@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T01:44:26.923Z",
+  "updated": "2026-05-10T07:04:40.318Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "2fd70b5bc",
+    "sha": "cee0b40a7",
     "dirty": true
   },
   "decisions": [
@@ -53,6 +53,11 @@
       "id": "D9",
       "summary": "Resolved latest review blockers by calculating effective work-agent harness before Docker-delayed starts, enforcing planning harness policy after final model resolution, and replacing the Settings override native select with shared HarnessSelect.",
       "recordedAt": "2026-05-10T01:43:28.352Z"
+    },
+    {
+      "id": "D10",
+      "summary": "Resolved review verification and latest review blockers: updated checkpoint reconciliation test mocks for per-agent checkpoint APIs, preserved conversation harness on model-only switch requests, cached harness-policy auth mode by provider per request, invalidated available-model cache after settings/OpenRouter changes, and optimized OpenRouter favorites filtering with a Set.",
+      "recordedAt": "2026-05-10T07:04:40.318Z"
     }
   ],
   "hazards": [
@@ -63,14 +68,16 @@
     }
   ],
   "resumePoint": {
-    "description": "Latest CHANGES_REQUESTED blockers fixed and verified: Docker-delayed work-agent starts preserve selected harness in all placeholder states and pan start invocation, planning sessions enforce harness policy after final model resolution, Settings per-role override uses shared HarnessSelect, and harness-policy route is bounded. typecheck, lint, targeted tests, and full npm test pass. Next step is commit and invoke /rebase-and-submit PAN-1055.",
+    "description": "Fixed PAN-1055 review verification test timeout and latest CHANGES_REQUESTED blockers. Verification passed locally: npm run typecheck, npm run lint, targeted tests, and full npm test. Next step is commit and invoke /rebase-and-submit PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
       ".pan/feedback/001-review-agent-changes-requested.md",
-      "src/dashboard/server/routes/agents.ts",
-      "src/lib/planning/spawn-planning-session.ts",
-      "src/dashboard/frontend/src/components/Settings/AgentCards/ModelOverrideModal.tsx",
-      "src/dashboard/server/routes/settings.ts"
+      "src/dashboard/server/routes/conversations.ts",
+      "src/dashboard/server/routes/settings.ts",
+      "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+      "src/dashboard/frontend/src/components/Settings/OpenRouterPage.tsx",
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      "src/dashboard/server/__tests__/read-model-diff-summaries.test.ts"
     ]
   },
   "beadsMapping": {
@@ -151,6 +158,12 @@
       "timestamp": "2026-05-10T01:44:26.923Z",
       "reason": "review-response-verified",
       "note": "Fixed review blockers for Docker-delayed harness preservation, planning policy enforcement after default/settings model resolution, and Settings shared picker usage. Also capped harness-policy request size. Verified npm run typecheck, npm run lint, targeted harness tests, and npm test (378 files / 4595 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T07:04:40.318Z",
+      "reason": "review-response-verified",
+      "note": "Fixed review verification test failure plus blockers for conversation switch harness persistence and harness-policy provider auth caching. Addressed high-priority cache freshness and OpenRouter favorite filtering. Verified typecheck, lint, targeted tests, and full npm test (378 files / 4595 tests passed).",
       "agentModel": "Claude Opus 4.7"
     }
   ],

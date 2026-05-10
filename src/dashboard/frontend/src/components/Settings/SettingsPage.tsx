@@ -49,6 +49,7 @@ import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
 import { OpenRouterPage } from './OpenRouterPage';
 import { SensitiveText } from '../SensitiveText';
 import { DesktopSettingsSection } from './DesktopSettingsSection';
+import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
 import {
   ModelOverrideModal,
   getCapabilityMatchScore,
@@ -367,6 +368,7 @@ export function SettingsPage() {
   const saveMutation = useMutation({
     mutationFn: saveSettings,
     onSuccess: (response) => {
+      invalidateAvailableModelsCache();
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
 
