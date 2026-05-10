@@ -44,6 +44,8 @@ vi.mock('../ComposerPromptEditor', () => ({
 vi.mock('../ModelPicker', () => ({
   ModelPicker: ({ value }: { value: string }) => <div data-testid="model-picker">{value}</div>,
   MODEL_EFFORT_SUPPORT: { 'claude-sonnet-4-6': ['low', 'medium', 'high'] },
+  loadStoredHarness: () => 'claude-code',
+  saveStoredHarness: vi.fn(),
   saveStoredModel: (...args: unknown[]) => mockSaveStoredModel(...args),
 }));
 
@@ -123,6 +125,12 @@ describe('ComposerFooter image attachments', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -220,6 +228,12 @@ describe('ComposerFooter image attachments', () => {
           headers: { 'Content-Type': 'application/json' },
         });
       }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
+      }
       throw new Error(`Unexpected fetch: ${url}`);
     });
 
@@ -270,6 +284,12 @@ describe('ComposerFooter image attachments', () => {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -322,6 +342,12 @@ describe('ComposerFooter image attachments', () => {
           headers: { 'Content-Type': 'application/json' },
         });
       }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
+      }
       throw new Error(`Unexpected fetch: ${url}`);
     });
 
@@ -371,6 +397,12 @@ describe('ComposerFooter image attachments', () => {
       }
       if (url.includes('/message')) {
         return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -428,6 +460,12 @@ describe('ComposerFooter image attachments', () => {
       }
       if (url.includes('/message')) {
         return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.includes('/api/settings/claude-auth')) {
+        return Promise.resolve(new Response(JSON.stringify({ loggedIn: true, hasAnthropicApiKey: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }));
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });

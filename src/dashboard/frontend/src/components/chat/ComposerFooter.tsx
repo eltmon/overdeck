@@ -17,7 +17,8 @@ import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
-import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredModel } from './ModelPicker';
+import { ModelPicker, MODEL_EFFORT_SUPPORT, loadStoredHarness, saveStoredHarness, saveStoredModel } from './ModelPicker';
+import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -29,6 +30,7 @@ async function switchModel(
   conversationName: string,
   model: string,
   agentId?: string,
+  harness?: Harness,
 ): Promise<void> {
   const endpoint = agentId
     ? `/api/agents/${encodeURIComponent(agentId)}/switch-model`
@@ -36,7 +38,7 @@ async function switchModel(
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model }),
+    body: JSON.stringify({ model, harness }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -149,6 +151,7 @@ interface ComposerFooterProps {
 
 export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: ComposerFooterProps) {
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
+  const [harness, setHarness] = useState<Harness>(conversation.harness ?? loadStoredHarness());
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
@@ -273,12 +276,17 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
 
   // Switch model via API — kills session and respawns with correct provider env.
   // Unlike /model (same-provider only), this works for cross-provider switches.
+  const handleHarnessChange = useCallback((newHarness: Harness) => {
+    setHarness(newHarness);
+    saveStoredHarness(newHarness);
+  }, []);
+
   const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {
     setModel(newModel);
     saveStoredModel(newModel);
     if (conversation.sessionAlive) {
       setSending(true);
-      void switchModel(conversation.name, newModel)
+      void switchModel(conversation.name, newModel, agentId, harness)
         .catch((err: unknown) => {
           console.error('[ComposerFooter] Failed to switch model:', err);
           toast.error(err instanceof Error ? err.message : 'Failed to switch model');
@@ -287,7 +295,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
           setSending(false);
         });
     }
-  }, [conversation.name, conversation.sessionAlive]);
+  }, [agentId, conversation.name, conversation.sessionAlive, harness]);
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLDivElement>) => {
     if (sending) {
@@ -367,7 +375,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
       // kill the session and restart with the new model before sending.
       // switchModel already waits for the new session to be ready before returning.
       if (model !== conversation.model && conversation.sessionAlive) {
-        await switchModel(submitConversationName, model, agentId);
+        await switchModel(submitConversationName, model, agentId, harness);
       }
 
       // Abort if conversation switched during the async model switch — the
@@ -433,6 +441,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
     setText('');
     setSending(false);
     setModel(conversation.model ?? getDefaultConversationModel());
+    setHarness(conversation.harness ?? loadStoredHarness());
     editorRef.current?.update(() => {
       $getRoot().clear();
     });
@@ -511,7 +520,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
 
         {/* Toolbar inside the box */}
         <div className={styles.composerToolbar}>
-          <ModelPicker value={model} onChange={handleModelChange} disabled={isDisabled} />
+          <ModelPicker value={model} onChange={handleModelChange} disabled={isDisabled} harness={harness} onHarnessChange={handleHarnessChange} />
           <div className={styles.composerToolbarDivider} />
           <EffortPicker value={effort} onChange={setEffort} disabled={isDisabled} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 

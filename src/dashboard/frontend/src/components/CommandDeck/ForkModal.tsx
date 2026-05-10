@@ -8,7 +8,8 @@ import {
 } from '../chat/defaultConversationModel';
 import styles from './styles/command-deck.module.css';
 import pickerStyles from '../shared/ModelPicker/ModelPicker.module.css';
-import { ModelSelect, useAvailableModels } from '../shared/ModelPicker';
+import { ModelHarnessPicker, ModelSelect, useAvailableModels } from '../shared/ModelPicker';
+import type { Harness } from '../shared/ModelPicker';
 import type { Conversation } from './ConversationList';
 
 const FORK_HELP_CONTENT = `## Fork Modes
@@ -105,17 +106,30 @@ interface ForkModalProps {
     localSummaryOnly: boolean,
     includeThinkingInSummary: boolean,
     title?: string,
+    launchHarness?: Harness,
+    summaryHarness?: Harness,
   ) => void;
   onClose: () => void;
   isPending: boolean;
 }
 
 export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkModalProps) {
-  const { groups, compactionModel } = useAvailableModels();
+  const { groups, compactionModel, harnessPolicy } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
+  // Plain forks copy Claude JSONL and resume — Pi cannot consume that history,
+  // so plainFork forces launchHarness back to claude-code. Summary forks inject
+  // a generated summary through the Pi FIFO after spawn, so Pi launch is fine
+  // there subject to the canonical harness policy (ToS gate).
+  const [launchHarness, setLaunchHarness] = useState<Harness>(conversation.harness || 'claude-code');
   const [summaryModel, setSummaryModel] = useState(compactionModel);
+  const [summaryHarness, setSummaryHarness] = useState<Harness>('claude-code');
   const [plainFork, setPlainFork] = useState(false);
+  useEffect(() => {
+    if (plainFork && launchHarness !== 'claude-code') {
+      setLaunchHarness('claude-code');
+    }
+  }, [plainFork, launchHarness]);
   const [localSummaryOnly, setLocalSummaryOnly] = useState(false);
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -234,14 +248,17 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
 
                 {!localSummaryOnly && (
                   <>
-                    <ModelSelect
-                      value={summaryModel}
-                      onChange={setSummaryModel}
+                    <ModelHarnessPicker
+                      model={summaryModel}
+                      harness={summaryHarness}
+                      onModelChange={setSummaryModel}
+                      onHarnessChange={setSummaryHarness}
                       groups={groups}
-                      label="Summary model"
+                      harnessPolicy={harnessPolicy}
+                      modelLabel="Summary model"
                     />
                     <span className={pickerStyles.fieldHint}>
-                      Generates a concise summary of the conversation history
+                      Generates a concise summary of the conversation history.
                     </span>
                   </>
                 )}
@@ -261,15 +278,35 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
               </>
             )}
 
-            <ModelSelect
-              value={launchModel}
-              onChange={setLaunchModel}
-              groups={groups}
-              label="Launch model"
-            />
-            <span className={pickerStyles.fieldHint}>
-              The model the new forked conversation will use
-            </span>
+            {plainFork ? (
+              <>
+                <ModelSelect
+                  value={launchModel}
+                  onChange={setLaunchModel}
+                  groups={groups}
+                  label="Launch model"
+                />
+                <span className={pickerStyles.fieldHint}>
+                  Plain forks always launch under Claude Code — Pi cannot consume the
+                  copied Claude session history.
+                </span>
+              </>
+            ) : (
+              <>
+                <ModelHarnessPicker
+                  model={launchModel}
+                  harness={launchHarness}
+                  onModelChange={setLaunchModel}
+                  onHarnessChange={setLaunchHarness}
+                  groups={groups}
+                  harnessPolicy={harnessPolicy}
+                  modelLabel="Launch model"
+                />
+                <span className={pickerStyles.fieldHint}>
+                  The model and harness the new forked conversation will use.
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -280,7 +317,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
           <button
             className={styles.forkConfirmBtn}
             disabled={isPending}
-            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, forkTitle.trim() || undefined)}
+            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, forkTitle.trim() || undefined, launchHarness, summaryHarness)}
           >
             <GitBranchPlus size={13} />
             {isPending ? 'Forking...' : 'Fork Conversation'}

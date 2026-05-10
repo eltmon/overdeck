@@ -1,15 +1,17 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSharedTick } from '../lib/useSharedTick';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { useAgentCost } from '../hooks/useHandoffData';
 import { HandoffPanel } from './HandoffPanel';
 import { useConfirm, useAlert } from './DialogProvider';
 import { getHarness } from '@panctl/contracts';
+import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
 
 export interface IssueAgent {
   id: string;
+  issueId?: string | null;
   status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped';
   runtime: string;
   model: string;
@@ -95,6 +97,23 @@ async function resumeAgent(agentId: string, message?: string): Promise<void> {
   }
 }
 
+async function startAgent(issueId: string, model: string, harness: Harness): Promise<void> {
+  const res = await fetch('/api/agents', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ issueId, model, harness }),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to start agent');
+  }
+}
+
+function inferIssueId(agent: IssueAgent): string | undefined {
+  if (agent.issueId) return agent.issueId;
+  return agent.id.match(/[A-Z][A-Z0-9]*-\d+/)?.[0];
+}
+
 interface ActivityEntry {
   ts: string;
   tool: string;
@@ -165,6 +184,10 @@ export function IssueAgentCard({
   const showAlert = useAlert();
   const [showHandoffPanel, setShowHandoffPanel] = useState(false);
   const [activityExpanded, setActivityExpanded] = useState(false);
+  const { groups: modelGroups, defaultModel, harnessPolicy } = useAvailableModels();
+  const [launchModel, setLaunchModel] = useState(agent.model || defaultModel);
+  const [launchHarness, setLaunchHarness] = useState<Harness>(getHarness(agent) === 'pi' ? 'pi' : 'claude-code');
+  const issueId = inferIssueId(agent);
   const { data: costData } = useAgentCost(agent.id);
   const { data: activityData } = useActivity(agent.id, health?.isRunning || health?.state === 'suspended');
 
@@ -195,6 +218,24 @@ export function IssueAgentCard({
     },
   });
 
+  const startMutation = useMutation({
+    mutationFn: () => {
+      if (!issueId) throw new Error('No issue ID available for this agent');
+      return startAgent(issueId, launchModel, launchHarness);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      showAlert({ message: `Started agent for ${issueId}`, variant: 'success' });
+    },
+    onError: (error: Error) => {
+      showAlert({ message: `Failed to start agent: ${error.message}`, variant: 'error' });
+    },
+  });
+
+  useEffect(() => {
+    if (!agent.model && defaultModel) setLaunchModel(defaultModel);
+  }, [agent.model, defaultModel]);
+
   const handleKill = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (await confirm({ title: 'Kill Agent', message: `Kill agent ${agent.id}?`, variant: 'destructive', confirmLabel: 'Kill' })) {
@@ -211,6 +252,11 @@ export function IssueAgentCard({
     e.stopPropagation();
     // Open the workspace detail pane where the user can type a resume message
     onSelect?.();
+  };
+
+  const handleStart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    startMutation.mutate();
   };
 
   const toggleActivityExpanded = (e: React.MouseEvent) => {
@@ -375,6 +421,34 @@ export function IssueAgentCard({
           </div>
         </div>
       </div>
+
+      {agent.status === 'stopped' && (
+        <div
+          className="mt-3 pt-3 border-t border-border space-y-3"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ModelHarnessPicker
+            model={launchModel}
+            harness={launchHarness}
+            onModelChange={setLaunchModel}
+            onHarnessChange={setLaunchHarness}
+            groups={modelGroups}
+            harnessPolicy={harnessPolicy}
+            modelLabel="Agent model"
+          />
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={startMutation.isPending || !issueId}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            title={issueId ? 'Start agent' : 'No issue ID available for this agent'}
+            data-testid="issue-agent-card-start-agent"
+          >
+            <Play className="w-4 h-4" />
+            {startMutation.isPending ? 'Starting…' : 'Start agent'}
+          </button>
+        </div>
+      )}
 
       {/* Handoff Panel */}
       {showHandoffPanel && (

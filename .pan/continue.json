@@ -1,216 +1,290 @@
 {
   "version": "1",
-  "issueId": "PAN-1044",
-  "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-10T02:28:53.004Z",
+  "issueId": "PAN-1055",
+  "created": "2026-05-09T21:07:00.000Z",
+  "updated": "2026-05-10T13:23:21.985Z",
   "gitState": {
-    "branch": "feature/pan-1044",
-    "sha": "c39af48aa",
+    "branch": "feature/pan-1055",
+    "sha": "9acd91e54",
     "dirty": true
   },
   "decisions": [
     {
       "id": "D1",
-      "summary": "SessionNode.type (not role) classifies session types. PRD draft erroneously used s.role === 'work'. Bucketing logic must use s.type === 'work' to detect work agent sessions.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Implemented a shared dashboard HarnessSelect/ModelHarnessPicker surface and threaded harness values through planning and work-agent start endpoints using the existing pan start --harness support.",
+      "recordedAt": "2026-05-09T21:07:00.000Z"
     },
     {
       "id": "D2",
-      "summary": "issueCosts is Record<string, number> (not Map). The CommandDeck index.tsx builds it as a plain object from costData.issues.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Persisted per-work-type harness overrides alongside model overrides as models.harness_overrides so settings round-trip model and harness choices together.",
+      "recordedAt": "2026-05-09T21:07:00.000Z"
     },
     {
       "id": "D3",
-      "summary": "feature.issueId is uppercase (e.g., PAN-1044). reviewStatusByIssueId keys are also uppercase. Direct lookup is safe without case normalization.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Fixed postMergeLifecycle verification to tolerate removed source refs after merge cleanup; the previous behavior broke the full test suite when no branch ref remained.",
+      "recordedAt": "2026-05-09T21:07:00.000Z"
     },
     {
       "id": "D4",
-      "summary": "useDashboardStore selector for reviewStatusByIssueId must be called once at component top (const reviewStatusByIssueId = useDashboardStore(s => s.reviewStatusByIssueId)), then indexed per feature — React hooks cannot be called in loops.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Fixed CLI build prompt-copy root cause after pan inspect could not find dist/cli/prompts/inspect-agent.md; build-cli now copies prompt templates to both dist/prompts and dist/cli/prompts.",
+      "recordedAt": "2026-05-09T21:14:00.000Z"
     },
     {
       "id": "D5",
-      "summary": "projectsWithSessions is ProjectData[] (array), not a Map. In CommandDeck routing: projectsWithSessions.find(p => p.name === selectedProject)?.features ?? [] is the correct lookup.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Review-response fixes now derive Anthropic auth mode from /api/settings/claude-auth on picker surfaces and from getClaudeAuthStatus() on backend spawn paths, so Pi is blocked only for Anthropic subscription auth and allowed for Anthropic API-key auth.",
+      "recordedAt": "2026-05-09T20:20:00.000Z"
     },
     {
       "id": "D6",
-      "summary": "Cost breakdown tooltip uses hover-popover pattern from FeatureItem.tsx (onMouseEnter/onMouseLeave/onFocus/onBlur) — not a click modal. This is the in-repo convention for inline popovers next to issue/feature rows.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Conversation and fork flows now persist the selected harness in SQLite and respawn via the selected runtime instead of silently falling back to Claude Code.",
+      "recordedAt": "2026-05-09T20:20:00.000Z"
     },
     {
       "id": "D7",
-      "summary": "IssueCostEntry in index.tsx is expanded to include byModel and byStage from /api/costs/by-issue (the endpoint already returns this data). CommandDeck builds issueCostDetails: Record<string, { byModel, byStage }> from costData.issues and passes it to ProjectOverview. No new API endpoints needed.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Review-response follow-up now exposes canonical harness policy through /api/settings/harness-policy and uses it in frontend pickers instead of duplicating Pi ToS logic client-side.",
+      "recordedAt": "2026-05-10T01:19:43.564Z"
     },
     {
       "id": "D8",
-      "summary": "ProjectNode click split: ChevronRight wrapped in a span with its own onClick (e.stopPropagation + toggle). The outer button onClick calls onSelectProject and expands if collapsed. MessageSquarePlus already has e.stopPropagation — preserve it exactly.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Work-agent resume/restart and conversation restart-all now resolve and pass persisted harness values, preserving Pi sessions where policy allows them.",
+      "recordedAt": "2026-05-10T01:19:43.564Z"
     },
     {
       "id": "D9",
-      "summary": "bucketFeature exported from ProjectOverview.tsx for testability. Tests co-located in __tests__/ProjectOverview.test.tsx covering all 9 stage branches.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Resolved latest review blockers by calculating effective work-agent harness before Docker-delayed starts, enforcing planning harness policy after final model resolution, and replacing the Settings override native select with shared HarnessSelect.",
+      "recordedAt": "2026-05-10T01:43:28.352Z"
+    },
+    {
+      "id": "D10",
+      "summary": "Resolved review verification and latest review blockers: updated checkpoint reconciliation test mocks for per-agent checkpoint APIs, preserved conversation harness on model-only switch requests, cached harness-policy auth mode by provider per request, invalidated available-model cache after settings/OpenRouter changes, and optimized OpenRouter favorites filtering with a Set.",
+      "recordedAt": "2026-05-10T07:04:40.318Z"
+    },
+    {
+      "id": "D11",
+      "summary": "Resolved IssueAgentCard review blocker by adding the shared ModelHarnessPicker to the stopped-agent start flow and sending the selected harness with the /api/agents request; also optimized chat OpenRouter favorites filtering with a Set.",
+      "recordedAt": "2026-05-10T08:55:18.473Z"
+    },
+    {
+      "id": "D12",
+      "summary": "Resolved ForkModal model-only selector blocker by replacing the summary ModelSelect with ModelHarnessPicker and threading summaryHarness through the fork request path for policy validation.",
+      "recordedAt": "2026-05-10T10:08:59.280Z"
+    },
+    {
+      "id": "D13",
+      "summary": "Resolved latest review blockers by forcing conversation harness resolution to claude-code when no concrete model is available, threading summaryHarness into fork summary generation so Pi launches use the Pi runtime, and initializing PlanDialog from models.harness_overrides[planning-agent].",
+      "recordedAt": "2026-05-10T10:43:45.000Z"
+    },
+    {
+      "id": "D14",
+      "summary": "Fixed verification test failures by isolating lifecycle tests from host Linear credentials, mocking Linear SDK in CLI state cleanup tests, and preserving fs/promises APIs in post-merge lifecycle tests so fallthrough cleanup does not time out under the full suite.",
+      "recordedAt": "2026-05-10T12:10:03Z"
+    },
+    {
+      "id": "D15",
+      "summary": "Fixed Pi execution-path blockers by routing conversation launchers through generateLauncherScript harness=pi with FIFO/session-dir/extension wiring, using Pi FIFO prompt delivery for conversation injections, and rejecting Pi summary generation until a real Pi prompt RPC path exists.",
+      "recordedAt": "2026-05-10T12:26:27Z"
+    },
+    {
+      "id": "D16",
+      "summary": "Resolved latest review feedback by making fork summary generation Claude Code-only in the UI/API contract, using Pi readiness before FIFO summary injection, and replacing getPiLauncherFields sync mkdir with async fs/promises mkdir.",
+      "recordedAt": "2026-05-10T12:36:38Z"
+    },
+    {
+      "id": "D17",
+      "summary": "Resolved fork summary harness picker blockers by restoring the shared summary ModelHarnessPicker, resolving summaryHarness through canonical policy, and accepting Pi summary requests through Pi RPC JSON commands.",
+      "recordedAt": "2026-05-10T12:47:02Z"
+    },
+    {
+      "id": "D18",
+      "summary": "Disabled Pi conversation forking until a transcript-faithful Pi session export is available, removing the synthetic tmux-pane JSONL fork source that could silently drop history.",
+      "recordedAt": "2026-05-10T12:56:10Z"
+    },
+    {
+      "id": "D19",
+      "summary": "Fixed review blockers: (1) fork route rejects launchHarness=pi and ForkModal locks launch harness to claude-code so Pi forks can't spawn empty sessions from Claude JSONL; (2) handleConversationMessage branches on conv.harness==='pi' to deliver follow-up messages via writePiConversationCommand (Pi FIFO/RPC) instead of tmux paste.",
+      "recordedAt": "2026-05-10T13:25:00Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "ProjectNode is currently a single <button> that toggles expand. The split requires the ChevronRight to be wrapped in a separate <span onClick e.stopPropagation> inside the button. Do not use a nested <button> inside <button> (invalid HTML).",
-      "mitigation": "Use a <span role='button' tabIndex=0> or plain <span onClick e.stopPropagation> for the chevron wrapper. The PRD narrative specifies plain <span>."
-    },
-    {
-      "id": "H2",
-      "summary": "issueCosts must be passed to ProjectOverview explicitly in the routing block. projectsWithSessions.find(...) returns undefined if the project name changed since last render — always use the ?. and ?? [] fallback.",
-      "mitigation": "Use: projectsWithSessions.find(p => p.name === selectedProject)?.features ?? []"
-    },
-    {
-      "id": "H3",
-      "summary": "The cost-breakdown-tooltip bead adds the CostBreakdownTooltip UI inside ProjectOverview.tsx. The issueCostDetails data is only wired in the commanddeck-routing bead. Until bead 6 is done, the tooltip degrades gracefully (badge shows, no hover). This is by design — the optional prop allows independent delivery.",
-      "mitigation": "issueCostDetails is optional in ProjectOverviewProps. The tooltip checks for presence before rendering hover behavior."
-    },
-    {
-      "id": "H4",
-      "summary": "CostBreakdownTooltip reads from the issueCostDetails prop directly — no local fetch or useQuery. Tooltip data freshness depends on CommandDeck's 15s costData refetch interval. This is acceptable: cost data is not real-time.",
-      "mitigation": "No action needed. Document in code comment."
-    },
-    {
-      "id": "H5",
-      "summary": "Friendly model name display should strip 'claude-' prefix and date suffixes (e.g. '-20250120') to avoid displaying raw API model IDs. Reference: friendlyModelName() in CostBreakdownModal.tsx uses replace('claude-', '').replace(/-20\\d{6}$/, '').replace(/-/g, ' ') with title case.",
-      "mitigation": "Copy the friendlyModelName() utility inline in ProjectOverview.tsx."
+      "summary": "Frontend tests that mock chat ModelPicker or fetch strictly need to include the new harness helpers and /api/settings/claude-auth call.",
+      "mitigation": "Updated affected CommandDeck and ComposerFooter tests; full npm test now passes."
     }
   ],
-  "resumePoint": null,
-  "beadsMapping": {},
-  "agentModel": "gpt-5.5",
+  "resumePoint": {
+    "description": "Fixed latest CHANGES_REQUESTED blocker by disabling Pi fork actions and returning a clear unsupported error instead of fabricating fork sources from tmux pane scrollback. typecheck, lint, npm test, and graphify update pass. Next step is commit and invoke /rebase-and-submit PAN-1055.",
+    "beadId": "workspace-xgc6",
+    "filesToRead": [
+      ".pan/feedback/001-review-agent-changes-requested.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+      "src/dashboard/server/routes/conversations.ts"
+    ]
+  },
+  "beadsMapping": {
+    "workspace-xgc6": "PAN-1055 dashboard harness picker implementation"
+  },
+  "agentModel": "Claude Opus 4.7",
   "sessionHistory": [
     {
-      "timestamp": "2026-05-09T17:02:13.086Z",
-      "reason": "planning",
-      "note": "Planning session started for PAN-1044: Command Deck: Project Overview Panel with pipeline swimlanes",
-      "agentModel": "agent:claude-opus-4-5"
-    },
-    {
-      "timestamp": "2026-05-09T17:30:00.000Z",
-      "reason": "planning-revised",
-      "note": "Plan revised: added cost-breakdown-tooltip bead (hover popover for model/stage cost breakdown). Updated pipeline-swimlanes bead to explicitly include cost badge on stuck callout cards. Updated commanddeck-routing to expand IssueCostEntry with byModel/byStage and wire issueCostDetails to ProjectOverview. User requests: (1) cost of issue shown in summary, (2) hover over cost shows model/stage breakdown.",
-      "agentModel": "agent:claude-opus-4-5"
-    },
-    {
-      "timestamp": "2026-05-09T17:19:07.860Z",
-      "reason": "start",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-09T21:03:11.463Z",
+      "timestamp": "2026-05-09T21:07:00.000Z",
       "reason": "bead-complete",
-      "note": "workspace-fran implemented CommandDeck selectedProject routing, issueCostDetails wiring, ProjectNode project-selection props, and CommandDeck coverage for project overview rendering. Commit 7e7c73a1d.",
-      "agentModel": "gpt-5.5"
+      "note": "Added shared harness picker primitives, surfaced harness in planning/settings flows, passed harness through start endpoints, added settings round-trip support, fixed unrelated post-merge lifecycle test failure, and verified typecheck/lint/npm test pass.",
+      "agentModel": "Claude Opus 4.7"
     },
     {
-      "timestamp": "2026-05-09T21:16:26.643Z",
-      "reason": "quality-gates",
-      "note": "Restored full-suite stability by aligning stale model/skill fixtures with current sources and isolating agent-spawning tests from local Channels settings. Gates passed: npm run typecheck, npm run lint, npm test. Commit f2d67ee9c.",
-      "agentModel": "gpt-5.5"
+      "timestamp": "2026-05-09T21:10:00.000Z",
+      "reason": "commit",
+      "note": "Committed bead workspace-xgc6 as 2497e06cc after typecheck, lint, and npm test passed.",
+      "agentModel": "Claude Opus 4.7"
     },
     {
-      "timestamp": "2026-05-09T21:38:06.576Z",
-      "reason": "end",
-      "note": "Project overview panel implemented"
+      "timestamp": "2026-05-09T21:14:00.000Z",
+      "reason": "inspection-tool-fix",
+      "note": "pan inspect failed because build-cli did not populate dist/cli/prompts; fixed build script and rebuilt CLI locally.",
+      "agentModel": "Claude Opus 4.7"
     },
     {
-      "timestamp": "2026-05-09T23:36:58.066Z",
-      "reason": "feedback-fix",
-      "note": "Fixed frontend-typecheck verification failure by passing issueCostDetails into PipelineSection so ProjectOverview cards can render cost breakdown data. Verified with npm --prefix ./src/dashboard/frontend exec tsc --noEmit.",
-      "agentModel": "gpt-5.5"
+      "timestamp": "2026-05-09T21:17:00.000Z",
+      "reason": "inspection-passed",
+      "note": "Inspection passed for workspace-xgc6. Reran npm test after build-cli fix; 375 test files / 4570 tests passed.",
+      "agentModel": "Claude Opus 4.7"
     },
     {
-      "timestamp": "2026-05-09T23:38:57.878Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
+      "timestamp": "2026-05-09T20:20:00.000Z",
+      "reason": "review-response-verified",
+      "note": "Addressed review blockers: added missing harness selectors and launch payloads for conversation/fork/fresh agent flows, persisted conversation harness, applied canonical Pi policy in planning/work/conversation spawns, restored PAN-1055 vBRIEF, and added Vitest coverage for Pi ToS gating plus settings harness round-trip. npm run typecheck, npm run lint, and npm test passed (377 files / 4584 tests).",
+      "agentModel": "Claude Opus 4.7"
     },
     {
-      "timestamp": "2026-05-09T23:39:32.479Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-09T23:46:44.875Z",
+      "timestamp": "2026-05-10T00:23:26.590Z",
       "reason": "end",
       "note": "Agent signaled work complete"
     },
     {
-      "timestamp": "2026-05-09T23:54:00.459Z",
-      "reason": "feedback-fix",
-      "note": "Fixed test verification failure by narrowing tests/global-setup.ts fallback from full npm run build to npm run build:contracts && npm run build:cli, avoiding unrelated dashboard Vite build during clean test setup. Verified npm run build:contracts && npm run build:cli and npm test.",
-      "agentModel": "gpt-5.5"
+      "timestamp": "2026-05-10T01:19:43.564Z",
+      "reason": "review-response-verified",
+      "note": "Fixed latest CHANGES_REQUESTED blockers: preserved persisted harness across work-agent resume/restart and conversation restart-all, added canonical harness policy route and frontend policy cache, added harness selectors to conversation/switch/start flows, updated tests. npm run typecheck, npm run lint, and npm test passed (377 files / 4584 tests).",
+      "agentModel": "Claude Opus 4.7"
     },
     {
-      "timestamp": "2026-05-09T23:54:52.281Z",
+      "timestamp": "2026-05-10T01:25:17.155Z",
+      "reason": "main-merge-verified",
+      "note": "pan done reported a rebase conflict in src/lib/cloister/merge-agent.ts. Merged origin/main, kept the origin/main rev-parse handling with the existing lifecycle verification flow, then reran npm run typecheck, npm run lint, and npm test (378 files / 4595 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T01:25:36.810Z",
+      "reason": "end",
+      "note": "Fixed remaining harness picker review blockers: persisted harness across resume/restart paths, canonicalized frontend harness policy, and added missing combined picker flows."
+    },
+    {
+      "timestamp": "2026-05-10T01:27:39.844Z",
+      "reason": "verification-fix",
+      "note": "Fixed frontend-typecheck failures reported in .pan/feedback/002-verification-gate-failed.md and verified with npm run typecheck.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T01:28:22.459Z",
+      "reason": "end",
+      "note": "Fixed frontend-typecheck by exporting harness picker policy types and adding frontend agent harness metadata."
+    },
+    {
+      "timestamp": "2026-05-10T01:29:29.380Z",
+      "reason": "verification-fix",
+      "note": "Fixed frontend-typecheck failures from .pan/feedback/003-verification-gate-failed.md by converting agent.runtime fallback to Harness literals for SwitchModelModal currentHarness. Verified with npm run typecheck.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T01:44:26.923Z",
+      "reason": "review-response-verified",
+      "note": "Fixed review blockers for Docker-delayed harness preservation, planning policy enforcement after default/settings model resolution, and Settings shared picker usage. Also capped harness-policy request size. Verified npm run typecheck, npm run lint, targeted harness tests, and npm test (378 files / 4595 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T07:04:40.318Z",
+      "reason": "review-response-verified",
+      "note": "Fixed review verification test failure plus blockers for conversation switch harness persistence and harness-policy provider auth caching. Addressed high-priority cache freshness and OpenRouter favorite filtering. Verified typecheck, lint, targeted tests, and full npm test (378 files / 4595 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T07:19:00.617Z",
+      "reason": "end",
+      "note": "Fixed review verification and remaining harness blockers: model-only conversation switches preserve persisted harness, harness policy caches auth by provider, model picker cache invalidates after settings changes, and checkpoint reconciliation tests match per-agent APIs."
+    },
+    {
+      "timestamp": "2026-05-10T07:45:18.780Z",
+      "reason": "end",
+      "note": "Re-ran full test suite for verification; no code changes required because local tests pass cleanly."
+    },
+    {
+      "timestamp": "2026-05-10T08:55:18.473Z",
+      "reason": "review-response-verified",
+      "note": "Added shared ModelHarnessPicker to IssueAgentCard stopped-agent start flow and included harness in /api/agents payload. Optimized chat ModelPicker OpenRouter favorites filtering with Set. Verified npm run typecheck, npm run lint, targeted tests, and full npm test (378 files / 4595 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T10:08:59.280Z",
+      "reason": "review-response-verified",
+      "note": "Replaced ForkModal summary ModelSelect with ModelHarnessPicker and threaded summaryHarness through frontend fork submit and server summary-fork validation. Verified npm run typecheck, npm run lint, targeted fork/picker tests, and full npm test (378 files / 4595 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T10:43:45.000Z",
+      "reason": "review-response-in-progress",
+      "note": "Fixed three latest review blockers for harness launch-state consistency, fork summary runtime selection, and saved planning-agent harness override. npm run typecheck and npm run lint pass; full npm test encountered one deep-wipe test flake that passed when rerun targeted.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T11:36:45.371Z",
       "reason": "end",
       "note": "Agent signaled work complete"
     },
     {
-      "timestamp": "2026-05-10T00:02:38.944Z",
-      "reason": "feedback-fix",
-      "note": "Fixed test verification failure where Vitest could not resolve @panctl/contracts when contract dist was missing but CLI dist existed. tests/global-setup.ts now independently rebuilds packages/contracts/dist before checking CLI dist. Verified targeted direct Vitest with contracts dist absent, npm run build, and npm test.",
-      "agentModel": "gpt-5.5"
+      "timestamp": "2026-05-10T12:10:03Z",
+      "reason": "verification-fix",
+      "note": "Fixed test verification failures by preventing Linear SDK/network access from unit tests and restoring partial fs/promises mocks. Verified npm run typecheck, npm run lint, targeted tests, and full npm test (378 files / 4595 tests passed).",
+      "agentModel": "Claude Opus 4.7"
     },
     {
-      "timestamp": "2026-05-10T00:03:30.715Z",
+      "timestamp": "2026-05-10T12:14:56Z",
+      "reason": "main-rebase-verified",
+      "note": "Resolved pan done rebase conflicts, regenerated graphify outputs, and verified npm run typecheck, npm run lint, and npm test after rebase (379 files / 4615 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T12:26:27Z",
+      "reason": "review-response-verified",
+      "note": "Fixed correctness blockers: conversation Pi launches now use Pi launcher config/FIFO/session-dir/extension wiring and Pi-specific prompt delivery; summary generation no longer invokes pi --mode rpc with raw prompt stdin and rejects unsupported Pi summary requests. Verified npm run typecheck, npm run lint, and npm test (379 files / 4615 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T12:36:38Z",
+      "reason": "review-response-verified",
+      "note": "Fixed latest review feedback: ForkModal no longer exposes Pi for summary generation and submits claude-code, summary fork injection waits for Pi readiness before FIFO writes, and getPiLauncherFields uses async mkdir. Verified npm run typecheck, npm run lint, npm test (379 files / 4615 tests passed), and graphify update.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T12:47:02Z",
+      "reason": "review-response-verified",
+      "note": "Fixed fork summary picker feedback: ForkModal summary uses ModelHarnessPicker, and summaryHarness is policy-resolved and threaded into generation including Pi RPC JSON command support. Verified npm run typecheck, npm run lint, npm test (379 files / 4615 tests passed), and graphify update.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T12:56:10Z",
+      "reason": "review-response-verified",
+      "note": "Fixed Pi fork transcript fidelity blocker by removing synthetic pane-scrollback fork source generation, hiding fork actions for Pi conversations in the dashboard, and returning a clear unsupported error from the fork endpoint for Pi conversations. Verified npm run typecheck, npm run lint, npm test (379 files / 4615 tests passed), and graphify update.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T13:03:47.493Z",
       "reason": "end",
-      "note": "Agent signaled work complete"
+      "note": "Disabled Pi conversation forks until Pi exposes transcript-faithful session export; removes fabricated JSONL from tmux scrollback"
     },
     {
-      "timestamp": "2026-05-10T00:18:44.000Z",
-      "reason": "feedback-fix",
-      "note": "Fixed repeated test verification failure where Vitest import analysis resolved @panctl/contracts through package exports and failed when generated dist artifacts were absent. Root and frontend Vitest configs now alias @panctl/contracts to packages/contracts/src/index.ts. Verified targeted contracts reducer test with contracts dist absent, frontend ProjectOverview test, npm test, and npm run build.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-10T01:28:53.494Z",
+      "timestamp": "2026-05-10T13:23:21.985Z",
       "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-10T01:31:04.000Z",
-      "reason": "feedback-fix",
-      "note": "Fixed frontend CommandDeck test failure after inactive projects added a second project-node test element. The project overview test now waits for all project nodes before selecting test-project. Verified with npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/CommandDeck.test.tsx.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-10T01:34:49.027Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-10T02:19:53.000Z",
-      "reason": "feedback-fix",
-      "note": "Fixed review-requested ProjectOverview correctness issues: blocked review and dispatch-failed tests now bucket as stuck with clear reasons, active-agent counts and working buckets ignore stopped/suspended agents unless an active work session exists, and partial cost breakdown data is safe. Combined cost maps into one memo pass and guarded static cost badges. Verified ProjectOverview tests, frontend typecheck, and npm test.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-10T02:21:09.354Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-10T02:21:27.085Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-10T02:27:56.000Z",
-      "reason": "feedback-fix",
-      "note": "Fixed test verification failure in read-model checkpoint reconciliation by updating the checkpoint-manager mock for the current deleteLegacyCheckpointRefs export and per-agent diff/timestamp helper signatures. Verified the targeted checkpoint test and npm test.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-10T02:28:53.003Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
+      "note": "Block Pi launch harness for forks; route Pi conversation messages through FIFO command protocol instead of tmux paste"
     }
   ],
   "feedback": []

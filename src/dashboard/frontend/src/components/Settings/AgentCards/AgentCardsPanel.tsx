@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { AgentCard, AgentPhase } from './AgentCard';
 import { ModelOverrideModal } from './ModelOverrideModal';
-import { WorkTypeId, ModelId, Provider } from '../types';
+import { WorkTypeId, ModelId, Provider, Harness } from '../types';
 import { getEffectiveModelId } from '../modelDefaults';
 
 // Agent definitions with their work types
@@ -115,14 +115,16 @@ const AGENT_DEFINITIONS = {
 
 interface AgentCardsPanelProps {
   overrides: Partial<Record<WorkTypeId, ModelId>>;
+  harnessOverrides?: Partial<Record<WorkTypeId, Harness>>;
   enabledProviders: Record<Provider, boolean>;
-  onSetOverride: (workType: WorkTypeId, model: ModelId) => void;
+  onSetOverride: (workType: WorkTypeId, model: ModelId, harness?: Harness) => void;
   onRemoveOverride: (workType: WorkTypeId) => void;
   onResetAllOverrides: () => void;
 }
 
 export function AgentCardsPanel({
   overrides,
+  harnessOverrides = {},
   enabledProviders,
   onSetOverride,
   onRemoveOverride,
@@ -171,9 +173,9 @@ export function AgentCardsPanel({
   };
 
   // Handle modal apply
-  const handleModalApply = (model: ModelId) => {
+  const handleModalApply = (model: ModelId, harness?: Harness) => {
     if (modalWorkType) {
-      onSetOverride(modalWorkType, model);
+      onSetOverride(modalWorkType, model, harness);
     }
   };
 
@@ -360,6 +362,7 @@ export function AgentCardsPanel({
         <ModelOverrideModal
           workType={modalWorkType}
           currentModel={modalModelInfo.model}
+          currentHarness={harnessOverrides[modalWorkType] || 'claude-code'}
           isOverride={modalModelInfo.isOverride}
           enabledProviders={enabledProviderList}
           onApply={handleModalApply}

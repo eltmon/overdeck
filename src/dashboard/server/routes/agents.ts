@@ -83,6 +83,7 @@ import {
   getProviderAuthMode,
 } from '../../../lib/agents.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
+import { canUseHarness } from '../../../lib/harness-policy.js';
 import { getProviderForModel } from '../../../lib/providers.js';
 import { validateProviderHealth, ProviderHealthError } from '../../../lib/provider-health.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
@@ -2042,9 +2043,7 @@ const postAgentsRoute = HttpRouter.add(
       agentType: (body as any).agentType,
       difficulty: (body as any).difficulty,
     });
-    const providerAuthMode = getProviderForModel(spawnModel).name === 'openai'
-      ? yield* Effect.promise(() => getProviderAuthMode(spawnModel))
-      : undefined;
+    const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
       const codexAuth = yield* Effect.promise(() => checkCodexAuthStatus());
       if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
@@ -2322,6 +2321,20 @@ const postAgentsRoute = HttpRouter.add(
       console.warn(`[start-agent] Failed to create pre-spawn stash for ${issueId}: ${message}`);
     }
 
+    const bodyHarness = (body as any).harness;
+    const workType = ((body as any).workType || `issue-agent:${phase}`) as string;
+    const savedHarness = yield* Effect.promise(async () => {
+      const { loadConfig: loadPanConfig } = await import('../../../lib/config-yaml.js');
+      return loadPanConfig().config.harnessOverrides[workType as any];
+    });
+    const requestedHarness = (bodyHarness === 'pi' || bodyHarness === 'claude-code')
+      ? bodyHarness
+      : (savedHarness === 'pi' || savedHarness === 'claude-code' ? savedHarness : 'claude-code');
+    const harnessDecision = yield* Effect.promise(async () =>
+      canUseHarness(requestedHarness, spawnModel, await getProviderAuthMode(spawnModel))
+    );
+    const effectiveHarness = harnessDecision.allowed ? requestedHarness : 'claude-code';
+
     // Spawn pan start command
     const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
       const activityId = `activity-${Date.now()}`;
@@ -2448,7 +2461,8 @@ const postAgentsRoute = HttpRouter.add(
           yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
             id: earlyAgentId,
             issueId,
-            runtime: 'claude',
+            runtime: effectiveHarness,
+            harness: effectiveHarness,
             model: 'pending-container-start',
             status: 'starting',
             startedAt: new Date().toISOString(),
@@ -2517,7 +2531,8 @@ const postAgentsRoute = HttpRouter.add(
                     await writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
                       id: earlyAgentId,
                       issueId,
-                      runtime: 'claude',
+                      runtime: effectiveHarness,
+                      harness: effectiveHarness,
                       model: 'pending-container-start',
                       status: 'failed',
                       startedAt: new Date().toISOString(),
@@ -2553,8 +2568,9 @@ const postAgentsRoute = HttpRouter.add(
                     issueId,
                     phase,
                     workspacePath,
+                    harness: effectiveHarness,
                   });
-                  await spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel], workspacePath);
+                  await spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel, '--harness', effectiveHarness], workspacePath);
                   await updateIssueStatus();
                 } catch (err: any) {
                   const errorMessage = err instanceof Error ? err.message : String(err);
@@ -2607,7 +2623,7 @@ const postAgentsRoute = HttpRouter.add(
       phase,
       workspacePath,
     }));
-    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel], workspacePath));
+    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel, '--harness', effectiveHarness], workspacePath));
 
     // Write early state.json so the dashboard immediately shows agent-<id> as the
     // active agent. Without this there's a race window between spawnPanCommand returning
@@ -2619,7 +2635,8 @@ const postAgentsRoute = HttpRouter.add(
     yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
       id: earlyAgentId,
       issueId,
-      runtime: 'claude',
+      runtime: effectiveHarness,
+      harness: effectiveHarness,
       model: 'pending-work-spawn',
       status: 'starting',
       startedAt: new Date().toISOString(),

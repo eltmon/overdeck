@@ -15,7 +15,8 @@ import { RestartFromPlanButton } from '../RestartFromPlanButton';
 import { ArtifactLinks } from '../ArtifactLinks';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { FileText } from 'lucide-react';
-import { useAvailableModels } from '../shared/ModelPicker/ModelPicker';
+import { HarnessSelect, useAvailableModels } from '../shared/ModelPicker/ModelPicker';
+import type { Harness } from '../shared/ModelPicker/ModelPicker';
 import { useSwitchModel } from '../../hooks/useSwitchModel';
 
 // Convenience alias — most mutations use void variables and unknown data
@@ -55,6 +56,8 @@ interface ActionsSectionProps {
   onSwitchModel?: () => void;
   lifecycle?: WorkAgentLifecycle;
   agentLaunchState?: 'starting' | 'resuming' | null;
+  launchHarness?: Harness;
+  onLaunchHarnessChange?: (harness: Harness) => void;
   isFeature?: boolean;
   issueStatus?: string;
   onPlan?: () => void;
@@ -94,6 +97,8 @@ export function ActionsSection({
   onSwitchModel,
   lifecycle,
   agentLaunchState,
+  launchHarness = 'claude-code',
+  onLaunchHarnessChange,
   isFeature,
   issueStatus,
   onPlan,
@@ -106,7 +111,7 @@ export function ActionsSection({
   const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';
 
   const [showResumeModelDropdown, setShowResumeModelDropdown] = useState(false);
-  const { groups } = useAvailableModels();
+  const { groups, defaultModel, harnessPolicy } = useAvailableModels();
   const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
 
   const isPipelineStuck = isReviewPipelineStuck(reviewStatus);
@@ -361,6 +366,17 @@ export function ActionsSection({
                   </>
                 )}
               </div>
+              {!isResume && onLaunchHarnessChange && (
+                <div className="min-w-[150px]" data-testid="inspector-start-harness-picker">
+                  <HarnessSelect
+                    value={launchHarness}
+                    onChange={onLaunchHarnessChange}
+                    modelId={defaultModel}
+                    groups={groups}
+                    harnessPolicy={harnessPolicy}
+                  />
+                </div>
+              )}
               {/* Reset Session — only when resuming (has a saved session) */}
               {isResume && (
                 <button

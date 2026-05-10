@@ -20,6 +20,9 @@ vi.mock('../../XTerminal', () => ({ XTerminal: () => null }));
 vi.mock('../MessagesTimeline', () => ({ MessagesTimeline: () => null }));
 vi.mock('../ComposerFooter', () => ({ ComposerFooter: () => null }));
 vi.mock('../ModelPicker', () => ({
+  loadStoredHarness: () => 'claude-code',
+  saveStoredHarness: vi.fn(),
+  saveStoredModel: vi.fn(),
   ModelPicker: ({ value, onChange }: { value: string; onChange: (m: string) => void }) => (
     <select
       data-testid="model-picker"

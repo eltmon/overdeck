@@ -110,6 +110,7 @@ graphify-out/.graphify_*
 .pan/feedback/
 .pan/followup-issues.txt
 .pan/spec.vbrief.json
+.pan/agent-mcp.json
 .panopticon/
 
 # Beads / Dolt files (added by bd init)

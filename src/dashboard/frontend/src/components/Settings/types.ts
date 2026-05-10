@@ -37,6 +37,7 @@ export type WorkTypeId =
   | 'cli:quick-command';
 
 export type ModelId = string;
+export type Harness = 'claude-code' | 'pi';
 
 export interface ProvidersConfig {
   anthropic: boolean;
@@ -52,6 +53,7 @@ export interface ProvidersConfig {
 export interface ModelsConfig {
   providers: ProvidersConfig;
   overrides: Partial<Record<WorkTypeId, ModelId>>;
+  harness_overrides?: Partial<Record<WorkTypeId, Harness>>;
   gemini_thinking_level?: number; // 1-4 (Minimal, Low, Medium, High)
   default_conversation_model?: ModelId;
 }

@@ -12,8 +12,10 @@ import {
   CheckCircle2,
   Star,
 } from 'lucide-react';
-import { WorkTypeId, ModelId } from '../types';
+import { WorkTypeId, ModelId, Harness } from '../types';
 import { CostWarningBadge, costWarningLevel } from '../../shared/costWarning';
+import { canUsePickerHarness, HarnessSelect } from '../../shared/ModelPicker';
+import type { HarnessPolicyDecisions, ModelGroup } from '../../shared/ModelPicker';
 
 // Model capabilities that can be matched to work types
 export type Capability = 'reasoning' | 'code' | 'vision' | 'fast' | 'cost-efficient' | 'large-context' | 'complex-math' | 'efficiency' | 'agentic';
@@ -220,10 +222,11 @@ export type OpenRouterFavoriteModel = {
 interface ModelOverrideModalProps {
   workType: WorkTypeId;
   currentModel: ModelId;
+  currentHarness?: Harness;
   isOverride: boolean;
   enabledProviders: string[];
   openRouterFavorites?: OpenRouterFavoriteModel[];
-  onApply: (model: ModelId) => void;
+  onApply: (model: ModelId, harness?: Harness) => void;
   onRemove: () => void;
   onClose: () => void;
 }
@@ -231,6 +234,7 @@ interface ModelOverrideModalProps {
 export function ModelOverrideModal({
   workType,
   currentModel,
+  currentHarness = 'claude-code',
   isOverride,
   enabledProviders,
   openRouterFavorites,
@@ -239,6 +243,8 @@ export function ModelOverrideModal({
   onClose,
 }: ModelOverrideModalProps) {
   const [selectedModel, setSelectedModel] = useState<ModelId>(currentModel);
+  const [selectedHarness, setSelectedHarness] = useState<Harness>(currentHarness);
+  const [harnessPolicy, setHarnessPolicy] = useState<HarnessPolicyDecisions>({});
   const [openRouterModels, setOpenRouterModels] = useState<ModelDef[]>([]);
 
   const workTypeName = WORK_TYPE_NAMES[workType] || workType;
@@ -321,12 +327,39 @@ export function ModelOverrideModal({
     return bestMatch?.id;
   }, [displayProviders, requiredCapabilities]);
 
+  useEffect(() => {
+    let canceled = false;
+    const modelIds = displayProviders.flatMap((provider) => provider.models.map((model) => model.id));
+    if (modelIds.length === 0) return undefined;
+
+    void fetch(`/api/settings/harness-policy?models=${encodeURIComponent(modelIds.join(','))}`)
+      .then((r) => r.json())
+      .then((data: { decisions?: HarnessPolicyDecisions }) => {
+        if (!canceled) setHarnessPolicy(data.decisions ?? {});
+      })
+      .catch(() => undefined);
+    return () => { canceled = true; };
+  }, [displayProviders]);
+
   const handleApply = () => {
-    onApply(selectedModel);
+    onApply(selectedModel, effectiveHarness);
     onClose();
   };
 
-  const hasChanges = selectedModel !== currentModel;
+  const pickerGroups: ModelGroup[] = displayProviders.map((provider) => ({
+    provider: provider.key,
+    label: provider.name,
+    models: provider.models.map((model) => ({
+      id: model.id,
+      label: model.name,
+      provider: provider.key,
+      costPer1MTokens: model.costPer1MTokens,
+    })),
+  }));
+  const selectedHarnessDecision = canUsePickerHarness(selectedHarness, selectedModel, harnessPolicy);
+  const effectiveHarness = selectedHarnessDecision.allowed ? selectedHarness : 'claude-code';
+  const hasChanges = selectedModel !== currentModel || effectiveHarness !== currentHarness;
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -353,6 +386,19 @@ export function ModelOverrideModal({
               <X className="w-5 h-5" />
             </button>
           </div>
+        </div>
+
+        <div className="px-6 py-4 border-b border-border bg-card">
+          <HarnessSelect
+            value={effectiveHarness}
+            onChange={setSelectedHarness}
+            modelId={selectedModel}
+            groups={pickerGroups}
+            harnessPolicy={harnessPolicy}
+          />
+          {!selectedHarnessDecision.allowed && (
+            <p className="text-xs text-warning mt-1">{selectedHarnessDecision.reason ?? 'Pi is unavailable for this model/auth combination; Claude Code will be used.'}</p>
+          )}
         </div>
 
         {/* Model List */}

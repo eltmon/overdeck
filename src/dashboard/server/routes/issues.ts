@@ -58,7 +58,8 @@ import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../../../lib/tmux.js';
-import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
+import { getAgentStateAsync, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
+import { canUseHarness } from '../../../lib/harness-policy.js';
 import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
 import {
@@ -572,7 +573,9 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       shadowMode = false,
       model: modelOverride,
       effort,
+      harness = 'claude-code',
     } = body as any;
+    const requestedHarness = harness === 'pi' || harness === 'claude-code' ? harness : 'claude-code';
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
 
@@ -746,6 +749,11 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         });
 
         try {
+          let effectiveHarness = requestedHarness;
+          if (typeof modelOverride === 'string' && modelOverride.trim()) {
+            const decision = canUseHarness(requestedHarness, modelOverride.trim(), await getProviderAuthMode(modelOverride.trim()));
+            if (!decision.allowed) effectiveHarness = 'claude-code';
+          }
           const result = await spawnPlanningSession({
             issue: issue as PlanningIssue,
             workspacePath,
@@ -755,6 +763,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
             startDocker: body.startDocker,
             shadowMode,
             model: modelOverride || undefined,
+            harness: effectiveHarness,
             effort: effort || undefined,
             onProgress: (event) => {
               console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);

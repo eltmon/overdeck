@@ -39,9 +39,13 @@ vi.mock('child_process', () => ({
 // ── fs/promises mock ──────────────────────────────────────────────────────────
 const mockWriteFile = vi.hoisted(() => vi.fn<() => Promise<void>>().mockResolvedValue(undefined));
 
-vi.mock('fs/promises', () => ({
-  writeFile: mockWriteFile,
-}));
+vi.mock('fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs/promises')>();
+  return {
+    ...actual,
+    writeFile: mockWriteFile,
+  };
+});
 
 // ── fs mock ───────────────────────────────────────────────────────────────────
 vi.mock('fs', async (importOriginal) => {
@@ -66,6 +70,8 @@ vi.mock('../../../src/lib/tmux.js', () => ({
 
 vi.mock('../../../src/lib/paths.js', () => ({
   PANOPTICON_HOME: '/tmp/panopticon-test',
+  AGENTS_DIR: '/tmp/panopticon-test/agents',
+  getPanopticonHome: () => '/tmp/panopticon-test',
   PROJECT_DOCS_SUBDIR: 'docs',
   PROJECT_PRDS_SUBDIR: 'prds',
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',

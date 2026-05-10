@@ -17,6 +17,7 @@ import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
 import { MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
+import type { RuntimeName } from './runtimes/types.js';
 export type { SubscriptionPlan, AuthMode };
 
 /**
@@ -112,6 +113,9 @@ export interface YamlConfig {
 
     /** Per-work-type overrides (explicit model for specific tasks) */
     overrides?: Partial<Record<WorkTypeId, ModelId>>;
+
+    /** Per-work-type harness overrides */
+    harness_overrides?: Partial<Record<WorkTypeId, RuntimeName>>;
 
     /** Gemini thinking level (1-4) */
     gemini_thinking_level?: 1 | 2 | 3 | 4;
@@ -302,6 +306,9 @@ export interface NormalizedConfig {
   /** Per-work-type overrides */
   overrides: Partial<Record<WorkTypeId, ModelId>>;
 
+  /** Per-work-type harness overrides */
+  harnessOverrides: Partial<Record<WorkTypeId, RuntimeName>>;
+
   /** Gemini thinking level */
   geminiThinkingLevel: 1 | 2 | 3 | 4;
 
@@ -422,6 +429,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   providerPlan: {},
   openrouterFavorites: [],
   overrides: {},
+  harnessOverrides: {},
   geminiThinkingLevel: 3,
   trackerKeys: {},
   conversations: {
@@ -858,6 +866,13 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       result.overrides = {
         ...result.overrides,
         ...config.models.overrides,
+      };
+    }
+
+    if (config.models?.harness_overrides) {
+      result.harnessOverrides = {
+        ...result.harnessOverrides,
+        ...config.models.harness_overrides,
       };
     }
 

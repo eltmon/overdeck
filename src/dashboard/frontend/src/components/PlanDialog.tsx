@@ -9,6 +9,7 @@ import { XTerminal } from './XTerminal';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { useConfirm } from './DialogProvider';
 import { PlanSetupScreen, type SetupProgressEvent } from './PlanSetupScreen';
+import { canUsePickerHarness, ModelHarnessPicker, type Harness, type HarnessPolicyDecisions, type ModelGroup } from './shared/ModelPicker';
 
 interface PlanDialogProps {
   issue: Issue;
@@ -75,6 +76,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const [workspaceLocation, setWorkspaceLocation] = useState<'local' | 'remote'>(getDefaultWorkspaceLocation);
   const [shadowMode, setShadowMode] = useState(false);
   const [modelOverride, setModelOverride] = useState<string>(''); // '' = use settings default
+  const [harnessOverride, setHarnessOverride] = useState<Harness>('claude-code');
+  const harnessOverrideTouched = useRef(false);
   const [effort, setEffort] = useState<'low' | 'medium' | 'high'>('medium');
   const [watchPlanning, setWatchPlanning] = useState(true);
   // Ref so async SSE callbacks always read the live checkbox value, not a stale closure copy
@@ -94,11 +97,19 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     queryFn: async () => {
       const res = await fetch('/api/settings');
       if (!res.ok) throw new Error('Failed to load settings');
-      return res.json() as Promise<{ models: { overrides: Record<string, string> } }>;
+      return res.json() as Promise<{ models: { overrides: Record<string, string>; harness_overrides?: Record<string, Harness> } }>;
     },
     staleTime: 60000,
   });
   const defaultPlanningModel = settingsQuery.data?.models?.overrides?.['planning-agent'] || 'claude-opus-4-6';
+  const defaultPlanningHarness = settingsQuery.data?.models?.harness_overrides?.['planning-agent'];
+
+  useEffect(() => {
+    if (harnessOverrideTouched.current) return;
+    if (defaultPlanningHarness === 'pi' || defaultPlanningHarness === 'claude-code') {
+      setHarnessOverride(defaultPlanningHarness);
+    }
+  }, [defaultPlanningHarness]);
 
   // Fetch available models from all configured providers
   const availableModelsQuery = useQuery({
@@ -121,6 +132,43 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     openrouter: 'OpenRouter',
   };
 
+
+  const planningModelGroups: ModelGroup[] = availableModelsQuery.data
+    ? Object.entries(availableModelsQuery.data)
+      .filter(([, models]) => models.length > 0)
+      .map(([provider, models]) => ({
+        provider,
+        label: PROVIDER_LABELS[provider] || provider,
+        models: models.map((model) => ({
+          id: model.id,
+          label: model.name,
+          provider,
+          costPer1MTokens: model.costPer1MTokens,
+        })),
+      }))
+    : [];
+  const planningPolicyQuery = useQuery({
+    queryKey: ['harness-policy', planningModelGroups.map((group) => group.models.map((model) => model.id).join('|')).join('|')],
+    queryFn: async () => {
+      const modelIds = planningModelGroups.flatMap((group) => group.models.map((model) => model.id));
+      if (modelIds.length === 0) return {} as HarnessPolicyDecisions;
+      const res = await fetch(`/api/settings/harness-policy?models=${encodeURIComponent(modelIds.join(','))}`);
+      if (!res.ok) throw new Error('Failed to load harness policy');
+      const data = await res.json() as { decisions?: HarnessPolicyDecisions };
+      return data.decisions ?? {};
+    },
+    enabled: planningModelGroups.length > 0,
+    staleTime: 60000,
+  });
+
+  const effectivePlanningModel = modelOverride || defaultPlanningModel;
+  const planningHarnessDecision = canUsePickerHarness(
+    harnessOverride,
+    effectivePlanningModel,
+    planningPolicyQuery.data,
+  );
+  const effectivePlanningHarness = planningHarnessDecision.allowed ? harnessOverride : 'claude-code';
+
   // Start planning via SSE stream — replaces the old fire-and-forget mutation.
   // Uses fetch with streaming body parsing since EventSource only supports GET.
   const startPlanningViaSSE = useCallback(async () => {
@@ -133,7 +181,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
       const res = await fetch(`/api/issues/${issue.identifier}/start-planning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode, model: modelOverride || undefined, effort }),
+        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode, model: modelOverride || undefined, harness: effectivePlanningHarness, effort }),
       });
 
       if (!res.ok) {
@@ -234,7 +282,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
       setError(err.message || 'Connection failed');
       setStep('error');
     }
-  }, [issue.identifier, startDocker, workspaceLocation, shadowMode, modelOverride, effort, watchPlanning, queryClient, onClose]);
+  }, [issue.identifier, startDocker, workspaceLocation, shadowMode, modelOverride, harnessOverride, effort, watchPlanning, queryClient, onClose]);
 
   // Legacy mutation wrapper — keeps the same handleStartPlanning interface
   const startPlanningMutation = {
@@ -766,28 +814,21 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                           </span>
                         </label>
 
-                        {/* Model override */}
-                        <div>
-                          <label className="text-sm font-medium text-foreground mb-1.5 block">Model</label>
-                          <select
-                            value={modelOverride}
-                            onChange={(e) => setModelOverride(e.target.value)}
-                            className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-signal-review"
-                          >
-                            <option value="">Settings default ({defaultPlanningModel})</option>
-                            {availableModelsQuery.data && Object.entries(availableModelsQuery.data)
-                              .filter(([, models]) => models.length > 0)
-                              .map(([provider, models]) => (
-                                <optgroup key={provider} label={PROVIDER_LABELS[provider] || provider}>
-                                  {models.map((model) => (
-                                    <option key={model.id} value={model.id}>
-                                      {model.name}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              ))}
-                          </select>
-                        </div>
+                        <ModelHarnessPicker
+                          model={effectivePlanningModel}
+                          harness={effectivePlanningHarness}
+                          onModelChange={(model) => setModelOverride(model === defaultPlanningModel ? '' : model)}
+                          onHarnessChange={(harness) => {
+                            harnessOverrideTouched.current = true;
+                            setHarnessOverride(harness);
+                          }}
+                          groups={planningModelGroups}
+                          harnessPolicy={planningPolicyQuery.data}
+                          modelLabel="Model"
+                        />
+                        {!planningHarnessDecision.allowed && (
+                          <p className="text-xs text-warning mt-1">{planningHarnessDecision.reason}</p>
+                        )}
 
                         {/* Effort level */}
                         <div>
