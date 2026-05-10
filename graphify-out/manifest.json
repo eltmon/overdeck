@@ -896,7 +896,7 @@
     "hash": "912dd048fc5f1898876a9d587eeafcc0"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/scripts/record-cost-event.d.ts": {
-    "mtime": 1778376562.9991841,
+    "mtime": 1778377007.6925364,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/scripts/notify-complete": {
@@ -2740,8 +2740,8 @@
     "hash": "78c3c7163624607c4a7f8b8c952b94ce"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx": {
-    "mtime": 1778376503.7351305,
-    "hash": "69b8df38a159a6ec39e3bf0c3c04f2ff"
+    "mtime": 1778379326.3902688,
+    "hash": "e164af01cd5b680844158d554e2a2fe7"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/src/dashboard/frontend/src/components/CommandDeck/LiveCounter.tsx": {
     "mtime": 1778289162.7651162,
@@ -2752,8 +2752,8 @@
     "hash": "63e7a3ce46f4a8211cd32400cf152dfc"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/src/dashboard/frontend/src/components/CommandDeck/index.tsx": {
-    "mtime": 1778376497.569917,
-    "hash": "d1982b4e5ef387eb91da6355dbe3fa9a"
+    "mtime": 1778379332.747484,
+    "hash": "01b11fbfe81f4a3c4c7565e409b3368a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/src/dashboard/frontend/src/components/CommandDeck/ConversationTerminal.tsx": {
     "mtime": 1778289162.7646506,
@@ -2908,8 +2908,8 @@
     "hash": "2cb90ec85078000709b53fb9324c11b4"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx": {
-    "mtime": 1778376463.784745,
-    "hash": "4ddc283741ff4bbdf86601769483305a"
+    "mtime": 1778379401.7608206,
+    "hash": "551ce07856c4f3f7d1605c8903102691"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationList.sort.test.ts": {
     "mtime": 1778289162.766784,

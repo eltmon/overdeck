@@ -417,26 +417,23 @@ export function CommandDeck({
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
 
   // Map aggregated costs per issue for the project tree sidebar and project overview.
-  const issueCosts = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const entry of costData?.issues || []) {
-      map[entry.issueId] = entry.totalCost;
-      map[entry.issueId.toLowerCase()] = entry.totalCost;
-    }
-    return map;
-  }, [costData]);
+  const { issueCosts, issueCostDetails } = useMemo(() => {
+    const costs: Record<string, number> = {};
+    const detailsByIssue: Record<string, IssueCostBreakdown> = {};
 
-  const issueCostDetails = useMemo(() => {
-    const map: Record<string, IssueCostBreakdown> = {};
     for (const entry of costData?.issues || []) {
+      costs[entry.issueId] = entry.totalCost;
+      costs[entry.issueId.toLowerCase()] = entry.totalCost;
+
       const details: IssueCostBreakdown = {
-        byModel: entry.byModel,
-        byStage: entry.byStage,
+        byModel: entry.byModel ?? {},
+        byStage: entry.byStage ?? {},
       };
-      map[entry.issueId] = details;
-      map[entry.issueId.toLowerCase()] = details;
+      detailsByIssue[entry.issueId] = details;
+      detailsByIssue[entry.issueId.toLowerCase()] = details;
     }
-    return map;
+
+    return { issueCosts: costs, issueCostDetails: detailsByIssue };
   }, [costData]);
 
   // Build title map from issues (memoized to avoid new object identity per render)

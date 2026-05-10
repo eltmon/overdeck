@@ -60,6 +60,19 @@ const STAGE_CONFIG: Record<PipelineStage, { label: string; color: string }> = {
 };
 
 const MERGING_STATUSES = new Set(['queued', 'merging', 'verifying']);
+const REVIEW_STUCK_STATUSES = new Set(['failed', 'blocked']);
+const TEST_STUCK_STATUSES = new Set(['failed', 'dispatch_failed']);
+const MERGE_STUCK_STATUSES = new Set(['failed']);
+const VERIFICATION_STUCK_STATUSES = new Set(['failed']);
+const ACTIVE_AGENT_STATUSES = new Set(['active', 'running', 'starting']);
+
+function hasActiveWorkSession(feature: ProjectFeature): boolean {
+  return feature.sessions?.some(session => session.type === 'work' && session.presence === 'active') ?? false;
+}
+
+function hasActiveAgentSignal(feature: ProjectFeature): boolean {
+  return hasActiveWorkSession(feature) || ACTIVE_AGENT_STATUSES.has(feature.agentStatus ?? '');
+}
 
 export function bucketFeature(
   feature: ProjectFeature,
@@ -68,10 +81,10 @@ export function bucketFeature(
   if (reviewStatus?.stuck) return 'stuck';
 
   if (
-    reviewStatus?.reviewStatus === 'failed' ||
-    reviewStatus?.testStatus === 'failed' ||
-    reviewStatus?.mergeStatus === 'failed' ||
-    reviewStatus?.verificationStatus === 'failed'
+    REVIEW_STUCK_STATUSES.has(reviewStatus?.reviewStatus ?? '') ||
+    TEST_STUCK_STATUSES.has(reviewStatus?.testStatus ?? '') ||
+    MERGE_STUCK_STATUSES.has(reviewStatus?.mergeStatus ?? '') ||
+    VERIFICATION_STUCK_STATUSES.has(reviewStatus?.verificationStatus ?? '')
   ) {
     return 'stuck';
   }
@@ -94,7 +107,7 @@ export function bucketFeature(
   if (reviewStatus?.testStatus === 'testing') return 'tests';
   if (reviewStatus?.reviewStatus === 'reviewing') return 'review';
   if (reviewStatus?.verificationStatus === 'running') return 'buildGate';
-  if (feature.agentStatus !== null && !reviewStatus) return 'working';
+  if (hasActiveAgentSignal(feature) && !reviewStatus) return 'working';
 
   if (feature.hasPlanning && !feature.sessions?.some(session => session.type === 'work')) {
     return 'planning';
@@ -118,7 +131,7 @@ export function ProjectOverview({
   );
 
   const activeAgentCount = useMemo(
-    () => features.filter(feature => feature.agentStatus !== null).length,
+    () => features.filter(hasActiveAgentSignal).length,
     [features],
   );
 
@@ -447,10 +460,10 @@ function CostBadge({ cost, details }: { cost: number; details?: IssueCostBreakdo
   return (
     <span
       tabIndex={hasDetails ? 0 : undefined}
-      onMouseEnter={() => setPopoverOpen(true)}
-      onMouseLeave={() => setPopoverOpen(false)}
-      onFocus={() => setPopoverOpen(true)}
-      onBlur={() => setPopoverOpen(false)}
+      onMouseEnter={() => hasDetails && setPopoverOpen(true)}
+      onMouseLeave={() => hasDetails && setPopoverOpen(false)}
+      onFocus={() => hasDetails && setPopoverOpen(true)}
+      onBlur={() => hasDetails && setPopoverOpen(false)}
       style={{
         position: 'relative',
         borderRadius: '999px',
@@ -548,8 +561,8 @@ function CostBreakdownSection({
   );
 }
 
-function sortedCostRows(rows: Record<string, { cost: number; tokens: number }>) {
-  return Object.entries(rows).sort(([, a], [, b]) => b.cost - a.cost);
+function sortedCostRows(rows: Record<string, { cost: number; tokens: number }> | undefined) {
+  return Object.entries(rows ?? {}).sort(([, a], [, b]) => b.cost - a.cost);
 }
 
 function formatCost(cost: number): string {
@@ -624,7 +637,9 @@ function StatusPill({ children }: { children: ReactNode }) {
 function stuckReason(reviewStatus: ReviewStatusSnapshot | undefined): string {
   if (reviewStatus?.stuckReason) return reviewStatus.stuckReason;
   if (reviewStatus?.blockerReasons?.[0]) return reviewStatus.blockerReasons[0].summary;
+  if (reviewStatus?.reviewStatus === 'blocked') return 'Review blocked';
   if (reviewStatus?.reviewStatus === 'failed') return 'Review failed';
+  if (reviewStatus?.testStatus === 'dispatch_failed') return 'Test dispatch failed';
   if (reviewStatus?.testStatus === 'failed') return 'Tests failed';
   if (reviewStatus?.mergeStatus === 'failed') return 'Merge failed';
   if (reviewStatus?.verificationStatus === 'failed') return 'Verification failed';
