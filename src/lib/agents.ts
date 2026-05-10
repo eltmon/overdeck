@@ -600,7 +600,7 @@ export async function saveAgentStateAsync(state: AgentState): Promise<void> {
   const dir = getAgentDir(state.id);
   await mkdirAsync(dir, { recursive: true });
 
-  const oldState = getAgentState(state.id);
+  const oldState = await getAgentStateAsync(state.id);
   const oldStatus = oldState?.status;
 
   if (state.status === 'running' || state.status === 'starting') {

@@ -25,7 +25,7 @@ import { getDatabase, closeDatabase } from '../database/index.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgents, getAgentState, getAgentRuntimeState, saveAgentRuntimeState } from '../agents.js';
+import { listRunningAgents, getAgentState, getAgentStateAsync, getAgentRuntimeState, saveAgentRuntimeState } from '../agents.js';
 import type { Role } from '../agents.js';
 import { resolveProjectFromIssue } from '../projects.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
@@ -218,9 +218,9 @@ Required steps:
  * the reactive scheduler dispatches review/test wrappers with the same
  * workspace contract those wrappers receive on the manual code path.
  */
-function resolveWorkspaceForIssue(issueId: string): string | null {
+async function resolveWorkspaceForIssue(issueId: string): Promise<string | null> {
   const issueLower = issueId.toLowerCase();
-  const agentState = getAgentState(`agent-${issueLower}`);
+  const agentState = await getAgentStateAsync(`agent-${issueLower}`);
   if (agentState?.workspace) return agentState.workspace;
   const resolved = resolveProjectFromIssue(issueId);
   if (!resolved) return null;
@@ -254,7 +254,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
 
   try {
     if (role === 'review') {
-      const workspace = resolveWorkspaceForIssue(normalizedIssueId);
+      const workspace = await resolveWorkspaceForIssue(normalizedIssueId);
       if (!workspace) {
         const failure = `${normalizedIssueId}: cannot dispatch review role — no workspace or project resolved`;
         console.error(`[cloister] ${failure}`);
@@ -271,7 +271,7 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
     }
 
     if (role === 'test') {
-      const workspace = resolveWorkspaceForIssue(normalizedIssueId) ?? undefined;
+      const workspace = (await resolveWorkspaceForIssue(normalizedIssueId)) ?? undefined;
       const branch = `feature/${normalizedIssueId.toLowerCase()}`;
       const { dispatchTestAgentAndNotify } = await import('./test-agent-queue.js');
       await dispatchTestAgentAndNotify(normalizedIssueId, workspace, branch);
