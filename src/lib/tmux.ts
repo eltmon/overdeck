@@ -455,34 +455,48 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     await writeFile(tmpFile, keys, 'utf-8');
     await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
     await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
-    await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
 
     // Verify paste arrived: poll capture-pane until the last non-empty line of
     // the pasted text is visible. Using the last line instead of the first
     // because large messages scroll the first line out of the capture window.
+    //
+    // Cold-start panes (Claude TUI booting, MCP servers loading, hooks firing)
+    // commonly take 4-8s to render the first frame, so the previous 3s budget
+    // false-negatived constantly. Bumped to 8s and added one paste-buffer retry
+    // before falling back to "send Enter anyway" — without retry, a missed
+    // paste sent Enter against an empty input box, the agent received nothing,
+    // and the orchestrator counted that as delivered (silent message loss).
     const lines = keys.split('\n');
     const verifyLine = ([...lines].reverse().find(l => l.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
-    const VERIFY_TIMEOUT_MS = 3_000;
+    const VERIFY_TIMEOUT_MS = 8_000;
     const VERIFY_INTERVAL_MS = 50;
-    const deadline = Date.now() + VERIFY_TIMEOUT_MS;
+    const PASTE_MAX_ATTEMPTS = 2;
     let pasteVerified = false;
 
     if (verifyLine.length >= 3) {
-      const verifyStart = Date.now();
-      while (Date.now() < deadline) {
-        const pane = await capturePaneAsync(sessionName, 10);
-        if (pane.includes(verifyLine.slice(0, 40))) {
-          pasteVerified = true;
-          // Ensure a minimum paste-to-Enter delay so Claude Code's TUI finishes
-          // processing the bracketed paste before Enter arrives. (PAN-699 follow-up)
-          const elapsed = Date.now() - verifyStart;
-          const minDelay = 600;
-          if (elapsed < minDelay) {
-            await new Promise(r => setTimeout(r, minDelay - elapsed));
+      attemptLoop: for (let attempt = 1; attempt <= PASTE_MAX_ATTEMPTS; attempt++) {
+        const verifyStart = Date.now();
+        const deadline = verifyStart + VERIFY_TIMEOUT_MS;
+        while (Date.now() < deadline) {
+          const pane = await capturePaneAsync(sessionName, 10);
+          if (pane.includes(verifyLine.slice(0, 40))) {
+            pasteVerified = true;
+            // Ensure a minimum paste-to-Enter delay so Claude Code's TUI finishes
+            // processing the bracketed paste before Enter arrives. (PAN-699 follow-up)
+            const elapsed = Date.now() - verifyStart;
+            const minDelay = 600;
+            if (elapsed < minDelay) {
+              await new Promise(r => setTimeout(r, minDelay - elapsed));
+            }
+            break attemptLoop;
           }
-          break;
+          await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
         }
-        await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
+
+        if (attempt < PASTE_MAX_ATTEMPTS) {
+          console.warn(`[tmux] Paste not visible on ${sessionName} after ${VERIFY_TIMEOUT_MS}ms (attempt ${attempt}/${PASTE_MAX_ATTEMPTS}) — re-pasting buffer.`);
+          await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
+        }
       }
     } else {
       // Very short text — use the old delay-based approach
@@ -491,9 +505,11 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
       pasteVerified = true;
     }
 
+    await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
+
     if (!pasteVerified) {
       const snapshot = await capturePaneAsync(sessionName, 30);
-      console.warn(`[tmux] Paste verification failed for ${sessionName} — text not visible after ${VERIFY_TIMEOUT_MS}ms. Sending Enter anyway to avoid orphaned input. Snapshot:\n${snapshot.slice(0, 500)}`);
+      console.warn(`[tmux] Paste verification failed for ${sessionName} after ${PASTE_MAX_ATTEMPTS} attempts × ${VERIFY_TIMEOUT_MS}ms. Sending Enter anyway to avoid orphaned input. Snapshot:\n${snapshot.slice(0, 500)}`);
     }
 
     // Send Enter — even if verification failed, the buffer was pasted; leaving

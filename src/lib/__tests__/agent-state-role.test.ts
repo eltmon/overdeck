@@ -35,6 +35,7 @@ describe('AgentState role persistence', () => {
 
     const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'agent-pan-1048-review', 'review');
     expect(command).toContain('--agent roles/review.md');
+    expect(command).toContain('--model claude-opus-4-7');
     expect(command).toContain('--name agent-pan-1048-review');
     expect(command).not.toContain('pan-review-agent');
   });

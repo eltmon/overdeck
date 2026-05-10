@@ -125,10 +125,10 @@ export async function getAgentRuntimeBaseCommand(
   // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
   // PAN-982: When agentDefinition is provided, pass it directly to --agent.
-  // The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
-  // so we usually omit --permission-mode and (for Anthropic models) --model.
-  // Non-Anthropic providers still need --model to pin the routed model id, since the
-  // frontmatter `model:` only accepts Anthropic identifiers.
+  // The agent frontmatter declares permissionMode, tools, and per-agent hooks.
+  // Still pass --model when launching with an agent definition so explicit model
+  // routing (state.json model, switch-model, cloister settings) wins over any
+  // frontmatter default model.
   const agentFlag = agentDefinition ? ` --agent ${agentDefinition}` : '';
   // When the user has opted into full bypass (PAN_YOLO=true or claude.permissionMode=bypass
   // in config), --dangerously-skip-permissions is added on top of --agent. The agent
@@ -155,11 +155,13 @@ export async function getAgentRuntimeBaseCommand(
   }
 
   if (agentDefinition) {
-    // Anthropic direct: --agent fully replaces --model. Non-Anthropic
-    // direct providers still need --model because agent frontmatter model:
-    // only accepts Anthropic identifiers.
-    const modelFlag = provider.name === 'anthropic' ? '' : ` --model ${model}`;
-    return `claude${bypassWithAgent}${agentFlag}${modelFlag}${nameFlag}`;
+    // --model is always passed when state has a resolved model so explicit
+    // overrides (state.json model, switch-model, cloister routing) win over
+    // the agent frontmatter's default model. Without this, Anthropic-direct
+    // launches silently fall back to the frontmatter model and ignore the
+    // user's selection — observed when switching PAN-977 to Opus 4.7 left
+    // the launcher running Sonnet.
+    return `claude${bypassWithAgent}${agentFlag} --model ${model}${nameFlag}`;
   }
   return `claude ${permissionFlags} --model ${model}${nameFlag}`;
 }
@@ -191,8 +193,7 @@ export async function getRoleRuntimeBaseCommand(
     return `claude${bypassWithAgent}${agentFlag} --model ${resolvedModel}${nameFlag}`;
   }
 
-  const modelFlag = provider.name === 'anthropic' ? '' : ` --model ${model}`;
-  return `claude${bypassWithAgent}${agentFlag}${modelFlag}${nameFlag}`;
+  return `claude${bypassWithAgent}${agentFlag} --model ${model}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */

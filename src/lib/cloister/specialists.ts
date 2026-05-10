@@ -655,6 +655,34 @@ export function makeSpecialistRegistryKey(specialistType: string, issueId: strin
 }
 
 /**
+ * Remove every project-specialist registry entry whose compound key references
+ * the given issueId (case-insensitive match on the second segment). Returns
+ * the number of entries removed. Called from teardown so closed issues do not
+ * leave behind metadata that the deacon keeps inspecting and force-killing.
+ */
+export function pruneSpecialistRegistryEntriesForIssue(issueId: string): number {
+  const issueLower = issueId.toLowerCase();
+  const issueUpper = issueId.toUpperCase();
+  const registry = loadRegistry();
+  let removed = 0;
+  for (const projectKey of Object.keys(registry.projects ?? {})) {
+    const bucket = registry.projects![projectKey] ?? {};
+    for (const key of Object.keys(bucket)) {
+      const { issueId: keyIssue } = parseSpecialistRegistryKey(key);
+      if (!keyIssue) continue;
+      if (keyIssue === issueLower || keyIssue === issueUpper) {
+        delete bucket[key];
+        removed++;
+      }
+    }
+  }
+  if (removed > 0) {
+    saveRegistry(registry);
+  }
+  return removed;
+}
+
+/**
  * Parse a compound registry key back into its parts.
  */
 export function parseSpecialistRegistryKey(key: string): { specialistType: string; issueId?: string; role?: string } {

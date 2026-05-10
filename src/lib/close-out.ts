@@ -311,6 +311,27 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     steps.push({ name: 'Clean up workspace', status: 'skipped', message: `Warning: ${(err as Error).message}` });
   }
 
+  // Step 4: Prune checkpoint refs
+  // Primary: delete all refs/pan/turn/<agentId>/* for this issue's agents.
+  // Global: also sweep any checkpoint refs older than 30 days (safety net for
+  // abandoned workspaces whose postMergeLifecycle was never called or skipped).
+  try {
+    const { pruneCheckpointRefsForAgents, pruneStaleCheckpointRefs } = await import('./checkpoint/checkpoint-manager.js');
+    const issueLower = ctx.issueId.toLowerCase();
+    const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`];
+    await pruneCheckpointRefsForAgents(ctx.projectPath, agentIds);
+    const stalePruned = await pruneStaleCheckpointRefs(ctx.projectPath, 30);
+    steps.push({
+      name: 'Prune checkpoint refs',
+      status: 'passed',
+      message: stalePruned > 0
+        ? `Issue refs removed; ${stalePruned} stale ref(s) >30 days also pruned`
+        : 'Issue checkpoint refs removed',
+    });
+  } catch (err) {
+    steps.push({ name: 'Prune checkpoint refs', status: 'skipped', message: `Warning: ${(err as Error).message}` });
+  }
+
   // Step 5: Clean up agent state
   try {
     let cleaned = false;

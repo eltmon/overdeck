@@ -307,6 +307,75 @@ export async function deleteAllCheckpoints(cwd: string, agentId: string): Promis
 }
 
 /**
+ * Delete all checkpoint refs for a set of agent IDs.
+ * Used at workspace teardown (merge/close-out) to clean up refs for specific agents.
+ */
+export async function pruneCheckpointRefsForAgents(cwd: string, agentIds: string[]): Promise<number> {
+  let totalRefs = 0
+  for (const agentId of agentIds) {
+    try {
+      assertSafeAgentId(agentId)
+      const turns = await listCheckpoints(cwd, agentId)
+      if (turns.length === 0) continue
+      for (const turnId of turns) {
+        await deleteCheckpoint(cwd, agentId, turnId)
+      }
+      console.log(`[checkpoint] Pruned ${turns.length} ref(s) for agent ${agentId}`)
+      totalRefs += turns.length
+    } catch (err) {
+      console.warn(`[checkpoint] Could not prune refs for agent ${agentId}: ${err}`)
+    }
+  }
+  if (totalRefs === 0) {
+    console.log(`[checkpoint] No checkpoint refs found for agents: ${agentIds.join(', ')}`)
+  }
+  return totalRefs
+}
+
+/**
+ * Delete all checkpoint refs older than olderThanDays days across all agents.
+ * Safety net for abandoned workspaces whose postMergeLifecycle was never called.
+ */
+export async function pruneStaleCheckpointRefs(cwd: string, olderThanDays: number): Promise<number> {
+  try {
+    const { stdout } = await execFileAsync('git', [
+      'for-each-ref',
+      '--format=%(creatordate:unix) %(refname)',
+      `${CHECKPOINT_REF_PREFIX}/`,
+    ], { cwd, encoding: 'utf-8' })
+
+    const allRefs = stdout.split('\n').filter(Boolean)
+    const cutoff = Math.floor(Date.now() / 1000) - olderThanDays * 86400
+    const staleRefs = allRefs.flatMap(line => {
+      const spaceIdx = line.indexOf(' ')
+      if (spaceIdx === -1) return []
+      const ts = parseInt(line.slice(0, spaceIdx), 10)
+      const ref = line.slice(spaceIdx + 1).trim()
+      return ts < cutoff && ref ? [ref] : []
+    })
+
+    console.log(`[checkpoint] Global stale sweep: ${allRefs.length} total ref(s), ${staleRefs.length} older than ${olderThanDays} days`)
+
+    let pruned = 0
+    for (const ref of staleRefs) {
+      try {
+        await execFileAsync('git', ['update-ref', '-d', ref], { cwd, encoding: 'utf-8' })
+        pruned++
+      } catch (err) {
+        console.warn(`[checkpoint] Could not delete stale ref ${ref}: ${err}`)
+      }
+    }
+    if (pruned > 0) {
+      console.log(`[checkpoint] Pruned ${pruned} stale checkpoint ref(s) older than ${olderThanDays} days`)
+    }
+    return pruned
+  } catch (err) {
+    console.warn(`[checkpoint] Stale ref sweep failed: ${err}`)
+    return 0
+  }
+}
+
+/**
  * One-time migration: delete legacy unscoped checkpoint refs (refs/pan/turn/<turnId>)
  * that were created before per-agent namespacing was introduced.
  * Safe to run multiple times (no-op if already migrated).

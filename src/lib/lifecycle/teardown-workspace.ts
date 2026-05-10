@@ -20,7 +20,7 @@ import { AGENTS_DIR } from '../paths.js';
 import { killSessionAsync, sessionExists, listSessionNamesAsync } from '../tmux.js';
 import type { LifecycleContext, StepResult, TeardownOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
-import { findWorkspacePath } from './archive-planning.js';
+import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js';
 import { extractPrefix } from '../issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
@@ -34,7 +34,7 @@ async function killTmuxSessions(issueLower: string): Promise<StepResult> {
   const step = 'teardown:tmux-sessions';
   let killed = 0;
 
-  // Exact-match sessions (agent, test, merge, planning)
+  // Exact-match sessions (agent, test, merge, planning).
   const exactPatterns = [
     `agent-${issueLower}`,
     `test-${issueLower}`,
@@ -52,13 +52,29 @@ async function killTmuxSessions(issueLower: string): Promise<StepResult> {
     }
   }
 
-  // Review sessions use timestamped names: review-<issue>-<timestamp>-<role>
-  // Use regex to match and kill all review sessions for this issue.
+  // Pattern-match sessions for review coordinators, review specialists, and
+  // canonical specialists. Today's naming uses the UPPER issue ID (PAN-1024)
+  // not the lower form, and includes session families that the prior
+  // single-regex didn't cover. PAN-1024 close-out left
+  // `review-coordinator-PAN-1024-...` and
+  // `specialist-panopticon-cli-PAN-1024-test-agent` alive (2026-05-09).
+  //
+  // Patterns we now match (case-insensitive on the issue ID):
+  //   - review-coordinator-<ISSUE>-<timestamp>
+  //   - review-<ISSUE>-<timestamp>-<role>          (legacy)
+  //   - specialist-<projectKey>-<ISSUE>-<role>     (canonical PAN-830/915)
   try {
     const allSessions = await listSessionNamesAsync();
-    const reviewRegex = new RegExp(`^review-${issueLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+`);
-    const reviewSessions = allSessions.filter(s => reviewRegex.test(s));
-    for (const session of reviewSessions) {
+    const escapedLower = issueLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedUpper = issueLower.toUpperCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const issuePart = `(${escapedLower}|${escapedUpper})`;
+    const patterns: RegExp[] = [
+      new RegExp(`^review-coordinator-${issuePart}-\\d+`),
+      new RegExp(`^review-${issuePart}-\\d+`),
+      new RegExp(`^specialist-[^-]+(?:-[^-]+)*?-${issuePart}-`),
+    ];
+    const matchedSessions = allSessions.filter(s => patterns.some(p => p.test(s)));
+    for (const session of matchedSessions) {
       try {
         await killSessionAsync(session);
         killed++;
@@ -541,9 +557,15 @@ export async function teardownWorkspace(
       }
     }
 
-    // 9. Remove worktree + workspace directory (only if deleting workspace)
+    // 9. Remove worktree + workspace directory (only if deleting workspace).
+    // Sweep ALL matching paths — canonical (feature-pan-XXXX) and legacy
+    // (feature-XXXX) can both exist when a workspace was created without the
+    // pan- prefix; if we only clean the canonical one, the orphan persists.
     if (shouldDeleteWorkspace) {
-      results.push(await removeWorktree(ctx.projectPath, workspacePath));
+      const allPaths = findAllWorkspacePaths(ctx.projectPath, issueLower);
+      for (const p of allPaths) {
+        results.push(await removeWorktree(ctx.projectPath, p));
+      }
     }
   } else {
     results.push(stepSkipped('teardown:workspace', ['No workspace found to clean up']));
@@ -557,5 +579,47 @@ export async function teardownWorkspace(
     results.push(await deleteBranches(ctx.projectPath, issueLower));
   }
 
+  // 12. Prune checkpoint refs for this issue's agents.
+  // Without this, refs/pan/turn/agent-pan-XXXX/* refs accumulate forever
+  // even after the issue closes. The forked diff-refactor work added
+  // pruneCheckpointRefsForAgents but it was wired only into the legacy
+  // src/lib/close-out.ts module, not into the lifecycle/workflows.ts path
+  // that pan close, deep-wipe, and reset actually invoke. Centralize here
+  // so every cleanup flow that tears down a workspace also prunes refs.
+  results.push(await pruneCheckpointRefs(ctx.projectPath, issueLower));
+
+  // 13. Prune specialist registry entries for this issue.
+  // ~/.panopticon/specialists/registry.json carries per-issue compound keys
+  // (e.g. test-agent:PAN-951, merge-agent:PAN-457). When the issue closes,
+  // those entries become tombstones — deacon's patrol still iterates them,
+  // logs "stuck specialist, force-killing <session>" for sessions that no
+  // longer exist, and burns CPU each cycle. Drop them on teardown.
+  results.push(await pruneSpecialistRegistry(ctx.issueId));
+
   return results;
+}
+
+async function pruneSpecialistRegistry(issueId: string): Promise<StepResult> {
+  const step = 'teardown:specialist-registry';
+  try {
+    const { pruneSpecialistRegistryEntriesForIssue } = await import('../cloister/specialists.js');
+    const removed = pruneSpecialistRegistryEntriesForIssue(issueId);
+    return removed > 0
+      ? stepOk(step, [`Pruned ${removed} specialist registry entr${removed === 1 ? 'y' : 'ies'} for ${issueId}`])
+      : stepSkipped(step, [`No specialist registry entries for ${issueId}`]);
+  } catch (err) {
+    return stepSkipped(step, [`Specialist registry prune failed (non-fatal): ${(err as Error).message}`]);
+  }
+}
+
+async function pruneCheckpointRefs(projectPath: string, issueLower: string): Promise<StepResult> {
+  const step = 'teardown:checkpoint-refs';
+  try {
+    const { pruneCheckpointRefsForAgents } = await import('../checkpoint/checkpoint-manager.js');
+    const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`];
+    await pruneCheckpointRefsForAgents(projectPath, agentIds);
+    return stepOk(step, [`Pruned checkpoint refs for ${agentIds.join(', ')}`]);
+  } catch (err) {
+    return stepSkipped(step, [`Checkpoint prune failed (non-fatal): ${(err as Error).message}`]);
+  }
 }
