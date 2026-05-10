@@ -61,12 +61,9 @@ The review role is the synthesis agent. There is no separate synthesis sub-agent
 
 ## Model Routing Contract
 
-The review role does not choose sub-reviewer models directly. The `subagent_type` is the contract:
+The convoy reviewers currently run as Claude Code Agent-tool subagents. The `subagent_type` determines which definition is loaded from `.claude/agents/code-review-<flavor>.md`; those definitions carry a static frontmatter model that is used as-is.
 
-- `code-review-security` resolves through `resolveModel('review', 'security')`
-- `code-review-correctness` resolves through `resolveModel('review', 'correctness')`
-- `code-review-performance` resolves through `resolveModel('review', 'performance')`
-- `code-review-requirements` resolves through `resolveModel('review', 'requirements')`
+Full sub-role model routing (where `roles.review.sub.security.model` in config.yaml resolves through the Panopticon launcher to give each reviewer its own harness and model) is implemented in PAN-1059. In that design the review role calls `spawnRun(issueId, 'review', { subRole: 'security' })` for each reviewer, which goes through `resolveModel('review', 'security')` → launcher-generator → its own tmux session — the same path work agents use. Until PAN-1059 lands, sub-role model config is stored but not applied to the Agent-tool subagents.
 
 ## Human-Merge Invariant
 

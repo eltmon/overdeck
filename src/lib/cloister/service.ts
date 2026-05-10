@@ -142,7 +142,7 @@ export interface CloisterDomainEventLike {
 }
 
 const ROLE_RUN_STATES: Record<ReactiveIssueState, Role | null> = {
-  todo: 'plan',
+  todo: null,
   open: null,
   in_planning: 'plan',
   in_progress: 'work',
