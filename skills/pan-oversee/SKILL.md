@@ -81,7 +81,7 @@ AGENT_STATE=$(cat ~/.panopticon/agents/agent-$ISSUE_LOWER/state.json 2>/dev/null
 echo "Agent state: ${AGENT_STATE:-NONE}"
 
 # 4. Tmux session?
-TMUX_SESSION=$(tmux list-sessions 2>/dev/null | grep -i "$ISSUE_LOWER" | head -1)
+TMUX_SESSION=$(tmux -L panopticon list-sessions 2>/dev/null | grep -i "$ISSUE_LOWER" | head -1)
 echo "Tmux: ${TMUX_SESSION:-NONE}"
 
 # 5. Completion marker?
@@ -188,7 +188,7 @@ Poll the agent's activity every 30-60 seconds. Watch for:
 **Monitoring commands:**
 ```bash
 # Watch live output (non-blocking)
-tmux capture-pane -t agent-pan-{ID} -p -S -30
+tmux -L panopticon capture-pane -t agent-pan-{ID} -p -S -30
 
 # Check heartbeat freshness
 cat ~/.panopticon/heartbeats/agent-pan-{ID}.json 2>/dev/null | jq '{timestamp, tool_name, current_task}'
@@ -239,7 +239,7 @@ Once review is triggered, the review-agent specialist should wake up:
 curl -s http://localhost:3011/api/specialists | jq '.[] | select(.name == "review-agent")'
 
 # Watch review agent output
-tmux capture-pane -t specialist-review-agent -p -S -50 2>/dev/null
+tmux -L panopticon capture-pane -t specialist-review-agent -p -S -50 2>/dev/null
 
 # Check review status progression
 curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '{reviewStatus, reviewNotes}'
@@ -271,7 +271,7 @@ If review returned feedback, the work agent should receive it and fix issues:
 
 ```bash
 # Check if work agent received feedback
-tmux capture-pane -t agent-pan-{ID} -p -S -50 2>/dev/null | tail -20
+tmux -L panopticon capture-pane -t agent-pan-{ID} -p -S -50 2>/dev/null | tail -20
 
 # Check auto-requeue count (circuit breaker: max 3)
 curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '.autoRequeueCount'
@@ -296,7 +296,7 @@ After review passes, test-agent should run:
 curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq '{testStatus, testNotes}'
 
 # Watch test agent
-tmux capture-pane -t specialist-test-agent -p -S -50 2>/dev/null
+tmux -L panopticon capture-pane -t specialist-test-agent -p -S -50 2>/dev/null
 ```
 
 **Expected:** `testStatus: "passed"` → ready for merge

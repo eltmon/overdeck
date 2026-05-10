@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { getDispatchableItems, blockingParentCount, hasFileOverlap, createActiveSlice, applyTaskOperation, applyTaskOperationToPlanFile, runTaskCommand, getPipelineMirror, setPipelineMirror, getTaskGraphView, activeSlicePromptSize, verifyActiveSlicePromptReduction, buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFile } from '../dag.js';
+import { getDispatchableItems, blockingParentCount, hasFileOverlap, createActiveSlice, applyTaskOperation, applyTaskOperationToPlanFile, runTaskCommand, getPipelineMirror, setPipelineMirror, getTaskGraphView, activeSlicePromptSize, verifyActiveSlicePromptReduction, buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFile, deriveSynthesisMetadata } from '../dag.js';
 import type { VBriefDocument, VBriefItem } from '../types.js';
 
 function makeDoc(
@@ -281,11 +281,42 @@ describe('active slices and task operations', () => {
     }, '2026-01-01T00:00:00Z');
     setPipelineMirror(doc, mirror as any);
     const stored = getPipelineMirror(doc) as any;
-    expect(stored.phase).toBe('test');
+    expect(stored.phase).toBe('review');
     expect(stored.review.approval).toBe('changes_requested');
     expect(stored.review.agentId).toBe('review-agent');
     expect(stored.merge.prUrl).toBe('https://github.com/example/repo/pull/1');
     expect(stored.review.history[0].status).toBe('CHANGES_REQUESTED');
+  });
+
+  it('maps production review statuses and ignores pending phases', () => {
+    const passed = buildPipelineMirrorFromStatus('PAN-977', {
+      reviewStatus: 'passed',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+    }, '2026-01-01T00:00:00Z');
+    expect(passed.phase).toBe('review');
+    expect(passed.review.approval).toBe('approved');
+
+    const failed = buildPipelineMirrorFromStatus('PAN-977', { reviewStatus: 'failed' }, '2026-01-01T00:00:00Z');
+    expect(failed.review.approval).toBe('changes_requested');
+
+    const defaults = buildPipelineMirrorFromStatus('PAN-977', {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      uatStatus: 'pending',
+      mergeStatus: 'pending',
+    }, '2026-01-01T00:00:00Z');
+    expect(defaults.phase).toBe('work');
+  });
+
+  it('derives requiresSynthesis metadata from DAG fan-in', () => {
+    const doc = makeDoc(
+      [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      [{ from: 'a', to: 'c' }, { from: 'b', to: 'c' }],
+    );
+    const annotated = deriveSynthesisMetadata(doc);
+    expect(annotated.plan.items.find(i => i.id === 'c')?.metadata?.requiresSynthesis).toBe(true);
+    expect(doc.plan.items.find(i => i.id === 'c')?.metadata?.requiresSynthesis).toBeUndefined();
   });
 
   it('exposes a vBRIEF-first task graph view instead of consulting Beads', () => {

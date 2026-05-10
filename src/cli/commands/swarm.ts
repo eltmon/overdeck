@@ -18,7 +18,7 @@ import { existsSync } from 'fs';
 import { getDashboardApiUrl } from '../../lib/config.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
 import { readWorkspacePlan } from '../../lib/vbrief/io.js';
-import { groupItemsByWave, runTaskCommand, createActiveSlice, verifyActiveSlicePromptReduction, isTaskCommand, type TaskCommand, type Wave } from '../../lib/vbrief/dag.js';
+import { groupItemsByWave, getDispatchableItems, runTaskCommand, createActiveSlice, verifyActiveSlicePromptReduction, isTaskCommand, type TaskCommand, type Wave } from '../../lib/vbrief/dag.js';
 
 const DASHBOARD_URL = getDashboardApiUrl();
 
@@ -152,13 +152,18 @@ async function dryRun(issueId: string): Promise<void> {
     process.exit(1);
   }
 
-  const waves = groupItemsByWave(doc);
-  if (waves.length === 0) {
-    console.log(chalk.yellow(`No actionable items in the plan for ${issueId}`));
+  const ready = getDispatchableItems(doc, new Set());
+  if (ready.length === 0) {
+    console.log(chalk.yellow(`No dispatchable items in the plan for ${issueId}`));
     return;
   }
 
-  printWavePlan(waves, issueId);
+  console.log(chalk.bold(`\nDispatchable items for ${issueId} (${ready.length})\n`));
+  for (const item of ready) {
+    console.log(`  ${chalk.white(item.id)} ${item.title} ${difficultyColor(item.metadata?.difficulty)}`);
+  }
+  console.log(chalk.dim('\nDependency waves (visualization only):'));
+  printWavePlan(groupItemsByWave(doc), issueId);
 }
 
 async function taskOperation(

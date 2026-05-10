@@ -158,8 +158,9 @@ export function criticalPath(doc: VBriefDocument): string[] {
 
   const topoOrder: string[] = [];
   const q = [...queue];
-  while (q.length > 0) {
-    const u = q.shift()!;
+  let qHead = 0;
+  while (qHead < q.length) {
+    const u = q[qHead++]!;
     topoOrder.push(u);
     for (const v of outgoing.get(u) ?? []) {
       const newDist = dist.get(u)! + 1;
@@ -249,6 +250,21 @@ export function blockingParentCount(doc: VBriefDocument, itemId: string): number
     const parent = itemById.get(e.from);
     return parent && !completedStatuses.has(parent.status);
   }).length;
+}
+
+export function blockingParentTotal(doc: VBriefDocument, itemId: string): number {
+  const itemIds = new Set(doc.plan.items.map(i => i.id));
+  return doc.plan.edges.filter(e => e.type === 'blocks' && e.to === itemId && itemIds.has(e.from)).length;
+}
+
+export function deriveSynthesisMetadata(doc: VBriefDocument): VBriefDocument {
+  const next = cloneDoc(doc);
+  for (const item of next.plan.items) {
+    if (blockingParentTotal(next, item.id) > 1) {
+      item.metadata = { ...(item.metadata ?? {}), requiresSynthesis: true };
+    }
+  }
+  return next;
 }
 
 /**
@@ -849,18 +865,27 @@ function stageFromStatus(status: Record<string, unknown>, key: string, now: stri
   };
 }
 
+function activePipelineStatus(value: unknown): boolean {
+  return typeof value === 'string' && value.length > 0 && value !== 'pending';
+}
+
 function inferPipelinePhase(status: Record<string, unknown>): PlanPipelinePhase {
   if (status.mergeCommit || status.mergedAt || status.mergeStatus === 'merged') return 'done';
-  if (status.mergeStatus || status.readyForMerge) return 'merge';
-  if (status.uatStatus) return 'uat';
-  if (status.testStatus) return 'test';
-  if (status.reviewStatus) return 'review';
+  if (activePipelineStatus(status.mergeStatus) || status.readyForMerge === true) return 'merge';
+  if (activePipelineStatus(status.uatStatus)) return 'uat';
+  if (activePipelineStatus(status.testStatus)) return 'test';
+  if (activePipelineStatus(status.reviewStatus)) return 'review';
   return 'work';
 }
 
 function reviewApproval(reviewStatus: unknown): PlanPipelineReviewMirror['approval'] {
-  if (reviewStatus === 'approved' || reviewStatus === 'APPROVED') return 'approved';
-  if (reviewStatus === 'changes_requested' || reviewStatus === 'CHANGES_REQUESTED') return 'changes_requested';
+  if (reviewStatus === 'approved' || reviewStatus === 'APPROVED' || reviewStatus === 'passed') return 'approved';
+  if (
+    reviewStatus === 'changes_requested' ||
+    reviewStatus === 'CHANGES_REQUESTED' ||
+    reviewStatus === 'failed' ||
+    reviewStatus === 'blocked'
+  ) return 'changes_requested';
   return reviewStatus ? 'pending' : undefined;
 }
 

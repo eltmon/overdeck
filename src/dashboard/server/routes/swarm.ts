@@ -22,7 +22,8 @@ import { getSystemHealthSnapshot, getResourceConfig } from '../services/system-h
 import { evaluateSpawnGuardrails } from './agents.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { findPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
-import { groupItemsByWave, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
+import { readContinueStateAsync, writeContinueStateAsync, type ContinueState, type SwarmRuntime } from '../../../lib/vbrief/continue-state.js';
+import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, workspacePlanPath, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
 import type { VBriefDocument, VBriefItem } from '../../../lib/vbrief/types.js';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { listSessionNamesAsync, isPaneDeadAsync, killSessionAsync, listPaneValuesAsync } from '../../../lib/tmux.js';
@@ -37,7 +38,7 @@ interface SlotAssignment {
   itemTitle: string;
   sessionName: string;
   workspace: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'merged' | 'failed';
   startedAt?: string;
   completedAt?: string;
   failureReason?: string;
@@ -105,6 +106,105 @@ function getSwarmDir(): string {
 
 function getSwarmStatePath(issueId: string): string {
   return join(getSwarmDir(), `${issueId.toLowerCase()}.json`);
+}
+
+function continueDirForWorkspace(workspacePath: string): string {
+  return join(workspacePath, '.pan');
+}
+
+function emptyContinueState(issueId: string, now: string): ContinueState {
+  return {
+    version: '1',
+    issueId: issueId.toUpperCase(),
+    created: now,
+    updated: now,
+    gitState: { branch: `feature/${issueId.toLowerCase()}`, dirty: false },
+    decisions: [],
+    hazards: [],
+    resumePoint: null,
+    beadsMapping: {},
+    sessionHistory: [],
+  };
+}
+
+async function loadWorkspaceContinue(workspacePath: string, issueId: string): Promise<ContinueState> {
+  const now = new Date().toISOString();
+  return await readContinueStateAsync(continueDirForWorkspace(workspacePath), issueId) ?? emptyContinueState(issueId, now);
+}
+
+async function saveRuntimeToContinue(workspacePath: string, issueId: string, runtime: SwarmRuntime): Promise<void> {
+  const continueDir = continueDirForWorkspace(workspacePath);
+  await mkdir(continueDir, { recursive: true });
+  const cont = await loadWorkspaceContinue(workspacePath, issueId);
+  await writeContinueStateAsync(continueDir, issueId, { ...cont, swarmRuntime: runtime });
+}
+
+function runtimeFromState(state: SwarmState, existing?: SwarmRuntime): SwarmRuntime {
+  const now = new Date().toISOString();
+  return {
+    model: state.model,
+    slots: state.slots.map(slot => ({
+      slotId: slot.slot,
+      itemId: slot.itemId,
+      itemTitle: slot.itemTitle,
+      sessionName: slot.sessionName,
+      workspace: slot.workspace,
+      status: slot.status === 'completed' ? 'merged' : slot.status === 'merged' ? 'merged' : slot.status === 'failed' ? 'failed' : 'running',
+      dispatchedAt: slot.startedAt,
+      mergedAt: slot.completedAt,
+    })),
+    synthesisOutputs: existing?.synthesisOutputs ?? {},
+    createdAt: existing?.createdAt ?? state.createdAt ?? now,
+    updatedAt: now,
+  };
+}
+
+async function persistSwarmRuntime(workspacePath: string, state: SwarmState): Promise<void> {
+  const existing = (await loadWorkspaceContinue(workspacePath, state.issueId)).swarmRuntime;
+  await saveRuntimeToContinue(workspacePath, state.issueId, runtimeFromState(state, existing));
+}
+
+async function persistSynthesisOutput(
+  workspacePath: string,
+  issueId: string,
+  doc: VBriefDocument,
+  item: VBriefItem,
+): Promise<void> {
+  const cont = await loadWorkspaceContinue(workspacePath, issueId);
+  const now = new Date().toISOString();
+  const existingRuntime = cont.swarmRuntime ?? {
+    model: DEFAULT_SWARM_MODEL,
+    slots: [],
+    synthesisOutputs: {},
+    createdAt: now,
+    updatedAt: now,
+  };
+  if (existingRuntime.synthesisOutputs[item.id]) return;
+  const parentIds = doc.plan.edges.filter(edge => edge.type === 'blocks' && edge.to === item.id).map(edge => edge.from);
+  const parents = parentIds
+    .map(parentId => doc.plan.items.find(planItem => planItem.id === parentId))
+    .filter((parent): parent is VBriefItem => Boolean(parent));
+  const contextUpdate = [
+    `Synthesis for convergence item ${item.id}: ${item.title}`,
+    '',
+    'Resolved upstream context:',
+    ...parents.map(parent => `- ${parent.id}: ${parent.title} [${parent.status}]${parent.narrative?.Action ? ` — ${parent.narrative.Action}` : ''}`),
+  ].join('\n');
+  await writeContinueStateAsync(continueDirForWorkspace(workspacePath), issueId, {
+    ...cont,
+    swarmRuntime: {
+      ...existingRuntime,
+      synthesisOutputs: {
+        ...existingRuntime.synthesisOutputs,
+        [item.id]: { targetItemId: item.id, writtenAt: now, contextUpdate },
+      },
+      updatedAt: now,
+    },
+    sessionHistory: [
+      ...cont.sessionHistory,
+      { timestamp: now, reason: 'manual', note: `swarm synthesis prepared for ${item.id}` },
+    ],
+  });
 }
 
 async function loadSwarmState(issueId: string): Promise<SwarmState | null> {
@@ -298,35 +398,52 @@ async function dispatchSwarmWave(
     };
   }
 
-  const waves = groupItemsByWave(doc);
-  if (waves.length === 0) {
-    return {
-      status: 422,
-      body: {
-        error: `No actionable items in the plan for ${issueUpper}`,
-        hint: 'All items may already be completed or cancelled.',
-      },
-    };
-  }
-
-  const waveIndex = requestedWave ?? 0;
-  const targetWave = waves.find(w => w.index === waveIndex);
-  if (!targetWave) {
-    return {
-      status: 422,
-      body: {
-        error: `Wave ${waveIndex} not found. Available: ${waves.map(w => w.index).join(', ')}`,
-      },
-    };
-  }
-
+  const annotatedDoc = deriveSynthesisMetadata(doc);
+  const waves = groupItemsByWave(annotatedDoc);
   const existingState = await loadSwarmState(issueUpper);
-  const itemById = new Map(doc.plan.items.map((planItem) => [planItem.id, planItem]));
-  const pendingItems = existingState?.currentWave === waveIndex && existingState.deferred?.length
+  const continueState = await loadWorkspaceContinue(mainWorkspace, issueUpper);
+  const mergedItemIds = new Set<string>([
+    ...(continueState.swarmRuntime?.slots ?? [])
+      .filter(slot => slot.status === 'merged')
+      .map(slot => slot.itemId),
+    ...(existingState?.slots ?? [])
+      .filter(slot => slot.status === 'completed' || slot.status === 'merged')
+      .map(slot => slot.itemId),
+  ]);
+  const runningItems = (continueState.swarmRuntime?.slots ?? [])
+    .filter(slot => slot.status === 'running')
+    .map(slot => annotatedDoc.plan.items.find(item => item.id === slot.itemId))
+    .filter((item): item is VBriefItem => Boolean(item));
+  const deferredReadyItems = existingState?.deferred?.length
     ? existingState.deferred
-      .map((deferredItem) => targetWave.items.find((item) => item.id === deferredItem.itemId))
-      .filter((item): item is WaveItem => item !== undefined)
-    : targetWave.items;
+      .map(deferred => annotatedDoc.plan.items.find(item => item.id === deferred.itemId))
+      .filter((item): item is VBriefItem => Boolean(item))
+    : null;
+  const readyItems = deferredReadyItems ?? getDispatchableItems(annotatedDoc, mergedItemIds).filter(item => !mergedItemIds.has(item.id));
+  const candidates = readyItems.filter(item => !hasFileOverlap(runningItems, item));
+  if (candidates.length === 0) {
+    return {
+      status: 422,
+      body: {
+        error: `No dispatchable items in the plan for ${issueUpper}`,
+        hint: readyItems.length > 0
+          ? 'Ready items are waiting for overlapping files_scope work to finish.'
+          : 'All items may already be running, completed, blocked, or waiting on dependencies.',
+        wavePlan: waves,
+      },
+    };
+  }
+
+  const waveIndex = requestedWave ?? existingState?.currentWave ?? 0;
+  const itemById = new Map(annotatedDoc.plan.items.map((planItem) => [planItem.id, planItem]));
+  const pendingItems: WaveItem[] = candidates.map(item => ({
+    id: item.id,
+    title: item.title,
+    difficulty: item.metadata?.difficulty,
+    blockedBy: annotatedDoc.plan.edges
+      .filter(edge => edge.type === 'blocks' && edge.to === item.id)
+      .map(edge => edge.from),
+  }));
 
   const health = await getSystemHealthSnapshot();
   const guardrails = evaluateSpawnGuardrails(health);
@@ -437,8 +554,13 @@ async function dispatchSwarmWave(
         }
       }
 
+      const fullItem = itemById.get(item.id);
+      if (fullItem && (fullItem.metadata?.requiresSynthesis || blockingParentCount(annotatedDoc, fullItem.id) > 1)) {
+        await persistSynthesisOutput(mainWorkspace, issueUpper, annotatedDoc, fullItem);
+      }
+
       const itemPrompt = buildSlotPrompt(
-        doc,
+        annotatedDoc,
         issueUpper,
         item,
         waveIndex,
@@ -513,6 +635,7 @@ async function dispatchSwarmWave(
     updatedAt: new Date().toISOString(),
   };
   await saveSwarmState(state);
+  await persistSwarmRuntime(mainWorkspace, state);
 
   if (state.autoAdvance) {
     ensureSwarmAutoAdvanceLoop();
@@ -543,6 +666,30 @@ async function dispatchSwarmWave(
   };
 }
 
+async function onSlotMergeComplete(issueId: string, itemId: string, slotId: number): Promise<void> {
+  const issueUpper = issueId.toUpperCase();
+  const project = resolveProjectFromIssue(issueUpper);
+  if (!project) return;
+  const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueUpper.toLowerCase()}`);
+  const now = new Date().toISOString();
+  const state = await loadSwarmState(issueUpper);
+  if (state) {
+    const slots = state.slots.map(slot => slot.slot === slotId || slot.itemId === itemId
+      ? { ...slot, status: 'merged' as const, completedAt: slot.completedAt ?? now }
+      : slot);
+    const nextState = { ...state, slots, updatedAt: now };
+    await saveSwarmState(nextState);
+    await persistSwarmRuntime(mainWorkspace, nextState);
+    if (nextState.autoAdvance) ensureSwarmAutoAdvanceLoop();
+  }
+  await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+    type: 'done',
+    itemId,
+    reason: `Swarm slot ${slotId} merged into feature branch`,
+    writerId: `swarm-merge-${process.pid}`,
+  }).catch(() => undefined);
+}
+
 async function pollSwarmAutoAdvance(): Promise<void> {
   const entries = await readdir(getSwarmDir()).catch(() => [] as string[]);
   if (entries.length === 0) return;
@@ -562,6 +709,10 @@ async function pollSwarmAutoAdvance(): Promise<void> {
     const { state, changed } = await refreshSwarmSlotStatuses(loadedState, sessions);
     if (changed) {
       await saveSwarmState(state);
+      const project = resolveProjectFromIssue(state.issueId);
+      if (project) {
+        await persistSwarmRuntime(join(project.projectPath, 'workspaces', `feature-${state.issueId.toLowerCase()}`), state);
+      }
     }
 
     if (state.slots.some((slot) => slot.status === 'failed')) {
@@ -867,7 +1018,13 @@ const getSwarmRoute = HttpRouter.add(
     const sessions = yield* Effect.promise(() => listSessionNamesAsync());
     const refreshed = yield* Effect.promise(() => refreshSwarmSlotStatuses(state, sessions));
     if (refreshed.changed) {
-      yield* Effect.promise(() => saveSwarmState(refreshed.state));
+      yield* Effect.promise(async () => {
+        await saveSwarmState(refreshed.state);
+        const project = resolveProjectFromIssue(issueId);
+        if (project) {
+          await persistSwarmRuntime(join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`), refreshed.state);
+        }
+      });
     }
 
     return jsonResponse(refreshed.state);
@@ -882,6 +1039,7 @@ export const __testInternals = {
   pollSwarmAutoAdvance,
   ensureSwarmAutoAdvanceLoop,
   resumeSwarmAutoAdvanceLoopOnStartup,
+  onSlotMergeComplete,
   buildStructuredSlotTaskInput,
   buildSlotPrompt,
 };
