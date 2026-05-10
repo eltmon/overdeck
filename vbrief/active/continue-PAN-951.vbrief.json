@@ -2,28 +2,13 @@
   "version": "1",
   "issueId": "PAN-951",
   "created": "2026-05-07T08:34:38.411Z",
-  "updated": "2026-05-07T09:24:13.897Z",
+  "updated": "2026-05-10T04:53:51.128Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
   "beadsMapping": {},
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "approved",
-      "timestamp": "2026-05-07T08:55:48Z",
-      "markdownBody": "# Verdict: APPROVED\n\n## Summary\nPR fixes typecheck error in `packages/contracts/src/editor.ts` by switching from `Schema.Literal(...EDITOR_IDS)` to `Schema.Literals(EDITOR_IDS)` with an explicit typed tuple. PAN-951 feature requirements (`pan resources` command, orphan detection, `--json` flag, skill file) were already implemented on `main` (commit `0374fa0ca`). This PR unblocks the verification gate. Separate typecheck errors in `src/cli/commands/open.ts` may need follow-up if they still block verification after merge.\n\n## Blockers (MUST fix before merge)\n\n_none_\n\n## High Priority (SHOULD fix; synthesis may still approve if justified)\n\n_none_\n\n## Nits (advisory — safe to defer)\n\n- `packages/contracts/src/editor.ts:18` — `?` — Hardcoded `EDITOR_IDS` can drift from `EDITORS`. Derive from `EDITORS.map((e) => e.id) as [EditorId, ...EditorId[]]` to preserve single source of truth. (correctness)\n\n## Cross-cutting groups\n\n_none_\n\n## What's good\n- Clean, minimal fix — one file, one schema construction change.\n- Security reviewer confirmed no new attack surface introduced.\n- Requirements reviewer verified typecheck passes and all PAN-951 deliverables are satisfied.\n\n## Review stats\n- Blockers: 0   High: 0   Medium: 0   Nits: 1\n- By reviewer: correctness=1, security=0, performance=0, requirements=0\n- Files touched: 1   Files with findings: 1\n\n## Appendix: individual reviews\n\nSee individual reviewer output files listed in `## Reviewer Output Files` in the Synthesis Context above. Those files contain full per-reviewer detail; this synthesis is the policy layer.\n\n## ✅ CODE APPROVED — YOUR WORK IS COMPLETE\n\n**Do NOT make any more changes.**\n**Do NOT run `pan done` again.**\n**Do NOT run `pan review request`.**\n\nThe specialist pipeline will now run tests. If tests pass, the issue enters the merge queue for human approval.\n"
-    },
-    {
-      "seq": 3,
-      "specialist": "review-agent",
-      "outcome": "commented",
-      "timestamp": "2026-05-07T09:24:13Z",
-      "markdownBody": "# Review: COMMENTED\n\n## Summary\n\nReview did not produce synthesis output\n"
-    }
-  ],
+  "feedback": [],
   "sessionHistory": [
     {
       "reason": "feedback",
@@ -49,6 +34,26 @@
       "reason": "feedback",
       "note": "[2026-05-07T09:24Z] review-agent → COMMENTED — seq 3",
       "timestamp": "2026-05-07T09:24:13.897Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T04:36Z] test-agent → FAILED — seq 3",
+      "timestamp": "2026-05-10T04:36:31.769Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-10T04:36:31.881Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-10T04:37:16.849Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T04:40Z] test-agent → FAILED — seq 4",
+      "timestamp": "2026-05-10T04:40:44.836Z"
     }
   ]
 }
