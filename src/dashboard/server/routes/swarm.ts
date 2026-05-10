@@ -1119,6 +1119,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
       }
     }
 
+    let dispatched = false;
     if (nextState.autoAdvance) {
       // PAN-977 blocker #3: do NOT pass `wave` here — auto-advance must dispatch
       // any newly-ready items per-DAG-readiness, not the next wave by index.
@@ -1127,12 +1128,27 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
       // applied above.
       const result = await dispatchSwarmWave({ issueId: issueUpper, model: nextState.model, autoAdvance: true });
       if (result.status >= 400) ensureSwarmAutoAdvanceLoop();
+      else dispatched = true;
     }
 
-    // If everything is now in a terminal state, stop polling for this swarm.
-    const stillActive = slots.some(slot => slot.status === 'running' || slot.status === 'pending');
-    if (!stillActive && (!nextState.deferred || nextState.deferred.length === 0)) {
-      activeSwarmIssueIds.delete(issueUpper);
+    // PAN-977 round-12 blocker #1: registry-cleanup MUST consult post-dispatch
+    // state. The pre-dispatch `slots` snapshot only contains records up to and
+    // including the just-merged slot — if dispatchSwarmWave just spawned slot B
+    // for a freshly-ready DAG item, deleting the issue from
+    // activeSwarmIssueIds here would strand slot B without an auto-advance
+    // poller. Reload the canonical runtime and decide cleanup from the
+    // observed running/pending/deferred set instead.
+    if (dispatched) {
+      // A fresh slot was dispatched; the swarm is by definition still active.
+      // Make sure the poll loop is running and skip the cleanup branch entirely.
+      ensureSwarmAutoAdvanceLoop();
+    } else {
+      const latest = await loadSwarmState(issueUpper).catch(() => null);
+      const obs = latest ?? nextState;
+      const stillActive = obs.slots.some(slot => slot.status === 'running' || slot.status === 'pending');
+      if (!stillActive && (!obs.deferred || obs.deferred.length === 0)) {
+        activeSwarmIssueIds.delete(issueUpper);
+      }
     }
   }
   return { ok: true };
@@ -1229,11 +1245,23 @@ async function pollSwarmAutoAdvance(): Promise<void> {
       activeSwarmIssueIds.delete(issueId);
       continue;
     }
-    if (loadedState.currentWave >= loadedState.totalWaves - 1 && !loadedState.deferred?.length) continue;
     if (autoAdvanceInFlight.has(loadedState.issueId)) continue;
     if (isAutoAdvanceCoolingDown(loadedState)) continue;
 
     const { state, changed } = await refreshSwarmSlotStatuses(loadedState, sessions);
+    // PAN-977 round-12 high-1: final-wave cleanup must consult observed
+    // post-refresh state, not the pre-refresh wave index. If the swarm is on
+    // the final wave AND no slots are still running/pending AND no deferred
+    // work remains, drop it from the active registry so the poll loop can
+    // converge to empty. Doing this *after* refreshSwarmSlotStatuses ensures
+    // freshly-terminated slots are observed before we bail.
+    if (state.currentWave >= state.totalWaves - 1 && !state.deferred?.length) {
+      const stillActive = state.slots.some(s => s.status === 'running' || s.status === 'pending');
+      if (!stillActive) {
+        activeSwarmIssueIds.delete(state.issueId);
+      }
+      continue;
+    }
     if (changed) {
       // PAN-977 round-11 blocker #2 / high-2: saveSwarmState is now the single
       // canonical writer; if it throws the auto-advance loop records the
@@ -1793,6 +1821,15 @@ export const __testInternals = {
   // path resolution.
   loadSwarmState,
   persistSwarmRuntime,
+  // PAN-977 round-12 blocker #1: regression coverage needs to assert the
+  // active-poll registry still contains the issue after a slot merge that
+  // dispatches the next DAG item. Expose the bounded set as a read-only view.
+  getActiveSwarmIssueIds: () => new Set(activeSwarmIssueIds),
+  // Test-only seeder for registry membership: the production path adds
+  // entries via dispatchSwarmWave, but regression tests for slot-merge
+  // cleanup only need to assert that an existing membership is preserved.
+  addActiveSwarmIssueId: (issueId: string) => { activeSwarmIssueIds.add(issueId); },
+  clearActiveSwarmIssueIds: () => { activeSwarmIssueIds.clear(); },
 };
 
 export { resumeSwarmAutoAdvanceLoopOnStartup };

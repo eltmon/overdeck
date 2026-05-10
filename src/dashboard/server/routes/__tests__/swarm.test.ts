@@ -289,6 +289,71 @@ describe('swarm route helpers', () => {
     expect(agents.spawnAgent).toHaveBeenCalledTimes(1);
   });
 
+  // PAN-977 round-12 blocker #1: regression — onSlotMergeComplete must not
+  // remove the swarm from the active-poll registry when its dispatch step
+  // just spawned the next DAG-ready slot. Pre-fix, registry cleanup ran
+  // against the stale pre-dispatch slots set (no running entries) and
+  // deleted the issue, stranding the freshly-dispatched slot without an
+  // auto-advance poller.
+  it('keeps the swarm in the active registry when slot-merge dispatches the next DAG item', async () => {
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    const initial = {
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-0-item',
+          itemTitle: 'Prepare slot input',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'running',
+          startedAt: '2026-05-07T00:00:00Z',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    };
+    writeFileSync(swarmStatePath, JSON.stringify(initial, null, 2));
+
+    const { __testInternals } = await import('../swarm.js');
+    // Seed runtime authority so subsequent loadSwarmState() reads the
+    // continue vBRIEF rather than re-importing from the legacy sidecar.
+    await __testInternals.persistSwarmRuntime(
+      join(projectPath, 'workspaces', 'feature-pan-971'),
+      initial as any,
+    );
+
+    // The slot-1 tmux pane has exited (the merged agent went away), so a
+    // fresh dispatch on slot 1 for the next DAG item is allowed.
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue([]);
+
+    // Simulate the steady-state where the initial dispatchSwarmWave already
+    // registered this issue with the auto-advance poll loop.
+    __testInternals.addActiveSwarmIssueId('PAN-971');
+
+    const result = await __testInternals.onSlotMergeComplete('PAN-971', 'wave-0-item', 1);
+    expect(result.ok).toBe(true);
+
+    // The merged slot must be marked merged on the canonical record (not
+    // every historical sibling sharing the slot/itemId).
+    const after = (await __testInternals.loadSwarmState('PAN-971'))!;
+    const mergedSlot = after.slots.find((s) => s.slot === 1 && s.itemId === 'wave-0-item');
+    expect(mergedSlot?.status).toBe('merged');
+
+    // Pre-fix this would be false: the cleanup branch ran on the stale
+    // pre-dispatch snapshot, saw no running/pending slots, and deleted the
+    // issue from the registry — even though dispatchSwarmWave had just been
+    // invoked for the next DAG item. Post-fix, registry membership is decided
+    // from observed post-dispatch state (or short-circuited entirely when a
+    // dispatch succeeded), so the issue stays pollable.
+    const registry = __testInternals.getActiveSwarmIssueIds();
+    expect(registry.has('PAN-971'), 'issue must remain in active poll registry after slot merge').toBe(true);
+  });
+
   it('does not advance while current wave still has running slots', async () => {
     const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
     writeFileSync(swarmStatePath, JSON.stringify({

@@ -481,9 +481,15 @@ async function collectAgentProcesses(): Promise<HealthAgentProcess[]> {
   return Promise.all(
     activeAgents.map(async (agent) => {
       const runtimeState = await getAgentRuntimeStateAsync(agent.id).catch(() => null);
-      void runtimeState;
-      const panePidValue = (await listPaneValuesAsync(agent.id, '#{pane_pid}'))[0];
-      const panePid = Number(panePidValue ?? '0');
+      // PAN-977 round-12 high-2: prefer the cached runtime panePid fast-path
+      // and only fall back to a tmux query when the cache is empty/invalid.
+      // This avoids one extra tmux exec per active agent on every health
+      // refresh tick, which scales with capacity.
+      let panePid = Number(runtimeState?.panePid ?? 0);
+      if (!Number.isFinite(panePid) || panePid <= 0) {
+        const panePidValue = (await listPaneValuesAsync(agent.id, '#{pane_pid}'))[0];
+        panePid = Number(panePidValue ?? '0');
+      }
       const descendants = Number.isFinite(panePid) && panePid > 0
         ? getDescendantPids(panePid, processTable)
         : new Set<number>();
