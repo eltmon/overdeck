@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T01:27:39.844Z",
+  "updated": "2026-05-10T01:29:29.380Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "f766fdb52",
+    "sha": "4d8896ad5",
     "dirty": true
   },
   "decisions": [
@@ -58,13 +58,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Fixed frontend-typecheck errors from verification feedback by exporting harness policy types from the shared picker barrel, exporting the chat Harness type, adding Agent.harness to frontend types, and removing an unused HarnessSelect destructured prop. npm run typecheck passes. Next step is commit and invoke /rebase-and-submit PAN-1055.",
+    "description": "Fixed frontend-typecheck errors from feedback 003 by narrowing string runtime fallbacks to Harness literals before passing currentHarness. npm run typecheck passes. Next step is commit and invoke /rebase-and-submit PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
-      ".pan/feedback/002-verification-gate-failed.md",
-      "src/dashboard/frontend/src/components/shared/ModelPicker/index.ts",
-      "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
-      "src/dashboard/frontend/src/types.ts"
+      ".pan/feedback/003-verification-gate-failed.md",
+      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx"
     ]
   },
   "beadsMapping": {
@@ -128,6 +127,17 @@
       "timestamp": "2026-05-10T01:27:39.844Z",
       "reason": "verification-fix",
       "note": "Fixed frontend-typecheck failures reported in .pan/feedback/002-verification-gate-failed.md and verified with npm run typecheck.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T01:28:22.459Z",
+      "reason": "end",
+      "note": "Fixed frontend-typecheck by exporting harness picker policy types and adding frontend agent harness metadata."
+    },
+    {
+      "timestamp": "2026-05-10T01:29:29.380Z",
+      "reason": "verification-fix",
+      "note": "Fixed frontend-typecheck failures from .pan/feedback/003-verification-gate-failed.md by converting agent.runtime fallback to Harness literals for SwitchModelModal currentHarness. Verified with npm run typecheck.",
       "agentModel": "Claude Opus 4.7"
     }
   ],

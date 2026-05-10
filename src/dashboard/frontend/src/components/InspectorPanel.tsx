@@ -1289,7 +1289,7 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
       {showSwitchModel && agent && (
         <SwitchModelModal
           currentModel={agent.model}
-          currentHarness={agent.harness ?? agent.runtime ?? 'claude-code'}
+          currentHarness={agent.harness ?? (agent.runtime === 'pi' ? 'pi' : 'claude-code')}
           agentId={agent.id}
           issueId={issueId}
           agentStatus={agent.status}
