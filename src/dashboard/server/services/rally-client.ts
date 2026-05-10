@@ -39,20 +39,22 @@ export interface RallyChildIssue {
   readonly description: string;
 }
 
+export type RallyClientError = IssueNotFound | TrackerApiError | TrackerNotConfigured;
+
 export interface RallyClientShape {
   /**
    * Get a Rally artifact by FormattedID (e.g. "US1234") or ObjectID.
    */
   readonly getIssue: (
     id: string,
-  ) => Effect.Effect<RallyIssue, IssueNotFound | TrackerApiError>;
+  ) => Effect.Effect<RallyIssue, RallyClientError>;
 
   /**
    * Get child issues (stories/defects) for a parent feature.
    */
   readonly getChildIssues: (
     id: string,
-  ) => Effect.Effect<readonly RallyChildIssue[], TrackerApiError>;
+  ) => Effect.Effect<readonly RallyChildIssue[], RallyClientError>;
 
   /**
    * Transition a Rally artifact to a new normalized state.
@@ -60,12 +62,12 @@ export interface RallyClientShape {
   readonly updateState: (
     id: string,
     state: 'open' | 'in_progress' | 'in_review' | 'closed',
-  ) => Effect.Effect<void, IssueNotFound | TrackerApiError>;
+  ) => Effect.Effect<void, RallyClientError>;
 
   /**
    * Add a comment to a Rally artifact.
    */
-  readonly addComment: (id: string, body: string) => Effect.Effect<void, TrackerApiError>;
+  readonly addComment: (id: string, body: string) => Effect.Effect<void, RallyClientError>;
 }
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
@@ -76,11 +78,11 @@ export class RallyClient extends Context.Service<RallyClient, RallyClientShape>(
 
 // ─── Live layer ───────────────────────────────────────────────────────────────
 
-function wrapRallyError(err: unknown): TrackerApiError | IssueNotFound | RateLimited {
+function wrapRallyError(err: unknown): TrackerApiError | IssueNotFound {
   if (err instanceof IssueNotFound) return err;
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.toLowerCase().includes('rate limit') || msg.includes('429')) {
-    return new RateLimited({ retryAfter: 60 });
+    return new TrackerApiError({ tracker: 'rally', message: msg, cause: err });
   }
   if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('0 results')) {
     // Rally returns empty results for missing artifacts rather than 404
@@ -153,7 +155,9 @@ export const RallyClientLive = Layer.effect(
             await tracker.addComment(id, body);
           },
           catch: (err) => {
-            if (err instanceof RateLimited) return err;
+            if (err instanceof RateLimited) {
+              return new TrackerApiError({ tracker: 'rally', message: 'rate limited', cause: err });
+            }
             return new TrackerApiError({ tracker: 'rally', message: String(err), cause: err });
           },
         }),
@@ -253,7 +257,9 @@ function makeRallyClientImpl(config: NonNullable<ReturnType<typeof getRallyConfi
         yield* Effect.tryPromise({
           try: () => t.addComment(id, body),
           catch: (err) => {
-            if (err instanceof RateLimited) return err;
+            if (err instanceof RateLimited) {
+              return new TrackerApiError({ tracker: 'rally', message: 'rate limited', cause: err });
+            }
             return new TrackerApiError({ tracker: 'rally', message: String(err), cause: err });
           },
         });

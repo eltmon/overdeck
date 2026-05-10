@@ -138,7 +138,7 @@ let previousSeverity: SystemHealthSeverity | null = null;
 let candidateSeverity: SystemHealthSeverity | null = null;
 let candidateCount = 0;
 const HYSTERESIS_POLLS = 3;
-let eventStorePromise: Promise<ReturnType<typeof initEventStore>> | null = null;
+let eventStorePromise: ReturnType<typeof initEventStore> | null = null;
 let cachedResourceConfig = DEFAULT_RESOURCE_CONFIG;
 let cachedPollSeconds = DEFAULT_HEALTH_POLL_SECONDS;
 let resourceConfigLoadedAt = 0;
@@ -481,7 +481,8 @@ async function collectAgentProcesses(): Promise<HealthAgentProcess[]> {
   return Promise.all(
     activeAgents.map(async (agent) => {
       const runtimeState = await getAgentRuntimeStateAsync(agent.id).catch(() => null);
-      const panePidValue = runtimeState?.panePid != null ? String(runtimeState.panePid) : (await listPaneValuesAsync(agent.id, '#{pane_pid}'))[0];
+      void runtimeState;
+      const panePidValue = (await listPaneValuesAsync(agent.id, '#{pane_pid}'))[0];
       const panePid = Number(panePidValue ?? '0');
       const descendants = Number.isFinite(panePid) && panePid > 0
         ? getDescendantPids(panePid, processTable)
