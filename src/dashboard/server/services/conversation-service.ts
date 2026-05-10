@@ -515,6 +515,15 @@ export async function parseConversationMessages(
         // Flush previous pending assistant
         if (pendingAssistant) {
           messages.push(pendingAssistant);
+          // Re-key file edits from the old (tool_use entry) UUID to the new (text entry) UUID
+          // so assistantMessageId matches the merged message ID in the rendered list.
+          const oldId = pendingAssistant.id;
+          const newId = entry.uuid ?? msg.id ?? `asst-${messages.length}`;
+          const edits = fileEditsByAssistantId.get(oldId);
+          if (edits && oldId !== newId) {
+            fileEditsByAssistantId.delete(oldId);
+            fileEditsByAssistantId.set(newId, edits);
+          }
         }
         pendingAssistant = {
           id: entry.uuid ?? msg.id ?? `asst-${messages.length}`,
