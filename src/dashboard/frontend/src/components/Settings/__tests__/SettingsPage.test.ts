@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { buildMiniMaxFormData } from '../SettingsPage';
-import { MODELS_BY_PROVIDER } from '../AgentCards/ModelOverrideModal';
+import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import { getEffectiveModelId, DEFAULT_MODELS_BY_WORK_TYPE, FALLBACK_DEFAULT_MODEL } from '../modelDefaults';
 import { WORK_TYPE_CATEGORIES } from '../types';
 import type { SettingsConfig } from '../types';

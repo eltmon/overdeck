@@ -5,32 +5,20 @@ import {
   Loader2,
   X,
   ChevronDown,
-  Search,
   Code,
   Beaker,
-  FileText,
-  MessageSquare,
   Eye,
-  GitMerge,
-  Shield,
   Zap,
   CheckCircle,
-  Merge,
   Globe,
-  Calendar,
   Terminal,
   Brain,
   SplitSquareVertical,
-  BookMarked,
   BarChart3,
   Route,
   MessageCircle,
   Lightbulb,
-  User,
   AlertTriangle,
-  CheckSquare as VerifiedUser,
-  Eye as PageView,
-  ClipboardList,
   Key,
   GitBranch,
   Flag,
@@ -41,8 +29,7 @@ import {
   Monitor,
   ShieldCheck,
 } from 'lucide-react';
-import { useAlert } from '../DialogProvider';
-import { SettingsConfig, Provider, ModelRouteId, ModelId } from './types';
+import { SettingsConfig, Provider, ModelId } from './types';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
@@ -51,14 +38,7 @@ import { SensitiveText } from '../SensitiveText';
 import { DesktopSettingsSection } from './DesktopSettingsSection';
 import { WorkhorsePanel } from './WorkhorsePanel';
 import { RolesPanel } from './RolesPanel';
-import {
-  ModelOverrideModal,
-  getCapabilityMatchScore,
-  getModelById,
-  MODELS_BY_PROVIDER,
-  OpenRouterFavoriteModel,
-} from './AgentCards/ModelOverrideModal';
-import { getEffectiveModelId } from './modelDefaults';
+import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
 import {
   SettingsLayout,
   SettingsHeader,
@@ -119,18 +99,6 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
   return res.json();
 }
 
-async function fetchOptimalDefaults(): Promise<SettingsConfig> {
-  const res = await fetch('/api/settings/optimal-defaults');
-  if (!res.ok) throw new Error('Failed to fetch optimal defaults');
-  return res.json();
-}
-
-async function fetchMiniMaxDefaults(): Promise<SettingsConfig> {
-  const res = await fetch('/api/settings/minimax-defaults');
-  if (!res.ok) throw new Error('Failed to fetch MiniMax defaults');
-  return res.json();
-}
-
 /** Pure merge: apply MiniMax model preset while preserving all non-model settings. */
 export function buildMiniMaxFormData(
   formData: SettingsConfig | null,
@@ -188,86 +156,6 @@ const TRACKERS: { id: TrackerType; name: string; icon: any; envVar: string; plac
   { id: 'rally', name: 'Rally', icon: Flag, envVar: 'RALLY_API_KEY', placeholder: '_abc123...' },
 ];
 
-// Agent definitions organized by category
-interface AgentDef { id: ModelRouteId; name: string; icon: any; description: string; implemented: boolean }
-interface AgentCategory { name: string; icon: any; agents: AgentDef[] }
-
-const AGENT_CATEGORIES: AgentCategory[] = [
-  {
-    name: 'Issue Agent Phases',
-    icon: ClipboardList,
-    agents: [
-      { id: 'issue-agent:exploration' as ModelRouteId, name: 'Exploration', icon: Search, description: 'Codebase discovery', implemented: true },
-      { id: 'issue-agent:implementation' as ModelRouteId, name: 'Implementation', icon: Code, description: 'Write the code', implemented: true },
-      { id: 'issue-agent:testing' as ModelRouteId, name: 'Testing', icon: Beaker, description: 'Write & run tests', implemented: true },
-      { id: 'issue-agent:documentation' as ModelRouteId, name: 'Documentation', icon: FileText, description: 'Update docs', implemented: true },
-      { id: 'issue-agent:review-response' as ModelRouteId, name: 'Review Response', icon: MessageSquare, description: 'Address PR feedback', implemented: true },
-    ],
-  },
-  {
-    name: 'Specialist Agents',
-    icon: Brain,
-    agents: [
-      { id: 'specialist-review-agent' as ModelRouteId, name: 'Review Agent', icon: Eye, description: 'Automated code reviews', implemented: true },
-      { id: 'specialist-test-agent' as ModelRouteId, name: 'Test Agent', icon: Beaker, description: 'Test generation', implemented: true },
-      { id: 'specialist-merge-agent' as ModelRouteId, name: 'Merge Agent', icon: GitMerge, description: 'Merge conflict resolution', implemented: true },
-      { id: 'specialist-inspect-agent' as ModelRouteId, name: 'Inspect Agent', icon: PageView, description: 'Per-bead diff inspection', implemented: true },
-      { id: 'specialist-uat-agent' as ModelRouteId, name: 'UAT Agent', icon: VerifiedUser, description: 'User acceptance testing', implemented: true },
-    ],
-  },
-  {
-    name: 'Review Agents',
-    icon: SplitSquareVertical,
-    agents: [
-      { id: 'review:security' as ModelRouteId, name: 'Security', icon: Shield, description: 'Security analysis', implemented: true },
-      { id: 'review:performance' as ModelRouteId, name: 'Performance', icon: Zap, description: 'Performance review', implemented: true },
-      { id: 'review:correctness' as ModelRouteId, name: 'Correctness', icon: CheckCircle, description: 'Logic validation', implemented: true },
-      { id: 'review:requirements' as ModelRouteId, name: 'Requirements', icon: ClipboardList, description: 'Requirements coverage vs issue + vBRIEF', implemented: true },
-      { id: 'review:synthesis' as ModelRouteId, name: 'Synthesis', icon: Merge, description: 'Combine reviews', implemented: true },
-    ],
-  },
-  {
-    name: 'Subagents',
-    icon: User,
-    agents: [
-      { id: 'subagent:explore' as ModelRouteId, name: 'Explore', icon: Globe, description: 'Codebase exploration', implemented: true },
-      { id: 'subagent:plan' as ModelRouteId, name: 'Plan', icon: Calendar, description: 'Task breakdown', implemented: true },
-      { id: 'subagent:bash' as ModelRouteId, name: 'Bash', icon: Terminal, description: 'CLI commands', implemented: true },
-      { id: 'subagent:general-purpose' as ModelRouteId, name: 'General', icon: Lightbulb, description: 'General tasks', implemented: true },
-    ],
-  },
-  {
-    name: 'Workflow Agents',
-    icon: Route,
-    agents: [
-      { id: 'status-review' as ModelRouteId, name: 'Status Review', icon: BarChart3, description: 'AI status reviews (executive-facing)', implemented: true },
-    ],
-  },
-  {
-    name: 'Planning',
-    icon: Brain,
-    agents: [
-      { id: 'planning-agent' as ModelRouteId, name: 'Planning Agent', icon: BookMarked, description: 'vBRIEF plan generation', implemented: true },
-    ],
-  },
-  {
-    name: 'CLI Modes',
-    icon: Terminal,
-    agents: [
-      { id: 'cli:interactive' as ModelRouteId, name: 'Interactive', icon: MessageCircle, description: 'Conversation mode', implemented: true },
-      { id: 'cli:quick-command' as ModelRouteId, name: 'Quick Command', icon: Zap, description: 'One-shot queries', implemented: true },
-    ],
-  },
-];
-
-
-function getModelDisplay(modelId?: string): string {
-  if (!modelId) return 'Default';
-  const model = getModelById(modelId as ModelId);
-  if (model) return model.name;
-  return modelId;
-}
-
 const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'model-routing', label: 'Model Routing', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
@@ -283,7 +171,6 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
-  const showAlert = useAlert();
   const { prefs: uiPrefs, update: updateUIPrefs } = useUIPreferences();
   const { prefs: diffPrefs, update: updateDiffPrefs } = useDiffPreferences();
   const { data: codexAuth } = useCodexAuthStatus();
@@ -295,7 +182,6 @@ export function SettingsPage() {
   const [formData, setFormData] = useState<SettingsConfig | null>(null);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
   const [showTrackerKey, setShowTrackerKey] = useState<Record<string, boolean>>({});
-  const [modalWorkType, setModalWorkType] = useState<ModelRouteId | null>(null);
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
   const [modelsModalProvider, setModelsModalProvider] = useState<Provider | null>(null);
@@ -513,67 +399,9 @@ export function SettingsPage() {
   };
 
 
-  const handleSetOverride = (workType: ModelRouteId, model: ModelId) => {
-    setFormData({
-      ...formData,
-      models: {
-        ...formData.models,
-        overrides: {
-          ...formData.models.overrides,
-          [workType]: model,
-        },
-      },
-    });
-  };
-
-  const handleRemoveOverride = (workType: ModelRouteId) => {
-    const { [workType]: _removed, ...remainingOverrides } = formData.models.overrides;
-    setFormData({
-      ...formData,
-      models: {
-        ...formData.models,
-        overrides: remainingOverrides,
-      },
-    });
-  };
-
   const handleSave = () => saveMutation.mutate(formData);
   const handleReset = () => setFormData(settings || null);
 
-  const handleRestoreOptimalDefaults = async () => {
-    try {
-      const optimalDefaults = await fetchOptimalDefaults();
-      // Deep clone to ensure React detects the change
-      const newFormData: SettingsConfig = {
-        models: {
-          providers: { ...(formData?.models.providers || optimalDefaults.models.providers) },
-          overrides: { ...optimalDefaults.models.overrides },
-          gemini_thinking_level: optimalDefaults.models.gemini_thinking_level,
-        },
-        api_keys: { ...(formData?.api_keys || {}) },
-        conversations: {
-          ...(formData?.conversations || optimalDefaults.conversations || {}),
-        },
-        tracker_keys: { ...(formData?.tracker_keys || {}) },
-        tmux: { ...(formData?.tmux || optimalDefaults.tmux || {}) },
-        openrouter: { ...(formData?.openrouter || optimalDefaults.openrouter || {}) },
-      };
-      setFormData(newFormData);
-    } catch (error) {
-      console.error('Failed to fetch optimal defaults:', error);
-      showAlert({ message: 'Failed to load optimal defaults: ' + (error as Error).message, variant: 'error' });
-    }
-  };
-
-  const handleRestoreMiniMaxDefaults = async () => {
-    try {
-      const miniMaxDefaults = await fetchMiniMaxDefaults();
-      setFormData(buildMiniMaxFormData(formData, miniMaxDefaults));
-    } catch (error) {
-      console.error('Failed to fetch MiniMax defaults:', error);
-      showAlert({ message: 'Failed to load optimal defaults: ' + (error as Error).message, variant: 'error' });
-    }
-  };
 
   const handleTestApiKey = async (provider: Provider) => {
     const apiKey = formData?.api_keys[provider as keyof typeof formData.api_keys];
@@ -673,112 +501,6 @@ export function SettingsPage() {
 
         <WorkhorsePanel />
         <RolesPanel />
-
-        {/* Preset summary */}
-        <div className="flex items-center justify-between px-4 py-3 bg-card border border-border rounded-lg mb-4">
-          <div>
-            <span className="text-xs text-muted-foreground">Active preset</span>
-            <p className="text-sm font-medium text-foreground">Custom configuration</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleRestoreOptimalDefaults}
-              className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-md transition-colors"
-            >
-              Apply Optimal
-            </button>
-            <button
-              type="button"
-              onClick={handleRestoreMiniMaxDefaults}
-              className="px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border rounded-md transition-colors"
-            >
-              Apply MiniMax
-            </button>
-          </div>
-        </div>
-
-        {/* Override summary */}
-        {(() => {
-          const overrideCount = Object.keys(formData.models.overrides).length;
-          const deprecatedCount = formData.deprecation_warnings?.length || 0;
-          const allAgents = AGENT_CATEGORIES.flatMap(c => c.agents);
-          const poorFitCount = allAgents.filter(agent => {
-            const modelId = getEffectiveModelId(agent.id, formData.models.overrides);
-            const { score } = getCapabilityMatchScore(modelId, agent.id);
-            return score < 0.5 && agent.implemented;
-          }).length;
-
-          return (
-            <div className="flex items-center gap-4 px-4 py-2 mb-4 text-xs text-muted-foreground">
-              <span>{overrideCount} override{overrideCount !== 1 ? 's' : ''}</span>
-              {deprecatedCount > 0 && (
-                <span className="text-warning">{deprecatedCount} deprecated</span>
-              )}
-              {poorFitCount > 0 && (
-                <span className="text-destructive">{poorFitCount} poor fit</span>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* Overrides by category */}
-        <div className="space-y-4">
-          {AGENT_CATEGORIES.map((category) => (
-            <div key={category.name}>
-              <div className="flex items-center gap-2 mb-2 px-1">
-                <category.icon className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{category.name}</span>
-              </div>
-
-              <div className="space-y-0.5">
-                {category.agents.map((agent) => {
-                  const currentModelId = getEffectiveModelId(agent.id, formData.models.overrides);
-                  const modelDisplay = getModelDisplay(currentModelId);
-                  const { score } = getCapabilityMatchScore(currentModelId, agent.id);
-                  const hasOverride = !!formData.models.overrides[agent.id];
-                  const isDeprecated = formData.deprecation_warnings?.some(
-                    (w) => w.workType === agent.id && w.from === currentModelId
-                  );
-
-                  return (
-                    <button
-                      key={agent.id}
-                      type="button"
-                      onClick={() => agent.implemented && setModalWorkType(agent.id)}
-                      disabled={!agent.implemented}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted/50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:outline-none"
-                    >
-                      <agent.icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span className="text-xs font-medium text-foreground flex-1 min-w-0 truncate">
-                        {agent.name}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
-                        {modelDisplay}
-                      </span>
-                      {hasOverride && (
-                        <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-primary/10 text-primary">
-                          override
-                        </span>
-                      )}
-                      {isDeprecated && (
-                        <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-warning/10 text-warning">
-                          deprecated
-                        </span>
-                      )}
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                        isDeprecated ? 'bg-warning' :
-                        score >= 1 ? 'bg-success' :
-                        score >= 0.5 ? 'bg-warning' :
-                        'bg-destructive'
-                      }`} />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
       </section>
 
       {/* Providers */}
@@ -1608,22 +1330,6 @@ export function SettingsPage() {
       <div id="desktop" className="py-6 scroll-mt-4">
         <DesktopSettingsSection />
       </div>
-
-      {/* Model Override Modal */}
-      {modalWorkType && (
-        <ModelOverrideModal
-          workType={modalWorkType}
-          currentModel={getEffectiveModelId(modalWorkType, formData.models.overrides)}
-          isOverride={!!formData.models.overrides[modalWorkType]}
-          enabledProviders={Object.entries(formData.models.providers)
-            .filter(([_, enabled]) => enabled)
-            .map(([provider]) => provider)}
-          openRouterFavorites={openRouterFavoriteModels}
-          onApply={(model) => handleSetOverride(modalWorkType, model)}
-          onRemove={() => handleRemoveOverride(modalWorkType)}
-          onClose={() => setModalWorkType(null)}
-        />
-      )}
 
       {/* Provider Models Modal */}
       {modelsModalProvider && (

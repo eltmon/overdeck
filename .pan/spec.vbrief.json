@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T23:49:32.457Z"
+    "updated": "2026-05-09T23:58:01.261Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 28,
+    "sequence": 29,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T23:49:32.457Z",
+    "updated": "2026-05-09T23:58:01.261Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -1139,7 +1139,7 @@
       {
         "id": "u4-delete-agentcards-components",
         "title": "Settings UI: delete AgentCardsPanel/AgentCard/ModelOverrideModal/WorkTypeOverrides",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -1154,28 +1154,32 @@
           {
             "id": "u4-delete-agentcards-components.ac1",
             "title": "AgentCardsPanel.tsx, AgentCard.tsx, ModelOverrideModal.tsx, WorkTypeOverrides.tsx deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T23:58:01.261Z"
           },
           {
             "id": "u4-delete-agentcards-components.ac2",
             "title": "All imports of those components removed; vite + tsc build cleanly",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T23:58:01.261Z"
           },
           {
             "id": "u4-delete-agentcards-components.ac3",
             "title": "Component-specific test files deleted; remaining frontend tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T23:58:01.261Z"
           }
-        ]
+        ],
+        "completed": "2026-05-09T23:58:01.261Z"
       },
       {
         "id": "u5-api-settings-workhorses-roles",
@@ -2037,5 +2041,5 @@
       "canonicalFilename": "2026-05-09-PAN-1048-unify-agent-type-system-5-enums-role-primitive-with-reactive-cloister.vbrief.json"
     }
   },
-  "updated": "2026-05-09T21:48:25.322Z"
+  "updated": "2026-05-09T23:58:01.261Z"
 }

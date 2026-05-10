@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T23:49:32.457Z",
+  "updated": "2026-05-09T23:58:01.261Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "f1309c65d",
+    "sha": "bc21d608c",
     "dirty": true
   },
   "decisions": [
@@ -163,10 +163,11 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-9uxn/U3 SettingsPage rewire is implemented and verified: the model-routing section renders WorkhorsePanel followed by RolesPanel, and SettingsPage does not mount AgentCardsPanel. Static coverage in SettingsPage.test.ts guards panel order and absence of the old AgentCardsPanel route. Validation passed: npx tsc --noEmit, npx eslint . --max-warnings=0, npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), and graphify update. Next: stage exact U3 files plus .pan/graphify updates, commit, close workspace-9uxn, then continue with bd ready -l pan-1048.",
-    "beadId": "workspace-9uxn",
+    "description": "workspace-3mhb/U4 Settings legacy AgentCards cleanup is implemented and verified: deleted AgentCardsPanel, AgentCard, ModelOverrideModal, AgentCards index, and WorkTypeOverrides; moved shared model catalog data to modelCatalog.ts so remaining Settings conversation/provider selectors do not depend on the deleted modal; removed SettingsPage legacy override UI imports/state/handlers/rendering; and updated SettingsPage tests to import MODELS_BY_PROVIDER from modelCatalog. Validation passed: npx tsc --noEmit, npx eslint . --max-warnings=0, npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), deleted-component reference grep, and graphify update.",
+    "beadId": "workspace-3mhb",
     "filesToRead": [
       "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
       "src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts"
     ]
   },
@@ -334,6 +335,12 @@
       "timestamp": "2026-05-09T23:49:32.457Z",
       "reason": "bead-complete",
       "note": "Implemented workspace-9uxn/U3: SettingsPage now renders WorkhorsePanel followed by RolesPanel in the model-routing section, and a SettingsPage test asserts that order while guarding that the old AgentCardsPanel route is not mounted from SettingsPage. Verified npx tsc --noEmit, npx eslint . --max-warnings=0, full npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T23:58:01.261Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-3mhb/U4: deleted the legacy Settings AgentCards override UI components (AgentCardsPanel, AgentCard, ModelOverrideModal, AgentCards index) and WorkTypeOverrides, removed SettingsPage legacy route-card override UI code, preserved reusable provider/model catalog data in modelCatalog.ts for remaining Settings selectors, updated tests to use the new catalog module, verified deleted-component references are gone except guard assertions, and ran npx tsc --noEmit, npx eslint . --max-warnings=0, full npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],
