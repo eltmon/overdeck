@@ -241,7 +241,43 @@ async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string,
   return { merged: true, reason: `No live branch or open PR found for ${branchName}; assuming post-merge cleanup already removed the source ref` };
 }
 
+/**
+ * Detect a swarm slot branch like `feature/pan-977/slot-3`.
+ * Slot branches merge into their parent feature branch, NOT into main, so we must NOT
+ * run the full per-issue post-merge lifecycle for them. Instead we drive
+ * `onSlotMergeComplete()` so the swarm runtime advances per-item.
+ */
+const SLOT_BRANCH_PATTERN = /^feature\/[a-z][a-z0-9]*-\d+\/slot-(\d+)$/;
+function parseSlotBranch(branch: string | undefined | null): { itemSlot: number; issueLower: string } | null {
+  if (!branch) return null;
+  const match = SLOT_BRANCH_PATTERN.exec(branch);
+  if (!match) return null;
+  const slot = Number.parseInt(match[1], 10);
+  if (!Number.isInteger(slot) || slot <= 0) return null;
+  const issueLower = branch.split('/')[1];
+  return { itemSlot: slot, issueLower };
+}
+
 export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string, options?: { skipDeploy?: boolean }): Promise<void> {
+  // Slot-branch merges (feature/<issue>/slot-N → feature/<issue>) drive the
+  // per-item swarm runtime, not the per-issue feature lifecycle. Route them to
+  // onSlotMergeComplete and return — the issue's overall postMergeLifecycle only
+  // fires when the parent feature branch itself merges to main.
+  const slotInfo = parseSlotBranch(sourceBranch);
+  if (slotInfo) {
+    try {
+      // Dynamic import to avoid circular dependency: merge-agent → swarm route.
+      // We don't know itemId at the merge layer; onSlotMergeComplete resolves the
+      // canonical itemId from runtime state by matching the slot number.
+      const { __testInternals } = await import('../../dashboard/server/routes/swarm.js');
+      await __testInternals.onSlotMergeComplete(issueId, '', slotInfo.itemSlot);
+      console.log(`[merge-agent] Slot-merge handled for ${issueId} slot ${slotInfo.itemSlot}; skipping issue lifecycle.`);
+    } catch (err: any) {
+      console.warn(`[merge-agent] Slot-merge handler failed for ${issueId} slot ${slotInfo.itemSlot}: ${err?.message ?? err}`);
+    }
+    return;
+  }
+
   // Guard 1: skip if already completed (defense-in-depth against infinite loops)
   if (_completedPostMerge.has(issueId)) {
     console.log(`[merge-agent] postMergeLifecycle already completed for ${issueId}, skipping`);

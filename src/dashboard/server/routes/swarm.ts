@@ -73,11 +73,27 @@ interface SwarmDispatchRequest {
 }
 
 const ISSUE_KEY_PATTERN = /^[A-Z][A-Z0-9]*-\d+$/;
+// Strict, conservative grammar for model identifiers passed to runtime launchers.
+// Runtime launchers (claude/pi/codex) interpolate `model` into shell command strings,
+// so we MUST refuse anything outside this safe alphabet at the API boundary to defeat
+// command injection. This is the only place model strings cross the dashboard API.
+const MODEL_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,63})$/;
 
 function canonicalIssueId(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const canonical = value.trim().toUpperCase();
   return ISSUE_KEY_PATTERN.test(canonical) ? canonical : null;
+}
+
+function validateModelId(value: unknown): { ok: true; value: string | undefined } | { ok: false; error: string } {
+  if (value === undefined) return { ok: true, value: undefined };
+  if (typeof value !== 'string') return { ok: false, error: 'model must be a string.' };
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return { ok: true, value: undefined };
+  if (!MODEL_ID_PATTERN.test(trimmed)) {
+    return { ok: false, error: 'model must match [A-Za-z0-9._-]{1,64} (no whitespace, slashes, or shell metacharacters).' };
+  }
+  return { ok: true, value: trimmed };
 }
 
 function assertPathInside(parent: string, child: string): void {
@@ -464,6 +480,13 @@ async function dispatchSwarmWave(
   if (!issueUpper) {
     return { status: 400, body: { error: 'issueId must be a tracker key like PAN-977.' } };
   }
+  // Defense-in-depth: dispatchSwarmWave is called from the API route AND from auto-advance
+  // and onSlotMergeComplete (which read model from persisted state). Re-validate here so a
+  // tampered state file cannot inject shell metacharacters into runtime launcher commands.
+  const modelGuard = validateModelId(requestedModel);
+  if (!modelGuard.ok) {
+    return { status: 400, body: { error: modelGuard.error } };
+  }
   const issueLower = issueUpper.toLowerCase();
 
   const project = resolveProjectFromIssue(issueUpper);
@@ -579,11 +602,11 @@ async function dispatchSwarmWave(
     };
   }
 
-  const swarmModel = requestedModel || DEFAULT_SWARM_MODEL;
+  const swarmModel = modelGuard.value || DEFAULT_SWARM_MODEL;
   const resourceConfig = getResourceConfig();
   const envLimit = process.env['PAN_AGENT_BLOCK_COUNT'];
   const parsedEnvLimit = envLimit !== undefined ? Number(envLimit) : undefined;
-  const hardLimit = Number.isFinite(parsedEnvLimit) ? parsedEnvLimit : resourceConfig.agentBlockCount;
+  const hardLimit: number = (Number.isFinite(parsedEnvLimit) ? parsedEnvLimit : resourceConfig.agentBlockCount) ?? 0;
   const currentAgents = health.summary.workAgentCount;
   const systemAvailable = Math.max(0, hardLimit - currentAgents);
 
@@ -715,17 +738,24 @@ async function dispatchSwarmWave(
         };
 
         await spawnAgent(spawnOptions);
-        if (!dispatchSynthesisFirst) {
-          await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
-            type: 'claim',
-            itemId: item.id,
-            reason: `Swarm slot ${slotNum} dispatched`,
-            writerId: `swarm-dispatch-${process.pid}`,
-          });
-        }
+        // Claim the canonical vBRIEF plan item so it is no longer dispatchable.
+        // Both implementation AND synthesis dispatches must claim — otherwise a synthesis
+        // slot leaves the convergence item in `pending`, and a second dispatch call can
+        // re-pick it before the synthesis agent finishes.
+        await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+          type: 'claim',
+          itemId: item.id,
+          reason: dispatchSynthesisFirst
+            ? `Swarm slot ${slotNum} dispatched (synthesis phase)`
+            : `Swarm slot ${slotNum} dispatched`,
+          writerId: `swarm-dispatch-${process.pid}`,
+        });
 
-        doc = await readWorkspacePlanAsync(mainWorkspace) ?? doc;
-        annotatedDoc = deriveSynthesisMetadata(doc);
+        const refreshedDoc = await readWorkspacePlanAsync(mainWorkspace);
+        if (refreshedDoc) {
+          doc = refreshedDoc;
+          annotatedDoc = deriveSynthesisMetadata(doc);
+        }
 
         return {
           slot: slotNum,
@@ -818,14 +848,22 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
   const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueUpper.toLowerCase()}`);
   const now = new Date().toISOString();
   const state = await loadSwarmState(issueUpper);
+  // If caller could not provide itemId (e.g. merge-agent only knows slot number),
+  // resolve it from runtime state. This is required so the canonical vBRIEF plan
+  // gets the matching `done` task operation below.
+  let resolvedItemId = itemId;
+  if (state && (!resolvedItemId || resolvedItemId.length === 0)) {
+    const matched = state.slots.find(slot => slot.slot === slotId);
+    if (matched) resolvedItemId = matched.itemId;
+  }
   if (state) {
-    const slots = state.slots.map(slot => slot.slot === slotId || slot.itemId === itemId
+    const slots = state.slots.map(slot => slot.slot === slotId || slot.itemId === resolvedItemId
       ? { ...slot, status: 'merged' as const, completedAt: slot.completedAt ?? now }
       : slot);
     const nextState = { ...state, slots, updatedAt: now };
     await saveSwarmState(nextState);
     await persistSwarmRuntime(mainWorkspace, nextState);
-    if (synthesisOutput) {
+    if (synthesisOutput && resolvedItemId) {
       const cont = await loadWorkspaceContinue(mainWorkspace, issueUpper);
       const runtime = cont.swarmRuntime ?? runtimeFromState(nextState);
       await writeContinueStateAsync(continueDirForWorkspace(mainWorkspace), issueUpper, {
@@ -834,7 +872,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
           ...runtime,
           synthesisOutputs: {
             ...runtime.synthesisOutputs,
-            [itemId]: { targetItemId: itemId, writtenAt: now, contextUpdate: synthesisOutput },
+            [resolvedItemId]: { targetItemId: resolvedItemId, writtenAt: now, contextUpdate: synthesisOutput },
           },
           updatedAt: now,
         },
@@ -845,12 +883,14 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
       if (result.status >= 400) ensureSwarmAutoAdvanceLoop();
     }
   }
-  await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
-    type: 'done',
-    itemId,
-    reason: `Swarm slot ${slotId} merged into feature branch`,
-    writerId: `swarm-merge-${process.pid}`,
-  }).catch(() => undefined);
+  if (resolvedItemId) {
+    await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+      type: 'done',
+      itemId: resolvedItemId,
+      reason: `Swarm slot ${slotId} merged into feature branch`,
+      writerId: `swarm-merge-${process.pid}`,
+    }).catch(() => undefined);
+  }
 }
 
 async function pollSwarmAutoAdvance(): Promise<void> {
@@ -1059,14 +1099,15 @@ const postSwarmRoute = HttpRouter.add(
     if (maxSlots !== undefined && (!Number.isInteger(maxSlots) || maxSlots <= 0)) {
       return jsonResponse({ error: 'maxSlots must be a positive integer.' }, { status: 400 });
     }
-    if (model !== undefined && typeof model !== 'string') {
-      return jsonResponse({ error: 'model must be a string.' }, { status: 400 });
+    const modelCheck = validateModelId(model);
+    if (!modelCheck.ok) {
+      return jsonResponse({ error: modelCheck.error }, { status: 400 });
     }
 
     const result = yield* Effect.promise(() => dispatchSwarmWave({
       issueId,
       wave,
-      model,
+      model: modelCheck.value,
       maxSlots,
       autoAdvance,
     }));
@@ -1142,16 +1183,32 @@ function buildSynthesisPrompt(
     .filter((parent): parent is VBriefItem => Boolean(parent));
 
   return [
-    `You are synthesis slot ${slotNum} for wave ${waveIndex} of plan ${doc.plan.id}.`,
+    `You are the synthesis agent for slot ${slotNum}, wave ${waveIndex} of plan ${doc.plan.id}.`,
     `Issue: ${issueId}`,
     `Convergence target: **${item.id}: ${item.title}**`,
     '',
     'Read the merged upstream changes for these completed parent items:',
     ...parents.map(parent => `- ${parent.id}: ${parent.title}`),
     '',
-    'Produce a concise markdown synthesis of the upstream decisions, changed files, hazards, and constraints the downstream implementation agent must know.',
-    'When complete, call the production merge-complete path with this synthesis output so Panopticon can persist it into the continue vBRIEF before dispatching downstream work.',
-    'Do not implement the convergence target itself in this synthesis slot.',
+    'Your job is NOT to implement the convergence target. Your job is to produce a concise',
+    'markdown synthesis covering: upstream decisions, changed files, hazards/risks, and',
+    'constraints the downstream implementation agent must respect.',
+    '',
+    'When the synthesis is ready, deliver it by POSTing to the dashboard:',
+    '',
+    '```bash',
+    `curl -fsS -X POST http://localhost:7878/api/swarm/slot-merged \\`,
+    `  -H 'Content-Type: application/json' \\`,
+    `  -d @- <<'JSON'`,
+    JSON.stringify({ issueId, itemId: item.id, slotId: slotNum, synthesisOutput: '<your markdown here>' }, null, 2),
+    'JSON',
+    '```',
+    '',
+    'Panopticon persists `synthesisOutput` into the continue vBRIEF runtime under',
+    '`swarmRuntime.synthesisOutputs[<convergence-item-id>]`. Only after that record exists',
+    'will the downstream implementation slot be dispatched, and it will receive your',
+    'synthesis as part of its prompt context.',
+    'Do NOT run `pan done` and do NOT modify the convergence target source files.',
   ].join('\n');
 }
 
