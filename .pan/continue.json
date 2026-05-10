@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-10T01:55:38.000Z",
+  "updated": "2026-05-10T02:14:44.034Z",
   "gitState": {
     "branch": "feature/pan-1048",
     "sha": "3331ac74f",
@@ -16,7 +16,7 @@
     },
     {
       "id": "D2",
-      "summary": "Workhorse Models = exactly 3 user-managed slots (`expensive`, `mid`, `cheap`) at the top of Settings. Every per-role and per-sub-role model picker accepts EITHER a literal model id OR a `workhorse:<slot>` reference. Default config uses workhorse refs everywhere \u2014 fresh install fully managed through the 3 dials. Resolution dereferences at spawn time (live cascade, not frozen at picker-click). Unresolved or chained references fail loudly at config-load time with a precise field-pointer error.",
+      "summary": "Workhorse Models = exactly 3 user-managed slots (`expensive`, `mid`, `cheap`) at the top of Settings. Every per-role and per-sub-role model picker accepts EITHER a literal model id OR a `workhorse:<slot>` reference. Default config uses workhorse refs everywhere — fresh install fully managed through the 3 dials. Resolution dereferences at spawn time (live cascade, not frozen at picker-click). Unresolved or chained references fail loudly at config-load time with a precise field-pointer error.",
       "recordedAt": "2026-05-09T17:43:03Z"
     },
     {
@@ -26,22 +26,22 @@
     },
     {
       "id": "D4",
-      "summary": "Drop work phases entirely. The work agent today transitions through exploration \u2192 implementation \u2192 testing \u2192 documentation \u2192 review-response with potentially different models per phase. After this PR, work is one undifferentiated mode with one model (workhorse:mid by default) plus two inspect sub-roles. All `state.phase` / `state.workType` reads die. Phase-handoff plumbing is removed.",
+      "summary": "Drop work phases entirely. The work agent today transitions through exploration → implementation → testing → documentation → review-response with potentially different models per phase. After this PR, work is one undifferentiated mode with one model (workhorse:mid by default) plus two inspect sub-roles. All `state.phase` / `state.workType` reads die. Phase-handoff plumbing is removed.",
       "recordedAt": "2026-05-09T17:43:03Z"
     },
     {
       "id": "D5",
-      "summary": "Reactive Cloister hooks into existing internal event emitters \u2014 NOT a new tracker poller. Issue-lifecycle service (src/dashboard/server/services/issue-lifecycle.ts) already emits `issue.*` domain events. Cloister subscribes to those plus existing agent-completion events (agent.completed, work.completed, review.approved, test.passed) and uses stateToRole(IssueState) to spawn the next role. Concurrency guard: skip spawn if an active run for (issueId, role) already exists.",
+      "summary": "Reactive Cloister hooks into existing internal event emitters — NOT a new tracker poller. Issue-lifecycle service (src/dashboard/server/services/issue-lifecycle.ts) already emits `issue.*` domain events. Cloister subscribes to those plus existing agent-completion events (agent.completed, work.completed, review.approved, test.passed) and uses stateToRole(IssueState) to spawn the next role. Concurrency guard: skip spawn if an active run for (issueId, role) already exists.",
       "recordedAt": "2026-05-09T17:43:03Z"
     },
     {
       "id": "D6",
-      "summary": "Convoy reviewers (security/correctness/performance/requirements) move from being separate Cloister specialists (with prompt templates at src/lib/cloister/prompts/review/*.prompt-template.md) to Claude Code subagent definitions at .claude/agents/code-review-<flavor>.md, invoked from inside roles/review.md via the Agent tool. Synthesis IS the review role itself \u2014 no separate synthesis sub-agent. Each sub-reviewer's model resolves through resolveModel('review', '<flavor>').",
+      "summary": "Convoy reviewers (security/correctness/performance/requirements) move from being separate Cloister specialists (with prompt templates at src/lib/cloister/prompts/review/*.prompt-template.md) to Claude Code subagent definitions at .claude/agents/code-review-<flavor>.md, invoked from inside roles/review.md via the Agent tool. Synthesis IS the review role itself — no separate synthesis sub-agent. Each sub-reviewer's model resolves through resolveModel('review', '<flavor>').",
       "recordedAt": "2026-05-09T17:43:03Z"
     },
     {
       "id": "D7",
-      "summary": "Pi harness scope: PAN-1048 ships claude-code-only roles. getAgentRuntimeBaseCommand keeps its existing `pi --mode rpc --model <model>` short-circuit unchanged \u2014 Pi has no agent-definition system. A follow-up issue (e.g. PAN-1049) tracks Pi role-body integration. Settings still allows Pi as a per-role harness override; Pi just doesn't read the role's .md body.",
+      "summary": "Pi harness scope: PAN-1048 ships claude-code-only roles. getAgentRuntimeBaseCommand keeps its existing `pi --mode rpc --model <model>` short-circuit unchanged — Pi has no agent-definition system. A follow-up issue (e.g. PAN-1049) tracks Pi role-body integration. Settings still allows Pi as a per-role harness override; Pi just doesn't read the role's .md body.",
       "recordedAt": "2026-05-09T17:43:03Z"
     },
     {
@@ -51,27 +51,27 @@
     },
     {
       "id": "D9",
-      "summary": "Unify `runtime` \u2192 `harness` in this PR. The Channels eligibility check (src/lib/agents.ts ~line 775) moves from `state.runtime !== 'claude' && state.runtime !== 'claude-code'` to `state.harness === 'claude-code' && state.role === 'work'` \u2014 Channels was always work-agent-only, so the role check makes the intent explicit. M1 carries this; if it gets dropped on the floor, Channels silently breaks for every work agent.",
+      "summary": "Unify `runtime` → `harness` in this PR. The Channels eligibility check (src/lib/agents.ts ~line 775) moves from `state.runtime !== 'claude' && state.runtime !== 'claude-code'` to `state.harness === 'claude-code' && state.role === 'work'` — Channels was always work-agent-only, so the role check makes the intent explicit. M1 carries this; if it gets dropped on the floor, Channels silently breaks for every work agent.",
       "recordedAt": "2026-05-09T17:43:03Z"
     },
     {
       "id": "D10",
-      "summary": "Synthesis IS the review role \u2014 there is no separate synthesis sub-agent. The review role reads the diff, fans out 4 parallel convoy sub-runs via the Agent tool, collects their findings, decides approve/request-changes, posts the review comment, and transitions the issue state. Human-merge invariant: review NEVER merges; only approves and transitions.",
+      "summary": "Synthesis IS the review role — there is no separate synthesis sub-agent. The review role reads the diff, fans out 4 parallel convoy sub-runs via the Agent tool, collects their findings, decides approve/request-changes, posts the review comment, and transitions the issue state. Human-merge invariant: review NEVER merges; only approves and transitions.",
       "recordedAt": "2026-05-09T17:43:03Z"
     },
     {
       "id": "D11",
-      "summary": "Test discipline: every refactor bead must keep the existing tests green. If a test references a deleted enum or field, the bead that deletes the enum/field is responsible for updating or replacing the test. No 'test cleanup' bead at the end \u2014 tests are part of each bead's acceptance criteria.",
+      "summary": "Test discipline: every refactor bead must keep the existing tests green. If a test references a deleted enum or field, the bead that deletes the enum/field is responsible for updating or replacing the test. No 'test cleanup' bead at the end — tests are part of each bead's acceptance criteria.",
       "recordedAt": "2026-05-09T17:43:03Z"
     },
     {
       "id": "D12",
-      "summary": "Concurrent work runs (PAN-970 swarm parallelism) is out of scope for PAN-1048. The reactive scheduler holds a per-issue concurrency guard (no second run spawned while one is active for the same role on the same issue). The role primitive does not block PAN-970 \u2014 it makes it easier to build.",
+      "summary": "Concurrent work runs (PAN-970 swarm parallelism) is out of scope for PAN-1048. The reactive scheduler holds a per-issue concurrency guard (no second run spawned while one is active for the same role on the same issue). The role primitive does not block PAN-970 — it makes it easier to build.",
       "recordedAt": "2026-05-09T17:43:03Z"
     },
     {
       "id": "D13",
-      "summary": "PRD location: this planning session left the PRD at .pan/prd.md (workspace-local). The final bead (z2-move-prd-canonical) moves it to docs/prds/planned/PAN-1048-role-primitive.md so the link in the GitHub issue body works after merge. Do not move it earlier \u2014 the PRD is mutated repeatedly during planning.",
+      "summary": "PRD location: this planning session left the PRD at .pan/prd.md (workspace-local). The final bead (z2-move-prd-canonical) moves it to docs/prds/planned/PAN-1048-role-primitive.md so the link in the GitHub issue body works after merge. Do not move it earlier — the PRD is mutated repeatedly during planning.",
       "recordedAt": "2026-05-09T17:43:03Z"
     },
     {
@@ -103,7 +103,7 @@
     },
     {
       "id": "H2",
-      "summary": "The convoy reviewer migration (V1 \u2192 R3 \u2192 S3) changes the spawn mechanism for 4 parallel reviewers. If R3's roles/review.md file does not correctly invoke .claude/agents/code-review-<flavor>.md sub-agents, the review pipeline silently degrades to no-convoy single-reviewer.",
+      "summary": "The convoy reviewer migration (V1 → R3 → S3) changes the spawn mechanism for 4 parallel reviewers. If R3's roles/review.md file does not correctly invoke .claude/agents/code-review-<flavor>.md sub-agents, the review pipeline silently degrades to no-convoy single-reviewer.",
       "mitigation": "S3 includes an end-to-end smoke test (subItem ac5) that validates the full convoy fan-out runs and produces a synthesized decision. R3 has requiresInspection=true so the inspect specialist verifies the file structure before downstream beads land."
     },
     {
@@ -118,8 +118,8 @@
     },
     {
       "id": "H5",
-      "summary": "The reactive Cloister scheduler depends on issue-lifecycle events that already exist plus agent-completion events that may not be emitted today. If C1 wires up subscribers for events that nothing fires, transitions break \u2014 work completes but review never spawns.",
-      "mitigation": "Before C1 implementation, the work agent should grep for each event name (agent.completed, work.completed, review.approved, test.passed) and confirm an emitter exists. If a needed event is missing, C1's scope expands to add the emitter \u2014 this is a known acceptable scope creep, called out in C1's narrative. C1 has requiresInspection=true."
+      "summary": "The reactive Cloister scheduler depends on issue-lifecycle events that already exist plus agent-completion events that may not be emitted today. If C1 wires up subscribers for events that nothing fires, transitions break — work completes but review never spawns.",
+      "mitigation": "Before C1 implementation, the work agent should grep for each event name (agent.completed, work.completed, review.approved, test.passed) and confirm an emitter exists. If a needed event is missing, C1's scope expands to add the emitter — this is a known acceptable scope creep, called out in C1's narrative. C1 has requiresInspection=true."
     },
     {
       "id": "H6",
@@ -128,13 +128,13 @@
     },
     {
       "id": "H7",
-      "summary": "Settings UI rewrite (U1-U5) and backend deletion (D1, E1-E5, K1) are loosely coupled \u2014 UI assumes config has workhorses/roles fields, backend assumes UI sends new field shapes. If U5 (API settings) lands without the frontend updates, GET /api/settings returns the new shape but the old AgentCardsPanel chokes.",
-      "mitigation": "U3 (settings page rewire) blocks U4 (delete old components). UI changes land in a single bead-cluster (U1 \u2192 U2,U5 \u2192 U3 \u2192 U4) with the page rewire as a single atomic point of switch. Manual UAT after U3 lands and again after U4 deletes the old code."
+      "summary": "Settings UI rewrite (U1-U5) and backend deletion (D1, E1-E5, K1) are loosely coupled — UI assumes config has workhorses/roles fields, backend assumes UI sends new field shapes. If U5 (API settings) lands without the frontend updates, GET /api/settings returns the new shape but the old AgentCardsPanel chokes.",
+      "mitigation": "U3 (settings page rewire) blocks U4 (delete old components). UI changes land in a single bead-cluster (U1 → U2,U5 → U3 → U4) with the page rewire as a single atomic point of switch. Manual UAT after U3 lands and again after U4 deletes the old code."
     },
     {
       "id": "H8",
       "summary": "Untracked files in the workspace (.claude/skills/pan-tts/scripts/tts_daemon.py, .claude/skills/pipeline-status/, three deleted feedback files) are unrelated to PAN-1048. Risk: a bead's `git add` accidentally sweeps them in.",
-      "mitigation": "Work agent should never use `git add -A` or `git add .`. Always add specific files by name. The .pan/feedback/* deletions were already on disk at planning start and should be either committed in a separate cleanup or restored \u2014 the work agent should not touch them."
+      "mitigation": "Work agent should never use `git add -A` or `git add .`. Always add specific files by name. The .pan/feedback/* deletions were already on disk at planning start and should be either committed in a separate cleanup or restored — the work agent should not touch them."
     },
     {
       "id": "H9",
@@ -176,7 +176,7 @@
   "sessionHistory": [
     {
       "reason": "planning",
-      "content": "Planning session for PAN-1048 (Unify agent type system: 5 enums \u2192 Role primitive). Pre-planning, the user updated the PRD and GitHub issue with the new Workhorse Models concept (3 user-managed slots \u2014 expensive/mid/cheap \u2014 referenced from per-role and per-sub-role pickers via `workhorse:<slot>` indirection). The user also clarified that plan + review should both default to workhorse:expensive (planning errors cascade; review gates merge). Architectural decisions surfaced via AskUserQuestion: (1) drop work phases entirely; (2) reactive Cloister hooks into existing internal event emitters rather than building a new tracker poller; (3) hard cut on upgrade \u2014 kill in-flight agents, drop legacy fields, no readRole() shim; (4) workhorse pickers list all enabled providers grouped; (5) Pi parity deferred to follow-up; (6) convoy prompt templates migrate to .claude/agents/code-review-<flavor>.md invoked via the Agent tool; (7) runtime \u2192 harness unification in this PR. Codebase mapping confirmed: 138 SpecialistType callsites, 167 WorkTypeId callsites, no `roles/` directory exists yet, IssueLifecycle service already emits issue.* domain events, convoy reviewers today are separate Cloister specialists (not subagents). Decomposed into 32 beads with 57 dependency edges across 7 phases (Foundation, Convoy migration, Role files, Per-role spawn wiring, Reactive Cloister + machinery deletion, Settings UI, Backend dead-code deletion + enum deletions + contracts + state.json hard cut + cleanup).",
+      "content": "Planning session for PAN-1048 (Unify agent type system: 5 enums → Role primitive). Pre-planning, the user updated the PRD and GitHub issue with the new Workhorse Models concept (3 user-managed slots — expensive/mid/cheap — referenced from per-role and per-sub-role pickers via `workhorse:<slot>` indirection). The user also clarified that plan + review should both default to workhorse:expensive (planning errors cascade; review gates merge). Architectural decisions surfaced via AskUserQuestion: (1) drop work phases entirely; (2) reactive Cloister hooks into existing internal event emitters rather than building a new tracker poller; (3) hard cut on upgrade — kill in-flight agents, drop legacy fields, no readRole() shim; (4) workhorse pickers list all enabled providers grouped; (5) Pi parity deferred to follow-up; (6) convoy prompt templates migrate to .claude/agents/code-review-<flavor>.md invoked via the Agent tool; (7) runtime → harness unification in this PR. Codebase mapping confirmed: 138 SpecialistType callsites, 167 WorkTypeId callsites, no `roles/` directory exists yet, IssueLifecycle service already emits issue.* domain events, convoy reviewers today are separate Cloister specialists (not subagents). Decomposed into 32 beads with 57 dependency edges across 7 phases (Foundation, Convoy migration, Role files, Per-role spawn wiring, Reactive Cloister + machinery deletion, Settings UI, Backend dead-code deletion + enum deletions + contracts + state.json hard cut + cleanup).",
       "note": "Planning complete. 32 beads written to .pan/spec.vbrief.json. Continue.json populated with 13 decisions and 10 hazards.",
       "timestamp": "2026-05-09T17:43:03Z",
       "agentModel": "agent:claude-opus-4-7"
@@ -310,7 +310,7 @@
     {
       "timestamp": "2026-05-09T22:03:31.034Z",
       "reason": "bead-complete",
-      "note": "Implemented C1 reactive Cloister scheduler: stateToRole maps issue states to Role, onIssueStateChange launches spawnRun with a concurrency guard, Cloister subscribes to domain events, contracts define agent.completed/work.completed/review.approved/test.passed, review status transitions emit review.approved/test.passed, legacy status routes no longer directly dispatch test after review pass, and tests cover work completion \u2192 review, review approval \u2192 test, and test pass \u2192 ship transitions. Targeted tests, typecheck, lint, and graphify update completed.",
+      "note": "Implemented C1 reactive Cloister scheduler: stateToRole maps issue states to Role, onIssueStateChange launches spawnRun with a concurrency guard, Cloister subscribes to domain events, contracts define agent.completed/work.completed/review.approved/test.passed, review status transitions emit review.approved/test.passed, legacy status routes no longer directly dispatch test after review pass, and tests cover work completion → review, review approval → test, and test pass → ship transitions. Targeted tests, typecheck, lint, and graphify update completed.",
       "agentModel": "agent:claude-opus-4-7"
     },
     {
@@ -384,6 +384,11 @@
       "reason": "tooling-fix",
       "note": "Fixed pan done completion gating after PAN-1048 executable beads closed: vBRIEF acceptance criteria extraction now skips deferred/cancelled plan items so intentionally deferred X1 cleanup ACs do not block issue completion. Added regression coverage for deferred items and verified npm run typecheck, npm run lint, full npm test (381 passed/5 skipped test files; 4523 passed/62 skipped tests), and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-10T02:14:44.033Z",
+      "reason": "end",
+      "note": "Unified agent state and routing around required Role primitive; deferred cleanup no longer blocks completion; quality gates passed."
     }
   ],
   "feedback": []
