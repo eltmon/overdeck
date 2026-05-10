@@ -2101,8 +2101,9 @@ const getConversationDiffsRoute = HttpRouter.add(
         const assistantMessages = parsed.messages.filter(m => m.role === 'assistant');
         const assistantById = new Map(assistantMessages.map(m => [m.id, m]));
 
-        // Cache git repo root lookups
+        // Cache git repo root and base-commit lookups (both keyed by repo root)
         const repoRootCache = new Map<string, string | null>();
+        const baseCommitCache = new Map<string, string | null>();
 
         for (const [assistantId, edits] of fileEditsByAssistantId) {
           const asstMsg = assistantById.get(assistantId);
@@ -2145,14 +2146,52 @@ const getConversationDiffsRoute = HttpRouter.add(
             }
           }
 
-          // Compute diffs per repo and merge
+          // Compute diffs per repo and merge.
+          // Diff against the conversation's base commit (the commit that existed just before
+          // the conversation started) so that committed changes are included in the summary —
+          // not just uncommitted working-tree changes.
           const allFiles: TurnDiffFileChange[] = [];
           for (const [repoRoot, filePaths] of filesByRepo) {
             try {
-              const diffs = await diffFilesAgainstHead(repoRoot, filePaths);
+              // Resolve base commit once per repo root
+              if (!baseCommitCache.has(repoRoot)) {
+                baseCommitCache.set(repoRoot, await findCommitAtTime(repoRoot, conv.createdAt));
+              }
+              const baseCommit = baseCommitCache.get(repoRoot) ?? null;
+
+              let diffs: TurnDiffFileChange[];
+              if (baseCommit) {
+                // Diff specific files against the pre-conversation base commit.
+                // This captures changes whether committed or still in the working tree.
+                const { stdout: numstat } = await promisify(exec)(
+                  `git diff --numstat --no-color ${baseCommit} -- ${filePaths.map(p => JSON.stringify(p)).join(' ')}`,
+                  { cwd: repoRoot, encoding: 'utf-8' },
+                );
+                const { stdout: nameStatus } = await promisify(exec)(
+                  `git diff --name-status --no-color ${baseCommit} -- ${filePaths.map(p => JSON.stringify(p)).join(' ')}`,
+                  { cwd: repoRoot, encoding: 'utf-8' },
+                );
+                const statusMap = new Map<string, string>();
+                for (const line of nameStatus.split('\n')) {
+                  if (!line.trim()) continue;
+                  const parts = line.split('\t');
+                  if (parts.length >= 2) statusMap.set(parts[parts.length - 1], parts[0]);
+                }
+                diffs = [];
+                for (const line of numstat.split('\n')) {
+                  if (!line.trim()) continue;
+                  const [addStr, delStr, ...pathParts] = line.split('\t');
+                  const path = pathParts.join('\t');
+                  if (!path) continue;
+                  diffs.push({ path, kind: statusMap.get(path), additions: parseInt(addStr, 10) || 0, deletions: parseInt(delStr, 10) || 0 });
+                }
+              } else {
+                // No base commit (repo too new) — fall back to working-tree-vs-HEAD diff
+                diffs = await diffFilesAgainstHead(repoRoot, filePaths);
+              }
               allFiles.push(...diffs);
             } catch {
-              // git diff failed — file may have been committed already, skip
+              // git diff failed — skip this repo
             }
           }
 
