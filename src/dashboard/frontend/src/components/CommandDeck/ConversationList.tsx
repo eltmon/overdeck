@@ -273,8 +273,8 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
           conversation={mutations.forkTarget}
           isPending={mutations.isForkPending}
           onClose={mutations.closeForkModal}
-          onConfirm={(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness) => {
-            mutations.submitFork(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness);
+          onConfirm={(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness) => {
+            mutations.submitFork(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness);
           }}
         />
       )}

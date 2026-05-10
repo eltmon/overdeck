@@ -8,7 +8,7 @@ import {
 } from '../chat/defaultConversationModel';
 import styles from './styles/command-deck.module.css';
 import pickerStyles from '../shared/ModelPicker/ModelPicker.module.css';
-import { ModelHarnessPicker, ModelSelect, useAvailableModels } from '../shared/ModelPicker';
+import { ModelHarnessPicker, useAvailableModels } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import type { Conversation } from './ConversationList';
 
@@ -107,6 +107,7 @@ interface ForkModalProps {
     includeThinkingInSummary: boolean,
     title?: string,
     launchHarness?: Harness,
+    summaryHarness?: Harness,
   ) => void;
   onClose: () => void;
   isPending: boolean;
@@ -118,6 +119,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
   const [launchHarness, setLaunchHarness] = useState<Harness>(conversation.harness || 'claude-code');
   const [summaryModel, setSummaryModel] = useState(compactionModel);
+  const [summaryHarness, setSummaryHarness] = useState<Harness>('claude-code');
   const [plainFork, setPlainFork] = useState(false);
   const [localSummaryOnly, setLocalSummaryOnly] = useState(false);
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
@@ -237,11 +239,14 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
 
                 {!localSummaryOnly && (
                   <>
-                    <ModelSelect
-                      value={summaryModel}
-                      onChange={setSummaryModel}
+                    <ModelHarnessPicker
+                      model={summaryModel}
+                      harness={summaryHarness}
+                      onModelChange={setSummaryModel}
+                      onHarnessChange={setSummaryHarness}
                       groups={groups}
-                      label="Summary model"
+                      harnessPolicy={harnessPolicy}
+                      modelLabel="Summary model"
                     />
                     <span className={pickerStyles.fieldHint}>
                       Generates a concise summary of the conversation history
@@ -286,7 +291,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
           <button
             className={styles.forkConfirmBtn}
             disabled={isPending}
-            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, forkTitle.trim() || undefined, launchHarness)}
+            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, forkTitle.trim() || undefined, launchHarness, summaryHarness)}
           >
             <GitBranchPlus size={13} />
             {isPending ? 'Forking...' : 'Fork Conversation'}

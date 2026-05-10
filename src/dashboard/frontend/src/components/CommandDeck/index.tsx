@@ -1143,8 +1143,8 @@ export function CommandDeck({
               conversation={projectConvMutations.forkTarget}
               isPending={projectConvMutations.isForkPending}
               onClose={projectConvMutations.closeForkModal}
-              onConfirm={(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness) => {
-                projectConvMutations.submitFork(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness);
+              onConfirm={(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness) => {
+                projectConvMutations.submitFork(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title, launchHarness, summaryHarness);
               }}
             />
           )}

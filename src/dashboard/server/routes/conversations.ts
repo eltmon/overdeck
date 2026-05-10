@@ -1834,6 +1834,7 @@ async function runForkPipeline(
   plain = false,
   localSummaryOnly = false,
   includeThinkingInSummary?: boolean,
+  _summaryHarness?: RuntimeName,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
@@ -1963,6 +1964,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const newTmux = `conv-${newName}`;
         const launchModel = model || conv.model;
         const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
+        const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], summaryModel);
         const defaultTitle = plain
           ? `Fork: ${conv.title || conv.name}`
           : `Summary Fork: ${conv.title || conv.name}`;
@@ -1985,7 +1987,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         });
         markConversationActive(newConv.name);
 
-        runForkPipeline(newConv.name, conv, sessionId, summaryModel, plain, localSummaryOnly, includeThinkingInSummary).catch((err) => {
+        runForkPipeline(newConv.name, conv, sessionId, summaryModel, plain, localSummaryOnly, includeThinkingInSummary, summaryHarness).catch((err) => {
           console.error(`[fork-pipeline] Failed for ${newConv.name}:`, err);
           updateForkStatus(newConv.name, 'failed', err?.message ?? String(err));
         });
