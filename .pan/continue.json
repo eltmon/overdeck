@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-10T00:18:44.000Z",
+  "updated": "2026-05-10T01:31:04.000Z",
   "gitState": {
     "branch": "feature/pan-1044",
-    "sha": "8754a53ec",
+    "sha": "f5f4dbc37",
     "dirty": true
   },
   "decisions": [
@@ -167,6 +167,17 @@
       "timestamp": "2026-05-10T00:18:44.000Z",
       "reason": "feedback-fix",
       "note": "Fixed repeated test verification failure where Vitest import analysis resolved @panctl/contracts through package exports and failed when generated dist artifacts were absent. Root and frontend Vitest configs now alias @panctl/contracts to packages/contracts/src/index.ts. Verified targeted contracts reducer test with contracts dist absent, frontend ProjectOverview test, npm test, and npm run build.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-10T01:28:53.494Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-10T01:31:04.000Z",
+      "reason": "feedback-fix",
+      "note": "Fixed frontend CommandDeck test failure after inactive projects added a second project-node test element. The project overview test now waits for all project nodes before selecting test-project. Verified with npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/CommandDeck.test.tsx.",
       "agentModel": "gpt-5.5"
     }
   ],

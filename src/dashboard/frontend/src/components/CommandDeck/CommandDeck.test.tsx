@@ -438,7 +438,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
   it('renders the project overview when a project row is selected', async () => {
     renderCommandDeck();
 
-    await screen.findByTestId('project-node');
+    await screen.findAllByTestId('project-node');
     fireEvent.click(screen.getByTestId('project-test-project'));
 
     const overview = screen.getByTestId('project-overview');
