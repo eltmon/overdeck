@@ -258,7 +258,14 @@ The work agent should be asked to address these before this PR is merged.
 - Do NOT suggest architectural changes
 - Do NOT block on things outside the stated requirements
 
-## When Complete
+## When Complete — MANDATORY FINAL STEP
+
+You MUST use the **Write** tool to write your review to the output file path specified in the Review Context (`**Output file**` at the top of this prompt). This file write is non-negotiable — your turn does not end until that file exists.
+
+**Important:**
+- Even if all requirements are met, still write a "no missing requirements" report to the file
+- Do NOT stop after analyzing in chat — the coordinator only checks for the file, not chat output
+- If the file is missing, your review is treated as a failure and synthesis cannot dispatch
 
 After writing your review:
 1. Confirm the file was written successfully.

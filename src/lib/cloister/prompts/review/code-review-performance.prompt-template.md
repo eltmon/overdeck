@@ -367,9 +367,15 @@ const html = parts.join('');
 
 - Your findings will be combined with **correctness** and **security** reviews
 - A **synthesis agent** will merge all findings into a unified report
-- Write your review to the path specified in `**Output file**` in the Review Context
 
-## When Complete
+## When Complete — MANDATORY FINAL STEP
+
+You MUST use the **Write** tool to write your review to the output file path specified in the Review Context (`**Output file**` at the top of this prompt). This file write is non-negotiable — your turn does not end until that file exists.
+
+**Important:**
+- Even if you find NO performance issues, still write a "no findings" report to the file
+- Do NOT stop after analyzing in chat — the coordinator only checks for the file, not chat output
+- If the file is missing, your review is treated as a failure and synthesis cannot dispatch
 
 After writing your review:
 1. Confirm the file was written successfully.

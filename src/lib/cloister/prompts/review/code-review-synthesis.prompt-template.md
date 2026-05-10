@@ -222,8 +222,23 @@ the verdict:
 
 ---
 
-## When complete
+## When complete — MANDATORY FINAL STEP
 
+You MUST use the **Write** tool to write **both** `synthesis.md` and
+`synthesis.json` to the paths given in the Synthesis Context. These two
+file writes are non-negotiable — your turn does not end until both files
+exist on disk.
+
+**Important:**
+- The dashboard, GitHub poster, and feedback delivery to the work agent ALL
+  depend on these files. Skipping the write step blocks the entire review
+  pipeline; the work agent will not be notified of the verdict.
+- Producing the synthesis content in chat is not a substitute for the file
+  writes. The orchestrator only checks for the files on disk.
+- If either file is missing after your turn ends, the review is marked
+  failed and the work agent receives no feedback.
+
+After writing both files:
 1. Confirm both `synthesis.md` and `synthesis.json` were written to the paths
    given in the Synthesis Context.
 2. **Display the full synthesis.md in this conversation.** Read the file you
