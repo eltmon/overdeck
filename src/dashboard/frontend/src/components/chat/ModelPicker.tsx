@@ -279,7 +279,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
       >
         <span className={styles.pickerLabel}>{label}</span>
         {harness === 'pi' && (
-          <span className={styles.harnessIndicator} title="Pi harness active">π</span>
+          <span className={styles.harnessIndicator} title="Pi harness active">Pi</span>
         )}
         {selectedWarning && (
           <CostWarningBadge level={selectedWarning} compact costPer1MTokens={selectedModel?.costPer1MTokens} />

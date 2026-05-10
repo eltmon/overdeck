@@ -3525,14 +3525,18 @@
   flex-shrink: 0;
 }
 
-/* π indicator shown in the trigger button when Pi harness is active */
+/* "Pi" pill shown in the trigger button when Pi harness is active */
 .harnessIndicator {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   color: var(--primary);
-  opacity: 0.85;
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  padding: 1px 5px;
+  border-radius: 3px;
   flex-shrink: 0;
-  line-height: 1;
+  line-height: 1.5;
 }
 
 /* Applied to the model picker dropdown to pin the harness section at top
