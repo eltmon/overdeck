@@ -316,80 +316,26 @@ export interface SpecialistRegistry {
 }
 
 /**
- * Default specialist definitions
+ * PAN-1048 review feedback 003 (REQ-16): default specialist definitions are
+ * gone. The role primitive replaces the specialist identity model, so
+ * recreating registry.json with a hard-coded list of specialist names would
+ * just resurrect what startup cleanup just deleted.
  */
-const DEFAULT_SPECIALISTS: LegacySpecialistDefinition[] = [
-  {
-    name: 'merge-agent',
-    displayName: 'Merge Agent',
-    description: 'Final merge validation and handoff specialist',
-    enabled: true,
-    autoWake: false,
-  },
-  {
-    name: 'review-agent',
-    displayName: 'Review Agent',
-    description: 'Code review and quality checks',
-    enabled: true,
-    autoWake: false,
-  },
-  {
-    name: 'test-agent',
-    displayName: 'Test Agent',
-    description: 'Test execution and analysis',
-    enabled: true,
-    autoWake: true,
-  },
-  {
-    name: 'inspect-agent',
-    displayName: 'Inspect Agent',
-    description: 'Per-bead specification and diff inspection',
-    enabled: true,
-    autoWake: false,
-  },
-  {
-    name: 'uat-agent',
-    displayName: 'UAT Agent',
-    description: 'Browser-based user acceptance testing',
-    enabled: true,
-    autoWake: true,
-  },
-];
+const DEFAULT_SPECIALISTS: LegacySpecialistDefinition[] = [];
 
 /**
- * Initialize specialists directory and registry
+ * PAN-1048 review feedback 003 (REQ-16): initSpecialistsDirectory is a no-op.
  *
- * Creates directory structure and default registry.json if needed.
- * Safe to call multiple times - idempotent.
+ * The cleanup at Cloister startup (service.ts cleanupLegacySpecialistsDirectory)
+ * removes ~/.panopticon/specialists/ on every boot. The previous body of this
+ * function would unconditionally re-create the directory and seed
+ * registry.json from DEFAULT_SPECIALISTS the next time anything called
+ * loadRegistry(), undoing the cleanup and resurrecting the legacy identity
+ * model. The stub keeps the call sites alive (callers that still loadRegistry
+ * get an in-memory default registry) without recreating any disk artifacts.
  */
 export function initSpecialistsDirectory(): void {
-  // Ensure specialists directory exists
-  if (!existsSync(SPECIALISTS_DIR)) {
-    mkdirSync(SPECIALISTS_DIR, { recursive: true });
-  }
-
-  // Create default registry if it doesn't exist
-  if (!existsSync(REGISTRY_FILE)) {
-    const registry: SpecialistRegistry = {
-      version: '3.0', // Updated for compound-key (issueId-aware) structure (PAN-754)
-      defaults: {
-        contextRuns: 5,
-        digestModel: null,
-        retention: {
-          maxDays: 30,
-          maxRuns: 50,
-        },
-      },
-      projects: {},
-      // Keep legacy specialists for backward compatibility during transition
-      specialists: DEFAULT_SPECIALISTS,
-      lastUpdated: new Date().toISOString(),
-    };
-    saveRegistry(registry);
-  } else {
-    // Migrate old registry if needed
-    migrateRegistryIfNeeded();
-  }
+  // Intentionally empty. See block comment above.
 }
 
 /**
@@ -444,16 +390,29 @@ function migrateRegistryIfNeeded(): void {
  * @returns Specialist registry
  */
 export function loadRegistry(): SpecialistRegistry {
-  initSpecialistsDirectory();
-
+  // PAN-1048 review feedback 003 (REQ-16): do not recreate the directory.
+  // If registry.json is missing (typical after Cloister startup cleanup),
+  // return an empty in-memory registry instead of seeding disk.
+  if (!existsSync(REGISTRY_FILE)) {
+    return {
+      version: '3.0',
+      defaults: {
+        contextRuns: 5,
+        digestModel: null,
+        retention: { maxDays: 30, maxRuns: 50 },
+      },
+      projects: {},
+      specialists: DEFAULT_SPECIALISTS,
+      lastUpdated: new Date().toISOString(),
+    };
+  }
   try {
     const content = readFileSync(REGISTRY_FILE, 'utf-8');
     return JSON.parse(content);
   } catch (error) {
     console.error('Failed to load specialist registry:', error);
-    // Return default registry
     return {
-      version: '1.0',
+      version: '3.0',
       defaults: {
         contextRuns: 5,
         digestModel: null,
@@ -472,9 +431,14 @@ export function loadRegistry(): SpecialistRegistry {
  * @param registry - Registry to save
  */
 export function saveRegistry(registry: SpecialistRegistry): void {
-  // Only ensure directory exists, don't call initSpecialistsDirectory to avoid recursion
+  // PAN-1048 review feedback 003 (REQ-16): only persist when the legacy
+  // directory already exists. Cloister startup cleanup deletes the directory
+  // on every boot, so writing here without a pre-existing dir would re-create
+  // the legacy identity model that the cleanup is meant to remove. The
+  // in-memory registry from loadRegistry() is enough for the few residual
+  // call sites that still consult specialist metadata.
   if (!existsSync(SPECIALISTS_DIR)) {
-    mkdirSync(SPECIALISTS_DIR, { recursive: true });
+    return;
   }
 
   registry.lastUpdated = new Date().toISOString();

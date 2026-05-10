@@ -85,6 +85,12 @@ export interface TtsSummarizerConfig {
 export type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 export type ModelRef = string;
 
+/**
+ * Canonical workhorse slot list. Anything outside this set is rejected by
+ * config-load validation (PAN-1048 review feedback 003 / REQ-18).
+ */
+export const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'] as const;
+
 export type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
 
 export interface RoleSubConfig {
@@ -765,6 +771,23 @@ function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): v
   if (!config?.workhorses && !config?.roles) return;
 
   if (config.workhorses) {
+    // PAN-1048 review feedback 003 (REQ-18): reject any workhorse key outside
+    // the canonical three slots (expensive | mid | cheap). The Settings API
+    // already gates this on the HTTP path; the config-load path was silently
+    // accepting hand-edited config.yaml values like workhorses.tiny: claude-…
+    // and propagating them into the merged registry, where derefWorkhorse()
+    // would later miss because the role config only references the canonical
+    // slots. Failing fast at load time gives a precise field error instead.
+    const unknownSlots = Object.keys(config.workhorses).filter(
+      (slot): slot is string => !(WORKHORSE_SLOTS as readonly string[]).includes(slot),
+    );
+    if (unknownSlots.length > 0) {
+      throw new Error(
+        `config.yaml: unknown workhorse slot${unknownSlots.length > 1 ? 's' : ''} ` +
+          unknownSlots.map((s) => `workhorses.${s}`).join(', ') +
+          `. Valid slots: ${WORKHORSE_SLOTS.join(', ')}.`,
+      );
+    }
     result.workhorses = {
       ...(result.workhorses ?? {}),
       ...config.workhorses,

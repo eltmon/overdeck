@@ -82,6 +82,24 @@ describe('role model configuration', () => {
     })).toThrow('config.yaml: workhorses.cheap cannot reference another workhorse');
   });
 
+  // PAN-1048 review feedback 003 (REQ-18): the manual-YAML config-load path
+  // must reject any workhorse key outside the canonical three slots (the HTTP
+  // settings API already gates this at settings-api.ts:246-253). Without this
+  // guard a hand-edited config.yaml with workhorses.tiny: claude-haiku-4-5
+  // passed silently, then the role config could never reference it because the
+  // role schema only knows the canonical three.
+  it('rejects unknown workhorse slot keys with a precise field-path error', () => {
+    expect(() => mergeConfigs({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      workhorses: { tiny: 'claude-haiku-4-5' } as any,
+    })).toThrow('config.yaml: unknown workhorse slot workhorses.tiny. Valid slots: expensive, mid, cheap.');
+
+    expect(() => mergeConfigs({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      workhorses: { tiny: 'claude-haiku-4-5', huge: 'claude-opus-4-7' } as any,
+    })).toThrow('config.yaml: unknown workhorse slots workhorses.tiny, workhorses.huge. Valid slots: expensive, mid, cheap.');
+  });
+
   it('round-trips workhorses, role models, harness, and sub-role overrides through merged config', () => {
     const { config } = mergeConfigs({
       workhorses: WORKHORSES,

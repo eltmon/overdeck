@@ -906,46 +906,36 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
 );
 
 // ─── Route: GET /api/specialists/:project/:issueId/:type/status ───────────────
+//
+// PAN-1048 review feedback 003 (REQ-16): the legacy specialist-status route
+// returned metadata sourced from ~/.panopticon/specialists/registry.json, which
+// the role-primitive refactor explicitly retires. The startup cleanup in
+// service.ts deletes that directory on every boot; preserving the read path
+// would silently recreate it via getRunMetadata() → loadRegistry()/saveRegistry().
+//
+// The route is now a 410 Gone with a pointer to the role-aware status surface.
+// The frontend's only caller (AgentOutputPanel) only fires when
+// parseSpecialistSession(agentId) matches the legacy `specialist-…` session
+// naming, which the new role spawns no longer use, so the dead-letter response
+// is invisible to current dashboards.
 
 const getProjectSpecialistStatusRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:project/:issueId/:type/status',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const issueId = params['issueId'] as string;
-    const type = params['type'] as string;
-
-    if (!validateSpecialistAgentName(type)) {
-      return jsonResponse(
-        { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
-        { status: 400 },
-      );
-    }
-
-    const {
-      makeSpecialistRegistryKey,
-      getRunMetadata,
-      getTmuxSessionName,
-      isProjectSpecialistActivelyRunning,
-    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const { getAgentRuntimeStateAsync } = yield* Effect.promise(() => import('../../../lib/agents.js'));
-
-    const registryKey = makeSpecialistRegistryKey(type, issueId);
-    const metadata = getRunMetadata(project, registryKey);
-    const tmuxSession = metadata.tmuxSession ?? getTmuxSessionName(type, project, issueId);
-    const runtimeState = yield* Effect.promise(() => getAgentRuntimeStateAsync(tmuxSession));
-    const isRunning = isProjectSpecialistActivelyRunning(runtimeState, metadata.currentRun !== null);
-
-    return jsonResponse({
-      name: type,
-      state: isRunning ? 'active' : 'sleeping',
-      isRunning,
-      tmuxSession,
-      currentIssue: issueId,
-      sessionId: metadata.sessionId,
-      contextTokens: undefined,
-    });
+    return jsonResponse(
+      {
+        error: 'specialist-status route retired',
+        hint: 'Specialist identity is replaced by the role primitive. Use GET /api/agents and read the role/status fields off the AgentSnapshot for the role-scoped session (e.g. agent-pan-509-review).',
+        retiredFor: {
+          project: params['project'],
+          issueId: params['issueId'],
+          type: params['type'],
+        },
+      },
+      { status: 410 },
+    );
   })),
 );
 

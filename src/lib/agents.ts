@@ -1794,13 +1794,22 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }
 
+  // PAN-1048 review feedback 003: respect roles.work.harness from config when
+  // the caller did not pass an explicit options.harness. Without this, every
+  // work spawn ignored the per-role harness slot surfaced in Settings → Roles
+  // and silently fell back to claude-code — the same bug spawnRun() already
+  // fixed for non-work roles at line 1659.
+  const resolvedHarness: 'claude-code' | 'pi' = options.harness
+    ?? loadYamlConfig().config.roles?.work?.harness
+    ?? 'claude-code';
+
   // Create state
   const existingState = getAgentState(agentId);
   const state: AgentState = {
     id: agentId,
     issueId: options.issueId,
     workspace: options.workspace,
-    harness: options.harness ?? 'claude-code',
+    harness: resolvedHarness,
     role,
     model: selectedModel,
     status: 'starting',
