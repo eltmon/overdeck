@@ -19,6 +19,7 @@ import { getDashboardApiUrl } from '../../lib/config.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
 import { readWorkspacePlan } from '../../lib/vbrief/io.js';
 import { groupItemsByWave, getDispatchableItems, runTaskCommand, createActiveSlice, verifyActiveSlicePromptReduction, isTaskCommand, type TaskCommand, type Wave } from '../../lib/vbrief/dag.js';
+import { INTERNAL_TOKEN_HEADER, ensureInternalToken } from '../../lib/internal-token.js';
 
 const DASHBOARD_URL = getDashboardApiUrl();
 
@@ -92,9 +93,15 @@ export async function swarmCommand(
     if (maxSlots !== undefined) body.maxSlots = maxSlots;
     if (options.autoAdvance !== undefined) body.autoAdvance = options.autoAdvance;
 
+    // PAN-977 blocker #3: POST /api/swarm is privileged. Send the internal
+    // token so the dashboard auth gate accepts the request.
+    const internalToken = ensureInternalToken();
     const response = await fetch(`${DASHBOARD_URL}/api/swarm`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        [INTERNAL_TOKEN_HEADER]: internalToken,
+      },
       body: JSON.stringify(body),
     });
 

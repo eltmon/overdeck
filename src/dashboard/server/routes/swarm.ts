@@ -205,17 +205,30 @@ async function saveRuntimeToContinue(workspacePath: string, issueId: string, run
 }
 
 function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
-  const slots: SlotAssignment[] = runtime.slots.map(slot => ({
-    slot: slot.slotId,
-    itemId: slot.itemId,
-    itemTitle: slot.itemTitle,
-    sessionName: slot.sessionName,
-    workspace: slot.workspace,
-    status: slot.status === 'merged' ? 'merged' : slot.status === 'failed' ? 'failed' : 'running',
-    phase: (slot as unknown as { phase?: 'synthesis' | 'implementation' }).phase,
-    startedAt: slot.dispatchedAt,
-    completedAt: slot.mergedAt,
-  }));
+  const slots: SlotAssignment[] = runtime.slots.map(slot => {
+    // Preserve passthrough fields (phase, failureReason, completed status)
+    // that the runtime persists alongside the canonical SwarmSlotRuntime shape.
+    const extra = slot as unknown as { phase?: 'synthesis' | 'implementation'; failureReason?: string; completedStatus?: 'completed' | 'merged' };
+    const status = slot.status === 'failed'
+      ? 'failed'
+      : extra.completedStatus === 'completed'
+        ? 'completed'
+        : slot.status === 'merged'
+          ? 'merged'
+          : 'running';
+    return {
+      slot: slot.slotId,
+      itemId: slot.itemId,
+      itemTitle: slot.itemTitle,
+      sessionName: slot.sessionName,
+      workspace: slot.workspace,
+      status,
+      phase: extra.phase,
+      failureReason: extra.failureReason,
+      startedAt: slot.dispatchedAt,
+      completedAt: slot.mergedAt,
+    };
+  });
   return {
     issueId: issueId.toUpperCase(),
     currentWave: runtime.currentWave ?? 0,
@@ -242,8 +255,13 @@ function runtimeFromState(state: SwarmState, existing?: SwarmRuntime): SwarmRunt
       itemTitle: slot.itemTitle,
       sessionName: slot.sessionName,
       workspace: slot.workspace,
-      status: slot.status === 'completed' ? 'merged' : slot.status === 'merged' ? 'merged' : slot.status === 'failed' ? 'failed' : 'running',
+      // SwarmSlotRuntime status is narrower than SwarmState — fold 'completed'
+      // into 'running' on the runtime side and round-trip the original via
+      // `completedStatus` so `stateFromRuntime` can recover it.
+      status: slot.status === 'merged' ? 'merged' : slot.status === 'failed' ? 'failed' : 'running',
+      completedStatus: slot.status === 'completed' ? 'completed' : undefined,
       phase: slot.phase,
+      failureReason: slot.failureReason,
       dispatchedAt: slot.startedAt,
       mergedAt: slot.completedAt,
     } as unknown as SwarmRuntime['slots'][number])),
@@ -326,14 +344,19 @@ async function loadSwarmState(issueId: string): Promise<SwarmState | null> {
   if (project) {
     const workspace = join(project.projectPath, 'workspaces', `feature-${canonical.toLowerCase()}`);
     const runtime = (await loadWorkspaceContinue(workspace, canonical)).swarmRuntime;
-    const legacy = await loadLegacySwarmState(canonical);
-    const legacyPath = getSwarmStatePath(canonical);
-    const legacyMtime = legacy ? (await stat(legacyPath).catch(() => null))?.mtimeMs : undefined;
-    const runtimeUpdated = runtime ? Date.parse(runtime.updatedAt) : undefined;
-    if (runtime && (!legacy || (runtimeUpdated ?? 0) >= (legacyMtime ?? Date.parse(legacy.updatedAt)))) {
+    // PAN-977 round-10 blocker #4: continue vBRIEF is the authority. Once a
+    // runtime record exists for this issue, the legacy sidecar is no longer
+    // consulted — only the canonical store. Falling back to legacy here on
+    // mtime grounds let stale on-disk sidecars override fresh runtime writes
+    // (notably under fake timers where Date.now()==0 yields a 1970 runtime
+    // timestamp that "lost" the mtime arbitration to a 2026 sidecar mtime).
+    if (runtime) {
       return stateFromRuntime(canonical, runtime);
     }
+    const legacy = await loadLegacySwarmState(canonical);
     if (legacy) {
+      // One-time import: convert legacy sidecar into the canonical runtime so
+      // subsequent reads find the runtime branch above and never re-arbitrate.
       await persistSwarmRuntime(workspace, legacy).catch(() => undefined);
       return legacy;
     }
@@ -350,20 +373,27 @@ async function loadSwarmState(issueId: string): Promise<SwarmState | null> {
 }
 
 /**
- * PAN-977: the swarm sidecar `~/.panopticon/swarms/<issue>.json` is no longer
- * the canonical runtime store — `loadSwarmState` reads the continue vBRIEF
- * (`continue-<issueId>.vbrief.json`) first and falls back to the sidecar only
- * for one-time import. We continue to write the sidecar as a non-authoritative
- * legacy mirror so external observers (dashboards, tests, ad-hoc tooling) that
- * still inspect the file see a consistent shadow until that consumer side is
- * migrated. Callers MUST also call `persistSwarmRuntime(workspace, state)` —
- * the durable authority for runtime state — which most call sites do.
+ * PAN-977 blocker #4 (round 10): the swarm sidecar
+ * `~/.panopticon/swarms/<issue>.json` is no longer written. The canonical
+ * runtime authority is the continue vBRIEF — `persistSwarmRuntime()` is the
+ * only durable write path. `saveSwarmState` is retained as the unified mutation
+ * entry point: it bumps `state.updatedAt` and routes the durable write
+ * through `persistSwarmRuntime`, so call sites that previously double-wrote
+ * to sidecar + continue stay correct.
+ *
+ * `loadSwarmState` still reads the legacy sidecar as a one-shot fallback to
+ * cover the migration window for swarms that started before this version
+ * shipped; that read converges them into the continue authority on first
+ * touch and the on-disk file is then ignored.
  */
 async function saveSwarmState(state: SwarmState): Promise<void> {
-  const dir = getSwarmDir();
-  await mkdir(dir, { recursive: true });
   state.updatedAt = new Date().toISOString();
-  await writeFile(getSwarmStatePath(state.issueId), JSON.stringify(state, null, 2));
+  const project = resolveProjectFromIssue(state.issueId);
+  if (!project) return;
+  const workspace = join(project.projectPath, 'workspaces', `feature-${state.issueId.toLowerCase()}`);
+  await persistSwarmRuntime(workspace, state).catch((err: any) => {
+    console.warn(`[swarm] Failed to persist runtime for ${state.issueId}: ${err.message}`);
+  });
 }
 
 async function runWithConcurrencyLimit<T, R>(
@@ -777,6 +807,23 @@ async function dispatchSwarmWave(
         persistedSynthesis?.contextUpdate,
       );
 
+      // PAN-977 blocker #1: claim BEFORE spawn so the canonical vBRIEF is the
+      // gate. If the CAS claim fails, no agent is spawned. If spawn fails after
+      // a successful claim, release the claim (`unblock`) so the next dispatch
+      // can retry — never leave an orphan claim with no live agent.
+      try {
+        await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+          type: 'claim',
+          itemId: item.id,
+          reason: dispatchSynthesisFirst
+            ? `Swarm slot ${slotNum} dispatched (synthesis phase)`
+            : `Swarm slot ${slotNum} dispatched`,
+          writerId: `swarm-dispatch-${process.pid}`,
+        });
+      } catch (claimErr: any) {
+        return `Slot ${slotNum} (${item.id}): canonical vBRIEF claim failed — ${claimErr.message}`;
+      }
+
       try {
         const spawnOptions: SpawnOptions = {
           issueId: issueUpper,
@@ -789,18 +836,6 @@ async function dispatchSwarmWave(
         };
 
         await spawnAgent(spawnOptions);
-        // Claim the canonical vBRIEF plan item so it is no longer dispatchable.
-        // Both implementation AND synthesis dispatches must claim — otherwise a synthesis
-        // slot leaves the convergence item in `pending`, and a second dispatch call can
-        // re-pick it before the synthesis agent finishes.
-        await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
-          type: 'claim',
-          itemId: item.id,
-          reason: dispatchSynthesisFirst
-            ? `Swarm slot ${slotNum} dispatched (synthesis phase)`
-            : `Swarm slot ${slotNum} dispatched`,
-          writerId: `swarm-dispatch-${process.pid}`,
-        });
 
         const refreshedDoc = await readWorkspacePlanAsync(mainWorkspace);
         if (refreshedDoc) {
@@ -819,6 +854,17 @@ async function dispatchSwarmWave(
           startedAt: new Date().toISOString(),
         } satisfies SlotAssignment;
       } catch (err: any) {
+        // Spawn failed after the claim landed — release the item so the next
+        // dispatch cycle can retry. If the release itself fails, the next poll
+        // can repair it; record the original spawn error either way.
+        await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+          type: 'unblock',
+          itemId: item.id,
+          reason: `Spawn failed for slot ${slotNum}; releasing claim for retry`,
+          writerId: `swarm-dispatch-${process.pid}`,
+        }).catch((releaseErr: any) => {
+          console.warn(`[swarm] Failed to release claim after spawn error for ${item.id}: ${releaseErr.message}`);
+        });
         return `Slot ${slotNum} (${item.id}): ${err.message}`;
       }
     },
@@ -845,14 +891,17 @@ async function dispatchSwarmWave(
   }
 
   // PAN-977 blocker #4: persist slots cumulatively across dispatch cycles.
-  // The previous implementation overwrote `slots` with the latest dispatch batch,
-  // dropping prior running/merged slots and weakening file-overlap enforcement
-  // and merge-state readiness checks downstream. We now keep prior slots intact
-  // and merge in the new dispatch batch, deduping by `slot` number — a fresh
-  // dispatch for the same slot id supersedes the old (terminal) record.
-  const newDispatchedBySlot = new Map(dispatched.map(s => [s.slot, s]));
+  // The previous implementation overwrote `slots` with the latest dispatch
+  // batch, dropping prior running/merged slots and weakening file-overlap and
+  // merge-state readiness checks downstream. We now keep prior slot records
+  // (including terminal `completed`/`merged`/`failed` ones) and only dedupe
+  // when the SAME `(slot, itemId)` pair is being re-dispatched — that is the
+  // only safe overwrite, because the old record describes the same task as
+  // the new one. Reusing slot id 1 for a different item id appends a new
+  // record alongside the prior history.
+  const newKeys = new Set(dispatched.map(s => `${s.slot}::${s.itemId}`));
   const carriedSlots: SlotAssignment[] = (existingState?.slots ?? [])
-    .filter(prior => !newDispatchedBySlot.has(prior.slot));
+    .filter(prior => !newKeys.has(`${prior.slot}::${prior.itemId}`));
   const cumulativeSlots: SlotAssignment[] = [...carriedSlots, ...dispatched];
 
   const state: SwarmState = {
@@ -904,11 +953,11 @@ async function dispatchSwarmWave(
   };
 }
 
-async function onSlotMergeComplete(issueId: string, itemId: string, slotId: number, synthesisOutput?: string): Promise<void> {
+async function onSlotMergeComplete(issueId: string, itemId: string, slotId: number, synthesisOutput?: string): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
   const issueUpper = canonicalIssueId(issueId);
-  if (!issueUpper) return;
+  if (!issueUpper) return { ok: false, status: 400, error: 'invalid issueId' };
   const project = resolveProjectFromIssue(issueUpper);
-  if (!project) return;
+  if (!project) return { ok: false, status: 404, error: `no project resolved for ${issueUpper}` };
   const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueUpper.toLowerCase()}`);
   const now = new Date().toISOString();
   const state = await loadSwarmState(issueUpper);
@@ -963,23 +1012,44 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
     // item still claimed/running and skips it, leaving the implementation slot
     // un-spawned. Apply the durable mutation, *then* compute readiness from the
     // refreshed plan via dispatchSwarmWave.
+    // PAN-977 blocker #2: durable vBRIEF mutation failures MUST surface to the
+    // caller. Swallowing them previously allowed /api/swarm/slot-merged to
+    // report success while the canonical plan item was still `running`,
+    // wedging downstream synthesis/implementation dispatch.
     if (resolvedItemId) {
-      if (isSynthesisCompletion) {
-        // Release the convergence item back to dispatchable so the next swarm
-        // dispatch picks it up as an implementation slot.
-        await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
-          type: 'unblock',
-          itemId: resolvedItemId,
-          reason: `Synthesis context delivered by slot ${slotId}; released for implementation dispatch`,
-          writerId: `swarm-synth-${process.pid}`,
-        }).catch(() => undefined);
-      } else {
-        await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
-          type: 'done',
-          itemId: resolvedItemId,
-          reason: `Swarm slot ${slotId} merged into feature branch`,
-          writerId: `swarm-merge-${process.pid}`,
-        }).catch(() => undefined);
+      try {
+        if (isSynthesisCompletion) {
+          await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+            type: 'unblock',
+            itemId: resolvedItemId,
+            reason: `Synthesis context delivered by slot ${slotId}; released for implementation dispatch`,
+            writerId: `swarm-synth-${process.pid}`,
+          });
+        } else {
+          await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+            type: 'done',
+            itemId: resolvedItemId,
+            reason: `Swarm slot ${slotId} merged into feature branch`,
+            writerId: `swarm-merge-${process.pid}`,
+          });
+        }
+      } catch (mutationErr: any) {
+        // Persist a retry-needed marker on the slot so the next reconciliation
+        // pass can repair it, then bubble the failure up so the HTTP route
+        // returns non-2xx and the caller knows to retry.
+        try {
+          const retryNote = `vBRIEF task mutation failed: ${mutationErr.message}`;
+          const retrySlots = nextState.slots.map(s =>
+            s.slot === slotId ? { ...s, status: 'failed' as const, failureReason: retryNote } : s);
+          const retryState = { ...nextState, slots: retrySlots, lastAutoAdvanceError: retryNote, updatedAt: new Date().toISOString() };
+          await saveSwarmState(retryState);
+          await persistSwarmRuntime(mainWorkspace, retryState);
+        } catch { /* best effort — original error still propagates */ }
+        return {
+          ok: false,
+          status: 500,
+          error: `Failed to apply canonical vBRIEF mutation for ${resolvedItemId}: ${mutationErr.message}`,
+        };
       }
     }
 
@@ -999,6 +1069,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
       activeSwarmIssueIds.delete(issueUpper);
     }
   }
+  return { ok: true };
 }
 
 /**
@@ -1246,6 +1317,26 @@ const postSwarmRoute = HttpRouter.add(
   'POST',
   '/api/swarm',
   httpHandler(Effect.gen(function* () {
+    // PAN-977 blocker #3: this is a privileged state-changing endpoint that
+    // can spawn autonomous agents, create worktrees, and mutate canonical
+    // vBRIEF task state. Require the same internal-token gate that
+    // /api/swarm/slot-merged uses, and reject unauthenticated requests before
+    // any side-effecting work.
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
+      import('../../../lib/internal-token.js'),
+    );
+    const expected = getInternalToken();
+    if (!expected) {
+      return jsonResponse({ error: 'internal token not configured' }, { status: 503 });
+    }
+    const headers = request.headers as Record<string, string | string[] | undefined>;
+    const rawHeader = headers[INTERNAL_TOKEN_HEADER];
+    const provided = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    if (!constantTimeTokenEqual(provided, expected)) {
+      return jsonResponse({ error: 'forbidden' }, { status: 403 });
+    }
+
     const body = yield* readJsonBody;
     const { wave, model, maxSlots, autoAdvance } = body as SwarmDispatchRequest;
     const issueId = canonicalIssueId((body as Record<string, unknown>)['issueId']);
@@ -1538,7 +1629,10 @@ const postSwarmSlotMergedRoute = HttpRouter.add(
       return jsonResponse({ error: `synthesisOutput exceeds ${MAX_SYNTHESIS_OUTPUT_BYTES} bytes.` }, { status: 413 });
     }
 
-    yield* Effect.promise(() => onSlotMergeComplete(issueId, itemId, slotId as number, synthesisOutput as string | undefined));
+    const result = yield* Effect.promise(() => onSlotMergeComplete(issueId, itemId, slotId as number, synthesisOutput as string | undefined));
+    if (!result.ok) {
+      return jsonResponse({ error: result.error }, { status: result.status });
+    }
     return jsonResponse({ success: true });
   })),
 );
@@ -1587,6 +1681,13 @@ export const __testInternals = {
   onSlotMergeComplete,
   buildStructuredSlotTaskInput,
   buildSlotPrompt,
+  // PAN-977 round-10 blocker #4: tests read durable runtime state via the
+  // continue vBRIEF (the canonical authority); the legacy sidecar file is no
+  // longer written. Expose `loadSwarmState`/`persistSwarmRuntime` so tests can
+  // read and seed the post-action state without duplicating the continue-state
+  // path resolution.
+  loadSwarmState,
+  persistSwarmRuntime,
 };
 
 export { resumeSwarmAutoAdvanceLoopOnStartup };

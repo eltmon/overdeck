@@ -272,11 +272,10 @@ describe('swarm route helpers', () => {
     const { __testInternals } = await import('../swarm.js');
     await __testInternals.pollSwarmAutoAdvance();
 
-    const nextState = JSON.parse(readFileSync(swarmStatePath, 'utf-8')) as {
-      currentWave: number;
-      autoAdvance: boolean;
-      slots: Array<{ itemId: string; itemTitle: string; sessionName: string; status: string }>;
-    };
+    // Round 10 blocker #4: durable runtime now lives in the continue vBRIEF;
+    // the sidecar file is no longer written. Read state via the canonical
+    // authority instead.
+    const nextState = (await __testInternals.loadSwarmState('PAN-971'))!;
 
     // PAN-977 blocker #3: auto-advance is per-DAG-readiness now, not by wave
     // index. We assert the new ready item dispatched, regardless of currentWave.
@@ -474,10 +473,7 @@ describe('swarm route helpers', () => {
     await __testInternals.pollSwarmAutoAdvance();
     await __testInternals.pollSwarmAutoAdvance();
 
-    const failedState = JSON.parse(readFileSync(swarmStatePath, 'utf-8')) as {
-      autoAdvanceFailureCount?: number;
-      autoAdvanceRetryAfter?: string;
-    };
+    const failedState = (await __testInternals.loadSwarmState('PAN-971'))!;
     expect(failedState.autoAdvanceFailureCount).toBe(3);
     expect(failedState.autoAdvanceRetryAfter).toBeTruthy();
 
@@ -534,36 +530,36 @@ describe('swarm route helpers', () => {
       { itemId: 'wave-0-item-b', itemTitle: 'Deferred slot item' },
     ]);
 
-    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
-    const initialState = JSON.parse(readFileSync(swarmStatePath, 'utf-8')) as {
-      deferred?: Array<{ itemId: string; itemTitle: string }>;
-      slots: Array<Record<string, unknown>>;
+    // Mark the dispatched slot as completed in the canonical runtime so the
+    // next poll re-dispatches the deferred item.
+    const initialState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    const completedState = {
+      ...initialState,
+      slots: [{
+        slot: 1,
+        itemId: 'wave-0-item-a',
+        itemTitle: 'First slot item',
+        sessionName: 'agent-pan-971-1',
+        workspace: '',
+        status: 'completed' as const,
+      }],
     };
-    initialState.slots = [{
-      slot: 1,
-      itemId: 'wave-0-item-a',
-      itemTitle: 'First slot item',
-      sessionName: 'agent-pan-971-1',
-      workspace: '',
-      status: 'completed',
-    }];
-    writeFileSync(swarmStatePath, JSON.stringify(initialState, null, 2));
+    await __testInternals.persistSwarmRuntime(
+      join(projectPath, 'workspaces', 'feature-pan-971'),
+      completedState,
+    );
 
     await __testInternals.pollSwarmAutoAdvance();
 
-    const nextState = JSON.parse(readFileSync(swarmStatePath, 'utf-8')) as {
-      currentWave: number;
-      deferred?: Array<{ itemId: string; itemTitle: string }>;
-      slots: Array<{ itemId: string; itemTitle: string; status: string }>;
-    };
-    expect(nextState.currentWave).toBe(0);
+    const nextState = (await __testInternals.loadSwarmState('PAN-971'))!;
     expect(nextState.deferred).toBeUndefined();
-    expect(nextState.slots.length).toBe(1);
-    expect(nextState.slots[0]?.slot).toBe(1);
-    expect(nextState.slots[0]?.itemId).toBe('wave-0-item-b');
-    expect(nextState.slots[0]?.itemTitle).toBe('Deferred slot item');
-    expect(nextState.slots[0]?.sessionName).toBe('agent-pan-971-1');
-    expect(nextState.slots[0]?.status).toBe('running');
+    // Cumulative slot history (PAN-977 #4) keeps the prior 'completed' record
+    // alongside the new dispatch. Locate the new dispatch by item id.
+    const dispatched = nextState.slots.find((s) => s.itemId === 'wave-0-item-b');
+    expect(dispatched).toBeTruthy();
+    expect(dispatched?.itemTitle).toBe('Deferred slot item');
+    expect(dispatched?.sessionName).toBe('agent-pan-971-1');
+    expect(dispatched?.status).toBe('running');
   });
 
   it('records failed slots and blocks auto-advance when tmux exits non-zero', async () => {
@@ -596,12 +592,7 @@ describe('swarm route helpers', () => {
     const { __testInternals } = await import('../swarm.js');
     await __testInternals.pollSwarmAutoAdvance();
 
-    const failedState = JSON.parse(readFileSync(swarmStatePath, 'utf-8')) as {
-      currentWave: number;
-      autoAdvanceFailureCount?: number;
-      lastAutoAdvanceError?: string;
-      slots: Array<{ status: string; failureReason?: string }>;
-    };
+    const failedState = (await __testInternals.loadSwarmState('PAN-971'))!;
     expect(failedState.currentWave).toBe(0);
     expect(failedState.autoAdvanceFailureCount).toBe(1);
     expect(failedState.lastAutoAdvanceError).toBe('One or more swarm slots failed before completion was confirmed.');
