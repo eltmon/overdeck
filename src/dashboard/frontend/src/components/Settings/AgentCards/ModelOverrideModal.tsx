@@ -15,7 +15,7 @@ import {
 import { WorkTypeId, ModelId, Harness } from '../types';
 import { CostWarningBadge, costWarningLevel } from '../../shared/costWarning';
 import { canUsePickerHarness } from '../../shared/ModelPicker';
-import type { AuthMode } from '../../shared/ModelPicker';
+import type { HarnessPolicyDecisions } from '../../shared/ModelPicker';
 
 // Model capabilities that can be matched to work types
 export type Capability = 'reasoning' | 'code' | 'vision' | 'fast' | 'cost-efficient' | 'large-context' | 'complex-math' | 'efficiency' | 'agentic';
@@ -244,7 +244,7 @@ export function ModelOverrideModal({
 }: ModelOverrideModalProps) {
   const [selectedModel, setSelectedModel] = useState<ModelId>(currentModel);
   const [selectedHarness, setSelectedHarness] = useState<Harness>(currentHarness);
-  const [anthropicAuthMode, setAnthropicAuthMode] = useState<AuthMode | undefined>(undefined);
+  const [harnessPolicy, setHarnessPolicy] = useState<HarnessPolicyDecisions>({});
   const [openRouterModels, setOpenRouterModels] = useState<ModelDef[]>([]);
 
   const workTypeName = WORK_TYPE_NAMES[workType] || workType;
@@ -329,22 +329,24 @@ export function ModelOverrideModal({
 
   useEffect(() => {
     let canceled = false;
-    void fetch('/api/settings/claude-auth')
+    const modelIds = displayProviders.flatMap((provider) => provider.models.map((model) => model.id));
+    if (modelIds.length === 0) return undefined;
+
+    void fetch(`/api/settings/harness-policy?models=${encodeURIComponent(modelIds.join(','))}`)
       .then((r) => r.json())
-      .then((status: { loggedIn?: boolean; hasAnthropicApiKey?: boolean }) => {
-        if (!canceled) setAnthropicAuthMode(status.hasAnthropicApiKey ? 'api-key' : (status.loggedIn ? 'subscription' : undefined));
+      .then((data: { decisions?: HarnessPolicyDecisions }) => {
+        if (!canceled) setHarnessPolicy(data.decisions ?? {});
       })
       .catch(() => undefined);
     return () => { canceled = true; };
-  }, []);
+  }, [displayProviders]);
 
   const handleApply = () => {
     onApply(selectedModel, effectiveHarness);
     onClose();
   };
 
-  const selectedProvider = displayProviders.find((provider) => provider.models.some((model) => model.id === selectedModel))?.key;
-  const piDecision = canUsePickerHarness('pi', selectedProvider, selectedProvider === 'anthropic' ? anthropicAuthMode : undefined);
+  const piDecision = canUsePickerHarness('pi', selectedModel, harnessPolicy);
   const piBlocked = !piDecision.allowed;
   const effectiveHarness = piBlocked && selectedHarness === 'pi' ? 'claude-code' : selectedHarness;
   const hasChanges = selectedModel !== currentModel || effectiveHarness !== currentHarness;

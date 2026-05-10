@@ -111,7 +111,7 @@ export function ActionsSection({
   const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';
 
   const [showResumeModelDropdown, setShowResumeModelDropdown] = useState(false);
-  const { groups, defaultModel, authModes } = useAvailableModels();
+  const { groups, defaultModel, harnessPolicy } = useAvailableModels();
   const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
 
   const isPipelineStuck = isReviewPipelineStuck(reviewStatus);
@@ -373,7 +373,7 @@ export function ActionsSection({
                     onChange={onLaunchHarnessChange}
                     modelId={defaultModel}
                     groups={groups}
-                    authMode={authModes.anthropic}
+                    harnessPolicy={harnessPolicy}
                   />
                 </div>
               )}

@@ -16,7 +16,7 @@ import {
 } from './defaultConversationModel';
 import { usePickerPosition } from './usePickerPosition';
 import { CostWarningBadge, costWarningLevel } from '../shared/costWarning';
-import { HarnessSelect, type AuthMode, type Harness, type ModelGroup as SharedModelGroup } from '../shared/ModelPicker';
+import { HarnessSelect, type Harness, type HarnessPolicyDecisions, type ModelGroup as SharedModelGroup } from '../shared/ModelPicker';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -156,12 +156,12 @@ interface ModelPickerProps {
   disabled?: boolean;
   harness?: Harness;
   onHarnessChange?: (harness: Harness) => void;
-  authMode?: AuthMode;
 }
 
-export function ModelPicker({ value, onChange, disabled = false, harness, onHarnessChange, authMode }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, disabled = false, harness, onHarnessChange }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
+  const [harnessPolicy, setHarnessPolicy] = useState<HarnessPolicyDecisions>({});
   const ref = useRef<HTMLDivElement>(null);
   const { openUp, align, maxHeight } = usePickerPosition(open, ref);
 
@@ -224,11 +224,15 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
           });
         }
 
-        if (newGroups.length > 0) {
-          syncKnownModels(newGroups);
-          setGroups(newGroups);
-        } else {
-          syncKnownModels(FALLBACK_GROUPS);
+        const effectiveGroups = newGroups.length > 0 ? newGroups : FALLBACK_GROUPS;
+        syncKnownModels(effectiveGroups);
+        if (newGroups.length > 0) setGroups(newGroups);
+
+        const modelIds = effectiveGroups.flatMap((group) => group.models.map((model) => model.id));
+        if (modelIds.length > 0) {
+          const policy = await fetch(`/api/settings/harness-policy?models=${encodeURIComponent(modelIds.join(','))}`)
+            .then((r) => r.json()) as { decisions?: HarnessPolicyDecisions };
+          setHarnessPolicy(policy.decisions ?? {});
         }
       } catch {
         syncKnownModels(FALLBACK_GROUPS);
@@ -330,7 +334,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
         onChange={onHarnessChange}
         modelId={value}
         groups={sharedGroups}
-        authMode={authMode}
+        harnessPolicy={harnessPolicy}
       />
     )}
     </>

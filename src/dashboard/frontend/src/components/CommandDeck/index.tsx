@@ -14,7 +14,7 @@ import { useConversationMutations } from './useConversationMutations';
 import { ForkModal } from './ForkModal';
 import { ConversationPanel, type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredHarness, loadStoredModel, saveStoredHarness, saveStoredModel } from '../chat/ModelPicker';
-import type { AuthMode, Harness } from '../shared/ModelPicker';
+import type { Harness } from '../shared/ModelPicker';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
 import { useDashboardStore, selectAgentList } from '../../lib/store';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
@@ -241,7 +241,6 @@ export function CommandDeck({
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
   const [sidebarHarness, setSidebarHarness] = useState<Harness>(loadStoredHarness);
-  const [anthropicAuthMode, setAnthropicAuthMode] = useState<AuthMode | undefined>(undefined);
 
   // Per-issue session selection (PAN-830 pan-11sr) — slice keyed by issueId.
   // The tree highlight uses the value for whichever feature is currently active.
@@ -795,17 +794,6 @@ export function CommandDeck({
 
   const projectConvMutations = useConversationMutations(selectedConversation, handleSelectConversation);
 
-  useEffect(() => {
-    let canceled = false;
-    void fetch('/api/settings/claude-auth')
-      .then((r) => r.json())
-      .then((status: { loggedIn?: boolean; hasAnthropicApiKey?: boolean }) => {
-        if (!canceled) setAnthropicAuthMode(status.hasAnthropicApiKey ? 'api-key' : (status.loggedIn ? 'subscription' : undefined));
-      })
-      .catch(() => undefined);
-    return () => { canceled = true; };
-  }, []);
-
   const createConversationForProject = useCallback(async (projectKey?: string) => {
     try {
       const payload: Record<string, unknown> = { model: sidebarModel, harness: sidebarHarness };
@@ -984,7 +972,6 @@ export function CommandDeck({
                     setSidebarHarness(harness);
                     saveStoredHarness(harness);
                   }}
-                  authMode={anthropicAuthMode}
                 />
                 <button
                   className={styles.conversationAddBtn}

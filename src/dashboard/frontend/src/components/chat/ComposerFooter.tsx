@@ -18,7 +18,7 @@ import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
 import { ModelPicker, MODEL_EFFORT_SUPPORT, loadStoredHarness, saveStoredHarness, saveStoredModel } from './ModelPicker';
-import type { AuthMode, Harness } from '../shared/ModelPicker';
+import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -152,7 +152,6 @@ interface ComposerFooterProps {
 export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: ComposerFooterProps) {
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
   const [harness, setHarness] = useState<Harness>(conversation.harness ?? loadStoredHarness());
-  const [authMode, setAuthMode] = useState<AuthMode | undefined>(undefined);
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
@@ -174,17 +173,6 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
 
   const isDisabled = !conversation.sessionAlive || sending;
   const isEmpty = text.trim() === '';
-
-  useEffect(() => {
-    let canceled = false;
-    void fetch('/api/settings/claude-auth')
-      .then((r) => r.json())
-      .then((status: { loggedIn?: boolean; hasAnthropicApiKey?: boolean }) => {
-        if (!canceled) setAuthMode(status.hasAnthropicApiKey ? 'api-key' : (status.loggedIn ? 'subscription' : undefined));
-      })
-      .catch(() => undefined);
-    return () => { canceled = true; };
-  }, []);
 
   const deleteUploadedImage = useCallback((conversationName: string, path: string) => {
     void deleteConversationImage(conversationName, path).catch((err: unknown) => {
@@ -532,7 +520,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
 
         {/* Toolbar inside the box */}
         <div className={styles.composerToolbar}>
-          <ModelPicker value={model} onChange={handleModelChange} disabled={isDisabled} harness={harness} onHarnessChange={handleHarnessChange} authMode={authMode} />
+          <ModelPicker value={model} onChange={handleModelChange} disabled={isDisabled} harness={harness} onHarnessChange={handleHarnessChange} />
           <div className={styles.composerToolbarDivider} />
           <EffortPicker value={effort} onChange={setEffort} disabled={isDisabled} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 

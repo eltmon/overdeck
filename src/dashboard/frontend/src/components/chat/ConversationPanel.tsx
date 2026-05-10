@@ -9,7 +9,7 @@ import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
-import { ModelPicker, saveStoredModel } from './ModelPicker';
+import { ModelPicker, loadStoredHarness, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
@@ -60,11 +60,11 @@ interface ConversationPanelProps {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-async function resumeConversation(name: string, model?: string, effort?: string): Promise<Conversation> {
+async function resumeConversation(name: string, model?: string, effort?: string, harness?: Harness): Promise<Conversation> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/resume`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, effort }),
+    body: JSON.stringify({ model, effort, harness }),
   });
   if (!res.ok) throw new Error('Failed to resume conversation');
   return res.json();
@@ -87,6 +87,7 @@ export function ConversationPanel({
   const [confirmArchive, setConfirmArchive] = useState(false);
   const confirm = useConfirm();
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
+  const [selectedHarness, setSelectedHarness] = useState<Harness>(() => conversation.harness ?? loadStoredHarness());
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -103,6 +104,13 @@ export function ConversationPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.model]);
+
+  useEffect(() => {
+    if (conversation.harness && conversation.harness !== selectedHarness) {
+      setSelectedHarness(conversation.harness);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation.harness]);
 
   // Query messages at this level so we can drive the header working-spinner
   const { data: messagesData } = useQuery({
@@ -231,7 +239,7 @@ export function ConversationPanel({
   }, [])
 
   const resumeMutation = useMutation({
-    mutationFn: () => resumeConversation(conversation.name, selectedModel),
+    mutationFn: () => resumeConversation(conversation.name, selectedModel, conversation.effort ?? undefined, selectedHarness),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
@@ -240,18 +248,19 @@ export function ConversationPanel({
   });
 
   const switchModelMutation = useMutation({
-    mutationFn: (model: string) => {
+    mutationFn: ({ model, harness }: { model: string; harness: Harness }) => {
       const endpoint = agentId
         ? `/api/agents/${encodeURIComponent(agentId)}/switch-model`
         : `/api/conversations/${encodeURIComponent(conversation.name)}/switch-model`;
       return fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model }),
+        body: JSON.stringify({ model, harness }),
       }).then(r => { if (!r.ok) throw new Error('Failed to switch model'); return r.json(); });
     },
-    onSuccess: (_, model) => {
+    onSuccess: (_, { model, harness }) => {
       saveStoredModel(model);
+      saveStoredHarness(harness);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
     },
@@ -497,9 +506,14 @@ export function ConversationPanel({
               modelPicker={!embedded ? (
                 <ModelPicker
                   value={selectedModel}
+                  harness={selectedHarness}
+                  onHarnessChange={(harness) => {
+                    setSelectedHarness(harness);
+                    switchModelMutation.mutate({ model: selectedModel, harness });
+                  }}
                   onChange={(modelId) => {
                     setSelectedModel(modelId);
-                    switchModelMutation.mutate(modelId);
+                    switchModelMutation.mutate({ model: modelId, harness: selectedHarness });
                   }}
                 />
               ) : undefined}

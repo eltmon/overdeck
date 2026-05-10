@@ -1289,13 +1289,14 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
       {showSwitchModel && agent && (
         <SwitchModelModal
           currentModel={agent.model}
+          currentHarness={agent.harness ?? agent.runtime ?? 'claude-code'}
           agentId={agent.id}
           issueId={issueId}
           agentStatus={agent.status}
           hasResumableSession={agentLifecycle?.canResumeSession ?? false}
           onClose={() => setShowSwitchModel(false)}
-          onSwitch={(model, message) => {
-            switchMutation.mutate({ model, message }, {
+          onSwitch={(model, message, harness) => {
+            switchMutation.mutate({ model, message, harness }, {
               onSuccess: () => {
                 setShowSwitchModel(false);
                 toast.success(`Agent restarted on ${model}`);

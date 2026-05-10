@@ -9,7 +9,7 @@ import { XTerminal } from './XTerminal';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { useConfirm } from './DialogProvider';
 import { PlanSetupScreen, type SetupProgressEvent } from './PlanSetupScreen';
-import { canUsePickerHarness, getProviderForPickerModel, ModelHarnessPicker, type AuthMode, type Harness, type ModelGroup } from './shared/ModelPicker';
+import { canUsePickerHarness, ModelHarnessPicker, type Harness, type HarnessPolicyDecisions, type ModelGroup } from './shared/ModelPicker';
 
 interface PlanDialogProps {
   issue: Issue;
@@ -77,7 +77,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const [shadowMode, setShadowMode] = useState(false);
   const [modelOverride, setModelOverride] = useState<string>(''); // '' = use settings default
   const [harnessOverride, setHarnessOverride] = useState<Harness>('claude-code');
-  const [anthropicAuthMode, setAnthropicAuthMode] = useState<AuthMode | undefined>(undefined);
   const [effort, setEffort] = useState<'low' | 'medium' | 'high'>('medium');
   const [watchPlanning, setWatchPlanning] = useState(true);
   // Ref so async SSE callbacks always read the live checkbox value, not a stale closure copy
@@ -102,17 +101,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     staleTime: 60000,
   });
   const defaultPlanningModel = settingsQuery.data?.models?.overrides?.['planning-agent'] || 'claude-opus-4-6';
-
-  useEffect(() => {
-    let canceled = false;
-    void fetch('/api/settings/claude-auth')
-      .then((r) => r.json())
-      .then((status: { loggedIn?: boolean; hasAnthropicApiKey?: boolean }) => {
-        if (!canceled) setAnthropicAuthMode(status.hasAnthropicApiKey ? 'api-key' : (status.loggedIn ? 'subscription' : undefined));
-      })
-      .catch(() => undefined);
-    return () => { canceled = true; };
-  }, []);
 
   // Fetch available models from all configured providers
   const availableModelsQuery = useQuery({
@@ -150,11 +138,25 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
         })),
       }))
     : [];
+  const planningPolicyQuery = useQuery({
+    queryKey: ['harness-policy', planningModelGroups.map((group) => group.models.map((model) => model.id).join('|')).join('|')],
+    queryFn: async () => {
+      const modelIds = planningModelGroups.flatMap((group) => group.models.map((model) => model.id));
+      if (modelIds.length === 0) return {} as HarnessPolicyDecisions;
+      const res = await fetch(`/api/settings/harness-policy?models=${encodeURIComponent(modelIds.join(','))}`);
+      if (!res.ok) throw new Error('Failed to load harness policy');
+      const data = await res.json() as { decisions?: HarnessPolicyDecisions };
+      return data.decisions ?? {};
+    },
+    enabled: planningModelGroups.length > 0,
+    staleTime: 60000,
+  });
+
   const effectivePlanningModel = modelOverride || defaultPlanningModel;
   const planningHarnessDecision = canUsePickerHarness(
     harnessOverride,
-    getProviderForPickerModel(effectivePlanningModel, planningModelGroups),
-    anthropicAuthMode,
+    effectivePlanningModel,
+    planningPolicyQuery.data,
   );
   const effectivePlanningHarness = planningHarnessDecision.allowed ? harnessOverride : 'claude-code';
 
@@ -809,7 +811,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                           onModelChange={(model) => setModelOverride(model === defaultPlanningModel ? '' : model)}
                           onHarnessChange={setHarnessOverride}
                           groups={planningModelGroups}
-                          authMode={anthropicAuthMode}
+                          harnessPolicy={planningPolicyQuery.data}
                           modelLabel="Model"
                         />
                         {!planningHarnessDecision.allowed && (

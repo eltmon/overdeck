@@ -47,6 +47,7 @@ import { BulkActionBar } from './BulkActionBar';
 import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';
 import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgress';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
+import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
 
 
 // Parity registry anchor — keeps the card action surface tied to the
@@ -2671,6 +2672,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const { prefs: _prefs } = useUIPreferences();
+  const { groups: modelGroups, defaultModel, harnessPolicy } = useAvailableModels();
+  const [launchModel, setLaunchModel] = useState(defaultModel);
+  const [launchHarness, setLaunchHarness] = useState<Harness>('claude-code');
 
   // Auto-scroll into view when selected via search
   useEffect(() => {
@@ -2851,7 +2855,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
 
   const startAgentMutation = useMutation({
     mutationFn: async () => {
-      const requestBody = { issueId: issue.identifier };
+      const requestBody = { issueId: issue.identifier, model: launchModel, harness: launchHarness };
       let lastRequestBody: Record<string, unknown> = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
@@ -3542,6 +3546,17 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
           {planLabelExists && (
             <>
               {artifactLinks}
+              <div className="min-w-[220px]" onClick={(e) => e.stopPropagation()}>
+                <ModelHarnessPicker
+                  model={launchModel}
+                  harness={launchHarness}
+                  onModelChange={setLaunchModel}
+                  onHarnessChange={setLaunchHarness}
+                  groups={modelGroups}
+                  harnessPolicy={harnessPolicy}
+                  modelLabel="Agent model"
+                />
+              </div>
               <button
                 ref={startButtonRef}
                 onClick={handleStartAgent}
@@ -3591,8 +3606,20 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
               <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
             </button>
           ) : hasBeads ? (
-            <button
-              ref={startButtonRef}
+            <>
+              <div className="min-w-[220px]" onClick={(e) => e.stopPropagation()}>
+                <ModelHarnessPicker
+                  model={launchModel}
+                  harness={launchHarness}
+                  onModelChange={setLaunchModel}
+                  onHarnessChange={setLaunchHarness}
+                  groups={modelGroups}
+                  harnessPolicy={harnessPolicy}
+                  modelLabel="Agent model"
+                />
+              </div>
+              <button
+                ref={startButtonRef}
               onClick={handleStartAgent}
               disabled={startAgentMutation.isPending || isStarting}
               className="flex items-center gap-1 text-xs font-semibold bg-success text-success-foreground hover:bg-emerald-500 transition-colors rounded px-2 py-1 disabled:opacity-50"
@@ -3600,8 +3627,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
               data-testid={`card-start-agent-${issue.identifier}`}
             >
               {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}</span>
-            </button>
+                <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}</span>
+              </button>
+            </>
           ) : null}
           <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
         </div>

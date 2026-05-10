@@ -1260,13 +1260,14 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       {showSwitchModel && agent && (
         <SwitchModelModal
           currentModel={agent.model}
+          currentHarness={agent.harness ?? agent.runtime ?? 'claude-code'}
           agentId={agent.id}
           issueId={issueId}
           agentStatus={agent.status}
           hasResumableSession={agent.hasSession ?? false}
           onClose={() => setShowSwitchModel(false)}
-          onSwitch={(model, message) => {
-            switchMutation.mutate({ model, message }, {
+          onSwitch={(model, message, harness) => {
+            switchMutation.mutate({ model, message, harness }, {
               onSuccess: () => setShowSwitchModel(false),
             });
           }}

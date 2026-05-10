@@ -34,6 +34,9 @@ import { generateLauncherScript } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge-token.js';
+import { canUseHarness } from './harness-policy.js';
+import type { RuntimeName } from './runtimes/types.js';
+import { createPiFifo, piFifoPaths } from './runtimes/pi-fifo.js';
 
 const execAsync = promisify(exec);
 
@@ -72,6 +75,28 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
     }
   }
   return false;
+}
+
+async function getPiLauncherFields(agentId: string): Promise<{
+  harness: 'pi';
+  piExtensionPath: string;
+  piFifoPath: string;
+  piSessionDir: string;
+}> {
+  const paths = piFifoPaths(agentId);
+  mkdirSync(paths.agentDir, { recursive: true, mode: 0o700 });
+  return {
+    harness: 'pi',
+    piExtensionPath: resolve(process.cwd(), 'packages/pi-extension/dist/index.js'),
+    piFifoPath: await createPiFifo(agentId),
+    piSessionDir: paths.agentDir,
+  };
+}
+
+async function resolveEffectiveHarness(harness: unknown, model: string): Promise<RuntimeName> {
+  const requested: RuntimeName = harness === 'pi' || harness === 'claude-code' ? harness : 'claude-code';
+  const decision = canUseHarness(requested, model, await getProviderAuthMode(model));
+  return decision.allowed ? requested : 'claude-code';
 }
 
 export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
@@ -1445,6 +1470,10 @@ export async function buildAgentLaunchConfig(opts: {
 
   const providerExports = await getProviderExportsForModel(model);
 
+  const piLauncherFields = opts.harness === 'pi'
+    ? await getPiLauncherFields(opts.agentId)
+    : {};
+
   if (opts.agentType === 'resume' && opts.resumeSessionId) {
     // PAN-982: Resume sessions adopt the work-agent definition via --agent.
     // Permissions/model/tools/hooks come from agents/pan-work-agent.md frontmatter.
@@ -1471,10 +1500,13 @@ export async function buildAgentLaunchConfig(opts: {
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: `claude ${bypassFlag}--agent ${panopticonAgentName('work')}`,
+      baseCommand: opts.harness === 'pi'
+        ? await getAgentRuntimeBaseCommand(model, opts.agentId, 'work', 'pi')
+        : `claude ${bypassFlag}--agent ${panopticonAgentName('work')}`,
       resumeSessionId: opts.resumeSessionId,
-      model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
-      extraArgs: `--name ${opts.agentId}`,
+      model: opts.harness === 'pi' || providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+      extraArgs: opts.harness === 'pi' ? undefined : `--name ${opts.agentId}`,
+      ...piLauncherFields,
     });
     return { launcherContent, providerEnv };
   }
@@ -1502,6 +1534,7 @@ export async function buildAgentLaunchConfig(opts: {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, panAgentType, opts.harness ?? 'claude-code'),
+    ...piLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
@@ -2211,12 +2244,15 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       agentState.model = opts.model;
       saveAgentState(agentState);
     }
+    const effectiveHarness = await resolveEffectiveHarness(agentState.harness, model);
+    agentState.harness = effectiveHarness;
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
       model,
       workspace: agentState.workspace,
       agentType: 'resume',
       resumeSessionId: sessionId,
+      harness: effectiveHarness,
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -2324,9 +2360,11 @@ export async function restartAgent(
   await stopAgentAsync(normalizedId);
 
   const effectiveModel = newModel || agentState.model || 'claude-sonnet-4-6';
+  const effectiveHarness = await resolveEffectiveHarness(agentState.harness, effectiveModel);
   if (newModel && newModel !== agentState.model) {
     agentState.model = newModel;
   }
+  agentState.harness = effectiveHarness;
   agentState.status = 'starting';
   saveAgentState(agentState);
 
@@ -2339,6 +2377,7 @@ export async function restartAgent(
       workspace: agentState.workspace,
       agentType: 'work',
       isPlanning: agentState.phase === 'planning',
+      harness: effectiveHarness,
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');

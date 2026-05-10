@@ -113,7 +113,7 @@ interface ForkModalProps {
 }
 
 export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkModalProps) {
-  const { groups, compactionModel, authModes } = useAvailableModels();
+  const { groups, compactionModel, harnessPolicy } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
   const [launchHarness, setLaunchHarness] = useState<Harness>(conversation.harness || 'claude-code');
@@ -270,7 +270,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
               onModelChange={setLaunchModel}
               onHarnessChange={setLaunchHarness}
               groups={groups}
-              authMode={authModes.anthropic}
+              harnessPolicy={harnessPolicy}
               modelLabel="Launch model"
             />
             <span className={pickerStyles.fieldHint}>

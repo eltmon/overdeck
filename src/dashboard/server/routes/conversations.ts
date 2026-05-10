@@ -1734,6 +1734,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
             const oldSessionId = conv.claudeSessionId;
             const sessionFileForResume = resolveSessionFile(conv);
             const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);
+            const harness = await resolveAllowedHarness(conv.harness, conv.model);
             await spawnConversationSession(
               conv.tmuxSession,
               conv.cwd,
@@ -1742,7 +1743,9 @@ const postConversationRestartAllRoute = HttpRouter.add(
               conv.effort ?? undefined,
               conv.issueId ?? undefined,
               canResume,
+              harness,
             );
+            setConversationHarness(conv.name, harness);
             markConversationActive(conv.name);
             results.push({ name: conv.name, model: conv.model, status: 'restarted' });
           } catch (err: unknown) {
