@@ -79,8 +79,9 @@ const execFileAsync = promisify(execFile);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
-type ProjectSpecialistType = 'review-agent' | 'test-agent' | 'merge-agent';
+type SpecialistAgentName = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
+type ProjectSpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent';
+type SpecialistEventRole = 'review' | 'test' | 'ship';
 
 const VALID_SPECIALIST_NAMES: string[] = [
   'merge-agent',
@@ -90,8 +91,15 @@ const VALID_SPECIALIST_NAMES: string[] = [
   'uat-agent',
 ];
 
-function validateSpecialistType(type: string): type is ProjectSpecialistType {
+function validateSpecialistAgentName(type: string): type is ProjectSpecialistAgentName {
   return type === 'review-agent' || type === 'test-agent' || type === 'merge-agent';
+}
+
+function specialistEventRole(name: string): SpecialistEventRole | undefined {
+  if (name === 'review' || name === 'review-agent') return 'review';
+  if (name === 'test' || name === 'test-agent') return 'test';
+  if (name === 'merge' || name === 'merge-agent') return 'ship';
+  return undefined;
 }
 
 // Read the request body as unknown JSON
@@ -336,8 +344,8 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         const project = resolveProjectFromIssue(normalizedIssueId);
         const projectKey = project?.projectKey;
         const tmuxSession = projectKey
-          ? getTmuxSessionName(`${specialist}-agent` as SpecialistType, projectKey, normalizedIssueId)
-          : getTmuxSessionName(`${specialist}-agent` as SpecialistType);
+          ? getTmuxSessionName(`${specialist}-agent` as SpecialistAgentName, projectKey, normalizedIssueId)
+          : getTmuxSessionName(`${specialist}-agent` as SpecialistAgentName);
         saveAgentRuntimeState(tmuxSession, {
           state: 'idle',
           lastActivity: new Date().toISOString(),
@@ -600,19 +608,22 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       });
     }
 
-    // Emit domain event for specialist completion/failure
-    if (status === 'passed') {
-      yield* eventStore.append({
-        type: 'specialist.completed',
-        timestamp: new Date().toISOString(),
-        payload: { name: `${specialist}-agent`, issueId: normalizedIssueId },
-      });
-    } else {
-      yield* eventStore.append({
-        type: 'specialist.failed',
-        timestamp: new Date().toISOString(),
-        payload: { name: `${specialist}-agent`, issueId: normalizedIssueId, error: notes || `${specialist} failed` },
-      });
+    // Emit domain event for role-backed specialist completion/failure.
+    const eventRole = specialistEventRole(specialist);
+    if (eventRole) {
+      if (status === 'passed') {
+        yield* eventStore.append({
+          type: 'specialist.completed',
+          timestamp: new Date().toISOString(),
+          payload: { name: eventRole, issueId: normalizedIssueId },
+        });
+      } else {
+        yield* eventStore.append({
+          type: 'specialist.failed',
+          timestamp: new Date().toISOString(),
+          payload: { name: eventRole, issueId: normalizedIssueId, error: notes || `${specialist} failed` },
+        });
+      }
     }
 
     return jsonResponse({
@@ -754,7 +765,7 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
     // When specialist reports completion (passed/blocked/failed), set state to idle
     if (['passed', 'blocked', 'failed'].includes(status)) {
       const { getTmuxSessionName } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-      const tmuxSession = getTmuxSessionName(name as SpecialistType);
+      const tmuxSession = getTmuxSessionName(name as SpecialistAgentName);
       saveAgentRuntimeState(tmuxSession, {
         state: 'idle',
         lastActivity: new Date().toISOString(),
@@ -762,17 +773,18 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
     }
 
     // Emit domain event based on status
-    if (status === 'passed') {
+    const eventRole = specialistEventRole(name);
+    if (eventRole && status === 'passed') {
       yield* eventStore.append({
         type: 'specialist.completed',
         timestamp: new Date().toISOString(),
-        payload: { name: name as SpecialistType, issueId },
+        payload: { name: eventRole, issueId },
       });
-    } else if (status === 'failed' || status === 'blocked') {
+    } else if (eventRole && (status === 'failed' || status === 'blocked')) {
       yield* eventStore.append({
         type: 'specialist.failed',
         timestamp: new Date().toISOString(),
-        payload: { name: name as SpecialistType, issueId, error: notes || `${name} reported ${status}` },
+        payload: { name: eventRole, issueId, error: notes || `${name} reported ${status}` },
       });
     }
 
@@ -822,7 +834,7 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
       getTmuxSessionName,
     } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
-    const tmuxSession = getTmuxSessionName(name as SpecialistType);
+    const tmuxSession = getTmuxSessionName(name as SpecialistAgentName);
 
     // Set specialist to idle and clear currentIssue
     saveAgentRuntimeState(tmuxSession, {
@@ -876,11 +888,14 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
       }
     }
 
-    yield* eventStore.append({
-      type: 'specialist.completed',
-      timestamp: new Date().toISOString(),
-      payload: { name: name as SpecialistType, issueId },
-    });
+    const eventRole = specialistEventRole(name);
+    if (eventRole) {
+      yield* eventStore.append({
+        type: 'specialist.completed',
+        timestamp: new Date().toISOString(),
+        payload: { name: eventRole, issueId },
+      });
+    }
 
     return jsonResponse({
       success: true,
@@ -901,7 +916,7 @@ const getProjectSpecialistStatusRoute = HttpRouter.add(
     const issueId = params['issueId'] as string;
     const type = params['type'] as string;
 
-    if (!validateSpecialistType(type)) {
+    if (!validateSpecialistAgentName(type)) {
       return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
@@ -945,7 +960,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
     const issueId = params['issueId'] as string;
     const type = params['type'] as string;
 
-    if (!validateSpecialistType(type)) {
+    if (!validateSpecialistAgentName(type)) {
       return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
@@ -995,7 +1010,7 @@ const postProjectSpecialistSpawnRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId is required' }, { status: 400 });
     }
 
-    if (!validateSpecialistType(type)) {
+    if (!validateSpecialistAgentName(type)) {
       return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
@@ -1177,7 +1192,7 @@ const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    if (!validateSpecialistType(type)) {
+    if (!validateSpecialistAgentName(type)) {
       return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
@@ -1200,7 +1215,7 @@ const postProjectSpecialistGracePauseRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    if (!validateSpecialistType(type)) {
+    if (!validateSpecialistAgentName(type)) {
       return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
@@ -1231,7 +1246,7 @@ const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    if (!validateSpecialistType(type)) {
+    if (!validateSpecialistAgentName(type)) {
       return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
@@ -1262,7 +1277,7 @@ const postProjectSpecialistGraceExitRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    if (!validateSpecialistType(type)) {
+    if (!validateSpecialistAgentName(type)) {
       return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
@@ -1288,7 +1303,7 @@ const getProjectSpecialistGraceRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
 
-    if (!validateSpecialistType(type)) {
+    if (!validateSpecialistAgentName(type)) {
       return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },
@@ -1372,7 +1387,7 @@ const postProjectSpecialistCompleteRoute = HttpRouter.add(
       );
     }
 
-    if (!validateSpecialistType(type)) {
+    if (!validateSpecialistAgentName(type)) {
       return jsonResponse(
         { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
         { status: 400 },

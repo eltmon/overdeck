@@ -12,8 +12,8 @@ import {
   toAgentStatus,
   toRole,
   toAgentResolution,
-  toSpecialistType,
-  toSpecialistState,
+  toSpecialistAgentName,
+  toSpecialistLifecycleState,
   toReviewStatus,
   toTestStatus,
   toMergeStatus,
@@ -65,41 +65,41 @@ describe('toRole', () => {
   })
 })
 
-// ─── toSpecialistType ─────────────────────────────────────────────────────────
+// ─── toSpecialistAgentName ─────────────────────────────────────────────────────────
 
-describe('toSpecialistType', () => {
-  it('passes through valid specialist types', () => {
-    expect(toSpecialistType('review-agent')).toBe('review-agent')
-    expect(toSpecialistType('test-agent')).toBe('test-agent')
-    expect(toSpecialistType('merge-agent')).toBe('merge-agent')
-    expect(toSpecialistType('inspect-agent')).toBe('inspect-agent')
-    expect(toSpecialistType('uat-agent')).toBe('uat-agent')
+describe('toSpecialistAgentName', () => {
+  it('passes through valid specialist names', () => {
+    expect(toSpecialistAgentName('review-agent')).toBe('review-agent')
+    expect(toSpecialistAgentName('test-agent')).toBe('test-agent')
+    expect(toSpecialistAgentName('merge-agent')).toBe('merge-agent')
+    expect(toSpecialistAgentName('inspect-agent')).toBe('inspect-agent')
+    expect(toSpecialistAgentName('uat-agent')).toBe('uat-agent')
   })
 
   it('returns undefined for invalid values', () => {
-    expect(toSpecialistType('deploy-agent')).toBeUndefined()
-    expect(toSpecialistType('REVIEW-AGENT')).toBeUndefined()
-    expect(toSpecialistType(null)).toBeUndefined()
-    expect(toSpecialistType(undefined)).toBeUndefined()
-    expect(toSpecialistType('')).toBeUndefined()
+    expect(toSpecialistAgentName('deploy-agent')).toBeUndefined()
+    expect(toSpecialistAgentName('REVIEW-AGENT')).toBeUndefined()
+    expect(toSpecialistAgentName(null)).toBeUndefined()
+    expect(toSpecialistAgentName(undefined)).toBeUndefined()
+    expect(toSpecialistAgentName('')).toBeUndefined()
   })
 })
 
-// ─── toSpecialistState ────────────────────────────────────────────────────────
+// ─── toSpecialistLifecycleState ────────────────────────────────────────────────────────
 
-describe('toSpecialistState', () => {
+describe('toSpecialistLifecycleState', () => {
   it('passes through valid states', () => {
-    expect(toSpecialistState('active')).toBe('active')
-    expect(toSpecialistState('sleeping')).toBe('sleeping')
-    expect(toSpecialistState('uninitialized')).toBe('uninitialized')
+    expect(toSpecialistLifecycleState('active')).toBe('active')
+    expect(toSpecialistLifecycleState('sleeping')).toBe('sleeping')
+    expect(toSpecialistLifecycleState('uninitialized')).toBe('uninitialized')
   })
 
   it('returns "uninitialized" for invalid values', () => {
-    expect(toSpecialistState('idle')).toBe('uninitialized')
-    expect(toSpecialistState('ACTIVE')).toBe('uninitialized')
-    expect(toSpecialistState(null)).toBe('uninitialized')
-    expect(toSpecialistState(undefined)).toBe('uninitialized')
-    expect(toSpecialistState('')).toBe('uninitialized')
+    expect(toSpecialistLifecycleState('idle')).toBe('uninitialized')
+    expect(toSpecialistLifecycleState('ACTIVE')).toBe('uninitialized')
+    expect(toSpecialistLifecycleState(null)).toBe('uninitialized')
+    expect(toSpecialistLifecycleState(undefined)).toBe('uninitialized')
+    expect(toSpecialistLifecycleState('')).toBe('uninitialized')
   })
 })
 

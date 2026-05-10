@@ -48,7 +48,6 @@ vi.mock('../../../lib/activity-logger.js', () => ({
 }));
 
 vi.mock('../specialists.js', () => ({
-  SpecialistType: {},
   getTmuxSessionName: vi.fn(),
   isRunning: vi.fn(async () => false),
   getAllProjectSpecialistStatuses: vi.fn(() => []),

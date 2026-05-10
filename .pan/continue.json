@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-10T00:12:51.808Z",
+  "updated": "2026-05-10T00:34:17.242Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "b3db3febf",
+    "sha": "4c4c9c956",
     "dirty": true
   },
   "decisions": [
@@ -163,15 +163,16 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-afb9/E1 PanopticonAgentType cleanup is implemented and verified: removed the exported PanopticonAgentType union and panopticonAgentName helper from src/lib/agents.ts, changed getAgentRuntimeBaseCommand to accept a direct Claude Code agent definition string, updated planning/work recovery/review/specialist callsites to pass role paths or legacy pan-* agent names explicitly, and updated command-builder tests. Validation passed: legacy symbol grep, npx tsc --noEmit, npx eslint . --max-warnings=0, targeted agent runtime tests (31 passed), full npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), and graphify update.",
-    "beadId": "workspace-afb9",
+    "description": "workspace-gil3/E2 specialist type cleanup is implemented and verified: removed SpecialistType/SpecialistMetadata/SpecialistStatus from cloister specialists exports, removed SpecialistType/SpecialistState contract schemas and SpecialistSnapshot references, updated specialist domain events to carry Role-backed names, mapped legacy specialist route emitters to review/test/ship roles, updated read-model/frontend/test consumers, rebuilt contracts, and verified no deleted specialist type names remain.",
+    "beadId": "workspace-gil3",
     "filesToRead": [
-      "src/lib/agents.ts",
-      "src/lib/planning/spawn-planning-session.ts",
-      "src/lib/cloister/review-agent.ts",
       "src/lib/cloister/specialists.ts",
-      "src/lib/__tests__/permission-mode-leak.test.ts",
-      "tests/lib/agents-auth-routing.test.ts"
+      "packages/contracts/src/types.ts",
+      "packages/contracts/src/events.ts",
+      "src/dashboard/server/routes/specialists.ts",
+      "src/dashboard/server/read-model.ts",
+      "src/dashboard/frontend/src/__tests__/store.test.ts",
+      "tests/dashboard/event-reducers.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -350,6 +351,12 @@
       "timestamp": "2026-05-10T00:12:51.808Z",
       "reason": "bead-complete",
       "note": "Implemented workspace-afb9/E1: deleted the PanopticonAgentType export and panopticonAgentName helper from agents.ts, made getAgentRuntimeBaseCommand accept direct agent definition strings instead of translating an agent enum, updated work/planning recovery, planning spawn, review-agent, and specialist command callsites to pass roles/work.md, roles/plan.md, or explicit pan-* agent names, and updated command-builder tests. Verified no PanopticonAgentType/panopticonAgentName references remain, npx tsc --noEmit, npx eslint . --max-warnings=0, targeted runtime-command tests (31 passed), full npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-10T00:34:17.242Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-gil3/E2: deleted SpecialistType, SpecialistMetadata, and SpecialistStatus from specialists.ts by replacing remaining legacy runtime surfaces with SpecialistAgentName/LegacySpecialistDefinition/LegacySpecialistRuntimeStatus; removed contract SpecialistType/SpecialistState schemas and SpecialistSnapshot references; changed specialist domain events to use Role names; mapped legacy specialist route/report emissions to review/test/ship; updated read-model, websocket/activity consumers, CLI/frontend/tests, and removed all remaining deleted specialist type name references. Verified contracts build via npm test pretest, npm run typecheck, npm run lint, full npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), deleted-symbol grep, and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

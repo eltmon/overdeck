@@ -19,7 +19,7 @@ import {
   INITIAL_READ_MODEL_STATE,
   applyEvent as applyEventReducer,
 } from '@panctl/contracts';
-import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, SpecialistProjection, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, SpecialistProjection, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEvent } from '../../lib/persistent-logger.js';
 
@@ -44,8 +44,11 @@ let _cachedEventStore: any = null;
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
 const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship"]);
 const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear"]);
-const VALID_SPECIALIST_TYPES = new Set<SpecialistType>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
-const VALID_SPECIALIST_STATES = new Set<SpecialistState>(["active", "sleeping", "uninitialized"]);
+type SpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent' | 'inspect-agent' | 'uat-agent';
+type SpecialistLifecycleState = 'active' | 'sleeping' | 'uninitialized';
+
+const VALID_SPECIALIST_NAMES = new Set<SpecialistAgentName>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
+const VALID_SPECIALIST_LIFECYCLE_STATES = new Set<SpecialistLifecycleState>(["active", "sleeping", "uninitialized"]);
 const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing", "passed", "failed", "blocked"]);
 const VALID_TEST_STATUSES = new Set<TestStatusValue>(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"]);
 const VALID_MERGE_STATUSES = new Set<MergeStatusValue>(["pending", "queued", "merging", "verifying", "merged", "failed"]);
@@ -61,11 +64,11 @@ export function toRole(v: unknown): Role | undefined {
 export function toAgentResolution(v: unknown): AgentResolution | undefined {
   return v && VALID_RESOLUTIONS.has(v as AgentResolution) ? v as AgentResolution : undefined;
 }
-export function toSpecialistType(v: unknown): SpecialistType | undefined {
-  return VALID_SPECIALIST_TYPES.has(v as SpecialistType) ? v as SpecialistType : undefined;
+export function toSpecialistAgentName(v: unknown): SpecialistAgentName | undefined {
+  return VALID_SPECIALIST_NAMES.has(v as SpecialistAgentName) ? v as SpecialistAgentName : undefined;
 }
-export function toSpecialistState(v: unknown): SpecialistState {
-  return VALID_SPECIALIST_STATES.has(v as SpecialistState) ? v as SpecialistState : "uninitialized";
+export function toSpecialistLifecycleState(v: unknown): SpecialistLifecycleState {
+  return VALID_SPECIALIST_LIFECYCLE_STATES.has(v as SpecialistLifecycleState) ? v as SpecialistLifecycleState : "uninitialized";
 }
 export function toReviewStatus(v: unknown): ReviewStatusValue | undefined {
   return v && VALID_REVIEW_STATUSES.has(v as ReviewStatusValue) ? v as ReviewStatusValue : undefined;
@@ -434,12 +437,12 @@ export const ReadModelServiceLive = Layer.effect(
         const allSpecs = getAllSpecialists();
         const specialistsByName: Record<string, SpecialistProjection> = {};
         for (const s of allSpecs) {
-          const specType = toSpecialistType(s.name);
-          if (!specType) continue; // Skip unknown specialist types
+          const specName = toSpecialistAgentName(s.name);
+          if (!specName) continue; // Skip unknown specialist names
           const specState = getSpecialistState(s.name);
           specialistsByName[s.name] = {
-            name: specType,
-            state: toSpecialistState(specState),
+            name: specName,
+            state: toSpecialistLifecycleState(specState),
             isRunning: specState === 'active',
             lastWake: s.lastWake || undefined,
           };

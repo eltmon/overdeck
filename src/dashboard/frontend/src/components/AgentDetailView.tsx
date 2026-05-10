@@ -27,7 +27,7 @@ interface HealthEvent {
   metadata?: Record<string, any>;
 }
 
-interface SpecialistStatus {
+interface SpecialistApiStatus {
   name: string;
   displayName: string;
   state: 'sleeping' | 'active' | 'uninitialized';
@@ -42,7 +42,7 @@ async function fetchHealthHistory(agentId: string, hours: number = 24): Promise<
   return res.json();
 }
 
-async function fetchSpecialists(): Promise<SpecialistStatus[]> {
+async function fetchSpecialists(): Promise<SpecialistApiStatus[]> {
   const res = await fetch('/api/specialists');
   if (!res.ok) throw new Error('Failed to fetch specialists');
   const data = await res.json();

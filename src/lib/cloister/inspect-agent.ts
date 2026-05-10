@@ -17,7 +17,7 @@ import {
   getCurrentHead,
   saveCheckpoint,
 } from './inspect-checkpoints.js';
-import { spawnEphemeralSpecialist, type SpecialistType } from './specialists.js';
+import { spawnEphemeralSpecialist, type SpecialistAgentName } from './specialists.js';
 import { setReviewStatus } from '../review-status.js';
 import { withBdMutex } from '../bd-mutex.js';
 
@@ -166,7 +166,7 @@ export async function spawnInspectAgent(context: InspectContext): Promise<{
   });
 
   // Spawn the ephemeral specialist
-  return spawnEphemeralSpecialist(context.projectKey, 'inspect-agent' as SpecialistType, {
+  return spawnEphemeralSpecialist(context.projectKey, 'inspect-agent' as SpecialistAgentName, {
     issueId: context.issueId,
     branch: context.branch,
     workspace: context.workspace,

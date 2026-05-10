@@ -98,10 +98,8 @@ function mapDomainEventToDetailed(event: StoredEvent): {
       return { source: 'test-specialist', level: 'info', message: `Test specialist started for ${issueId}`, issueId, triggeringEvent: event.type };
     case 'pipeline.test-completed':
       return { source: 'test-specialist', level: p['passed'] ? 'success' : 'error', message: `Tests ${p['passed'] ? 'passed' : 'failed'} for ${issueId}`, issueId, triggeringEvent: event.type };
-    case 'specialist.started': {
-      const spec = p['specialist'] as Record<string, unknown> | undefined;
-      return { source: 'cloister', level: 'info', message: `Specialist ${spec?.['name'] ?? '?'} started${spec?.['currentIssue'] ? ` for ${spec['currentIssue']}` : ''}`, issueId, triggeringEvent: event.type };
-    }
+    case 'specialist.started':
+      return { source: 'cloister', level: 'info', message: `Specialist ${p['name'] ?? '?'} started${p['currentIssue'] ? ` for ${p['currentIssue']}` : ''}`, issueId, triggeringEvent: event.type };
     case 'specialist.completed':
       return { source: 'cloister', level: 'success', message: `Specialist ${p['name']} completed`, issueId, triggeringEvent: event.type };
     case 'specialist.failed':

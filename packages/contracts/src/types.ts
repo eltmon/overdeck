@@ -24,12 +24,6 @@ export type Role = typeof Role.Type
 export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"])
 export type AgentResolution = typeof AgentResolution.Type
 
-export const SpecialistType = Schema.Literals(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"])
-export type SpecialistType = typeof SpecialistType.Type
-
-export const SpecialistState = Schema.Literals(["active", "sleeping", "uninitialized"])
-export type SpecialistState = typeof SpecialistState.Type
-
 export const ReviewStatusValue = Schema.Literals(["pending", "reviewing", "passed", "failed", "blocked"])
 export type ReviewStatusValue = typeof ReviewStatusValue.Type
 

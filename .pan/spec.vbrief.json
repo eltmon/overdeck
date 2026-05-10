@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-10T00:12:51.808Z"
+    "updated": "2026-05-10T00:34:17.242Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 30,
+    "sequence": 31,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-10T00:12:51.808Z",
+    "updated": "2026-05-10T00:34:17.242Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -1331,7 +1331,7 @@
       {
         "id": "e2-delete-specialist-type",
         "title": "Delete SpecialistType, SpecialistMetadata, SpecialistStatus (and contracts)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -1346,36 +1346,41 @@
           {
             "id": "e2-delete-specialist-type.ac1",
             "title": "SpecialistType, SpecialistMetadata, SpecialistStatus deleted from src/lib/cloister/specialists.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T00:34:17.242Z"
           },
           {
             "id": "e2-delete-specialist-type.ac2",
             "title": "SpecialistType schema and SpecialistSnapshot deleted from packages/contracts/src/types.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T00:34:17.242Z"
           },
           {
             "id": "e2-delete-specialist-type.ac3",
             "title": "Agent event payloads in packages/contracts/src/events.ts use Role (not specialist types); contracts rebuilt",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T00:34:17.242Z"
           },
           {
             "id": "e2-delete-specialist-type.ac4",
             "title": "Frontend consumers of SpecialistType/SpecialistSnapshot updated; typecheck passes; dashboard renders correctly end-to-end",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T00:34:17.242Z"
           }
-        ]
+        ],
+        "completed": "2026-05-10T00:34:17.242Z"
       },
       {
         "id": "e3-delete-launcher-agent-type",

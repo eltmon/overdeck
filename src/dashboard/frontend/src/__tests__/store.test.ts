@@ -23,7 +23,7 @@ import type {
   AgentSnapshot,
   DashboardSnapshot,
   DomainEvent,
-  SpecialistSnapshot,
+  SpecialistProjection,
 } from '@panctl/contracts'
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
@@ -38,8 +38,8 @@ const baseAgent: AgentSnapshot = {
   startedAt: '2026-01-01T00:00:00Z',
 }
 
-const baseSpec: SpecialistSnapshot = {
-  name: 'review-agent',
+const baseSpec: SpecialistProjection = {
+  name: 'review',
   state: 'active',
   isRunning: true,
 }
@@ -100,7 +100,7 @@ describe('syncSnapshotReducer', () => {
     expect(next.sequence).toBe(10)
     expect(Object.keys(next.agentsById)).toHaveLength(1)
     expect(next.agentsById['agent-1']).toEqual(baseAgent)
-    expect(next.specialistsByName['review-agent']).toEqual(baseSpec)
+    expect(next.specialistsByName['review']).toEqual(baseSpec)
   })
 })
 
@@ -291,7 +291,7 @@ describe('selectors', () => {
     ...emptyState,
     bootstrapComplete: true,
     agentsById: { 'a1': baseAgent },
-    specialistsByName: { 'review-agent': baseSpec },
+    specialistsByName: { 'review': baseSpec },
     agentOutputById: { 'a1': ['line 1', 'line 2'] },
     resources: { containers: 5, networks: 3 },
   }

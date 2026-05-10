@@ -35,7 +35,7 @@ import type { TrackerConfig } from '../tracker/factory.js';
 // Review status file location (same as dashboard server)
 
 import {
-  SpecialistType,
+  SpecialistAgentName,
   getTmuxSessionName,
   isRunning,
   getAllProjectSpecialistStatuses,
@@ -90,7 +90,7 @@ export interface DeaconConfig {
  * Health check state for a single specialist
  */
 export interface SpecialistHealthState {
-  specialistName: SpecialistType;
+  specialistName: SpecialistAgentName;
   lastPingTime?: string;         // ISO 8601
   lastResponseTime?: string;     // ISO 8601
   consecutiveFailures: number;
@@ -112,7 +112,7 @@ export interface ContainerRestartRecord {
  * Complete health check state for all specialists
  */
 export interface DeaconState {
-  specialists: Record<SpecialistType, SpecialistHealthState>;
+  specialists: Record<SpecialistAgentName, SpecialistHealthState>;
   lastPatrol?: string;           // ISO 8601
   patrolCycle: number;
   recentDeaths: string[];        // ISO timestamps of recent deaths
@@ -125,7 +125,7 @@ export interface DeaconState {
  * Result of a health check
  */
 export interface HealthCheckResult {
-  specialistName: SpecialistType;
+  specialistName: SpecialistAgentName;
   isResponsive: boolean;
   responseTimeMs?: number;
   consecutiveFailures: number;
@@ -207,7 +207,7 @@ export function loadState(): DeaconState {
 
   // Return empty state
   return {
-    specialists: {} as Record<SpecialistType, SpecialistHealthState>,
+    specialists: {} as Record<SpecialistAgentName, SpecialistHealthState>,
     patrolCycle: 0,
     recentDeaths: [],
   };
@@ -231,7 +231,7 @@ export function saveState(state: DeaconState): void {
  */
 function getSpecialistState(
   state: DeaconState,
-  name: SpecialistType
+  name: SpecialistAgentName
 ): SpecialistHealthState {
   if (!state.specialists[name]) {
     state.specialists[name] = {
@@ -277,7 +277,7 @@ function getCooldownRemaining(healthState: SpecialistHealthState): number {
 /**
  * Check if a specialist is responsive by reading their heartbeat
  */
-function checkHeartbeat(name: SpecialistType): {
+function checkHeartbeat(name: SpecialistAgentName): {
   isResponsive: boolean;
   lastActivity?: number;
   responseTimeMs?: number;
@@ -318,7 +318,7 @@ function checkHeartbeat(name: SpecialistType): {
  * When called standalone (no sharedState), loads and saves state itself.
  */
 export async function checkSpecialistHealth(
-  name: SpecialistType,
+  name: SpecialistAgentName,
   sharedState?: DeaconState,
 ): Promise<HealthCheckResult> {
   const state = sharedState ?? loadState();
@@ -409,7 +409,7 @@ export async function checkSpecialistHealth(
  * When called standalone, loads and saves state itself.
  */
 export async function forceKillSpecialist(
-  name: SpecialistType,
+  name: SpecialistAgentName,
   sharedState?: DeaconState,
 ): Promise<{
   success: boolean;

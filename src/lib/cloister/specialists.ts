@@ -219,21 +219,13 @@ export async function buildSpecialistCavemanExports(
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const REGISTRY_FILE = join(SPECIALISTS_DIR, 'registry.json');
 
-/**
- * Supported specialist types
- */
-export type SpecialistType = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
+const SPECIALIST_AGENT_NAMES = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent', 'uat-agent'] as const;
+export type SpecialistAgentName = typeof SPECIALIST_AGENT_NAMES[number];
 
-/**
- * Specialist state
- */
-export type SpecialistState = 'sleeping' | 'active' | 'uninitialized';
+type SpecialistLifecycleState = 'sleeping' | 'active' | 'uninitialized';
 
-/**
- * Specialist metadata
- */
-export interface SpecialistMetadata {
-  name: SpecialistType;
+export interface LegacySpecialistDefinition {
+  name: SpecialistAgentName;
   displayName: string;
   description: string;
   enabled: boolean;
@@ -243,11 +235,8 @@ export interface SpecialistMetadata {
   contextTokens?: number;
 }
 
-/**
- * Specialist status including runtime state
- */
-export interface SpecialistStatus extends SpecialistMetadata {
-  state: SpecialistState;
+export interface LegacySpecialistRuntimeStatus extends LegacySpecialistDefinition {
+  state: SpecialistLifecycleState;
   isRunning: boolean;
   tmuxSession?: string;
   currentIssue?: string; // Issue ID currently being worked on
@@ -322,14 +311,14 @@ export interface SpecialistRegistry {
     };
   };
   // Legacy: Global specialists list (for backward compatibility)
-  specialists?: SpecialistMetadata[];
+  specialists?: LegacySpecialistDefinition[];
   lastUpdated: string; // ISO 8601 timestamp
 }
 
 /**
  * Default specialist definitions
  */
-const DEFAULT_SPECIALISTS: SpecialistMetadata[] = [
+const DEFAULT_SPECIALISTS: LegacySpecialistDefinition[] = [
   {
     name: 'merge-agent',
     displayName: 'Merge Agent',
@@ -517,7 +506,7 @@ function deterministicUUID(input: string): string {
  * @param name - Specialist name
  * @returns Specialist metadata or null if not found
  */
-export function getSpecialistMetadata(name: SpecialistType): SpecialistMetadata | null {
+export function getSpecialistMetadata(name: SpecialistAgentName): LegacySpecialistDefinition | null {
   const registry = loadRegistry();
   return (registry.specialists ?? []).find((s) => s.name === name) || null;
 }
@@ -529,8 +518,8 @@ export function getSpecialistMetadata(name: SpecialistType): SpecialistMetadata 
  * @param updates - Partial metadata to update
  */
 export function updateSpecialistMetadata(
-  name: SpecialistType,
-  updates: Partial<SpecialistMetadata>
+  name: SpecialistAgentName,
+  updates: Partial<LegacySpecialistDefinition>
 ): void {
   const registry = loadRegistry();
 
@@ -556,7 +545,7 @@ export function updateSpecialistMetadata(
  *
  * @returns Array of all specialists
  */
-export function getAllSpecialists(): SpecialistMetadata[] {
+export function getAllSpecialists(): LegacySpecialistDefinition[] {
   const registry = loadRegistry();
   return registry.specialists ?? [];
 }
@@ -567,7 +556,7 @@ export function getAllSpecialists(): SpecialistMetadata[] {
  * @param name - Specialist name
  * @returns True if the specialist has a recorded session id in its agent directory
  */
-export function isInitialized(name: SpecialistType): boolean {
+export function isInitialized(name: SpecialistAgentName): boolean {
   return readRecordedClaudeSessionId(getTmuxSessionName(name)) !== null;
 }
 
@@ -580,7 +569,7 @@ export function isInitialized(name: SpecialistType): boolean {
  * @param name - Specialist name
  * @returns Specialist state
  */
-export function getSpecialistState(name: SpecialistType): Exclude<SpecialistState, 'active'> {
+export function getSpecialistState(name: SpecialistAgentName): Exclude<SpecialistLifecycleState, 'active'> {
   return isInitialized(name) ? 'sleeping' : 'uninitialized';
 }
 
@@ -591,7 +580,7 @@ export function getSpecialistState(name: SpecialistType): Exclude<SpecialistStat
  * @param projectKey - Optional project key for per-project specialists
  * @returns Expected tmux session name
  */
-export function getTmuxSessionName(name: SpecialistType, projectKey?: string, issueId?: string): string {
+export function getTmuxSessionName(name: SpecialistAgentName, projectKey?: string, issueId?: string): string {
   if (projectKey && issueId) {
     return `specialist-${projectKey}-${issueId}-${name}`;
   }
@@ -681,8 +670,8 @@ export function parseSpecialistRegistryKey(key: string): { specialistType: strin
  * @param name - Specialist name
  * @param sessionId - New session ID (if changed)
  */
-export function recordWake(name: SpecialistType, sessionId?: string): void {
-  const updates: Partial<SpecialistMetadata> = {
+export function recordWake(name: SpecialistAgentName, sessionId?: string): void {
+  const updates: Partial<LegacySpecialistDefinition> = {
     lastWake: new Date().toISOString(),
   };
 
@@ -740,7 +729,7 @@ export interface TaskContext {
  */
 export async function spawnEphemeralSpecialist(
   projectKey: string,
-  specialistType: SpecialistType,
+  specialistType: SpecialistAgentName,
   task: {
     issueId: string;
     branch?: string;
@@ -830,7 +819,7 @@ export async function spawnEphemeralSpecialist(
       const parsed = parseSpecialistRegistryKey(key);
       if (parsed.issueId && !parsed.role) {
         const expectedSession = getTmuxSessionName(
-          parsed.specialistType as SpecialistType,
+          parsed.specialistType as SpecialistAgentName,
           projectKey,
           parsed.issueId,
         );
@@ -1033,7 +1022,7 @@ ${basePrompt}`;
     // PAN-982: Each specialist now has a matching .claude/agents/pan-<specialistType>.md
     // definition (pan-review-agent, pan-test-agent, pan-inspect-agent, pan-uat-agent,
     // pan-merge-agent) that declares model, permissionMode, tools, and per-agent hooks.
-    // SpecialistType already ends in '-agent' (e.g. 'review-agent') so we just prepend 'pan-'.
+    // SpecialistAgentName already ends in '-agent' (e.g. 'review-agent') so we just prepend 'pan-'.
     const specialistAgentName = `pan-${specialistType}`;
     writeFileSync(
       innerScript,
@@ -1222,7 +1211,7 @@ export async function buildTestAgentPromptContent(task: {
  */
 async function buildTaskPrompt(
   projectKey: string,
-  specialistType: SpecialistType,
+  specialistType: SpecialistAgentName,
   task: {
     issueId: string;
     branch?: string;
@@ -1380,7 +1369,7 @@ async function buildTaskPrompt(
  */
 export function startGracePeriod(
   projectKey: string,
-  specialistType: SpecialistType,
+  specialistType: SpecialistAgentName,
   duration: number = 60000
 ): void {
   const key = `${projectKey}-${specialistType}`;
@@ -1406,7 +1395,7 @@ export function startGracePeriod(
 /**
  * Pause grace period countdown
  */
-export function pauseGracePeriod(projectKey: string, specialistType: SpecialistType): boolean {
+export function pauseGracePeriod(projectKey: string, specialistType: SpecialistAgentName): boolean {
   const key = `${projectKey}-${specialistType}`;
   const state = gracePeriodStates.get(key);
 
@@ -1430,7 +1419,7 @@ export function pauseGracePeriod(projectKey: string, specialistType: SpecialistT
 /**
  * Resume grace period countdown
  */
-export function resumeGracePeriod(projectKey: string, specialistType: SpecialistType): boolean {
+export function resumeGracePeriod(projectKey: string, specialistType: SpecialistAgentName): boolean {
   const key = `${projectKey}-${specialistType}`;
   const state = gracePeriodStates.get(key);
 
@@ -1459,7 +1448,7 @@ export function resumeGracePeriod(projectKey: string, specialistType: Specialist
 /**
  * Exit grace period immediately (terminate now)
  */
-export function exitGracePeriod(projectKey: string, specialistType: SpecialistType): void {
+export function exitGracePeriod(projectKey: string, specialistType: SpecialistAgentName): void {
   const key = `${projectKey}-${specialistType}`;
   gracePeriodStates.delete(key);
 
@@ -1471,7 +1460,7 @@ export function exitGracePeriod(projectKey: string, specialistType: SpecialistTy
  */
 export function getGracePeriodState(
   projectKey: string,
-  specialistType: SpecialistType
+  specialistType: SpecialistAgentName
 ): GracePeriodState | null {
   const key = `${projectKey}-${specialistType}`;
   return gracePeriodStates.get(key) || null;
@@ -1482,7 +1471,7 @@ export function getGracePeriodState(
  * Searches compound keys; falls back to plain specialistType key.
  * Returns undefined if nothing is currently active.
  */
-export function findActiveRegistryKey(projectKey: string, specialistType: SpecialistType): string | undefined {
+export function findActiveRegistryKey(projectKey: string, specialistType: SpecialistAgentName): string | undefined {
   const registry = loadRegistry();
   const bucket = registry.projects[projectKey] ?? {};
 
@@ -1518,7 +1507,7 @@ export function findActiveRegistryKey(projectKey: string, specialistType: Specia
  */
 export async function signalSpecialistCompletion(
   projectKey: string,
-  specialistType: SpecialistType,
+  specialistType: SpecialistAgentName,
   result: {
     status: 'passed' | 'failed' | 'blocked';
     notes?: string;
@@ -1581,7 +1570,7 @@ export async function signalSpecialistCompletion(
  */
 export async function terminateSpecialist(
   projectKey: string,
-  specialistType: SpecialistType,
+  specialistType: SpecialistAgentName,
   issueId?: string
 ): Promise<void> {
   const registryKey = issueId
@@ -1644,7 +1633,7 @@ export async function terminateSpecialist(
  * @param projectKey - Project identifier
  * @param specialistType - Specialist type
  */
-function scheduleLogCleanup(projectKey: string, specialistType: SpecialistType): void {
+function scheduleLogCleanup(projectKey: string, specialistType: SpecialistAgentName): void {
   // Run async without awaiting
   Promise.resolve().then(async () => {
     try {
@@ -1672,14 +1661,14 @@ function scheduleLogCleanup(projectKey: string, specialistType: SpecialistType):
 /**
  * Get the directory for a project's specialist
  */
-export function getProjectSpecialistDir(projectKey: string, specialistType: SpecialistType): string {
+export function getProjectSpecialistDir(projectKey: string, specialistType: SpecialistAgentName): string {
   return join(SPECIALISTS_DIR, projectKey, specialistType);
 }
 
 /**
  * Ensure per-project specialist directory structure exists
  */
-export function ensureProjectSpecialistDir(projectKey: string, specialistType: SpecialistType): void {
+export function ensureProjectSpecialistDir(projectKey: string, specialistType: SpecialistAgentName): void {
   const specialistDir = getProjectSpecialistDir(projectKey, specialistType);
   const runsDir = join(specialistDir, 'runs');
   const contextDir = join(specialistDir, 'context');
@@ -1756,7 +1745,7 @@ export function updateRunMetadata(
  */
 export function getProjectSpecialistMetadata(
   projectKey: string,
-  specialistType: SpecialistType
+  specialistType: SpecialistAgentName
 ): ProjectSpecialistMetadata {
   const registry = loadRegistry();
   const projectBucket = registry.projects[projectKey] ?? {};
@@ -1790,7 +1779,7 @@ export function getProjectSpecialistMetadata(
  */
 export function updateProjectSpecialistMetadata(
   projectKey: string,
-  specialistType: SpecialistType,
+  specialistType: SpecialistAgentName,
   updates: Partial<ProjectSpecialistMetadata>
 ): void {
   const registry = loadRegistry();
@@ -1869,7 +1858,7 @@ export function listProjectsWithSpecialists(): string[] {
 /**
  * List all specialist types for a project
  */
-export function listSpecialistsForProject(projectKey: string): SpecialistType[] {
+export function listSpecialistsForProject(projectKey: string): SpecialistAgentName[] {
   const registry = loadRegistry();
   const project = registry.projects[projectKey];
 
@@ -1877,7 +1866,7 @@ export function listSpecialistsForProject(projectKey: string): SpecialistType[] 
     return [];
   }
 
-  return Object.keys(project) as SpecialistType[];
+  return Object.keys(project) as SpecialistAgentName[];
 }
 
 /**
@@ -1887,7 +1876,7 @@ export function listSpecialistsForProject(projectKey: string): SpecialistType[] 
  */
 export async function getAllProjectSpecialistStatuses(): Promise<Array<{
   projectKey: string;
-  specialistType: SpecialistType;
+  specialistType: SpecialistAgentName;
   registryKey: string;
   issueId?: string;
   role?: string;
@@ -1900,7 +1889,7 @@ export async function getAllProjectSpecialistStatuses(): Promise<Array<{
 
   const results: Array<{
     projectKey: string;
-    specialistType: SpecialistType;
+    specialistType: SpecialistAgentName;
     registryKey: string;
     issueId?: string;
     role?: string;
@@ -1915,16 +1904,16 @@ export async function getAllProjectSpecialistStatuses(): Promise<Array<{
 
       // Determine tmux session: use stored field when available
       const tmuxSession = metadata.tmuxSession
-        ?? getTmuxSessionName(specialistType as SpecialistType, projectKey, issueId);
+        ?? getTmuxSessionName(specialistType as SpecialistAgentName, projectKey, issueId);
 
       const runtimeState = getAgentRuntimeState(tmuxSession);
-      const sessionRunning = await isRunning(specialistType as SpecialistType, projectKey).catch(() => false);
+      const sessionRunning = await isRunning(specialistType as SpecialistAgentName, projectKey).catch(() => false);
       const running = isProjectSpecialistActivelyRunning(runtimeState, sessionRunning);
       const effectiveMetadata = running ? metadata : { ...metadata, currentRun: null };
 
       results.push({
         projectKey,
-        specialistType: specialistType as SpecialistType,
+        specialistType: specialistType as SpecialistAgentName,
         registryKey,
         issueId,
         role,
@@ -1944,7 +1933,7 @@ export async function getAllProjectSpecialistStatuses(): Promise<Array<{
  * @param name - Specialist name
  * @param tokens - Total context tokens
  */
-export function updateContextTokens(name: SpecialistType, tokens: number): void {
+export function updateContextTokens(name: SpecialistAgentName, tokens: number): void {
   updateSpecialistMetadata(name, { contextTokens: tokens });
 }
 
@@ -1953,7 +1942,7 @@ export function updateContextTokens(name: SpecialistType, tokens: number): void 
  *
  * @param name - Specialist name
  */
-export function enableSpecialist(name: SpecialistType): void {
+export function enableSpecialist(name: SpecialistAgentName): void {
   updateSpecialistMetadata(name, { enabled: true });
 }
 
@@ -1962,7 +1951,7 @@ export function enableSpecialist(name: SpecialistType): void {
  *
  * @param name - Specialist name
  */
-export function disableSpecialist(name: SpecialistType): void {
+export function disableSpecialist(name: SpecialistAgentName): void {
   updateSpecialistMetadata(name, { enabled: false });
 }
 
@@ -1972,7 +1961,7 @@ export function disableSpecialist(name: SpecialistType): void {
  * @param name - Specialist name
  * @returns True if specialist is enabled
  */
-export function isEnabled(name: SpecialistType): boolean {
+export function isEnabled(name: SpecialistAgentName): boolean {
   const metadata = getSpecialistMetadata(name);
   return metadata?.enabled ?? false;
 }
@@ -1982,7 +1971,7 @@ export function isEnabled(name: SpecialistType): boolean {
  *
  * @returns Array of enabled specialists
  */
-export function getEnabledSpecialists(): SpecialistMetadata[] {
+export function getEnabledSpecialists(): LegacySpecialistDefinition[] {
   return getAllSpecialists().filter((s) => s.enabled);
 }
 
@@ -2020,7 +2009,7 @@ export function findSessionFile(sessionId: string): string | null {
  * @param name - Specialist name
  * @returns Total token count or null if session not found
  */
-export function countContextTokens(name: SpecialistType): number | null {
+export function countContextTokens(name: SpecialistAgentName): number | null {
   const sessionId = readRecordedClaudeSessionId(getTmuxSessionName(name));
 
   if (!sessionId) {
@@ -2055,7 +2044,7 @@ export function countContextTokens(name: SpecialistType): number | null {
  * @param projectKey - Optional project key for per-project specialists
  * @returns True if specialist has an active tmux session
  */
-export async function isRunning(name: SpecialistType, projectKey?: string): Promise<boolean> {
+export async function isRunning(name: SpecialistAgentName, projectKey?: string): Promise<boolean> {
   const tmuxSession = getTmuxSessionName(name, projectKey);
 
   try {
@@ -2087,9 +2076,9 @@ export async function isRunning(name: SpecialistType, projectKey?: string): Prom
  * @returns Complete specialist status
  */
 export async function getSpecialistStatus(
-  name: SpecialistType,
+  name: SpecialistAgentName,
   projectKey?: string
-): Promise<SpecialistStatus> {
+): Promise<LegacySpecialistRuntimeStatus> {
   const metadata = getSpecialistMetadata(name) || {
     name,
     displayName: name,
@@ -2107,7 +2096,7 @@ export async function getSpecialistStatus(
   const tmuxSession = getTmuxSessionName(name, projectKey);
   const runtimeState = getAgentRuntimeState(tmuxSession);
 
-  let state: SpecialistState;
+  let state: SpecialistLifecycleState;
   if (runtimeState) {
     // Map runtime state to specialist state
     switch (runtimeState.state) {
@@ -2152,7 +2141,7 @@ export async function getSpecialistStatus(
  *
  * @returns Array of specialist statuses
  */
-export async function getAllSpecialistStatus(): Promise<SpecialistStatus[]> {
+export async function getAllSpecialistStatus(): Promise<LegacySpecialistRuntimeStatus[]> {
   const specialists = getAllSpecialists();
   return Promise.all(specialists.map((metadata) => getSpecialistStatus(metadata.name)));
 }
@@ -2166,7 +2155,7 @@ export async function getAllSpecialistStatus(): Promise<SpecialistStatus[]> {
  * @param name - Specialist name
  * @returns Promise with initialization result
  */
-export async function initializeSpecialist(name: SpecialistType): Promise<{
+export async function initializeSpecialist(name: SpecialistAgentName): Promise<{
   success: boolean;
   message: string;
   tmuxSession?: string;
@@ -2237,7 +2226,7 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
     const newSessionId = randomUUID();
     const initProviderExportLines = buildProviderExportLines(providerEnv);
     // PAN-982: --agent pan-<specialistType> selects the matching .claude/agents/pan-*.md
-    // definition. SpecialistType already ends in '-agent' so we just prepend 'pan-'.
+    // definition. SpecialistAgentName already ends in '-agent' so we just prepend 'pan-'.
     const specialistAgentName = `pan-${name}`;
     writeFileSync(
       launcherScript,
@@ -2297,12 +2286,12 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
  * @returns Promise with array of initialization results
  */
 export async function initializeEnabledSpecialists(): Promise<Array<{
-  name: SpecialistType;
+  name: SpecialistAgentName;
   success: boolean;
   message: string;
 }>> {
   const enabled = getEnabledSpecialists();
-  const results: Array<{ name: SpecialistType; success: boolean; message: string }> = [];
+  const results: Array<{ name: SpecialistAgentName; success: boolean; message: string }> = [];
 
   for (const specialist of enabled) {
     results.push({
@@ -2331,7 +2320,7 @@ export async function initializeEnabledSpecialists(): Promise<Array<{
 export interface SpecialistFeedback {
   id: string;
   timestamp: string;
-  fromSpecialist: SpecialistType;
+  fromSpecialist: SpecialistAgentName;
   toIssueId: string;
   feedbackType: 'success' | 'failure' | 'warning' | 'insight';
   category: 'merge' | 'test' | 'review' | 'general';
@@ -2493,7 +2482,7 @@ export function getPendingFeedback(issueId: string): SpecialistFeedback[] {
  * @returns Feedback stats by specialist and type
  */
 export function getFeedbackStats(): {
-  bySpecialist: Record<SpecialistType, number>;
+  bySpecialist: Record<SpecialistAgentName, number>;
   byType: Record<string, number>;
   total: number;
 } {
@@ -2502,7 +2491,7 @@ export function getFeedbackStats(): {
       'merge-agent': 0,
       'review-agent': 0,
       'test-agent': 0,
-    } as Record<SpecialistType, number>,
+    } as Record<SpecialistAgentName, number>,
     byType: {} as Record<string, number>,
     total: 0,
   };

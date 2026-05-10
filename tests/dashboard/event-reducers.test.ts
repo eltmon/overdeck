@@ -38,7 +38,7 @@ const baseAgent: AgentSnapshot = {
 }
 
 const baseSpecialist: SpecialistProjection = {
-  name: 'review-agent',
+  name: 'review',
   state: 'sleeping',
   isRunning: false,
   currentIssue: undefined,
@@ -85,7 +85,7 @@ describe('syncSnapshot', () => {
 
   it('populates specialistsByName keyed by name', () => {
     const state = syncSnapshot(makeState(), snapshot)
-    expect(state.specialistsByName['review-agent']).toEqual(baseSpecialist)
+    expect(state.specialistsByName['review']).toEqual(baseSpecialist)
   })
 
   it('sets sequence from snapshot', () => {
@@ -271,23 +271,23 @@ describe('applyEvent — specialist.started', () => {
       timestamp: ts(),
       payload: specialist,
     })
-    expect(state.specialistsByName['review-agent']).toEqual(specialist)
+    expect(state.specialistsByName['review']).toEqual(specialist)
   })
 })
 
 describe('applyEvent — specialist.completed', () => {
   it('sets state to sleeping and isRunning to false', () => {
     const activeSpec: SpecialistProjection = { ...baseSpecialist, state: 'active', isRunning: true, currentIssue: 'PAN-1' }
-    const state = makeState({ specialistsByName: { 'review-agent': activeSpec } })
+    const state = makeState({ specialistsByName: { 'review': activeSpec } })
     const next = applyEvent(state, {
       type: 'specialist.completed',
       sequence: 11,
       timestamp: ts(),
-      payload: { name: 'review-agent', issueId: 'PAN-1' },
+      payload: { name: 'review', issueId: 'PAN-1' },
     })
-    expect(next.specialistsByName['review-agent']!.state).toBe('sleeping')
-    expect(next.specialistsByName['review-agent']!.isRunning).toBe(false)
-    expect(next.specialistsByName['review-agent']!.currentIssue).toBeUndefined()
+    expect(next.specialistsByName['review']!.state).toBe('sleeping')
+    expect(next.specialistsByName['review']!.isRunning).toBe(false)
+    expect(next.specialistsByName['review']!.currentIssue).toBeUndefined()
   })
 
   it('updates sequence even when specialist not found', () => {
@@ -296,7 +296,7 @@ describe('applyEvent — specialist.completed', () => {
       type: 'specialist.completed',
       sequence: 11,
       timestamp: ts(),
-      payload: { name: 'unknown', issueId: 'PAN-1' },
+      payload: { name: 'ship', issueId: 'PAN-1' },
     })
     expect(next.sequence).toBe(11)
     expect(next.specialistsByName).toBe(state.specialistsByName)
@@ -306,15 +306,15 @@ describe('applyEvent — specialist.completed', () => {
 describe('applyEvent — specialist.failed', () => {
   it('sets state to sleeping and isRunning to false', () => {
     const activeSpec: SpecialistProjection = { ...baseSpecialist, state: 'active', isRunning: true }
-    const state = makeState({ specialistsByName: { 'review-agent': activeSpec } })
+    const state = makeState({ specialistsByName: { 'review': activeSpec } })
     const next = applyEvent(state, {
       type: 'specialist.failed',
       sequence: 12,
       timestamp: ts(),
-      payload: { name: 'review-agent', issueId: 'PAN-1', reason: 'timeout' },
+      payload: { name: 'review', issueId: 'PAN-1', reason: 'timeout' },
     })
-    expect(next.specialistsByName['review-agent']!.state).toBe('sleeping')
-    expect(next.specialistsByName['review-agent']!.isRunning).toBe(false)
+    expect(next.specialistsByName['review']!.state).toBe('sleeping')
+    expect(next.specialistsByName['review']!.isRunning).toBe(false)
   })
 })
 

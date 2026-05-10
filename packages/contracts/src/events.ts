@@ -14,8 +14,6 @@ import {
   ReviewStatusSnapshot,
   Role,
   SequenceNumber,
-  SpecialistState,
-  SpecialistType,
   WaitingReason,
 } from "./types"
 
@@ -482,14 +480,16 @@ export type ReviewCoordinatorStartedEvent = typeof ReviewCoordinatorStartedEvent
 
 // ─── Specialist Events ────────────────────────────────────────────────────────
 
-/** New — specialist became active */
+const SpecialistLifecycleState = Schema.Literals(["active", "sleeping", "uninitialized"])
+
+/** New — role-backed specialist became active */
 export const SpecialistStartedEvent = Schema.Struct({
   type: Schema.Literal("specialist.started"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    name: SpecialistType,
-    state: SpecialistState,
+    name: Role,
+    state: SpecialistLifecycleState,
     isRunning: Schema.Boolean,
     currentIssue: Schema.optional(Schema.String),
     lastWake: Schema.optional(Schema.String),
@@ -497,22 +497,22 @@ export const SpecialistStartedEvent = Schema.Struct({
 })
 export type SpecialistStartedEvent = typeof SpecialistStartedEvent.Type
 
-/** New — specialist completed work */
+/** New — role-backed specialist completed work */
 export const SpecialistCompletedEvent = Schema.Struct({
   type: Schema.Literal("specialist.completed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ name: SpecialistType, issueId: Schema.optional(IssueId) }),
+  payload: Schema.Struct({ name: Role, issueId: Schema.optional(IssueId) }),
 })
 export type SpecialistCompletedEvent = typeof SpecialistCompletedEvent.Type
 
-/** New — specialist failed */
+/** New — role-backed specialist failed */
 export const SpecialistFailedEvent = Schema.Struct({
   type: Schema.Literal("specialist.failed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    name: SpecialistType,
+    name: Role,
     issueId: Schema.optional(IssueId),
     error: Schema.String,
   }),
