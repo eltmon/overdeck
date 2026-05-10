@@ -150,16 +150,20 @@ describe('role model configuration', () => {
   });
 
   it('seeds missing workhorse slots while preserving user-defined slots', () => {
+    // PAN-1067 added MODEL_DEPRECATIONS that transparently maps
+    // 'gpt-5.5-mini' → 'gpt-5.4-mini' (a hallucinated tier that never
+    // shipped). Use 'gpt-5.4-mini' here so the assertion exercises the
+    // user-overlay-preserved path without tripping the deprecation rewrite.
     const { config } = mergeConfigs({
       workhorses: {
-        mid: 'gpt-5.5-mini',
+        mid: 'gpt-5.4-mini',
       },
     });
 
     expect(config.workhorses).toEqual({
       ...DEFAULT_WORKHORSES,
-      mid: 'gpt-5.5-mini',
+      mid: 'gpt-5.4-mini',
     });
-    expect(resolveModel('work', undefined, config)).toBe('gpt-5.5-mini');
+    expect(resolveModel('work', undefined, config)).toBe('gpt-5.4-mini');
   });
 });

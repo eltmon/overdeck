@@ -20,23 +20,25 @@ import {
   parseReviewSynthesis,
   getReviewAgents,
   reviewResultToReviewStatus,
-  dispatchParallelReview,
   // PAN-1048 R5: getActiveParallelReviewIssues was deleted along with the
   // `pan review run` coordinator. Its callers (deacon, service startup
   // recovery) now scan listRunningAgentsAsync for role==='review' agents
   // directly, which covers the agent-<id>-review session naming the role
   // primitive uses. Tests for the helper went with it.
+  // PAN-1048 R6 (REQ-17): dispatchParallelReview, runParallelReview, and
+  // spawnReviewCoordinatorSession have been retired. Convoy reviewers now
+  // run as Agent-tool subagents inside the review role launched by
+  // spawnReviewRoleForIssue.
   buildReviewFeedbackBody,
   waitForReviewer,
   getFilesChangedFromPR,
   selectCompletedReviewers,
   resolveTemplatePath,
-  runParallelReview,
   killAllReviewSessions,
   type ReviewResult,
 } from '../../../src/lib/cloister/review-agent.js';
 
-// ── dispatchParallelReview ────────────────────────────────────────────────────
+// ── shared test fixtures ──────────────────────────────────────────────────────
 // vi.mock is hoisted, so mock fns must be defined with vi.hoisted() before they
 // are referenced in the factory.
 
@@ -106,102 +108,6 @@ vi.mock('../../../src/lib/stashes.js', () => ({
   listStashes: mockListStashes,
 }));
 
-describe('dispatchParallelReview', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
-      const callback = (typeof _opts === 'function' ? _opts : cb)!;
-      if (cmd === 'git status --porcelain') return callback(null, { stdout: '', stderr: '' });
-      callback(new Error(`unexpected command: ${cmd}`));
-    });
-    mockListStashes.mockResolvedValue([]);
-    mockCreateNamedStash.mockResolvedValue(null);
-    mockDropStash.mockResolvedValue(undefined);
-  });
-
-  const baseOpts = {
-    issueId: 'PAN-999',
-    workspace: '/workspaces/feature-pan-999',
-    branch: 'feature/pan-999',
-    prUrl: 'https://github.com/org/repo/pull/1',
-  };
-
-  // Post-refactor behavior (see docs/REVIEW-AGENT-ARCHITECTURE.md):
-  // dispatchParallelReview spawns a detached tmux coordinator session running
-  // `pan review run <id>`. The coordinator session writes the terminal
-  // reviewStatus when the CLI exits — NOT this function. Under test we
-  // inject coordinatorSpawnFn to avoid touching real tmux.
-
-  it('writes reviewing status upfront and invokes the coordinator spawn', async () => {
-    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-123' });
-
-    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
-
-    expect(ret.success).toBe(true);
-    expect(ret.message).toContain('Review coordinator spawned');
-    expect(coordinatorSpawnFn).toHaveBeenCalledOnce();
-    expect(coordinatorSpawnFn).toHaveBeenCalledWith({
-      issueId: 'PAN-999',
-      workspace: '/workspaces/feature-pan-999',
-    });
-
-    // Exactly one setReviewStatus call: the upfront 'reviewing' write.
-    // Terminal status (passed/blocked/failed) is NOT written here — it lives
-    // in the coordinator session's CLI exit path.
-    expect(mockSetReviewStatus).toHaveBeenCalledOnce();
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-999', {
-      reviewStatus: 'reviewing',
-      reviewSpawnedAt: expect.any(String),
-    });
-  });
-
-  it('records terminal failed status when coordinator spawn throws', async () => {
-    // Coordinator spawn failure is a hard failure — no detached session was
-    // created, so no CLI will ever write the terminal status. dispatchParallelReview
-    // records 'failed' itself in this case to avoid the status stuck at 'reviewing'.
-    const coordinatorSpawnFn = vi.fn().mockRejectedValue(new Error('tmux unavailable'));
-
-    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
-
-    expect(ret.success).toBe(false);
-    expect(ret.error).toBe('tmux unavailable');
-
-    const calls = mockSetReviewStatus.mock.calls;
-    // First call: upfront 'reviewing'. Second call: terminal 'failed' after spawn error.
-    expect(calls.length).toBe(2);
-    expect(calls[0][1].reviewStatus).toBe('reviewing');
-    expect(calls[1][1].reviewStatus).toBe('failed');
-    expect(calls[1][1].reviewNotes).toContain('tmux unavailable');
-  });
-
-  it('returns the coordinator session name in its message for observability', async () => {
-    const coordinatorSpawnFn = vi.fn().mockResolvedValue({
-      sessionName: 'review-coordinator-PAN-999-1713456789000',
-    });
-
-    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
-
-    expect(ret.message).toContain('review-coordinator-PAN-999-1713456789000');
-  });
-
-  it('does NOT write a terminal reviewStatus on happy path — coordinator owns it', async () => {
-    // This is the core invariant: dispatchParallelReview transitions to
-    // 'reviewing' and returns. It does NOT know or care about the eventual
-    // passed/blocked/failed outcome — that's the coordinator session's job.
-    // Dashboard-restart invariance depends on this: server can die after
-    // spawning the coordinator and the CLI will still write the terminal
-    // state into SQLite when it exits.
-    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-123' });
-
-    await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
-    await new Promise(resolve => setTimeout(resolve, 0));
-
-    const terminalCalls = mockSetReviewStatus.mock.calls.filter(
-      c => c[1].reviewStatus === 'passed' || c[1].reviewStatus === 'blocked' || c[1].reviewStatus === 'failed',
-    );
-    expect(terminalCalls.length).toBe(0);
-  });
-});
 
 // ── killAllReviewSessions ─────────────────────────────────────────────────────
 // PAN-931: pan down must kill review sessions so they don't survive dashboard
@@ -341,85 +247,6 @@ describe('pan down integration (PAN-931)', () => {
   });
 });
 
-// ── dispatchParallelReview idempotency guard (PAN-931) ────────────────────────
-
-describe('dispatchParallelReview idempotency guard', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
-      const callback = (typeof _opts === 'function' ? _opts : cb)!;
-      if (cmd === 'git status --porcelain') return callback(null, { stdout: '', stderr: '' });
-      callback(new Error(`unexpected command: ${cmd}`));
-    });
-    mockListStashes.mockResolvedValue([]);
-    mockCreateNamedStash.mockResolvedValue(null);
-    mockDropStash.mockResolvedValue(undefined);
-  });
-
-  const baseOpts = {
-    issueId: 'PAN-999',
-    workspace: '/workspaces/feature-pan-999',
-    branch: 'feature/pan-999',
-    prUrl: 'https://github.com/org/repo/pull/1',
-  };
-
-  it('kills stale coordinator and proceeds when pane is dead (PAN-912)', async () => {
-    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
-    vi.mocked(listSessionNamesAsync).mockResolvedValue([
-      'review-coordinator-PAN-999-1234567890000',
-    ]);
-    mockIsPaneDeadAsync.mockResolvedValue(true);
-    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-new' });
-
-    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
-
-    expect(mockKillSessionAsync).toHaveBeenCalledWith('review-coordinator-PAN-999-1234567890000');
-    expect(coordinatorSpawnFn).toHaveBeenCalledOnce();
-    expect(ret.success).toBe(true);
-  });
-
-  it('kills zombie coordinator when pane_dead=0 but process PID is gone (PAN-931)', async () => {
-    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
-    vi.mocked(listSessionNamesAsync).mockResolvedValue([
-      'review-coordinator-PAN-999-1234567890000',
-    ]);
-    mockIsPaneDeadAsync.mockResolvedValue(false);
-    // Simulate a pane PID that no longer exists in the process table
-    mockListPaneValuesAsync.mockResolvedValue(['999999']);
-    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-new' });
-
-    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
-
-    expect(mockKillSessionAsync).toHaveBeenCalledWith('review-coordinator-PAN-999-1234567890000');
-    expect(coordinatorSpawnFn).toHaveBeenCalledOnce();
-    expect(ret.success).toBe(true);
-  });
-
-  it('skips dispatch when coordinator pane and process are both alive', async () => {
-    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
-    vi.mocked(listSessionNamesAsync).mockResolvedValue([
-      'review-coordinator-PAN-999-1234567890000',
-    ]);
-    mockIsPaneDeadAsync.mockResolvedValue(false);
-    // Simulate a real live PID
-    mockListPaneValuesAsync.mockResolvedValue(['1']);
-    // process.kill(1, 0) may throw EPERM in restricted test environments;
-    // mock it to succeed so the alive-path is deterministic.
-    const killSpy = vi.spyOn(process, 'kill').mockReturnValue(undefined as never);
-    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-new' });
-
-    try {
-      const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
-
-      expect(mockKillSessionAsync).not.toHaveBeenCalled();
-      expect(coordinatorSpawnFn).not.toHaveBeenCalled();
-      expect(ret.success).toBe(true);
-      expect(ret.message).toContain('Review already in progress');
-    } finally {
-      killSpy.mockRestore();
-    }
-  });
-});
 
 // PAN-1048 R5: getActiveParallelReviewIssues describe block removed along
 // with the helper. Equivalent regression coverage now lives where it belongs
@@ -1111,29 +938,6 @@ describe('getReviewAgents', () => {
   });
 });
 
-// ── runParallelReview configuration regressions ───────────────────────────────
-
-describe('runParallelReview configuration regressions', () => {
-  it('empty agents guard: source validates agents.length === 0 before spawning', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const src = readFileSync(
-      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
-      'utf-8',
-    );
-    expect(src).toContain('agents.length === 0');
-  });
-
-  it('template existence guard: source checks existsSync(templatePath) before spawning', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const src = readFileSync(
-      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
-      'utf-8',
-    );
-    expect(src).toContain('existsSync(promptTemplatePath)');
-  });
-});
 
 // ── resolvePromptTemplatePath (legacy alias: resolveTemplatePath) ────────────
 
@@ -1144,144 +948,6 @@ describe('resolvePromptTemplatePath', () => {
   });
 });
 
-// ── runParallelReview orchestration ──────────────────────────────────────────
-
-describe('runParallelReview', () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'pan-review-'));
-    // Create workspace agents/ dir with minimal templates; tests inject
-    // resolvePromptTemplateFn so these local templates are used instead of the global cache.
-    mkdirSync(join(tmpDir, 'agents'), { recursive: true });
-    const frontmatter = '---\nmodel: sonnet\n---\nReview the code.\n';
-    writeFileSync(join(tmpDir, 'agents', 'code-review-correctness.md'), frontmatter);
-    // PAN-1048 R2: synthesis is programmatic in runParallelReview;
-    // no .claude/agents/code-review-synthesis.md is required.
-  });
-
-  afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  const baseContext = () => ({
-    projectPath: tmpDir,
-    prUrl: 'https://github.com/org/repo/pull/1',
-    issueId: 'PAN-999',
-    branch: 'feature/pan-999',
-  });
-
-  it('happy path: all reviewers succeed → programmatic synthesis writes result (PAN-1048 R2)', async () => {
-    const spawnFn = vi.fn().mockResolvedValue(undefined);
-    // PAN-1048 R2: synthesis runs in-process. waitFn must mark each reviewer
-    // output present so runParallelReview can read it for aggregation.
-    const waitFn = vi.fn().mockImplementation(async (_session: string, outputFile: string) => {
-      writeFileSync(outputFile, 'REVIEW_RESULT: APPROVED\nNOTES: LGTM\nFILES_REVIEWED: src/foo.ts');
-      return { status: 'completed' as const };
-    });
-    const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
-    const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
-    const postReviewFn = vi.fn().mockResolvedValue(undefined);
-    const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
-
-    const { result } = await runParallelReview(
-      baseContext(),
-      ['src/foo.ts'],
-      [{ name: 'correctness', focus: ['logic'] }],
-      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
-    );
-
-    // Only the convoy reviewers spawn now — synthesis is no longer a Claude session.
-    expect(spawnFn).toHaveBeenCalledTimes(1);
-    expect(waitFn).toHaveBeenCalledOnce();
-    expect(parseSynthesisFn).toHaveBeenCalledOnce();
-    expect(postReviewFn).toHaveBeenCalledOnce();
-    expect(result.reviewResult).toBe('APPROVED');
-  });
-
-  it('failure path: reviewer failure aborts synthesis → COMMENTED returned', async () => {
-    const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue({ status: 'failed', reason: 'timeout' }); // all reviewers fail
-    const parseSynthesisFn = vi.fn();
-    const postReviewFn = vi.fn();
-    const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
-
-    const { result } = await runParallelReview(
-      baseContext(),
-      [],
-      [{ name: 'correctness' }],
-      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
-    );
-
-    expect(parseSynthesisFn).not.toHaveBeenCalled();
-    expect(postReviewFn).not.toHaveBeenCalled();
-    expect(result.reviewResult).toBe('COMMENTED');
-    expect(result.notes).toContain('correctness');
-  });
-
-  // PAN-915 supersedes PAN-846. Canonical reviewer sessions are now intended to
-  // PERSIST across rounds so reviewers retain accumulated context (codebase
-  // patterns, prior findings, decisions). Sessions are torn down by terminal
-  // lifecycle events (merge complete, reset, cancel, deep-wipe, explicit
-  // abort), not by the per-round finally block.
-
-  it('PAN-915: does NOT kill canonical reviewer sessions on successful round (cross-round persistence)', async () => {
-    mockKillSessionAsync.mockClear();
-
-    const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockImplementation(async (_session: string, outputFile: string) => {
-      writeFileSync(outputFile, 'REVIEW_RESULT: APPROVED\nNOTES: LGTM\nFILES_REVIEWED: src/foo.ts');
-      return { status: 'completed' as const };
-    });
-    const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
-    const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
-    const postReviewFn = vi.fn().mockResolvedValue(undefined);
-    const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
-
-    const { result } = await runParallelReview(
-      baseContext(),
-      ['src/foo.ts'],
-      [{ name: 'correctness', focus: ['logic'] }],
-      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
-    );
-
-    expect(result.reviewResult).toBe('APPROVED');
-
-    // PAN-1048 R2: synthesis is now programmatic (no synthesis tmux session
-    // exists), so we only need to confirm the canonical reviewer session is
-    // not torn down on a successful round.
-    expect(mockKillSessionAsync).not.toHaveBeenCalledWith(
-      'specialist-panopticon-cli-PAN-999-review-correctness',
-    );
-  });
-
-  it('PAN-915: does NOT kill canonical reviewer sessions on aborted round (cross-round persistence)', async () => {
-    mockKillSessionAsync.mockClear();
-
-    const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue({ status: 'failed', reason: 'timeout' });
-    const parseSynthesisFn = vi.fn();
-    const postReviewFn = vi.fn();
-    const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
-
-    const { result } = await runParallelReview(
-      baseContext(),
-      [],
-      [{ name: 'correctness' }],
-      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
-    );
-
-    expect(result.reviewResult).toBe('COMMENTED');
-
-    // Even when the round aborts, canonical sessions persist — the next round
-    // can resume into the same Claude process. Auto-respawn within the round
-    // may still call killSessionAsync (when isPaneDeadAsync says the pane is
-    // dead), but on a clean failure with a live pane, no kill happens.
-    expect(mockKillSessionAsync).not.toHaveBeenCalledWith(
-      'specialist-panopticon-cli-PAN-999-review-synthesis',
-    );
-  });
-});
 
 // ── dispatch failure sets 'pending' not 'failed' ─────────────────────────────
 // Regression: dispatch failures must set reviewStatus='pending' so the deacon

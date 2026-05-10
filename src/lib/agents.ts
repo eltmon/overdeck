@@ -76,11 +76,12 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
   return false;
 }
 
-async function getPiLauncherFields(agentId: string): Promise<{
+async function getPiLauncherFields(agentId: string, model: string): Promise<{
   harness: 'pi';
   piExtensionPath: string;
   piFifoPath: string;
   piSessionDir: string;
+  model: string;
 }> {
   const paths = piFifoPaths(agentId);
   await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
@@ -90,11 +91,18 @@ async function getPiLauncherFields(agentId: string): Promise<{
       `Pi extension not built. Run: cd packages/pi-extension && npm run build\n(expected: ${piExtensionPath})`
     );
   }
+  // PAN-1048 review feedback 006 (S1): thread the resolved role/workhorse model
+  // through to buildPiCommand. The Pi launcher branch ignores baseCommand and
+  // rebuilds from scratch starting with the literal `pi`, so the only way to
+  // surface --model is via the launcher config's `model` field. Without this,
+  // a Pi-backed role silently fell back to Pi's default model and ignored the
+  // configured workhorse model entirely.
   return {
     harness: 'pi',
     piExtensionPath,
     piFifoPath: await createPiFifo(agentId),
     piSessionDir: paths.agentDir,
+    model,
   };
 }
 
@@ -1538,7 +1546,7 @@ export async function buildAgentLaunchConfig(opts: {
   // the launcher; getPiLauncherFields() resolves them from the agent state
   // and they're spread into generateLauncherScript() below.
   const piLauncherFields = opts.harness === 'pi'
-    ? await getPiLauncherFields(opts.agentId)
+    ? await getPiLauncherFields(opts.agentId, model)
     : {};
 
   if (opts.spawnMode === 'resume' && opts.resumeSessionId) {
@@ -1729,7 +1737,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // Without this, a config'd `roles.review.harness: pi` produced a launcher
   // that silently fell back to Claude shape.
   const piLauncherFields = resolvedHarness === 'pi'
-    ? await getPiLauncherFields(agentId)
+    ? await getPiLauncherFields(agentId, selectedModel)
     : {};
   const launcherContent = generateLauncherScript({
     role,
@@ -2384,6 +2392,15 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     // saved role. Use agentState.role and route through getRoleRuntimeBaseCommand
     // so the role-specific .claude/agents/* definition file is loaded.
     const resumeRole: Role = agentState.role ?? 'work';
+    // PAN-1048 review feedback 006 (S1): Pi-backed resumes need the same
+    // launcher fields the fresh-spawn path threads through generateLauncherScript.
+    // buildPiCommand throws on missing piSessionDir, so the previous fallback
+    // emitted a launcher that would crash on resume for any Pi role agent.
+    const resumeModel = agentState.model || 'claude-sonnet-4-6';
+    const fallbackHarness = agentState.harness ?? 'claude-code';
+    const fallbackPiFields = fallbackHarness === 'pi'
+      ? await getPiLauncherFields(normalizedId, resumeModel)
+      : {};
     const fallbackContent = generateLauncherScript({
       role: resumeRole,
       workingDir: agentState.workspace,
@@ -2391,11 +2408,12 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       setCi: true,
       providerExports,
       baseCommand: await getRoleRuntimeBaseCommand(
-        agentState.model || 'claude-sonnet-4-6',
+        resumeModel,
         normalizedId,
         resumeRole,
-        agentState.harness ?? 'claude-code',
+        fallbackHarness,
       ),
+      ...fallbackPiFields,
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
