@@ -245,13 +245,14 @@ describe('ReadModel checkpoint reconciliation', () => {
   it('caps checkpoint reconciliation before diffing old history while preserving absolute turn counts', async () => {
     const checkpoints = Array.from({ length: 205 }, (_, index) => `turn-${index + 1}`)
     const listCheckpoints = vi.fn().mockResolvedValue(checkpoints)
-    const diffCheckpointFiles = vi.fn().mockImplementation(async (_workspace: string, prevTurnId: string, turnId: string) => ([
+    const diffCheckpointFiles = vi.fn().mockImplementation(async (_workspace: string, _agentId: string, prevTurnId: string, turnId: string) => ([
       { path: `${prevTurnId}-to-${turnId}.ts`, additions: 1, deletions: 0 },
     ]))
-    const getCheckpointTimestamp = vi.fn().mockImplementation(async (_workspace: string, turnId: string) => {
+    const getCheckpointTimestamp = vi.fn().mockImplementation(async (_workspace: string, _agentId: string, turnId: string) => {
       const turnNumber = Number.parseInt(turnId.replace('turn-', ''), 10)
       return new Date(Date.parse('2026-05-08T05:00:00.000Z') + turnNumber * 1000).toISOString()
     })
+    const deleteLegacyCheckpointRefs = vi.fn().mockResolvedValue(0)
 
     const summaries = await withIsolatedReadModel(
       async (readModel) => {
@@ -268,6 +269,7 @@ describe('ReadModel checkpoint reconciliation', () => {
             listCheckpoints,
             diffCheckpointFiles,
             getCheckpointTimestamp,
+            deleteLegacyCheckpointRefs,
           }))
           vi.doMock('../../../lib/agent-enrichment.js', () => ({
             computeAgentEnrichment: vi.fn().mockResolvedValue(undefined),
@@ -297,8 +299,8 @@ describe('ReadModel checkpoint reconciliation', () => {
     )
 
     expect(diffCheckpointFiles).toHaveBeenCalledTimes(200)
-    expect(diffCheckpointFiles).toHaveBeenNthCalledWith(1, '/tmp/pan-1024', 'turn-5', 'turn-6')
-    expect(diffCheckpointFiles).toHaveBeenLastCalledWith('/tmp/pan-1024', 'turn-204', 'turn-205')
+    expect(diffCheckpointFiles).toHaveBeenNthCalledWith(1, '/tmp/pan-1024', 'agent-reconcile', 'turn-5', 'turn-6')
+    expect(diffCheckpointFiles).toHaveBeenLastCalledWith('/tmp/pan-1024', 'agent-reconcile', 'turn-204', 'turn-205')
     expect(summaries[0].turnId).toBe('turn-6')
     expect(summaries[0].checkpointTurnCount).toBe(6)
     expect(summaries.at(-1)?.turnId).toBe('turn-205')

@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-10T02:21:09.354Z",
+  "updated": "2026-05-10T02:27:56.000Z",
   "gitState": {
     "branch": "feature/pan-1044",
-    "sha": "560eedc8e",
+    "sha": "c39af48aa",
     "dirty": true
   },
   "decisions": [
@@ -195,6 +195,17 @@
       "timestamp": "2026-05-10T02:21:09.354Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-10T02:21:27.085Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-10T02:27:56.000Z",
+      "reason": "feedback-fix",
+      "note": "Fixed test verification failure in read-model checkpoint reconciliation by updating the checkpoint-manager mock for the current deleteLegacyCheckpointRefs export and per-agent diff/timestamp helper signatures. Verified the targeted checkpoint test and npm test.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []
