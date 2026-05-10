@@ -12,12 +12,15 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { Effect, Layer, Context } from 'effect';
-import type { DashboardSnapshot, DomainEvent } from '@panctl/contracts';
+import type { DashboardSnapshot, DomainEvent, TurnDiffSummary } from '@panctl/contracts';
 import { AGENTS_DIR } from '../../lib/paths.js';
 import {
   type ReadModelState,
   INITIAL_READ_MODEL_STATE,
   applyEvent as applyEventReducer,
+  getMaxTurnDiffSummariesPerAgent,
+  isTerminalTurnDiffSummaryStatus,
+  trimTurnDiffSummaries,
 } from '@panctl/contracts';
 import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
@@ -34,6 +37,10 @@ export async function discoverNewAgentIds(agentsDir: string, cachedIds: Set<stri
     return [];
   }
   return entries.filter(e => !cachedIds.has(e) && existsSync(join(agentsDir, e, 'state.json')));
+}
+
+export function shouldSkipCheckpointReconciliation(agent: Pick<AgentSnapshot, 'status' | 'workspace'>): boolean {
+  return !agent.workspace || isTerminalTurnDiffSummaryStatus(agent.status)
 }
 
 // ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
@@ -128,6 +135,8 @@ export interface ReadModelServiceShape {
   readonly getResolvedChannelPermissionDecision: (
     requestId: string,
   ) => Effect.Effect<import('@panctl/contracts').ResolvedChannelPermissionDecision | null>;
+  /** Return in-memory turn diff summaries for a single agent. */
+  readonly getTurnDiffSummaries: (agentId: string) => Effect.Effect<TurnDiffSummary[]>;
   /** Apply a domain event to the read model (called by event store on append). */
   readonly applyEvent: (event: DomainEvent) => void;
   /** Bootstrap the read model from existing lib module state. */
@@ -149,18 +158,14 @@ export const ReadModelServiceLive = Layer.effect(
     // Reference to projection cache — set during bootstrap once the event store initializes it
     let projectionCache: import('./services/projection-cache.js').ProjectionCache | null = null;
 
-    function sanitizeTurnDiffs(
-      raw: ReadModelState['turnDiffSummariesByAgentId'],
-    ): DashboardSnapshot['turnDiffSummariesByAgentId'] {
-      const out: Record<string, Array<{ turnId: string; completedAt: string; status?: string; files: any[]; checkpointRef?: string; assistantMessageId?: string; checkpointTurnCount?: number }>> = {};
-      for (const [agentId, summaries] of Object.entries(raw)) {
-        out[agentId] = summaries.map(s => ({
-          ...s,
-          assistantMessageId: s.assistantMessageId ?? undefined,
-          checkpointRef: s.checkpointRef ?? undefined,
-        }));
-      }
-      return out;
+    function cloneTurnDiffSummaries(summaries: TurnDiffSummary[] | undefined): TurnDiffSummary[] {
+      if (!summaries || summaries.length === 0) return [];
+      return summaries.map(summary => ({
+        ...summary,
+        files: summary.files.map(file => ({ ...file })),
+        assistantMessageId: summary.assistantMessageId ?? undefined,
+        checkpointRef: summary.checkpointRef ?? undefined,
+      }));
     }
 
     function buildSnapshot(): DashboardSnapshot {
@@ -178,9 +183,8 @@ export const ReadModelServiceLive = Layer.effect(
         agents: Object.values(state.agentsById),
         specialists: Object.values(state.specialistsByName),
         reviewStatuses: Object.values(state.reviewStatusByIssueId),
-        turnDiffSummariesByAgentId: {},
         agentRuntimeById: state.agentRuntimeById,
-        channelPermissionRequests: Object.values(state.channelPermissionRequestsById),
+        channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
         issues: state.issuesRaw,
         resources: state.resources ?? undefined,
         timestamp: new Date().toISOString(),
@@ -216,12 +220,15 @@ export const ReadModelServiceLive = Layer.effect(
     const getChannelPermissionRequest = (
       requestId: string,
     ): Effect.Effect<import('@panctl/contracts').ChannelPermissionRequestSnapshot | null> =>
-      Effect.succeed(state.channelPermissionRequestsById[requestId] ?? null);
+      Effect.succeed(state.channelPermissionRequestsById?.[requestId] ?? null);
 
     const getResolvedChannelPermissionDecision = (
       requestId: string,
     ): Effect.Effect<import('@panctl/contracts').ResolvedChannelPermissionDecision | null> =>
-      Effect.succeed(state.resolvedChannelPermissionDecisionsById[requestId] ?? null);
+      Effect.succeed(state.resolvedChannelPermissionDecisionsById?.[requestId] ?? null);
+
+    const getTurnDiffSummaries = (agentId: string): Effect.Effect<TurnDiffSummary[]> =>
+      Effect.sync(() => cloneTurnDiffSummaries(state.turnDiffSummariesByAgentId[agentId]));
 
     // ── Bootstrap inline during layer construction ───────────────────────────
     yield* Effect.gen(function* () {
@@ -337,7 +344,6 @@ export const ReadModelServiceLive = Layer.effect(
             reviewStatusByIssueId: Object.fromEntries(
               Object.values(statusMap).map((status) => [status.issueId, toReviewStatusSnapshot(status)]),
             ),
-            turnDiffSummariesByAgentId: (cached as any).turnDiffSummariesByAgentId ?? {},
             issuesRaw: cached.issues ?? [],
             resources: cached.resources,
           };
@@ -496,15 +502,21 @@ export const ReadModelServiceLive = Layer.effect(
           const agents = Object.values(state.agentsById);
           let reconciled = 0;
           for (const agent of agents) {
-            const workspace = (agent as any).workspace as string | undefined;
-            if (!workspace) continue;
+            if (shouldSkipCheckpointReconciliation(agent)) continue;
 
-            const existingSummaries = state.turnDiffSummariesByAgentId[(agent as any).id];
+            const workspace = agent.workspace;
+            const existingSummaries = state.turnDiffSummariesByAgentId[agent.id];
             if (existingSummaries && existingSummaries.length > 0) continue;
 
             try {
               const checkpoints = await listCheckpoints(workspace);
               if (checkpoints.length === 0) continue;
+
+              const maxRetainedSummaries = getMaxTurnDiffSummariesPerAgent();
+              const retainedCheckpoints = checkpoints.length > maxRetainedSummaries
+                ? checkpoints.slice(-maxRetainedSummaries)
+                : checkpoints;
+              const checkpointOffset = checkpoints.length - retainedCheckpoints.length;
 
               const summaries: Array<{
                 turnId: string;
@@ -515,9 +527,10 @@ export const ReadModelServiceLive = Layer.effect(
                 checkpointTurnCount?: number;
               }> = [];
 
-              for (let i = 0; i < checkpoints.length; i++) {
-                const turnId = checkpoints[i];
-                const prevTurnId = i > 0 ? checkpoints[i - 1] : null;
+              for (let i = 0; i < retainedCheckpoints.length; i++) {
+                const absoluteIndex = checkpointOffset + i;
+                const turnId = retainedCheckpoints[i];
+                const prevTurnId = absoluteIndex > 0 ? checkpoints[absoluteIndex - 1] : null;
                 let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = [];
                 if (prevTurnId) {
                   try {
@@ -530,7 +543,7 @@ export const ReadModelServiceLive = Layer.effect(
                   completedAt,
                   files,
                   checkpointRef: `refs/pan/turn/${turnId}`,
-                  checkpointTurnCount: i + 1,
+                  checkpointTurnCount: absoluteIndex + 1,
                 });
               }
 
@@ -539,7 +552,7 @@ export const ReadModelServiceLive = Layer.effect(
                   ...state,
                   turnDiffSummariesByAgentId: {
                     ...state.turnDiffSummariesByAgentId,
-                    [(agent as any).id]: summaries,
+                    [agent.id]: trimTurnDiffSummaries(summaries),
                   },
                 };
                 reconciled++;
@@ -615,6 +628,7 @@ export const ReadModelServiceLive = Layer.effect(
       getSnapshot,
       getChannelPermissionRequest,
       getResolvedChannelPermissionDecision,
+      getTurnDiffSummaries,
       applyEvent,
       bootstrap: Effect.void,
     };

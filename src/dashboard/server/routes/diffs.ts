@@ -55,7 +55,7 @@ const getDiffsRoute = HttpRouter.add(
         }
 
         const workspace: string | null = agent.workspace ?? null
-        const summaries = snapshot.turnDiffSummariesByAgentId?.[agentId] ?? []
+        const summaries = await Effect.runPromise(readModel.getTurnDiffSummaries(agentId))
 
         let checkpointTurns: string[] = []
         if (workspace) {

@@ -196,17 +196,19 @@ async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string,
   const refsToCheck = [branchName, `origin/${branchName}`];
   for (const ref of refsToCheck) {
     const quotedRef = shellQuote(ref);
-    const { stdout } = await execAsync(`git rev-parse --verify ${quotedRef} 2>/dev/null || true`, { cwd: projectPath });
-    if (!stdout.trim()) continue;
+    const revParseResult = await execAsync(`git rev-parse --verify ${quotedRef} 2>/dev/null || true`, { cwd: projectPath });
+    const refSha = typeof revParseResult?.stdout === 'string' ? revParseResult.stdout : '';
+    if (!refSha.trim()) continue;
 
     try {
       await execAsync(`git merge-base --is-ancestor ${quotedRef} origin/main`, { cwd: projectPath });
       return { merged: true, reason: `${ref} is an ancestor of origin/main` };
     } catch {
-      const { stdout: codeDiff } = await execAsync(
+      const diffResult = await execAsync(
         `git diff origin/main...${quotedRef} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
         { cwd: projectPath },
       );
+      const codeDiff = typeof diffResult?.stdout === 'string' ? diffResult.stdout : '';
       if (!codeDiff.trim()) {
         return { merged: true, reason: `${ref} has no remaining code diff against origin/main` };
       }

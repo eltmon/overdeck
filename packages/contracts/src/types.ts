@@ -393,7 +393,6 @@ export const DashboardSnapshot = Schema.Struct({
   reviewStatuses: Schema.Array(ReviewStatusSnapshot),
   issues: Schema.Array(Schema.Unknown),  // Issues are complex — pass through unvalidated
   resources: Schema.optional(Schema.Unknown),
-  turnDiffSummariesByAgentId: Schema.optional(Schema.Record(Schema.String, Schema.Array(TurnDiffSummary))),
   agentRuntimeById: Schema.optional(Schema.Record(Schema.String, AgentRuntimeSnapshot)),
   channelPermissionRequests: Schema.optional(Schema.Array(ChannelPermissionRequestSnapshot)),
   timestamp: Schema.String,
