@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T13:03:47.493Z",
+  "updated": "2026-05-10T13:23:21.985Z",
   "gitState": {
     "branch": "feature/pan-1055",
     "sha": "9acd91e54",
@@ -280,6 +280,11 @@
       "timestamp": "2026-05-10T13:03:47.493Z",
       "reason": "end",
       "note": "Disabled Pi conversation forks until Pi exposes transcript-faithful session export; removes fabricated JSONL from tmux scrollback"
+    },
+    {
+      "timestamp": "2026-05-10T13:23:21.985Z",
+      "reason": "end",
+      "note": "Block Pi launch harness for forks; route Pi conversation messages through FIFO command protocol instead of tmux paste"
     }
   ],
   "feedback": []

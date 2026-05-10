@@ -1949,6 +1949,14 @@ async function runForkPipeline(
   if (!parentSessionFile) throw new Error(`Parent has no session file`);
 
   if (plain) {
+    if (conv.harness === 'pi') {
+      // Plain forks copy a Claude-format JSONL session file and spawn with --resume.
+      // Pi cannot consume Claude JSONL, so a Pi plain fork would silently start
+      // empty while the pipeline reported success. The summary-fork route already
+      // rejects launchHarness='pi'; this guard is defense in depth so the pipeline
+      // itself never produces a "successful" empty Pi session.
+      throw new Error('Plain forks cannot launch under the Pi harness — Pi cannot consume Claude session history.');
+    }
     // Plain Claude Code fork: copy JSONL from last compact boundary into the new
     // session file, then spawn with --resume so Claude Code loads the history
     // directly.
