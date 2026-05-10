@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-10T02:14:44.034Z",
+  "updated": "2026-05-10T02:22:30.000Z",
   "gitState": {
     "branch": "feature/pan-1048",
     "sha": "3331ac74f",
@@ -389,6 +389,12 @@
       "timestamp": "2026-05-10T02:14:44.033Z",
       "reason": "end",
       "note": "Unified agent state and routing around required Role primitive; deferred cleanup no longer blocks completion; quality gates passed."
+    },
+    {
+      "timestamp": "2026-05-10T02:22:30.000Z",
+      "reason": "tooling-fix",
+      "note": "Fixed pan done stale merged-status guard: cached review status can say mergeStatus=merged even when the feature branch is not an ancestor of the target branch. pan done now verifies git ancestry for the review artifact merge set before skipping the review pipeline, and falls through to reset review/test/merge status when the cached status is stale. Added command-level regression coverage and verified npm run typecheck, npm run lint, targeted doneCommand tests, full npm test (383 passed/5 skipped test files; 4550 passed/62 skipped tests), and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
     }
   ],
   "feedback": []
