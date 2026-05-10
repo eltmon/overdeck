@@ -20,7 +20,7 @@ import { AGENTS_DIR } from '../paths.js';
 import { killSessionAsync, sessionExists, listSessionNamesAsync } from '../tmux.js';
 import type { LifecycleContext, StepResult, TeardownOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
-import { findWorkspacePath } from './archive-planning.js';
+import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js';
 import { extractPrefix } from '../issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
@@ -557,9 +557,15 @@ export async function teardownWorkspace(
       }
     }
 
-    // 9. Remove worktree + workspace directory (only if deleting workspace)
+    // 9. Remove worktree + workspace directory (only if deleting workspace).
+    // Sweep ALL matching paths — canonical (feature-pan-XXXX) and legacy
+    // (feature-XXXX) can both exist when a workspace was created without the
+    // pan- prefix; if we only clean the canonical one, the orphan persists.
     if (shouldDeleteWorkspace) {
-      results.push(await removeWorktree(ctx.projectPath, workspacePath));
+      const allPaths = findAllWorkspacePaths(ctx.projectPath, issueLower);
+      for (const p of allPaths) {
+        results.push(await removeWorktree(ctx.projectPath, p));
+      }
     }
   } else {
     results.push(stepSkipped('teardown:workspace', ['No workspace found to clean up']));

@@ -37,10 +37,13 @@ import { stepOk, stepSkipped, stepFailed } from './types.js';
 const execAsync = promisify(exec);
 
 /**
- * Find the workspace path for an issue.
- * Checks multiple conventional locations, including legacy numeric-suffix naming.
+ * Find ALL workspace paths matching an issue across canonical and legacy
+ * naming conventions. Returns every candidate that exists on disk, so callers
+ * (especially teardown) can clean up drift where the same issue ended up with
+ * both `feature-pan-XXXX` and `feature-XXXX` directories. Order is canonical
+ * → legacy, so first-match callers still prefer the canonical form.
  */
-export function findWorkspacePath(projectPath: string, issueLower: string): string | null {
+export function findAllWorkspacePaths(projectPath: string, issueLower: string): string[] {
   // e.g. "pan-488" → "488" for legacy workspaces named feature-488
   const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
   const candidates = [
@@ -50,10 +53,16 @@ export function findWorkspacePath(projectPath: string, issueLower: string): stri
     join(projectPath, '.worktrees', issueLower),
     join(dirname(projectPath), `feature-${issueLower}`),
   ];
-  for (const p of candidates) {
-    if (existsSync(p)) return p;
-  }
-  return null;
+  return candidates.filter((p) => existsSync(p));
+}
+
+/**
+ * Find the workspace path for an issue.
+ * Checks multiple conventional locations, including legacy numeric-suffix naming.
+ * Prefer findAllWorkspacePaths when cleaning up — this only returns the first match.
+ */
+export function findWorkspacePath(projectPath: string, issueLower: string): string | null {
+  return findAllWorkspacePaths(projectPath, issueLower)[0] ?? null;
 }
 
 /**
