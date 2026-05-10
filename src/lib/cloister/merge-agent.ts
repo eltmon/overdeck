@@ -531,9 +531,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     const issueLower = issueId.toLowerCase();
     const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`];
     const pruned = await pruneCheckpointRefsForAgents(projectPath, agentIds);
-    if (pruned > 0) {
-      console.log(`[merge-agent] ✓ Pruned checkpoint refs for ${pruned} agent(s) on ${issueId}`);
-    }
+    console.log(`[merge-agent] ✓ Checkpoint ref prune: ${pruned} ref(s) removed for ${issueId}`);
   } catch (err) {
     console.warn(`[merge-agent] Checkpoint ref pruning failed (non-fatal): ${err}`);
   }
