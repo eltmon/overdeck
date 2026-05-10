@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T07:04:40.318Z",
+  "updated": "2026-05-10T07:19:00.617Z",
   "gitState": {
     "branch": "feature/pan-1055",
     "sha": "cee0b40a7",
@@ -165,6 +165,11 @@
       "reason": "review-response-verified",
       "note": "Fixed review verification test failure plus blockers for conversation switch harness persistence and harness-policy provider auth caching. Addressed high-priority cache freshness and OpenRouter favorite filtering. Verified typecheck, lint, targeted tests, and full npm test (378 files / 4595 tests passed).",
       "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T07:19:00.617Z",
+      "reason": "end",
+      "note": "Fixed review verification and remaining harness blockers: model-only conversation switches preserve persisted harness, harness policy caches auth by provider, model picker cache invalidates after settings changes, and checkpoint reconciliation tests match per-agent APIs."
     }
   ],
   "feedback": []

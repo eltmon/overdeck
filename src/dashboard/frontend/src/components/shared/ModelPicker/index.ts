@@ -5,6 +5,7 @@ export {
   canUsePickerHarness,
   getProviderForPickerModel,
   useAvailableModels,
+  invalidateAvailableModelsCache,
   formatCost,
   PROVIDER_LABELS,
   FALLBACK_GROUPS,
