@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-10T02:19:53.000Z",
+  "updated": "2026-05-10T02:21:09.354Z",
   "gitState": {
     "branch": "feature/pan-1044",
     "sha": "560eedc8e",
@@ -190,6 +190,11 @@
       "reason": "feedback-fix",
       "note": "Fixed review-requested ProjectOverview correctness issues: blocked review and dispatch-failed tests now bucket as stuck with clear reasons, active-agent counts and working buckets ignore stopped/suspended agents unless an active work session exists, and partial cost breakdown data is safe. Combined cost maps into one memo pass and guarded static cost badges. Verified ProjectOverview tests, frontend typecheck, and npm test.",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-10T02:21:09.354Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": []
