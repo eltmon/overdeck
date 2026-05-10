@@ -9,7 +9,7 @@ import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
-import { ModelPicker, loadStoredHarness, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
+import { ModelPicker, saveStoredHarness, saveStoredModel, type Harness } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
@@ -87,7 +87,9 @@ export function ConversationPanel({
   const [confirmArchive, setConfirmArchive] = useState(false);
   const confirm = useConfirm();
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
-  const [selectedHarness, setSelectedHarness] = useState<Harness>(() => conversation.harness ?? loadStoredHarness());
+  // See ComposerFooter for rationale — never seed an existing conversation's
+  // harness from the global localStorage default.
+  const [selectedHarness, setSelectedHarness] = useState<Harness>(() => conversation.harness ?? 'claude-code');
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);

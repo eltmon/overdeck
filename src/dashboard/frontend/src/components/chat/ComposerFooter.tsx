@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
-import { ModelPicker, MODEL_EFFORT_SUPPORT, loadStoredHarness, saveStoredHarness, saveStoredModel } from './ModelPicker';
+import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredHarness, saveStoredModel } from './ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
@@ -151,7 +151,14 @@ interface ComposerFooterProps {
 
 export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: ComposerFooterProps) {
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
-  const [harness, setHarness] = useState<Harness>(conversation.harness ?? loadStoredHarness());
+  // Existing conversations are bound to the harness they were spawned with.
+  // Falling back to a global localStorage default here caused the picker to
+  // display the *last globally-picked* harness for any conversation whose
+  // harness column was null, then send that harness on the next /switch-model
+  // call — silently rewriting the conversation's runtime. Default to
+  // 'claude-code' (the safe runtime) when the conversation has no stored
+  // harness; do NOT consult localStorage.
+  const [harness, setHarness] = useState<Harness>(conversation.harness ?? 'claude-code');
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
@@ -274,12 +281,30 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
     processUploadQueue();
   }, [processUploadQueue]);
 
-  // Switch model via API — kills session and respawns with correct provider env.
-  // Unlike /model (same-provider only), this works for cross-provider switches.
+  // Changing harness is a runtime switch — the new harness wraps a different
+  // binary (claude vs pi). Just updating local state would diverge the UI from
+  // the running tmux session. Reuse switch-model (which already accepts harness
+  // and handles kill+respawn) so the conversation is truly rebound. Persist to
+  // the global localStorage default *only* — the per-conversation harness is
+  // now owned by the backend.
   const handleHarnessChange = useCallback((newHarness: Harness) => {
+    if (newHarness === harness) return;
     setHarness(newHarness);
     saveStoredHarness(newHarness);
-  }, []);
+    if (conversation.sessionAlive) {
+      setSending(true);
+      void switchModel(conversation.name, model, agentId, newHarness)
+        .catch((err: unknown) => {
+          console.error('[ComposerFooter] Failed to switch harness:', err);
+          toast.error(err instanceof Error ? err.message : 'Failed to switch harness');
+          // Roll back the optimistic state change so the UI matches the server.
+          setHarness(harness);
+        })
+        .finally(() => {
+          setSending(false);
+        });
+    }
+  }, [agentId, conversation.name, conversation.sessionAlive, harness, model]);
 
   const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {
     setModel(newModel);
@@ -441,7 +466,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
     setText('');
     setSending(false);
     setModel(conversation.model ?? getDefaultConversationModel());
-    setHarness(conversation.harness ?? loadStoredHarness());
+    setHarness(conversation.harness ?? 'claude-code');
     editorRef.current?.update(() => {
       $getRoot().clear();
     });
