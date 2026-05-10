@@ -274,6 +274,8 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     // itemId from runtime state by matching the slot number.
     const apiPort = process.env.API_PORT || process.env.PORT || '3011';
     const url = `http://127.0.0.1:${apiPort}/api/swarm/slot-merged`;
+    let deliveryError: string | null = null;
+    let deliveryStatus: number | null = null;
     try {
       const { INTERNAL_TOKEN_HEADER, ensureInternalToken } = await import('../internal-token.js');
       const token = ensureInternalToken();
@@ -287,12 +289,48 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) {
-        console.warn(`[merge-agent] Slot-merge POST returned ${res.status} for ${issueId} slot ${slotInfo.itemSlot}`);
+        deliveryStatus = res.status;
+        deliveryError = `HTTP ${res.status}`;
       } else {
         console.log(`[merge-agent] Slot-merge handled for ${issueId} slot ${slotInfo.itemSlot}; skipping issue lifecycle.`);
       }
     } catch (err: any) {
-      console.warn(`[merge-agent] Slot-merge POST failed for ${issueId} slot ${slotInfo.itemSlot}: ${err?.message ?? err}`);
+      deliveryError = err?.message ?? String(err);
+    }
+    if (deliveryError) {
+      // PAN-977 round-11 blocker #3: a merged slot branch with a lost dashboard
+      // callback used to vanish silently — runtime/plan state was never updated
+      // and auto-advance for the issue stalled forever. Persist a durable retry
+      // marker the swarm poller picks up on its next cycle, AND surface the
+      // failure via the activity log so an operator can see it. The slot branch
+      // is already merged at this point so we can't roll back — durable retry
+      // is the only safe answer.
+      console.warn(`[merge-agent] Slot-merge POST failed for ${issueId} slot ${slotInfo.itemSlot}: ${deliveryError}`);
+      try {
+        const retryDir = join(PANOPTICON_HOME, 'swarms', 'pending-slot-merges');
+        if (!existsSync(retryDir)) mkdirSync(retryDir, { recursive: true });
+        const retryFile = join(retryDir, `${issueId.toLowerCase()}-slot-${slotInfo.itemSlot}.json`);
+        await writeFile(retryFile, JSON.stringify({
+          issueId,
+          slotId: slotInfo.itemSlot,
+          sourceBranch,
+          status: deliveryStatus,
+          error: deliveryError,
+          queuedAt: new Date().toISOString(),
+        }, null, 2), 'utf-8');
+        try {
+          emitActivityEntry({
+            source: 'merge-agent',
+            level: 'warn',
+            issueId,
+            message: `Slot ${slotInfo.itemSlot} merged but /api/swarm/slot-merged delivery failed (${deliveryError}); retry queued at ${retryFile}.`,
+          });
+        } catch { /* activity logger best-effort */ }
+      } catch (writeErr: any) {
+        // If we cannot even persist a retry marker, surface a hard error so the
+        // outer merge result captures it instead of silently losing the slot.
+        throw new Error(`[merge-agent] Slot-merge callback failed for ${issueId} slot ${slotInfo.itemSlot} (${deliveryError}) AND retry-marker write failed: ${writeErr?.message ?? writeErr}`);
+      }
     }
     return;
   }

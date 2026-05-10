@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -389,11 +389,20 @@ async function loadSwarmState(issueId: string): Promise<SwarmState | null> {
 async function saveSwarmState(state: SwarmState): Promise<void> {
   state.updatedAt = new Date().toISOString();
   const project = resolveProjectFromIssue(state.issueId);
-  if (!project) return;
+  if (!project) {
+    // No project resolution = no canonical workspace path = no durable runtime.
+    // Surface this so callers don't report a successful state transition while
+    // the authoritative continue-vBRIEF write was silently skipped.
+    throw new Error(`[swarm] saveSwarmState: no project resolved for ${state.issueId}; refusing to drop runtime mutation on the floor.`);
+  }
   const workspace = join(project.projectPath, 'workspaces', `feature-${state.issueId.toLowerCase()}`);
-  await persistSwarmRuntime(workspace, state).catch((err: any) => {
-    console.warn(`[swarm] Failed to persist runtime for ${state.issueId}: ${err.message}`);
-  });
+  // PAN-977 round-11 blocker #2: do NOT swallow persistence errors. The
+  // continue-vBRIEF runtime is the authoritative state since the sidecar mirror
+  // was removed; if this write fails the swarm has lost its durable record and
+  // dispatch / slot-merge / auto-advance callers MUST observe the failure
+  // (return non-2xx or record an auto-advance failure) instead of reporting
+  // a phantom-successful transition.
+  await persistSwarmRuntime(workspace, state);
 }
 
 async function runWithConcurrencyLimit<T, R>(
@@ -920,8 +929,10 @@ async function dispatchSwarmWave(
     createdAt: existingState?.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+  // PAN-977 round-11 high-2: saveSwarmState() now routes through
+  // persistSwarmRuntime() and propagates errors, so a separate
+  // persistSwarmRuntime() here would just be a duplicate canonical write.
   await saveSwarmState(state);
-  await persistSwarmRuntime(mainWorkspace, state);
 
   if (state.autoAdvance) {
     activeSwarmIssueIds.add(issueUpper);
@@ -966,8 +977,44 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
   // gets the matching `done` task operation below.
   let resolvedItemId = itemId;
   let matchedSlot: SlotAssignment | undefined;
+  let matchedSlotIndex = -1;
   if (state) {
-    matchedSlot = state.slots.find(slot => slot.slot === slotId);
+    // PAN-977 round-11 blocker #1: numeric slot ids can recur across cumulative
+    // history (slot 1 used by item-A in wave 0, then by item-B in wave 1).
+    // Array.find() returned the OLDEST matching record and the downstream
+    // status mapping mutated *every* record sharing the slot or itemId,
+    // which could mark a stale historical entry done while the actual current
+    // dispatch kept running. Resolve unambiguously:
+    //   1. If caller supplied a non-empty itemId, prefer the (slotId,itemId)
+    //      tuple — that is the unique key we record at dispatch time.
+    //   2. Otherwise reverse-scan and prefer 'running' over already-merged/completed
+    //      historical entries, falling back to the most recent matching slot.
+    // Then mutate ONLY that resolved record below.
+    if (resolvedItemId && resolvedItemId.length > 0) {
+      for (let i = state.slots.length - 1; i >= 0; i--) {
+        const s = state.slots[i]!;
+        if (s.slot === slotId && s.itemId === resolvedItemId) {
+          matchedSlot = s;
+          matchedSlotIndex = i;
+          break;
+        }
+      }
+    }
+    if (!matchedSlot) {
+      for (let i = state.slots.length - 1; i >= 0; i--) {
+        const s = state.slots[i]!;
+        if (s.slot !== slotId) continue;
+        if (s.status === 'running') {
+          matchedSlot = s;
+          matchedSlotIndex = i;
+          break;
+        }
+        if (matchedSlotIndex === -1) {
+          matchedSlot = s;
+          matchedSlotIndex = i;
+        }
+      }
+    }
     if (matchedSlot && (!resolvedItemId || resolvedItemId.length === 0)) {
       resolvedItemId = matchedSlot.itemId;
     }
@@ -981,16 +1028,31 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
   // buildSlotPrompt receives the persisted context).
   const isSynthesisCompletion = Boolean(synthesisOutput) || matchedSlot?.phase === 'synthesis';
   if (state) {
-    const slots = state.slots.map(slot => slot.slot === slotId || slot.itemId === resolvedItemId
-      ? {
-          ...slot,
-          status: isSynthesisCompletion ? ('completed' as const) : ('merged' as const),
-          completedAt: slot.completedAt ?? now,
-        }
-      : slot);
+    // PAN-977 round-11 blocker #1: mutate ONLY the resolved slot index. Older
+    // history records with the same numeric slot or itemId stay untouched, so
+    // their `status` and `completedAt` reflect the actual dispatch they belong
+    // to. If we couldn't resolve a slot at all (matchedSlotIndex < 0) the
+    // canonical record is a no-op write — auto-advance below still runs in
+    // case readiness changed via other slots.
+    const slots = matchedSlotIndex >= 0
+      ? state.slots.map((slot, idx) => idx === matchedSlotIndex
+        ? {
+            ...slot,
+            status: isSynthesisCompletion ? ('completed' as const) : ('merged' as const),
+            completedAt: slot.completedAt ?? now,
+          }
+        : slot)
+      : state.slots;
     const nextState = { ...state, slots, updatedAt: now };
-    await saveSwarmState(nextState);
-    await persistSwarmRuntime(mainWorkspace, nextState);
+    try {
+      await saveSwarmState(nextState);
+    } catch (persistErr: any) {
+      return {
+        ok: false,
+        status: 500,
+        error: `Failed to persist canonical swarm runtime for ${issueUpper} slot ${slotId}: ${persistErr?.message ?? persistErr}`,
+      };
+    }
     if (synthesisOutput && resolvedItemId) {
       const cont = await loadWorkspaceContinue(mainWorkspace, issueUpper);
       const runtime = cont.swarmRuntime ?? runtimeFromState(nextState);
@@ -1039,11 +1101,15 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
         // returns non-2xx and the caller knows to retry.
         try {
           const retryNote = `vBRIEF task mutation failed: ${mutationErr.message}`;
-          const retrySlots = nextState.slots.map(s =>
-            s.slot === slotId ? { ...s, status: 'failed' as const, failureReason: retryNote } : s);
+          // PAN-977 round-11 blocker #1: only flag the resolved slot index, not
+          // every historical record sharing the numeric slot.
+          const retrySlots = matchedSlotIndex >= 0
+            ? nextState.slots.map((s, idx) => idx === matchedSlotIndex
+              ? { ...s, status: 'failed' as const, failureReason: retryNote }
+              : s)
+            : nextState.slots;
           const retryState = { ...nextState, slots: retrySlots, lastAutoAdvanceError: retryNote, updatedAt: new Date().toISOString() };
           await saveSwarmState(retryState);
-          await persistSwarmRuntime(mainWorkspace, retryState);
         } catch { /* best effort — original error still propagates */ }
         return {
           ok: false,
@@ -1103,7 +1169,44 @@ async function discoverActiveSwarmIssueIds(): Promise<string[]> {
   return Array.from(ids);
 }
 
+/**
+ * PAN-977 round-11 blocker #3: drain pending slot-merge retry markers written
+ * by merge-agent when the dashboard loopback was unavailable. Each marker
+ * represents a slot branch that was already merged into the feature branch
+ * but whose runtime/plan transition never landed. Replay them in-process by
+ * calling onSlotMergeComplete directly; remove the marker on success, leave
+ * it in place on failure so a future poll cycle retries.
+ */
+async function drainPendingSlotMerges(): Promise<void> {
+  const retryDir = join(getSwarmDir(), 'pending-slot-merges');
+  const entries = await readdir(retryDir).catch(() => [] as string[]);
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) continue;
+    const file = join(retryDir, entry);
+    try {
+      const raw = await readFile(file, 'utf-8');
+      const parsed = JSON.parse(raw) as { issueId?: string; slotId?: number; itemId?: string };
+      if (!parsed.issueId || !Number.isInteger(parsed.slotId)) {
+        await unlink(file).catch(() => undefined);
+        continue;
+      }
+      const result = await onSlotMergeComplete(parsed.issueId, parsed.itemId ?? '', parsed.slotId as number);
+      if (result.ok) {
+        await unlink(file).catch(() => undefined);
+        console.log(`[swarm] Drained pending slot-merge marker ${entry}`);
+      } else {
+        console.warn(`[swarm] Pending slot-merge ${entry} retry failed: ${result.error}; leaving marker for next cycle.`);
+      }
+    } catch (err: any) {
+      console.warn(`[swarm] Failed reading slot-merge marker ${entry}: ${err?.message ?? err}`);
+    }
+  }
+}
+
 async function pollSwarmAutoAdvance(): Promise<void> {
+  // Drain any persisted slot-merge retry markers first so a stuck slot can
+  // unwedge auto-advance before the readiness check below fires.
+  await drainPendingSlotMerges();
   // PAN-977 blocker #2: poll only the bounded active-swarm registry. If the
   // registry is empty, we still do one discovery sweep — this seeds the
   // registry from any pre-existing legacy sidecar files (migration window) and
@@ -1132,10 +1235,14 @@ async function pollSwarmAutoAdvance(): Promise<void> {
 
     const { state, changed } = await refreshSwarmSlotStatuses(loadedState, sessions);
     if (changed) {
-      await saveSwarmState(state);
-      const project = resolveProjectFromIssue(state.issueId);
-      if (project) {
-        await persistSwarmRuntime(join(project.projectPath, 'workspaces', `feature-${state.issueId.toLowerCase()}`), state);
+      // PAN-977 round-11 blocker #2 / high-2: saveSwarmState is now the single
+      // canonical writer; if it throws the auto-advance loop records the
+      // failure as a backoff condition rather than silently dropping the write.
+      try {
+        await saveSwarmState(state);
+      } catch (persistErr: any) {
+        await saveSwarmState(recordAutoAdvanceFailure(state, `Runtime persist failed: ${persistErr?.message ?? persistErr}`)).catch(() => undefined);
+        continue;
       }
     }
 
@@ -1658,11 +1765,9 @@ const getSwarmRoute = HttpRouter.add(
     const refreshed = yield* Effect.promise(() => refreshSwarmSlotStatuses(state, sessions));
     if (refreshed.changed) {
       yield* Effect.promise(async () => {
+        // PAN-977 round-11 high-2: saveSwarmState is the single canonical
+        // writer — no separate persistSwarmRuntime() needed here.
         await saveSwarmState(refreshed.state);
-        const project = resolveProjectFromIssue(issueId);
-        if (project) {
-          await persistSwarmRuntime(join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`), refreshed.state);
-        }
       });
     }
 
