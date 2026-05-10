@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-09T23:54:52.281Z",
+  "updated": "2026-05-10T00:02:38.944Z",
   "gitState": {
     "branch": "feature/pan-1044",
-    "sha": "751e6f45f",
+    "sha": "2b5ba992f",
     "dirty": true
   },
   "decisions": [
@@ -151,6 +151,12 @@
       "timestamp": "2026-05-09T23:54:52.281Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-10T00:02:38.944Z",
+      "reason": "feedback-fix",
+      "note": "Fixed test verification failure where Vitest could not resolve @panctl/contracts when contract dist was missing but CLI dist existed. tests/global-setup.ts now independently rebuilds packages/contracts/dist before checking CLI dist. Verified targeted direct Vitest with contracts dist absent, npm run build, and npm test.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []
