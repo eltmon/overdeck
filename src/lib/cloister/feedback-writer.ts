@@ -143,6 +143,16 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
   const filePath = workspacePath ? join(getWorkspacePanPaths(workspacePath).feedbackDir, filename) : undefined;
 
   // Write to the scope vBRIEF's continue file (primary store, Layer 3+).
+  //
+  // Best-effort: if a single malformed vBRIEF on main (e.g. one missing a
+  // valid root status) makes appendFeedbackEntryForIssue throw, do NOT abort
+  // the whole feedback delivery. The workspace mirror at .pan/feedback/NNN-*.md
+  // is what the agent reads, and the messageAgent call is what nudges it to
+  // read. Aborting here on a continue-state error blocks feedback for every
+  // issue in the project just because one unrelated spec is malformed
+  // (observed PAN-977 cycle: PAN-1015 spec was bad → review CHANGES_REQUESTED
+  // never reached the work agent → agent sat idle waiting).
+  let continueStateWritten = false;
   try {
     appendFeedbackEntryForIssue(resolved.projectPath, opts.issueId, {
       seq,
@@ -151,12 +161,12 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
       timestamp,
       markdownBody: opts.markdownBody,
     });
+    continueStateWritten = true;
   } catch (err: any) {
     console.error(
-      `[feedback-writer] Failed to append continue-file feedback entry for ${opts.issueId}:`,
+      `[feedback-writer] Failed to append continue-file feedback entry for ${opts.issueId} (non-fatal — will still write workspace mirror):`,
       err.message,
     );
-    return { success: false, error: err.message };
   }
   try {
     appendContinueSessionEntryForIssue(resolved.projectPath, opts.issueId, {
@@ -179,6 +189,8 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
     }
   }
 
-  console.log(`[feedback-writer] Wrote feedback seq ${seq} for ${opts.issueId} (${opts.specialist} → ${opts.outcome})`);
+  console.log(
+    `[feedback-writer] Wrote feedback seq ${seq} for ${opts.issueId} (${opts.specialist} → ${opts.outcome})${continueStateWritten ? '' : ' [continue-state skipped]'}`,
+  );
   return { success: true, relativePath, filePath };
 }

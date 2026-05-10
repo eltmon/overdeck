@@ -7,6 +7,11 @@ type PipelineStateLike = {
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed';
   uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
   verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+  updatedAt?: string;
+  reviewSpawnedAt?: string;
+  readyForMerge?: boolean;
+  queuePosition?: number | null;
+  activeSpecialist?: string | null;
   // PAN-794: persistent stuck flag + reason set by the deacon/breaker or main-diverged flow.
   stuck?: boolean;
   stuckReason?: string;
@@ -17,8 +22,29 @@ type PipelineStateLike = {
   deaconIgnoredReason?: string;
 };
 
-export function hasActualPendingQuestion(agent?: Pick<Agent, 'hasPendingQuestion' | 'pendingQuestionCount'> | null): boolean {
-  return agent?.hasPendingQuestion === true && (agent.pendingQuestionCount ?? 0) > 0;
+// Keep in sync with the review coordinator's longest specialist timeout.
+export const REVIEW_SPECIALIST_TIMEOUT_MS = 30 * 60 * 1000;
+export const PENDING_REVIEW_STRANDED_MS = REVIEW_SPECIALIST_TIMEOUT_MS * 2;
+
+export function hasActualPendingQuestion(agent?: Pick<Agent, 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'> | null): boolean {
+  return agent?.hasPendingQuestion === true && ((agent.pendingQuestionCount ?? 0) > 0 || !!agent.pendingQuestionPrompt?.trim());
+}
+
+export function getPendingQuestionTitle(agent?: Pick<Agent, 'pendingQuestionCount' | 'pendingQuestionPrompt' | 'pendingQuestionReason'> | null): string {
+  const prompt = agent?.pendingQuestionPrompt?.trim();
+  if (prompt) {
+    const firstLine = prompt.split('\n').find((line) => line.trim().length > 0)?.trim() ?? prompt;
+    const prefix = agent?.pendingQuestionReason === 'tool_permission'
+      ? 'Permission prompt'
+      : agent?.pendingQuestionReason === 'planning_done'
+        ? 'Planning complete'
+        : agent?.pendingQuestionReason === 'confirmation'
+          ? 'Confirmation prompt'
+          : 'Awaiting input';
+    return `${prefix}: ${firstLine}`;
+  }
+  const count = agent?.pendingQuestionCount || 1;
+  return `Agent is waiting for user input (${count} question${count > 1 ? 's' : ''})`;
 }
 
 export function isReviewPipelineStuck(status?: PipelineStateLike | null): boolean {
@@ -44,6 +70,27 @@ export function isReviewPipelineStuck(status?: PipelineStateLike | null): boolea
  */
 export function isReviewInfraStuck(status?: PipelineStateLike | null): boolean {
   return status?.stuck === true && status.stuckReason === 'review_infrastructure_failure';
+}
+
+/**
+ * PAN-1034: a pending review with no active queue/specialist for more than 2x
+ * the longest specialist timeout is stranded. This is distinct from a fresh
+ * pending state while dispatch/verification is still starting up.
+ */
+export function isPendingReviewStranded(status?: PipelineStateLike | null, now = Date.now()): boolean {
+  if (!status) return false;
+  if (status.reviewStatus !== 'pending') return false;
+  if (status.stuck) return false;
+  if (status.readyForMerge) return false;
+  if (status.queuePosition != null || status.activeSpecialist) return false;
+
+  const reference = status.reviewSpawnedAt ?? status.updatedAt;
+  if (!reference) return false;
+
+  const referenceMs = Date.parse(reference);
+  if (!Number.isFinite(referenceMs)) return false;
+
+  return now - referenceMs >= PENDING_REVIEW_STRANDED_MS;
 }
 
 /**

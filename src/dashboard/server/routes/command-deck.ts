@@ -31,12 +31,14 @@ import { promisify } from 'node:util';
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
+import { ReadModelService } from '../read-model.js';
 
 import { getAgentRuntimeStateAsync, listRunningAgentsAsync } from '../../../lib/agents.js';
+import { detectAwaitingInputForAgent, detectAwaitingInputFromPane, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
-import { SessionNodePresence } from '@panctl/contracts';
+import type { AgentSnapshot, SessionNodePresence } from '@panctl/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
@@ -187,12 +189,15 @@ const getMissionControlActivityRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const request = yield* HttpServerRequest.HttpServerRequest;
+    const readModel = yield* ReadModelService;
     const issueId = params['issueId'] ?? '';
     const url = new URL(request.url, 'http://localhost');
     const includeTranscripts = url.searchParams.get('summary') !== '1';
+    const snapshot = yield* readModel.getSnapshot;
+    const agentSnapshotsById = new Map(snapshot.agents.map((agent) => [agent.id, agent]));
 
     const result = yield* Effect.tryPromise({
-      try: () => fetchActivityDataWithContext(issueId, { includeTranscripts }),
+      try: () => fetchActivityDataWithContext(issueId, { includeTranscripts, agentSnapshotsById }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     return jsonResponse(result);
@@ -203,6 +208,20 @@ export interface ActivityContext {
   tmuxSessionNames?: Set<string>;
   taskFileContents?: Map<string, string>;
   includeTranscripts?: boolean;
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>;
+}
+
+function awaitingInputFromProjection(
+  agentId: string,
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>,
+): AwaitingInputDetection | null | undefined {
+  const agent = agentSnapshotsById?.get(agentId);
+  if (!agent) return undefined;
+  if (agent.hasPendingQuestion !== true) return null;
+  return {
+    reason: (agent.pendingQuestionReason as AwaitingInputDetection['reason'] | undefined) ?? 'other',
+    prompt: agent.pendingQuestionPrompt || 'Agent is waiting for human input',
+  };
 }
 
 export async function fetchActivityData(issueId: string): Promise<unknown> {
@@ -240,6 +259,9 @@ export async function fetchActivityDataWithContext(
     status: string;
     transcript?: string;
     presence: SessionNodePresence;
+    awaitingInput?: boolean;
+    awaitingInputPrompt?: string;
+    awaitingInputReason?: string;
     hasJsonl?: boolean;
     roundMetadata?: ReviewerRoundMetadata;
   }> = [];
@@ -268,9 +290,11 @@ export async function fetchActivityDataWithContext(
       if (isPlanning) hasPlanningSection = true;
 
       let transcript = '';
+      let transcriptFromPane = false;
       if (includeTranscripts) {
         try {
           transcript = (await capturePaneAsync(checkId, 500)).trim();
+          transcriptFromPane = transcript.length > 0;
         } catch { /* agent may not be running */ }
 
         if (!isPlanning && !transcript) {
@@ -290,6 +314,14 @@ export async function fetchActivityDataWithContext(
 
       const rtState = await getAgentRuntimeStateAsync(checkId);
       const presence = await deriveSessionPresence(checkId, rtState, tmuxSessionNames);
+      const projectedAwaitingInput = awaitingInputFromProjection(checkId, context.agentSnapshotsById);
+      const awaitingInput = projectedAwaitingInput !== undefined
+        ? projectedAwaitingInput
+        : transcriptFromPane
+          ? detectAwaitingInputFromPane(transcript, { isPlanning })
+          : tmuxSessionNames.has(checkId)
+            ? await detectAwaitingInputForAgent(checkId, { isPlanning })
+            : null;
 
       // Resolve JSONL path for conversation rendering (PAN-821)
       const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
@@ -315,6 +347,9 @@ export async function fetchActivityDataWithContext(
           : (state.status || 'completed'),
         transcript: jsonlPath ? undefined : transcript,
         presence,
+        awaitingInput: awaitingInput !== null,
+        awaitingInputPrompt: awaitingInput?.prompt,
+        awaitingInputReason: awaitingInput?.reason,
         hasJsonl: !!jsonlPath,
         tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
       });

@@ -298,6 +298,7 @@ function formatCost(cost: number): string {
 type AggregateActivityState = 'running' | 'error' | 'queued' | 'stopped';
 
 type AggregateBadge =
+  | { key: 'input'; label: string; tone: 'waiting' }
   | { key: 'work'; label: string; tone: 'running' | 'stopped' }
   | { key: 'reviewers'; label: string; tone: 'running' | 'stopped' }
   | { key: 'review-error'; label: string; tone: 'error' };
@@ -340,6 +341,7 @@ function formatSessionDuration(seconds: number): string {
 
 function getAggregateActivityState(sessions: readonly SessionNodeType[]): AggregateActivityState {
   if (sessions.some(isErrorSession)) return 'error';
+  if (sessions.some((session) => session.awaitingInput === true)) return 'queued';
   if (sessions.some(isRunningSession)) return 'running';
   if (sessions.some(isQueuedSession)) return 'queued';
   return 'stopped';
@@ -411,6 +413,14 @@ function getAggregateBadges(sessions: readonly SessionNodeType[]): AggregateBadg
 
   const badges: AggregateBadge[] = [];
 
+  if (sessions.some((session) => session.awaitingInput === true)) {
+    badges.push({
+      key: 'input',
+      label: '! INPUT',
+      tone: 'waiting',
+    });
+  }
+
   if (workSessions.length > 0) {
     badges.push({
       key: 'work',
@@ -449,6 +459,17 @@ function getFeatureStateTone(stateLabel: string): 'done' | 'progress' | 'review'
 }
 
 function getAggregateBadgeTitle(badge: AggregateBadge, sessions: readonly SessionNodeType[]): string {
+  if (badge.key === 'input') {
+    const waiting = sessions.find((session) => session.awaitingInput === true);
+    const firstLine = waiting?.awaitingInputPrompt
+      ?.split('\n')
+      .find((line) => line.trim().length > 0)
+      ?.trim();
+    return firstLine
+      ? `Awaiting user input in ${waiting?.sessionId}: ${firstLine}`
+      : `Awaiting user input in ${waiting?.sessionId ?? 'an agent session'}.`;
+  }
+
   if (badge.key === 'work') {
     const workSessions = sessions.filter((session) => session.type === 'work');
     const runningWork = workSessions.filter(isRunningSession);
@@ -602,7 +623,8 @@ function computeDominantStatus(sessions: readonly SessionNodeType[]): StatusDotS
   let hasThinking = false;
   let hasWaiting = false;
   for (const s of sessions) {
-    if (s.presence === 'active') return 'active';
+    if (s.awaitingInput === true) hasWaiting = true;
+    if (s.presence === 'active' && s.awaitingInput !== true) return 'active';
     if (s.presence === 'idle') hasIdle = true;
     const st = (s.status || '').toLowerCase();
     if (st.includes('thinking')) hasThinking = true;

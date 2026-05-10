@@ -154,6 +154,27 @@ setPipelineHandler((event) => {
       return;
     }
 
+    case 'reviewer_timed_out': {
+      try {
+        const es = getEventStore();
+        es.append({
+          type: 'review.specialist.timed_out',
+          timestamp: new Date().toISOString(),
+          payload: {
+            issueId: event.issueId,
+            role: event.role,
+            sessionName: event.sessionName,
+            attempt: event.attempt,
+            maxRetries: event.maxRetries,
+            willRetry: event.willRetry,
+          },
+        } as any);
+      } catch (err) {
+        console.error('[pipeline] Failed to append reviewer_timed_out event:', err);
+      }
+      return;
+    }
+
     case 'coordinator_started': {
       try {
         const es = getEventStore();
@@ -164,6 +185,20 @@ setPipelineHandler((event) => {
         } as any);
       } catch (err) {
         console.error('[pipeline] Failed to append coordinator_started event:', err);
+      }
+      return;
+    }
+
+    case 'coordinator_died': {
+      try {
+        const es = getEventStore();
+        es.append({
+          type: 'review.coordinator.died',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: event.issueId, sessionName: event.sessionName, reason: event.reason },
+        } as any);
+      } catch (err) {
+        console.error('[pipeline] Failed to append coordinator_died event:', err);
       }
       return;
     }

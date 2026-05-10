@@ -273,6 +273,8 @@ export const AgentSnapshot = Schema.Struct({
   // Enrichment fields (PAN-440)
   hasPendingQuestion: Schema.optional(Schema.Boolean),
   pendingQuestionCount: Schema.optional(Schema.Number),
+  pendingQuestionPrompt: Schema.optional(Schema.String),
+  pendingQuestionReason: Schema.optional(Schema.String),
   resolution: Schema.optional(AgentResolution),
   resolutionCount: Schema.optional(Schema.Number),
   // PAN-800 — bumped on every runtime event so subscribers can cheaply detect
@@ -373,7 +375,6 @@ export const DashboardSnapshot = Schema.Struct({
   reviewStatuses: Schema.Array(ReviewStatusSnapshot),
   issues: Schema.Array(Schema.Unknown),  // Issues are complex — pass through unvalidated
   resources: Schema.optional(Schema.Unknown),
-  turnDiffSummariesByAgentId: Schema.optional(Schema.Record(Schema.String, Schema.Array(TurnDiffSummary))),
   agentRuntimeById: Schema.optional(Schema.Record(Schema.String, AgentRuntimeSnapshot)),
   channelPermissionRequests: Schema.optional(Schema.Array(ChannelPermissionRequestSnapshot)),
   timestamp: Schema.String,
@@ -454,6 +455,9 @@ export const SessionNode = Schema.Struct({
   hasJsonl: Schema.optional(Schema.Boolean),
   transcript: Schema.optional(Schema.String),
   presence: SessionNodePresence,
+  awaitingInput: Schema.optional(Schema.Boolean),
+  awaitingInputPrompt: Schema.optional(Schema.String),
+  awaitingInputReason: Schema.optional(Schema.String),
   roundMetadata: Schema.optional(ReviewerRoundMetadata),
 })
 export type SessionNode = typeof SessionNode.Type

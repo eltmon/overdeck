@@ -11,7 +11,10 @@ const mockUnref = vi.hoisted(() => vi.fn());
 const mockSpawnChild = vi.hoisted(() => ({ pid: 12345, unref: mockUnref }));
 const mockSpawn = vi.hoisted(() => vi.fn(() => mockSpawnChild));
 const mockExecAsync = vi.hoisted(() => vi.fn(async (cmd: string) => {
-  if (cmd.includes('git rev-parse --verify')) return { stdout: 'abc123\n', stderr: '' };
+  if (cmd.includes('git rev-parse --verify')) return { stdout: 'deadbeef\n', stderr: '' };
+  if (cmd.includes('git merge-base --is-ancestor')) return { stdout: '', stderr: '' };
+  if (cmd.includes('git diff origin/main...')) return { stdout: '', stderr: '' };
+  if (cmd.includes('gh pr list')) return { stdout: '[]', stderr: '' };
   return { stdout: '', stderr: '' };
 }));
 const mockExec = vi.hoisted(() => vi.fn((cmd: string, optionsOrCb?: any, maybeCb?: any) => {

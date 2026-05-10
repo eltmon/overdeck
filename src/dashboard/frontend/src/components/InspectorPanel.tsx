@@ -26,7 +26,7 @@ import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { Agent, Issue, WorkAgentLifecycle, type StartAgentResponse } from '../types';
 import type { ContainerStatus, ReviewStatus, SalvageableStashInfo, WorkspaceInfo } from './inspector/types';
-import { getFriendlyModelName, shouldForceReviewTrigger } from './inspector/utils';
+import { formatRelativeTime, getFriendlyModelName, shouldForceReviewTrigger } from './inspector/utils';
 import { useAlert } from './DialogProvider';
 import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
@@ -34,7 +34,7 @@ import { PlanDialog } from './PlanDialog';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
-import { isReviewPipelineStuck } from '../lib/pipeline-state';
+import { getPendingQuestionTitle, hasActualPendingQuestion, isPendingReviewStranded, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { RecoverButton } from './RecoverButton';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { PanOpenInPicker } from './PanOpenInPicker';
@@ -102,7 +102,7 @@ export interface InspectorPanelProps {
   /** Loading state for reviewStatus */
   reviewStatusLoading?: boolean;
   onClose: () => void;
-  onOpenTerminal?: () => void;
+  onOpenTerminal?: (sessionName?: string) => void;
   /** Open the terminal and select the active merge session (PAN-905) */
   onViewMergeLog?: () => void;
   /** When true, render without sidebar chrome (border-r, close btn) for embedded use */
@@ -128,6 +128,9 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
   } | null>(null);
 
   const tmuxCommand = agent ? `tmux attach -t ${agent.id}` : '';
+  const awaitingInput = hasActualPendingQuestion(agent);
+  const awaitingInputTitle = getPendingQuestionTitle(agent);
+  const awaitingInputPrompt = agent?.pendingQuestionPrompt?.trim();
 
   // Check lifecycle state for stopped agents (drives Start vs Resume vs Reset semantics)
   const { data: agentLifecycle } = useQuery<WorkAgentLifecycle | undefined>({
@@ -194,6 +197,13 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
 
   const reviewStatus = reviewStatusProp ?? fetchedReviewStatus;
   const reviewStatusLoading = reviewStatusLoadingProp ?? fetchedReviewStatusLoading ?? false;
+  const pendingReviewStranded = isPendingReviewStranded(reviewStatus);
+  const pendingReviewStrandedSince = pendingReviewStranded
+    ? (reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt)
+    : undefined;
+  const pendingReviewStrandedAge = pendingReviewStrandedSince
+    ? formatRelativeTime(pendingReviewStrandedSince)
+    : 'over an hour ago';
 
   useEffect(() => {
     if (!agentLaunchState) return;
@@ -612,11 +622,16 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
   };
 
   const handleReview = async () => {
+    const strandedPendingReview = isPendingReviewStranded(reviewStatus);
     const forceReview = shouldForceReviewTrigger(reviewStatus);
-    const message = forceReview
-      ? `Re-run review & test pipeline for ${issueId}?`
-      : `Start review & test pipeline for ${issueId}?`;
-    if (await confirm({ title: forceReview ? 'Re-run Review' : 'Start Review', message, confirmLabel: forceReview ? 'Re-run' : 'Start Review' })) {
+    const title = strandedPendingReview ? 'Re-request Review' : forceReview ? 'Re-run Review' : 'Start Review';
+    const message = strandedPendingReview
+      ? `Pending review for ${issueId} appears stranded (${pendingReviewStrandedAge}). Re-request the review now?`
+      : forceReview
+        ? `Re-run review & test pipeline for ${issueId}?`
+        : `Start review & test pipeline for ${issueId}?`;
+    const confirmLabel = strandedPendingReview ? 'Re-request Review' : forceReview ? 'Re-run' : 'Start Review';
+    if (await confirm({ title, message, confirmLabel })) {
       forceReviewRef.current = forceReview;
       reviewMutation.mutate();
     }
@@ -709,7 +724,7 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
             <div className="flex items-center gap-1 shrink-0">
               {onOpenTerminal && agent && (
                 <button
-                  onClick={onOpenTerminal}
+                  onClick={() => onOpenTerminal()}
                   className="p-1 rounded transition-colors hover:bg-popover text-muted-foreground"
                   title="Open terminal"
                   data-testid={`inspector-open-terminal-${issueId}`}
@@ -762,7 +777,7 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
         )}
 
         {/* Pipeline stuck banner */}
-        {reviewStatusProp && isReviewPipelineStuck(reviewStatusProp) && (
+        {reviewStatus && isReviewPipelineStuck(reviewStatus) && (
           <div className="px-3 py-2 border-b border-border bg-warning/10">
             <div className="flex items-center gap-2 mb-1.5">
               <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
@@ -771,7 +786,29 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
             <p className="text-[10px] text-muted-foreground mb-2">
               Review/test/merge pipeline is stuck and needs recovery.
             </p>
-            <RecoverButton issueId={issueId} reviewStatus={reviewStatusProp} variant="inspector" />
+            <RecoverButton issueId={issueId} reviewStatus={reviewStatus} variant="inspector" />
+          </div>
+        )}
+
+        {/* PAN-1034: pending review stranded beyond 2x reviewer timeout. */}
+        {pendingReviewStranded && (
+          <div className="px-3 py-2 border-b border-border bg-amber-500/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span className="text-xs font-medium text-amber-200">Pending Review Stranded</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              Pending review started {pendingReviewStrandedAge} and no reviewer is queued or active. Re-request review to restart the pipeline.
+            </p>
+            <button
+              onClick={handleReview}
+              disabled={reviewMutation.isPending}
+              className="flex items-center justify-center gap-1 px-2 py-1 rounded text-xs bg-amber-500/20 text-amber-100 hover:bg-amber-500/30 border border-amber-500/40 disabled:opacity-50 w-full"
+              data-testid="stranded-review-request-btn"
+            >
+              {reviewMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              Re-request Review
+            </button>
           </div>
         )}
 
@@ -803,6 +840,34 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
               No workspace created yet. Use <strong>Plan</strong> to create a workspace and plan this issue,
               or <strong>Create Workspace</strong> below.
             </div>
+          </div>
+        )}
+
+        {/* Awaiting input banner */}
+        {agent && awaitingInput && (
+          <div className="px-3 py-2 border-b border-warning/40 bg-warning/10" data-testid={`inspector-input-${issueId}`}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+              <span className="text-xs font-bold uppercase tracking-wide text-warning">Awaiting Input</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2" title={awaitingInputTitle}>
+              {awaitingInputTitle}
+            </p>
+            {awaitingInputPrompt && (
+              <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-warning/30 bg-card/80 p-2 text-[10px] leading-4 text-foreground">
+                {awaitingInputPrompt}
+              </pre>
+            )}
+            {onOpenTerminal && (
+              <button
+                onClick={() => onOpenTerminal(agent.id)}
+                className="mt-2 inline-flex items-center gap-1.5 rounded border border-warning/40 bg-warning/15 px-2 py-1 text-[10px] font-medium text-warning hover:bg-warning/25"
+                title="Open terminal to answer this prompt"
+              >
+                <Terminal className="w-3 h-3" />
+                Attach terminal
+              </button>
+            )}
           </div>
         )}
 

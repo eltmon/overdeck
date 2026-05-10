@@ -1,45 +1,54 @@
-# Flywheel State — Run 2026-05-09
+# Flywheel State — Run 2026-05-09 (late)
 
 ## Active Pipeline
 
 | Issue | Phase | Root Cause / Blocker | Auto-Requeues | Runs Stuck | Notes |
 |---|---|---|---|---|---|
-| PAN-1024 | In Progress | — | — | — | Lazy-load per-turn diff summaries |
-| PAN-1027 | In Progress | merge-status drift: deacon sets mergeStatus=merged without postMergeLifecycle | — | — | Bug filed |
-| PAN-1029 | In Review | Harness picker UI missing (backend shipped, no dashboard surface) | — | — | PAN-636 backend shipped |
-| PAN-1030 | In Review | INPUT indicator missing from kanban/command deck | — | — | |
-| PAN-1031 | In Progress | Missing Tests cycle counter + Sync action in InspectorPanel | — | — | PAN-954 follow-on |
-| PAN-1034 | Done (merged) | N/A | — | — | Fixed: coordinator API routing + atomic reviewedAtCommit |
-| PAN-1035-PAN-1043 | Various | Many issues with no workspace activity | — | — | Stale workspaces |
-| PAN-1044 | In Progress | Command Deck: Project Overview Panel with pipeline swimlanes | — | — | |
-| PAN-1048 | Planning | Unify agent type system | — | — | Architecture |
-| PAN-1052 | Todo | Activity feed feature | — | — | |
+| PAN-1024 | In Progress | — | — | — | gpt-5.4 work agent active, bypass perms on |
+| PAN-1044 | In Progress | — | — | — | gpt-5.5 work agent active |
+| PAN-1048 | In Progress | — | — | — | gpt-5.5 work agent active, ctx 82% — close to cap |
+| PAN-1055 | Planning | Filed today: harness picker everywhere model is selected | 0 | 0 | gpt-5.5 work agent + review specialists running |
+| PAN-1030 | Done (merged) | N/A | — | — | Landed by hand this session (1fcb8cb49) — awaiting-input indicator |
+| PAN-1029 | Closed (no work shipped) | Harness picker UI not delivered — replaced by PAN-1055 | — | — | False-merged, kept closed; work redone in PAN-1055 |
+| PAN-977 | In Progress | Reopened after false-merge — work agent rebasing + finishing | 0 | 0 | gpt-5.5 work agent re-spawned |
+| PAN-945 | In Progress | Reopened after false-merge — work agent rebasing + finishing | 0 | 0 | gpt-5.5 work agent re-spawned |
+| PAN-913 | Reopened, awaiting workflow | Reopened after false-merge — needs work agent | — | — | Branch restored, PR reopened |
+| PAN-544 | Reopened, awaiting workflow | Reopened after false-merge — needs work agent | — | — | Branch restored, PR reopened |
+| PAN-457 | Reopened, awaiting workflow | Reopened after false-merge — needs work agent | — | — | Branch restored, PR reopened |
 
 ## Cycling Alerts
 
-None.
+None this run. Previously-cycling items resolved:
+- Deacon idle-nudge interrupting active Bash → fixed (`9865808f9`)
+- Resume launcher missing `--dangerously-skip-permissions` → fixed (`754460d78`)
+- Settings Warning dialog from invalid deny patterns → fixed (`156e0f204`)
 
 ## Infrastructure Gaps
 
 | Gap | Severity | Notes |
 |---|---|---|
-| Test-agent MiniMax auth failure | High | `spawnEphemeralSpecialist` for test-agent fails with auth error; needs API key fix or model override |
-| Specialist paste verification failure causing coordinator hangs | High | PAN-1034 review coordinator hangs indefinitely when specialist output paste verification fails; coordinator has no timeout guard for individual specialists |
-| Merge status drift (PAN-1027) | Medium | deacon auto-detect paths set mergeStatus=merged without calling postMergeLifecycle |
+| Test-agent MiniMax auth failure | High | Open from prior run |
+| Specialist paste verification failure causing coordinator hangs | High | Open from prior run |
+| Merge status drift (PAN-1027) | Resolved | Replaced regex-based squash detection with GitHub API truth (`54505cce2`) |
+| review-temp stash leak across rounds | Resolved | Drop-then-create in `ensureReviewTempStash` (`cfced34b1`) |
+| close-out closes unmerged PRs | Resolved | `closeGitHubDirect`/`closeGitHubPr` refuse non-merged PRs (`cfced34b1`) |
+| Resume launcher missing DSP | Resolved | Resume now reads `resolvePermissionMode()` (`754460d78`) |
+| Deacon idle-nudge cancels active Bash | Resolved | `isAgentIdleForNudge` requires `state==='idle'` or `'uninitialized'` only (`9865808f9`) |
+| Invalid Bash(rm:**) deny patterns block agent input | Resolved | Valid `:*`-trailing syntax + auto-scrub legacy (`156e0f204`) |
 
 ## Pattern Ledger
 
 | Failure Signature | Root Cause | Fix Applied |
 |---|---|---|
-| Coordinator hangs after "Paste verification failed" | `sendKeysAsync` verification fails for long output; coordinator has no per-specialist timeout; waits forever for output file | Not fixed — needs coordinator timeout per specialist |
-| `reviewedAtCommit` null despite review passing | API route set reviewStatus='passed' in one call, then reviewedAtCommit in a second call — test-agent dispatch fires before snapshot is set | Fixed: snapshot atomically in same setReviewStatus call |
-| Test-agent not dispatching after review passes | `pan review run` CLI exits before async IIFE in setReviewStatus runs | Fixed: coordinator calls dashboard API instead of direct setReviewStatus |
-| Specialists not spawning (PAN-1034 root cause) | `createSessionAsync` creates empty tmux sessions without running launcher | Fixed (prior session): use execAsync tmux new-session pattern |
+| `Bash(...) ⎿ Interrupted` after `continue` | (a) Settings Warning dialog from invalid `Bash(rm:**/...)` deny patterns blocking input; (b) deacon nudging mid-tool when `state==='active'` + heartbeat stale; (c) permission prompts on resume without DSP | All three fixed today (`156e0f204`, `9865808f9`, `754460d78`) |
+| Issue closed but PR open + unmerged | Squash-merge regex `\(PAN-XXX[ )]` matched any `(PAN-XXX)` trailer in unrelated commits → false `mergeStatus=merged` → close-out swept | Deacon now queries GitHub PR API for `mergedAt`/`mergeCommit` (`54505cce2`); close-out gates on PR merge (`cfced34b1`) |
+| Review-temp stash accumulation per issue | `ensureReviewTempStash` overwrote `reviewTempStashRef` without dropping prior round's stash | Drop-then-create ordering (`cfced34b1`) |
+| Coordinator hangs after "Paste verification failed" | Open — needs per-specialist timeout | Not fixed |
 
 ## Skill Gaps
 
 | Desired Capability | Priority |
 |---|---|
 | Per-specialist timeout in coordinator with graceful abort | High |
-| Dashboard surface for harness picker (PAN-1030/PAN-636) | High |
 | Auto-cleanup of workspaces with no agent activity > 1 week | Medium |
+| One-button "reopen + rebase + redrive" for false-merged issues | Medium (manual today; took 5 rebases per recovered issue) |

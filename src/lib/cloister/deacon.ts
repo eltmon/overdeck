@@ -645,7 +645,13 @@ function isAgentIdleForNudge(agentId: string, staleActiveThresholdMs = 5 * 60 * 
   }
   if (runtimeState.state === 'suspended' || runtimeState.state === 'stopped') return false;
   if (runtimeState.state === 'idle') return true;
-  // Stale-active: heartbeat hasn't fired in staleActiveThresholdMs (state='active'/'uninitialized')
+  // Stale-active fallback: only fires for 'uninitialized' agents — never for
+  // 'active'. An 'active' state means the pre-tool-hook fired and Stop hasn't,
+  // which by definition is mid-turn work. Nudging an active agent injects
+  // text into the pane mid-Bash and surfaces as `Interrupted · What should
+  // Claude do instead?` (PAN-1024 reproduced this with slow gpt-5 runtimes
+  // where the heartbeat between tool calls easily exceeds 5min).
+  if (runtimeState.state !== 'uninitialized') return false;
   const ageMs = Date.now() - new Date(runtimeState.lastActivity).getTime();
   return ageMs > staleActiveThresholdMs;
 }
@@ -2090,19 +2096,30 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
         // Not a regular merge ancestor — try squash-merge detection
       }
 
-      // Check 2: squash merge — match issue IDs in subjects only to avoid body-reference false positives.
+      // Check 2: squash merge — query GitHub for PR mergedAt/mergeCommit. The
+      // old regex-based detection (`\(PAN-XXXX[ )]` against `git log --pretty=%s`)
+      // matched ANY commit that mentioned the issue in a trailer, not just
+      // genuine squash merges. That's how PAN-977/945/913/544/457 got
+      // mergeStatus=merged and rolled into close-out without an actual merge:
+      // unrelated commits landed on main with `(PAN-977)` references and the
+      // deacon trusted them. GitHub's API is the only authoritative source.
       if (!isMerged) {
-        try {
-          const { stdout } = await execFileAsync(
-            'git', ['log', 'main', '--pretty=%s', '-200'],
-            { cwd: project.projectPath },
-          );
-          const id = issueId.toUpperCase();
-          // Anchored patterns: ^PAN-1030(:| |$)  OR  ((PAN-1030|...))
-          const anchored = new RegExp(`(^${id}([:\\s]|$))|\\(${id}[ )]`, 'm');
-          if (anchored.test(stdout)) isMerged = true;
-        } catch {
-          // git log failed — skip
+        const { resolveGitHubIssue: _resolveGitHubIssue } = await import('../tracker-utils.js');
+        const ghResolved = _resolveGitHubIssue(issueId);
+        if (ghResolved.isGitHub) {
+          try {
+            const repoArg = `${ghResolved.owner}/${ghResolved.repo}`;
+            const { stdout } = await execFileAsync(
+              'gh', ['pr', 'list', '--repo', repoArg, '--head', branch, '--state', 'all', '--json', 'number,mergedAt,mergeCommit', '--limit', '5'],
+              { cwd: project.projectPath },
+            );
+            const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
+            if (prs.some((pr) => pr.mergedAt || pr.mergeCommit)) {
+              isMerged = true;
+            }
+          } catch {
+            // gh query failed — leave isMerged as false rather than guess.
+          }
         }
       }
 
@@ -2495,11 +2512,12 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       // 'failed' covers verification gate errors (e.g. JSON parse error in `.pan/spec.vbrief.json`)
       // that prevent the review specialist from running at all.
       const isReviewBlocked = status.reviewStatus === 'blocked' || status.reviewStatus === 'failed';
+      const isVerificationFailed = status.verificationStatus === 'failed';
       const isTestFailed = status.testStatus === 'failed';
       const isMergeCiFailed = status.mergeStatus === 'failed' &&
         typeof status.mergeNotes === 'string' &&
         status.mergeNotes.includes('failing required checks');
-      if (!isReviewBlocked && !isTestFailed && !isMergeCiFailed) continue;
+      if (!isReviewBlocked && !isVerificationFailed && !isTestFailed && !isMergeCiFailed) continue;
 
       // Skip merged/completed issues
       if (status.mergeStatus === 'merged' || status.readyForMerge) continue;
@@ -2550,6 +2568,10 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       let statusType: string;
       if (isReviewBlocked) {
         statusType = status.reviewStatus === 'failed' ? 'review failed' : 'review blocked';
+      } else if (isVerificationFailed) {
+        statusType = status.reviewStatus === 'pending'
+          ? 'verification failed while review pending'
+          : 'verification failed';
       } else if (isTestFailed) {
         statusType = 'tests failed';
       } else {
@@ -2606,7 +2628,9 @@ export async function checkDeadEndAgents(): Promise<string[]> {
           ? `Review verification failed for ${issueId}.${feedbackPart}\n\nCommon cause: merge conflict markers in .pan/spec.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
           : isReviewBlocked
             ? `The review agent found issues in your code.${feedbackPart}\n\nFix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". Do NOT stop until pan review request completes successfully.`
-            : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
+            : isVerificationFailed
+              ? `Verification failed for ${issueId} while review is pending.${feedbackPart}\n\nFix the failing verification check, commit every change, push your branch, then request a new review with: pan review request ${issueId} -m "Fixed verification failure". Do NOT stop until pan review request completes successfully.`
+              : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
 
         await sendKeysAsync(agentSessionName, nudgeMessage);
         actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);

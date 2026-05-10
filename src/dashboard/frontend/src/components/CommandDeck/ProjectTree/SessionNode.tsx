@@ -471,11 +471,11 @@ export function SessionNode({
 
   const [isStopping, setIsStopping] = useState(false);
 
-  const dotStatus = deriveDotStatus(runtime, session.presence);
+  const dotStatus = session.awaitingInput ? 'waiting' : deriveDotStatus(runtime, session.presence);
   const activity = effectiveActivity(runtime, session.presence);
   const isLive = session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
-  const displayStatus = (isStopping && isLive) ? 'stopping' : (activity ?? session.status);
-  const statusCssKey = (isStopping && isLive) ? 'stopping' : (activity ?? session.status);
+  const displayStatus = (isStopping && isLive) ? 'stopping' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
+  const statusCssKey = (isStopping && isLive) ? 'stopping' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
 
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
@@ -507,12 +507,14 @@ export function SessionNode({
   const lastHeardLabel = lastActivity ? formatRelativeTime(lastActivity, new Date()) : undefined;
   const sessionLabel = deriveSessionLabel(session, defaultModel);
   const sessionLabelTitle = getSessionLabelTitle(session, defaultModel, lastHeardLabel);
-  const sessionStatusTitle = getSessionStatusTitle({
-    runtime,
-    presence: session.presence,
-    displayStatus,
-    lastHeardLabel,
-  });
+  const sessionStatusTitle = session.awaitingInput
+    ? `Awaiting user input${session.awaitingInputPrompt ? `: ${session.awaitingInputPrompt}` : '.'}`
+    : getSessionStatusTitle({
+        runtime,
+        presence: session.presence,
+        displayStatus,
+        lastHeardLabel,
+      });
   // Use "Start" label when session has ended (agent stopped); "Restart" when live
   const restartLabel = session.type === 'review' ? 'Restart all' : !isLive ? 'Start' : undefined;
 

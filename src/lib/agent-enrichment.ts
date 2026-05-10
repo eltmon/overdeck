@@ -16,6 +16,11 @@ import { encodeClaudeProjectDir } from './paths.js'
 import { promisify } from 'util'
 import { exec } from 'child_process'
 import { getAgentRuntimeStateAsync, getAgentDir } from './agents.js'
+import {
+  detectAwaitingInputForAgent,
+  normalizeAwaitingInputPrompt,
+  type AwaitingInputDetection,
+} from './agent-input-detection.js'
 import { resolveProjectFromIssue } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
 import { extractPrefix } from './issue-id.js'
@@ -32,6 +37,8 @@ export interface AgentEnrichment {
   agentPhase: 'planning' | 'exploration' | 'implementation' | 'testing' | 'documentation' | 'pre_push' | 'post_push'
   hasPendingQuestion: boolean
   pendingQuestionCount: number
+  pendingQuestionPrompt?: string
+  pendingQuestionReason?: string
   resolution: string
   resolutionCount: number
 }
@@ -242,13 +249,11 @@ export async function computeAgentEnrichment(
 
   const agentPhase = (isPlanning || stateRole === 'plan' ? 'planning' : 'implementation') as AgentEnrichment['agentPhase']
 
-  // Get runtime state for resolution + idle detection
+  // Get runtime state for resolution + explicit waiting signals.
   const runtimeState = await getAgentRuntimeStateAsync(agentId)
-  const isIdle = runtimeState?.state === 'idle' ||
-    (runtimeState?.currentTool === 'AskUserQuestion')
 
-  // Get pending questions, filtered by agent start time
-  // Skip JSONL scan when mtime is unchanged (optimization for static TUI sessions)
+  // Get pending questions, filtered by agent start time.
+  // Skip JSONL scan when mtime is unchanged (optimization for static TUI sessions).
   let pendingQuestions: PendingQuestion[] = []
   if (!skipJsonlScan) {
     pendingQuestions = await getAgentPendingQuestions(agentId)
@@ -261,14 +266,47 @@ export async function computeAgentEnrichment(
     }
   }
 
-  const hasPendingQuestion =
-    !hasActiveSpecialist &&
-    (pendingQuestions.length > 0 || isIdle || runtimeState?.resolution === 'needs_input')
+  const questionDetection: AwaitingInputDetection | null = pendingQuestions.length > 0
+    ? {
+        reason: 'user_question',
+        prompt: normalizeAwaitingInputPrompt(
+          pendingQuestions[0]?.questions
+            .map(q => q.question)
+            .filter(Boolean)
+            .join('\n') || 'Agent is waiting for a user answer',
+        ),
+      }
+    : null
+
+  const runtimeDetection: AwaitingInputDetection | null = runtimeState?.state === 'waiting-on-human'
+    ? {
+        reason: (runtimeState.waitingReason as AwaitingInputDetection['reason']) || 'other',
+        prompt: normalizeAwaitingInputPrompt(
+          runtimeState.waitingNotification || 'Agent is waiting for human input',
+        ),
+      }
+    : null
+
+  const paneDetection = !questionDetection && !runtimeDetection
+    ? await detectAwaitingInputForAgent(agentId, { isPlanning })
+    : null
+
+  const fallbackDetection: AwaitingInputDetection | null = runtimeState?.resolution === 'needs_input'
+    ? {
+        reason: 'other',
+        prompt: normalizeAwaitingInputPrompt('Agent stopped because it needs human input or hit a blocker'),
+      }
+    : null
+
+  const detection = questionDetection ?? runtimeDetection ?? paneDetection ?? fallbackDetection
+  const hasPendingQuestion = !hasActiveSpecialist && detection !== null
 
   return {
     agentPhase,
     hasPendingQuestion,
     pendingQuestionCount: pendingQuestions.length,
+    pendingQuestionPrompt: detection?.prompt,
+    pendingQuestionReason: detection?.reason,
     resolution: runtimeState?.resolution || 'working',
     resolutionCount: runtimeState?.resolutionCount || 0,
   }

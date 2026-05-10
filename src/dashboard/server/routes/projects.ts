@@ -19,10 +19,12 @@ import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
-import type { SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
+import { ReadModelService } from '../read-model.js';
+import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
+import { detectAwaitingInputForAgent, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatus } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
@@ -67,6 +69,20 @@ function sanitizeDisplayTitle(title: string): string {
 interface ActivityContext {
   tmuxSessionNames?: Set<string>;
   issueTitles?: ReadonlyMap<string, string>;
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>;
+}
+
+function awaitingInputFromProjection(
+  agentId: string,
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>,
+): AwaitingInputDetection | null | undefined {
+  const agent = agentSnapshotsById?.get(agentId);
+  if (!agent) return undefined;
+  if (agent.hasPendingQuestion !== true) return null;
+  return {
+    reason: (agent.pendingQuestionReason as AwaitingInputDetection['reason'] | undefined) ?? 'other',
+    prompt: agent.pendingQuestionPrompt || 'Agent is waiting for human input',
+  };
 }
 
 const LEGACY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -85,6 +101,7 @@ function isStaleLegacySession(s: SessionNode): boolean {
 
 interface SessionTreeContext {
   tmuxSessionNames: Set<string>;
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>;
 }
 
 function escapeRegExp(value: string): string {
@@ -174,6 +191,12 @@ async function collectSessionTreeNodes(
       if (isPlanning) hasPlanningSection = true;
       const rtState = await getAgentRuntimeStateAsync(checkId);
       const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
+      const projectedAwaitingInput = awaitingInputFromProjection(checkId, context.agentSnapshotsById);
+      const awaitingInput = projectedAwaitingInput !== undefined
+        ? projectedAwaitingInput
+        : context.tmuxSessionNames.has(checkId)
+          ? await detectAwaitingInputForAgent(checkId, { isPlanning })
+          : null;
       const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
       sections.push({
@@ -197,6 +220,9 @@ async function collectSessionTreeNodes(
               : (state.status || 'completed'),
         ),
         presence,
+        awaitingInput: awaitingInput !== null,
+        awaitingInputPrompt: awaitingInput?.prompt,
+        awaitingInputReason: awaitingInput?.reason,
         hasJsonl: !!jsonlPath,
       });
     } catch {
@@ -304,10 +330,13 @@ const getProjectSessionTreeRoute = HttpRouter.add(
   '/api/projects/:projectKey/session-tree',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
+    const readModel = yield* ReadModelService;
     const projectKey = params['projectKey'] ?? '';
+    const snapshot = yield* readModel.getSnapshot;
+    const agentSnapshotsById = new Map(snapshot.agents.map((agent) => [agent.id, agent]));
 
     const result = yield* Effect.tryPromise({
-      try: () => fetchProjectSessionTree(projectKey),
+      try: () => fetchProjectSessionTree(projectKey, { agentSnapshotsById }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
 
@@ -366,6 +395,7 @@ export async function fetchProjectSessionTree(
 
   const effectiveSharedContext: SessionTreeContext = {
     tmuxSessionNames: sharedTmuxSessionNames,
+    agentSnapshotsById: sharedContext?.agentSnapshotsById,
   };
 
   const features: Array<{
@@ -428,6 +458,9 @@ const getAllSessionTreesRoute = HttpRouter.add(
     const url = new URL(request.url, 'http://localhost');
     const projectsParam = url.searchParams.get('projects') ?? '';
     const projectKeys = projectsParam.split(',').filter(Boolean);
+    const readModel = yield* ReadModelService;
+    const snapshot = yield* readModel.getSnapshot;
+    const agentSnapshotsById = new Map(snapshot.agents.map((agent) => [agent.id, agent]));
 
     if (projectKeys.length === 0) {
       return jsonResponse({ trees: [] });
@@ -442,6 +475,7 @@ const getAllSessionTreesRoute = HttpRouter.add(
         const sharedContext: ActivityContext = {
           tmuxSessionNames: sharedTmuxSessionNames,
           issueTitles,
+          agentSnapshotsById,
         };
 
         return Promise.all(

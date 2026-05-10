@@ -193,14 +193,14 @@ export const EventStoreServiceLive = Layer.effect(
           const turnId = `turn-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
           // Capture checkpoint (git tag at current working tree state)
-          await captureCheckpoint(workspace, turnId);
+          await captureCheckpoint(workspace, agentId, turnId);
 
           // Compute file changes from previous checkpoint
-          const checkpoints = await listCheckpoints(workspace);
+          const checkpoints = await listCheckpoints(workspace, agentId);
           const prevCheckpoint = checkpoints.length >= 2 ? checkpoints[checkpoints.length - 2] : null;
           let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = [];
           if (prevCheckpoint) {
-            files = await diffCheckpointFiles(workspace, prevCheckpoint, turnId);
+            files = await diffCheckpointFiles(workspace, agentId, prevCheckpoint, turnId);
           }
 
           // Only emit if there are actual changes
@@ -215,7 +215,7 @@ export const EventStoreServiceLive = Layer.effect(
               turnId,
               completedAt: new Date().toISOString(),
               files,
-              checkpointRef: `refs/pan/turn/${turnId}`,
+              checkpointRef: `refs/pan/turn/${agentId}/${turnId}`,
               assistantMessageId: undefined,
               checkpointTurnCount: checkpoints.length,
             },

@@ -1399,6 +1399,18 @@ export async function buildAgentLaunchConfig(opts: {
 }): Promise<AgentLaunchConfig> {
   const model = opts.model;
 
+  // Substrate guard: inject permission deny rules for Panopticon infrastructure
+  // paths (.claude/agents/, .claude/hooks/, ~/.panopticon/, JSONL session dirs)
+  // into the workspace's .claude/settings.local.json. Idempotent. Without this
+  // a vBRIEF action like "delete the legacy pan-*-agent.md files" can convince
+  // an agent to brick its own runtime. PAN-1048 X1 incident, 2026-05-09.
+  try {
+    const { injectPanopticonInfraDeny } = await import('./claude-settings-overlay.js');
+    await injectPanopticonInfraDeny(opts.workspace);
+  } catch (err) {
+    console.warn(`[agents] injectPanopticonInfraDeny failed for ${opts.agentId} (non-fatal): ${err instanceof Error ? err.message : err}`);
+  }
+
   const providerEnv = await getProviderEnvForModel(model);
 
   const provider = getProviderForModel(model as ModelId);
@@ -1414,6 +1426,22 @@ export async function buildAgentLaunchConfig(opts: {
     // Resume sessions adopt the work role definition via --agent.
     // Permissions/model/tools/hooks come from roles/work.md frontmatter.
     // --name <agentId> gives the resumed Claude session a human-readable handle.
+    //
+    // The frontmatter's permissionMode: bypassPermissions only bypasses prompts
+    // INSIDE cwd. Tools that touch siblings of cwd (e.g. bd reading
+    // .beads/issues.jsonl through git subprocesses, pan reading
+    // ~/.panopticon/...) still hit "Do you want to proceed?" without DSP.
+    // Mid-Bash dialog dismissals (deacon nudge, paste-buffer write, sibling
+    // hook output) cancel the in-flight tool call and surface as
+    // `Interrupted · What should Claude do instead?` (PAN-1024 reproduced
+    // this loop on every fresh resume of PAN-1044/PAN-934).
+    //
+    // Match the fresh-spawn path: when permissionMode resolves to 'bypass'
+    // (PAN_YOLO=true OR claude.permissionMode=bypass in config), prepend
+    // --dangerously-skip-permissions on resume too.
+    const bypassFlag = resolvePermissionMode() === 'bypass'
+      ? '--dangerously-skip-permissions '
+      : '';
     const launcherContent = generateLauncherScript({
       role: 'work',
       spawnMode: 'resume',
@@ -1421,7 +1449,7 @@ export async function buildAgentLaunchConfig(opts: {
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: `claude --agent ${roleAgentDefinitionPath('work')}`,
+      baseCommand: `claude ${bypassFlag}--agent ${roleAgentDefinitionPath('work')}`,
       resumeSessionId: opts.resumeSessionId,
       model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: `--name ${opts.agentId}`,

@@ -110,11 +110,13 @@ import {
   getAgentJsonlPath as getAgentJsonlPathShared,
   getPendingQuestions as getPendingQuestionsShared,
   getAgentPendingQuestions as getAgentPendingQuestionsShared,
+  computeAgentEnrichment,
   type PendingQuestion,
 } from '../../../lib/agent-enrichment.js';
 import { parseConversationMessages } from '../services/conversation-service.js';
 import type { ConversationResponse } from '@panctl/contracts';
 import { EventStoreService } from '../services/domain-services.js';
+import { normalizeAwaitingInputPrompt } from '../../../lib/agent-input-detection.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessionAsync, listSessionsAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
@@ -454,22 +456,13 @@ const getAgentsRoute = HttpRouter.add(
               ? name.replace('planning-', '').toUpperCase()
               : name.replace('agent-', '').toUpperCase();
 
-            let pendingQuestions = await getAgentPendingQuestions(name);
-            if (pendingQuestions.length > 0 && startedAt) {
-              const agentStartTime = new Date(startedAt).getTime();
-              pendingQuestions = pendingQuestions.filter(q => {
-                const qTime = new Date(q.timestamp).getTime();
-                return !isNaN(qTime) && qTime >= agentStartTime;
-              });
-            }
-
             const runtimeState = await getAgentRuntimeStateAsync(name);
-            const isIdle = runtimeState?.state === 'idle' || (runtimeState?.currentTool === 'AskUserQuestion' && pendingQuestions.length === 0);
 
             const issueReviewStatus = getReviewStatus(issueId);
             const hasActiveSpecialist = issueReviewStatus?.reviewStatus === 'reviewing'
               || issueReviewStatus?.testStatus === 'testing'
               || issueReviewStatus?.mergeStatus === 'merging';
+            const enrichment = await computeAgentEnrichment(name, startedAt, hasActiveSpecialist);
 
             const workspaceLocation = await getWorkspaceLocation(issueId);
 
@@ -496,11 +489,13 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation,
               git: gitStatus,
               type: 'agent',
-              agentPhase: isPlanning || state.role === 'plan' ? 'planning' : 'implementation',
-              hasPendingQuestion: !hasActiveSpecialist && (pendingQuestions.length > 0 || isIdle || runtimeState?.resolution === 'needs_input'),
-              pendingQuestionCount: pendingQuestions.length,
-              resolution: runtimeState?.resolution || 'working',
-              resolutionCount: runtimeState?.resolutionCount || 0,
+              agentPhase: enrichment.agentPhase || (isPlanning || state.role === 'plan' ? 'planning' : 'implementation'),
+              hasPendingQuestion: enrichment.hasPendingQuestion,
+              pendingQuestionCount: enrichment.pendingQuestionCount,
+              pendingQuestionPrompt: enrichment.pendingQuestionPrompt,
+              pendingQuestionReason: enrichment.pendingQuestionReason,
+              resolution: runtimeState?.resolution || enrichment.resolution || 'working',
+              resolutionCount: runtimeState?.resolutionCount || enrichment.resolutionCount || 0,
               contextPercent,
               initialContextPercent,
             };
@@ -580,6 +575,16 @@ const getAgentsRoute = HttpRouter.add(
                 );
               if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000 && !keepStoppedAgentVisible) continue;
               const lifecycle = getWorkAgentLifecycleState(dir);
+              const needsInput = runtimeData.resolution === 'needs_input';
+              const pendingQuestionPrompt = needsInput
+                ? normalizeAwaitingInputPrompt(
+                    runtimeData.waitingNotification ||
+                      'Agent stopped because it needs human input or hit a blocker',
+                  )
+                : undefined;
+              const pendingQuestionReason = needsInput
+                ? runtimeData.waitingReason || 'other'
+                : undefined;
               stoppedAgents.push({
                 id: dir,
                 issueId,
@@ -594,8 +599,10 @@ const getAgentsRoute = HttpRouter.add(
                 git: null,
                 type: 'agent',
                 agentPhase: isPlanning || state.role === 'plan' ? 'planning' : 'implementation',
-                hasPendingQuestion: runtimeData.resolution === 'needs_input',
+                hasPendingQuestion: needsInput,
                 pendingQuestionCount: 0,
+                pendingQuestionPrompt,
+                pendingQuestionReason,
                 resolution: runtimeData.resolution || 'working',
                 resolutionCount: runtimeData.resolutionCount || 0,
                 hasSession: lifecycle.canResumeSession,

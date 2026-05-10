@@ -116,6 +116,30 @@ const MAX_AGENT_OUTPUT_LINES = 200
 const MAX_ACTIVITY_ENTRIES = 50
 const MAX_DETAILED_ENTRIES = 200
 const MAX_TTS_ENTRIES = 50
+export const DEFAULT_MAX_TURN_DIFF_SUMMARIES_PER_AGENT = 200
+
+export function getMaxTurnDiffSummariesPerAgent(): number {
+  const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.PANOPTICON_TURN_DIFF_SUMMARY_LIMIT
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_TURN_DIFF_SUMMARIES_PER_AGENT
+}
+
+export function isTerminalTurnDiffSummaryStatus(status: unknown): boolean {
+  return status === 'stopped' || status === 'done' || status === 'archived' || status === 'closed'
+}
+
+export function trimTurnDiffSummaries(summaries: TurnDiffSummary[]): TurnDiffSummary[] {
+  const max = getMaxTurnDiffSummariesPerAgent()
+  return summaries.length > max ? summaries.slice(-max) : summaries
+}
+
+export function omitTurnDiffSummariesForAgent(
+  turnDiffSummariesByAgentId: ReadModelState['turnDiffSummariesByAgentId'] | undefined,
+  agentId: string,
+): ReadModelState['turnDiffSummariesByAgentId'] {
+  const { [agentId]: _removed, ...rest } = turnDiffSummariesByAgentId ?? {}
+  return rest
+}
 
 // ─── PAN-800 runtime helpers ─────────────────────────────────────────────────
 
@@ -236,6 +260,8 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
             role: event.payload.role,
             hasPendingQuestion: event.payload.hasPendingQuestion,
             pendingQuestionCount: event.payload.pendingQuestionCount,
+            pendingQuestionPrompt: event.payload.pendingQuestionPrompt,
+            pendingQuestionReason: event.payload.pendingQuestionReason,
             resolution: event.payload.resolution,
             resolutionCount: event.payload.resolutionCount,
           },
@@ -293,12 +319,16 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         channelPermissionRequestIdsByAgentId: restPendingIds,
         resolvedChannelPermissionDecisionsById: nextResolvedDecisionsById,
         resolvedChannelPermissionDecisionIdsByAgentId: restResolvedIds,
+        turnDiffSummariesByAgentId: omitTurnDiffSummariesForAgent(state.turnDiffSummariesByAgentId, event.payload.agentId),
       }
     }
 
     case 'agent.status_changed': {
       const agent = state.agentsById[event.payload.agentId]
       if (!agent) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      const nextTurnDiffSummariesByAgentId = isTerminalTurnDiffSummaryStatus(event.payload.status)
+        ? omitTurnDiffSummariesForAgent(state.turnDiffSummariesByAgentId, event.payload.agentId)
+        : state.turnDiffSummariesByAgentId
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
@@ -306,6 +336,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           ...state.agentsById,
           [event.payload.agentId]: { ...agent, status: event.payload.status },
         },
+        turnDiffSummariesByAgentId: nextTurnDiffSummariesByAgentId,
       }
     }
 
@@ -369,6 +400,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       }
     }
 
+    case 'review.specialist.timed_out':
+      // Telemetry-only event. Sequence update lets clients observe the event
+      // stream without mutating the durable review-status snapshot.
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
     case 'review.coordinator_started': {
       const { issueId, sessionName } = event.payload
       const existing = state.reviewStatusByIssueId[issueId]
@@ -382,6 +418,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus },
       }
     }
+
+    case 'review.coordinator.died':
+      // Telemetry-only. The durable review-status row is updated by recovery
+      // checks; keep clients in sequence so event stream subscribers can alert.
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
     case 'pipeline.review-started':
     case 'pipeline.review-completed':
@@ -524,9 +565,16 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'workspace.destroyed':
     case 'workspace.deleted': {
       const { issueId } = event.payload
+      const removedAgentIds = Object.entries(state.agentsById)
+        .filter(([, agent]) => agent.issueId === issueId)
+        .map(([agentId]) => agentId)
       const updatedAgents = Object.fromEntries(
         Object.entries(state.agentsById).filter(([, agent]) => agent.issueId !== issueId)
       )
+      let nextTurnDiffSummariesByAgentId = state.turnDiffSummariesByAgentId
+      for (const agentId of removedAgentIds) {
+        nextTurnDiffSummariesByAgentId = omitTurnDiffSummariesForAgent(nextTurnDiffSummariesByAgentId, agentId)
+      }
       const updatedIssues = (state.issuesRaw as Array<Record<string, unknown>>).map(issue => {
         if (issue['identifier'] === issueId || issue['id'] === issueId) {
           return { ...issue, status: 'Todo', canonicalStatus: 'todo', state: 'todo' }
@@ -537,6 +585,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: updatedAgents,
+        turnDiffSummariesByAgentId: nextTurnDiffSummariesByAgentId,
         issuesRaw: updatedIssues,
       }
     }
@@ -544,18 +593,27 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'workspace.aborted': {
       const { issueId, sessionName } = event.payload
       let updatedAgents: typeof state.agentsById
+      let nextTurnDiffSummariesByAgentId = state.turnDiffSummariesByAgentId
       if (sessionName) {
         const { [sessionName]: _removed, ...rest } = state.agentsById
         updatedAgents = rest
+        nextTurnDiffSummariesByAgentId = omitTurnDiffSummariesForAgent(nextTurnDiffSummariesByAgentId, sessionName)
       } else {
+        const removedAgentIds = Object.entries(state.agentsById)
+          .filter(([, agent]) => agent.issueId === issueId)
+          .map(([agentId]) => agentId)
         updatedAgents = Object.fromEntries(
           Object.entries(state.agentsById).filter(([, agent]) => agent.issueId !== issueId)
         )
+        for (const agentId of removedAgentIds) {
+          nextTurnDiffSummariesByAgentId = omitTurnDiffSummariesForAgent(nextTurnDiffSummariesByAgentId, agentId)
+        }
       }
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: updatedAgents,
+        turnDiffSummariesByAgentId: nextTurnDiffSummariesByAgentId,
       }
     }
 
@@ -963,9 +1021,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       }
       // Deduplicate by turnId — replace if exists, append otherwise
       const idx = existing.findIndex(s => s.turnId === p.turnId)
-      const updated = idx >= 0
-        ? existing.map((s, i) => i === idx ? summary : s)
-        : [...existing, summary]
+      const updated = trimTurnDiffSummaries(
+        idx >= 0
+          ? existing.map((s, i) => i === idx ? summary : s)
+          : [...existing, summary]
+      )
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),

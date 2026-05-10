@@ -9,6 +9,7 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNamesAsync: vi.fn(),
+  capturePaneAsync: vi.fn(async () => ''),
 }));
 
 vi.mock('../../../../../src/lib/agents.js', () => ({

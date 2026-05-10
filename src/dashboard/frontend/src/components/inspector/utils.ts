@@ -1,3 +1,5 @@
+import { isPendingReviewStranded } from '../../lib/pipeline-state';
+
 export function formatRelativeTime(isoString: string): string {
   const now = Date.now();
   const then = new Date(isoString).getTime();
@@ -24,10 +26,12 @@ export interface ReviewButtonState {
 }
 
 interface ReviewButtonInput {
-  reviewStatus: string;
-  testStatus: string;
-  mergeStatus?: string;
-  verificationStatus?: string;
+  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
+  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
+  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+  updatedAt?: string;
+  reviewSpawnedAt?: string;
   queuePosition?: number | null;
   activeSpecialist?: string | null;
   readyForMerge: boolean;
@@ -37,6 +41,7 @@ export function shouldForceReviewTrigger(status: ReviewButtonInput | undefined):
   if (!status) return false;
 
   return (
+    isPendingReviewStranded(status) ||
     status.readyForMerge ||
     status.reviewStatus === 'passed' ||
     status.reviewStatus === 'failed' ||
@@ -82,6 +87,9 @@ export function getReviewButtonState(
     }
     const n = status.queuePosition;
     return { label: `Queued (${n}${getOrdinalSuffix(n)})`, disabled: true, spinning: false };
+  }
+  if (isPendingReviewStranded(status)) {
+    return { label: 'Re-request Review', disabled: false, spinning: false };
   }
   if (status.readyForMerge || (status.reviewStatus === 'passed' && status.testStatus === 'passed' && status.mergeStatus === 'failed')) {
     return { label: 'Re-Review', disabled: false, spinning: false };

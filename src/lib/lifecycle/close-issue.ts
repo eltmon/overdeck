@@ -151,6 +151,36 @@ async function closeGitHubDirect(ctx: LifecycleContext, comment?: string): Promi
     return stepFailed(step, 'GitHub config not provided');
   }
   const { owner, repo, number } = ctx.github;
+
+  // Refuse to close a GitHub issue when its feature branch still has an open,
+  // unmerged PR. PAN-1030 closed the issue while PR #1046 was open with 1152
+  // lines of real changes — the close-out path trusted the operator without
+  // verifying the merge. Fail loudly so the operator notices and either
+  // merges the PR first or tells us why the issue should still close.
+  const branchName = `feature/${ctx.issueId.toLowerCase()}`;
+  try {
+    const { stdout: prRaw } = await execAsync(
+      `gh pr list --repo ${owner}/${repo} --head "${branchName}" --state open --json number,mergedAt,mergeCommit --jq '.[0]'`,
+      { encoding: 'utf-8' },
+    );
+    const trimmed = prRaw.trim();
+    if (trimmed) {
+      try {
+        const pr = JSON.parse(trimmed) as { number?: number; mergedAt?: string | null; mergeCommit?: unknown };
+        if (pr.number && !pr.mergedAt && !pr.mergeCommit) {
+          return stepFailed(
+            step,
+            `Refusing to close issue #${number}: open PR #${pr.number} on ${branchName} has not been merged. Merge or close the PR first, or rename the branch if it is unrelated.`,
+          );
+        }
+      } catch {
+        // PR JSON unparseable — continue with the close (don't block on parser error).
+      }
+    }
+  } catch {
+    // gh query failed — don't block close-out on a flaky network call.
+  }
+
   try {
     const commentArg = comment ? ` --comment "${comment.replace(/"/g, '\\"')}"` : '';
     await execAsync(
@@ -177,19 +207,41 @@ async function closeGitHubPr(ctx: LifecycleContext): Promise<StepResult> {
   const branchName = `feature/${issueLower}`;
 
   try {
+    // Pull number + merge status. Closing without checking can land us in the
+    // PAN-1030 state: issue closed + PR left OPEN with real unmerged code,
+    // or worse — close a not-yet-merged PR with a "Merged via Panopticon
+    // lifecycle" comment that lies about what happened.
     const { stdout: prListRaw } = await execAsync(
-      `gh pr list --repo ${owner}/${repo} --head "${branchName}" --state open --json number --jq '.[0].number'`,
+      `gh pr list --repo ${owner}/${repo} --head "${branchName}" --state open --json number,mergedAt,mergeCommit --jq '.[0]'`,
       { encoding: 'utf-8' },
     );
-    const prNumber = prListRaw.trim();
-    if (!prNumber) {
+    const prRaw = prListRaw.trim();
+    if (!prRaw) {
       return stepSkipped(step, ['No open PR found for branch']);
     }
+    let pr: { number?: number; mergedAt?: string | null; mergeCommit?: unknown };
+    try {
+      pr = JSON.parse(prRaw);
+    } catch {
+      return stepSkipped(step, [`PR JSON parse failed: ${prRaw.slice(0, 80)}`]);
+    }
+    if (!pr.number) {
+      return stepSkipped(step, ['Open PR query returned no number']);
+    }
+    if (!pr.mergedAt && !pr.mergeCommit) {
+      // PR is open but NOT merged — refuse to close. The close-out flow must
+      // not pretend an unmerged PR was merged. Fail loudly so the operator
+      // notices the inconsistency rather than the PR silently disappearing.
+      return stepFailed(
+        step,
+        `Refusing to close PR #${pr.number} on ${owner}/${repo}: PR is not merged. Investigate why close-out fired without a merge.`,
+      );
+    }
     await execAsync(
-      `gh pr close ${prNumber} --repo ${owner}/${repo} --comment "Merged via Panopticon lifecycle"`,
+      `gh pr close ${pr.number} --repo ${owner}/${repo} --comment "Merged via Panopticon lifecycle"`,
       { encoding: 'utf-8' },
     );
-    return stepOk(step, [`Closed PR #${prNumber} on ${owner}/${repo}`]);
+    return stepOk(step, [`Closed PR #${pr.number} on ${owner}/${repo}`]);
   } catch (err) {
     return stepSkipped(step, [`PR close failed (non-fatal): ${(err as Error).message}`]);
   }

@@ -1,9 +1,12 @@
+import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
-import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard } from './KanbanBoard';
+import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard } from './KanbanBoard';
 import { useDashboardStore } from '../lib/store';
+import { DialogProvider } from './DialogProvider';
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -490,6 +493,85 @@ describe('ListIssueRow', () => {
     const trackerLink = links.find(l => l.getAttribute('href') === 'https://github.com/test/repo/issues/123');
     expect(trackerLink).toBeDefined();
     expect(trackerLink!.getAttribute('target')).toBe('_blank');
+  });
+});
+
+describe('IssueCard', () => {
+  const createMockIssue = (overrides: Partial<Issue> = {}): Issue => ({
+    id: 'issue-1',
+    identifier: 'TEST-123',
+    title: 'Test Issue',
+    description: '',
+    status: 'In Progress',
+    priority: 3,
+    labels: [],
+    url: 'https://test.com/TEST-123',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    project: {
+      id: 'proj-1',
+      name: 'Test Project',
+      color: '#000',
+      icon: 'test',
+    },
+    source: 'github',
+    ...overrides,
+  });
+
+  const createMockAgent = (overrides: Partial<Agent> = {}): Agent => ({
+    id: 'planning-test-123',
+    issueId: 'TEST-123',
+    runtime: 'claude-code',
+    model: 'test-model',
+    status: 'healthy',
+    startedAt: new Date().toISOString(),
+    consecutiveFailures: 0,
+    killCount: 0,
+    ...overrides,
+  });
+
+  function renderIssueCard(props: Partial<ComponentProps<typeof IssueCard>> = {}) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const defaultProps: ComponentProps<typeof IssueCard> = {
+      issue: createMockIssue(),
+      isSelected: false,
+      onSelect: vi.fn(),
+      onPlan: vi.fn(),
+      ...props,
+    };
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DialogProvider>
+          <IssueCard {...defaultProps} />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+
+    return defaultProps;
+  }
+
+  it('opens the inspector rather than the planning dialog for planning-only input', () => {
+    const onSelect = vi.fn();
+    const onPlan = vi.fn();
+    renderIssueCard({
+      onSelect,
+      onPlan,
+      planningAgent: createMockAgent({
+        hasPendingQuestion: true,
+        pendingQuestionCount: 1,
+        pendingQuestionPrompt: 'Planning finalized — click Done in the dashboard',
+        pendingQuestionReason: 'planning_done',
+        agentPhase: 'planning',
+      }),
+    });
+
+    fireEvent.click(screen.getByTestId('card-input-TEST-123'));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onPlan).not.toHaveBeenCalled();
   });
 });
 

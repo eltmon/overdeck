@@ -184,6 +184,24 @@ describe('applyEvent — agent.stopped', () => {
     expect(next.agentsById['agent-2']).toEqual(agent2)
     expect(Object.keys(next.agentsById)).toHaveLength(1)
   })
+
+  it('drops stored turn diff summaries for the stopped agent', () => {
+    const state = makeState({
+      agentsById: { 'agent-1': baseAgent },
+      turnDiffSummariesByAgentId: {
+        'agent-1': [{ turnId: 'turn-1', completedAt: ts(), files: [] }],
+        'agent-2': [{ turnId: 'turn-2', completedAt: ts(), files: [] }],
+      },
+    })
+    const next = applyEvent(state, {
+      type: 'agent.stopped',
+      sequence: 4,
+      timestamp: ts(),
+      payload: { agentId: 'agent-1', issueId: 'PAN-1' },
+    })
+    expect(next.turnDiffSummariesByAgentId['agent-1']).toBeUndefined()
+    expect(next.turnDiffSummariesByAgentId['agent-2']).toEqual(state.turnDiffSummariesByAgentId['agent-2'])
+  })
 })
 
 describe('applyEvent — agent.status_changed', () => {
@@ -218,6 +236,48 @@ describe('applyEvent — agent.status_changed', () => {
       payload: { agentId: 'unknown', status: 'stopped' },
     })
     expect(next.sequence).toBe(5)
+  })
+
+  it('drops stored turn diff summaries when the agent enters a terminal status', () => {
+    const state = makeState({
+      agentsById: { 'agent-1': baseAgent },
+      turnDiffSummariesByAgentId: {
+        'agent-1': [{ turnId: 'turn-1', completedAt: ts(), files: [] }],
+      },
+    })
+    const next = applyEvent(state, {
+      type: 'agent.status_changed',
+      sequence: 5,
+      timestamp: ts(),
+      payload: { agentId: 'agent-1', status: 'stopped' },
+    })
+    expect(next.turnDiffSummariesByAgentId['agent-1']).toBeUndefined()
+  })
+})
+
+describe('applyEvent — agent.turn_diff_completed', () => {
+  it('retains only the latest 200 summaries per agent', () => {
+    const existing = Array.from({ length: 200 }, (_, index) => ({
+      turnId: `turn-${index + 1}`,
+      completedAt: `2026-05-08T05:${String(index).padStart(2, '0')}:00.000Z`,
+      files: [{ path: `src/file-${index + 1}.ts`, additions: 1, deletions: 0 }],
+    }))
+    const state = makeState({ turnDiffSummariesByAgentId: { 'agent-1': existing } })
+    const next = applyEvent(state, {
+      type: 'agent.turn_diff_completed',
+      sequence: 6,
+      timestamp: ts(),
+      payload: {
+        agentId: 'agent-1',
+        turnId: 'turn-201',
+        completedAt: '2026-05-08T09:21:00.000Z',
+        files: [{ path: 'src/file-201.ts', additions: 3, deletions: 1 }],
+      },
+    })
+
+    expect(next.turnDiffSummariesByAgentId['agent-1']).toHaveLength(200)
+    expect(next.turnDiffSummariesByAgentId['agent-1']?.[0]?.turnId).toBe('turn-2')
+    expect(next.turnDiffSummariesByAgentId['agent-1']?.at(-1)?.turnId).toBe('turn-201')
   })
 })
 
@@ -649,6 +709,25 @@ describe('applyEvent — workspace.deleted', () => {
     expect((next.issuesRaw[0] as any).canonicalStatus).toBe('todo')
     expect((next.issuesRaw[0] as any).state).toBe('todo')
   })
+
+  it('removes stored turn diff summaries for agents in the deleted workspace issue', () => {
+    const agent2: AgentSnapshot = { ...baseAgent, id: 'agent-2', issueId: 'PAN-2' }
+    const state = makeState({
+      agentsById: { 'agent-1': baseAgent, 'agent-2': agent2 },
+      turnDiffSummariesByAgentId: {
+        'agent-1': [{ turnId: 'turn-1', completedAt: ts(), files: [] }],
+        'agent-2': [{ turnId: 'turn-2', completedAt: ts(), files: [] }],
+      },
+    })
+    const next = applyEvent(state, {
+      type: 'workspace.deleted',
+      sequence: 8,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1' },
+    })
+    expect(next.turnDiffSummariesByAgentId['agent-1']).toBeUndefined()
+    expect(next.turnDiffSummariesByAgentId['agent-2']).toEqual(state.turnDiffSummariesByAgentId['agent-2'])
+  })
 })
 
 describe('applyEvent — workspace.aborted', () => {
@@ -688,5 +767,25 @@ describe('applyEvent — workspace.aborted', () => {
       payload: { issueId: 'PAN-1', sessionName: 'planning-pan-1' },
     })
     expect(next.agentsById).toEqual({})
+  })
+
+  it('removes turn diff summaries for the aborted planning session only', () => {
+    const planningAgent: AgentSnapshot = { ...baseAgent, id: 'planning-pan-1', issueId: 'PAN-1' }
+    const workAgent: AgentSnapshot = { ...baseAgent, id: 'agent-pan-1', issueId: 'PAN-1' }
+    const state = makeState({
+      agentsById: { 'planning-pan-1': planningAgent, 'agent-pan-1': workAgent },
+      turnDiffSummariesByAgentId: {
+        'planning-pan-1': [{ turnId: 'turn-plan', completedAt: ts(), files: [] }],
+        'agent-pan-1': [{ turnId: 'turn-work', completedAt: ts(), files: [] }],
+      },
+    })
+    const next = applyEvent(state, {
+      type: 'workspace.aborted',
+      sequence: 9,
+      timestamp: ts(),
+      payload: { issueId: 'PAN-1', sessionName: 'planning-pan-1' },
+    })
+    expect(next.turnDiffSummariesByAgentId['planning-pan-1']).toBeUndefined()
+    expect(next.turnDiffSummariesByAgentId['agent-pan-1']).toEqual(state.turnDiffSummariesByAgentId['agent-pan-1'])
   })
 })
