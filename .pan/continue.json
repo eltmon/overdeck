@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T12:56:10Z",
+  "updated": "2026-05-10T13:03:47.493Z",
   "gitState": {
     "branch": "feature/pan-1055",
     "sha": "9acd91e54",
@@ -98,6 +98,11 @@
       "id": "D18",
       "summary": "Disabled Pi conversation forking until a transcript-faithful Pi session export is available, removing the synthetic tmux-pane JSONL fork source that could silently drop history.",
       "recordedAt": "2026-05-10T12:56:10Z"
+    },
+    {
+      "id": "D19",
+      "summary": "Fixed review blockers: (1) fork route rejects launchHarness=pi and ForkModal locks launch harness to claude-code so Pi forks can't spawn empty sessions from Claude JSONL; (2) handleConversationMessage branches on conv.harness==='pi' to deliver follow-up messages via writePiConversationCommand (Pi FIFO/RPC) instead of tmux paste.",
+      "recordedAt": "2026-05-10T13:25:00Z"
     }
   ],
   "hazards": [
@@ -270,6 +275,11 @@
       "reason": "review-response-verified",
       "note": "Fixed Pi fork transcript fidelity blocker by removing synthetic pane-scrollback fork source generation, hiding fork actions for Pi conversations in the dashboard, and returning a clear unsupported error from the fork endpoint for Pi conversations. Verified npm run typecheck, npm run lint, npm test (379 files / 4615 tests passed), and graphify update.",
       "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T13:03:47.493Z",
+      "reason": "end",
+      "note": "Disabled Pi conversation forks until Pi exposes transcript-faithful session export; removes fabricated JSONL from tmux scrollback"
     }
   ],
   "feedback": []

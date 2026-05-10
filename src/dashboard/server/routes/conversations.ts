@@ -580,7 +580,14 @@ export async function handleConversationMessage(
     // Unmanaged @paths in prose are allowed to pass through
   }
 
-  await deliverMessage(conv.tmuxSession, message, 'conversation-message');
+  if (conv.harness === 'pi') {
+    // Pi conversations consume a JSONL command stream over a FIFO. Pasting prompts
+    // into tmux bypasses the Pi command protocol (used for initial prompts and
+    // fork injection) and would land as terminal noise rather than a model turn.
+    await writePiConversationCommand(conv.tmuxSession, message);
+  } else {
+    await deliverMessage(conv.tmuxSession, message, 'conversation-message');
+  }
 
   // Generate AI title for conversations created via instant-start (no message at creation)
   if (conv.titleSource === 'default') {
@@ -2065,6 +2072,16 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const effectiveSummaryModel = summaryModel || 'claude-sonnet-4-6';
         const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
         const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
+        if (launchHarness === 'pi') {
+          // Plain forks copy a Claude-format JSONL session file and spawn with --resume,
+          // and summary forks inject via the Pi FIFO; Pi cannot consume Claude JSONL
+          // history, so launching a Pi fork from a Claude conversation would silently
+          // drop the parent transcript. Reject until Pi exposes a transcript-faithful
+          // import path.
+          return jsonResponse({
+            error: 'Launching forks under the Pi harness is not supported until Pi can consume Claude session history.',
+          }, { status: 400 });
+        }
         const defaultTitle = plain
           ? `Fork: ${conv.title || conv.name}`
           : `Summary Fork: ${conv.title || conv.name}`;

@@ -8,7 +8,7 @@ import {
 } from '../chat/defaultConversationModel';
 import styles from './styles/command-deck.module.css';
 import pickerStyles from '../shared/ModelPicker/ModelPicker.module.css';
-import { ModelHarnessPicker, useAvailableModels } from '../shared/ModelPicker';
+import { ModelHarnessPicker, ModelSelect, useAvailableModels } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import type { Conversation } from './ConversationList';
 
@@ -117,7 +117,11 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
   const { groups, compactionModel, harnessPolicy } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
   const [launchModel, setLaunchModel] = useState(conversation.model || defaultModel);
-  const [launchHarness, setLaunchHarness] = useState<Harness>(conversation.harness || 'claude-code');
+  // Forks always launch under Claude Code: plain forks copy a Claude-format JSONL
+  // and resume, and summary forks inject via Claude prompt. Pi cannot consume Claude
+  // session history, so we lock the launch harness here and the server rejects Pi
+  // launchHarness explicitly.
+  const launchHarness: Harness = 'claude-code';
   const [summaryModel, setSummaryModel] = useState(compactionModel);
   const [summaryHarness, setSummaryHarness] = useState<Harness>('claude-code');
   const [plainFork, setPlainFork] = useState(false);
@@ -269,17 +273,15 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
               </>
             )}
 
-            <ModelHarnessPicker
-              model={launchModel}
-              harness={launchHarness}
-              onModelChange={setLaunchModel}
-              onHarnessChange={setLaunchHarness}
+            <ModelSelect
+              value={launchModel}
+              onChange={setLaunchModel}
               groups={groups}
-              harnessPolicy={harnessPolicy}
-              modelLabel="Launch model"
+              label="Launch model"
             />
             <span className={pickerStyles.fieldHint}>
-              The model the new forked conversation will use
+              The model the new forked conversation will use. Forks always launch under
+              Claude Code — Pi cannot import Claude session history yet.
             </span>
           </div>
         </div>
