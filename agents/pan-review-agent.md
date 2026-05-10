@@ -1,9 +1,9 @@
 ---
 name: pan-review-agent
-description: Code review specialist — read-only audit of a feature branch's diff against correctness, security, performance, and requirements.
+description: Code review specialist — read-only audit of a feature branch's diff against correctness, security, performance, and requirements. Writes ONLY to its assigned review output file under .pan/review/<runId>/<role>.md (and synthesis writes synthesis.md + synthesis.json). Must not modify code under review.
 model: opus
-permissionMode: plan
-tools: Read, Grep, Glob, Bash
+permissionMode: default
+tools: Read, Grep, Glob, Bash, Write
 hooks:
   PostToolUse:
     - matcher: ".*"

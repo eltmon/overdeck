@@ -272,10 +272,19 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    // Scroll virtualizer to last virtual row first (expands its height),
+    // then set scrollTop to max to reach the unvirtualized tail rows.
+    if (virtualRows.length > 0) {
+      rowVirtualizer.scrollToIndex(virtualRows.length - 1, { align: 'end' });
+    }
+    requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      }
+    });
     isPinnedToBottomRef.current = true;
     setShowScrollToBottom(false);
-  }, []);
+  }, [rowVirtualizer, virtualRows.length]);
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;

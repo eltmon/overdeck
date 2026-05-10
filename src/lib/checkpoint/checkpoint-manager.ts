@@ -18,6 +18,14 @@ import { mkdtemp, rm, writeFile } from 'fs/promises'
 const execFileAsync = promisify(execFile)
 
 const CHECKPOINT_REF_PREFIX = 'refs/pan/turn'
+
+// Agent IDs must be alphanumeric + hyphens/underscores to be safe as ref path segments.
+const SAFE_AGENT_ID_RE = /^[a-zA-Z0-9_-]+$/
+function assertSafeAgentId(agentId: string): void {
+  if (!SAFE_AGENT_ID_RE.test(agentId)) {
+    throw new Error(`Unsafe agentId for checkpoint ref: ${agentId}`)
+  }
+}
 const CHECKPOINT_AUTHOR_NAME = 'Panopticon'
 const CHECKPOINT_AUTHOR_EMAIL = 'panopticon@users.noreply.github.com'
 
@@ -32,8 +40,8 @@ export interface TurnDiffFileChange {
 
 // ─── Ref helpers ──────────────────────────────────────────────────────────────
 
-function checkpointRef(turnId: string): string {
-  return `${CHECKPOINT_REF_PREFIX}/${turnId}`
+function checkpointRef(agentId: string, turnId: string): string {
+  return `${CHECKPOINT_REF_PREFIX}/${agentId}/${turnId}`
 }
 
 // ─── Core operations ─────────────────────────────────────────────────────────
@@ -57,9 +65,9 @@ async function resolveHeadCommit(cwd: string): Promise<string | null> {
 /**
  * Resolve a checkpoint ref to its commit SHA. Returns null if not found.
  */
-async function resolveCheckpointCommit(cwd: string, turnId: string): Promise<string | null> {
+async function resolveCheckpointCommit(cwd: string, agentId: string, turnId: string): Promise<string | null> {
   try {
-    const { stdout } = await execFileAsync('git', ['rev-parse', '--verify', '--quiet', `${checkpointRef(turnId)}^{commit}`], {
+    const { stdout } = await execFileAsync('git', ['rev-parse', '--verify', '--quiet', `${checkpointRef(agentId, turnId)}^{commit}`], {
       cwd,
       encoding: 'utf-8',
     })
@@ -77,7 +85,8 @@ async function resolveCheckpointCommit(cwd: string, turnId: string): Promise<str
  * without affecting the user's staging area. Creates a hidden ref that persists
  * until explicitly deleted.
  */
-export async function captureCheckpoint(cwd: string, turnId: string): Promise<void> {
+export async function captureCheckpoint(cwd: string, agentId: string, turnId: string): Promise<void> {
+  assertSafeAgentId(agentId)
   const tempDir = await mkdtemp(join(tmpdir(), 'pan-checkpoint-'))
   const tempIndex = join(tempDir, `index-${randomUUID()}`)
 
@@ -97,8 +106,17 @@ export async function captureCheckpoint(cwd: string, turnId: string): Promise<vo
       await execFileAsync('git', ['read-tree', 'HEAD'], { cwd, env })
     }
 
-    // Stage all working tree changes into temp index
-    await execFileAsync('git', ['add', '-A', '--', '.'], { cwd, env })
+    // Stage all working tree changes into temp index.
+    // Use --ignore-errors-on-unreadable-file equivalent: if git add -A fails due to a
+    // transiently-deleted temp file (agents write and remove .tmp files rapidly),
+    // fall back to `git add -u` which only stages changes to already-tracked files.
+    // This still captures all meaningful code edits; it just won't add new untracked files
+    // if the -A pass fails. Better than dropping the entire checkpoint.
+    try {
+      await execFileAsync('git', ['add', '-A', '--', '.'], { cwd, env })
+    } catch {
+      await execFileAsync('git', ['add', '-u', '--', '.'], { cwd, env })
+    }
 
     // Write tree from temp index
     const { stdout: treeOid } = await execFileAsync('git', ['write-tree'], { cwd, env })
@@ -116,7 +134,7 @@ export async function captureCheckpoint(cwd: string, turnId: string): Promise<vo
     }
 
     // Point the hidden ref at the new commit
-    await execFileAsync('git', ['update-ref', checkpointRef(turnId), commit], { cwd })
+    await execFileAsync('git', ['update-ref', checkpointRef(agentId, turnId), commit], { cwd })
   } finally {
     await rm(tempDir, { recursive: true, force: true })
   }
@@ -125,17 +143,19 @@ export async function captureCheckpoint(cwd: string, turnId: string): Promise<vo
 /**
  * Check whether a checkpoint exists for the given turn.
  */
-export async function hasCheckpoint(cwd: string, turnId: string): Promise<boolean> {
-  const commit = await resolveCheckpointCommit(cwd, turnId)
+export async function hasCheckpoint(cwd: string, agentId: string, turnId: string): Promise<boolean> {
+  assertSafeAgentId(agentId)
+  const commit = await resolveCheckpointCommit(cwd, agentId, turnId)
   return commit !== null
 }
 
 /**
  * Delete a checkpoint ref. No-op if it doesn't exist.
  */
-export async function deleteCheckpoint(cwd: string, turnId: string): Promise<void> {
+export async function deleteCheckpoint(cwd: string, agentId: string, turnId: string): Promise<void> {
+  assertSafeAgentId(agentId)
   try {
-    await execFileAsync('git', ['update-ref', '-d', checkpointRef(turnId)], {
+    await execFileAsync('git', ['update-ref', '-d', checkpointRef(agentId, turnId)], {
       cwd,
       encoding: 'utf-8',
     })
@@ -148,9 +168,10 @@ export async function deleteCheckpoint(cwd: string, turnId: string): Promise<voi
  * Compute unified diff between two checkpoints.
  * Returns the raw git diff output.
  */
-export async function diffCheckpoints(cwd: string, fromTurnId: string, toTurnId: string, filePath?: string): Promise<string> {
-  const fromCommit = await resolveCheckpointCommit(cwd, fromTurnId)
-  const toCommit = await resolveCheckpointCommit(cwd, toTurnId)
+export async function diffCheckpoints(cwd: string, agentId: string, fromTurnId: string, toTurnId: string, filePath?: string): Promise<string> {
+  assertSafeAgentId(agentId)
+  const fromCommit = await resolveCheckpointCommit(cwd, agentId, fromTurnId)
+  const toCommit = await resolveCheckpointCommit(cwd, agentId, toTurnId)
 
   if (!fromCommit || !toCommit) {
     throw new Error(`Checkpoint ref unavailable for diff: from=${fromTurnId}(${fromCommit}) to=${toTurnId}(${toCommit})`)
@@ -168,8 +189,9 @@ export async function diffCheckpoints(cwd: string, fromTurnId: string, toTurnId:
  * Compute diff between a checkpoint and the current HEAD.
  * Useful for showing what changed since a specific turn.
  */
-export async function diffCheckpointToHead(cwd: string, turnId: string): Promise<string> {
-  const checkpointCommit = await resolveCheckpointCommit(cwd, turnId)
+export async function diffCheckpointToHead(cwd: string, agentId: string, turnId: string): Promise<string> {
+  assertSafeAgentId(agentId)
+  const checkpointCommit = await resolveCheckpointCommit(cwd, agentId, turnId)
   if (!checkpointCommit) {
     throw new Error(`Checkpoint ref unavailable: ${turnId}`)
   }
@@ -187,11 +209,13 @@ export async function diffCheckpointToHead(cwd: string, turnId: string): Promise
  */
 export async function diffCheckpointFiles(
   cwd: string,
+  agentId: string,
   fromTurnId: string,
   toTurnId: string,
 ): Promise<TurnDiffFileChange[]> {
-  const fromCommit = await resolveCheckpointCommit(cwd, fromTurnId)
-  const toCommit = await resolveCheckpointCommit(cwd, toTurnId)
+  assertSafeAgentId(agentId)
+  const fromCommit = await resolveCheckpointCommit(cwd, agentId, fromTurnId)
+  const toCommit = await resolveCheckpointCommit(cwd, agentId, toTurnId)
 
   if (!fromCommit || !toCommit) {
     throw new Error(`Checkpoint ref unavailable for diff: from=${fromTurnId}(${fromCommit}) to=${toTurnId}(${toCommit})`)
@@ -239,9 +263,10 @@ export async function diffCheckpointFiles(
  * Get the committer date (ISO 8601) of a checkpoint commit.
  * Returns current time as fallback if the ref can't be resolved.
  */
-export async function getCheckpointTimestamp(cwd: string, turnId: string): Promise<string> {
+export async function getCheckpointTimestamp(cwd: string, agentId: string, turnId: string): Promise<string> {
+  assertSafeAgentId(agentId)
   try {
-    const commit = await resolveCheckpointCommit(cwd, turnId)
+    const commit = await resolveCheckpointCommit(cwd, agentId, turnId)
     if (!commit) return new Date().toISOString()
     const { stdout } = await execFileAsync('git', [
       'log', '-1', '--format=%cI', commit,
@@ -256,10 +281,13 @@ export async function getCheckpointTimestamp(cwd: string, turnId: string): Promi
 /**
  * Get the list of checkpoint turn IDs for a workspace.
  */
-export async function listCheckpoints(cwd: string): Promise<string[]> {
+export async function listCheckpoints(cwd: string, agentId: string): Promise<string[]> {
+  assertSafeAgentId(agentId)
   try {
+    // List only refs scoped to this agent: refs/pan/turn/<agentId>/<turnId>
+    // strip=4 removes the first 4 slash-delimited components, yielding just <turnId>
     const { stdout } = await execFileAsync('git', [
-      'for-each-ref', '--format=%(refname:strip=3)', `${CHECKPOINT_REF_PREFIX}/`,
+      'for-each-ref', '--format=%(refname:strip=4)', `${CHECKPOINT_REF_PREFIX}/${agentId}/`,
     ], { cwd, encoding: 'utf-8' })
     return stdout.split('\n').filter(Boolean).sort()
   } catch {
@@ -270,10 +298,110 @@ export async function listCheckpoints(cwd: string): Promise<string[]> {
 /**
  * Delete all checkpoint refs for a workspace.
  */
-export async function deleteAllCheckpoints(cwd: string): Promise<void> {
-  const turns = await listCheckpoints(cwd)
+export async function deleteAllCheckpoints(cwd: string, agentId: string): Promise<void> {
+  assertSafeAgentId(agentId)
+  const turns = await listCheckpoints(cwd, agentId)
   for (const turnId of turns) {
-    await deleteCheckpoint(cwd, turnId)
+    await deleteCheckpoint(cwd, agentId, turnId)
+  }
+}
+
+/**
+ * Delete all checkpoint refs for a set of agent IDs.
+ * Used at workspace teardown (merge/close-out) to clean up refs for specific agents.
+ */
+export async function pruneCheckpointRefsForAgents(cwd: string, agentIds: string[]): Promise<number> {
+  let totalRefs = 0
+  for (const agentId of agentIds) {
+    try {
+      assertSafeAgentId(agentId)
+      const turns = await listCheckpoints(cwd, agentId)
+      if (turns.length === 0) continue
+      for (const turnId of turns) {
+        await deleteCheckpoint(cwd, agentId, turnId)
+      }
+      console.log(`[checkpoint] Pruned ${turns.length} ref(s) for agent ${agentId}`)
+      totalRefs += turns.length
+    } catch (err) {
+      console.warn(`[checkpoint] Could not prune refs for agent ${agentId}: ${err}`)
+    }
+  }
+  if (totalRefs === 0) {
+    console.log(`[checkpoint] No checkpoint refs found for agents: ${agentIds.join(', ')}`)
+  }
+  return totalRefs
+}
+
+/**
+ * Delete all checkpoint refs older than olderThanDays days across all agents.
+ * Safety net for abandoned workspaces whose postMergeLifecycle was never called.
+ */
+export async function pruneStaleCheckpointRefs(cwd: string, olderThanDays: number): Promise<number> {
+  try {
+    const { stdout } = await execFileAsync('git', [
+      'for-each-ref',
+      '--format=%(creatordate:unix) %(refname)',
+      `${CHECKPOINT_REF_PREFIX}/`,
+    ], { cwd, encoding: 'utf-8' })
+
+    const allRefs = stdout.split('\n').filter(Boolean)
+    const cutoff = Math.floor(Date.now() / 1000) - olderThanDays * 86400
+    const staleRefs = allRefs.flatMap(line => {
+      const spaceIdx = line.indexOf(' ')
+      if (spaceIdx === -1) return []
+      const ts = parseInt(line.slice(0, spaceIdx), 10)
+      const ref = line.slice(spaceIdx + 1).trim()
+      return ts < cutoff && ref ? [ref] : []
+    })
+
+    console.log(`[checkpoint] Global stale sweep: ${allRefs.length} total ref(s), ${staleRefs.length} older than ${olderThanDays} days`)
+
+    let pruned = 0
+    for (const ref of staleRefs) {
+      try {
+        await execFileAsync('git', ['update-ref', '-d', ref], { cwd, encoding: 'utf-8' })
+        pruned++
+      } catch (err) {
+        console.warn(`[checkpoint] Could not delete stale ref ${ref}: ${err}`)
+      }
+    }
+    if (pruned > 0) {
+      console.log(`[checkpoint] Pruned ${pruned} stale checkpoint ref(s) older than ${olderThanDays} days`)
+    }
+    return pruned
+  } catch (err) {
+    console.warn(`[checkpoint] Stale ref sweep failed: ${err}`)
+    return 0
+  }
+}
+
+/**
+ * One-time migration: delete legacy unscoped checkpoint refs (refs/pan/turn/<turnId>)
+ * that were created before per-agent namespacing was introduced.
+ * Safe to run multiple times (no-op if already migrated).
+ */
+export async function deleteLegacyCheckpointRefs(cwd: string): Promise<number> {
+  try {
+    // Old layout: refs/pan/turn/<turnId> — exactly 3 components (strip=3 gives the turnId directly, no slash)
+    // New layout: refs/pan/turn/<agentId>/<turnId> — has a slash in strip=3 output
+    const { stdout } = await execFileAsync('git', [
+      'for-each-ref', '--format=%(refname)', `${CHECKPOINT_REF_PREFIX}/`,
+    ], { cwd, encoding: 'utf-8' })
+    const refs = stdout.split('\n').filter(Boolean)
+    const legacyRefs = refs.filter(ref => {
+      // Count slash components: refs/pan/turn/X has 4 parts; refs/pan/turn/A/B has 5 parts
+      return ref.split('/').length === 4
+    })
+    for (const ref of legacyRefs) {
+      try {
+        await execFileAsync('git', ['update-ref', '-d', ref], { cwd, encoding: 'utf-8' })
+      } catch {
+        // Best-effort
+      }
+    }
+    return legacyRefs.length
+  } catch {
+    return 0
   }
 }
 

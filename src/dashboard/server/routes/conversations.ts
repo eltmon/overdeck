@@ -2047,7 +2047,7 @@ const getConversationDiffsRoute = HttpRouter.add(
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
       try {
-        const conv = getConversationByName(name);
+        const conv = getConversationByName(name) ?? (/^\d+$/.test(name) ? getConversationById(parseInt(name, 10)) : null);
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
@@ -2057,30 +2057,10 @@ const getConversationDiffsRoute = HttpRouter.add(
           return jsonResponse({ summaries: [] });
         }
 
-        const cwd = conv.cwd;
-        const isInRepo = existsSync(join(cwd, '.git'));
-
-        if (isInRepo) {
-          // Option B: standalone conversation in a git repo — single diff since conversation start
-          const baseCommit = await findCommitAtTime(cwd, conv.createdAt);
-          if (!baseCommit) {
-            return jsonResponse({ summaries: [] });
-          }
-          const files = await diffSinceCommit(cwd, baseCommit);
-          if (files.length === 0) {
-            return jsonResponse({ summaries: [] });
-          }
-          return jsonResponse({
-            summaries: [{
-              turnId: 'conversation-diff',
-              completedAt: new Date().toISOString(),
-              status: 'completed',
-              files,
-            }],
-          });
-        }
-
-        // Option A: devroot conversation — parse JSONL for file-modifying tool_use per turn
+        // Parse JSONL for file-modifying tool_use blocks per turn.
+        // Works for all conversation types: devroot, in-repo, and worktree.
+        // Per-turn git diffs use findCommitAtTime(repoRoot, conv.createdAt) so they
+        // capture committed changes too, not just working-tree modifications.
         const parsed = await getCachedMessages(sessionFile, false);
         const { fileEditsByAssistantId } = parsed;
         if (!fileEditsByAssistantId || fileEditsByAssistantId.size === 0) {
@@ -2100,8 +2080,9 @@ const getConversationDiffsRoute = HttpRouter.add(
         const assistantMessages = parsed.messages.filter(m => m.role === 'assistant');
         const assistantById = new Map(assistantMessages.map(m => [m.id, m]));
 
-        // Cache git repo root lookups
+        // Cache git repo root and base-commit lookups (both keyed by repo root)
         const repoRootCache = new Map<string, string | null>();
+        const baseCommitCache = new Map<string, string | null>();
 
         for (const [assistantId, edits] of fileEditsByAssistantId) {
           const asstMsg = assistantById.get(assistantId);
@@ -2144,14 +2125,52 @@ const getConversationDiffsRoute = HttpRouter.add(
             }
           }
 
-          // Compute diffs per repo and merge
+          // Compute diffs per repo and merge.
+          // Diff against the conversation's base commit (the commit that existed just before
+          // the conversation started) so that committed changes are included in the summary —
+          // not just uncommitted working-tree changes.
           const allFiles: TurnDiffFileChange[] = [];
           for (const [repoRoot, filePaths] of filesByRepo) {
             try {
-              const diffs = await diffFilesAgainstHead(repoRoot, filePaths);
+              // Resolve base commit once per repo root
+              if (!baseCommitCache.has(repoRoot)) {
+                baseCommitCache.set(repoRoot, await findCommitAtTime(repoRoot, conv.createdAt));
+              }
+              const baseCommit = baseCommitCache.get(repoRoot) ?? null;
+
+              let diffs: TurnDiffFileChange[];
+              if (baseCommit) {
+                // Diff specific files against the pre-conversation base commit.
+                // This captures changes whether committed or still in the working tree.
+                const { stdout: numstat } = await promisify(exec)(
+                  `git diff --numstat --no-color ${baseCommit} -- ${filePaths.map(p => JSON.stringify(p)).join(' ')}`,
+                  { cwd: repoRoot, encoding: 'utf-8' },
+                );
+                const { stdout: nameStatus } = await promisify(exec)(
+                  `git diff --name-status --no-color ${baseCommit} -- ${filePaths.map(p => JSON.stringify(p)).join(' ')}`,
+                  { cwd: repoRoot, encoding: 'utf-8' },
+                );
+                const statusMap = new Map<string, string>();
+                for (const line of nameStatus.split('\n')) {
+                  if (!line.trim()) continue;
+                  const parts = line.split('\t');
+                  if (parts.length >= 2) statusMap.set(parts[parts.length - 1], parts[0]);
+                }
+                diffs = [];
+                for (const line of numstat.split('\n')) {
+                  if (!line.trim()) continue;
+                  const [addStr, delStr, ...pathParts] = line.split('\t');
+                  const path = pathParts.join('\t');
+                  if (!path) continue;
+                  diffs.push({ path, kind: statusMap.get(path), additions: parseInt(addStr, 10) || 0, deletions: parseInt(delStr, 10) || 0 });
+                }
+              } else {
+                // No base commit (repo too new) — fall back to working-tree-vs-HEAD diff
+                diffs = await diffFilesAgainstHead(repoRoot, filePaths);
+              }
               allFiles.push(...diffs);
             } catch {
-              // git diff failed — file may have been committed already, skip
+              // git diff failed — skip this repo
             }
           }
 
@@ -2270,18 +2289,21 @@ const getConversationDiffTurnRoute = HttpRouter.add(
     const fileFilter = reqUrl.searchParams.get('file') ?? undefined;
     return yield* Effect.promise(async () => {
       try {
-        const conv = getConversationByName(name);
+        const conv = getConversationByName(name) ?? (/^\d+$/.test(name) ? getConversationById(parseInt(name, 10)) : null);
         if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
 
         const cwd = conv.cwd;
         const isInRepo = existsSync(join(cwd, '.git'));
 
         if (isInRepo) {
-          // For in-repo conversations, the single summary has turnId='conversation-diff'
+          // For in-repo conversations, try single diff since conversation start.
+          // Falls through to per-turn JSONL path if no base commit (cwd is in a repo
+          // with no commits before the conversation started).
           const baseCommit = await findCommitAtTime(cwd, conv.createdAt);
-          if (!baseCommit) return jsonResponse({ diff: '' });
-          const diff = await diffPatchSinceCommit(cwd, baseCommit, fileFilter);
-          return jsonResponse({ turnId, diff });
+          if (baseCommit) {
+            const diff = await diffPatchSinceCommit(cwd, baseCommit, fileFilter);
+            return jsonResponse({ turnId, diff });
+          }
         }
 
         // Devroot: extract assistant ID from turnId (format: conv-turn-<assistantId>)
@@ -2314,12 +2336,26 @@ const getConversationDiffTurnRoute = HttpRouter.add(
           if (!repoFiles.includes(relativePath)) repoFiles.push(relativePath);
         }
 
+        const baseCommitByRepo = new Map<string, string | null>();
         const patches: string[] = [];
         for (const [repoRoot, filePaths] of filesByRepo) {
           try {
-            const patch = await diffPatchFilesAgainstHead(repoRoot, filePaths);
+            if (!baseCommitByRepo.has(repoRoot)) {
+              baseCommitByRepo.set(repoRoot, await findCommitAtTime(repoRoot, conv.createdAt));
+            }
+            const baseCommit = baseCommitByRepo.get(repoRoot) ?? null;
+            let patch: string;
+            if (baseCommit) {
+              const { stdout } = await promisify(exec)(
+                `git diff --patch --minimal --no-color ${baseCommit} -- ${filePaths.map(p => JSON.stringify(p)).join(' ')}`,
+                { cwd: repoRoot, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
+              );
+              patch = stdout;
+            } else {
+              patch = await diffPatchFilesAgainstHead(repoRoot, filePaths);
+            }
             if (patch) patches.push(patch);
-          } catch { /* file may have been committed */ }
+          } catch { /* file may have been committed or repo unavailable */ }
         }
 
         return jsonResponse({ turnId, diff: patches.join('\n') });

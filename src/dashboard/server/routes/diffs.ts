@@ -55,12 +55,12 @@ const getDiffsRoute = HttpRouter.add(
         }
 
         const workspace: string | null = agent.workspace ?? null
-        const summaries = snapshot.turnDiffSummariesByAgentId?.[agentId] ?? []
+        const summaries = await Effect.runPromise(readModel.getTurnDiffSummaries(agentId))
 
         let checkpointTurns: string[] = []
         if (workspace) {
           try {
-            checkpointTurns = await listCheckpoints(workspace)
+            checkpointTurns = await listCheckpoints(workspace, agentId)
           } catch {
             // Workspace might not exist yet
           }
@@ -106,7 +106,7 @@ const getTurnDiffRoute = HttpRouter.add(
           return jsonResponse({ error: 'Agent has no workspace' }, { status: 400 })
         }
 
-        const checkpoints = await listCheckpoints(workspace)
+        const checkpoints = await listCheckpoints(workspace, agentId)
         const turnIdx = checkpoints.indexOf(turnId)
         if (turnIdx < 0) {
           return jsonResponse({ error: 'Checkpoint not found' }, { status: 404 })
@@ -115,7 +115,7 @@ const getTurnDiffRoute = HttpRouter.add(
         const fromTurnId = turnIdx > 0 ? checkpoints[turnIdx - 1] : turnId
         const url = new URL(request.url, 'http://localhost')
         const filePath = url.searchParams.get('file') ?? undefined
-        const diff = await diffCheckpoints(workspace, fromTurnId, turnId, filePath)
+        const diff = await diffCheckpoints(workspace, agentId, fromTurnId, turnId, filePath)
 
         return jsonResponse({ agentId, turnId, fromTurnId, diff })
       } catch (error: unknown) {
@@ -156,7 +156,7 @@ const getFullDiffRoute = HttpRouter.add(
           return jsonResponse({ error: 'Agent has no workspace' }, { status: 400 })
         }
 
-        const checkpoints = await listCheckpoints(workspace)
+        const checkpoints = await listCheckpoints(workspace, agentId)
         if (checkpoints.length < 2) {
           return jsonResponse({ agentId, diff: '', files: [], turnCount: checkpoints.length })
         }
@@ -165,8 +165,8 @@ const getFullDiffRoute = HttpRouter.add(
         const lastTurn = checkpoints[checkpoints.length - 1]
         const url = new URL(request.url, 'http://localhost')
         const filePath = url.searchParams.get('file') ?? undefined
-        const files = await diffCheckpointFiles(workspace, firstTurn, lastTurn)
-        const diff = filePath ? await diffCheckpoints(workspace, firstTurn, lastTurn, filePath) : undefined
+        const files = await diffCheckpointFiles(workspace, agentId, firstTurn, lastTurn)
+        const diff = filePath ? await diffCheckpoints(workspace, agentId, firstTurn, lastTurn, filePath) : undefined
 
         return jsonResponse({
           agentId,
@@ -263,14 +263,14 @@ const postTestCheckpointRoute = HttpRouter.add(
         const turnId = `test-turn-${Date.now()}`
 
         // Capture checkpoint
-        await captureCheckpoint(workspace, turnId)
+        await captureCheckpoint(workspace, agentId, turnId)
 
         // Get file changes from previous checkpoint (if any)
-        const checkpoints = await listCheckpoints(workspace)
+        const checkpoints = await listCheckpoints(workspace, agentId)
         const prevCheckpoint = checkpoints.length >= 2 ? checkpoints[checkpoints.length - 2] : null
         let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = []
         if (prevCheckpoint) {
-          files = await diffCheckpointFiles(workspace, prevCheckpoint, turnId)
+          files = await diffCheckpointFiles(workspace, agentId, prevCheckpoint, turnId)
         }
 
         // Emit event
@@ -283,7 +283,7 @@ const postTestCheckpointRoute = HttpRouter.add(
             turnId,
             completedAt: new Date().toISOString(),
             files,
-            checkpointRef: `refs/pan/turn/${turnId}`,
+            checkpointRef: `refs/pan/turn/${agentId}/${turnId}`,
             assistantMessageId: undefined,
             checkpointTurnCount: checkpoints.length,
           },

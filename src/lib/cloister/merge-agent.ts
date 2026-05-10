@@ -193,27 +193,27 @@ async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string,
   await execAsync('git fetch origin main --prune', { cwd: projectPath }).catch(() => undefined);
   await execAsync(`git fetch origin ${shellQuote(`${branchName}:refs/remotes/origin/${branchName}`)}`, { cwd: projectPath }).catch(() => undefined);
 
+  // Check 1: branch tip is an ancestor of origin/main (regular merge case).
   const refsToCheck = [branchName, `origin/${branchName}`];
   for (const ref of refsToCheck) {
     const quotedRef = shellQuote(ref);
-    const { stdout } = await execAsync(`git rev-parse --verify ${quotedRef} 2>/dev/null || true`, { cwd: projectPath });
-    if (!stdout.trim()) continue;
-
+    const revParseResult = await execAsync(`git rev-parse --verify ${quotedRef} 2>/dev/null || true`, { cwd: projectPath });
+    const refSha = typeof revParseResult?.stdout === 'string' ? revParseResult.stdout : '';
+    if (!refSha.trim()) continue;
     try {
       await execAsync(`git merge-base --is-ancestor ${quotedRef} origin/main`, { cwd: projectPath });
       return { merged: true, reason: `${ref} is an ancestor of origin/main` };
     } catch {
-      const { stdout: codeDiff } = await execAsync(
-        `git diff origin/main...${quotedRef} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
-        { cwd: projectPath },
-      );
-      if (!codeDiff.trim()) {
-        return { merged: true, reason: `${ref} has no remaining code diff against origin/main` };
-      }
-      return { merged: false, reason: `${ref} still has unmerged changes` };
+      // Not a regular merge ancestor — fall through to GitHub API check.
     }
   }
 
+  // Check 2: GitHub API truth — authoritative for squash and rebase merges
+  // where the branch tip is intentionally not an ancestor of main. Run this
+  // BEFORE the local-diff fallback so that a squash-merged PR isn't mistaken
+  // for "still has unmerged changes" just because the branch retains its
+  // own commits (PAN-1024 hit this 2026-05-09: merge succeeded on GitHub
+  // but post-merge lifecycle was refused, leaving labels + workspace stale).
   const ghResolved = resolveGitHubIssue(issueId);
   if (ghResolved.isGitHub) {
     const { owner, repo } = ghResolved;
@@ -226,9 +226,25 @@ async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string,
     if (mergedPr) {
       return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
     }
-    if (prs.length > 0) {
-      return { merged: false, reason: `GitHub PR #${prs[0]?.number} is not merged` };
+  }
+
+  // Check 3: local-diff fallback — for the non-GitHub case (Linear/Rally), or
+  // GitHub edge cases where the PR API returned nothing. If the branch has
+  // no remaining code diff against main, treat as merged.
+  for (const ref of refsToCheck) {
+    const quotedRef = shellQuote(ref);
+    const revParseResult2 = await execAsync(`git rev-parse --verify ${quotedRef} 2>/dev/null || true`, { cwd: projectPath });
+    const refSha = typeof revParseResult2?.stdout === 'string' ? revParseResult2.stdout : '';
+    if (!refSha.trim()) continue;
+    const diffResult = await execAsync(
+      `git diff origin/main...${quotedRef} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
+      { cwd: projectPath },
+    );
+    const codeDiff = typeof diffResult?.stdout === 'string' ? diffResult.stdout : '';
+    if (!codeDiff.trim()) {
+      return { merged: true, reason: `${ref} has no remaining code diff against origin/main` };
     }
+    return { merged: false, reason: `${ref} still has unmerged changes` };
   }
 
   return { merged: false, reason: `No merged branch or PR found for ${branchName}` };
@@ -504,6 +520,20 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     }
   } catch (err) {
     console.warn(`[merge-agent] Workspace teardown failed (non-fatal): ${err}`);
+  }
+
+  // 7b. Prune checkpoint refs for this issue's agents (non-fatal)
+  // Refs are written per-turn into refs/pan/turn/<agentId>/<turnId> and accumulate in the
+  // main repo's ref store (worktrees share the parent .git). Delete them on merge so they
+  // don't pile up indefinitely.
+  try {
+    const { pruneCheckpointRefsForAgents } = await import('../checkpoint/checkpoint-manager.js');
+    const issueLower = issueId.toLowerCase();
+    const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`];
+    const pruned = await pruneCheckpointRefsForAgents(projectPath, agentIds);
+    console.log(`[merge-agent] ✓ Checkpoint ref prune: ${pruned} ref(s) removed for ${issueId}`);
+  } catch (err) {
+    console.warn(`[merge-agent] Checkpoint ref pruning failed (non-fatal): ${err}`);
   }
 
   // 8. Apply 'needs-close-out' label to signal the user that close-out ceremony is pending (PAN-925)

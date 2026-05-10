@@ -191,11 +191,13 @@ export async function getAgentRuntimeBaseCommand(
   }
 
   if (agentType) {
-    // Anthropic direct: --agent fully replaces --model. Non-Anthropic
-    // direct providers still need --model because agent frontmatter model:
-    // only accepts Anthropic identifiers.
-    const modelFlag = provider.name === 'anthropic' ? '' : ` --model ${model}`;
-    return `claude${bypassWithAgent}${agentFlag}${modelFlag}${nameFlag}`;
+    // --model is always passed when state has a resolved model so explicit
+    // overrides (state.json model, switch-model, cloister routing) win over
+    // the agent frontmatter's default model:. Without this, Anthropic-direct
+    // launches silently fall back to the frontmatter model and ignore the
+    // user's selection — observed when switching PAN-977 to Opus 4.7 left
+    // the launcher running Sonnet.
+    return `claude${bypassWithAgent}${agentFlag} --model ${model}${nameFlag}`;
   }
   return `claude ${permissionFlags} --model ${model}${nameFlag}`;
 }
