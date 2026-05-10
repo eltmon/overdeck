@@ -3425,6 +3425,11 @@
 
 .pickerLabel {
   font-size: 12px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Provider icon inside picker trigger button */
@@ -3541,6 +3546,76 @@
   overscroll-behavior: contain;
   flex: 1;
   min-height: 0;
+}
+
+/* Harness segmented control inside the model picker dropdown */
+.harnessRow {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px 2px;
+}
+
+.harnessBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  flex: 1;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.harnessBtn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--primary) 50%, transparent);
+  color: var(--foreground);
+}
+
+.harnessBtnActive {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.harnessBtnLocked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.harnessCheckIcon {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.harnessLockIcon {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+/* Inline explanation when a harness option is locked */
+.harnessLockNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 4px 8px 6px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  line-height: 1.4;
+}
+
+.harnessLockNoteIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  opacity: 0.7;
 }
 
 .pickerOptionLabel {

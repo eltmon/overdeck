@@ -8,7 +8,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
+import { ChevronDown, Check, Lock, Info } from 'lucide-react';
 import {
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
   getDefaultConversationModel,
@@ -295,33 +295,49 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
             ...(align === 'right' ? { left: 'auto', right: 0 } : {}),
           }}
         >
-          {/* Harness section — pinned at top, always visible without scrolling */}
-          {harness !== undefined && onHarnessChange && (
-            <>
-              <div className={styles.pickerGroupHeader}>Harness</div>
-              {HARNESS_OPTIONS.map((opt: { id: Harness; label: string; description: string }) => {
-                const decision = canUsePickerHarness(opt.id, value, harnessPolicy);
-                const isActive = harness === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    className={`${styles.pickerOption} ${isActive ? styles.pickerOptionActive : ''}`}
-                    disabled={!decision.allowed}
-                    title={decision.allowed ? opt.description : (decision.reason ?? '')}
-                    onClick={() => { if (decision.allowed) onHarnessChange(opt.id); }}
-                  >
-                    <span className={styles.pickerOptionLabel}>{opt.label}</span>
-                    {!decision.allowed && (
-                      <span className={styles.pickerGroupNoKey}>ToS</span>
-                    )}
-                    {isActive && <Check size={12} className="flex-shrink-0" style={{ color: 'var(--primary)' }} />}
-                  </button>
-                );
-              })}
-              <div className={styles.pickerSectionDivider} />
-            </>
-          )}
+          {/* Harness section — pinned at top as a segmented control */}
+          {harness !== undefined && onHarnessChange && (() => {
+            const lockedOpt = HARNESS_OPTIONS.find(
+              (opt: { id: Harness; label: string; description: string }) =>
+                !canUsePickerHarness(opt.id, value, harnessPolicy).allowed
+            );
+            const lockReason = lockedOpt
+              ? canUsePickerHarness(lockedOpt.id, value, harnessPolicy).reason
+              : undefined;
+            return (
+              <>
+                <div className={styles.harnessRow}>
+                  {HARNESS_OPTIONS.map((opt: { id: Harness; label: string; description: string }) => {
+                    const decision = canUsePickerHarness(opt.id, value, harnessPolicy);
+                    const isActive = harness === opt.id;
+                    const isLocked = !decision.allowed;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        className={`${styles.harnessBtn} ${isActive ? styles.harnessBtnActive : ''} ${isLocked ? styles.harnessBtnLocked : ''}`}
+                        disabled={isLocked}
+                        onClick={() => { if (!isLocked) { onHarnessChange(opt.id); } }}
+                      >
+                        {isLocked
+                          ? <Lock size={9} className={styles.harnessLockIcon} />
+                          : (isActive ? <Check size={9} className={styles.harnessCheckIcon} /> : null)
+                        }
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {lockReason && (
+                  <div className={styles.harnessLockNote}>
+                    <Info size={9} className={styles.harnessLockNoteIcon} />
+                    <span>{lockReason}</span>
+                  </div>
+                )}
+                <div className={styles.pickerSectionDivider} />
+              </>
+            );
+          })()}
 
           {/* Scrollable model list */}
           <div className={harness !== undefined ? styles.pickerScrollArea : undefined}>
