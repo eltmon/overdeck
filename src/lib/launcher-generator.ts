@@ -318,6 +318,10 @@ function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
 
   if (config.agentType === 'conversation') {
+    if (config.harness === 'pi') {
+      return buildPiCommand(config, false);
+    }
+
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
       const args: string[] = [];

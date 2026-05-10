@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T12:14:56Z",
+  "updated": "2026-05-10T12:26:27Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "ef23b1d14",
+    "sha": "95699d9a6",
     "dirty": true
   },
   "decisions": [
@@ -78,6 +78,11 @@
       "id": "D14",
       "summary": "Fixed verification test failures by isolating lifecycle tests from host Linear credentials, mocking Linear SDK in CLI state cleanup tests, and preserving fs/promises APIs in post-merge lifecycle tests so fallthrough cleanup does not time out under the full suite.",
       "recordedAt": "2026-05-10T12:10:03Z"
+    },
+    {
+      "id": "D15",
+      "summary": "Fixed Pi execution-path blockers by routing conversation launchers through generateLauncherScript harness=pi with FIFO/session-dir/extension wiring, using Pi FIFO prompt delivery for conversation injections, and rejecting Pi summary generation until a real Pi prompt RPC path exists.",
+      "recordedAt": "2026-05-10T12:26:27Z"
     }
   ],
   "hazards": [
@@ -88,14 +93,13 @@
     }
   ],
   "resumePoint": {
-    "description": "Resolved pan done rebase conflicts and verified after rebase. npm run typecheck, npm run lint, and npm test pass (379 files / 4615 tests). Next step is commit regenerated graphify/continue updates and rerun pan done PAN-1055.",
+    "description": "Fixed latest CHANGES_REQUESTED blockers for Pi conversation launch/protocol paths and Pi summary prompt misuse. typecheck, lint, and full npm test pass. Next step is commit and invoke /rebase-and-submit PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
-      ".pan/feedback/002-verification-gate-failed.md",
-      ".pan/feedback/003-verification-gate-failed.md",
-      "tests/cli/commands/work/linear-states.test.ts",
-      "tests/unit/lib/lifecycle/workflows.test.ts",
-      "tests/unit/lib/pan-444-post-merge-step0.test.ts"
+      ".pan/feedback/001-review-agent-changes-requested.md",
+      "src/dashboard/server/routes/conversations.ts",
+      "src/lib/launcher-generator.ts",
+      "src/lib/conversations/smart-compaction.ts"
     ]
   },
   "beadsMapping": {
@@ -227,6 +231,12 @@
       "timestamp": "2026-05-10T12:14:56Z",
       "reason": "main-rebase-verified",
       "note": "Resolved pan done rebase conflicts, regenerated graphify outputs, and verified npm run typecheck, npm run lint, and npm test after rebase (379 files / 4615 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T12:26:27Z",
+      "reason": "review-response-verified",
+      "note": "Fixed correctness blockers: conversation Pi launches now use Pi launcher config/FIFO/session-dir/extension wiring and Pi-specific prompt delivery; summary generation no longer invokes pi --mode rpc with raw prompt stdin and rejects unsupported Pi summary requests. Verified npm run typecheck, npm run lint, and npm test (379 files / 4615 tests passed).",
       "agentModel": "Claude Opus 4.7"
     }
   ],

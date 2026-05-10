@@ -896,7 +896,7 @@
     "hash": "912dd048fc5f1898876a9d587eeafcc0"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/scripts/record-cost-event.d.ts": {
-    "mtime": 1778413087.8380244,
+    "mtime": 1778415356.0304034,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/scripts/notify-complete": {
@@ -1436,8 +1436,8 @@
     "hash": "72266e05d0b2b40791e4fc95524d82d1"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/lib/launcher-generator.ts": {
-    "mtime": 1778359583.3123379,
-    "hash": "46c4ab12ba2e3c4bc204ceb3cfe49da1"
+    "mtime": 1778415700.33504,
+    "hash": "71dbd15061abd7c0c2d31302af00c759"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/lib/manifest.ts": {
     "mtime": 1778359583.3127232,
@@ -1896,8 +1896,8 @@
     "hash": "6132684bd7e051984a0d462707a1251b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/lib/conversations/smart-compaction.ts": {
-    "mtime": 1778415110.357516,
-    "hash": "d065d94525dc262e2e570ca3eb1bb5c2"
+    "mtime": 1778415831.51421,
+    "hash": "0ea2921138d94737b8447edd5640359f"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/lib/vbrief/builder.ts": {
     "mtime": 1778359583.3175213,
@@ -3788,8 +3788,8 @@
     "hash": "07ce61728663c7c8d2809b1c64c6f0e3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/server/routes/conversations.ts": {
-    "mtime": 1778415110.357516,
-    "hash": "28f0de48c2ed9ec47d0a8b4fb1702c33"
+    "mtime": 1778415789.9158895,
+    "hash": "7656aa8039bc44401897ef16e9105e47"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/server/routes/codex-auth.ts": {
     "mtime": 1778359583.279561,

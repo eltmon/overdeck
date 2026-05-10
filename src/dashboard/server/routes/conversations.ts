@@ -16,10 +16,10 @@ import { getClaudePermissionFlagsString, resolvePermissionMode } from '../../../
 
 import { randomUUID } from 'node:crypto';
 import { exec, spawn } from 'node:child_process';
-import { existsSync, createReadStream } from 'node:fs';
-import { mkdir, writeFile, readFile, stat, realpath, rename, rm, readdir } from 'node:fs/promises';
+import { constants as fsConstants, existsSync, createReadStream } from 'node:fs';
+import { mkdir, writeFile, readFile, stat, realpath, rename, rm, readdir, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { extname, join } from 'node:path';
+import { extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
@@ -81,6 +81,7 @@ import {
 } from '../../../lib/agents.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
+import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import {
   parseConversationMessages,
@@ -391,6 +392,32 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
 }
 
+async function waitForPiReady(agentId: string): Promise<void> {
+  const { readyPath } = piFifoPaths(agentId);
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (existsSync(readyPath)) {
+      console.log(`[conversations] Pi ready for ${agentId}`);
+      return;
+    }
+    await new Promise<void>((r) => setTimeout(r, 500));
+  }
+  console.warn(`[conversations] Timed out waiting for Pi ready marker for ${agentId}`);
+}
+
+async function writePiConversationCommand(agentId: string, text: string): Promise<void> {
+  const { fifoPath, readyPath } = piFifoPaths(agentId);
+  if (!existsSync(readyPath)) {
+    throw new Error(`Pi conversation ${agentId} is not ready`);
+  }
+  const fifo = await open(fifoPath, fsConstants.O_WRONLY | fsConstants.O_NONBLOCK);
+  try {
+    await fifo.writeFile(`${JSON.stringify({ cmd: 'prompt', text })}\n`);
+  } finally {
+    await fifo.close();
+  }
+}
+
 function resolveSessionFile(conv: Conversation): string | null {
   if (conv.claudeSessionId) {
     return sessionFilePath(conv.cwd, conv.claudeSessionId);
@@ -685,6 +712,13 @@ async function spawnConversationSession(
   let runtimeCommand = `claude ${permissionFlags}`;
   let providerExportsStr = '';
   let providerEnv: Record<string, string> = {};
+  let piFields: {
+    harness: 'pi';
+    piExtensionPath: string;
+    piFifoPath: string;
+    piSessionDir: string;
+    resumeSessionId?: string;
+  } | undefined;
   if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
@@ -721,6 +755,25 @@ async function spawnConversationSession(
     }
     providerExportsStr = (await getProviderExportsForModel(model)).trim();
     providerEnv = await getProviderEnvForModel(model);
+
+    if (harness === 'pi') {
+      const paths = piFifoPaths(tmuxSession);
+      const piSessionDir = join(paths.agentDir, 'sessions');
+      await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
+      await mkdir(piSessionDir, { recursive: true, mode: 0o700 });
+      await rm(paths.fifoPath, { force: true });
+      await execAsync(`mkfifo -m 600 ${shellQuote(paths.fifoPath)}`);
+      const storedPiSessionId = resume
+        ? (await readFile(join(paths.agentDir, 'session.id'), 'utf-8').then((s) => s.trim()).catch(() => undefined))
+        : undefined;
+      piFields = {
+        harness: 'pi',
+        piExtensionPath: resolve(process.cwd(), 'packages/pi-extension/dist/index.js'),
+        piFifoPath: paths.fifoPath,
+        piSessionDir,
+        resumeSessionId: storedPiSessionId || undefined,
+      };
+    }
   }
 
   if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
@@ -734,13 +787,16 @@ async function spawnConversationSession(
       workingDir: cwd,
       setTerminalEnv: true,
       unsetProviderEnv: true,
-      panopticonEnv: issueId ? { issueId } : undefined,
+      panopticonEnv: { ...(issueId ? { issueId } : {}), ...(piFields ? { agentId: tmuxSession } : {}) },
       providerExports: providerExportsStr || undefined,
       trapHup: true,
       baseCommand: runtimeCommand,
-      resumeSessionId: resume ? claudeSessionId : undefined,
-      sessionId: resume ? undefined : claudeSessionId,
-      extraArgs: effort ? `--effort "${effort}"` : undefined,
+      model,
+      ...(piFields ?? {
+        resumeSessionId: resume ? claudeSessionId : undefined,
+        sessionId: resume ? undefined : claudeSessionId,
+      }),
+      extraArgs: !piFields && effort ? `--effort "${effort}"` : undefined,
       keepAlive: true,
       fileMode: 0o700,
     }),
@@ -1061,14 +1117,22 @@ const postConversationRoute = HttpRouter.add(
         await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
         console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
 
-        // Wait for Claude Code to reach its prompt before returning.
-        // Bounded by waitForClaudeReady's existing 30s timeout.
-        await waitForClaudeReady(tmuxSession);
-        console.log(`[conversations] Claude ready in ${tmuxSession}`);
+        if (harness === 'pi') {
+          await waitForPiReady(tmuxSession);
+        } else {
+          // Wait for Claude Code to reach its prompt before returning.
+          // Bounded by waitForClaudeReady's existing 30s timeout.
+          await waitForClaudeReady(tmuxSession);
+          console.log(`[conversations] Claude ready in ${tmuxSession}`);
+        }
 
         // If a message was provided (legacy callers), send it now
         if (message) {
-          await sendKeysAsync(tmuxSession, message, 'conversation-message');
+          if (harness === 'pi') {
+            await writePiConversationCommand(tmuxSession, message);
+          } else {
+            await sendKeysAsync(tmuxSession, message, 'conversation-message');
+          }
         }
 
         // Title = truncated first message (T3Code pattern), or default
@@ -1215,7 +1279,11 @@ const postConversationResumeRoute = HttpRouter.add(
 
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId, harness);
         await waitForTmuxSession(conv.tmuxSession);
-        await waitForClaudePrompt(conv.tmuxSession, 30000).catch(() => false);
+        if (harness === 'pi') {
+          await waitForPiReady(conv.tmuxSession);
+        } else {
+          await waitForClaudePrompt(conv.tmuxSession, 30000).catch(() => false);
+        }
 
         markConversationActive(name);
         return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
@@ -1289,7 +1357,11 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const canResume = !!oldSessionId && !!sessionFile && existsSync(sessionFile);
         await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, canResume, harness);
         await waitForTmuxSession(tmuxSession);
-        await waitForClaudePrompt(tmuxSession, 30000).catch(() => false);
+        if (harness === 'pi') {
+          await waitForPiReady(tmuxSession);
+        } else {
+          await waitForClaudePrompt(tmuxSession, 30000).catch(() => false);
+        }
 
         markConversationActive(name);
         return jsonResponse({ ...conv, status: 'active', model, harness, reattached: false, sessionAlive: true });
@@ -1898,7 +1970,11 @@ async function runForkPipeline(
   if (!ready) {
     console.warn(`[summary-fork] Prompt not detected in time for ${convName}, sending summary anyway`);
   }
-  await sendKeysAsync(conv.tmuxSession, summary, 'summary-fork');
+  if (conv.harness === 'pi') {
+    await writePiConversationCommand(conv.tmuxSession, summary);
+  } else {
+    await sendKeysAsync(conv.tmuxSession, summary, 'summary-fork');
+  }
 
   markConversationActive(convName);
   updateForkStatus(convName, null);
@@ -1969,7 +2045,10 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const launchModel = model || conv.model;
         const effectiveSummaryModel = summaryModel || 'claude-sonnet-4-6';
         const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
-        const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
+        if (body['summaryHarness'] === 'pi') {
+          return jsonResponse({ error: 'Pi summary generation is not supported yet; choose Claude Code for summary generation.' }, { status: 400 });
+        }
+        const summaryHarness: RuntimeName = 'claude-code';
         const defaultTitle = plain
           ? `Fork: ${conv.title || conv.name}`
           : `Summary Fork: ${conv.title || conv.name}`;

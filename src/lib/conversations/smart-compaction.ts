@@ -609,15 +609,17 @@ Be thorough. Preserve exact file paths, function names, error messages, and code
 
 export async function runModelSummary(prompt: string, model?: string, timeoutMs?: number, harness: RuntimeName = 'claude-code'): Promise<string> {
   const useModel = model || DEFAULT_SUMMARY_MODEL;
-  console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | harness=${harness} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
+  const effectiveHarness: RuntimeName = harness === 'pi' ? 'claude-code' : harness;
+  if (harness === 'pi') {
+    console.warn('[smart-compaction] Pi summary generation is not implemented; using Claude Code prompt mode instead');
+  }
+  console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | harness=${effectiveHarness} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
 
-  const args = harness === 'pi'
-    ? ['--mode', 'rpc', '--model', useModel]
-    : [
-        '-p',
-        '--model', useModel,
-        ...getClaudePermissionFlags(),
-      ];
+  const args = [
+    '-p',
+    '--model', useModel,
+    ...getClaudePermissionFlags(),
+  ];
 
   // Sanitize parent provider env (strip ANTHROPIC_BASE_URL etc.) and inject the
   // correct provider env for `useModel`. If provider env lookup fails (e.g.
@@ -625,7 +627,7 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
   // falls back to a heuristic summary.
   const spawnEnv = await buildSpawnEnvForModel(useModel);
   const injectedKeys = Object.keys(await getProviderEnvForModel(useModel));
-  const command = harness === 'pi' ? 'pi' : 'claude';
+  const command = 'claude';
   if (injectedKeys.length > 0) {
     console.log(`[smart-compaction] Spawning ${command} for summary with model ${useModel}, injecting provider env: ${injectedKeys.join(', ')}`);
   } else {
