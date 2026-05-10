@@ -4,17 +4,17 @@
     "created": "2026-05-07T02:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-982: Evaluate Claude Code --agent/subagent system for agent lifecycle",
-    "updated": "2026-05-07T02:13:23.619Z"
+    "updated": "2026-05-10T05:00:02.316Z"
   },
   "plan": {
     "id": "pan-982",
     "title": "Claude Code --agent integration for agent lifecycle",
-    "status": "proposed",
+    "status": "completed",
     "uid": "bd1e908a-5e24-4fcd-b467-a195bc6b5a5e",
     "author": "agent:claude-opus-4-6",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-07T02:30:00.000Z",
-    "updated": "2026-05-07T02:13:23.619Z",
+    "updated": "2026-05-10T05:00:02.316Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/982",
@@ -611,5 +611,6 @@
     "metadata": {
       "canonicalFilename": "2026-05-07-PAN-982-claude-code-agent-integration-for-agent-lifecycle.vbrief.json"
     }
-  }
+  },
+  "status": "completed"
 }

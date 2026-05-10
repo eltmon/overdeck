@@ -37,6 +37,7 @@ import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-cod
 import { getPendingQuestionTitle, hasActualPendingQuestion, isPendingReviewStranded, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { RecoverButton } from './RecoverButton';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
+import { ReviewPipelineSection } from './inspector/ReviewPipelineSection';
 import { PanOpenInPicker } from './PanOpenInPicker';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
@@ -970,6 +971,17 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Review pipeline (Tests row + verification cycle counter, parity with command deck) */}
+        {reviewStatus && (
+          <div className="px-3 py-2 border-b border-border">
+            <ReviewPipelineSection
+              reviewStatus={reviewStatus}
+              issueId={issueId}
+              onViewLog={onViewMergeLog}
+            />
           </div>
         )}
 

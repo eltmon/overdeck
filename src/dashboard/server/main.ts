@@ -8,7 +8,7 @@
 import { Effect } from 'effect';
 import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
-import { startSharedIssueService } from './services/issue-service-singleton.js';
+import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
@@ -17,7 +17,7 @@ import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { ensureInternalToken } from '../../lib/internal-token.js';
-import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatus } from '../../lib/review-status.js';
+import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatus, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { clearStuckForks } from '../../lib/database/conversations-db.js';
 import { getEventStore } from './event-store.js';
@@ -60,6 +60,16 @@ await initTrackerConfigCache().catch(err => {
 // then fetches fresh data from APIs in the background.
 void startSharedIssueService().then(() => {
   console.log('[panopticon] IssueDataService background fetch complete');
+  // Once the issue cache is warm, prune review-status rows for issues that
+  // are CLOSED on the tracker. Without this, manually-closed issues
+  // (`gh issue close` instead of `pan close`) leave stale review-state
+  // behind, and the deacon keeps auto-resuming agents and re-dispatching
+  // test specialists for them every patrol — observed on PAN-951 / PAN-512 /
+  // PAN-714. Runs once per boot as a sweep; the canonical close-out flow
+  // already calls clearReviewStatus on its own path.
+  void pruneClosedIssueReviewStatuses().catch((err) => {
+    console.warn('[panopticon] pruneClosedIssueReviewStatuses failed:', err?.message ?? err);
+  });
 });
 console.log('[panopticon] IssueDataService started (non-blocking)');
 
@@ -358,6 +368,42 @@ if (process.env.PANOPTICON_DISABLE_DEACON === '1') {
   });
   console.log('[panopticon] Cloister auto-starting (startup.auto_start=true)');
   emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
+}
+
+/**
+ * Drop review-status rows for issues that are CLOSED on the tracker. Runs once
+ * after the IssueDataService warm-fetch so closed issues don't keep waking the
+ * deacon's orphan-recovery and feedback-redelivery loops.
+ */
+async function pruneClosedIssueReviewStatuses(): Promise<void> {
+  const issues = getSharedIssueService().getIssues();
+  const closed = new Set<string>();
+  for (const issue of issues) {
+    const id = (issue?.identifier ?? '').toString().toUpperCase();
+    if (!id) continue;
+    const state = (issue?.state ?? '').toString().toUpperCase();
+    const status = (issue?.status ?? '').toString().toLowerCase();
+    if (state === 'CLOSED' || status === 'done' || status === 'closed' || status === 'cancelled') {
+      closed.add(id);
+    }
+  }
+  if (closed.size === 0) return;
+
+  const statuses = loadReviewStatuses();
+  let removed = 0;
+  for (const issueId of Object.keys(statuses)) {
+    if (closed.has(issueId.toUpperCase())) {
+      try {
+        clearReviewStatus(issueId.toUpperCase());
+        removed++;
+      } catch {
+        // Non-fatal — next boot will retry.
+      }
+    }
+  }
+  if (removed > 0) {
+    console.log(`[panopticon] Pruned ${removed} stale review-status entr${removed === 1 ? 'y' : 'ies'} for closed issues`);
+  }
 }
 
 const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
