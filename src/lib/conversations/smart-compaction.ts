@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 import { getClaudePermissionFlags } from '../claude-permissions.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -607,13 +609,70 @@ Be thorough. Preserve exact file paths, function names, error messages, and code
 // LLM call
 // ============================================================================
 
+async function runPiModelSummary(prompt: string, model: string, timeoutMs?: number): Promise<string> {
+  const sessionDir = await mkdtemp(join(tmpdir(), 'panopticon-pi-summary-'));
+  const effectiveTimeout = timeoutMs ?? SUMMARY_TIMEOUT_MS;
+  const spawnEnv = await buildSpawnEnvForModel(model);
+
+  const child = spawn('pi', [
+    '--mode', 'rpc',
+    '--model', model,
+    '--session-dir', sessionDir,
+    '--no-context-files',
+  ], {
+    env: spawnEnv,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+
+  let stdout = '';
+  let stderr = '';
+  child.stdout.setEncoding('utf-8');
+  child.stderr.setEncoding('utf-8');
+  child.stdout.on('data', chunk => { stdout += chunk; });
+  child.stderr.on('data', chunk => { stderr += chunk; });
+
+  try {
+    return await new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        child.kill('SIGTERM');
+        reject(new Error(`Pi summary generation timed out after ${effectiveTimeout}ms`));
+      }, effectiveTimeout);
+
+      child.on('error', err => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+      child.on('close', code => {
+        clearTimeout(timeout);
+        if (code !== 0 && !stdout.trim()) {
+          const detail = stderr.trim() || `exit code ${code}`;
+          reject(new Error(`Pi summary generation failed: ${detail}`));
+          return;
+        }
+        const summary = stdout.trim();
+        if (!summary) {
+          reject(new Error('Pi summary generation returned empty output'));
+          return;
+        }
+        resolve(summary);
+      });
+
+      child.stdin.end(`${JSON.stringify({ cmd: 'prompt', text: prompt })}\n`);
+    });
+  } finally {
+    await rm(sessionDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
 export async function runModelSummary(prompt: string, model?: string, timeoutMs?: number, harness: RuntimeName = 'claude-code'): Promise<string> {
   const useModel = model || DEFAULT_SUMMARY_MODEL;
-  const effectiveHarness: RuntimeName = harness === 'pi' ? 'claude-code' : harness;
+  console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | harness=${harness} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
+
   if (harness === 'pi') {
-    console.warn('[smart-compaction] Pi summary generation is not implemented; using Claude Code prompt mode instead');
+    const summary = await runPiModelSummary(prompt, useModel, timeoutMs);
+    console.log(`[claude-invoke] SUCCESS purpose=smart-summary | model=${useModel} | harness=pi | outputChars=${summary.length}`);
+    return summary;
   }
-  console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | harness=${effectiveHarness} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
 
   const args = [
     '-p',

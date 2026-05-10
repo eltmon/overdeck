@@ -425,6 +425,46 @@ function resolveSessionFile(conv: Conversation): string | null {
   return null;
 }
 
+async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
+  const claudeSessionFile = resolveSessionFile(conv);
+  if (claudeSessionFile && existsSync(claudeSessionFile)) {
+    return claudeSessionFile;
+  }
+
+  if (conv.harness !== 'pi') {
+    return claudeSessionFile;
+  }
+
+  const paths = piFifoPaths(conv.tmuxSession);
+  await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
+  const syntheticPath = join(paths.agentDir, 'fork-source.jsonl');
+  const paneText = await capturePaneAsync(conv.tmuxSession, 5000).catch(() => '');
+  const content = paneText.trim()
+    ? `Pi terminal transcript for ${conv.name}:\n\n${paneText.trim()}`
+    : `Pi conversation ${conv.name} has no captured terminal transcript.`;
+  const timestamp = new Date().toISOString();
+  const entries = [
+    {
+      type: 'system',
+      subtype: 'pi_fork_source',
+      cwd: conv.cwd,
+      session_id: conv.claudeSessionId ?? null,
+      timestamp,
+      content: `Synthetic fork source for Pi conversation ${conv.name}`,
+    },
+    {
+      type: 'user',
+      timestamp,
+      message: {
+        role: 'user',
+        content,
+      },
+    },
+  ];
+  await writeFile(syntheticPath, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`, 'utf-8');
+  return syntheticPath;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const readJsonBody = Effect.gen(function* () {
@@ -1902,6 +1942,21 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
 
 // ─── Route: POST /api/conversations/:name/summary-fork ───────────────────────
 
+async function injectForkSummary(conv: Conversation, summary: string): Promise<void> {
+  updateForkStatus(conv.name, 'injecting');
+  if (conv.harness === 'pi') {
+    await waitForPiReady(conv.tmuxSession);
+    await writePiConversationCommand(conv.tmuxSession, summary);
+    return;
+  }
+
+  const ready = await waitForClaudePrompt(conv.tmuxSession, 60000).catch(() => false);
+  if (!ready) {
+    console.warn(`[summary-fork] Prompt not detected in time for ${conv.name}, sending summary anyway`);
+  }
+  await sendKeysAsync(conv.tmuxSession, summary, 'summary-fork');
+}
+
 async function runForkPipeline(
   convName: string,
   parentConv: Conversation,
@@ -1915,12 +1970,14 @@ async function runForkPipeline(
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
 
-  const parentSessionFile = resolveSessionFile(parentConv);
+  const parentSessionFile = await resolveForkSourceSessionFile(parentConv);
   if (!parentSessionFile) throw new Error(`Parent has no session file`);
 
-  if (plain) {
-    // Plain fork: copy JSONL from last compact boundary into the new session file,
-    // then spawn with --resume so Claude Code loads the history directly.
+  if (plain && conv.harness !== 'pi') {
+    // Plain Claude Code fork: copy JSONL from last compact boundary into the new
+    // session file, then spawn with --resume so Claude Code loads the history
+    // directly. Pi sessions do not consume Claude JSONL, so Pi plain forks are
+    // seeded with a local transcript summary below instead of a dead JSONL copy.
     const forkSessionFile = resolveSessionFile(conv);
     if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
     await copySessionFromCompactBoundary(parentSessionFile, forkSessionFile);
@@ -1938,7 +1995,7 @@ async function runForkPipeline(
     );
     await waitForTmuxSession(conv.tmuxSession);
 
-    // No summary injection needed for plain fork
+    // No summary injection needed for plain Claude Code forks.
     markConversationActive(convName);
     updateForkStatus(convName, null);
     return;
@@ -1965,17 +2022,7 @@ async function runForkPipeline(
   );
   await waitForTmuxSession(conv.tmuxSession);
 
-  updateForkStatus(convName, 'injecting');
-  if (conv.harness === 'pi') {
-    await waitForPiReady(conv.tmuxSession);
-    await writePiConversationCommand(conv.tmuxSession, summary);
-  } else {
-    const ready = await waitForClaudePrompt(conv.tmuxSession, 60000).catch(() => false);
-    if (!ready) {
-      console.warn(`[summary-fork] Prompt not detected in time for ${convName}, sending summary anyway`);
-    }
-    await sendKeysAsync(conv.tmuxSession, summary, 'summary-fork');
-  }
+  await injectForkSummary(conv, summary);
 
   markConversationActive(convName);
   updateForkStatus(convName, null);
@@ -2000,9 +2047,9 @@ const postConversationSummaryForkRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        const sourceSessionFile = resolveSessionFile(conv);
+        const sourceSessionFile = await resolveForkSourceSessionFile(conv);
         if (!sourceSessionFile || !existsSync(sourceSessionFile)) {
-          return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
+          return jsonResponse({ error: `No forkable session source found for conversation ${conv.name}` }, { status: 400 });
         }
 
         const model = typeof body['model'] === 'string'
@@ -2046,10 +2093,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const launchModel = model || conv.model;
         const effectiveSummaryModel = summaryModel || 'claude-sonnet-4-6';
         const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
-        if (body['summaryHarness'] === 'pi') {
-          return jsonResponse({ error: 'Pi summary generation is not supported yet; choose Claude Code for summary generation.' }, { status: 400 });
-        }
-        const summaryHarness: RuntimeName = 'claude-code';
+        const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
         const defaultTitle = plain
           ? `Fork: ${conv.title || conv.name}`
           : `Summary Fork: ${conv.title || conv.name}`;
