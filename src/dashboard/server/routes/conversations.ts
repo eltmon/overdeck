@@ -2318,11 +2318,14 @@ const getConversationDiffTurnRoute = HttpRouter.add(
         const isInRepo = existsSync(join(cwd, '.git'));
 
         if (isInRepo) {
-          // For in-repo conversations, the single summary has turnId='conversation-diff'
+          // For in-repo conversations, try single diff since conversation start.
+          // Falls through to per-turn JSONL path if no base commit (cwd is in a repo
+          // with no commits before the conversation started).
           const baseCommit = await findCommitAtTime(cwd, conv.createdAt);
-          if (!baseCommit) return jsonResponse({ diff: '' });
-          const diff = await diffPatchSinceCommit(cwd, baseCommit, fileFilter);
-          return jsonResponse({ turnId, diff });
+          if (baseCommit) {
+            const diff = await diffPatchSinceCommit(cwd, baseCommit, fileFilter);
+            return jsonResponse({ turnId, diff });
+          }
         }
 
         // Devroot: extract assistant ID from turnId (format: conv-turn-<assistantId>)
