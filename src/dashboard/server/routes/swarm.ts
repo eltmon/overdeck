@@ -157,6 +157,10 @@ const SWARM_AUTO_ADVANCE_BACKOFF_THRESHOLD = 3;
 const SWARM_PANE_CHECK_CONCURRENCY = 10;
 const SWARM_SLOT_SPAWN_CONCURRENCY = 3;
 const autoAdvanceInFlight = new Set<string>();
+// PAN-977 blocker #2: bounded active-swarm registry. Only swarms in this set
+// are polled by the auto-advance loop; the loop self-suspends when the set is
+// empty so the dashboard does not scan every workspace every 5 s indefinitely.
+const activeSwarmIssueIds = new Set<string>();
 let autoAdvanceLoopStarted = false;
 let autoAdvancePolling = false;
 let autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -755,11 +759,12 @@ async function dispatchSwarmWave(
 
       const fullItem = itemById.get(item.id);
       const requiresSynthesis = Boolean(fullItem && (fullItem.metadata?.requiresSynthesis || blockingParentCount(annotatedDoc, fullItem.id) > 1));
-      const hasSynthesisOutput = Boolean(continueState.swarmRuntime?.synthesisOutputs?.[item.id]);
+      const persistedSynthesis = continueState.swarmRuntime?.synthesisOutputs?.[item.id];
+      const hasSynthesisOutput = Boolean(persistedSynthesis);
       const dispatchSynthesisFirst = requiresSynthesis && !hasSynthesisOutput;
 
       const itemPrompt = dispatchSynthesisFirst
-        ? buildSynthesisPrompt(annotatedDoc, issueUpper, item, waveIndex, slotNum)
+        ? buildSynthesisPrompt(annotatedDoc, issueUpper, item, waveIndex, slotNum, continueState.swarmRuntime?.slots ?? [])
         : buildSlotPrompt(
         annotatedDoc,
         issueUpper,
@@ -769,6 +774,7 @@ async function dispatchSwarmWave(
         worktreeResult.branch,
         worktreeResult.parentBranch,
         itemById,
+        persistedSynthesis?.contextUpdate,
       );
 
       try {
@@ -838,6 +844,17 @@ async function dispatchSwarmWave(
     };
   }
 
+  // PAN-977 blocker #4: persist slots cumulatively across dispatch cycles.
+  // The previous implementation overwrote `slots` with the latest dispatch batch,
+  // dropping prior running/merged slots and weakening file-overlap enforcement
+  // and merge-state readiness checks downstream. We now keep prior slots intact
+  // and merge in the new dispatch batch, deduping by `slot` number — a fresh
+  // dispatch for the same slot id supersedes the old (terminal) record.
+  const newDispatchedBySlot = new Map(dispatched.map(s => [s.slot, s]));
+  const carriedSlots: SlotAssignment[] = (existingState?.slots ?? [])
+    .filter(prior => !newDispatchedBySlot.has(prior.slot));
+  const cumulativeSlots: SlotAssignment[] = [...carriedSlots, ...dispatched];
+
   const state: SwarmState = {
     issueId: issueUpper,
     currentWave: waveIndex,
@@ -847,7 +864,7 @@ async function dispatchSwarmWave(
     autoAdvanceFailureCount: 0,
     autoAdvanceRetryAfter: undefined,
     lastAutoAdvanceError: undefined,
-    slots: dispatched,
+    slots: cumulativeSlots,
     deferred: deferredItems.length > 0
       ? deferredItems.map((item) => ({ itemId: item.id, itemTitle: item.title }))
       : undefined,
@@ -858,6 +875,7 @@ async function dispatchSwarmWave(
   await persistSwarmRuntime(mainWorkspace, state);
 
   if (state.autoAdvance) {
+    activeSwarmIssueIds.add(issueUpper);
     ensureSwarmAutoAdvanceLoop();
   }
 
@@ -939,28 +957,46 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
         },
       });
     }
+
+    // PAN-977 blocker #1: the canonical vBRIEF task transition MUST land BEFORE
+    // we kick off auto-advance. Otherwise the next dispatch sees the convergence
+    // item still claimed/running and skips it, leaving the implementation slot
+    // un-spawned. Apply the durable mutation, *then* compute readiness from the
+    // refreshed plan via dispatchSwarmWave.
+    if (resolvedItemId) {
+      if (isSynthesisCompletion) {
+        // Release the convergence item back to dispatchable so the next swarm
+        // dispatch picks it up as an implementation slot.
+        await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+          type: 'unblock',
+          itemId: resolvedItemId,
+          reason: `Synthesis context delivered by slot ${slotId}; released for implementation dispatch`,
+          writerId: `swarm-synth-${process.pid}`,
+        }).catch(() => undefined);
+      } else {
+        await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+          type: 'done',
+          itemId: resolvedItemId,
+          reason: `Swarm slot ${slotId} merged into feature branch`,
+          writerId: `swarm-merge-${process.pid}`,
+        }).catch(() => undefined);
+      }
+    }
+
     if (nextState.autoAdvance) {
-      const result = await dispatchSwarmWave({ issueId: issueUpper, wave: nextState.deferred?.length ? nextState.currentWave : nextState.currentWave + 1, model: nextState.model, autoAdvance: true });
+      // PAN-977 blocker #3: do NOT pass `wave` here — auto-advance must dispatch
+      // any newly-ready items per-DAG-readiness, not the next wave by index.
+      // dispatchSwarmWave with an undefined `wave` falls through to
+      // getDispatchableItems(), which reflects the durable mutation we just
+      // applied above.
+      const result = await dispatchSwarmWave({ issueId: issueUpper, model: nextState.model, autoAdvance: true });
       if (result.status >= 400) ensureSwarmAutoAdvanceLoop();
     }
-  }
-  if (resolvedItemId) {
-    if (isSynthesisCompletion) {
-      // Release the convergence item back to dispatchable so the next swarm
-      // wave can spawn the implementation slot. Do NOT mark it done.
-      await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
-        type: 'unblock',
-        itemId: resolvedItemId,
-        reason: `Synthesis context delivered by slot ${slotId}; released for implementation dispatch`,
-        writerId: `swarm-synth-${process.pid}`,
-      }).catch(() => undefined);
-    } else {
-      await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
-        type: 'done',
-        itemId: resolvedItemId,
-        reason: `Swarm slot ${slotId} merged into feature branch`,
-        writerId: `swarm-merge-${process.pid}`,
-      }).catch(() => undefined);
+
+    // If everything is now in a terminal state, stop polling for this swarm.
+    const stillActive = slots.some(slot => slot.status === 'running' || slot.status === 'pending');
+    if (!stillActive && (!nextState.deferred || nextState.deferred.length === 0)) {
+      activeSwarmIssueIds.delete(issueUpper);
     }
   }
 }
@@ -997,14 +1033,28 @@ async function discoverActiveSwarmIssueIds(): Promise<string[]> {
 }
 
 async function pollSwarmAutoAdvance(): Promise<void> {
-  const issueIds = await discoverActiveSwarmIssueIds();
-  if (issueIds.length === 0) return;
+  // PAN-977 blocker #2: poll only the bounded active-swarm registry. If the
+  // registry is empty, we still do one discovery sweep — this seeds the
+  // registry from any pre-existing legacy sidecar files (migration window) and
+  // also lets tests that drop a sidecar file directly drive the poller.
+  // After the sweep, only the registry is used.
+  if (activeSwarmIssueIds.size === 0) {
+    const discovered = await discoverActiveSwarmIssueIds();
+    for (const issueId of discovered) activeSwarmIssueIds.add(issueId);
+    if (activeSwarmIssueIds.size === 0) return;
+  }
+  const issueIds = Array.from(activeSwarmIssueIds);
 
   const sessions = await listSessionNamesAsync().catch(() => [] as string[]);
 
   for (const issueId of issueIds) {
     const loadedState = await loadSwarmState(issueId);
-    if (!loadedState?.autoAdvance) continue;
+    if (!loadedState?.autoAdvance) {
+      // No longer an active auto-advance swarm — drop from registry so the
+      // poll loop converges to empty.
+      activeSwarmIssueIds.delete(issueId);
+      continue;
+    }
     if (loadedState.currentWave >= loadedState.totalWaves - 1 && !loadedState.deferred?.length) continue;
     if (autoAdvanceInFlight.has(loadedState.issueId)) continue;
     if (isAutoAdvanceCoolingDown(loadedState)) continue;
@@ -1032,9 +1082,11 @@ async function pollSwarmAutoAdvance(): Promise<void> {
 
     autoAdvanceInFlight.add(state.issueId);
     try {
+      // Per-item DAG dispatch: rely on getDispatchableItems(), not next-wave
+      // index. Omit `wave` so dispatchSwarmWave() pulls all currently-ready
+      // items from the refreshed plan.
       const result = await dispatchSwarmWave({
         issueId: state.issueId,
-        wave: state.deferred?.length ? state.currentWave : state.currentWave + 1,
         model: state.model,
         autoAdvance: true,
       });
@@ -1050,6 +1102,14 @@ async function pollSwarmAutoAdvance(): Promise<void> {
 }
 
 function scheduleNextSwarmAutoAdvancePoll(): void {
+  // PAN-977 blocker #2: only schedule if there is work to do. When the active
+  // swarm registry empties, the loop self-suspends until ensureSwarmAutoAdvanceLoop
+  // is called again by a fresh dispatch.
+  if (activeSwarmIssueIds.size === 0) {
+    autoAdvanceLoopStarted = false;
+    autoAdvanceTimer = null;
+    return;
+  }
   autoAdvanceTimer = setTimeout(() => {
     void runSwarmAutoAdvancePollLoop();
   }, SWARM_AUTO_ADVANCE_POLL_MS);
@@ -1075,20 +1135,22 @@ async function runSwarmAutoAdvancePollLoop(): Promise<void> {
 
 function ensureSwarmAutoAdvanceLoop(): void {
   if (autoAdvanceLoopStarted) return;
+  if (activeSwarmIssueIds.size === 0) return;
   autoAdvanceLoopStarted = true;
   scheduleNextSwarmAutoAdvancePoll();
 }
 
 async function resumeSwarmAutoAdvanceLoopOnStartup(): Promise<void> {
+  // Discovery only runs once at startup to seed the bounded registry. Steady-state
+  // poll iteration uses the registry alone, never re-scans every workspace.
   const issueIds = await discoverActiveSwarmIssueIds();
   for (const issueId of issueIds) {
     const state = await loadSwarmState(issueId);
     if (!state?.autoAdvance) continue;
     if (state.currentWave >= state.totalWaves - 1 && !state.deferred?.length) continue;
-
-    ensureSwarmAutoAdvanceLoop();
-    return;
+    activeSwarmIssueIds.add(issueId);
   }
+  if (activeSwarmIssueIds.size > 0) ensureSwarmAutoAdvanceLoop();
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -1275,18 +1337,61 @@ function buildSynthesisPrompt(
   item: WaveItem,
   waveIndex: number,
   slotNum: number,
+  // PAN-977 blocker #5: pass cumulative slot runtime so the synthesis agent
+  // sees the actual upstream deliverables (slot branch, workspace path, status)
+  // instead of just the original plan-text parent titles.
+  runtimeSlots: ReadonlyArray<{ slotId: number; itemId: string; itemTitle: string; sessionName: string; workspace: string; status: string; }> = [],
 ): string {
   const parents = item.blockedBy
     .map(parentId => doc.plan.items.find(planItem => planItem.id === parentId))
     .filter((parent): parent is VBriefItem => Boolean(parent));
+  const issueLower = issueId.toLowerCase();
+
+  // Map plan-item parents to runtime delivery records (most recent slot wins).
+  const slotByItemId = new Map<string, typeof runtimeSlots[number]>();
+  for (const slot of runtimeSlots) {
+    const existing = slotByItemId.get(slot.itemId);
+    if (!existing || slot.slotId >= existing.slotId) slotByItemId.set(slot.itemId, slot);
+  }
+
+  const deliverableLines: string[] = [];
+  for (const parent of parents) {
+    const slot = slotByItemId.get(parent.id);
+    if (slot) {
+      deliverableLines.push(
+        `- **${parent.id}: ${parent.title}**`,
+        `  - slot ${slot.slotId}, status \`${slot.status}\``,
+        `  - branch: \`feature/${issueLower}/slot-${slot.slotId}\``,
+        `  - merge target: \`feature/${issueLower}\``,
+        `  - slot workspace: \`${slot.workspace || '(not yet created)'}\``,
+        `  - tmux session: \`${slot.sessionName}\``,
+      );
+    } else {
+      deliverableLines.push(`- **${parent.id}: ${parent.title}** (no recorded slot — read the plan and feature branch directly)`);
+    }
+  }
 
   return [
     `You are the synthesis agent for slot ${slotNum}, wave ${waveIndex} of plan ${doc.plan.id}.`,
     `Issue: ${issueId}`,
     `Convergence target: **${item.id}: ${item.title}**`,
     '',
-    'Read the merged upstream changes for these completed parent items:',
-    ...parents.map(parent => `- ${parent.id}: ${parent.title}`),
+    'Inspect the actual delivered upstream work (NOT just the original plan text).',
+    'Each parent item below lists its slot branch, workspace, and tmux session so',
+    'you can read the real commits, changed files, and any continue-state notes.',
+    '',
+    'Suggested commands to inspect upstream deliverables:',
+    '```bash',
+    `cd <your synthesis workspace>`,
+    `# changed files merged into the parent feature branch by each upstream slot:`,
+    `git fetch origin`,
+    `git diff --stat origin/feature/${issueLower}...origin/feature/${issueLower}/slot-<N>`,
+    `# full diff for review:`,
+    `git log --stat origin/feature/${issueLower}/slot-<N> ^origin/main`,
+    '```',
+    '',
+    'Upstream parent items and their delivery records:',
+    ...deliverableLines,
     '',
     'Your job is NOT to implement the convergence target. Your job is to produce a concise',
     'markdown synthesis covering: upstream decisions, changed files, hazards/risks, and',
@@ -1323,6 +1428,11 @@ function buildSlotPrompt(
   slotBranch: string,
   parentBranch: string,
   itemById = new Map(doc.plan.items.map((planItem) => [planItem.id, planItem])),
+  // PAN-977 blocker #6: when a synthesis agent has already produced an upstream
+  // context update for this convergence item, splice it into the implementation
+  // slot's prompt so the work agent sees it without having to discover the
+  // continue-state file by hand.
+  synthesisContextUpdate?: string,
 ): string {
   const taskInput = buildStructuredSlotTaskInput(
     doc,
@@ -1335,13 +1445,28 @@ function buildSlotPrompt(
     itemById,
   );
 
+  const synthesisBlock: string[] = synthesisContextUpdate
+    ? [
+        '',
+        '────────────────────────────────────────────────────────────────────',
+        'UPSTREAM SYNTHESIS CONTEXT (from convergence-point synthesis agent):',
+        '────────────────────────────────────────────────────────────────────',
+        synthesisContextUpdate,
+        '────────────────────────────────────────────────────────────────────',
+        'Treat the section above as authoritative guidance from your upstream',
+        `synthesis agent. It is the persisted \`swarmRuntime.synthesisOutputs[${item.id}]\``,
+        'record from the continue vBRIEF.',
+        '',
+      ]
+    : [];
+
   return [
     `You are swarm slot ${slotNum} working on wave ${waveIndex} of plan ${doc.plan.id}.`,
     `Your assigned task is: **${item.id}: ${item.title}**`,
     '',
     'Focus ONLY on this specific task from the vBRIEF plan.',
     'The plan is in .pan/spec.vbrief.json — read it for full context, acceptance criteria, and dependencies.',
-    '',
+    ...synthesisBlock,
     'Structured AgentTaskInput:',
     '```json',
     JSON.stringify(taskInput, null, 2),

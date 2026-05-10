@@ -278,12 +278,15 @@ describe('swarm route helpers', () => {
       slots: Array<{ itemId: string; itemTitle: string; sessionName: string; status: string }>;
     };
 
-    expect(nextState.currentWave).toBe(1);
+    // PAN-977 blocker #3: auto-advance is per-DAG-readiness now, not by wave
+    // index. We assert the new ready item dispatched, regardless of currentWave.
+    // PAN-977 blocker #4: prior slots are persisted cumulatively, so the new
+    // dispatch appears alongside the prior completed slot.
     expect(nextState.autoAdvance).toBe(true);
-    expect(nextState.slots[0]?.itemId).toBe('wave-1-item');
-    expect(nextState.slots[0]?.itemTitle).toBe('Dispatch next wave');
-    expect(nextState.slots[0]?.sessionName).toBe('agent-pan-971-1');
-    expect(nextState.slots[0]?.status).toBe('running');
+    const newSlot = nextState.slots.find((s) => s.itemId === 'wave-1-item');
+    expect(newSlot).toBeTruthy();
+    expect(newSlot?.itemTitle).toBe('Dispatch next wave');
+    expect(newSlot?.status).toBe('running');
     expect(agents.spawnAgent).toHaveBeenCalledTimes(1);
   });
 
