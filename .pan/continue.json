@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T12:10:03Z",
+  "updated": "2026-05-10T12:14:56Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "6c4848c67",
+    "sha": "ef23b1d14",
     "dirty": true
   },
   "decisions": [
@@ -88,7 +88,7 @@
     }
   ],
   "resumePoint": {
-    "description": "Fixed verification-gate test failures from feedback 002/003. Full npm test now passes (378 files / 4595 tests). Next step is commit and invoke /rebase-and-submit PAN-1055.",
+    "description": "Resolved pan done rebase conflicts and verified after rebase. npm run typecheck, npm run lint, and npm test pass (379 files / 4615 tests). Next step is commit regenerated graphify/continue updates and rerun pan done PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
       ".pan/feedback/002-verification-gate-failed.md",
@@ -221,6 +221,12 @@
       "timestamp": "2026-05-10T12:10:03Z",
       "reason": "verification-fix",
       "note": "Fixed test verification failures by preventing Linear SDK/network access from unit tests and restoring partial fs/promises mocks. Verified npm run typecheck, npm run lint, targeted tests, and full npm test (378 files / 4595 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T12:14:56Z",
+      "reason": "main-rebase-verified",
+      "note": "Resolved pan done rebase conflicts, regenerated graphify outputs, and verified npm run typecheck, npm run lint, and npm test after rebase (379 files / 4615 tests passed).",
       "agentModel": "Claude Opus 4.7"
     }
   ],
