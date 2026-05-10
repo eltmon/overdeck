@@ -65,7 +65,8 @@
   },
   "scripts": {
     "dev": "tsx watch src/cli/index.ts",
-    "build": "npm run build:contracts && npm run build:cli && npm run build:scripts && npm run build:dashboard",
+    "build": "npm run build:contracts && npm run build:pi-extension && npm run build:cli && npm run build:scripts && npm run build:dashboard",
+    "build:pi-extension": "npm --prefix ./packages/pi-extension run build",
     "build:cli": "node scripts/build-cli.mjs && mkdir -p dist/cli/caveman/skills/caveman dist/cli/caveman/skills/caveman-review dist/cli/caveman-compress && cp src/lib/caveman/*.js src/lib/caveman/caveman-statusline.sh dist/cli/caveman/ && cp src/lib/caveman/skills/caveman/SKILL.md dist/cli/caveman/skills/caveman/ && cp src/lib/caveman/skills/caveman-review/SKILL.md dist/cli/caveman/skills/caveman-review/ && cp src/lib/caveman/compress/*.py dist/cli/caveman-compress/ && cp -r dist/cli/caveman dist/caveman && cp -r dist/cli/caveman-compress dist/caveman-compress",
     "build:contracts": "rm -rf packages/contracts/dist && npm --prefix ./packages/contracts run build",
     "build:scripts": "cd scripts && tsdown",

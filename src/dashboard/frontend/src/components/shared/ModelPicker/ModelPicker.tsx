@@ -379,8 +379,8 @@ export function ModelHarnessPicker({
 }) {
   return (
     <>
-      <ModelSelect value={model} onChange={onModelChange} groups={groups} label={modelLabel} />
       <HarnessSelect value={harness} onChange={onHarnessChange} modelId={model} groups={groups} harnessPolicy={harnessPolicy} />
+      <ModelSelect value={model} onChange={onModelChange} groups={groups} label={modelLabel} />
     </>
   );
 }
