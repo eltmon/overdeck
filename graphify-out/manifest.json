@@ -896,7 +896,7 @@
     "hash": "912dd048fc5f1898876a9d587eeafcc0"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/scripts/record-cost-event.d.ts": {
-    "mtime": 1778392531.7589638,
+    "mtime": 1778399149.6811159,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/scripts/notify-complete": {
@@ -2728,8 +2728,8 @@
     "hash": "f2e5abbc0611f02ee362eac4eefcd593"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/frontend/src/components/IssueAgentCard.tsx": {
-    "mtime": 1778359583.2627094,
-    "hash": "d89831f764825293801fde26e7ab3990"
+    "mtime": 1778402871.7795527,
+    "hash": "e8f5ed6a736f3cffc90468f030f51b09"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/frontend/src/components/CommandDeck/RoleBadge.tsx": {
     "mtime": 1778359583.2592661,
@@ -3244,8 +3244,8 @@
     "hash": "6112c2a3af60efc9a93bb6b68419edb5"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/frontend/src/components/chat/ModelPicker.tsx": {
-    "mtime": 1778376467.5428755,
-    "hash": "3aa2a192912372835a3019d1215897c5"
+    "mtime": 1778402554.8570724,
+    "hash": "17f52ffeee2853bb0bac1067ef50bebc"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/frontend/src/components/chat/ComposerPromptEditor.tsx": {
     "mtime": 1778359583.2677243,
@@ -3452,8 +3452,8 @@
     "hash": "aa0baf9f71a037412e15f9d926054b27"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/frontend/src/components/shared/ModelPicker/index.ts": {
-    "mtime": 1778376394.0573237,
-    "hash": "b78e65f23cbe4ba84b561ca3b0fde06a"
+    "mtime": 1778397875.663306,
+    "hash": "b2dd4fd3379cdfca92d29bf4c00fb3e9"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.test.ts": {
     "mtime": 1778376090.1838505,

@@ -210,8 +210,8 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
           });
         }
 
-        const orFavorites: string[] = orData.favorites ?? [];
-        const orFavoriteModels = (orData.models ?? []).filter((m) => orFavorites.includes(m.id));
+        const orFavorites = new Set(orData.favorites ?? []);
+        const orFavoriteModels = (orData.models ?? []).filter((m) => orFavorites.has(m.id));
         if (orFavoriteModels.length > 0) {
           newGroups.push({
             provider: 'openrouter',

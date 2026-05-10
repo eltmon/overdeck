@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T07:19:00.617Z",
+  "updated": "2026-05-10T08:55:18.473Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "cee0b40a7",
+    "sha": "5f75caf54",
     "dirty": true
   },
   "decisions": [
@@ -58,6 +58,11 @@
       "id": "D10",
       "summary": "Resolved review verification and latest review blockers: updated checkpoint reconciliation test mocks for per-agent checkpoint APIs, preserved conversation harness on model-only switch requests, cached harness-policy auth mode by provider per request, invalidated available-model cache after settings/OpenRouter changes, and optimized OpenRouter favorites filtering with a Set.",
       "recordedAt": "2026-05-10T07:04:40.318Z"
+    },
+    {
+      "id": "D11",
+      "summary": "Resolved IssueAgentCard review blocker by adding the shared ModelHarnessPicker to the stopped-agent start flow and sending the selected harness with the /api/agents request; also optimized chat OpenRouter favorites filtering with a Set.",
+      "recordedAt": "2026-05-10T08:55:18.473Z"
     }
   ],
   "hazards": [
@@ -68,16 +73,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Fixed PAN-1055 review verification test timeout and latest CHANGES_REQUESTED blockers. Verification passed locally: npm run typecheck, npm run lint, targeted tests, and full npm test. Next step is commit and invoke /rebase-and-submit PAN-1055.",
+    "description": "Fixed latest CHANGES_REQUESTED blocker: IssueAgentCard stopped-agent start flow now exposes the shared model/harness picker and threads the selected harness into the start-agent request. Also addressed the high-priority chat OpenRouter favorites Set optimization. typecheck, lint, targeted tests, and full npm test pass. Next step is commit and invoke /rebase-and-submit PAN-1055.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
       ".pan/feedback/001-review-agent-changes-requested.md",
-      "src/dashboard/server/routes/conversations.ts",
-      "src/dashboard/server/routes/settings.ts",
-      "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
-      "src/dashboard/frontend/src/components/Settings/OpenRouterPage.tsx",
-      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
-      "src/dashboard/server/__tests__/read-model-diff-summaries.test.ts"
+      "src/dashboard/frontend/src/components/IssueAgentCard.tsx",
+      "src/dashboard/frontend/src/components/chat/ModelPicker.tsx"
     ]
   },
   "beadsMapping": {
@@ -170,6 +171,17 @@
       "timestamp": "2026-05-10T07:19:00.617Z",
       "reason": "end",
       "note": "Fixed review verification and remaining harness blockers: model-only conversation switches preserve persisted harness, harness policy caches auth by provider, model picker cache invalidates after settings changes, and checkpoint reconciliation tests match per-agent APIs."
+    },
+    {
+      "timestamp": "2026-05-10T07:45:18.780Z",
+      "reason": "end",
+      "note": "Re-ran full test suite for verification; no code changes required because local tests pass cleanly."
+    },
+    {
+      "timestamp": "2026-05-10T08:55:18.473Z",
+      "reason": "review-response-verified",
+      "note": "Added shared ModelHarnessPicker to IssueAgentCard stopped-agent start flow and included harness in /api/agents payload. Optimized chat ModelPicker OpenRouter favorites filtering with Set. Verified npm run typecheck, npm run lint, targeted tests, and full npm test (378 files / 4595 tests passed).",
+      "agentModel": "Claude Opus 4.7"
     }
   ],
   "feedback": []
