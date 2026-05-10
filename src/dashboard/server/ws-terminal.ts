@@ -21,7 +21,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 import { buildTmuxCommandString, buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
-import { consumeReauthTerminalToken } from './routes/codex-auth.js';
+import { validateReauthTerminalToken } from './routes/codex-auth.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 
 type ClientControlMessage =
@@ -142,7 +142,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
       return;
     }
 
-    // Re-auth sessions require a valid one-time terminal token to prevent hijacking.
+    // Re-auth sessions require a valid session-bound terminal token to prevent hijacking.
     if (sessionName.startsWith('reauth-')) {
       const cookie = req.headers.cookie ?? '';
       const token = cookie
@@ -157,7 +157,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
         decodedToken = '';
       }
       const [cookieSessionName, terminalToken] = decodedToken.split(':');
-      if (cookieSessionName !== sessionName || !consumeReauthTerminalToken(sessionName, terminalToken)) {
+      if (cookieSessionName !== sessionName || !validateReauthTerminalToken(sessionName, terminalToken)) {
         ws.close(1008, 'Invalid or missing re-auth token');
         return;
       }

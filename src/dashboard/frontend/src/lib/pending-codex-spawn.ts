@@ -69,6 +69,18 @@ export function clearPendingCodexSpawn() {
   writeStoredPendingSpawn(null);
 }
 
+export function clearPendingCodexReauthSession() {
+  const existing = currentPendingSpawn();
+  if (!existing?.requestBody) {
+    writeStoredPendingSpawn(null);
+    return;
+  }
+  writeStoredPendingSpawn({
+    requestBody: existing.requestBody,
+    timestamp: Date.now(),
+  });
+}
+
 export function hasPendingCodexSpawn(): boolean {
   return !!getPendingCodexSpawn()?.requestBody;
 }

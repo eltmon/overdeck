@@ -403,6 +403,58 @@ export function SettingsPage() {
 
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(settings);
 
+  const getModelProvider = (modelId: string): { id: Provider; name: string } | null => {
+    const entry = Object.entries(MODELS_BY_PROVIDER).find(([, providerDef]) =>
+      providerDef.models.some((model) => model.id === modelId),
+    );
+    if (!entry) return null;
+    const [id, providerDef] = entry;
+    return { id: id as Provider, name: providerDef.name };
+  };
+
+  const formatExpiry = (expiresAt?: string): string | null => {
+    if (!expiresAt) return null;
+    const date = new Date(expiresAt);
+    if (Number.isNaN(date.getTime())) return null;
+    return `Expires ${date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  };
+
+  const getModelAuthMetadata = (modelId: string) => {
+    const provider = getModelProvider(modelId);
+    if (!provider) return null;
+
+    if (provider.id === 'openai') {
+      const apiKey = formData.api_keys.openai || '';
+      const usesApiKey = !!apiKey && !apiKey.startsWith('$') && codexAuth?.status === 'missing';
+      return {
+        provider: provider.name,
+        authType: usesApiKey ? 'API key' : 'Subscription OAuth',
+        status: usesApiKey ? 'Key configured' : codexAuth?.status ?? 'unknown',
+        detail: usesApiKey ? null : formatExpiry(codexAuth?.expiresAt),
+        variant: codexAuth?.status === 'valid' || usesApiKey ? 'success' : codexAuth?.status === 'expired' || codexAuth?.status === 'burned' ? 'warning' : 'neutral',
+      };
+    }
+
+    if (provider.id === 'anthropic') {
+      return {
+        provider: provider.name,
+        authType: claudeAuth?.loggedIn ? 'Subscription' : 'API key',
+        status: claudeAuth?.loggedIn ? 'valid' : claudeAuth?.hasAnthropicApiKey ? 'Key configured' : 'Not authenticated',
+        detail: null,
+        variant: claudeAuth?.loggedIn || claudeAuth?.hasAnthropicApiKey ? 'success' : 'warning',
+      };
+    }
+
+    const apiKey = formData.api_keys[provider.id as keyof typeof formData.api_keys] || '';
+    return {
+      provider: provider.name,
+      authType: 'API key',
+      status: apiKey ? 'Key configured' : 'No key',
+      detail: null,
+      variant: apiKey ? 'success' : 'neutral',
+    };
+  };
+
   const handleProviderToggle = (provider: Provider) => {
     setFormData({
       ...formData,
@@ -733,6 +785,7 @@ export function SettingsPage() {
                   const modelDisplay = getModelDisplay(currentModelId);
                   const { score } = getCapabilityMatchScore(currentModelId, agent.id);
                   const hasOverride = !!formData.models.overrides[agent.id];
+                  const authMetadata = getModelAuthMetadata(currentModelId);
                   const isDeprecated = formData.deprecation_warnings?.some(
                     (w) => w.workType === agent.id && w.from === currentModelId
                   );
@@ -752,6 +805,20 @@ export function SettingsPage() {
                       <span className="text-[10px] text-muted-foreground truncate max-w-[140px]">
                         {modelDisplay}
                       </span>
+                      {authMetadata && (
+                        <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                          <span className="px-1 py-0.5 rounded bg-muted/50">{authMetadata.provider}</span>
+                          <span className="px-1 py-0.5 rounded bg-muted/50">{authMetadata.authType}</span>
+                          <span className={`px-1 py-0.5 rounded ${
+                            authMetadata.variant === 'success' ? 'text-success bg-success/10' :
+                            authMetadata.variant === 'warning' ? 'text-warning bg-warning/10' :
+                            'text-muted-foreground bg-muted/50'
+                          }`}>
+                            {authMetadata.status}
+                          </span>
+                          {authMetadata.detail && <span>{authMetadata.detail}</span>}
+                        </div>
+                      )}
                       {hasOverride && (
                         <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-primary/10 text-primary">
                           override

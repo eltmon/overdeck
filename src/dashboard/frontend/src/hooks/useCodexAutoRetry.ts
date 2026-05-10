@@ -5,6 +5,7 @@ import { useCodexAuthStatus } from './useCodexAuthStatus';
 import {
   getPendingCodexSpawn,
   clearPendingCodexSpawn,
+  clearPendingCodexReauthSession,
 } from '../lib/pending-codex-spawn';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import type { StartAgentResponse } from '../types';
@@ -33,11 +34,25 @@ export function useCodexAutoRetry() {
           body: JSON.stringify({ session: reauthSessionName, token: reauthStatusToken }),
         });
         if (!res.ok) return;
-        const data = (await res.json()) as { completed?: boolean };
+        const data = (await res.json()) as {
+          completed?: boolean;
+          success?: boolean;
+          authStatus?: { status?: string; message?: string };
+          error?: string;
+        };
         if (data.completed) {
           if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
+          }
+          if (data.success !== true || data.authStatus?.status !== 'valid') {
+            clearPendingCodexReauthSession();
+            toast.error(
+              data.error || data.authStatus?.message || 'Codex re-authentication did not produce valid auth',
+              { duration: 8000 },
+            );
+            await refreshDashboardState(queryClient);
+            return;
           }
           if (pending.requestBody) {
             retryPendingSpawn(pending.requestBody, queryClient);

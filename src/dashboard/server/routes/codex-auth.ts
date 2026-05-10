@@ -15,7 +15,6 @@ interface ReauthSession {
   terminalToken: string;
   statusToken: string;
   createdAt: number;
-  terminalAttached: boolean;
 }
 
 const reauthSessions = new Map<string, ReauthSession>();
@@ -39,7 +38,7 @@ function generateReauthSession(): { sessionName: string; terminalToken: string; 
   const sessionName = `reauth-${randomUUID()}`;
   const terminalToken = randomUUID();
   const statusToken = randomUUID();
-  reauthSessions.set(sessionName, { terminalToken, statusToken, createdAt: Date.now(), terminalAttached: false });
+  reauthSessions.set(sessionName, { terminalToken, statusToken, createdAt: Date.now() });
   return { sessionName, terminalToken, statusToken };
 }
 
@@ -67,12 +66,9 @@ function cleanupExpiredReauthSessions(): void {
   }
 }
 
-export function consumeReauthTerminalToken(sessionName: string, token: string | undefined): boolean {
+export function validateReauthTerminalToken(sessionName: string, token: string | undefined): boolean {
   const session = getLiveReauthSession(sessionName);
-  if (!session || !token || session.terminalToken !== token || session.terminalAttached) return false;
-  session.terminalAttached = true;
-  session.terminalToken = '';
-  return true;
+  return !!session && !!token && session.terminalToken === token;
 }
 
 function buildTerminalCookie(sessionName: string, terminalToken: string): string {
@@ -162,8 +158,17 @@ const postCodexReauthStatusRoute = HttpRouter.add(
 
       yield* Effect.promise(() => bridgeCodexAuthToCliproxyAsync());
       const authStatus = yield* Effect.promise(() => checkCodexAuthStatus());
+      if (authStatus.status !== 'valid') {
+        return jsonResponse({
+          completed: true,
+          success: false,
+          authStatus,
+          error: authStatus.message || `Codex authentication is ${authStatus.status}`,
+        });
+      }
+
       reauthSessions.delete(sessionName);
-      return jsonResponse({ completed: true, authStatus });
+      return jsonResponse({ completed: true, success: true, authStatus });
     }),
   ),
 );
