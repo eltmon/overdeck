@@ -46,11 +46,11 @@ The review role is the synthesis agent. There is no separate synthesis sub-agent
 ## Review Process
 
 1. Read the issue context, acceptance criteria, and branch diff before spawning subagents.
-2. Launch the convoy reviewers in parallel with four Agent tool calls in the same message:
-   - `Agent({ subagent_type: 'code-review-security', description, prompt })`
-   - `Agent({ subagent_type: 'code-review-correctness', description, prompt })`
-   - `Agent({ subagent_type: 'code-review-performance', description, prompt })`
-   - `Agent({ subagent_type: 'code-review-requirements', description, prompt })`
+2. Read your spawn prompt for the four convoy reviewer models resolved from Panopticon config. Launch the convoy in parallel with four Agent tool calls in the same message, passing the model from your prompt:
+   - `Agent({ subagent_type: 'code-review-security',     model: '<security model from prompt>',     description, prompt })`
+   - `Agent({ subagent_type: 'code-review-correctness',  model: '<correctness model from prompt>',  description, prompt })`
+   - `Agent({ subagent_type: 'code-review-performance',  model: '<performance model from prompt>',  description, prompt })`
+   - `Agent({ subagent_type: 'code-review-requirements', model: '<requirements model from prompt>', description, prompt })`
 3. Each prompt must include the issue id, branch, diff scope, acceptance criteria, and explicit instruction to report blockers with `file:line` evidence.
 4. Collect all four reports. Treat the review role itself as synthesis: deduplicate findings, discard non-blocking style commentary, and preserve every blocker that is supported by evidence.
 5. Decide:
@@ -61,9 +61,9 @@ The review role is the synthesis agent. There is no separate synthesis sub-agent
 
 ## Model Routing Contract
 
-The convoy reviewers currently run as Claude Code Agent-tool subagents. The `subagent_type` determines which definition is loaded from `.claude/agents/code-review-<flavor>.md`; those definitions carry a static frontmatter model that is used as-is.
+The convoy reviewers run as Claude Code Agent-tool subagents. Panopticon resolves each reviewer's model from `config.yaml` via `resolveModel('review', '<flavor>')` at spawn time and injects the four resolved model IDs into this role's spawn prompt (see "Convoy reviewer models" block above). You pass those models to the Agent calls — the `subagent_type` determines the definition (`.claude/agents/code-review-<flavor>.md`) and the `model` parameter overrides its frontmatter model with the config-resolved value.
 
-Full sub-role model routing (where `roles.review.sub.security.model` in config.yaml resolves through the Panopticon launcher to give each reviewer its own harness and model) is implemented in PAN-1059. In that design the review role calls `spawnRun(issueId, 'review', { subRole: 'security' })` for each reviewer, which goes through `resolveModel('review', 'security')` → launcher-generator → its own tmux session — the same path work agents use. Until PAN-1059 lands, sub-role model config is stored but not applied to the Agent-tool subagents.
+Full per-reviewer isolation (each convoy reviewer in its own tmux session via `spawnRun(issueId, 'review', { subRole: 'security' })`) is tracked in PAN-1059. In that design the review role won't dispatch Agent-tool subagents at all — instead Panopticon spawns four independent sessions, each with its own launcher, harness, and model. Until PAN-1059 lands, the convoy runs inside a single Claude Code session using Agent tool with config-resolved model overrides.
 
 ## Human-Merge Invariant
 

@@ -46,6 +46,7 @@ import { emitActivityEntry } from '../activity-logger.js';
 import { getReviewerSessionName, REVIEWER_ROLES } from './specialists.js';
 import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
+import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
 
 const execAsync = promisify(exec);
 
@@ -114,11 +115,14 @@ export async function cleanupReviewTempStash(issueId: string, workspace: string)
  * instructions, so review behavior changes are managed in role files (which
  * version-control with the repo) rather than scattered through prompt strings.
  */
+type ConvoyModels = { security: string; correctness: string; performance: string; requirements: string };
+
 function buildReviewRolePrompt(opts: {
   issueId: string;
   workspace: string;
   branch: string;
   prUrl?: string;
+  convoyModels: ConvoyModels;
 }): string {
   const port = process.env.API_PORT || process.env.PORT || '3011';
   return [
@@ -129,10 +133,19 @@ function buildReviewRolePrompt(opts: {
     `Workspace: ${opts.workspace}`,
     opts.prUrl ? `PR: ${opts.prUrl}` : 'PR: (resolve via gh pr view ${branch})',
     '',
+    'Convoy reviewer models (resolved from Panopticon config at spawn time):',
+    `  security:     ${opts.convoyModels.security}`,
+    `  correctness:  ${opts.convoyModels.correctness}`,
+    `  performance:  ${opts.convoyModels.performance}`,
+    `  requirements: ${opts.convoyModels.requirements}`,
+    '',
     'Follow roles/review.md exactly. The four convoy reviewers are launched',
-    'via Agent tool calls (subagent_type: code-review-{security,correctness,',
-    'performance,requirements}). Synthesis is your job — there is no separate',
-    'synthesis sub-agent.',
+    'via Agent tool calls with the model values above:',
+    '  Agent({ subagent_type: "code-review-security",     model: "<security model above>",     ... })',
+    '  Agent({ subagent_type: "code-review-correctness",  model: "<correctness model above>",  ... })',
+    '  Agent({ subagent_type: "code-review-performance",  model: "<performance model above>",  ... })',
+    '  Agent({ subagent_type: "code-review-requirements", model: "<requirements model above>", ... })',
+    'Synthesis is your job — there is no separate synthesis sub-agent.',
     '',
     'When you have a verdict, post it through the review status API:',
     '',
@@ -242,7 +255,14 @@ export async function spawnReviewRoleForIssue(
 
   try {
     const { spawnRun } = await import('../agents.js');
-    const prompt = buildReviewRolePrompt(opts);
+    const cfg = loadYamlConfig().config;
+    const convoyModels: ConvoyModels = {
+      security:     resolveModel('review', 'security',     cfg),
+      correctness:  resolveModel('review', 'correctness',  cfg),
+      performance:  resolveModel('review', 'performance',  cfg),
+      requirements: resolveModel('review', 'requirements', cfg),
+    };
+    const prompt = buildReviewRolePrompt({ ...opts, convoyModels });
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,
