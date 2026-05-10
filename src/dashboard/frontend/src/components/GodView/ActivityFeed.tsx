@@ -36,6 +36,8 @@ export const selectIssueActivityFeed =
       }
 
       // Older activity events only carry agentId, so keep the historical fallback.
+      // System/global events that lack both issueId and agentId fall through.
+      if (!event.agentId) return false;
       return event.agentId.toLowerCase() === `agent-${issueId.toLowerCase()}`;
     });
 
