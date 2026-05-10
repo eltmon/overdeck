@@ -110,12 +110,14 @@ describe('router-config', () => {
       expect(openaiProvider?.apiKey).toBe('sk-test-key');
       expect(openaiProvider?.models).toEqual([
         'gpt-5.5',
-        'gpt-5.5-mini',
-        'gpt-5.5-nano',
+        'gpt-5.5-pro',
         'gpt-5.4',
         'gpt-5.4-mini',
-        'gpt-5.4-nano',
+        'gpt-5.4-pro',
+        'gpt-5.3-codex',
+        'gpt-5.2',
         'o3',
+        'o4-mini',
       ]);
     });
 
@@ -301,7 +303,7 @@ describe('router-config', () => {
             simple: 'claude-haiku-4-5',
             medium: 'gpt-4o',
             complex: 'claude-sonnet-4-5',
-            expert: 'gpt-5.2-codex',
+            expert: 'gpt-5.3-codex',
           },
         },
         api_keys: {
@@ -315,7 +317,7 @@ describe('router-config', () => {
       expect(config.router['complexity-simple'].model).toBe('claude-haiku-4-5');
       expect(config.router['complexity-medium'].model).toBe('gpt-4o');
       expect(config.router['complexity-complex'].model).toBe('claude-sonnet-4-5');
-      expect(config.router['complexity-expert'].model).toBe('gpt-5.2-codex');
+      expect(config.router['complexity-expert'].model).toBe('gpt-5.3-codex');
     });
 
     it('should create all router rules', async () => {

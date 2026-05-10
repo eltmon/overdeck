@@ -33,7 +33,7 @@ describe('model-fallback', () => {
     });
 
     it('should return openai for OpenAI models', () => {
-      expect(getModelProvider('gpt-5.2-codex')).toBe('openai');
+      expect(getModelProvider('gpt-5.3-codex')).toBe('openai');
       expect(getModelProvider('o3-deep-research')).toBe('openai');
       expect(getModelProvider('gpt-4o')).toBe('openai');
       expect(getModelProvider('gpt-4o-mini')).toBe('openai');
@@ -53,7 +53,7 @@ describe('model-fallback', () => {
     });
 
     it('should return true for OpenAI models', () => {
-      expect(requiresExternalKey('gpt-5.2-codex')).toBe(true);
+      expect(requiresExternalKey('gpt-5.3-codex')).toBe(true);
       expect(requiresExternalKey('gpt-4o')).toBe(true);
     });
 
@@ -77,20 +77,18 @@ describe('model-fallback', () => {
     it('should return all OpenAI models', () => {
       const models = getModelsByProvider('openai');
       expect(models).toContain('gpt-5.5');
-      expect(models).toContain('gpt-5.5-mini');
-      expect(models).toContain('gpt-5.5-nano');
       expect(models).toContain('gpt-5.5-pro');
       expect(models).toContain('gpt-5.4');
       expect(models).toContain('gpt-5.4-mini');
-      expect(models).toContain('gpt-5.4-nano');
       expect(models).toContain('gpt-5.4-pro');
+      expect(models).toContain('gpt-5.3-codex');
+      expect(models).toContain('gpt-5.2');
       expect(models).toContain('o3');
       expect(models).toContain('o4-mini');
-      expect(models).toContain('gpt-5.2-codex'); // legacy
       expect(models).toContain('o3-deep-research'); // legacy
       expect(models).toContain('gpt-4o'); // legacy
       expect(models).toContain('gpt-4o-mini'); // legacy
-      expect(models).toHaveLength(14);
+      expect(models).toHaveLength(12);
     });
 
     it('should return all Google models', () => {
@@ -166,13 +164,13 @@ describe('model-fallback', () => {
   describe('applyFallback', () => {
     it('should return original model if provider is enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai']);
-      expect(applyFallback('gpt-5.2-codex', enabled)).toBe('gpt-5.2-codex');
+      expect(applyFallback('gpt-5.3-codex', enabled)).toBe('gpt-5.3-codex');
       expect(applyFallback('claude-opus-4-6', enabled)).toBe('claude-opus-4-6');
     });
 
     it('should fallback GPT-5.2 Codex to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gpt-5.2-codex', enabled)).toBe('claude-sonnet-4-6');
+      expect(applyFallback('gpt-5.3-codex', enabled)).toBe('claude-sonnet-4-6');
     });
 
     it('should fallback O3 Deep Research to Sonnet', () => {
@@ -202,10 +200,10 @@ describe('model-fallback', () => {
 
     it('should log warning when applying fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      applyFallback('gpt-5.2-codex', enabled);
+      applyFallback('gpt-5.3-codex', enabled);
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Model gpt-5.2-codex requires openai API key')
+        expect.stringContaining('Model gpt-5.3-codex requires openai API key')
       );
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('falling back to claude-sonnet-4-6')
@@ -214,7 +212,7 @@ describe('model-fallback', () => {
 
     it('should not log warning when provider is enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai']);
-      applyFallback('gpt-5.2-codex', enabled);
+      applyFallback('gpt-5.3-codex', enabled);
 
       expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
@@ -235,7 +233,7 @@ describe('model-fallback', () => {
     });
 
     it('should return fallback for OpenAI models', () => {
-      expect(getFallbackModel('gpt-5.2-codex')).toBe('claude-sonnet-4-6');
+      expect(getFallbackModel('gpt-5.3-codex')).toBe('claude-sonnet-4-6');
       expect(getFallbackModel('o3-deep-research')).toBe('claude-sonnet-4-6');
       expect(getFallbackModel('gpt-4o')).toBe('claude-sonnet-4-6');
       expect(getFallbackModel('gpt-4o-mini')).toBe('claude-haiku-4-5');
@@ -303,13 +301,13 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
       const models: ModelId[] = [
         'claude-opus-4-6',
-        'gpt-5.2-codex',
+        'gpt-5.3-codex',
         'gemini-3-pro-preview',
       ];
 
       const filtered = filterAvailableModels(models, enabled);
       expect(filtered).toContain('claude-opus-4-6');
-      expect(filtered).not.toContain('gpt-5.2-codex');
+      expect(filtered).not.toContain('gpt-5.3-codex');
       expect(filtered).not.toContain('gemini-3-pro-preview');
     });
 
@@ -317,7 +315,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google']);
       const models: ModelId[] = [
         'claude-opus-4-6',
-        'gpt-5.2-codex',
+        'gpt-5.3-codex',
         'gemini-3-pro-preview',
       ];
 
@@ -329,13 +327,13 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai']);
       const models: ModelId[] = [
         'claude-opus-4-6',
-        'gpt-5.2-codex',
+        'gpt-5.3-codex',
         'gemini-3-pro-preview',
       ];
 
       const filtered = filterAvailableModels(models, enabled);
       expect(filtered).toContain('claude-opus-4-6');
-      expect(filtered).toContain('gpt-5.2-codex');
+      expect(filtered).toContain('gpt-5.3-codex');
       expect(filtered).not.toContain('gemini-3-pro-preview');
     });
   });
@@ -357,7 +355,7 @@ describe('model-fallback', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModels(enabled);
 
-      expect(models.length).toBe(29); // 5 Anthropic + 14 OpenAI + 6 Google + 4 Kimi
+      expect(models.length).toBe(27); // 5 Anthropic + 12 OpenAI + 6 Google + 4 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -367,9 +365,9 @@ describe('model-fallback', () => {
       expect(models).toContain('gpt-5.5');
       expect(models).toContain('gpt-5.4');
       expect(models).toContain('o3');
-      expect(models).toContain('gpt-5.2-codex');
+      expect(models).toContain('gpt-5.3-codex');
       expect(models).toContain('gpt-4o');
-      expect(models.length).toBe(19); // 5 Anthropic + 14 OpenAI
+      expect(models.length).toBe(17); // 5 Anthropic + 12 OpenAI
     });
 
     it('should include Google models when Google enabled', () => {
@@ -388,7 +386,7 @@ describe('model-fallback', () => {
   describe('fallback strategy validation', () => {
     it('should map premium models to Sonnet', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
-      expect(applyFallback('gpt-5.2-codex', enabled)).toBe('claude-sonnet-4-6');
+      expect(applyFallback('gpt-5.3-codex', enabled)).toBe('claude-sonnet-4-6');
       expect(applyFallback('o3-deep-research', enabled)).toBe('claude-sonnet-4-6');
       expect(applyFallback('gemini-3-pro-preview', enabled)).toBe('claude-sonnet-4-6');
     });
@@ -402,7 +400,7 @@ describe('model-fallback', () => {
     it('should never fallback to Opus by default', () => {
       const enabled = new Set<ModelProvider>(['anthropic']);
       const allModels: ModelId[] = [
-        'gpt-5.2-codex',
+        'gpt-5.3-codex',
         'o3-deep-research',
         'gpt-4o',
         'gpt-4o-mini',

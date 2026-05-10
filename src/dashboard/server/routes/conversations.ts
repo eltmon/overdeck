@@ -16,8 +16,8 @@ import { getClaudePermissionFlagsString, resolvePermissionMode } from '../../../
 
 import { randomUUID } from 'node:crypto';
 import { exec, spawn } from 'node:child_process';
-import { constants as fsConstants, existsSync, createReadStream } from 'node:fs';
-import { mkdir, writeFile, readFile, stat, realpath, rename, rm, readdir, open } from 'node:fs/promises';
+import { existsSync, createReadStream } from 'node:fs';
+import { mkdir, writeFile, readFile, stat, realpath, rename, rm, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
@@ -80,6 +80,7 @@ import {
   getProviderAuthMode,
 } from '../../../lib/agents.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
+import { getProviderForModel } from '../../../lib/providers.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
 import { piFifoPaths } from '../../../lib/runtimes/pi-fifo.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
@@ -388,30 +389,57 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
 }
 
-async function waitForPiReady(agentId: string): Promise<void> {
-  const { readyPath } = piFifoPaths(agentId);
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    if (existsSync(readyPath)) {
-      console.log(`[conversations] Pi ready for ${agentId}`);
-      return;
-    }
-    await new Promise<void>((r) => setTimeout(r, 500));
+/**
+ * Wait until Pi's TUI has rendered into the tmux pane.
+ *
+ * Pi TUI mode does not write a ready.json marker (that was an RPC-mode
+ * artifact). We instead poll capture-pane for non-empty content, which
+ * indicates Pi has drawn at least its title/prompt line. This is the same
+ * shape of readiness check we use for Claude Code's interactive prompt.
+ */
+/**
+ * Map a Panopticon model id to the matching Pi-side provider name. Pi has
+ * its own provider taxonomy (`pi --list-models`); the IDs differ from our
+ * internal {@link getProviderForModel}. Returning `undefined` lets Pi fall
+ * back to its registry order.
+ *
+ * Pi conversations rely on the user's own Pi auth (`~/.pi/agent/auth.json`).
+ * We only constrain *which* Pi provider Pi uses; we never inject keys.
+ */
+function piProviderForModel(modelId: string): string | undefined {
+  const provider = getProviderForModel(modelId).name;
+  switch (provider) {
+    case 'openai':
+      return 'openai-codex';
+    case 'anthropic':
+      return 'anthropic';
+    case 'google':
+      return 'google';
+    case 'minimax':
+      return 'minimax';
+    case 'zai':
+      return 'zai';
+    case 'kimi':
+      return 'kimi-coding';
+    case 'mimo':
+      return 'xiaomi';
+    default:
+      return undefined;
   }
-  console.warn(`[conversations] Timed out waiting for Pi ready marker for ${agentId}`);
 }
 
-async function writePiConversationCommand(agentId: string, text: string): Promise<void> {
-  const { fifoPath, readyPath } = piFifoPaths(agentId);
-  if (!existsSync(readyPath)) {
-    throw new Error(`Pi conversation ${agentId} is not ready`);
+async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const snapshot = await capturePaneAsync(tmuxSession, 10).catch(() => '');
+    if (snapshot.trim().length > 0) {
+      console.log(`[conversations] Pi TUI ready for ${tmuxSession}`);
+      return true;
+    }
+    await new Promise<void>((r) => setTimeout(r, 250));
   }
-  const fifo = await open(fifoPath, fsConstants.O_WRONLY | fsConstants.O_NONBLOCK);
-  try {
-    await fifo.writeFile(`${JSON.stringify({ cmd: 'prompt', text })}\n`);
-  } finally {
-    await fifo.close();
-  }
+  console.warn(`[conversations] Timed out waiting for Pi TUI to render in ${tmuxSession}`);
+  return false;
 }
 
 function resolveSessionFile(conv: Conversation): string | null {
@@ -576,14 +604,10 @@ export async function handleConversationMessage(
     // Unmanaged @paths in prose are allowed to pass through
   }
 
-  if (conv.harness === 'pi') {
-    // Pi conversations consume a JSONL command stream over a FIFO. Pasting prompts
-    // into tmux bypasses the Pi command protocol (used for initial prompts and
-    // fork injection) and would land as terminal noise rather than a model turn.
-    await writePiConversationCommand(conv.tmuxSession, message);
-  } else {
-    await deliverMessage(conv.tmuxSession, message, 'conversation-message');
-  }
+  // Pi conversations now run in TUI mode (PAN-1067), so dashboard messages
+  // are delivered via the same tmux paste-buffer pattern as Claude Code.
+  // The legacy FIFO/RPC path is retained only for work-agents in src/lib/runtimes/pi.ts.
+  await deliverMessage(conv.tmuxSession, message, 'conversation-message');
 
   // Generate AI title for conversations created via instant-start (no message at creation)
   if (conv.titleSource === 'default') {
@@ -725,8 +749,8 @@ async function spawnConversationSession(
   let providerEnv: Record<string, string> = {};
   let piFields: {
     harness: 'pi';
+    piMode: 'tui';
     piExtensionPath: string;
-    piFifoPath: string;
     piSessionDir: string;
     resumeSessionId?: string;
   } | undefined;
@@ -768,23 +792,45 @@ async function spawnConversationSession(
     providerEnv = await getProviderEnvForModel(model);
 
     if (harness === 'pi') {
+      // Conversations run Pi in TUI mode (the default Pi terminal UI). This
+      // gives users an actual terminal in the tmux pane — they can type
+      // directly into Pi, and dashboard-composer messages are delivered via
+      // tmux paste-buffer (sendKeysAsync) just like Claude Code. Pi still
+      // writes JSONL session files to --session-dir, so cost parsing and
+      // resume keep working.
+      //
+      // Work-agents (spawned elsewhere) keep --mode rpc + FIFO because
+      // Cloister needs the structured delivery primitive. See PAN-1067.
       const paths = piFifoPaths(tmuxSession);
       const piSessionDir = join(paths.agentDir, 'sessions');
       await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
       await mkdir(piSessionDir, { recursive: true, mode: 0o700 });
-      await rm(paths.fifoPath, { force: true });
-      await execAsync(`mkfifo -m 600 ${shellQuote(paths.fifoPath)}`);
+      // No FIFO needed in TUI mode — Pi reads from the pane stdin.
       const storedPiSessionId = resume
         ? (await readFile(join(paths.agentDir, 'session.id'), 'utf-8').then((s) => s.trim()).catch(() => undefined))
         : undefined;
       piFields = {
         harness: 'pi',
+        piMode: 'tui',
         piExtensionPath: resolve(process.cwd(), 'packages/pi-extension/dist/index.js'),
-        piFifoPath: paths.fifoPath,
         piSessionDir,
         resumeSessionId: storedPiSessionId || undefined,
       };
+
     }
+  }
+
+  // Pi's CLI matches `--model <id>` against its full registry; with
+  // ambiguous IDs like "gpt-5.4" (which exist under multiple providers),
+  // the first registry hit wins — and that hit can be a provider the user
+  // has no auth for (e.g. azure-openai-responses). Pass the model as
+  // `<pi-provider>/<id>` so Pi's resolveCliModel locks in the intended
+  // provider. The user's pi auth (`~/.pi/agent/auth.json`) determines
+  // whether the call actually succeeds.
+  let launcherModel = model;
+  if (harness === 'pi' && model) {
+    const piProvider = piProviderForModel(model);
+    if (piProvider) launcherModel = `${piProvider}/${model}`;
   }
 
   if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
@@ -802,7 +848,7 @@ async function spawnConversationSession(
       providerExports: providerExportsStr || undefined,
       trapHup: true,
       baseCommand: runtimeCommand,
-      model,
+      model: launcherModel,
       ...(piFields ?? {
         resumeSessionId: resume ? claudeSessionId : undefined,
         sessionId: resume ? undefined : claudeSessionId,
@@ -1129,7 +1175,7 @@ const postConversationRoute = HttpRouter.add(
         console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
 
         if (harness === 'pi') {
-          await waitForPiReady(tmuxSession);
+          await waitForPiTuiReady(tmuxSession);
         } else {
           // Wait for Claude Code to reach its prompt before returning.
           // Bounded by waitForClaudeReady's existing 30s timeout.
@@ -1137,13 +1183,10 @@ const postConversationRoute = HttpRouter.add(
           console.log(`[conversations] Claude ready in ${tmuxSession}`);
         }
 
-        // If a message was provided (legacy callers), send it now
+        // If a message was provided (legacy callers), send it now.
+        // Both harnesses now use tmux paste-buffer delivery (Pi TUI mode + Claude Code).
         if (message) {
-          if (harness === 'pi') {
-            await writePiConversationCommand(tmuxSession, message);
-          } else {
-            await sendKeysAsync(tmuxSession, message, 'conversation-message');
-          }
+          await sendKeysAsync(tmuxSession, message, 'conversation-message');
         }
 
         // Title = truncated first message (T3Code pattern), or default
@@ -1291,7 +1334,7 @@ const postConversationResumeRoute = HttpRouter.add(
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId, harness);
         await waitForTmuxSession(conv.tmuxSession);
         if (harness === 'pi') {
-          await waitForPiReady(conv.tmuxSession);
+          await waitForPiTuiReady(conv.tmuxSession);
         } else {
           await waitForClaudePrompt(conv.tmuxSession, 30000).catch(() => false);
         }
@@ -1369,7 +1412,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, canResume, harness);
         await waitForTmuxSession(tmuxSession);
         if (harness === 'pi') {
-          await waitForPiReady(tmuxSession);
+          await waitForPiTuiReady(tmuxSession);
         } else {
           await waitForClaudePrompt(tmuxSession, 30000).catch(() => false);
         }
@@ -1916,8 +1959,8 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
 async function injectForkSummary(conv: Conversation, summary: string): Promise<void> {
   updateForkStatus(conv.name, 'injecting');
   if (conv.harness === 'pi') {
-    await waitForPiReady(conv.tmuxSession);
-    await writePiConversationCommand(conv.tmuxSession, summary);
+    await waitForPiTuiReady(conv.tmuxSession, 60000);
+    await sendKeysAsync(conv.tmuxSession, summary, 'summary-fork');
     return;
   }
 

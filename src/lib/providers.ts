@@ -77,8 +77,8 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'openai',
     displayName: 'OpenAI',
     compatibility: 'direct',
-    models: ['gpt-5.5', 'gpt-5.5-mini', 'gpt-5.5-nano', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini'],
-    tierModels: { opus: 'gpt-5.5-pro', sonnet: 'gpt-5.5', haiku: 'gpt-5.5-mini' },
+    models: ['gpt-5.5', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-pro', 'gpt-5.3-codex', 'gpt-5.2', 'o3', 'o4-mini'],
+    tierModels: { opus: 'gpt-5.5-pro', sonnet: 'gpt-5.4', haiku: 'gpt-5.4-mini' },
     tested: true,
     description: 'Route through the local CLIProxyAPI Anthropic-compatible sidecar using Codex/ChatGPT subscription auth.',
   },
@@ -159,7 +159,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check OpenAI models
-  if (['gpt-5.5', 'gpt-5.5-mini', 'gpt-5.5-nano', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini', 'gpt-5.2-codex', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
+  if (['gpt-5.5', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-pro', 'gpt-5.3-codex', 'gpt-5.2', 'o3', 'o4-mini', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
     return PROVIDERS.openai;
   }
 

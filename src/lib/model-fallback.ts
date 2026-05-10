@@ -26,20 +26,18 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'claude-sonnet-4-5': 'anthropic',
   'claude-haiku-4-5': 'anthropic',
 
-  // OpenAI models (current)
+  // OpenAI models (current — per developers.openai.com/codex/models)
   'gpt-5.5': 'openai',
-  'gpt-5.5-mini': 'openai',
-  'gpt-5.5-nano': 'openai',
   'gpt-5.5-pro': 'openai',
   'gpt-5.4': 'openai',
   'gpt-5.4-mini': 'openai',
-  'gpt-5.4-nano': 'openai',
   'gpt-5.4-pro': 'openai',
+  'gpt-5.3-codex': 'openai',
+  'gpt-5.2': 'openai',
   'o3': 'openai',
   'o4-mini': 'openai',
 
   // OpenAI legacy (for backward compat with existing configs/tests)
-  'gpt-5.2-codex': 'openai',
   'o3-deep-research': 'openai',
   'gpt-4o': 'openai',
   'gpt-4o-mini': 'openai',
@@ -88,17 +86,15 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // OpenAI → Anthropic
   'gpt-5.5': 'claude-sonnet-4-6', // Flagship model → Sonnet
-  'gpt-5.5-mini': 'claude-haiku-4-5', // Mid-tier → Haiku
-  'gpt-5.5-nano': 'claude-haiku-4-5', // Economy model → Haiku
   'gpt-5.5-pro': 'claude-sonnet-4-6', // Top-tier model → Sonnet
   'gpt-5.4': 'claude-sonnet-4-6', // Flagship model → Sonnet
   'gpt-5.4-mini': 'claude-haiku-4-5', // Mid-tier → Haiku
-  'gpt-5.4-nano': 'claude-haiku-4-5', // Economy model → Haiku
   'gpt-5.4-pro': 'claude-sonnet-4-6', // Top-tier model → Sonnet
+  'gpt-5.3-codex': 'claude-sonnet-4-6', // Coding flagship → Sonnet
+  'gpt-5.2': 'claude-sonnet-4-6', // Previous-gen flagship → Sonnet
   'o3': 'claude-sonnet-4-6', // Reasoning model → Sonnet
   'o4-mini': 'claude-sonnet-4-6', // Compact reasoning model → Sonnet
   // Retired OpenAI IDs — mappings preserve semantic tier intent
-  'gpt-5.2-codex': 'claude-sonnet-4-6',
   'o3-deep-research': 'claude-sonnet-4-6',
   // Active OpenAI API names — NOT deprecated. Included here so configs using these
   // IDs still fall back correctly if the OpenAI provider is disabled.
@@ -152,12 +148,11 @@ const MODEL_TIER_RANK: Record<string, number> = {
   'gpt-5.5': 2,
   'gpt-5.4-pro': 3,
   'gpt-5.4': 2,
+  'gpt-5.3-codex': 2,
+  'gpt-5.2': 2,
   'o3': 2,
   'o4-mini': 1,
-  'gpt-5.5-mini': 0,
   'gpt-5.4-mini': 0,
-  'gpt-5.5-nano': -1, // API-only, no OAuth tier
-  'gpt-5.4-nano': -1, // API-only, no OAuth tier
 };
 
 /**

@@ -40,14 +40,14 @@ import { resolveSpecialistBaseCommand, resetGlobalRouter } from '../router.js'
 describe('resolveSpecialistBaseCommand (PAN-636)', () => {
   it('claude-code role -> claude command via getAgentRuntimeBaseCommand(model, claude-code)', async () => {
     resetGlobalRouter()
-    const cmd = await resolveSpecialistBaseCommand('merge-agent', 'gpt-5.5-mini')
-    expect(cmd).toBe('claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.5-mini')
+    const cmd = await resolveSpecialistBaseCommand('merge-agent', 'gpt-5.4-mini')
+    expect(cmd).toBe('claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.4-mini')
   })
 
   it('pi role + non-Anthropic model -> pi command (ToS gate allows)', async () => {
     resetGlobalRouter()
-    const cmd = await resolveSpecialistBaseCommand('review-agent', 'gpt-5.5-mini')
-    expect(cmd).toBe('pi --mode rpc --model gpt-5.5-mini')
+    const cmd = await resolveSpecialistBaseCommand('review-agent', 'gpt-5.4-mini')
+    expect(cmd).toBe('pi --mode rpc --model gpt-5.4-mini')
   })
 
   it('pi role + Anthropic model + subscription auth -> ToS gate falls back to claude-code with warning', async () => {
@@ -67,7 +67,7 @@ describe('resolveSpecialistBaseCommand (PAN-636)', () => {
   it('explicit harness override beats config', async () => {
     resetGlobalRouter()
     // merge-agent is configured as claude-code; explicitly pass pi.
-    const cmd = await resolveSpecialistBaseCommand('merge-agent', 'gpt-5.5-mini', undefined, 'pi')
-    expect(cmd).toBe('pi --mode rpc --model gpt-5.5-mini')
+    const cmd = await resolveSpecialistBaseCommand('merge-agent', 'gpt-5.4-mini', undefined, 'pi')
+    expect(cmd).toBe('pi --mode rpc --model gpt-5.4-mini')
   })
 })

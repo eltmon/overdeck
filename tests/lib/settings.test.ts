@@ -212,7 +212,7 @@ describe('settings', () => {
       const userSettings = {
         models: {
           complexity: {
-            expert: 'gpt-5.2-codex', // Override just one complexity level
+            expert: 'gpt-5.3-codex', // Override just one complexity level
           },
         },
       };
@@ -221,7 +221,7 @@ describe('settings', () => {
       const loaded = loadSettings();
 
       // User override should apply
-      expect(loaded.models.complexity.expert).toBe('gpt-5.2-codex');
+      expect(loaded.models.complexity.expert).toBe('gpt-5.3-codex');
 
       // Other complexity levels should be defaults per DEFAULT_SETTINGS
       expect(loaded.models.complexity.trivial).toBe('claude-haiku-4-5');
@@ -449,13 +449,12 @@ describe('settings', () => {
 
       expect(available.openai).toEqual([
         'gpt-5.5',
-        'gpt-5.5-mini',
-        'gpt-5.5-nano',
         'gpt-5.5-pro',
         'gpt-5.4',
         'gpt-5.4-mini',
-        'gpt-5.4-nano',
         'gpt-5.4-pro',
+        'gpt-5.3-codex',
+        'gpt-5.2',
         'o3',
         'o4-mini',
       ]);

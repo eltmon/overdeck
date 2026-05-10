@@ -51,18 +51,18 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'review:requirements': 'claude-sonnet-4-6',
     'review:synthesis': 'claude-sonnet-4-6',
 
-    // Subagents — GPT-5.5 Nano (fastest, cheapest, strong tool use)
-    'subagent:explore': 'gpt-5.5-nano',
-    'subagent:plan': 'gpt-5.5-nano',
-    'subagent:bash': 'gpt-5.5-nano',
+    // Subagents — GPT-5.4 Mini (cheapest current OpenAI model with strong tool use)
+    'subagent:explore': 'gpt-5.4-mini',
+    'subagent:plan': 'gpt-5.4-mini',
+    'subagent:bash': 'gpt-5.4-mini',
     'subagent:general-purpose': 'kimi-k2.6',
 
     // Workflow jobs
-    'status-review': 'gpt-5.5-nano',
+    'status-review': 'gpt-5.4-mini',
 
     // CLI modes
-    'cli:interactive': 'gpt-5.5-mini',
-    'cli:quick-command': 'gpt-5.5-nano',
+    'cli:interactive': 'gpt-5.4-mini',
+    'cli:quick-command': 'gpt-5.4-mini',
   };
 
   // Apply deprecation resolution to all model IDs
@@ -544,12 +544,14 @@ export function getAvailableModelsApi(): {
     }
   }
 
-  // Order OpenAI models with latest family first: 5.5 (current default) → 5.4 → o-series → gpt-4o legacy.
+  // Order OpenAI models with latest family first: 5.5 (current default) → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
   const openaiOrder: Record<string, number> = {
-    'gpt-5.5': 0, 'gpt-5.5-pro': 1, 'gpt-5.5-mini': 2, 'gpt-5.5-nano': 3,
-    'gpt-5.4': 10, 'gpt-5.4-pro': 11, 'gpt-5.4-mini': 12, 'gpt-5.4-nano': 13,
-    'o3': 20, 'o4-mini': 21,
-    'gpt-4o': 30, 'gpt-4o-mini': 31,
+    'gpt-5.5': 0, 'gpt-5.5-pro': 1,
+    'gpt-5.4': 10, 'gpt-5.4-pro': 11, 'gpt-5.4-mini': 12,
+    'gpt-5.3-codex': 20,
+    'gpt-5.2': 30,
+    'o3': 40, 'o4-mini': 41,
+    'gpt-4o': 50, 'gpt-4o-mini': 51,
   };
   result.openai.sort((a, b) => (openaiOrder[a.id] ?? 99) - (openaiOrder[b.id] ?? 99));
 

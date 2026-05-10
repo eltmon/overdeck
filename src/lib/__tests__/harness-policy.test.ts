@@ -5,9 +5,12 @@ import type { AuthMode } from '../subscription-types.js'
 
 // One representative model id per provider that getProviderForModel() resolves
 // today. Keeping these explicit guards us against silent provider re-routing.
+// gpt-5.4 is used (not gpt-5.5) because gpt-5.5 has its own auth-mode rule
+// (subscription-only) that the matrix below does not cover; gpt-5.5 is
+// validated by its own dedicated test.
 const MODEL_BY_PROVIDER = {
   anthropic: 'claude-sonnet-4-6',
-  openai: 'gpt-5.5',
+  openai: 'gpt-5.4',
   google: 'gemini-3-pro-preview',
   minimax: 'minimax-m2.7',
   openrouter: 'qwen/qwen3.6-plus:free',
@@ -49,6 +52,27 @@ describe('canUseHarness', () => {
     const model = MODEL_BY_PROVIDER[provider]
     for (const authMode of AUTH_MODES) {
       expect(canUseHarness('claude-code', model, authMode)).toEqual({ allowed: true })
+    }
+  })
+
+  it('blocks gpt-5.5 + api-key on every harness (subscription-only model)', () => {
+    for (const harness of HARNESSES) {
+      const decision = canUseHarness(harness, 'gpt-5.5', 'api-key')
+      expect(decision.allowed).toBe(false)
+      expect(decision.reason).toBeTruthy()
+      expect(decision.reason!.toLowerCase()).toContain('subscription')
+    }
+  })
+
+  it('allows gpt-5.5 + subscription on every harness', () => {
+    for (const harness of HARNESSES) {
+      expect(canUseHarness(harness, 'gpt-5.5', 'subscription')).toEqual({ allowed: true })
+    }
+  })
+
+  it('allows gpt-5.5 + undefined authMode (no auth context engaged)', () => {
+    for (const harness of HARNESSES) {
+      expect(canUseHarness(harness, 'gpt-5.5', undefined)).toEqual({ allowed: true })
     }
   })
 

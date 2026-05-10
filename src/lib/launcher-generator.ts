@@ -23,9 +23,24 @@ export interface LauncherConfig {
    * to the tmux pane.
    */
   harness?: LauncherHarness;
+  /**
+   * Pi output mode (mapped to `pi --mode <mode>`).
+   *
+   *   - 'rpc' (default for harness='pi'): JSONL command stream over stdin/
+   *     stdout. Used for work-agents where Cloister needs structured delivery.
+   *     Requires piFifoPath. Pane is non-interactive (no TUI).
+   *   - 'tui': interactive Pi terminal UI (Pi's default mode). Used for
+   *     conversation panels so users can type in the tmux pane directly.
+   *     Dashboard messages are delivered via tmux paste-buffer instead of
+   *     the FIFO. piFifoPath is not used in this mode.
+   *
+   * Pi writes JSONL session files via --session-dir regardless of mode, so
+   * cost parsing keeps working in both modes.
+   */
+  piMode?: 'rpc' | 'tui';
   /** Absolute path to packages/pi-extension/dist/index.js. Required for harness='pi'. */
   piExtensionPath?: string;
-  /** Absolute path to ~/.panopticon/agents/<id>/rpc.in. Required for harness='pi'. */
+  /** Absolute path to ~/.panopticon/agents/<id>/rpc.in. Required for harness='pi' + piMode='rpc'. */
   piFifoPath?: string;
   /** Absolute path to per-agent Pi session-dir (Pi --session-dir). Required for harness='pi'. */
   piSessionDir?: string;
@@ -438,6 +453,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
 /**
  * Build a Pi command line.
  *
+ * RPC mode (work-agents):
  *   pi --mode rpc \
  *      --model <model> \
  *      --session-dir <piSessionDir> \
@@ -445,29 +461,45 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
  *      --no-context-files \
  *      [--session <resumeSessionId>] \
  *      [--append-system-prompt "$prompt"] \
- *      < <piFifoPath>
+ *      <> <piFifoPath>
+ *
+ * TUI mode (conversations):
+ *   pi --model <model> \
+ *      --session-dir <piSessionDir> \
+ *      [--extension <piExtensionPath>] \
+ *      --no-context-files \
+ *      [--session <resumeSessionId>] \
+ *      [--append-system-prompt "$prompt"]
  *
  * Pi has no permission system, so permissionFlags are intentionally
  * dropped (AC4). baseCommand is ignored — Pi launchers always start with
  * the literal `pi` so callers cannot accidentally smuggle in claude flags.
  */
 function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
-  if (!config.piExtensionPath) {
-    throw new Error('Pi launcher requires piExtensionPath');
-  }
-  if (!config.piFifoPath) {
-    throw new Error('Pi launcher requires piFifoPath');
-  }
+  const piMode = config.piMode ?? 'rpc';
   if (!config.piSessionDir) {
     throw new Error('Pi launcher requires piSessionDir');
   }
+  if (piMode === 'rpc') {
+    if (!config.piExtensionPath) {
+      throw new Error('Pi launcher (rpc mode) requires piExtensionPath');
+    }
+    if (!config.piFifoPath) {
+      throw new Error('Pi launcher (rpc mode) requires piFifoPath');
+    }
+  }
 
-  const tokens: string[] = ['pi', '--mode', 'rpc'];
+  const tokens: string[] = ['pi'];
+  if (piMode === 'rpc') {
+    tokens.push('--mode', 'rpc');
+  }
   if (config.model) {
     tokens.push('--model', config.model);
   }
   tokens.push('--session-dir', shellQuote(config.piSessionDir));
-  tokens.push('--extension', shellQuote(config.piExtensionPath));
+  if (config.piExtensionPath) {
+    tokens.push('--extension', shellQuote(config.piExtensionPath));
+  }
   tokens.push('--no-context-files');
 
   if (config.resumeSessionId) {
@@ -482,16 +514,20 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
     tokens.push('--append-system-prompt', shellQuote(config.promptInline));
   }
 
-  // stdin redirection from the per-agent fifo. Pi reads JSONL RPC commands
-  // from stdin in --mode rpc. Use bash read-write redirection (`<>`) instead
-  // of read-only (`<`): opening a FIFO read-only blocks until a writer is
-  // present, which means Pi could never exec and never write `ready.json`
-  // before any external writer attached, deadlocking conversation/fork
-  // launches. `<>` opens the FIFO without blocking, lets Pi start, emit its
-  // ready marker, and then read JSONL commands as the dashboard writer
-  // pushes them.
-  const stdinRedirect = `<> ${shellQuote(config.piFifoPath)}`;
-  const cmd = `${tokens.join(' ')} ${stdinRedirect}`.replace(/\s+/g, ' ').trim();
+  let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
+
+  if (piMode === 'rpc') {
+    // stdin redirection from the per-agent fifo. Pi reads JSONL RPC commands
+    // from stdin in --mode rpc. Use bash read-write redirection (`<>`) instead
+    // of read-only (`<`): opening a FIFO read-only blocks until a writer is
+    // present, which means Pi could never exec and never write `ready.json`
+    // before any external writer attached, deadlocking work-agent launches.
+    // `<>` opens the FIFO without blocking, lets Pi start, emit its ready
+    // marker, and then read JSONL commands as the dashboard writer pushes them.
+    cmd = `${cmd} <> ${shellQuote(config.piFifoPath!)}`;
+  }
+  // TUI mode: leave stdin attached to the tmux pane so the user (or paste-buffer
+  // delivery from the dashboard) can type into Pi directly.
 
   return [useExec ? `exec ${cmd}` : cmd];
 }

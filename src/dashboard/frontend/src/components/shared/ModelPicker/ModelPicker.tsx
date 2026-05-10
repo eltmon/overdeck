@@ -299,6 +299,8 @@ export function HarnessSelect({
   value,
   onChange,
   modelId,
+  groups,
+  onModelChange,
   harnessPolicy,
   label = 'Harness',
 }: {
@@ -306,6 +308,13 @@ export function HarnessSelect({
   onChange: (harness: Harness) => void;
   modelId: string;
   groups: ModelGroup[];
+  /**
+   * Optional model setter. When provided and the user picks a harness that
+   * conflicts with the current model, we auto-flip the model to a compatible
+   * default before changing the harness — instead of grey-ing out the
+   * harness option. (PAN-1067)
+   */
+  onModelChange?: (modelId: string) => void;
   harnessPolicy?: HarnessPolicyDecisions;
   label?: string;
 }) {
@@ -322,10 +331,32 @@ export function HarnessSelect({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
 
+  // If the conversation already has a harness/model combo that policy now
+  // forbids (e.g. config drift), fall back to claude-code. Auto-resolve flow
+  // below covers the user-driven case — this guards stale persisted state.
   useEffect(() => {
     const decision = canUsePickerHarness(value, modelId, harnessPolicy);
     if (!decision.allowed) onChange('claude-code');
   }, [value, modelId, harnessPolicy, onChange]);
+
+  function handlePick(newHarness: Harness): void {
+    const decision = canUsePickerHarness(newHarness, modelId, harnessPolicy);
+    if (decision.allowed) {
+      onChange(newHarness);
+      setOpen(false);
+      return;
+    }
+    if (!onModelChange) {
+      // No way to auto-resolve — silently ignore. The caller is responsible
+      // for ensuring model + harness are compatible before passing them in.
+      setOpen(false);
+      return;
+    }
+    const fallback = pickModelForHarness(newHarness, modelId, groups, harnessPolicy);
+    if (fallback !== modelId) onModelChange(fallback);
+    onChange(newHarness);
+    setOpen(false);
+  }
 
   return (
     <div className={styles.field}>
@@ -339,17 +370,20 @@ export function HarnessSelect({
           <div className={styles.pickerDropdown}>
             {HARNESS_OPTIONS.map((harness) => {
               const decision = canUsePickerHarness(harness.id, modelId, harnessPolicy);
+              const willAutoFlip = !decision.allowed;
+              const titleText = willAutoFlip
+                ? (onModelChange ? `Will auto-switch model: ${decision.reason}` : decision.reason)
+                : harness.description;
               return (
                 <button
                   key={harness.id}
                   type="button"
                   className={`${styles.pickerOption} ${harness.id === value ? styles.pickerOptionActive : ''}`}
-                  disabled={!decision.allowed}
-                  title={decision.reason ?? harness.description}
-                  onClick={() => { if (decision.allowed) { onChange(harness.id); setOpen(false); } }}
+                  title={titleText}
+                  onClick={() => handlePick(harness.id)}
                 >
                   <span className={styles.pickerOptionLabel}>{harness.label}</span>
-                  {!decision.allowed && <span className={styles.pickerOptionCost}>ToS gated</span>}
+                  {willAutoFlip && !onModelChange && <span className={styles.pickerOptionCost}>ToS gated</span>}
                 </button>
               );
             })}
@@ -358,6 +392,33 @@ export function HarnessSelect({
       </div>
     </div>
   );
+}
+
+/**
+ * Find a model the new harness can run. Mirrors the auto-resolve logic in
+ * the chat ModelPicker — kept here so legacy HarnessSelect can share it.
+ */
+function pickModelForHarness(
+  newHarness: Harness,
+  currentModel: string,
+  groups: ModelGroup[],
+  policy: HarnessPolicyDecisions | undefined,
+): string {
+  const allModels = groups.flatMap((g) => g.models);
+  const allowed = (modelId: string) => canUsePickerHarness(newHarness, modelId, policy).allowed;
+
+  // Hardcoded preferences match HARNESS_DEFAULT_MODEL in the chat picker.
+  const preferred = newHarness === 'pi' ? 'gpt-5.4' : 'claude-sonnet-4-6';
+  if (allModels.some((m) => m.id === preferred) && allowed(preferred)) return preferred;
+
+  const currentProvider = allModels.find((m) => m.id === currentModel)?.provider;
+  if (currentProvider) {
+    const sameProviderHit = allModels.find((m) => m.provider === currentProvider && allowed(m.id));
+    if (sameProviderHit) return sameProviderHit.id;
+  }
+  const anyHit = allModels.find((m) => allowed(m.id));
+  if (anyHit) return anyHit.id;
+  return currentModel;
 }
 
 export function ModelHarnessPicker({
@@ -379,7 +440,14 @@ export function ModelHarnessPicker({
 }) {
   return (
     <>
-      <HarnessSelect value={harness} onChange={onHarnessChange} modelId={model} groups={groups} harnessPolicy={harnessPolicy} />
+      <HarnessSelect
+        value={harness}
+        onChange={onHarnessChange}
+        modelId={model}
+        onModelChange={onModelChange}
+        groups={groups}
+        harnessPolicy={harnessPolicy}
+      />
       <ModelSelect value={model} onChange={onModelChange} groups={groups} label={modelLabel} />
     </>
   );

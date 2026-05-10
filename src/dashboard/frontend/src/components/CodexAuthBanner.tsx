@@ -37,7 +37,7 @@ export function CodexAuthBanner() {
     <div className="bg-warning/10 border-b-2 border-warning/40 px-4 py-3 flex items-center gap-3 shrink-0">
       <AlertTriangle className="w-5 h-5 text-warning-foreground shrink-0" />
       <p className="text-warning-foreground text-sm font-semibold flex-1">
-        Codex authentication {authStatus.status} — gpt-5.4 agents will fail.
+        Codex authentication {authStatus.status} — Codex-routed agents (gpt-5.x, o3, o4-mini) will fail.
         {authStatus.email && (
           <span className="font-normal ml-1 opacity-80">(<SensitiveText value={authStatus.email} className="text-sm" />)</span>
         )}

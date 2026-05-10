@@ -158,29 +158,16 @@ const DEFAULT_PRICING = [
 	{
 		provider: "openai",
 		model: "gpt-5.5",
-		inputPer1k: .003,
-		outputPer1k: .018,
-		currency: "USD"
-	},
-	{
-		provider: "openai",
-		model: "gpt-5.5-mini",
-		inputPer1k: 5e-4,
-		outputPer1k: .002,
-		currency: "USD"
-	},
-	{
-		provider: "openai",
-		model: "gpt-5.5-nano",
-		inputPer1k: 25e-5,
-		outputPer1k: .0015,
+		inputPer1k: .005,
+		outputPer1k: .03,
+		cacheReadPer1k: 5e-4,
 		currency: "USD"
 	},
 	{
 		provider: "openai",
 		model: "gpt-5.5-pro",
-		inputPer1k: .018,
-		outputPer1k: .22,
+		inputPer1k: .03,
+		outputPer1k: .18,
 		currency: "USD"
 	},
 	{
@@ -188,27 +175,37 @@ const DEFAULT_PRICING = [
 		model: "gpt-5.4",
 		inputPer1k: .0025,
 		outputPer1k: .015,
+		cacheReadPer1k: 25e-5,
 		currency: "USD"
 	},
 	{
 		provider: "openai",
 		model: "gpt-5.4-mini",
-		inputPer1k: 4e-4,
-		outputPer1k: .0016,
-		currency: "USD"
-	},
-	{
-		provider: "openai",
-		model: "gpt-5.4-nano",
-		inputPer1k: 2e-4,
-		outputPer1k: .00125,
+		inputPer1k: 75e-5,
+		outputPer1k: .0045,
+		cacheReadPer1k: 75e-6,
 		currency: "USD"
 	},
 	{
 		provider: "openai",
 		model: "gpt-5.4-pro",
-		inputPer1k: .015,
-		outputPer1k: .195,
+		inputPer1k: .03,
+		outputPer1k: .18,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.3-codex",
+		inputPer1k: .00175,
+		outputPer1k: .014,
+		cacheReadPer1k: 175e-6,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.2",
+		inputPer1k: .00125,
+		outputPer1k: .01,
 		currency: "USD"
 	},
 	{
@@ -221,8 +218,9 @@ const DEFAULT_PRICING = [
 	{
 		provider: "openai",
 		model: "o4-mini",
-		inputPer1k: .0011,
-		outputPer1k: .0044,
+		inputPer1k: .004,
+		outputPer1k: .016,
+		cacheReadPer1k: .001,
 		currency: "USD"
 	},
 	{

@@ -621,26 +621,69 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       ...DEFAULT_CONFIG,
       agentType: 'resume',
       harness: 'pi',
-      model: 'gpt-5.5-mini',
+      model: 'gpt-5.4-mini',
       piExtensionPath: '/x/dist/index.js',
       piFifoPath: '/x/rpc.in',
       piSessionDir: '/x/sessions',
       resumeSessionId: 'sess-pi-123',
     });
     expect(script).toMatch(/--session 'sess-pi-123'/);
-    expect(script).toMatch(/exec pi --mode rpc --model gpt-5.5-mini/);
+    expect(script).toMatch(/exec pi --mode rpc --model gpt-5.4-mini/);
   });
 
   it('throws when pi launcher is missing required path config', () => {
+    // piSessionDir is the universal requirement (rpc + tui both need it)
     expect(() =>
       generateLauncherScript({
         ...DEFAULT_CONFIG,
         agentType: 'work',
         harness: 'pi',
-        model: 'gpt-5.5-mini',
+        model: 'gpt-5.4-mini',
+      }),
+    ).toThrow(/piSessionDir/);
+
+    // rpc-mode (default) additionally requires piExtensionPath and piFifoPath.
+    expect(() =>
+      generateLauncherScript({
+        ...DEFAULT_CONFIG,
+        agentType: 'work',
+        harness: 'pi',
+        model: 'gpt-5.4-mini',
+        piSessionDir: '/x/sessions',
         // missing piExtensionPath
       }),
     ).toThrow(/piExtensionPath/);
+
+    expect(() =>
+      generateLauncherScript({
+        ...DEFAULT_CONFIG,
+        agentType: 'work',
+        harness: 'pi',
+        model: 'gpt-5.4-mini',
+        piSessionDir: '/x/sessions',
+        piExtensionPath: '/x/dist/index.js',
+        // missing piFifoPath
+      }),
+    ).toThrow(/piFifoPath/);
+  });
+
+  it('pi tui mode launcher omits --mode rpc and FIFO redirect', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'conversation',
+      harness: 'pi',
+      piMode: 'tui',
+      model: 'gpt-5.4-mini',
+      piSessionDir: '/x/sessions',
+      piExtensionPath: '/x/dist/index.js',
+    });
+    // No --mode rpc flag
+    expect(script).not.toMatch(/--mode rpc/);
+    // No FIFO redirect (`<>`)
+    expect(script).not.toMatch(/<> /);
+    // Still has --session-dir and --extension
+    expect(script).toMatch(/--session-dir '\/x\/sessions'/);
+    expect(script).toMatch(/--extension '\/x\/dist\/index.js'/);
   });
 
   it('claude-code (default) output is bit-for-bit unchanged when harness is unset (AC3)', () => {

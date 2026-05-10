@@ -9,6 +9,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown, Check, Lock, Search, LayoutGrid } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
   getDefaultConversationModel,
@@ -20,6 +21,51 @@ import { HARNESS_OPTIONS, canUsePickerHarness, type HarnessPolicyDecisions } fro
 import type { Harness } from '../shared/ModelPicker';
 import { ProviderIcon, ProviderDot } from './ProviderIcons';
 import styles from '../CommandDeck/styles/command-deck.module.css';
+
+/**
+ * Recommended model to auto-flip to when the user switches harness and the
+ * current model is incompatible with the new harness. Pi cannot run Anthropic
+ * on subscription auth, so a non-Anthropic default is the safe pick.
+ */
+const HARNESS_DEFAULT_MODEL: Record<Harness, string> = {
+  'claude-code': 'claude-sonnet-4-6',
+  'pi': 'gpt-5.4',
+};
+
+/**
+ * Find a model the new harness can run, given the current selection and
+ * the available groups. Preference order:
+ *   1. The harness's hardcoded default if it exists in the loaded groups
+ *      and is allowed.
+ *   2. Any model in the current selection's provider that's allowed.
+ *   3. Any allowed model anywhere.
+ *   4. The original value (caller will surface the error).
+ */
+function pickModelForHarness(
+  newHarness: Harness,
+  currentModel: string,
+  groups: ModelGroup[],
+  policy: HarnessPolicyDecisions,
+): string {
+  const allModels = groups.flatMap((g) => g.models);
+  const isAllowed = (modelId: string) => canUsePickerHarness(newHarness, modelId, policy).allowed;
+
+  const recommended = HARNESS_DEFAULT_MODEL[newHarness];
+  if (allModels.some((m) => m.id === recommended) && isAllowed(recommended)) {
+    return recommended;
+  }
+
+  const currentProvider = allModels.find((m) => m.id === currentModel)?.provider;
+  if (currentProvider) {
+    const sameProviderHit = allModels.find((m) => m.provider === currentProvider && isAllowed(m.id));
+    if (sameProviderHit) return sameProviderHit.id;
+  }
+
+  const anyHit = allModels.find((m) => isAllowed(m.id));
+  if (anyHit) return anyHit.id;
+
+  return currentModel;
+}
 
 export type { Harness } from '../shared/ModelPicker';
 
@@ -143,9 +189,17 @@ interface ModelPickerProps {
   disabled?: boolean;
   harness?: Harness;
   onHarnessChange?: (harness: Harness) => void;
+  /**
+   * Optional atomic setter used when the picker needs to swap *both* model
+   * and harness in one transaction (auto-resolve flow). When provided, the
+   * picker calls this instead of firing onChange + onHarnessChange in
+   * sequence — avoids the parent issuing two switch-model calls that race
+   * on the tmux session lifecycle. (PAN-1067)
+   */
+  onComboChange?: (modelId: string, effortLevels: readonly string[], harness: Harness) => void;
 }
 
-export function ModelPicker({ value, onChange, disabled = false, harness, onHarnessChange }: ModelPickerProps) {
+export function ModelPicker({ value, onChange, disabled = false, harness, onHarnessChange, onComboChange }: ModelPickerProps) {
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
   const [harnessPolicy, setHarnessPolicy] = useState<HarnessPolicyDecisions>({});
@@ -339,25 +393,54 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
 
           {/* Main panel */}
           <div className={styles.pickerMainPanel}>
-            {/* Harness section — pinned above search, scales to many harnesses */}
+            {/* Harness section — pinned above search, always clickable.
+                If the user picks a harness incompatible with the current model,
+                we auto-flip the model to a sensible default and toast the reason
+                instead of greying out the harness option (PAN-1067). */}
             {harness !== undefined && onHarnessChange && (
               <>
                 <div className={`${styles.pickerGroupHeader} ${styles.pickerHarnessHeader}`}>Harness</div>
                 {HARNESS_OPTIONS.map((opt: { id: Harness; label: string; description: string }) => {
                   const decision = canUsePickerHarness(opt.id, value, harnessPolicy);
                   const isActive = harness === opt.id;
-                  const isLocked = !decision.allowed;
-                  const subtitle = isLocked && decision.reason ? decision.reason : opt.description;
+                  const willAutoFlip = !decision.allowed;
+                  const subtitle = willAutoFlip && decision.reason ? decision.reason : opt.description;
+                  const handleClick = () => {
+                    if (isActive) return;
+                    if (decision.allowed) {
+                      onHarnessChange(opt.id);
+                      setOpen(false);
+                      return;
+                    }
+                    // Auto-resolve: pick a model the new harness can run.
+                    const replacementModel = pickModelForHarness(opt.id, value, groups, harnessPolicy);
+                    const replacement = groups.flatMap((g) => g.models).find((m) => m.id === replacementModel);
+                    const replacementLabel = replacement?.label ?? replacementModel;
+                    const replacementEffort = replacement?.effortLevels ?? [];
+                    if (replacementModel !== value) {
+                      toast.message(`Switched to ${replacementLabel}`, { description: decision.reason });
+                    }
+                    // If the parent provided a combo callback, apply both in one
+                    // transaction so the backend sees a single switch-model call.
+                    // Otherwise fall back to firing both separately (legacy callers).
+                    if (onComboChange && replacementModel !== value) {
+                      onComboChange(replacementModel, replacementEffort, opt.id);
+                    } else {
+                      if (replacementModel !== value) onChange(replacementModel, replacementEffort);
+                      onHarnessChange(opt.id);
+                    }
+                    setOpen(false);
+                  };
                   return (
                     <button
                       key={opt.id}
                       type="button"
-                      className={`${styles.harnessOption} ${isActive ? styles.harnessOptionActive : ''} ${isLocked ? styles.harnessOptionLocked : ''}`}
-                      disabled={isLocked}
-                      onClick={() => { if (!isLocked) onHarnessChange(opt.id); }}
+                      className={`${styles.harnessOption} ${isActive ? styles.harnessOptionActive : ''}`}
+                      onClick={handleClick}
+                      title={willAutoFlip ? `Will auto-switch model: ${decision.reason}` : opt.description}
                     >
                       <span className={styles.harnessOptionIcon}>
-                        {isActive ? <Check size={11} /> : isLocked ? <Lock size={11} /> : null}
+                        {isActive ? <Check size={11} /> : null}
                       </span>
                       <span className={styles.harnessOptionBody}>
                         <span className={styles.harnessOptionName}>{opt.label}</span>

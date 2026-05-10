@@ -33,8 +33,11 @@ import type { SubscriptionPlan } from './subscription-types.js';
 export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   'claude-opus-4-5': 'claude-opus-4-7',
   'claude-sonnet-4-5': 'claude-sonnet-4-6',
-  // OpenAI retired models (Feb 2026)
-  'gpt-5.2-codex': 'gpt-5.4',
+  // OpenAI retired/superseded models
+  'gpt-5.2-codex': 'gpt-5.3-codex', // superseded by gpt-5.3-codex (April 2026)
+  'gpt-5.5-mini': 'gpt-5.4-mini',   // hallucinated tier — never shipped
+  'gpt-5.5-nano': 'gpt-5.4-mini',   // hallucinated tier — never shipped
+  'gpt-5.4-nano': 'gpt-5.4-mini',   // hallucinated tier — never shipped
   'o3-deep-research': 'o3',
   // NOTE: gpt-5.4 family is Panopticon's abstraction over real OpenAI models.
   // Do NOT treat gpt-4o/gpt-4o-mini as deprecated — they are the actual API names.
@@ -276,28 +279,6 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Fast and efficient. 400K context. Available in ChatGPT Free/Plus tiers.',
   },
 
-  'gpt-5.4-nano': {
-    model: 'gpt-5.4-nano',
-    provider: 'openai',
-    displayName: 'GPT-5.4 Nano',
-    costPer1MTokens: 0.7, // $0.20 in / $1.25 out
-    contextWindow: 128000,
-    skills: {
-      'code-generation': 70,
-      'code-review': 65,
-      debugging: 62,
-      planning: 58,
-      documentation: 68,
-      testing: 62,
-      security: 52,
-      performance: 58,
-      synthesis: 60,
-      speed: 96, // Fastest OpenAI model
-      'context-length': 75,
-    },
-    notes: 'API-only. Best for classification, extraction, ranking, sub-agents.',
-  },
-
   'o3': {
     model: 'o3',
     provider: 'openai',
@@ -390,51 +371,6 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'OpenAI flagship (April 2026). Successor to GPT-5.4 with improved reasoning and coding. 1.05M context, 128K max output.',
   },
 
-  'gpt-5.5-mini': {
-    model: 'gpt-5.5-mini',
-    provider: 'openai',
-    displayName: 'GPT-5.5 Mini',
-    costPer1MTokens: 1.25, // ~$0.50 in / $2.00 out
-    contextWindow: 400000,
-    minTier: 'free', // Available in ChatGPT Free tier
-    skills: {
-      'code-generation': 85,
-      'code-review': 81,
-      debugging: 79,
-      planning: 76,
-      documentation: 83,
-      testing: 79,
-      security: 72,
-      performance: 76,
-      synthesis: 79,
-      speed: 92, // 2x faster than predecessor
-      'context-length': 90, // 400K context
-    },
-    notes: 'Fast and efficient mid-tier model. 400K context. Available in ChatGPT Free/Plus tiers.',
-  },
-
-  'gpt-5.5-nano': {
-    model: 'gpt-5.5-nano',
-    provider: 'openai',
-    displayName: 'GPT-5.5 Nano',
-    costPer1MTokens: 0.875, // $0.25 in / $1.50 out
-    contextWindow: 128000,
-    skills: {
-      'code-generation': 73,
-      'code-review': 68,
-      debugging: 65,
-      planning: 61,
-      documentation: 71,
-      testing: 65,
-      security: 56,
-      performance: 61,
-      synthesis: 64,
-      speed: 97, // Fastest OpenAI model
-      'context-length': 75,
-    },
-    notes: 'API-only. Best for classification, extraction, ranking, sub-agents.',
-  },
-
   'gpt-5.5-pro': {
     model: 'gpt-5.5-pro',
     provider: 'openai',
@@ -458,8 +394,51 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Most advanced OpenAI model. Enhanced reasoning and agentic capabilities over GPT-5.5. Pro subscribers only.',
   },
 
-  // Retired OpenAI model IDs — replaced by newer versions, kept for backward compat
-  'gpt-5.2-codex': { model: 'gpt-5.2-codex', provider: 'openai', displayName: 'GPT-5.2 Codex (deprecated)', costPer1MTokens: 20.0, contextWindow: 128000, skills: { 'code-generation': 92, 'code-review': 90, debugging: 88, planning: 85, documentation: 85, testing: 85, security: 80, performance: 82, synthesis: 88, speed: 50, 'context-length': 75 } },
+  'gpt-5.3-codex': {
+    model: 'gpt-5.3-codex',
+    provider: 'openai',
+    displayName: 'GPT-5.3 Codex',
+    costPer1MTokens: 7.875, // $1.75 in / $14.00 out
+    contextWindow: 400000,
+    skills: {
+      'code-generation': 96,
+      'code-review': 95,
+      debugging: 94,
+      planning: 90,
+      documentation: 88,
+      testing: 90,
+      security: 86,
+      performance: 88,
+      synthesis: 92,
+      speed: 75,
+      'context-length': 90,
+    },
+    notes: 'Industry-leading agentic coding model (2026). Available via Codex CLI/IDE/cloud and the Responses API.',
+  },
+
+  'gpt-5.2': {
+    model: 'gpt-5.2',
+    provider: 'openai',
+    displayName: 'GPT-5.2',
+    costPer1MTokens: 5.625, // $1.25 in / $10 out (estimate)
+    contextWindow: 200000,
+    skills: {
+      'code-generation': 88,
+      'code-review': 86,
+      debugging: 84,
+      planning: 82,
+      documentation: 84,
+      testing: 82,
+      security: 78,
+      performance: 80,
+      synthesis: 84,
+      speed: 70,
+      'context-length': 85,
+    },
+    notes: 'Previous-generation general-purpose model (Oct 2025). Superseded by GPT-5.4.',
+  },
+
+  // Retired OpenAI model IDs — kept for backward compat
   'o3-deep-research': { model: 'o3-deep-research', provider: 'openai', displayName: 'O3 Deep Research (deprecated)', costPer1MTokens: 5.0, contextWindow: 200000, skills: { 'code-generation': 88, 'code-review': 95, debugging: 98, planning: 95, documentation: 88, testing: 88, security: 92, performance: 92, synthesis: 95, speed: 25, 'context-length': 95 } },
   // Active OpenAI API names — NOT deprecated. Kept in MODEL_CAPABILITIES for backward compat
   // with saved configs. These are real OpenAI model IDs that still work via the OpenAI API.
