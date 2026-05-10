@@ -27,9 +27,11 @@ export function useCodexAutoRetry() {
 
     intervalRef.current = setInterval(async () => {
       try {
-        const res = await fetch(
-          `/api/settings/codex-reauth/status?session=${encodeURIComponent(reauthSessionName)}&token=${encodeURIComponent(reauthStatusToken)}`,
-        );
+        const res = await fetch('/api/settings/codex-reauth/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session: reauthSessionName, token: reauthStatusToken }),
+        });
         if (!res.ok) return;
         const data = (await res.json()) as { completed?: boolean };
         if (data.completed) {

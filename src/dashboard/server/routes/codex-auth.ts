@@ -1,4 +1,4 @@
-import { Effect, Layer, Option } from 'effect';
+import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -7,6 +7,7 @@ import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { bridgeCodexAuthToCliproxyAsync } from '../../../lib/cliproxy.js';
 import { createSessionAsync, sessionExistsAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { validateOrigin } from './origin-validation.js';
 
 // ─── Re-auth session registry ──────────────────────────────────────────────────
 
@@ -19,6 +20,20 @@ interface ReauthSession {
 
 const reauthSessions = new Map<string, ReauthSession>();
 const SESSION_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+
+const readJsonBody = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const text = yield* request.text;
+  return text ? JSON.parse(text) as Record<string, unknown> : {};
+});
+
+function rejectInvalidOrigin(request: HttpServerRequest.HttpServerRequest): ReturnType<typeof jsonResponse> | null {
+  const originCheck = validateOrigin(request);
+  if (!originCheck.ok) {
+    return jsonResponse({ error: originCheck.error }, { status: 403 });
+  }
+  return null;
+}
 
 function generateReauthSession(): { sessionName: string; terminalToken: string; statusToken: string } {
   const sessionName = `reauth-${randomUUID()}`;
@@ -91,6 +106,10 @@ const postCodexReauthRoute = HttpRouter.add(
   '/api/settings/codex-reauth',
   httpHandler(
     Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const originError = rejectInvalidOrigin(request);
+      if (originError) return originError;
+
       const existing = yield* Effect.promise(() => hasExistingLiveReauthSession());
       if (existing) {
         return jsonResponse({
@@ -117,20 +136,20 @@ const postCodexReauthRoute = HttpRouter.add(
   ),
 );
 
-// ─── Route: GET /api/settings/codex-reauth/status ──────────────────────────────
+// ─── Route: POST /api/settings/codex-reauth/status ─────────────────────────────
 
-const getCodexReauthStatusRoute = HttpRouter.add(
-  'GET',
+const postCodexReauthStatusRoute = HttpRouter.add(
+  'POST',
   '/api/settings/codex-reauth/status',
   httpHandler(
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
-      const urlOpt = HttpServerRequest.toURL(request);
-      const searchParams = Option.isSome(urlOpt)
-        ? urlOpt.value.searchParams
-        : new URLSearchParams();
-      const sessionName = searchParams.get('session') ?? '';
-      const token = searchParams.get('token') ?? '';
+      const originError = rejectInvalidOrigin(request);
+      if (originError) return originError;
+
+      const body = yield* readJsonBody;
+      const sessionName = typeof body.session === 'string' ? body.session : '';
+      const token = typeof body.token === 'string' ? body.token : '';
 
       if (!validateReauthStatusToken(sessionName, token)) {
         return jsonResponse({ completed: false });
@@ -152,5 +171,5 @@ const getCodexReauthStatusRoute = HttpRouter.add(
 export const codexAuthRouteLayer = Layer.mergeAll(
   getCodexAuthRoute,
   postCodexReauthRoute,
-  getCodexReauthStatusRoute,
+  postCodexReauthStatusRoute,
 );

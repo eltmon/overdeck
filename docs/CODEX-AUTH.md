@@ -106,13 +106,13 @@ Clicking **Re-authenticate**:
 4. The session runs `codex login` (or `codex login --device-auth` on headless systems)
 5. The browser navigates to `/terminal/reauth-<uuid>` so you can complete the OAuth flow
 
-Only the client that initiated the flow receives the terminal cookie and status token. Duplicate re-auth starts return `409` while a live re-auth session exists and never redisclose another client's capabilities. On headless systems, the device-auth URL/code is shown in the terminal session output.
+Only the client that initiated the flow receives the terminal cookie and status token. Duplicate re-auth starts return `409` while a live re-auth session exists and never redisclose another client's capabilities. On headless systems, the device-auth URL/code is shown in the terminal session output; automatic status polling replaces a manual “I've completed auth” button by verifying completion when the re-auth session exits.
 
 ### Automatic Retry
 
 When you finish logging in and close the terminal:
 
-1. The auto-retry hook polls `/api/settings/codex-reauth/status` with the generated session name and `statusToken`
+1. The auto-retry hook posts the generated session name and `statusToken` to `/api/settings/codex-reauth/status`
 2. When the re-auth tmux session exits, `bridgeCodexAuthToCliproxyAsync()` copies the new token to `~/.codex/`
 3. Any **blocked spawn** that was queued during the expired state is **automatically retried**
 

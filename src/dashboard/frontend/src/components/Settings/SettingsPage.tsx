@@ -48,6 +48,7 @@ import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
 import { OpenRouterPage } from './OpenRouterPage';
 import { SensitiveText } from '../SensitiveText';
+import { setReauthSession } from '../../lib/pending-codex-spawn';
 import { DesktopSettingsSection } from './DesktopSettingsSection';
 import {
   ModelOverrideModal,
@@ -896,7 +897,8 @@ export function SettingsPage() {
                                     const body = await res.json().catch(() => ({}));
                                     throw new Error(body.error || `Failed (${res.status})`);
                                   }
-                                  const { sessionName } = await res.json() as { sessionName: string };
+                                  const { sessionName, statusToken } = await res.json() as { sessionName: string; statusToken: string };
+                                  setReauthSession(sessionName, statusToken);
                                   window.location.href = `/terminal/${sessionName}`;
                                 } catch (err) {
                                   toast.error(err instanceof Error ? err.message : 'Failed to start re-authentication');
