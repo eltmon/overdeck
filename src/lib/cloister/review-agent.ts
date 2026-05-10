@@ -11,7 +11,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync, listPaneValuesAsync, detectTerminalApiError, type TerminalApiError, buildTmuxCommandString } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, sendRawKeystrokeAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync, listPaneValuesAsync, detectTerminalApiError, type TerminalApiError, buildTmuxCommandString } from '../tmux.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { getProviderExportsForModel } from '../agents.js';
 import { resolveSpecialistBaseCommand } from './router.js';
@@ -1169,8 +1169,25 @@ export async function runParallelReview(
     // pane (e.g. specialist crashed). In that case, kill it and fall through to spawn.
     const paneDead = await isPaneDeadAsync(sessionName);
     if (await sessionExistsAsync(sessionName) && !paneDead) {
-      // Session exists and pane is alive — resume it
+      // Session exists and pane is alive — resume it. CRITICAL: clear any
+      // stale typed text in the input buffer before pasting the new round's
+      // prompt. Without this, leftover input from a prior interaction
+      // (e.g. a partial agent message that never submitted) gets prepended
+      // to the paste, mangling the prompt and the specialist sits idle
+      // forever (PAN-1055 stuck ~3hr in this state on 2026-05-09 — five
+      // panes had stale text like "write the review file", "fix the
+      // blockers" left in the input box).
       console.log(`[review-agent] Resuming reviewer ${sessionName} for new round`);
+      try {
+        // Escape exits any active state in Claude Code (autocomplete, modal,
+        // etc.). Ctrl-U clears the readline-style input line. Send both,
+        // then a small delay so the TUI redraws before paste.
+        await sendRawKeystrokeAsync(sessionName, 'Escape', 'runParallelReview-resume-clear');
+        await sendRawKeystrokeAsync(sessionName, 'C-u', 'runParallelReview-resume-clear');
+        await new Promise(r => setTimeout(r, 200));
+      } catch (err) {
+        console.warn(`[review-agent] Failed to clear input buffer for ${sessionName} (non-fatal): ${err instanceof Error ? err.message : err}`);
+      }
       await sendKeysAsync(sessionName, prompt, 'runParallelReview-resume');
       resumedCount++;
     } else {
