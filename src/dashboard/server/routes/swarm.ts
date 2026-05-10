@@ -1273,7 +1273,10 @@ const postSwarmSlotMergedRoute = HttpRouter.add(
     const synthesisOutput = (body as Record<string, unknown>)['synthesisOutput'];
 
     if (!issueId) return jsonResponse({ error: 'issueId must be a tracker key like PAN-977.' }, { status: 400 });
-    if (typeof itemId !== 'string' || itemId.length === 0) return jsonResponse({ error: 'itemId required' }, { status: 400 });
+    // itemId may be empty when the caller is the merge-agent loopback (it knows the
+    // slot number but not the canonical item id). onSlotMergeComplete resolves the
+    // item id from runtime state by slot in that case.
+    if (typeof itemId !== 'string') return jsonResponse({ error: 'itemId must be a string (may be empty when called by merge-agent loopback)' }, { status: 400 });
     if (!Number.isInteger(slotId) || (slotId as number) <= 0) return jsonResponse({ error: 'slotId must be a positive integer.' }, { status: 400 });
     if (synthesisOutput !== undefined && typeof synthesisOutput !== 'string') return jsonResponse({ error: 'synthesisOutput must be a string.' }, { status: 400 });
 

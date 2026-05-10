@@ -265,15 +265,29 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   // fires when the parent feature branch itself merges to main.
   const slotInfo = parseSlotBranch(sourceBranch);
   if (slotInfo) {
+    // Loopback HTTP POST to the dashboard's /api/swarm/slot-merged endpoint.
+    // We deliberately do NOT static-import the swarm route module here — that would
+    // force the entire dashboard-server type graph into every consumer of merge-agent
+    // (lib code) and leak dashboard-only types into pure CLI builds. The HTTP edge
+    // keeps the dependency direction clean: merge-agent → REST → swarm route.
+    // We don't know itemId at the merge layer; the route resolves the canonical
+    // itemId from runtime state by matching the slot number.
+    const apiPort = process.env.API_PORT || process.env.PORT || '3011';
+    const url = `http://127.0.0.1:${apiPort}/api/swarm/slot-merged`;
     try {
-      // Dynamic import to avoid circular dependency: merge-agent → swarm route.
-      // We don't know itemId at the merge layer; onSlotMergeComplete resolves the
-      // canonical itemId from runtime state by matching the slot number.
-      const { __testInternals } = await import('../../dashboard/server/routes/swarm.js');
-      await __testInternals.onSlotMergeComplete(issueId, '', slotInfo.itemSlot);
-      console.log(`[merge-agent] Slot-merge handled for ${issueId} slot ${slotInfo.itemSlot}; skipping issue lifecycle.`);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueId, itemId: '', slotId: slotInfo.itemSlot }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        console.warn(`[merge-agent] Slot-merge POST returned ${res.status} for ${issueId} slot ${slotInfo.itemSlot}`);
+      } else {
+        console.log(`[merge-agent] Slot-merge handled for ${issueId} slot ${slotInfo.itemSlot}; skipping issue lifecycle.`);
+      }
     } catch (err: any) {
-      console.warn(`[merge-agent] Slot-merge handler failed for ${issueId} slot ${slotInfo.itemSlot}: ${err?.message ?? err}`);
+      console.warn(`[merge-agent] Slot-merge POST failed for ${issueId} slot ${slotInfo.itemSlot}: ${err?.message ?? err}`);
     }
     return;
   }
