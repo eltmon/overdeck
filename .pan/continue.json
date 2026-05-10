@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-10T01:31:04.000Z",
+  "updated": "2026-05-10T01:34:49.027Z",
   "gitState": {
     "branch": "feature/pan-1044",
     "sha": "f5f4dbc37",
@@ -179,6 +179,11 @@
       "reason": "feedback-fix",
       "note": "Fixed frontend CommandDeck test failure after inactive projects added a second project-node test element. The project overview test now waits for all project nodes before selecting test-project. Verified with npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/CommandDeck.test.tsx.",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-10T01:34:49.027Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": []
