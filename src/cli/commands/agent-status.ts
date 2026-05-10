@@ -124,7 +124,7 @@ export async function agentStatusCommand(options: AgentStatusOptions): Promise<v
         ...info,
         model: info.model || agent.model,
         issueId: agent.issueId,
-        phase: agent.phase,
+        role: agent.role,
       };
     })
   );
@@ -149,7 +149,7 @@ export async function agentStatusCommand(options: AgentStatusOptions): Promise<v
       const statusStr = STATUS_COLORS[a.status](a.status.toUpperCase());
       console.log(`  ${chalk.cyan(a.name)}  ${chalk.dim(a.issueId)}`);
       console.log(`    Model:  ${a.model ?? chalk.dim('unknown')}`);
-      console.log(`    Phase:  ${a.phase ?? chalk.dim('--')}`);
+      console.log(`    Role:   ${a.role ?? chalk.dim('--')}`);
       console.log(`    Status: ${statusStr}  ${chalk.dim(a.detail)}`);
       if (a.cost) console.log(`    Cost:   ${a.cost}`);
       console.log('');

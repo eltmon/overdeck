@@ -56,7 +56,7 @@ describe('reactive Cloister scheduler', () => {
         id: 'agent-pan-503-review',
         issueId: 'PAN-503',
         workspace: '/tmp/workspace',
-        runtime: 'claude',
+        harness: 'claude-code',
         role: 'review',
         model: 'sonnet',
         status: 'running',

@@ -16,7 +16,7 @@ import { listRunningAgentsAsync } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
 import { getReviewStatus } from '../../../lib/review-status.js'
 import { getEventStore } from '../event-store.js'
-import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent, Role } from '@panctl/contracts'
+import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent } from '@panctl/contracts'
 import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,15 +33,6 @@ interface EnrichmentServiceState {
 }
 
 // ─── Diff helpers ─────────────────────────────────────────────────────────────
-
-function legacyPhaseToRole(phase: unknown, fallback: Role = 'work'): Role {
-  if (phase === 'plan' || phase === 'work' || phase === 'review' || phase === 'test' || phase === 'ship') return phase
-  if (phase === 'planning') return 'plan'
-  if (phase === 'testing') return 'test'
-  if (phase === 'review-response') return 'review'
-  if (phase === 'merge') return 'ship'
-  return fallback
-}
 
 function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichment): boolean {
   if (!prev) return true
@@ -89,7 +80,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 id: agentId,
                 issueId: issueId ?? agentId,
                 workspace: agent.workspace || undefined,
-                runtime: agent.runtime || undefined,
+                runtime: undefined,
                 model: agent.model || undefined,
                 status: toAgentStatus(agent.tmuxActive && agent.status === 'stopped' ? 'running' : agent.status),
                 startedAt: agent.startedAt || undefined,
@@ -97,7 +88,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 branch: agent.branch || undefined,
                 costSoFar: agent.costSoFar,
                 sessionId: agent.sessionId || undefined,
-                role: toRole((agent as { role?: unknown }).role) ?? legacyPhaseToRole(agent.phase),
+                role: toRole(agent.role) ?? 'work',
                 hasPendingQuestion: undefined,
                 pendingQuestionCount: undefined,
                 resolution: toAgentResolution(agent.resolution),
@@ -149,7 +140,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
       let enrichment: AgentEnrichment
       try {
-        // If JSONL hasn't changed, only re-check runtime state (resolution/phase)
+        // If JSONL hasn't changed, only re-check runtime state (resolution)
         // by passing a flag that skips the expensive JSONL scan.
         enrichment = await computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, jsonlUnchanged)
       } catch {
@@ -168,7 +159,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         timestamp: new Date().toISOString(),
         payload: {
           agentId,
-          role: legacyPhaseToRole(enrichment.agentPhase),
+          role: toRole(agent.role) ?? 'work',
           hasPendingQuestion: enrichment.hasPendingQuestion,
           pendingQuestionCount: enrichment.pendingQuestionCount,
           resolution: enrichment.resolution as AgentEnrichmentChangedEvent['payload']['resolution'],

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
 import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import { join, resolve, dirname } from 'path';
@@ -11,7 +11,6 @@ import { getClaudePermissionFlagsString, resolvePermissionMode } from './claude-
 import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
-import type { ComplexityLevel } from './cloister/complexity.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId } from './settings.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
@@ -399,16 +398,10 @@ export interface AgentState {
   id: string;
   issueId: string;
   workspace: string;
-  runtime: string;
-  /**
-   * Coding-agent harness this agent runs under (PAN-636).
-   * Optional for forward compat with state.json files written before
-   * harness existed; readers must default unset/legacy values to
-   * 'claude-code' (see getHarness in @panctl/contracts).
-   */
+  /** Coding-agent harness this agent runs under (PAN-636). */
   harness?: 'claude-code' | 'pi';
-  /** Unified role primitive (PAN-1048). Optional until all writers migrate. */
-  role?: Role;
+  /** Unified role primitive (PAN-1048). */
+  role: Role;
   model: string;
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
@@ -419,16 +412,8 @@ export interface AgentState {
    *  deliberate stop from a crash/orphan. */
   stoppedByUser?: boolean;
   branch?: string; // Git branch name for this agent
-
-  // Model routing & handoffs (Phase 4)
-  complexity?: ComplexityLevel;
-  handoffCount?: number;
   costSoFar?: number;
   sessionId?: string; // For resuming sessions after handoff
-
-  // Work type system (PAN-118)
-  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning';
-  workType?: string; // Legacy model-routing key
 
   preSpawnStashRef?: string;
   preSpawnStashMessage?: string;
@@ -448,11 +433,39 @@ export function getAgentDir(agentId: string): string {
   return join(AGENTS_DIR, agentId);
 }
 
+function isRole(value: unknown): value is Role {
+  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship';
+}
+
+function cleanAgentState(raw: AgentState): AgentState {
+  return {
+    id: raw.id,
+    issueId: raw.issueId,
+    workspace: raw.workspace,
+    harness: raw.harness,
+    role: raw.role,
+    model: raw.model,
+    status: raw.status,
+    startedAt: raw.startedAt,
+    lastActivity: raw.lastActivity,
+    stoppedAt: raw.stoppedAt,
+    stoppedByUser: raw.stoppedByUser,
+    branch: raw.branch,
+    costSoFar: raw.costSoFar,
+    sessionId: raw.sessionId,
+    preSpawnStashRef: raw.preSpawnStashRef,
+    preSpawnStashMessage: raw.preSpawnStashMessage,
+    preSpawnBaselineHead: raw.preSpawnBaselineHead,
+    channelsEnabled: raw.channelsEnabled,
+  };
+}
+
 function parseAgentState(content: string, normalizedId: string): AgentState | null {
   try {
-    const state = JSON.parse(content) as AgentState;
+    const state = JSON.parse(content) as Partial<AgentState>;
+    if (!isRole(state.role)) return null;
     if (!state.id) state.id = normalizedId;
-    return state;
+    return cleanAgentState(state as AgentState);
   } catch {
     return null;
   }
@@ -492,7 +505,7 @@ export function saveAgentState(state: AgentState): void {
 
   writeFileSync(
     join(dir, 'state.json'),
-    JSON.stringify(state, null, 2)
+    JSON.stringify(cleanAgentState(state), null, 2)
   );
 
   if (oldStatus && oldStatus !== state.status) {
@@ -750,7 +763,7 @@ interface ChannelsDecision {
  * Eligibility (all required):
  *   - experimental.claudeCodeChannels is true in the merged config
  *   - the agent is a work agent (specialists/conversations stay on tmux)
- *   - the runtime is Claude Code (not Codex/Cursor/Gemini/Cliproxy-routed-GPT)
+ *   - the harness is Claude Code (not Pi or another runtime harness)
  *   - auth provider is Anthropic-direct (excludes Bedrock/Vertex/Foundry)
  *   - the workspace is not running inside a Docker container
  *
@@ -781,13 +794,9 @@ export function decideChannelsForWorkAgent(
     return { eligible: false, reason: 'not-a-work-agent' };
   }
 
-  // Runtime gate. The runtime field is 'claude' for Claude Code; specialised
-  // launchers set it to 'codex' / 'cursor' / 'gemini' and those are not
-  // Channel-capable.
-  const runtime = state.runtime;
-  if (runtime !== 'claude' && runtime !== 'claude-code') {
-    log(false, `runtime-${runtime}`);
-    return { eligible: false, reason: `runtime-${runtime}` };
+  if (state.harness !== 'claude-code') {
+    log(false, `harness-${state.harness ?? 'unknown'}`);
+    return { eligible: false, reason: `harness-${state.harness ?? 'unknown'}` };
   }
 
   // Auth gate. The Channels capability is gated by Anthropic auth in the
@@ -1191,18 +1200,11 @@ export function getLatestSessionId(agentId: string): string | null {
 export interface SpawnOptions {
   issueId: string;
   workspace: string;
-  runtime?: string;
   /** Coding-agent harness (PAN-636). Defaults to 'claude-code' when omitted. */
   harness?: 'claude-code' | 'pi';
   model?: string;
   prompt?: string;
   role?: 'work';
-  difficulty?: ComplexityLevel;
-  agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
-
-  // Legacy fields retained for old callers during migration. Work spawns ignore them.
-  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning';
-  workType?: string;
 
   // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
   // and the one-agent-per-issue uniqueness check is scoped to the slot.
@@ -1212,7 +1214,6 @@ export interface SpawnOptions {
 
 export interface SpawnRunOptions {
   workspace?: string;
-  runtime?: string;
   harness?: 'claude-code' | 'pi';
   model?: string;
   prompt?: string;
@@ -1487,7 +1488,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     return spawnAgent({
       issueId,
       workspace,
-      runtime: options.runtime,
       harness: options.harness,
       model: options.model,
       prompt: options.prompt,
@@ -1521,7 +1521,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     id: agentId,
     issueId,
     workspace,
-    runtime: options.runtime || 'claude',
     harness: options.harness ?? 'claude-code',
     role,
     model: selectedModel,
@@ -1641,7 +1640,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     id: agentId,
     issueId: options.issueId,
     workspace: options.workspace,
-    runtime: options.runtime || 'claude',
     harness: options.harness ?? 'claude-code',
     role,
     model: selectedModel,
@@ -1910,6 +1908,38 @@ export async function listRunningAgentsAsync(): Promise<(AgentState & { tmuxActi
   return agents;
 }
 
+function dropLegacyAgentStatesMissingRole(): number {
+  if (!existsSync(AGENTS_DIR)) return 0;
+
+  const dirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
+    .filter(d => d.isDirectory());
+
+  let dropped = 0;
+  for (const dir of dirs) {
+    const agentId = normalizeAgentId(dir.name);
+    const stateFile = join(AGENTS_DIR, dir.name, 'state.json');
+    if (!existsSync(stateFile)) continue;
+
+    try {
+      const raw = JSON.parse(readFileSync(stateFile, 'utf8')) as { role?: unknown };
+      if (isRole(raw.role)) continue;
+    } catch {
+      continue;
+    }
+
+    try { killSession(agentId); } catch { /* best effort */ }
+    try {
+      rmSync(join(AGENTS_DIR, dir.name), { recursive: true, force: true });
+      dropped++;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[agents] Failed to drop legacy agent state ${agentId}: ${msg}`);
+    }
+  }
+
+  return dropped;
+}
+
 /**
  * Scan ~/.panopticon/agents/ for state files with bare numeric issueIds
  * (e.g. "484" instead of "PAN-484") and log warnings to stderr.
@@ -1919,6 +1949,11 @@ export async function listRunningAgentsAsync(): Promise<(AgentState & { tmuxActi
  * Called once at server startup to surface legacy state files.
  */
 export function warnOnBareNumericIssueIds(): void {
+  const droppedLegacyAgents = dropLegacyAgentStatesMissingRole();
+  if (droppedLegacyAgents > 0) {
+    console.warn(`[agents] Dropped ${droppedLegacyAgents} legacy agent state file(s) missing role`);
+  }
+
   if (!existsSync(AGENTS_DIR)) return;
 
   const dirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
@@ -2110,7 +2145,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
         ...BLANKED_PROVIDER_ENV,
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
-        PANOPTICON_SESSION_TYPE: agentState.phase || 'implementation',
+        PANOPTICON_SESSION_TYPE: agentState.role,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...providerEnv
       }
@@ -2305,7 +2340,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         ...BLANKED_PROVIDER_ENV,
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
-        PANOPTICON_SESSION_TYPE: agentState.phase || 'implementation',
+        PANOPTICON_SESSION_TYPE: agentState.role,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...providerEnv
       }
@@ -2415,7 +2450,7 @@ export async function restartAgent(
       model: effectiveModel,
       workspace: agentState.workspace,
       role: 'work',
-      isPlanning: agentState.phase === 'planning',
+      isPlanning: agentState.role === 'plan',
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -2428,7 +2463,7 @@ export async function restartAgent(
         TERM: 'xterm-256color',
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
-        PANOPTICON_SESSION_TYPE: agentState.phase || 'implementation',
+        PANOPTICON_SESSION_TYPE: agentState.role,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         GIT_SEQUENCE_EDITOR: 'false',
         ...providerEnv,

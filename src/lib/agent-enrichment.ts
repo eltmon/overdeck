@@ -230,17 +230,17 @@ export async function computeAgentEnrichment(
 ): Promise<AgentEnrichment> {
   const isPlanning = agentId.startsWith('planning-')
 
-  // Read state.json for current phase
+  // Read state.json role for enrichment projection.
   const stateFile = join(getAgentDir(agentId), 'state.json')
-  let statePhase: string | undefined
+  let stateRole: string | undefined
   if (existsSync(stateFile)) {
     try {
       const state = JSON.parse(await readFile(stateFile, 'utf-8'))
-      statePhase = state.phase
+      stateRole = state.role
     } catch {}
   }
 
-  const agentPhase = (isPlanning ? 'planning' : (statePhase || 'implementation')) as AgentEnrichment['agentPhase']
+  const agentPhase = (isPlanning || stateRole === 'plan' ? 'planning' : 'implementation') as AgentEnrichment['agentPhase']
 
   // Get runtime state for resolution + idle detection
   const runtimeState = await getAgentRuntimeStateAsync(agentId)

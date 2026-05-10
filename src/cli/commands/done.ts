@@ -365,12 +365,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.log(chalk.yellow('  ⚠ No changed repos detected for review artifact creation'));
     }
 
-    // Step 3: Update agent state to stopped (so it appears in dashboard agents list)
-    // Mark phase as 'review-response' so the dashboard shows the agent as on
-    // standby for UAT tweaks rather than fully stopped.
+    // Step 3: Update agent state to stopped (so it appears in dashboard agents list).
+    // The completed marker and review artifact state represent standby/review handoff;
+    // state.json now keeps only stable role identity, not transient phases.
     if (existingState) {
       existingState.status = 'stopped';
-      existingState.phase = 'review-response';
       existingState.stoppedByUser = true;
       existingState.lastActivity = new Date().toISOString();
       saveAgentState(existingState);

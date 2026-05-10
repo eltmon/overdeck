@@ -329,7 +329,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     expect(actions[0]).toContain(ISSUE_ID);
   });
 
-  it('does not re-dispatch pending review when the work agent was explicitly stopped', async () => {
+  it('re-dispatches pending review after completed handoff even when the work agent is stopped', async () => {
     const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${ISSUE_ID.toLowerCase()}`);
     mkdirSync(agentDir, { recursive: true });
     writeFileSync(join(agentDir, 'completed.processed'), 'done\n', 'utf-8');
@@ -347,16 +347,22 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
       },
     });
 
+    const workspace = '/workspaces/feature-pan-369-test';
     mockGetAgentState.mockReturnValue({
-      workspace: '/workspaces/feature-pan-369-test',
+      workspace,
       status: 'stopped',
       stoppedByUser: true,
     });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon-cli', projectPath: '/workspaces' });
 
     const actions = await checkOrphanedReviewStatuses();
 
-    expect(mockSpawnRun).not.toHaveBeenCalled();
-    expect(actions).toContain(`Skipped pending review for ${ISSUE_ID}: work agent was explicitly stopped`);
+    expect(mockDispatchParallelReview).toHaveBeenCalledWith({
+      issueId: ISSUE_ID,
+      workspace,
+      branch: `feature/${ISSUE_ID.toLowerCase()}`,
+    });
+    expect(actions).toContain(`Re-dispatched pending review for ${ISSUE_ID} (deacon-orphan-recovery)`);
   });
 
   it('restores passed review/test state when top-level status is stuck in reviewing', async () => {

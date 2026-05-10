@@ -136,7 +136,7 @@ async function performKillAndSpawn(
     const newState = await spawnAgent({
       issueId: state.issueId,
       workspace: state.workspace,
-      runtime: state.runtime,
+      harness: state.harness,
       model: options.targetModel,
       role: 'work',
       prompt,

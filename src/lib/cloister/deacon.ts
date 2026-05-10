@@ -1454,18 +1454,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         const completedProcessedFile = join(AGENTS_DIR, agentIdForCheck, 'completed.processed');
         if (existsSync(completedProcessedFile)) {
           const agentState = getAgentState(agentIdForCheck);
-          // stoppedByUser is also set by `pan done` (work agent signaling completion),
-          // not just `pan kill`. For pan-done agents, phase==='review-response'.
-          // Re-dispatching the review fan-out doesn't require the work agent to be
-          // running — only a true user-kill (different phase) should block recovery.
-          if (
-            agentState?.status === 'stopped' &&
-            agentState.stoppedByUser &&
-            agentState.phase !== 'review-response'
-          ) {
-            actions.push(`Skipped pending review for ${issueId}: work agent was explicitly stopped`);
-            continue;
-          }
+          // A completed.processed marker means the work agent intentionally handed off;
+          // review recovery does not require that work session to still be running.
           const { resolveProjectFromIssue } = await import('../projects.js');
           const resolved = resolveProjectFromIssue(issueId);
           const issueLower = issueId.toLowerCase();
@@ -4180,7 +4170,7 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
     const state = getAgentState(agentId);
     if (!state) continue;
     if (state.status !== 'running') continue;
-    if (state.phase !== 'implementation' && state.phase !== 'review-response') continue;
+    if (state.role !== 'work') continue;
 
     // Tmux must be alive; orphans are handled by recoverOrphanedAgents.
     if (!await sessionExistsAsync(agentId)) continue;
@@ -4249,7 +4239,7 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
 /**
  * Auto-resume work agents that were stopped by a system crash/reboot
  * but still have incomplete work. Scans all agent state directories for
- * stopped implementation-phase agents and resumes them.
+ * stopped work-role agents and resumes them.
  *
  * Resumption rules:
  * - Agents with pending review feedback (blocked/failed/verification-failed)
@@ -4281,8 +4271,8 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — status=${state.status} (not stopped)`);
       continue;
     }
-    if (state.phase !== 'implementation' && state.phase !== 'review-response') {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — phase=${state.phase} (not implementation or review-response)`);
+    if (state.role !== 'work') {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — role=${state.role} (not work)`);
       continue;
     }
 
@@ -4364,14 +4354,6 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} resuming — review feedback pending (review=${review?.reviewStatus}, test=${review?.testStatus}, verification=${review?.verificationStatus})`);
     } else {
 
-      // Skip agents that are on standby for UAT tweaks after pan done.
-      // review-response phase means the agent is waiting for human input via pan tell,
-      // not crashed or orphaned.
-      if (state.phase === 'review-response') {
-        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — standby for UAT tweaks (phase=review-response)`);
-        continue;
-      }
-
       // Fallback: runtime.state === 'idle' means the agent is genuinely idle,
       // not crashed. Skip auto-resume unless review feedback arrives later.
       const runtimeState = getAgentRuntimeState(agentId);
@@ -4392,18 +4374,17 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${msg}`);
         logAgentLifecycle(agentId, `resumed by deacon auto-recovery (session restored after system event)`);
         const issueId = state.issueId;
-        const phaseLabel = state.phase === 'review-response' ? 'review-response' : 'work';
         emitActivityEntry({
           source: 'cloister',
           level: 'info',
           message: issueId
-            ? `Deacon auto-resumed ${issueId} ${phaseLabel} agent`
+            ? `Deacon auto-resumed ${issueId} work agent`
             : `Deacon auto-resumed agent ${agentId}`,
           issueId,
         });
         emitActivityTts({
           utterance: issueId
-            ? `Deacon auto resumed ${issueId} ${phaseLabel} agent`
+            ? `Deacon auto resumed ${issueId} work agent`
             : `Deacon auto resumed agent ${agentId}`,
           priority: 1,
           issueId,

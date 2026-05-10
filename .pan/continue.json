@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-10T01:10:30.000Z",
+  "updated": "2026-05-10T01:42:12.000Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "f8fcfbcec",
+    "sha": "a96104fa1",
     "dirty": true
   },
   "decisions": [
@@ -163,13 +163,15 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-tgba/E3 LauncherAgentType cleanup is implemented and verified: launcher-generator now uses role: Role plus optional spawnMode for conversation/remote/resume, deleted the specialist-dispatch and specialist-init command branches, migrated launcher call sites and tests to role/spawnMode, and verified typecheck, lint, full tests, and graphify update pass.",
-    "beadId": "workspace-tgba",
+    "description": "workspace-f3us/M1 state.json hard cut is implemented and verified: AgentState now requires role and persists only new fields, legacy state files missing role are dropped at startup after best-effort tmux kill, Channels eligibility gates on role=work plus harness=claude-code, and forbidden state.* legacy reads return zero hits in src/. Typecheck, lint, full tests, targeted lifecycle/resume/deacon/state/channel tests, and graphify update pass; inspection/commit/close are next.",
+    "beadId": "workspace-f3us",
     "filesToRead": [
-      "src/lib/launcher-generator.ts",
       "src/lib/agents.ts",
-      "src/lib/cloister/specialists.ts",
-      "src/lib/__tests__/launcher-generator.test.ts"
+      "src/lib/agent-enrichment.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/__tests__/agent-state-role.test.ts",
+      "tests/lib/work-agent-lifecycle.test.ts",
+      "tests/unit/dashboard/server/routes/resume-gate.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -372,6 +374,12 @@
       "timestamp": "2026-05-10T01:10:30.000Z",
       "reason": "bead-complete",
       "note": "Implemented workspace-tgba/E3: deleted LauncherAgentType, refactored LauncherConfig to require role: Role plus optional spawnMode for conversation/remote/resume, removed specialist-dispatch and specialist-init branches from launcher-generator, migrated launcher call sites/tests to role/spawnMode, and verified npm run typecheck, npm run lint, full npm test (381 passed/5 skipped test files; 4518 passed/62 skipped tests), and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-10T01:42:12.000Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-f3us/M1: removed legacy AgentState fields (type/agentPhase/phase/workType/complexity/handoffCount/runtime), made role required, sanitized parse/save round-trips to the new schema, added startup dropping of no-role legacy agent state with best-effort tmux kill and count logging, moved Channels eligibility to state.role === work plus harness === claude-code with updated reason strings, migrated CLI/dashboard/deacon/health/cost/runtime callsites and tests away from legacy state fields, and verified npm run typecheck, npm run lint, full npm test (381 passed/5 skipped test files; 4521 passed/62 skipped tests), forbidden state-field grep, and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

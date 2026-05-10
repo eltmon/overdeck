@@ -119,15 +119,6 @@ import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessi
 
 const execAsync = promisify(exec);
 
-function legacyPhaseToRole(phase: unknown, fallback: Role = 'work'): Role {
-  if (phase === 'plan' || phase === 'work' || phase === 'review' || phase === 'test' || phase === 'ship') return phase;
-  if (phase === 'planning') return 'plan';
-  if (phase === 'testing') return 'test';
-  if (phase === 'review-response') return 'review';
-  if (phase === 'merge') return 'ship';
-  return fallback;
-}
-
 function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
   if (!provided) return false;
   const providedBuffer = Buffer.from(provided, 'utf8');
@@ -448,7 +439,7 @@ const getAgentsRoute = HttpRouter.add(
             const isPlanning = name.startsWith('planning-');
             const stateFile = join(homedir(), '.panopticon', 'agents', name, 'state.json');
             const healthFile = join(homedir(), '.panopticon', 'agents', name, 'health.json');
-            let state: any = { runtime: 'claude', model: isPlanning ? 'opus' : 'sonnet', workspace: process.cwd() };
+            let state: any = { model: isPlanning ? 'opus' : 'sonnet', workspace: process.cwd() };
             let health: any = { consecutiveFailures: 0, killCount: 0 };
 
             if (existsSync(stateFile)) {
@@ -495,7 +486,7 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: name,
               issueId,
-              runtime: state.runtime || 'claude',
+              runtime: 'claude',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'healthy' as const,
               startedAt,
@@ -505,7 +496,7 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation,
               git: gitStatus,
               type: 'agent',
-              agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
+              agentPhase: isPlanning || state.role === 'plan' ? 'planning' : 'implementation',
               hasPendingQuestion: !hasActiveSpecialist && (pendingQuestions.length > 0 || isIdle || runtimeState?.resolution === 'needs_input'),
               pendingQuestionCount: pendingQuestions.length,
               resolution: runtimeState?.resolution || 'working',
@@ -592,7 +583,7 @@ const getAgentsRoute = HttpRouter.add(
               stoppedAgents.push({
                 id: dir,
                 issueId,
-                runtime: state.runtime || 'claude',
+                runtime: 'claude',
                 model: state.model || (isPlanning ? 'opus' : 'sonnet'),
                 status: 'stopped' as const,
                 startedAt: state.startedAt || new Date().toISOString(),
@@ -602,7 +593,7 @@ const getAgentsRoute = HttpRouter.add(
                 workspaceLocation: 'local',
                 git: null,
                 type: 'agent',
-                agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
+                agentPhase: isPlanning || state.role === 'plan' ? 'planning' : 'implementation',
                 hasPendingQuestion: runtimeData.resolution === 'needs_input',
                 pendingQuestionCount: 0,
                 resolution: runtimeData.resolution || 'working',
@@ -624,7 +615,7 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: dir,
               issueId,
-              runtime: state.runtime || 'claude',
+              runtime: 'claude',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'starting' as const,
               startedAt: state.startedAt || new Date().toISOString(),
@@ -634,7 +625,7 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation: 'local',
               git: null,
               type: 'agent',
-              agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
+              agentPhase: isPlanning || state.role === 'plan' ? 'planning' : 'implementation',
               hasPendingQuestion: false,
               pendingQuestionCount: 0,
               message: state.message || 'Starting...',
@@ -652,7 +643,7 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: dir,
               issueId,
-              runtime: state.runtime || 'claude',
+              runtime: 'claude',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'failed' as const,
               startedAt: state.startedAt || new Date().toISOString(),
@@ -662,7 +653,7 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation: state.location || 'local',
               git: null,
               type: 'agent',
-              agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
+              agentPhase: isPlanning || state.role === 'plan' ? 'planning' : 'implementation',
               hasPendingQuestion: false,
               pendingQuestionCount: 0,
               error: state.error || 'Unknown error',
@@ -1502,7 +1493,7 @@ const postAgentResumeRoute = HttpRouter.add(
             status: 'running',
             startedAt: agentState?.startedAt,
             lastActivity: new Date().toISOString(),
-            role: legacyPhaseToRole((agentState as { role?: Role; phase?: unknown } | undefined)?.role ?? agentState?.phase),
+            role: agentState?.role ?? 'work',
           },
         },
       })));
@@ -1588,12 +1579,12 @@ const postAgentRestartRoute = HttpRouter.add(
                   id,
                   issueId: updatedState?.issueId || agentState.issueId,
                   workspace: updatedState?.workspace || agentState.workspace,
-                  runtime: updatedState?.runtime || agentState.runtime,
+                  runtime: 'claude',
                   model: model || updatedState?.model || agentState.model,
                   status: 'running',
                   startedAt: updatedState?.startedAt || agentState.startedAt,
                   lastActivity: new Date().toISOString(),
-                  role: legacyPhaseToRole((updatedState as { role?: Role; phase?: unknown } | undefined)?.role ?? updatedState?.phase ?? agentState.phase),
+                  role: updatedState?.role ?? agentState.role,
                 },
               },
             }));
@@ -1634,12 +1625,12 @@ const postAgentRestartRoute = HttpRouter.add(
             id,
             issueId: updatedState?.issueId || agentState.issueId,
             workspace: updatedState?.workspace || agentState.workspace,
-            runtime: updatedState?.runtime || agentState.runtime,
+            runtime: 'claude',
             model: model || updatedState?.model || agentState.model,
             status: 'running',
             startedAt: updatedState?.startedAt || agentState.startedAt,
             lastActivity: new Date().toISOString(),
-            role: legacyPhaseToRole((updatedState as { role?: Role; phase?: unknown } | undefined)?.role ?? updatedState?.phase ?? agentState.phase),
+            role: updatedState?.role ?? agentState.role,
           },
         },
       })));

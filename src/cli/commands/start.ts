@@ -813,7 +813,9 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     console.log(chalk.bold('Agent Details:'));
     console.log(`  Session:    ${chalk.cyan(agent.id)}`);
     console.log(`  Workspace:  ${workspace}`);
-    console.log(`  Runtime:    ${agent.runtime} (${agent.model})`);
+    console.log(`  Harness:    ${agent.harness ?? 'claude-code'}`);
+    console.log(`  Model:      ${agent.model}`);
+    console.log(`  Role:       ${agent.role}`);
 
     // Show context info
     const planningContext = readPlanningContext(workspace);
