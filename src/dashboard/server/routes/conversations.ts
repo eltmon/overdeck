@@ -90,6 +90,7 @@ import {
   summarizeConversationActivity,
   type ParseState,
 } from '../services/conversation-service.js';
+import { parsePiConversationMessages } from '../services/pi-conversation-parser.js';
 import {
   maybeCompactBeforeRespawn,
   compactConversationNative,
@@ -234,7 +235,14 @@ async function getCachedMessages(
 
   let result: Awaited<ReturnType<typeof parseConversationMessages>>;
 
-  if (isSpecialist) {
+  // Pi sessions use a different JSONL schema than Claude Code. The Pi parser
+  // produces the same ParseResult shape and we cache by file path, so the
+  // rest of the pipeline (cost rollup, streaming flag, etc.) is unchanged.
+  // Pi files don't support the incremental-parse path — we always do a full
+  // read; chat sessions are small enough that this is fine.
+  if (isPiSessionFile(sessionFile)) {
+    result = await parsePiConversationMessages(sessionFile);
+  } else if (isSpecialist) {
     result = await parseFromLastCompactBoundary(sessionFile);
   } else if (
     cached &&
@@ -442,15 +450,45 @@ async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 30_000): Promi
   return false;
 }
 
-function resolveSessionFile(conv: Conversation): string | null {
+async function resolveSessionFile(conv: Conversation): Promise<string | null> {
+  // Pi conversations write their own JSONL into the agent's session dir,
+  // not into ~/.claude/projects/<dir>/<id>.jsonl. The path uses a per-run
+  // timestamped filename, so we resolve by globbing the directory.
+  if (conv.harness === 'pi') {
+    return resolvePiSessionFile(conv.tmuxSession);
+  }
   if (conv.claudeSessionId) {
     return sessionFilePath(conv.cwd, conv.claudeSessionId);
   }
   return null;
 }
 
+/**
+ * Return the most-recently-written Pi JSONL session file for a conversation,
+ * or null if Pi hasn't created one yet (TUI just started, or session reset).
+ * The dashboard chat panel uses this to render Pi conversation history.
+ */
+async function resolvePiSessionFile(tmuxSession: string): Promise<string | null> {
+  const sessionDir = join(homedir(), '.panopticon', 'agents', tmuxSession, 'sessions');
+  if (!existsSync(sessionDir)) return null;
+  try {
+    const entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl'));
+    if (entries.length === 0) return null;
+    // Filenames are `<iso-timestamp>_<session-id>.jsonl` — newest sorts last.
+    entries.sort();
+    return join(sessionDir, entries[entries.length - 1]!);
+  } catch {
+    return null;
+  }
+}
+
+/** Detect whether a session file path is a Pi conversation JSONL. */
+function isPiSessionFile(sessionFile: string): boolean {
+  return sessionFile.includes('/.panopticon/agents/') && sessionFile.includes('/sessions/');
+}
+
 async function resolveForkSourceSessionFile(conv: Conversation): Promise<string | null> {
-  const claudeSessionFile = resolveSessionFile(conv);
+  const claudeSessionFile = await resolveSessionFile(conv);
   if (claudeSessionFile && existsSync(claudeSessionFile)) {
     return claudeSessionFile;
   }
@@ -579,7 +617,7 @@ export async function handleConversationMessage(
   }
 
   if (shouldInterceptManualCompact(message)) {
-    const compactSessionFile = resolveSessionFile(conv);
+    const compactSessionFile = await resolveSessionFile(conv);
     if (!compactSessionFile || !existsSync(compactSessionFile)) {
       return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
     }
@@ -685,14 +723,18 @@ async function backfillConversationModels(): Promise<void> {
   backfillRunning = true;
   try {
     const convs = listConversations();
-    const candidates = convs.filter((conv) => !conv.model && resolveSessionFile(conv) !== null);
+    // Async filter — resolveSessionFile may need to glob the agent dir for Pi.
+    const probe = await Promise.all(
+      convs.map(async (conv) => (!conv.model ? await resolveSessionFile(conv) : null)),
+    );
+    const candidates = convs.filter((_, i) => probe[i] !== null);
     const BATCH_SIZE = 10;
     let backfilled = 0;
     for (let i = 0; i < candidates.length; i += BATCH_SIZE) {
       const batch = candidates.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
         batch.map(async (conv) => {
-          const sessionFile = resolveSessionFile(conv);
+          const sessionFile = await resolveSessionFile(conv);
           if (!sessionFile) return false;
           const model = await extractModelFromSessionFile(sessionFile);
           if (model && SAFE_MODEL_PATTERN.test(model)) {
@@ -1040,7 +1082,7 @@ const getConversationsRoute = HttpRouter.add(
           let currentTool: string | null = null;
 
           if (sessionAlive) {
-            const sf = resolveSessionFile(conv);
+            const sf = await resolveSessionFile(conv);
             if (sf && existsSync(sf)) {
               try {
                 const summary = await summarizeConversationActivity(sf);
@@ -1052,7 +1094,7 @@ const getConversationsRoute = HttpRouter.add(
             }
           }
 
-          const convSf = resolveSessionFile(conv);
+          const convSf = await resolveSessionFile(conv);
           const compacting = convSf ? isCompacting(convSf) : false;
           return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting };
         }));
@@ -1399,7 +1441,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const oldSessionId = conv.claudeSessionId;
 
         // Compact (if needed) then respawn with the new model before reporting success.
-        const sessionFile = resolveSessionFile(conv);
+        const sessionFile = await resolveSessionFile(conv);
         const cwd = conv.cwd;
         const tmuxSession = conv.tmuxSession;
         const effort = conv.effort ?? undefined;
@@ -1473,7 +1515,7 @@ const getConversationMessagesRoute = HttpRouter.add(
 
         // Fall back to specialist session file when name is a specialist tmux session
         // (e.g. specialist-panopticon-cli-merge-agent) and not in the conversations DB.
-        let sessionFile: string | null | undefined = conv ? resolveSessionFile(conv) : undefined;
+        let sessionFile: string | null | undefined = conv ? await resolveSessionFile(conv) : undefined;
         if (!conv) {
           const cached = getSpecialistSessionCache(name);
           if (cached) {
@@ -1862,7 +1904,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
 
             // Re-spawn with stored model
             const oldSessionId = conv.claudeSessionId;
-            const sessionFileForResume = resolveSessionFile(conv);
+            const sessionFileForResume = await resolveSessionFile(conv);
             const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);
             const harness = await resolveAllowedHarness(conv.harness, conv.model);
             await spawnConversationSession(
@@ -1999,7 +2041,7 @@ async function runForkPipeline(
     // Plain Claude Code fork: copy JSONL from last compact boundary into the new
     // session file, then spawn with --resume so Claude Code loads the history
     // directly.
-    const forkSessionFile = resolveSessionFile(conv);
+    const forkSessionFile = await resolveSessionFile(conv);
     if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
     await copySessionFromCompactBoundary(parentSessionFile, forkSessionFile);
 
@@ -2243,7 +2285,7 @@ const getConversationDiffsRoute = HttpRouter.add(
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
 
-        const sessionFile = resolveSessionFile(conv);
+        const sessionFile = await resolveSessionFile(conv);
         if (!sessionFile || !existsSync(sessionFile)) {
           return jsonResponse({ summaries: [] });
         }
@@ -2415,7 +2457,7 @@ const getConversationDiffFullRoute = HttpRouter.add(
         }
 
         // Devroot: aggregate all file edits across all turns
-        const sessionFile = resolveSessionFile(conv);
+        const sessionFile = await resolveSessionFile(conv);
         if (!sessionFile || !existsSync(sessionFile)) return jsonResponse({ diff: '' });
 
         const parsed = await getCachedMessages(sessionFile, false);
@@ -2499,7 +2541,7 @@ const getConversationDiffTurnRoute = HttpRouter.add(
 
         // Devroot: extract assistant ID from turnId (format: conv-turn-<assistantId>)
         const assistantId = turnId.startsWith('conv-turn-') ? turnId.slice('conv-turn-'.length) : turnId;
-        const sessionFile = resolveSessionFile(conv);
+        const sessionFile = await resolveSessionFile(conv);
         if (!sessionFile || !existsSync(sessionFile)) return jsonResponse({ diff: '' });
 
         const parsed = await getCachedMessages(sessionFile, false);
