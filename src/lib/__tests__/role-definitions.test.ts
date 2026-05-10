@@ -89,20 +89,19 @@ describe('role definitions', () => {
     expect(body).toContain("subagent_type: 'code-review-correctness'");
     expect(body).toContain("subagent_type: 'code-review-performance'");
     expect(body).toContain("subagent_type: 'code-review-requirements'");
-    expect(body).toContain('Launch the convoy reviewers in parallel');
+    expect(body).toContain('Launch the convoy in parallel');
     expect(body).toContain('Approve');
     expect(body).toContain('Request changes');
     expect(body).toContain('Review NEVER merges');
-    // PAN-1048 R7: roles/review.md no longer claims that each convoy
-    // reviewer is dispatched through resolveModel('review', '<sub-role>') —
-    // that wiring is deferred to PAN-1059. Today the Agent-tool subagents
-    // use the static model in each .claude/agents/code-review-*.md
-    // frontmatter. The stale per-sub-role expectations are replaced with a
-    // single assertion that the doc points the future routing path at
-    // PAN-1059, so the next round of review changes can't silently
-    // re-introduce the misleading claim.
+    // PAN-1048 R7 follow-up: spawnReviewRoleForIssue now resolves the four
+    // convoy models from config.yaml at spawn time via
+    // resolveModel('review', '<flavor>') and injects them into this role's
+    // prompt. The Agent-tool subagents receive that resolved model as a
+    // per-call override on top of their .claude/agents/code-review-*.md
+    // frontmatter. Full per-reviewer tmux isolation remains tracked under
+    // PAN-1059. Assert both invariants are still discoverable in the doc.
+    expect(body).toMatch(/resolveModel\(['"]review['"],\s*['"]<flavor>['"]\)/);
     expect(body).toMatch(/PAN-1059/);
-    expect(body).toMatch(/static frontmatter model/i);
   });
 
   it('defines the test role as suite verification plus browser UAT', () => {
