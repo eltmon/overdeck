@@ -1662,9 +1662,18 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // (used by the dashboard run picker), then config, then default. Without this
   // step, every role spawned through spawnRun ignored the per-role harness slot
   // surfaced in the Settings UI.
-  const resolvedHarness: 'claude-code' | 'pi' = options.harness
+  //
+  // PAN-1048 review feedback 005 (C4): every spawn entry point must pass the
+  // requested harness through canUseHarness() before persisting or launching
+  // (harness-policy.ts:3-6). resolveEffectiveHarness() collapses the requested
+  // harness to claude-code when the policy gate (e.g. Pi + Anthropic
+  // subscription auth, a ToS violation) blocks it, so a config-level
+  // `roles.work.harness: pi` cannot silently bypass the gate just because the
+  // model+auth combination is illegal.
+  const requestedHarness: 'claude-code' | 'pi' = options.harness
     ?? loadYamlConfig().config.roles?.[role]?.harness
     ?? 'claude-code';
+  const resolvedHarness: 'claude-code' | 'pi' = await resolveEffectiveHarness(requestedHarness, selectedModel);
 
   if (
     getProviderForModel(selectedModel).name === 'openai'
@@ -1713,6 +1722,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   const providerExports = await getProviderExportsForModel(selectedModel);
   const providerEnv = await getProviderEnvForModel(selectedModel);
+  // PAN-1048 review feedback 005 (S1): when the resolved harness is Pi, thread
+  // the per-agent Pi launcher fields (--session-dir, --extension, FIFO
+  // redirect) through generateLauncherScript so the role launcher emits the
+  // correct `pi --mode rpc` command instead of a malformed Claude command.
+  // Without this, a config'd `roles.review.harness: pi` produced a launcher
+  // that silently fell back to Claude shape.
+  const piLauncherFields = resolvedHarness === 'pi'
+    ? await getPiLauncherFields(agentId)
+    : {};
   const launcherContent = generateLauncherScript({
     role,
     workingDir: workspace,
@@ -1723,6 +1741,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     promptFile,
     panopticonEnv: { agentId, issueId, sessionType: role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness),
+    ...piLauncherFields,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -1804,10 +1823,15 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // the caller did not pass an explicit options.harness. Without this, every
   // work spawn ignored the per-role harness slot surfaced in Settings → Roles
   // and silently fell back to claude-code — the same bug spawnRun() already
-  // fixed for non-work roles at line 1659.
-  const resolvedHarness: 'claude-code' | 'pi' = options.harness
+  // fixed for non-work roles at line 1665.
+  //
+  // PAN-1048 review feedback 005 (C4): also gate through resolveEffectiveHarness
+  // so the policy check (e.g. Pi + Anthropic subscription auth → ToS violation)
+  // runs before we persist the resolved harness or hand it to the launcher.
+  const requestedHarness: 'claude-code' | 'pi' = options.harness
     ?? loadYamlConfig().config.roles?.work?.harness
     ?? 'claude-code';
+  const resolvedHarness: 'claude-code' | 'pi' = await resolveEffectiveHarness(requestedHarness, selectedModel);
 
   // Create state
   const existingState = getAgentState(agentId);

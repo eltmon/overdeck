@@ -29,14 +29,6 @@ export interface ResolvedChannelPermissionDecision {
   behavior: 'allow' | 'deny'
 }
 
-export interface SpecialistProjection {
-  name: string
-  state: 'active' | 'sleeping' | 'uninitialized'
-  isRunning: boolean
-  currentIssue?: string
-  lastWake?: string
-}
-
 export interface ReadModelState {
   sequence: number
   agentsById: Record<string, AgentSnapshot>
@@ -46,7 +38,6 @@ export interface ReadModelState {
    * would cause the whole AgentSnapshot to re-diff on the frontend.
    */
   agentRuntimeById: Record<string, AgentRuntimeSnapshot>
-  specialistsByName: Record<string, SpecialistProjection>
   reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>
   resources: ResourceStats | null
   agentOutputById: Record<string, string[]>
@@ -82,7 +73,6 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   sequence: 0,
   agentsById: {},
   agentRuntimeById: {},
-  specialistsByName: {},
   reviewStatusByIssueId: {},
   resources: null,
   agentOutputById: {},
@@ -176,20 +166,6 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     agentsById[agent.id] = agent
   }
 
-  const specialistsByName: Record<string, SpecialistProjection> = {}
-  for (const rawSpec of snapshot.specialists) {
-    if (!rawSpec || typeof rawSpec !== 'object') continue
-    const spec = rawSpec as Partial<SpecialistProjection>
-    if (typeof spec.name !== 'string') continue
-    specialistsByName[spec.name] = {
-      name: spec.name,
-      state: spec.state ?? 'uninitialized',
-      isRunning: spec.isRunning ?? false,
-      currentIssue: spec.currentIssue,
-      lastWake: spec.lastWake,
-    }
-  }
-
   const reviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {}
   for (const rs of snapshot.reviewStatuses) {
     reviewStatusByIssueId[rs.issueId] = rs
@@ -207,7 +183,6 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     ...state,
     sequence: snapshot.sequence,
     agentsById,
-    specialistsByName,
     reviewStatusByIssueId,
     agentRuntimeById: snapshot.agentRuntimeById ?? state.agentRuntimeById,
     channelPermissionRequestsById,
@@ -434,41 +409,14 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'merge.ready':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
+    // PAN-1048 — specialist.* events still flow but no longer feed a separate
+    // projection. The same lifecycle is now visible via agent.started /
+    // agent.stopped + role-filtered agentsById. Sequence-only update keeps
+    // clients in lockstep.
     case 'specialist.started':
-      return {
-        ...state,
-        sequence: Math.max(state.sequence, event.sequence),
-        specialistsByName: {
-          ...state.specialistsByName,
-          [event.payload.name]: event.payload,
-        },
-      }
-
-    case 'specialist.completed': {
-      const spec = state.specialistsByName[event.payload.name]
-      if (!spec) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
-      return {
-        ...state,
-        sequence: Math.max(state.sequence, event.sequence),
-        specialistsByName: {
-          ...state.specialistsByName,
-          [event.payload.name]: { ...spec, state: 'sleeping', isRunning: false, currentIssue: undefined },
-        },
-      }
-    }
-
-    case 'specialist.failed': {
-      const spec = state.specialistsByName[event.payload.name]
-      if (!spec) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
-      return {
-        ...state,
-        sequence: Math.max(state.sequence, event.sequence),
-        specialistsByName: {
-          ...state.specialistsByName,
-          [event.payload.name]: { ...spec, state: 'sleeping', isRunning: false },
-        },
-      }
-    }
+    case 'specialist.completed':
+    case 'specialist.failed':
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
     case 'resources.updated':
       return {

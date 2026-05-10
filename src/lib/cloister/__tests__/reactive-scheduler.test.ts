@@ -6,6 +6,10 @@ vi.mock('../../agents.js', () => ({
   // on the reactive scheduler hot path.
   listRunningAgentsAsync: vi.fn(async () => []),
   getAgentState: vi.fn(() => null),
+  // PAN-1048 round-5 mechanical fix: resolveWorkspaceForIssue now awaits the
+  // async agent-state read, so the mock module must export this symbol or the
+  // dynamic call in the scheduler throws before reaching the wrapper spy.
+  getAgentStateAsync: vi.fn(async () => null),
   getAgentRuntimeState: vi.fn(() => null),
   saveAgentRuntimeState: vi.fn(),
   spawnRun: vi.fn(async (issueId: string, role: string) => ({ id: `agent-${issueId.toLowerCase()}-${role}` })),

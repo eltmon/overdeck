@@ -1516,91 +1516,32 @@ const postProjectReviewRestartRoute = HttpRouter.add(
 );
 
 // ─── Route: POST /api/specialists/:project/:issueId/reviewer/:role/restart ───
-// Kills a single reviewer role's tmux session and re-spawns it using the
-// prompt from the most recent review run. If no prompt file exists (review
-// never ran), returns 404 — the user should restart all reviewers instead.
+//
+// PAN-1048 review feedback 005 (C5): the per-reviewer restart endpoint is
+// retired. The role primitive launches the four code-review-* sub-agents in a
+// single review-role run via the Agent tool — there is no longer a per-axis
+// tmux session to restart, no `pan-review-agent` shell to relaunch, and no
+// per-reviewer prompt file to feed back in. Returning 410 with a pointer to
+// the supported restart surface keeps any frontend cache/intent that still
+// hits this URL from silently re-establishing the legacy machinery.
 
 const postProjectReviewerRoleRestartRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:project/:issueId/reviewer/:role/restart',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const issueId = params['issueId'] as string;
-    const role = params['role'] as string;
-    const body = yield* readJsonBody;
-    const { model } = body as { model?: string };
-
-    const {
-      REVIEWER_ROLES,
-      getReviewerSessionName,
-    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-
-    if (!REVIEWER_ROLES.includes(role as any)) {
-      return jsonResponse(
-        { error: `Invalid reviewer role: ${role}. Must be one of: ${REVIEWER_ROLES.join(', ')}` },
-        { status: 400 },
-      );
-    }
-
-    const sessionName = getReviewerSessionName(role as any, project, issueId);
-
-    // Kill existing session
-    yield* Effect.promise(() => killSessionAsync(sessionName).catch(() => {}));
-    saveAgentRuntimeState(sessionName, {
-      state: 'idle',
-      lastActivity: new Date().toISOString(),
-    });
-
-    // Resolve workspace
-    const projectConfig = resolveProjectFromIssue(issueId);
-    if (!projectConfig) {
-      return jsonResponse({ error: `Cannot resolve project for ${issueId}` }, { status: 404 });
-    }
-    const workspacePath = join(projectConfig.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-    if (!existsSync(workspacePath)) {
-      return jsonResponse({ error: `Workspace not found` }, { status: 404 });
-    }
-
-    // Find the most recent review run's prompt file for this role
-    const panReviewDir = join(workspacePath, '.pan', 'review');
-    let promptFile: string | null = null;
-    try {
-      const entries = yield* Effect.promise(() => readdir(panReviewDir));
-      const reviewDirs = entries.filter(e => e.startsWith('review-')).sort().reverse();
-      for (const dir of reviewDirs) {
-        const candidate = join(panReviewDir, dir, `${role}-prompt.md`);
-        if (existsSync(candidate)) {
-          promptFile = candidate;
-          break;
-        }
-      }
-    } catch { /* review dir may not exist */ }
-
-    if (!promptFile) {
-      return jsonResponse(
-        { error: `No prompt file found for ${role} reviewer. Use "Restart Review" to run a full review instead.` },
-        { status: 404 },
-      );
-    }
-
-    // Resolve model
-    const { resolveReviewerModel, spawnSingleReviewer } = yield* Effect.promise(
-      () => import('../../../lib/cloister/review-agent.js'),
+    return jsonResponse(
+      {
+        error: 'per-reviewer restart route retired',
+        hint: 'The review role launches all four code-review-* sub-agents in a single run via the Agent tool. To re-run a review, POST /api/review/:issueId/trigger (full review restart through spawnReviewRoleForIssue), which dispatches role: review and re-fans-out the convoy.',
+        retiredFor: {
+          project: params['project'],
+          issueId: params['issueId'],
+          role: params['role'],
+        },
+      },
+      { status: 410 },
     );
-    const resolvedModel = model ?? resolveReviewerModel(
-      { name: role, model: undefined } as any,
-      'claude-sonnet-4-6',
-    );
-
-    yield* Effect.promise(() => spawnSingleReviewer(sessionName, resolvedModel, promptFile!, workspacePath));
-
-    return jsonResponse({
-      success: true,
-      message: `Restarted ${role} reviewer for ${issueId}`,
-      sessionName,
-      model: resolvedModel,
-    });
   })),
 );
 

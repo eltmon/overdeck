@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef, createContext, useContext } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
+import { useDashboardStore, selectAgentList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
 /* Drag-and-drop disabled pending rework (PAN-TODO)
 import {
   DndContext,
@@ -27,7 +27,8 @@ import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, 
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
-import { SpecialistAgent } from './SpecialistAgentCard';
+// PAN-1048 — SpecialistAgent type retired; specialist-style indicators now
+// derive directly from role-tagged AgentSnapshots (review / test / ship).
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
@@ -880,7 +881,8 @@ export function ListIssueRow({
   issue: Issue;
   issueWorkAgentsById?: Map<string, Agent[]>;
   agents: Agent[];
-  specialists: SpecialistAgent[];
+  /** PAN-1048 — role-tagged agents (review / test / ship) for the visible cycle. */
+  specialists: Agent[];
   issueCosts: Record<string, IssueCost>;
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
@@ -930,9 +932,9 @@ export function ListIssueRow({
   const isRunning = workAgents.some(isAgentSessionAttachable) || !!standbyAgent;
   const hasMultipleWorkAgents = workAgents.length > 1;
 
-  // Check for specialists
+  // Check for specialists — PAN-1048 — role-tagged agents whose issueId matches.
   const issueSpecialists = specialists.filter(
-    s => s.currentIssue?.toLowerCase() === issueIdLower
+    (s) => s.issueId?.toLowerCase() === issueIdLower && s.status !== 'stopped'
   );
 
   // Parse difficulty from labels
@@ -1013,10 +1015,10 @@ export function ListIssueRow({
         </span>
       )}
 
-      {/* Specialist indicators */}
-      {issueSpecialists.map(s => (
-        <span key={s.name} className="text-xs text-primary shrink-0" title={`${s.displayName} specialist`}>
-          {s.name === 'review-agent' ? '👁️' : s.name === 'test-agent' ? '🧪' : s.name === 'merge-agent' ? '🔀' : '🤖'}
+      {/* Specialist indicators — PAN-1048 keyed on role primitive */}
+      {issueSpecialists.map((s) => (
+        <span key={s.id} className="text-xs text-primary shrink-0" title={`${s.role} agent`}>
+          {s.role === 'review' ? '👁️' : s.role === 'test' ? '🧪' : s.role === 'ship' ? '🔀' : '🤖'}
         </span>
       ))}
 
@@ -1166,7 +1168,14 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   // Event-sourced state from Zustand store (PAN-433 read model)
   const issues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
-  const specialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
+  // PAN-1048 — derive specialist-role agents (review / test / ship) from the
+  // unified agent list. Replaces the retired specialistsByName projection.
+  const specialists = useMemo(
+    () => agents.filter(
+      (a) => a.role === 'review' || a.role === 'test' || a.role === 'ship',
+    ),
+    [agents],
+  );
   const reviewStatusByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
 
   // Bulk selection state — key based on filters so selection survives data refreshes
@@ -2010,7 +2019,8 @@ function ColumnContent({
   issues: Issue[];
   issueWorkAgentsById: Map<string, Agent[]>;
   agents: Agent[];
-  specialists: SpecialistAgent[];
+  /** PAN-1048 — role-tagged agents (review / test / ship). */
+  specialists: Agent[];
   issueCosts: Record<string, IssueCost>;
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
@@ -2036,7 +2046,7 @@ function ColumnContent({
       (a) => a.issueId?.toLowerCase() === issueIdLower && a.id?.startsWith('planning-')
     );
     const issueSpecialists = specialists.filter(
-      (s) => s.currentIssue?.toLowerCase() === issueIdLower
+      (s) => s.issueId?.toLowerCase() === issueIdLower && s.status !== 'stopped'
     );
 
     return (
@@ -2659,7 +2669,8 @@ interface IssueCardProps {
   workAgent?: Agent;
   workAgents?: Agent[];
   planningAgent?: Agent;
-  specialists?: SpecialistAgent[];
+  /** PAN-1048 — role-tagged agents (review / test / ship) for this issue. */
+  specialists?: Agent[];
   cost?: IssueCost;
   costsLoading?: boolean;
   isSelected: boolean;
@@ -3185,7 +3196,11 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                 });
               }
               for (const spec of specialists) {
-                const specType = spec.name.replace('-agent', '') as 'review' | 'test' | 'merge';
+                // PAN-1048 — role primitive directly maps to the AgentBadge type.
+                // Map ship → merge for the legacy badge palette so reviewers
+                // still see the familiar "merge" indicator.
+                const specType = (spec.role === 'ship' ? 'merge' : spec.role) as 'review' | 'test' | 'merge';
+                if (specType !== 'review' && specType !== 'test' && specType !== 'merge') continue;
                 badges.push({ type: specType, name: specType });
               }
 

@@ -22,7 +22,7 @@ import {
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
 } from '@panctl/contracts';
-import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, SpecialistProjection, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEvent } from '../../lib/persistent-logger.js';
 
@@ -185,7 +185,11 @@ export const ReadModelServiceLive = Layer.effect(
       return {
         sequence: state.sequence,
         agents: Object.values(state.agentsById),
-        specialists: Object.values(state.specialistsByName),
+        // PAN-1048 — specialistsByName projection retired. The DashboardSnapshot
+        // schema still has a `specialists` field for backward compat with the
+        // wire format; we always send an empty array and clients derive the
+        // same data from agentsById filtered by role.
+        specialists: [],
         reviewStatuses: Object.values(state.reviewStatusByIssueId),
         agentRuntimeById: state.agentRuntimeById,
         channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
@@ -350,7 +354,8 @@ export const ReadModelServiceLive = Layer.effect(
             ...INITIAL_READ_MODEL_STATE,
             sequence: cached.sequence,
             agentsById,
-            specialistsByName: Object.fromEntries((cached.specialists ?? []).map((s) => [s.name, s])),
+            // PAN-1048 — specialistsByName projection retired; consumers derive
+            // from agentsById filtered by role.
             reviewStatusByIssueId: Object.fromEntries(
               Object.values(statusMap).map((status) => [status.issueId, toReviewStatusSnapshot(status)]),
             ),
@@ -370,10 +375,9 @@ export const ReadModelServiceLive = Layer.effect(
       // ── Slow path: bootstrap from lib modules ────────────────────────────────
       if (!usedProjectionCache) {
         // Lazy imports to avoid circular dependency issues
-        const [{ listRunningAgentsAsync, warnOnBareNumericIssueIds }, { getAllSpecialists, getSpecialistState }, { getReviewStatus }, { computeAgentEnrichment }] =
+        const [{ listRunningAgentsAsync, warnOnBareNumericIssueIds }, { getReviewStatus }, { computeAgentEnrichment }] =
           yield* Effect.all([
             Effect.promise(() => import('../../lib/agents.js')),
-            Effect.promise(() => import('../../lib/cloister/specialists.js')),
             Effect.promise(() => import('../../lib/review-status.js')),
             Effect.promise(() => import('../../lib/agent-enrichment.js')),
           ]);
@@ -456,21 +460,6 @@ export const ReadModelServiceLive = Layer.effect(
           };
         }
 
-        // ── Specialists ────────────────────────────────────────────────────────
-        const allSpecs = getAllSpecialists();
-        const specialistsByName: Record<string, SpecialistProjection> = {};
-        for (const s of allSpecs) {
-          const specName = toSpecialistAgentName(s.name);
-          if (!specName) continue; // Skip unknown specialist names
-          const specState = getSpecialistState(s.name);
-          specialistsByName[s.name] = {
-            name: specName,
-            state: toSpecialistLifecycleState(specState),
-            isRunning: specState === 'active',
-            lastWake: s.lastWake || undefined,
-          };
-        }
-
         // ── Review statuses ────────────────────────────────────────────────────
         const statusMap = loadReviewStatuses();
         const reviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {};
@@ -495,14 +484,14 @@ export const ReadModelServiceLive = Layer.effect(
           ...INITIAL_READ_MODEL_STATE,
           sequence,
           agentsById,
-          specialistsByName,
+          // PAN-1048 — specialistsByName projection retired; consumers derive
+          // from agentsById filtered by role.
           reviewStatusByIssueId,
           issuesRaw: [],
         };
 
         console.log(
           `[ReadModel] Bootstrapped: ${Object.keys(agentsById).length} agents, ` +
-          `${Object.keys(specialistsByName).length} specialists, ` +
           `${Object.keys(reviewStatusByIssueId).length} review statuses, seq=${sequence}`,
         );
       }

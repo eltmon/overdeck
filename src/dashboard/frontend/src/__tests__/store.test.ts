@@ -9,7 +9,7 @@ import {
   applyEventsReducer,
   selectAgentList,
   selectAgentById,
-  selectSpecialistList,
+  selectAgentsByRole,
   selectReviewStatus,
   selectAgentOutput,
   selectChannelPermissionRequests,
@@ -23,7 +23,6 @@ import type {
   AgentSnapshot,
   DashboardSnapshot,
   DomainEvent,
-  SpecialistProjection,
 } from '@panctl/contracts'
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
@@ -38,10 +37,16 @@ const baseAgent: AgentSnapshot = {
   startedAt: '2026-01-01T00:00:00Z',
 }
 
-const baseSpec: SpecialistProjection = {
-  name: 'review',
-  state: 'active',
-  isRunning: true,
+// PAN-1048 — role-tagged agent fixture used to exercise selectAgentsByRole.
+const reviewAgent: AgentSnapshot = {
+  id: 'review-1',
+  issueId: 'PAN-1',
+  workspace: '/ws/1',
+  runtime: 'claude-code',
+  model: 'claude-sonnet-4',
+  status: 'running',
+  startedAt: '2026-01-01T00:00:00Z',
+  role: 'review',
 }
 
 const emptyState: DashboardState = {
@@ -50,7 +55,6 @@ const emptyState: DashboardState = {
   sequence: 0,
   agentsById: {},
   agentRuntimeById: {},
-  specialistsByName: {},
   reviewStatusByIssueId: {},
   resources: null,
   agentOutputById: {},
@@ -79,7 +83,9 @@ function makeSnapshot(seq = 5): DashboardSnapshot {
   return {
     sequence: seq,
     agents: [baseAgent],
-    specialists: [baseSpec],
+    // PAN-1048 — specialists projection retired; field kept on the wire for
+    // back-compat but always empty.
+    specialists: [],
     reviewStatuses: [],
     issues: [],
     channelPermissionRequests: [],
@@ -100,7 +106,6 @@ describe('syncSnapshotReducer', () => {
     expect(next.sequence).toBe(10)
     expect(Object.keys(next.agentsById)).toHaveLength(1)
     expect(next.agentsById['agent-1']).toEqual(baseAgent)
-    expect(next.specialistsByName['review']).toEqual(baseSpec)
   })
 })
 
@@ -290,14 +295,13 @@ describe('selectors', () => {
   const state: DashboardState = {
     ...emptyState,
     bootstrapComplete: true,
-    agentsById: { 'a1': baseAgent },
-    specialistsByName: { 'review': baseSpec },
+    agentsById: { 'a1': baseAgent, 'review-1': reviewAgent },
     agentOutputById: { 'a1': ['line 1', 'line 2'] },
     resources: { containers: 5, networks: 3 },
   }
 
   it('selectAgentList returns array of agents', () => {
-    expect(selectAgentList(state)).toEqual([baseAgent])
+    expect(selectAgentList(state).map((a) => a.id).sort()).toEqual(['agent-1', 'review-1'])
   })
 
   it('selectAgentById returns agent for known id', () => {
@@ -308,8 +312,9 @@ describe('selectors', () => {
     expect(selectAgentById('unknown')(state)).toBeUndefined()
   })
 
-  it('selectSpecialistList returns array of specialists', () => {
-    expect(selectSpecialistList(state)).toEqual([baseSpec])
+  it('selectAgentsByRole returns role-tagged agents (PAN-1048)', () => {
+    expect(selectAgentsByRole('review')(state)).toEqual([reviewAgent])
+    expect(selectAgentsByRole('test')(state)).toEqual([])
   })
 
   it('selectReviewStatus returns undefined when not present', () => {

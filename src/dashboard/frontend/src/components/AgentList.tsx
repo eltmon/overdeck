@@ -1,9 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSharedTick } from '../lib/useSharedTick';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
-import { useDashboardStore, selectSpecialistList } from '../lib/store';
+import { useDashboardStore, selectAgentList } from '../lib/store';
 import { Brain, Play, Square, Clock, AlertCircle, CheckCircle2, Activity, XCircle, Radio } from 'lucide-react';
-import { type SpecialistAgent } from './SpecialistAgentCard';
 
 interface CloisterStatus {
   running: boolean;
@@ -126,8 +125,9 @@ function LiveLastHeard({ timestamp, label }: { timestamp: string | null; label?:
 export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
   const queryClient = useQueryClient();
 
-  const specialistsFromStore = useDashboardStore(selectSpecialistList);
-  const specialists = specialistsFromStore as unknown as SpecialistAgent[];
+  // PAN-1048 — derive specialist liveness from role-tagged agents
+  // (review / test / ship), not the retired specialistsByName projection.
+  const allAgents = useDashboardStore(selectAgentList);
 
   const { data: runningProjectSpecialists } = useQuery({
     queryKey: ['project-specialists-running'],
@@ -161,8 +161,12 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
     },
   });
 
-  // Check if any specialist is actually active (running tmux session)
-  const anySpecialistActive = specialists?.some(s => s.isRunning) || false;
+  // Check if any specialist role is actually active (running tmux session).
+  // A "specialist" in the new role-primitive model is any agent with role
+  // review / test / ship that is not stopped.
+  const anySpecialistActive = allAgents.some(
+    (a) => (a.role === 'review' || a.role === 'test' || a.role === 'ship') && a.status !== 'stopped',
+  );
   const patrolRunning = cloisterStatus?.running || false;
 
   // Get recent activity (last 5)

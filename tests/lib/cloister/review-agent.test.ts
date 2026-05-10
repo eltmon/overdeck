@@ -1020,16 +1020,26 @@ describe('template/output contract', () => {
     { name: 'code-review-requirements', role: 'requirements' },
   ];
 
-  describe('reviewer templates write to injected Output file', () => {
+  describe('reviewer templates return findings as agent response (PAN-1048 R5 C1)', () => {
+    // PAN-1048 R5 C1 superseded PAN-540 — reviewer sub-agents are now read-only
+    // and return their findings as the agent's response (synthesized
+    // programmatically by runParallelReview). They MUST NOT write to a file.
     for (const { name, role } of reviewerTemplates) {
       it(`${role}: does NOT hardcode .claude/reviews/ path`, () => {
         const content = readTemplate(name);
         expect(content).not.toContain('.claude/reviews/');
       });
 
-      it(`${role}: instructs agent to write to the **Output file** from Review Context`, () => {
+      it(`${role}: does NOT instruct the agent to write to a file`, () => {
         const content = readTemplate(name);
-        expect(content).toMatch(/\*\*Output file\*\*/);
+        expect(content).not.toMatch(/\*\*Output file\*\*/);
+      });
+
+      it(`${role}: instructs the agent to return findings as its response`, () => {
+        const content = readTemplate(name);
+        // The new tail "Returning your review" tells the reviewer to surface
+        // findings in the agent response, not to a file.
+        expect(content).toMatch(/Returning your review/i);
       });
     }
   });

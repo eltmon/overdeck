@@ -14,7 +14,6 @@ import {
   ReadModelState,
 } from '../../packages/contracts/src/event-reducers.js'
 import type { AgentSnapshot, DashboardSnapshot } from '../../packages/contracts/src/index.js'
-import type { SpecialistProjection } from '../../packages/contracts/src/event-reducers.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -37,14 +36,6 @@ const baseAgent: AgentSnapshot = {
   model: 'claude-opus-4-6',
 }
 
-const baseSpecialist: SpecialistProjection = {
-  name: 'review',
-  state: 'sleeping',
-  isRunning: false,
-  currentIssue: undefined,
-  lastWake: undefined,
-}
-
 // ─── INITIAL_READ_MODEL_STATE ────────────────────────────────────────────────
 
 describe('INITIAL_READ_MODEL_STATE', () => {
@@ -54,7 +45,6 @@ describe('INITIAL_READ_MODEL_STATE', () => {
 
   it('starts with empty collections', () => {
     expect(INITIAL_READ_MODEL_STATE.agentsById).toEqual({})
-    expect(INITIAL_READ_MODEL_STATE.specialistsByName).toEqual({})
     expect(INITIAL_READ_MODEL_STATE.reviewStatusByIssueId).toEqual({})
     expect(INITIAL_READ_MODEL_STATE.agentOutputById).toEqual({})
     expect(INITIAL_READ_MODEL_STATE.issuesRaw).toEqual([])
@@ -72,7 +62,9 @@ describe('syncSnapshot', () => {
   const snapshot: DashboardSnapshot = {
     sequence: 10,
     agents: [baseAgent],
-    specialists: [baseSpecialist],
+    // PAN-1048 — specialists projection retired; snapshot field kept on the
+    // wire for back-compat but the reducer no longer materializes it.
+    specialists: [],
     reviewStatuses: [],
     resources: { cpu: 30, memPercent: 50, memUsed: 1000, memTotal: 2000 },
     timestamp: new Date().toISOString(),
@@ -81,11 +73,6 @@ describe('syncSnapshot', () => {
   it('populates agentsById keyed by agent id', () => {
     const state = syncSnapshot(makeState(), snapshot)
     expect(state.agentsById['agent-1']).toEqual(baseAgent)
-  })
-
-  it('populates specialistsByName keyed by name', () => {
-    const state = syncSnapshot(makeState(), snapshot)
-    expect(state.specialistsByName['review']).toEqual(baseSpecialist)
   })
 
   it('sets sequence from snapshot', () => {
@@ -320,61 +307,45 @@ describe('applyEvent — agent.output_received', () => {
   })
 })
 
-// ─── applyEvent — specialist events ─────────────────────────────────────────
+// ─── applyEvent — specialist events (sequence-only no-ops post PAN-1048) ────
+// The specialistsByName projection has been retired. Specialist lifecycle is
+// now visible via agent.started / agent.stopped + role-filtered agentsById.
+// Specialist events still flow over the wire so older clients don't crash, but
+// the reducer only advances the sequence number.
 
-describe('applyEvent — specialist.started', () => {
-  it('adds specialist to specialistsByName', () => {
-    const specialist: SpecialistProjection = { ...baseSpecialist, state: 'active', isRunning: true }
-    const state = applyEvent(makeState(), {
+describe('applyEvent — specialist.* events (post PAN-1048)', () => {
+  it('only advances sequence for specialist.started', () => {
+    const state = makeState({ sequence: 0 })
+    const next = applyEvent(state, {
       type: 'specialist.started',
       sequence: 10,
       timestamp: ts(),
-      payload: specialist,
-    })
-    expect(state.specialistsByName['review']).toEqual(specialist)
-  })
-})
-
-describe('applyEvent — specialist.completed', () => {
-  it('sets state to sleeping and isRunning to false', () => {
-    const activeSpec: SpecialistProjection = { ...baseSpecialist, state: 'active', isRunning: true, currentIssue: 'PAN-1' }
-    const state = makeState({ specialistsByName: { 'review': activeSpec } })
-    const next = applyEvent(state, {
-      type: 'specialist.completed',
-      sequence: 11,
-      timestamp: ts(),
-      payload: { name: 'review', issueId: 'PAN-1' },
-    })
-    expect(next.specialistsByName['review']!.state).toBe('sleeping')
-    expect(next.specialistsByName['review']!.isRunning).toBe(false)
-    expect(next.specialistsByName['review']!.currentIssue).toBeUndefined()
+      payload: { name: 'review', state: 'active', isRunning: true },
+    } as any)
+    expect(next.sequence).toBe(10)
+    expect(next.agentsById).toBe(state.agentsById)
   })
 
-  it('updates sequence even when specialist not found', () => {
+  it('only advances sequence for specialist.completed', () => {
     const state = makeState({ sequence: 0 })
     const next = applyEvent(state, {
       type: 'specialist.completed',
       sequence: 11,
       timestamp: ts(),
-      payload: { name: 'ship', issueId: 'PAN-1' },
-    })
+      payload: { name: 'review', issueId: 'PAN-1' },
+    } as any)
     expect(next.sequence).toBe(11)
-    expect(next.specialistsByName).toBe(state.specialistsByName)
   })
-})
 
-describe('applyEvent — specialist.failed', () => {
-  it('sets state to sleeping and isRunning to false', () => {
-    const activeSpec: SpecialistProjection = { ...baseSpecialist, state: 'active', isRunning: true }
-    const state = makeState({ specialistsByName: { 'review': activeSpec } })
+  it('only advances sequence for specialist.failed', () => {
+    const state = makeState({ sequence: 0 })
     const next = applyEvent(state, {
       type: 'specialist.failed',
       sequence: 12,
       timestamp: ts(),
-      payload: { name: 'review', issueId: 'PAN-1', reason: 'timeout' },
-    })
-    expect(next.specialistsByName['review']!.state).toBe('sleeping')
-    expect(next.specialistsByName['review']!.isRunning).toBe(false)
+      payload: { name: 'review', issueId: 'PAN-1', error: 'timeout' },
+    } as any)
+    expect(next.sequence).toBe(12)
   })
 })
 
