@@ -124,7 +124,11 @@ const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
 
 async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   const harness: RuntimeName = requested === 'pi' || requested === 'claude-code' ? requested : 'claude-code';
-  if (!model) return harness;
+  // Conversation runtime only honors non-default harnesses when a concrete model is
+  // passed through to getAgentRuntimeBaseCommand(). Without a model,
+  // spawnConversationSession() intentionally launches the default Claude Code
+  // command, so persist the matching default harness as the effective value.
+  if (!model) return 'claude-code';
   const decision = canUseHarness(harness, model, await getProviderAuthMode(model));
   return decision.allowed ? harness : 'claude-code';
 }
@@ -1834,7 +1838,7 @@ async function runForkPipeline(
   plain = false,
   localSummaryOnly = false,
   includeThinkingInSummary?: boolean,
-  _summaryHarness?: RuntimeName,
+  summaryHarness?: RuntimeName,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
@@ -1872,7 +1876,7 @@ async function runForkPipeline(
   if (localSummaryOnly) {
     summary = await generateFallbackSummary(parentSessionFile);
   } else {
-    const result = await generateSummaryForFork(parentSessionFile, summaryModel, includeThinkingInSummary);
+    const result = await generateSummaryForFork(parentSessionFile, summaryModel, includeThinkingInSummary, summaryHarness);
     summary = result.summary;
   }
 
@@ -1963,8 +1967,9 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const newName = `${timestamp}-${suffix}`;
         const newTmux = `conv-${newName}`;
         const launchModel = model || conv.model;
+        const effectiveSummaryModel = summaryModel || 'claude-sonnet-4-6';
         const launchHarness = await resolveAllowedHarness(body['harness'], launchModel);
-        const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], summaryModel);
+        const summaryHarness = await resolveAllowedHarness(body['summaryHarness'], effectiveSummaryModel);
         const defaultTitle = plain
           ? `Fork: ${conv.title || conv.name}`
           : `Summary Fork: ${conv.title || conv.name}`;

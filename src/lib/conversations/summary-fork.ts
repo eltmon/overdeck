@@ -30,6 +30,7 @@ import { createConversation } from '../database/conversations-db.js';
 import { encodeClaudeProjectDir, sessionFilePath } from '../paths.js';
 import { loadConfig } from '../config-yaml.js';
 import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
+import type { RuntimeName } from '../runtimes/types.js';
 
 export interface SummaryForkOptions {
   model?: string;
@@ -133,20 +134,20 @@ export async function generateFallbackSummary(jsonlPath: string): Promise<string
   return summary;
 }
 
-export async function generateSummaryForFork(jsonlPath: string, summaryModel?: string, includeThinkingInSummary?: boolean): Promise<{ summary: string; summaryModel: string | null }> {
+export async function generateSummaryForFork(jsonlPath: string, summaryModel?: string, includeThinkingInSummary?: boolean, summaryHarness: RuntimeName = 'claude-code'): Promise<{ summary: string; summaryModel: string | null }> {
   if (!summaryModel) {
     // Fork summaries serialize the entire conversation in one shot. Sonnet 4.6's
     // 1M-token context handles large sessions that would overflow Haiku's 200k.
     summaryModel = 'claude-sonnet-4-6';
   }
 
-  console.log(`[claude-invoke] purpose=summary-fork | model=${summaryModel} | source=summary-fork.ts:generateSummaryForFork | jsonl=${jsonlPath}`);
+  console.log(`[claude-invoke] purpose=summary-fork | model=${summaryModel} | harness=${summaryHarness} | source=summary-fork.ts:generateSummaryForFork | jsonl=${jsonlPath}`);
 
   const { config } = loadConfig();
   const richMode = config.conversations.richCompaction;
 
   try {
-    const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork', includeThinkingInSummary });
+    const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork', includeThinkingInSummary, harness: summaryHarness });
     console.log(`[claude-invoke] SUCCESS purpose=summary-fork | model=${summaryModel} | outputChars=${result.summary.length}`);
     return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
   } catch (err: any) {

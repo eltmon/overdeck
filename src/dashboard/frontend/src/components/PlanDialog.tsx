@@ -77,6 +77,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const [shadowMode, setShadowMode] = useState(false);
   const [modelOverride, setModelOverride] = useState<string>(''); // '' = use settings default
   const [harnessOverride, setHarnessOverride] = useState<Harness>('claude-code');
+  const harnessOverrideTouched = useRef(false);
   const [effort, setEffort] = useState<'low' | 'medium' | 'high'>('medium');
   const [watchPlanning, setWatchPlanning] = useState(true);
   // Ref so async SSE callbacks always read the live checkbox value, not a stale closure copy
@@ -96,11 +97,19 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     queryFn: async () => {
       const res = await fetch('/api/settings');
       if (!res.ok) throw new Error('Failed to load settings');
-      return res.json() as Promise<{ models: { overrides: Record<string, string> } }>;
+      return res.json() as Promise<{ models: { overrides: Record<string, string>; harness_overrides?: Record<string, Harness> } }>;
     },
     staleTime: 60000,
   });
   const defaultPlanningModel = settingsQuery.data?.models?.overrides?.['planning-agent'] || 'claude-opus-4-6';
+  const defaultPlanningHarness = settingsQuery.data?.models?.harness_overrides?.['planning-agent'];
+
+  useEffect(() => {
+    if (harnessOverrideTouched.current) return;
+    if (defaultPlanningHarness === 'pi' || defaultPlanningHarness === 'claude-code') {
+      setHarnessOverride(defaultPlanningHarness);
+    }
+  }, [defaultPlanningHarness]);
 
   // Fetch available models from all configured providers
   const availableModelsQuery = useQuery({
@@ -809,7 +818,10 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                           model={effectivePlanningModel}
                           harness={effectivePlanningHarness}
                           onModelChange={(model) => setModelOverride(model === defaultPlanningModel ? '' : model)}
-                          onHarnessChange={setHarnessOverride}
+                          onHarnessChange={(harness) => {
+                            harnessOverrideTouched.current = true;
+                            setHarnessOverride(harness);
+                          }}
                           groups={planningModelGroups}
                           harnessPolicy={planningPolicyQuery.data}
                           modelLabel="Model"

@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-10T10:08:59.280Z",
+  "updated": "2026-05-10T10:43:45.000Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "f8016a818",
+    "sha": "dc02bd740",
     "dirty": true
   },
   "decisions": [
@@ -68,6 +68,11 @@
       "id": "D12",
       "summary": "Resolved ForkModal model-only selector blocker by replacing the summary ModelSelect with ModelHarnessPicker and threading summaryHarness through the fork request path for policy validation.",
       "recordedAt": "2026-05-10T10:08:59.280Z"
+    },
+    {
+      "id": "D13",
+      "summary": "Resolved latest review blockers by forcing conversation harness resolution to claude-code when no concrete model is available, threading summaryHarness into fork summary generation so Pi launches use the Pi runtime, and initializing PlanDialog from models.harness_overrides[planning-agent].",
+      "recordedAt": "2026-05-10T10:43:45.000Z"
     }
   ],
   "hazards": [
@@ -78,15 +83,14 @@
     }
   ],
   "resumePoint": {
-    "description": "Fixed latest CHANGES_REQUESTED blocker: ForkModal summary model selection now uses shared ModelHarnessPicker instead of a model-only selector, with summaryHarness sent through the fork mutation and summary-fork route. typecheck, lint, targeted tests, and full npm test pass. Next step is commit and invoke /rebase-and-submit PAN-1055.",
+    "description": "Fixed latest CHANGES_REQUESTED blockers: conversation create/resume/switch no longer persist Pi without a concrete model, summary fork generation now receives and uses summaryHarness, and planning kickoff initializes harness from the saved planning-agent override. typecheck and lint pass; full npm test had one unrelated flake that passed when targeted and should be rerun before submit.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
       ".pan/feedback/001-review-agent-changes-requested.md",
-      "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/server/routes/conversations.ts"
+      "src/dashboard/server/routes/conversations.ts",
+      "src/lib/conversations/summary-fork.ts",
+      "src/lib/conversations/smart-compaction.ts",
+      "src/dashboard/frontend/src/components/PlanDialog.tsx"
     ]
   },
   "beadsMapping": {
@@ -195,6 +199,12 @@
       "timestamp": "2026-05-10T10:08:59.280Z",
       "reason": "review-response-verified",
       "note": "Replaced ForkModal summary ModelSelect with ModelHarnessPicker and threaded summaryHarness through frontend fork submit and server summary-fork validation. Verified npm run typecheck, npm run lint, targeted fork/picker tests, and full npm test (378 files / 4595 tests passed).",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-10T10:43:45.000Z",
+      "reason": "review-response-in-progress",
+      "note": "Fixed three latest review blockers for harness launch-state consistency, fork summary runtime selection, and saved planning-agent harness override. npm run typecheck and npm run lint pass; full npm test encountered one deep-wipe test flake that passed when rerun targeted.",
       "agentModel": "Claude Opus 4.7"
     }
   ],

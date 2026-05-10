@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 import { getClaudePermissionFlags } from '../claude-permissions.js';
+import type { RuntimeName } from '../runtimes/types.js';
 
 const SUMMARY_TIMEOUT_MS = 60_000;
 const FORK_SUMMARY_TIMEOUT_MS = 300_000;
@@ -18,6 +19,8 @@ export interface CompactionOptions {
   mode?: 'compact' | 'fork';
   /** When true, include thinking block content in the serialized conversation sent to the summary model. Default: true. */
   includeThinkingInSummary?: boolean;
+  /** Runtime harness used for model-backed summary generation. */
+  harness?: RuntimeName;
 }
 
 export interface CompactionResult {
@@ -604,15 +607,17 @@ Be thorough. Preserve exact file paths, function names, error messages, and code
 // LLM call
 // ============================================================================
 
-export async function runModelSummary(prompt: string, model?: string, timeoutMs?: number): Promise<string> {
+export async function runModelSummary(prompt: string, model?: string, timeoutMs?: number, harness: RuntimeName = 'claude-code'): Promise<string> {
   const useModel = model || DEFAULT_SUMMARY_MODEL;
-  console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
+  console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | harness=${harness} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
 
-  const args = [
-    '-p',
-    '--model', useModel,
-    ...getClaudePermissionFlags(),
-  ];
+  const args = harness === 'pi'
+    ? ['--mode', 'rpc', '--model', useModel]
+    : [
+        '-p',
+        '--model', useModel,
+        ...getClaudePermissionFlags(),
+      ];
 
   // Sanitize parent provider env (strip ANTHROPIC_BASE_URL etc.) and inject the
   // correct provider env for `useModel`. If provider env lookup fails (e.g.
@@ -620,13 +625,14 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
   // falls back to a heuristic summary.
   const spawnEnv = await buildSpawnEnvForModel(useModel);
   const injectedKeys = Object.keys(await getProviderEnvForModel(useModel));
+  const command = harness === 'pi' ? 'pi' : 'claude';
   if (injectedKeys.length > 0) {
-    console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel}, injecting provider env: ${injectedKeys.join(', ')}`);
+    console.log(`[smart-compaction] Spawning ${command} for summary with model ${useModel}, injecting provider env: ${injectedKeys.join(', ')}`);
   } else {
-    console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel} (anthropic, parent provider env stripped)`);
+    console.log(`[smart-compaction] Spawning ${command} for summary with model ${useModel} (anthropic, parent provider env stripped)`);
   }
 
-  const child = spawn('claude', args, {
+  const child = spawn(command, args, {
     env: spawnEnv,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -676,6 +682,7 @@ async function generateSummaryFromPrompt(
   model: string | undefined,
   richMode: boolean,
   timeoutMs?: number,
+  harness: RuntimeName = 'claude-code',
 ): Promise<string> {
   const conversationText = `<conversation>\n${serialized}\n</conversation>`;
   let promptText = `${conversationText}\n\n`;
@@ -698,17 +705,18 @@ async function generateSummaryFromPrompt(
 
   // Wrap in system prompt via claude -p
   const fullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${messages[0].content[0].text}`;
-  return runModelSummary(fullPrompt, model, timeoutMs);
+  return runModelSummary(fullPrompt, model, timeoutMs, harness);
 }
 
 async function generateTurnPrefixSummary(
   serialized: string,
   model: string | undefined,
   timeoutMs?: number,
+  harness: RuntimeName = 'claude-code',
 ): Promise<string> {
   const promptText = `<conversation>\n${serialized}\n</conversation>\n\n${TURN_PREFIX_PROMPT}`;
   const fullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${promptText}`;
-  return runModelSummary(fullPrompt, model, timeoutMs);
+  return runModelSummary(fullPrompt, model, timeoutMs, harness);
 }
 
 // ============================================================================
@@ -757,6 +765,7 @@ async function generateChunkedSummary(
   richMode: boolean,
   timeoutMs: number,
   includeThinking: boolean = true,
+  harness: RuntimeName = 'claude-code',
 ): Promise<string> {
   const budget = getChunkBudgetChars(model);
   const chunks = chunkEntriesByBudget(entries, budget);
@@ -772,7 +781,7 @@ async function generateChunkedSummary(
       `[smart-compaction] Summarizing chunk ${i + 1}/${chunks.length} ` +
       `(${serialized.length} chars, ${chunks[i].length} entries) with ${model ?? DEFAULT_SUMMARY_MODEL}`,
     );
-    running = await generateSummaryFromPrompt(serialized, running, model, richMode, timeoutMs);
+    running = await generateSummaryFromPrompt(serialized, running, model, richMode, timeoutMs, harness);
   }
 
   return running ?? '';
@@ -796,6 +805,7 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
   const model = options.model || DEFAULT_SUMMARY_MODEL;
   const richMode = options.richMode ?? false;
   const includeThinking = options.includeThinkingInSummary ?? true;
+  const harness = options.harness ?? 'claude-code';
   const tokensBefore = estimateContextTokens(entries);
 
   // Detect previous compact boundary for incremental summarization
@@ -872,7 +882,7 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
       const anyContent = forkEntries.some((e) => serializeEntry(e, includeThinking));
       if (anyContent) {
         try {
-          summary = await generateChunkedSummary(forkEntries, previousSummary, model, richMode, forkTimeoutMs, includeThinking);
+          summary = await generateChunkedSummary(forkEntries, previousSummary, model, richMode, forkTimeoutMs, includeThinking, harness);
         } catch (error) {
           throw new Error(`Smart summary generation failed: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -893,9 +903,9 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
       if (hasPrefix) {
         const [historyResult, turnPrefixResult] = await Promise.all([
           hasHistory
-            ? generateSummaryFromPrompt(serializedHistory, previousSummary, model, richMode, llmTimeoutMs)
+            ? generateSummaryFromPrompt(serializedHistory, previousSummary, model, richMode, llmTimeoutMs, harness)
             : Promise.resolve('No prior history.'),
-          generateTurnPrefixSummary(serializeConversation(turnPrefixMessages, includeThinking), model, llmTimeoutMs),
+          generateTurnPrefixSummary(serializeConversation(turnPrefixMessages, includeThinking), model, llmTimeoutMs, harness),
         ]);
         summary = `${historyResult}\n\n---\n\n**Turn Context (split turn):**\n\n${turnPrefixResult}`;
       } else {
@@ -905,6 +915,7 @@ export async function generateSmartSummary(options: CompactionOptions): Promise<
           model,
           richMode,
           llmTimeoutMs,
+          harness,
         );
       }
     } catch (error) {

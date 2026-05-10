@@ -896,7 +896,7 @@
     "hash": "912dd048fc5f1898876a9d587eeafcc0"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/scripts/record-cost-event.d.ts": {
-    "mtime": 1778403472.4268665,
+    "mtime": 1778407860.1579862,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/scripts/notify-complete": {
@@ -1892,12 +1892,12 @@
     "hash": "2de21ead7ed7237336a86f7db693dd42"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/lib/conversations/summary-fork.ts": {
-    "mtime": 1778359583.3097801,
-    "hash": "2b08da3bbfb1e06f8c5151b84c71908c"
+    "mtime": 1778409181.0024652,
+    "hash": "6132684bd7e051984a0d462707a1251b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/lib/conversations/smart-compaction.ts": {
-    "mtime": 1778359583.308562,
-    "hash": "2ea39d688983676558acd7961b2b04f9"
+    "mtime": 1778409167.0362587,
+    "hash": "d065d94525dc262e2e570ca3eb1bb5c2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/lib/vbrief/builder.ts": {
     "mtime": 1778359583.3175213,
@@ -2656,8 +2656,8 @@
     "hash": "ef02357766e909a967ff93464e43a667"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/frontend/src/components/PlanDialog.tsx": {
-    "mtime": 1778376090.1838505,
-    "hash": "9bea7c09f965e49099ab986c2e2fe71f"
+    "mtime": 1778409204.0344546,
+    "hash": "e10792cb4a9a73d86a592bc7bb376c11"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/frontend/src/components/ActivityPanel.tsx": {
     "mtime": 1778359583.2576776,
@@ -3780,8 +3780,8 @@
     "hash": "07ce61728663c7c8d2809b1c64c6f0e3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/server/routes/conversations.ts": {
-    "mtime": 1778406836.4316921,
-    "hash": "884df12c6b39658b42553d455421a4d4"
+    "mtime": 1778409119.9209018,
+    "hash": "28f0de48c2ed9ec47d0a8b4fb1702c33"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1055/src/dashboard/server/routes/codex-auth.ts": {
     "mtime": 1778359583.279561,
