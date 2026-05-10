@@ -2047,7 +2047,7 @@ const getConversationDiffsRoute = HttpRouter.add(
     const name = params['name'] ?? '';
     return yield* Effect.promise(async () => {
       try {
-        const conv = getConversationByName(name);
+        const conv = getConversationByName(name) ?? (/^\d+$/.test(name) ? getConversationById(parseInt(name, 10)) : null);
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
@@ -2310,7 +2310,7 @@ const getConversationDiffTurnRoute = HttpRouter.add(
     const fileFilter = reqUrl.searchParams.get('file') ?? undefined;
     return yield* Effect.promise(async () => {
       try {
-        const conv = getConversationByName(name);
+        const conv = getConversationByName(name) ?? (/^\d+$/.test(name) ? getConversationById(parseInt(name, 10)) : null);
         if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
 
         const cwd = conv.cwd;
@@ -2354,12 +2354,26 @@ const getConversationDiffTurnRoute = HttpRouter.add(
           if (!repoFiles.includes(relativePath)) repoFiles.push(relativePath);
         }
 
+        const baseCommitByRepo = new Map<string, string | null>();
         const patches: string[] = [];
         for (const [repoRoot, filePaths] of filesByRepo) {
           try {
-            const patch = await diffPatchFilesAgainstHead(repoRoot, filePaths);
+            if (!baseCommitByRepo.has(repoRoot)) {
+              baseCommitByRepo.set(repoRoot, await findCommitAtTime(repoRoot, conv.createdAt));
+            }
+            const baseCommit = baseCommitByRepo.get(repoRoot) ?? null;
+            let patch: string;
+            if (baseCommit) {
+              const { stdout } = await promisify(exec)(
+                `git diff --patch --minimal --no-color ${baseCommit} -- ${filePaths.map(p => JSON.stringify(p)).join(' ')}`,
+                { cwd: repoRoot, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
+              );
+              patch = stdout;
+            } else {
+              patch = await diffPatchFilesAgainstHead(repoRoot, filePaths);
+            }
             if (patch) patches.push(patch);
-          } catch { /* file may have been committed */ }
+          } catch { /* file may have been committed or repo unavailable */ }
         }
 
         return jsonResponse({ turnId, diff: patches.join('\n') });
