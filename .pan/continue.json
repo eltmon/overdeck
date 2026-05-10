@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-945",
   "created": "2026-05-07T09:30:00Z",
-  "updated": "2026-05-09T02:27:40.766Z",
+  "updated": "2026-05-10T04:44:19.835Z",
   "gitState": {
     "branch": "feature/pan-945",
     "sha": "266e38308",
@@ -193,6 +193,11 @@
       "timestamp": "2026-05-09T02:27:40.766Z",
       "reason": "end",
       "note": "Fixed review blockers for PRD vBRIEF discovery/import hardening"
+    },
+    {
+      "timestamp": "2026-05-10T04:44:19.835Z",
+      "reason": "end",
+      "note": "Rebased onto current main and fixed checkpoint test after substrate restore"
     }
   ],
   "feedback": []
