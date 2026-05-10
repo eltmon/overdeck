@@ -573,5 +573,26 @@ export async function teardownWorkspace(
     results.push(await deleteBranches(ctx.projectPath, issueLower));
   }
 
+  // 12. Prune checkpoint refs for this issue's agents.
+  // Without this, refs/pan/turn/agent-pan-XXXX/* refs accumulate forever
+  // even after the issue closes. The forked diff-refactor work added
+  // pruneCheckpointRefsForAgents but it was wired only into the legacy
+  // src/lib/close-out.ts module, not into the lifecycle/workflows.ts path
+  // that pan close, deep-wipe, and reset actually invoke. Centralize here
+  // so every cleanup flow that tears down a workspace also prunes refs.
+  results.push(await pruneCheckpointRefs(ctx.projectPath, issueLower));
+
   return results;
+}
+
+async function pruneCheckpointRefs(projectPath: string, issueLower: string): Promise<StepResult> {
+  const step = 'teardown:checkpoint-refs';
+  try {
+    const { pruneCheckpointRefsForAgents } = await import('../checkpoint/checkpoint-manager.js');
+    const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`];
+    await pruneCheckpointRefsForAgents(projectPath, agentIds);
+    return stepOk(step, [`Pruned checkpoint refs for ${agentIds.join(', ')}`]);
+  } catch (err) {
+    return stepSkipped(step, [`Checkpoint prune failed (non-fatal): ${(err as Error).message}`]);
+  }
 }
