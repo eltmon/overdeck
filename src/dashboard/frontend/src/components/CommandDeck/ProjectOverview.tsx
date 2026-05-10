@@ -35,8 +35,7 @@ interface BucketedFeature {
   stage: PipelineStage;
 }
 
-const PIPELINE_STAGES: PipelineStage[] = [
-  'stuck',
+const PIPELINE_STAGES: Exclude<PipelineStage, 'stuck'>[] = [
   'merging',
   'awaitingMerge',
   'tests',
@@ -46,6 +45,8 @@ const PIPELINE_STAGES: PipelineStage[] = [
   'planning',
   'idle',
 ];
+
+const BUCKET_STAGES: PipelineStage[] = ['stuck', ...PIPELINE_STAGES];
 
 const STAGE_CONFIG: Record<PipelineStage, { label: string; color: string }> = {
   stuck: { label: 'Stuck / blocked', color: 'var(--destructive)' },
@@ -149,13 +150,13 @@ export function ProjectOverview({
 
   const bucketedByStage = useMemo(() => {
     const byStage = new Map<PipelineStage, BucketedFeature[]>();
-    for (const stage of PIPELINE_STAGES) byStage.set(stage, []);
+    for (const stage of BUCKET_STAGES) byStage.set(stage, []);
     for (const entry of bucketedFeatures) byStage.get(entry.stage)?.push(entry);
     return byStage;
   }, [bucketedFeatures]);
 
   const stuckFeatures = bucketedByStage.get('stuck') ?? [];
-  const activeStageCount = PIPELINE_STAGES.filter(stage => (bucketedByStage.get(stage)?.length ?? 0) > 0).length;
+  const activeStageCount = BUCKET_STAGES.filter(stage => (bucketedByStage.get(stage)?.length ?? 0) > 0).length;
 
   return (
     <section

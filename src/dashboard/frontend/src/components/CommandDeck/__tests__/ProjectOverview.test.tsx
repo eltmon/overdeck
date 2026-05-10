@@ -152,6 +152,9 @@ describe('bucketFeature', () => {
 
     expect(screen.getByText('Review blocked')).toBeInTheDocument();
     expect(screen.getByText('Test dispatch failed')).toBeInTheDocument();
+    expect(screen.queryAllByText('Blocked review')).toHaveLength(1);
+    expect(screen.queryAllByText('Dispatch failed')).toHaveLength(1);
+    expect(screen.queryByRole('region', { name: 'Stuck / blocked pipeline stage' })).not.toBeInTheDocument();
   });
 
   it('counts only active work agents in the hero summary', () => {
