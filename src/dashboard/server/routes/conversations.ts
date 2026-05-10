@@ -247,16 +247,21 @@ async function getCachedMessages(
       // File was truncated or rotated — fall back to full parse.
       result = await parseConversationMessages(sessionFile, 0);
     } else {
-      // Lazy getters avoid O(n) array copies on the hot incremental-parse path;
-      // the arrays are only materialized when the caller serializes or iterates.
+      // Materialize the merged result once and cache concrete structures.
+      // Lazy getters chained across cache entries grew an unbounded wrapper
+      // chain across polls and re-allocated the full history on every read.
       const cachedResult = cached.result;
+      const mergedMessages = cachedResult.messages.concat(incremental.messages);
+      const mergedWorkLog = cachedResult.workLog.concat(incremental.workLog);
+      const mergedCompactBoundaries = cachedResult.compactBoundaries.concat(incremental.compactBoundaries);
+      const mergedFileEdits = new Map(cachedResult.fileEditsByAssistantId);
+      for (const [k, v] of incremental.fileEditsByAssistantId) {
+        const existing = mergedFileEdits.get(k);
+        mergedFileEdits.set(k, existing ? [...existing, ...v] : v);
+      }
       result = {
-        get messages() {
-          return cachedResult.messages.concat(incremental.messages);
-        },
-        get workLog() {
-          return cachedResult.workLog.concat(incremental.workLog);
-        },
+        messages: mergedMessages,
+        workLog: mergedWorkLog,
         byteOffset: incremental.byteOffset,
         streaming: incremental.streaming,
         totalCost: cachedResult.totalCost + incremental.totalCost,
@@ -265,19 +270,10 @@ async function getCachedMessages(
         lastSequence: incremental.lastSequence,
         mtimeMs: incremental.mtimeMs,
         proposedPlan: incremental.proposedPlan ?? cachedResult.proposedPlan,
-        get compactBoundaries() {
-          return cachedResult.compactBoundaries.concat(incremental.compactBoundaries);
-        },
+        compactBoundaries: mergedCompactBoundaries,
         planToolUseIds: incremental.planToolUseIds,
         permissionMode: incremental.permissionMode ?? cachedResult.permissionMode,
-        get fileEditsByAssistantId() {
-          const merged = new Map(cachedResult.fileEditsByAssistantId);
-          for (const [k, v] of incremental.fileEditsByAssistantId) {
-            const existing = merged.get(k);
-            merged.set(k, existing ? [...existing, ...v] : v);
-          }
-          return merged;
-        },
+        fileEditsByAssistantId: mergedFileEdits,
       };
     }
   } else {
