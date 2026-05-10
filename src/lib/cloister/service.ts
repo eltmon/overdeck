@@ -126,6 +126,7 @@ export function parseSpecialistAgentSession(name: string): {
 }
 
 export type ReactiveIssueState =
+  | 'todo'
   | 'open'
   | 'in_planning'
   | 'in_progress'
@@ -141,6 +142,7 @@ export interface CloisterDomainEventLike {
 }
 
 const ROLE_RUN_STATES: Record<ReactiveIssueState, Role | null> = {
+  todo: 'plan',
   open: null,
   in_planning: 'plan',
   in_progress: 'work',
@@ -171,32 +173,25 @@ function roleFromAgentId(agentId: string, issueId: string): Role | null {
 }
 
 /**
- * PAN-1048 P1 + C2 race fix.
+ * PAN-1048 performance fix: O(1) direct state lookup instead of scanning
+ * all agent directories. Roles use canonical IDs: agent-<issue-lower> for
+ * work, agent-<issue-lower>-<role> for all others.
  *
- * Async because this is on the reactive scheduler hot path (called from
- * onIssueStateChange → subscribed to every domain event). The legacy
- * synchronous version shelled out to tmux + readdir/readFileSync inside
- * `listRunningAgents()`, which blocked the Node event loop on every
- * lifecycle event.
- *
- * The "active" check intentionally does NOT require tmuxActive. The
- * spawn routes (POST /api/agents start-agent and start-planning) write
- * state.json with role + status:'starting' BEFORE the tmux session is
- * fully attached. If we filtered on tmuxActive here, reactive Cloister
- * would see `state === 'in_progress'` from the spawn, fail to find
- * the in-flight run, and race-spawn a second one. Treat any non-stopped
- * agent state file with the matching role as "in-flight" and skip.
+ * Intentionally does NOT require tmuxActive — spawn routes write state.json
+ * with status:'starting' before the tmux session attaches, so filtering on
+ * tmuxActive would race-spawn a second run.
  */
 async function activeRoleRunExists(issueId: string, role: Role): Promise<boolean> {
-  const { listRunningAgentsAsync } = await import('../agents.js');
-  const normalizedIssueId = normalizeIssueId(issueId);
-  const agents = await listRunningAgentsAsync();
-  return agents.some((agent) => {
-    if (normalizeIssueId(agent.issueId ?? '') !== normalizedIssueId) return false;
-    const agentRole = agent.role ?? roleFromAgentId(agent.id, normalizedIssueId);
-    if (agentRole !== role) return false;
-    return agent.status !== 'stopped' && agent.status !== 'error';
-  });
+  const issueLower = issueId.toLowerCase();
+  const candidateId = role === 'work'
+    ? `agent-${issueLower}`
+    : `agent-${issueLower}-${role}`;
+
+  const state = await getAgentStateAsync(candidateId);
+  if (!state) return false;
+
+  const stateRole = state.role ?? roleFromAgentId(candidateId, issueId);
+  return stateRole === role && state.status !== 'stopped' && state.status !== 'error';
 }
 
 function buildReactiveRolePrompt(issueId: string, state: string, role: Role): string {
