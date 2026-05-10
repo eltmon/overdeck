@@ -1298,14 +1298,24 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       }
     }
 
-    // Also detect ad-hoc parallel review sessions spawned by dispatchParallelReview.
-    // These never register runtime state, so they're invisible to the specialist checks above.
+    // PAN-1048 R5: detect role-primitive review/test runs (agent-<id>-review,
+    // agent-<id>-test) so the deacon doesn't spuriously flag an in-flight role
+    // run as an orphan. Replaces the legacy getActiveParallelReviewIssues
+    // helper that scanned for review-coordinator-* / review-<id>-<role>
+    // sessions spawned by dispatchParallelReview (now retired).
     try {
-      const { listSessionNamesAsync } = await import('../tmux.js');
-      const { getActiveParallelReviewIssues } = await import('./review-agent.js');
-      const allSessions = await listSessionNamesAsync();
-      for (const issueId of getActiveParallelReviewIssues(allSessions)) {
-        activeReviewSessions.add(issueId);
+      const { listRunningAgentsAsync } = await import('../agents.js');
+      const agents = await listRunningAgentsAsync();
+      for (const agent of agents) {
+        if (agent.status === 'stopped' || agent.status === 'error') continue;
+        const issueId = (agent.issueId ?? '').trim().toUpperCase();
+        if (!issueId) continue;
+        const role = agent.role
+          ?? (agent.id.endsWith('-review') ? 'review'
+            : agent.id.endsWith('-test') ? 'test'
+            : null);
+        if (role === 'review') activeReviewSessions.add(issueId);
+        else if (role === 'test') activeTestSessions.add(issueId);
       }
     } catch {
       // Non-fatal: fall back to specialist-only detection
@@ -1775,18 +1785,19 @@ export async function checkStuckReviewing(): Promise<string[]> {
         activeReviewIssues.add(rState.currentIssue.toUpperCase());
       }
     }
-    // PAN-796: Also check parallel review sessions (review-<issueId>-<ts>-<role>)
-    // and coordinator sessions (review-coordinator-<issueId>-<ts>)
+    // PAN-1048 R5: detect role-primitive review runs (agent-<id>-review).
+    // Replaces the legacy review-coordinator-* / review-<id>-<role> session
+    // pattern matching that depended on dispatchParallelReview's tmux-coordinator
+    // architecture (now retired).
     try {
-      const { listSessionNamesAsync } = await import('../tmux.js');
-      const { getActiveParallelReviewIssues } = await import('./review-agent.js');
-      const allSessions = await listSessionNamesAsync();
-      for (const issueId of getActiveParallelReviewIssues(allSessions)) {
-        activeReviewIssues.add(issueId.toUpperCase());
-      }
-      for (const s of allSessions) {
-        const coordMatch = s.match(/^review-coordinator-([A-Za-z]+-\d+)-/);
-        if (coordMatch) activeReviewIssues.add(coordMatch[1].toUpperCase());
+      const { listRunningAgentsAsync } = await import('../agents.js');
+      const agents = await listRunningAgentsAsync();
+      for (const agent of agents) {
+        if (agent.status === 'stopped' || agent.status === 'error') continue;
+        const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : null);
+        if (role !== 'review') continue;
+        const issueId = (agent.issueId ?? '').trim().toUpperCase();
+        if (issueId) activeReviewIssues.add(issueId);
       }
     } catch {
       // Non-fatal: fall back to specialist-only detection

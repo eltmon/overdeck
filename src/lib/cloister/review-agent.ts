@@ -113,27 +113,11 @@ const DEFAULT_REVIEW_AGENTS: ReviewAgentConfig[] = [
   { name: 'requirements', focus: ['acceptance criteria', 'vBRIEF coverage', 'missing functionality'] },
 ];
 
-/**
- * Extracts issue IDs from ad-hoc parallel review tmux session names.
- * Sessions spawned by dispatchParallelReview follow the pattern:
- *   review-<issueId>-<timestamp>-<role>
- * e.g. review-PAN-540-1713456789000-correctness
- */
-export function getActiveParallelReviewIssues(sessionNames: string[]): Set<string> {
-  const active = new Set<string>();
-  for (const name of sessionNames) {
-    const match = name.match(/^review-([A-Z0-9]+-\d+)-\d+-/);
-    if (match) {
-      active.add(match[1].toUpperCase());
-    }
-    // Coordinator sessions are also active review work (PAN-830)
-    const coordMatch = name.match(/^review-coordinator-([A-Z0-9]+-\d+)-\d+/);
-    if (coordMatch) {
-      active.add(coordMatch[1].toUpperCase());
-    }
-  }
-  return active;
-}
+// PAN-1048 R5: getActiveParallelReviewIssues removed. The legacy review
+// session naming patterns (review-<id>-<ts>-<role>, review-coordinator-<id>-<ts>)
+// no longer exist — the review role primitive uses agent-<id>-review.
+// Callers (deacon, service startup recovery) now scan listRunningAgentsAsync
+// for role==='review' agents directly.
 
 async function ensureReviewTempStash(issueId: string, workspace: string): Promise<{ ref: string; message: string; sequence: number } | null> {
   // Drop any prior cycle's review-temp stash before creating a new one. Without

@@ -57,7 +57,10 @@ import { pendingCommand } from './commands/pending.js';
 import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
 import { abortReviewCommand } from './commands/abort-review.js';
-import { reviewRunCommand } from './commands/review-run.js';
+// PAN-1048 R5: `pan review run` removed. Review now runs as the role primitive
+// via spawnRun(issueId, 'review', …) → roles/review.md → Agent tool convoy.
+// The blocking-orchestrator CLI was the only caller of runParallelReview /
+// parseReviewSynthesis (now also retired).
 import { reviewRestartCommand } from './commands/review-restart.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
@@ -271,15 +274,7 @@ review
   .option('--role <role>', 'Restart only a specific reviewer role (correctness/security/performance/requirements)')
   .action(reviewRestartCommand);
 
-review
-  .command('run <id>')
-  .description('Run the full review pipeline (blocking): spawn reviewers → synthesize → post to GitHub. Exit codes: 0=approved, 1=changes, 2=failed.')
-  .option('--cwd <path>', 'Workspace directory (default: cwd)')
-  .option('--pr-url <url>', 'Override PR URL detection')
-  .option('--branch <name>', 'Override branch detection')
-  .option('--files-changed <list>', 'Comma-separated file list (overrides git diff)')
-  .option('--model <model>', 'Override model for all reviewers')
-  .action(reviewRunCommand);
+// PAN-1048 R5: `pan review run` removed (see import note above).
 
 // pan plan finalize <id>
 const planCmd = program

@@ -558,13 +558,17 @@ export class CloisterService {
           activeReviewIssues.add(globalRs.currentIssue.toUpperCase());
         }
 
-        // Also detect ad-hoc parallel review sessions spawned by dispatchParallelReview.
-        // These never register runtime state, so they're invisible to the checks above.
-        const { listSessionNamesAsync } = await import('../tmux.js');
-        const { getActiveParallelReviewIssues } = await import('./review-agent.js');
-        const allSessions = await listSessionNamesAsync();
-        for (const issueId of getActiveParallelReviewIssues(allSessions)) {
-          activeReviewIssues.add(issueId);
+        // PAN-1048 R5: detect role-primitive review runs (agent-<id>-review).
+        // Replaces the legacy getActiveParallelReviewIssues helper that scanned
+        // tmux for dispatchParallelReview's coordinator session naming pattern.
+        const { listRunningAgentsAsync } = await import('../agents.js');
+        const agents = await listRunningAgentsAsync();
+        for (const agent of agents) {
+          if (agent.status === 'stopped' || agent.status === 'error') continue;
+          const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : null);
+          if (role !== 'review') continue;
+          const issueId = (agent.issueId ?? '').trim().toUpperCase();
+          if (issueId) activeReviewIssues.add(issueId);
         }
       } catch {
         // Non-fatal: if we can't check active sessions, re-dispatch all orphaned
