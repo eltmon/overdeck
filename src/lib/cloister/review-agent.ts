@@ -1131,7 +1131,7 @@ export async function runParallelReview(
   }));
 
   console.log(`[review-agent] Reviewer sessions ready for review ${reviewId} (spawned=${spawnedCount}, resumed=${resumedCount})`);
-  emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — ${reviewerSessions.length} reviewer(s) ready (spawned=${spawnedCount}, resumed=${resumedCount})`, issueId: context.issueId });
+  emitActivityEntry({ source: 'review', level: 'info', message: `${context.issueId} — ${reviewerSessions.length} reviewer(s) ready (spawned=${spawnedCount}, resumed=${resumedCount})`, issueId: context.issueId });
 
   // ── Phase 2: Wait for all reviewers ───────────────────────────────────────
   // PAN-915 — emit reviewer_completed as each reviewer's output file lands
@@ -1194,7 +1194,7 @@ export async function runParallelReview(
       const promptFile = join(outputDir, `${agent.name}-prompt.md`);
 
       console.log(`[review-agent] Auto-respawning dead reviewer ${failed.sessionName} for retry`);
-      emitActivityEntry({ source: 'review-specialist', level: 'warn', message: `${context.issueId} — auto-respawning dead reviewer ${failed.role}`, issueId: context.issueId });
+      emitActivityEntry({ source: 'review', level: 'warn', message: `${context.issueId} — auto-respawning dead reviewer ${failed.role}`, issueId: context.issueId });
 
       // Kill stale session (if any) and respawn fresh
       if (failed.sessionName) {
@@ -1265,7 +1265,7 @@ export async function runParallelReview(
       notes = `Review aborted: reviewer(s) failed or timed out (${failedRoles.join(', ')}). Resubmit to retry.`;
     }
     console.warn(`[review-agent] Aborting synthesis — reviewer(s) failed: ${failedRoles.join(', ')}${apiErrors.length > 0 ? ` (terminal API errors: ${apiErrors.length})` : ''}`);
-    emitActivityEntry({ source: 'review-specialist', level: 'error', message: `${context.issueId} — review aborted: ${failedRoles.join(', ')} failed${apiErrors.length > 0 ? ` (${apiErrors[0]!.apiError!.summary})` : ''}`, issueId: context.issueId });
+    emitActivityEntry({ source: 'review', level: 'error', message: `${context.issueId} — review aborted: ${failedRoles.join(', ')} failed${apiErrors.length > 0 ? ` (${apiErrors[0]!.apiError!.summary})` : ''}`, issueId: context.issueId });
     emitActivityTts({ utterance: apiErrors.length > 0 ? `${context.issueId} review blocked, ${apiErrors[0]!.apiError!.summary}` : `${context.issueId} review aborted, ${failedRoles.join(', ')} failed`, priority: 0, issueId: context.issueId });
     const abortResult: ReviewResult = {
       success: false,
@@ -1316,14 +1316,14 @@ export async function runParallelReview(
       console.warn(`[review-agent] Failed to set remain-on-exit on ${synthSessionName}: ${err instanceof Error ? err.message : err}`);
     }
   }
-  emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — synthesis started`, issueId: context.issueId });
+  emitActivityEntry({ source: 'review', level: 'info', message: `${context.issueId} — synthesis started`, issueId: context.issueId });
   await waitSynthesisFn(synthSessionName, synthOutputFile, REVIEW_TIMEOUT_MS);
 
   // ── Phase 4: Parse result ─────────────────────────────────────────────────
   const result = await parseSynthesisFn(outputDir, agents);
 
   await postReviewFn(context, result, outputDir);
-  emitActivityEntry({ source: 'review-specialist', level: result.success ? (result.reviewResult === 'APPROVED' ? 'success' : 'warn') : 'error', message: `${context.issueId} — review complete: ${result.reviewResult}`, issueId: context.issueId });
+  emitActivityEntry({ source: 'review', level: result.success ? (result.reviewResult === 'APPROVED' ? 'success' : 'warn') : 'error', message: `${context.issueId} — review complete: ${result.reviewResult}`, issueId: context.issueId });
 
   // ── Phase 5: Log to history + notify work agent ───────────────────────────
   // These were previously in the deprecated spawnReviewAgent wrapper; moved here
@@ -1336,7 +1336,7 @@ export async function runParallelReview(
   }
   try {
     await sendFeedbackToWorkAgent(context, result);
-    emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — feedback sent to work agent`, issueId: context.issueId });
+    emitActivityEntry({ source: 'review', level: 'info', message: `${context.issueId} — feedback sent to work agent`, issueId: context.issueId });
   } catch (err) {
     console.error(`[review-agent] sendFeedbackToWorkAgent failed for ${context.issueId} (non-fatal):`, err);
   }
@@ -1710,7 +1710,7 @@ export async function dispatchParallelReview(
       model: opts.model,
     });
     console.log(`[review-agent] Review coordinator spawned for ${opts.issueId}: ${sessionName}`);
-    emitActivityEntry({ source: 'review-specialist', level: 'info', message: `Review coordinator spawned for ${opts.issueId}: ${sessionName}`, issueId: opts.issueId });
+    emitActivityEntry({ source: 'review', level: 'info', message: `Review coordinator spawned for ${opts.issueId}: ${sessionName}`, issueId: opts.issueId });
     return {
       success: true,
       message: `Review coordinator spawned: ${sessionName}`,

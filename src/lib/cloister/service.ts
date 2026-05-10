@@ -1324,7 +1324,7 @@ export class CloisterService {
       if (previousState === undefined || previousState !== currentState) {
         // Determine source from heartbeat
         const source = health.heartbeat?.source
-          ? this.mapActivitySource(health.heartbeat.source)
+          ? this.mapHeartbeatSource(health.heartbeat.source)
           : 'unknown';
 
         writeHealthEvent({
@@ -1429,9 +1429,9 @@ export class CloisterService {
   }
 
   /**
-   * Map ActivitySource to database source string
+   * Map heartbeat source to database source string
    */
-  private mapActivitySource(source: string): string {
+  private mapHeartbeatSource(source: string): string {
     switch (source) {
       case 'jsonl':
         return 'jsonl_mtime';

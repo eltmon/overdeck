@@ -1201,7 +1201,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
 
     // Emit activity + TTS for planning completion
     emitActivityEntry({
-      source: 'planning-agent',
+      source: 'plan',
       level: 'info',
       message: `${id} planning complete — ready for work`,
       issueId: id,

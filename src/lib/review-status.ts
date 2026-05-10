@@ -305,7 +305,7 @@ export function setReviewStatus(
       blocked:   { level: 'warn',    msg: `${issueId} — review blocked (changes requested)`, tts: `${issueId} review blocked` },
     };
     const entry = rMap[update.reviewStatus];
-    if (entry) emitActivityEntry({ source: 'review-specialist', level: entry.level, message: entry.msg, details: update.reviewNotes, issueId });
+    if (entry) emitActivityEntry({ source: 'review', level: entry.level, message: entry.msg, details: update.reviewNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.testStatus && update.testStatus !== status.testStatus) {
@@ -317,7 +317,7 @@ export function setReviewStatus(
       dispatch_failed: { level: 'warn',    msg: `${issueId} — test dispatch failed` },
     };
     const entry = tMap[update.testStatus];
-    if (entry) emitActivityEntry({ source: 'test-specialist', level: entry.level, message: entry.msg, details: update.testNotes, issueId });
+    if (entry) emitActivityEntry({ source: 'test', level: entry.level, message: entry.msg, details: update.testNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
@@ -329,7 +329,7 @@ export function setReviewStatus(
       failed:    { level: 'error',   msg: `${issueId} — merge failed`, tts: `${issueId} merge failed` },
     };
     const entry = mMap[update.mergeStatus];
-    if (entry) emitActivityEntry({ source: 'merge-agent', level: entry.level, message: entry.msg, details: update.mergeNotes, issueId });
+    if (entry) emitActivityEntry({ source: 'ship', level: entry.level, message: entry.msg, details: update.mergeNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.readyForMerge === true && !status.readyForMerge) {

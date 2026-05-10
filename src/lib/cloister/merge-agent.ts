@@ -788,7 +788,7 @@ function logMergeHistory(context: MergeConflictContext, result: MergeResult, ses
  */
 function logActivity(action: string, details: string, issueId?: string): void {
   emitActivityEntry({
-    source: 'merge-agent',
+    source: 'ship',
     level: action.includes('fail') || action.includes('error') ? 'error' : action.includes('warn') ? 'warn' : 'success',
     message: details,
     issueId,
@@ -815,7 +815,7 @@ function announceMerge(
       : 'Merge failed';
   const tail = extra ? `. ${extra}` : '';
   emitActivityEntry({
-    source: 'merge-agent',
+    source: 'ship',
     level: status === 'failed' ? 'error' : 'success',
     message: `${prefix} for ${issueId}${tail}`,
     issueId,
@@ -887,7 +887,7 @@ export function scanGitPatterns(
           ts,
         });
         emitActivityEntry({
-          source: 'merge-agent',
+          source: 'ship',
           level,
           message: `[git] ${trimmed.slice(0, 100)}`,
           issueId,

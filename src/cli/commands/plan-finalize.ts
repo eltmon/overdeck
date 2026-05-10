@@ -70,7 +70,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   }
 
   emitActivityEntry({
-    source: 'planning-agent',
+    source: 'plan',
     level: 'info',
     message: `${issueId} planning finalized — awaiting your approval`,
     issueId,

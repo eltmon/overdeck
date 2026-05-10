@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system \u2014 5 enums \u2192 Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-10T00:49:46.940Z"
+    "updated": "2026-05-10T00:57:06.782Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 32,
+    "sequence": 33,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-10T00:49:46.940Z",
+    "updated": "2026-05-10T00:57:06.782Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -1479,7 +1479,7 @@
       {
         "id": "e5-delete-activity-source",
         "title": "Delete ActivitySource enum (derive from role + literal contexts)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -1494,28 +1494,32 @@
           {
             "id": "e5-delete-activity-source.ac1",
             "title": "ActivitySource type deleted from src/lib/activity-logger.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T00:57:06.782Z"
           },
           {
             "id": "e5-delete-activity-source.ac2",
             "title": "Activity callers use `state.role` (literal Role values) or 'cloister'/'dashboard' literals; deploy-script value removed",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T00:57:06.782Z"
           },
           {
             "id": "e5-delete-activity-source.ac3",
             "title": "Activity log rendering in dashboard handles new source set; typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-10T00:57:06.782Z"
           }
-        ]
+        ],
+        "completed": "2026-05-10T00:57:06.782Z"
       },
       {
         "id": "k1-contracts-agent-phase-to-role",

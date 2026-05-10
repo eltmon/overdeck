@@ -111,20 +111,12 @@ describe('inferCategory', () => {
     expect(inferCategory(makeEntry({ id: '1', source: 'git' }))).toBe('git');
   });
 
-  it('returns "specialist" for source containing "specialist"', () => {
-    expect(inferCategory(makeEntry({ id: '1', source: 'test-specialist' }))).toBe('specialist');
-  });
-
-  it('returns "specialist" for source containing "merge-agent"', () => {
-    expect(inferCategory(makeEntry({ id: '1', source: 'merge-agent' }))).toBe('specialist');
-  });
-
-  it('returns "specialist" for source containing "review"', () => {
-    expect(inferCategory(makeEntry({ id: '1', source: 'review-specialist' }))).toBe('specialist');
-  });
-
-  it('returns "specialist" for source containing "test" (not specialist)', () => {
-    expect(inferCategory(makeEntry({ id: '1', source: 'test-runner' }))).toBe('specialist');
+  it('returns "role" for role sources', () => {
+    expect(inferCategory(makeEntry({ id: '1', source: 'plan' }))).toBe('role');
+    expect(inferCategory(makeEntry({ id: '2', source: 'work' }))).toBe('role');
+    expect(inferCategory(makeEntry({ id: '3', source: 'review' }))).toBe('role');
+    expect(inferCategory(makeEntry({ id: '4', source: 'test' }))).toBe('role');
+    expect(inferCategory(makeEntry({ id: '5', source: 'ship' }))).toBe('role');
   });
 
   it('returns "sync" for source containing "sync"', () => {

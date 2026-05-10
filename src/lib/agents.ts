@@ -1587,7 +1587,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   saveAgentState(state);
 
   emitActivityEntry({
-    source: 'dashboard',
+    source: role,
     level: 'info',
     message: `${role} role started for ${issueId}`,
     issueId,
@@ -1840,7 +1840,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // Emit activity + TTS so the user knows an agent has started
   emitActivityEntry({
-    source: 'dashboard',
+    source: role,
     level: 'info',
     message: `Work agent started for ${options.issueId}`,
     issueId: options.issueId,
