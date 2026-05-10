@@ -1,14 +1,14 @@
 /**
  * ModelPicker (PAN-479)
  *
- * Dropdown for selecting the model to use in a conversation.
- * Fetches available models from all enabled providers (including OpenRouter favorites).
- * Groups by provider, shows per-model cost, and exposes effort level support.
+ * Two-panel dropdown for selecting the model + harness combination.
+ * Left sidebar: AI provider filter (Anthropic, OpenAI, …).
+ * Right panel: pinned harness selector → search bar → scrollable model list.
  * Selection is persisted to localStorage.
  */
 
-import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, Lock, Info } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { ChevronDown, Check, Lock, Search, LayoutGrid } from 'lucide-react';
 import {
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
   getDefaultConversationModel,
@@ -18,6 +18,7 @@ import { usePickerPosition } from './usePickerPosition';
 import { CostWarningBadge, costWarningLevel } from '../shared/costWarning';
 import { HARNESS_OPTIONS, canUsePickerHarness, type HarnessPolicyDecisions } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
+import { ProviderIcon, ProviderDot } from './ProviderIcons';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 export type { Harness } from '../shared/ModelPicker';
@@ -28,11 +29,8 @@ interface PickerModel {
   id: string;
   label: string;
   provider: string;
-  /** Formatted cost string, e.g. "FREE" or "$5.00/1M" */
   costDisplay?: string;
-  /** Raw cost in $/1M tokens — preserved so we can flag expensive models. */
   costPer1MTokens?: number;
-  /** Effort levels supported by this model. Empty = effort not supported. */
   effortLevels: readonly string[];
 }
 
@@ -55,7 +53,6 @@ export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
   'claude-haiku-4-5-20251001': [],
 };
 
-/** Effort levels for all known models. Fallback when API is unavailable. */
 const STATIC_EFFORT_LEVELS: Record<string, readonly string[]> = {
   ...MODEL_EFFORT_SUPPORT,
 };
@@ -71,7 +68,6 @@ const PROVIDER_LABELS: Record<string, string> = {
   openrouter: 'OpenRouter',
 };
 
-/** Fallback model groups shown when the API call fails. */
 const FALLBACK_GROUPS: ModelGroup[] = [
   {
     provider: 'anthropic',
@@ -97,14 +93,14 @@ const MODEL_STORAGE_KEY = 'conv-composer-model';
 const HARNESS_STORAGE_KEY = 'conv-composer-harness';
 export const FALLBACK_DEFAULT_MODEL = FALLBACK_DEFAULT_CONVERSATION_MODEL;
 
-let knownModelIds = new Set(FALLBACK_GROUPS.flatMap((group) => group.models.map((model) => model.id)));
+let knownModelIds = new Set(FALLBACK_GROUPS.flatMap((g) => g.models.map((m) => m.id)));
 
 function isKnownModel(modelId: string): boolean {
   return knownModelIds.has(modelId);
 }
 
 function syncKnownModels(groups: readonly ModelGroup[]): void {
-  knownModelIds = new Set(groups.flatMap((group) => group.models.map((model) => model.id)));
+  knownModelIds = new Set(groups.flatMap((g) => g.models.map((m) => m.id)));
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -113,36 +109,24 @@ export function loadStoredModel(resolvedDefault = getDefaultConversationModel())
   try {
     const stored = localStorage.getItem(MODEL_STORAGE_KEY);
     if (stored && isKnownModel(stored)) return stored;
-  } catch {
-    // Ignore
-  }
+  } catch { /* ignore */ }
   return resolvedDefault || FALLBACK_DEFAULT_MODEL;
 }
 
 export function saveStoredModel(modelId: string): void {
-  try {
-    localStorage.setItem(MODEL_STORAGE_KEY, modelId);
-  } catch {
-    // Ignore
-  }
+  try { localStorage.setItem(MODEL_STORAGE_KEY, modelId); } catch { /* ignore */ }
 }
 
 export function loadStoredHarness(): Harness {
   try {
     const stored = localStorage.getItem(HARNESS_STORAGE_KEY);
     if (stored === 'pi' || stored === 'claude-code') return stored;
-  } catch {
-    // Ignore
-  }
+  } catch { /* ignore */ }
   return 'claude-code';
 }
 
 export function saveStoredHarness(harness: Harness): void {
-  try {
-    localStorage.setItem(HARNESS_STORAGE_KEY, harness);
-  } catch {
-    // Ignore
-  }
+  try { localStorage.setItem(HARNESS_STORAGE_KEY, harness); } catch { /* ignore */ }
 }
 
 function formatCost(costPer1M: number): string {
@@ -165,10 +149,17 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
   const [harnessPolicy, setHarnessPolicy] = useState<HarnessPolicyDecisions>({});
+  const [search, setSearch] = useState('');
+  const [providerFilter, setProviderFilter] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const { openUp, align, maxHeight } = usePickerPosition(open, ref);
 
-  // Fetch available models on mount so known models stay in sync with the current provider config.
+  // Reset search when dropdown closes
+  useEffect(() => {
+    if (!open) setSearch('');
+  }, [open]);
+
+  // Fetch available models on mount
   useEffect(() => {
     async function loadModels() {
       try {
@@ -178,19 +169,13 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
             Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>
           >,
           fetch('/api/settings/openrouter/models').then((r) => r.json()) as Promise<{
-            models: Array<{
-              id: string;
-              name: string;
-              promptCostPer1M: number;
-              supportsThinking: boolean;
-            }>;
+            models: Array<{ id: string; name: string; promptCostPer1M: number; supportsThinking: boolean }>;
             favorites: string[];
           }>,
         ]);
 
         const avail = availRes.status === 'fulfilled' ? availRes.value : {};
         const orData = orRes.status === 'fulfilled' ? orRes.value : { models: [], favorites: [] };
-
         const newGroups: ModelGroup[] = [];
 
         for (const [prov, models] of Object.entries(avail)) {
@@ -231,7 +216,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
         syncKnownModels(effectiveGroups);
         if (newGroups.length > 0) setGroups(newGroups);
 
-        const modelIds = effectiveGroups.flatMap((group) => group.models.map((model) => model.id));
+        const modelIds = effectiveGroups.flatMap((g) => g.models.map((m) => m.id));
         if (modelIds.length > 0) {
           const policy = await fetch(`/api/settings/harness-policy?models=${encodeURIComponent(modelIds.join(','))}`)
             .then((r) => r.json()) as { decisions?: HarnessPolicyDecisions };
@@ -244,21 +229,41 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
     void loadModels();
   }, []);
 
-  // Find selected model across all groups
-  const allModels = groups.flatMap((g) => g.models);
-  const selectedModel = allModels.find((m) => m.id === value);
-
   // Close dropdown on outside click
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
+
+  // Filtered model groups — respects both provider filter and search query
+  const filteredGroups = useMemo(() => {
+    let result = groups;
+    if (providerFilter !== null) {
+      result = result.filter((g) => g.provider === providerFilter);
+    }
+    const q = search.trim().toLowerCase();
+    if (q) {
+      result = result
+        .map((g) => ({ ...g, models: g.models.filter((m) => m.label.toLowerCase().includes(q)) }))
+        .filter((g) => g.models.length > 0);
+    }
+    return result;
+  }, [groups, providerFilter, search]);
+
+  const allModels = groups.flatMap((g) => g.models);
+  const selectedModel = allModels.find((m) => m.id === value);
+  const selectedWarning = costWarningLevel(selectedModel?.costPer1MTokens);
+
+  // Show provider sidebar when there are multiple AI providers
+  const showProviderSidebar = groups.length > 1;
+  // Show provider subtitle on model rows when multiple providers are visible
+  const showProviderSubtitle = filteredGroups.length > 1;
+  // Show group headers when multiple providers are in view
+  const showGroupHeaders = filteredGroups.length > 1;
 
   function handleSelect(model: PickerModel) {
     onChange(model.id, model.effortLevels);
@@ -267,16 +272,23 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   }
 
   const label = selectedModel?.label ?? value;
-  const selectedWarning = costWarningLevel(selectedModel?.costPer1MTokens);
 
   return (
     <div ref={ref} className={styles.pickerContainer}>
+      {/* ── Trigger button ── */}
       <button
         className={styles.pickerBtn}
         onClick={() => setOpen((o) => !o)}
         disabled={disabled}
         type="button"
       >
+        {selectedModel && (
+          <ProviderIcon
+            provider={selectedModel.provider}
+            label={PROVIDER_LABELS[selectedModel.provider] ?? selectedModel.provider}
+            className={styles.pickerProviderIcon}
+          />
+        )}
         <span className={styles.pickerLabel}>{label}</span>
         {harness === 'pi' && (
           <span className={styles.harnessIndicator} title="Pi harness active">Pi</span>
@@ -287,84 +299,134 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
         <ChevronDown size={11} />
       </button>
 
+      {/* ── Dropdown ── */}
       {open && (
         <div
-          className={`${styles.pickerDropdown} ${harness !== undefined ? styles.pickerDropdownSplit : ''} ${openUp ? styles.pickerDropdownUp : ''}`}
+          className={`${styles.pickerDropdown} ${openUp ? styles.pickerDropdownUp : ''}`}
           style={{
             maxHeight: `${maxHeight}px`,
             ...(align === 'right' ? { left: 'auto', right: 0 } : {}),
           }}
         >
-          {/* Harness section — pinned at top as a segmented control */}
-          {harness !== undefined && onHarnessChange && (() => {
-            const lockedOpt = HARNESS_OPTIONS.find(
-              (opt: { id: Harness; label: string; description: string }) =>
-                !canUsePickerHarness(opt.id, value, harnessPolicy).allowed
-            );
-            const lockReason = lockedOpt
-              ? canUsePickerHarness(lockedOpt.id, value, harnessPolicy).reason
-              : undefined;
-            return (
-              <>
-                <div className={styles.harnessRow}>
-                  {HARNESS_OPTIONS.map((opt: { id: Harness; label: string; description: string }) => {
-                    const decision = canUsePickerHarness(opt.id, value, harnessPolicy);
-                    const isActive = harness === opt.id;
-                    const isLocked = !decision.allowed;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        className={`${styles.harnessBtn} ${isActive ? styles.harnessBtnActive : ''} ${isLocked ? styles.harnessBtnLocked : ''}`}
-                        disabled={isLocked}
-                        onClick={() => { if (!isLocked) { onHarnessChange(opt.id); } }}
-                      >
-                        {isLocked
-                          ? <Lock size={9} className={styles.harnessLockIcon} />
-                          : (isActive ? <Check size={9} className={styles.harnessCheckIcon} /> : null)
-                        }
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {lockReason && (
-                  <div className={styles.harnessLockNote}>
-                    <Info size={9} className={styles.harnessLockNoteIcon} />
-                    <span>{lockReason}</span>
-                  </div>
-                )}
-                <div className={styles.pickerSectionDivider} />
-              </>
-            );
-          })()}
+          {/* Provider filter sidebar */}
+          {showProviderSidebar && (
+            <div className={styles.pickerProviderSidebar}>
+              <button
+                type="button"
+                className={`${styles.pickerProviderBtn} ${providerFilter === null ? styles.pickerProviderBtnActive : ''}`}
+                onClick={() => setProviderFilter(null)}
+                title="All providers"
+              >
+                <LayoutGrid size={13} />
+              </button>
+              {groups.map((group) => (
+                <button
+                  key={group.provider}
+                  type="button"
+                  className={`${styles.pickerProviderBtn} ${providerFilter === group.provider ? styles.pickerProviderBtnActive : ''}`}
+                  onClick={() => setProviderFilter(group.provider)}
+                  title={group.label}
+                >
+                  <ProviderIcon
+                    provider={group.provider}
+                    label={group.label}
+                    className={styles.pickerProviderBtnIcon}
+                  />
+                </button>
+              ))}
+            </div>
+          )}
 
-          {/* Scrollable model list */}
-          <div className={harness !== undefined ? styles.pickerScrollArea : undefined}>
-            {groups.map((group) => (
-              <div key={group.provider}>
-                {groups.length > 1 && (
-                  <div className={styles.pickerGroupHeader}>{group.label}</div>
-                )}
-                {group.models.map((model) => {
-                  const lvl = costWarningLevel(model.costPer1MTokens);
+          {/* Main panel */}
+          <div className={styles.pickerMainPanel}>
+            {/* Harness section — pinned above search, scales to many harnesses */}
+            {harness !== undefined && onHarnessChange && (
+              <>
+                <div className={`${styles.pickerGroupHeader} ${styles.pickerHarnessHeader}`}>Harness</div>
+                {HARNESS_OPTIONS.map((opt: { id: Harness; label: string; description: string }) => {
+                  const decision = canUsePickerHarness(opt.id, value, harnessPolicy);
+                  const isActive = harness === opt.id;
+                  const isLocked = !decision.allowed;
+                  const subtitle = isLocked && decision.reason ? decision.reason : opt.description;
                   return (
                     <button
-                      key={model.id}
-                      className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
-                      onClick={() => handleSelect(model)}
+                      key={opt.id}
                       type="button"
+                      className={`${styles.harnessOption} ${isActive ? styles.harnessOptionActive : ''} ${isLocked ? styles.harnessOptionLocked : ''}`}
+                      disabled={isLocked}
+                      onClick={() => { if (!isLocked) onHarnessChange(opt.id); }}
                     >
-                      <span className={styles.pickerOptionLabel}>{model.label}</span>
-                      {lvl && <CostWarningBadge level={lvl} compact costPer1MTokens={model.costPer1MTokens} />}
-                      {model.costDisplay && (
-                        <span className={styles.pickerCostBadge}>{model.costDisplay}</span>
-                      )}
+                      <span className={styles.harnessOptionIcon}>
+                        {isActive ? <Check size={11} /> : isLocked ? <Lock size={11} /> : null}
+                      </span>
+                      <span className={styles.harnessOptionBody}>
+                        <span className={styles.harnessOptionName}>{opt.label}</span>
+                        {subtitle && <span className={styles.harnessOptionDesc}>{subtitle}</span>}
+                      </span>
                     </button>
                   );
                 })}
-              </div>
-            ))}
+                <div className={styles.pickerSectionDivider} />
+              </>
+            )}
+
+            {/* Search bar */}
+            <div className={styles.pickerSearchWrapper}>
+              <Search size={11} className={styles.pickerSearchIcon} />
+              <input
+                type="text"
+                className={styles.pickerSearchInput}
+                placeholder="Search models…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+                autoFocus
+              />
+            </div>
+
+            {/* Scrollable model list */}
+            <div className={styles.pickerScrollContent}>
+              {filteredGroups.length > 0 ? (
+                filteredGroups.map((group) => (
+                  <div key={group.provider}>
+                    {showGroupHeaders && (
+                      <div className={styles.pickerGroupHeader}>{group.label}</div>
+                    )}
+                    {group.models.map((model) => {
+                      const lvl = costWarningLevel(model.costPer1MTokens);
+                      return (
+                        <button
+                          key={model.id}
+                          className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
+                          onClick={() => handleSelect(model)}
+                          type="button"
+                        >
+                          <span className={styles.pickerOptionContent}>
+                            <span className={styles.pickerOptionRow}>
+                              <span className={styles.pickerOptionLabel}>{model.label}</span>
+                              {lvl && <CostWarningBadge level={lvl} compact costPer1MTokens={model.costPer1MTokens} />}
+                              {model.costDisplay && (
+                                <span className={styles.pickerCostBadge}>{model.costDisplay}</span>
+                              )}
+                            </span>
+                            {showProviderSubtitle && (
+                              <span className={styles.pickerOptionSubtitle}>
+                                <ProviderDot provider={model.provider} />
+                                {PROVIDER_LABELS[model.provider] ?? model.provider}
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))
+              ) : (
+                <div className={styles.pickerNoResults}>
+                  No models match &ldquo;{search}&rdquo;
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

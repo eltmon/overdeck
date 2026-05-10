@@ -3439,6 +3439,7 @@
   flex-shrink: 0;
 }
 
+/* Two-panel picker: provider sidebar (left) + main panel (right) */
 .pickerDropdown {
   position: absolute;
   left: 0;
@@ -3447,14 +3448,12 @@
   background: var(--background);
   border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-  min-width: 220px;
-  max-width: min(calc(100vw - 16px), 400px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  min-width: 300px;
+  max-width: min(calc(100vw - 16px), 460px);
   display: flex;
-  flex-direction: column;
-  padding: 4px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  flex-direction: row;
+  overflow: hidden;
 }
 
 .pickerDropdownUp {
@@ -3462,19 +3461,151 @@
   bottom: calc(100% + 4px);
 }
 
-.pickerOption {
+/* ── Provider filter sidebar ── */
+.pickerProviderSidebar {
+  width: 44px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  gap: 2px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: color-mix(in srgb, var(--muted) 30%, transparent);
+}
+
+.pickerProviderBtn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px;
+  justify-content: center;
+  color: var(--muted-foreground);
+  transition: background 0.1s, color 0.1s;
+  position: relative;
+  padding: 0;
+}
+
+.pickerProviderBtn:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.pickerProviderBtnActive {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
+}
+
+.pickerProviderBtnActive::after {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--primary);
+}
+
+/* SVG icon inside sidebar button */
+.pickerProviderBtnIcon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+/* Small colored letter badge for providers without an SVG icon */
+.providerBadge {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 9px;
+  font-weight: 800;
+  font-family: inherit;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* ── Main panel ── */
+.pickerMainPanel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Harness section header is slightly indented vs the model section headers */
+.pickerHarnessHeader {
+  padding-top: 8px;
+}
+
+/* ── Search bar ── */
+.pickerSearchWrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px 6px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.pickerSearchIcon {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  opacity: 0.55;
+}
+
+.pickerSearchInput {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--foreground);
+}
+
+.pickerSearchInput::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.55;
+}
+
+/* ── Scrollable model list ── */
+.pickerScrollContent {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding: 4px;
+}
+
+/* ── Model row ── */
+.pickerOption {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  padding: 7px 10px;
   font-size: 12px;
   text-align: left;
   background: none;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
   color: var(--foreground);
+  position: relative;
+  transition: background 0.1s;
 }
 
 .pickerOption:hover {
@@ -3483,7 +3614,67 @@
 
 .pickerOptionActive {
   background: color-mix(in srgb, var(--primary) 8%, transparent);
-  font-weight: 500;
+}
+
+.pickerOptionActive:hover {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.pickerOptionActive::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--primary);
+}
+
+/* Two-row content inside each model row */
+.pickerOptionContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Top row: label + cost badges */
+.pickerOptionRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* Provider subtitle row */
+.pickerOptionSubtitle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  opacity: 0.75;
+  line-height: 1.2;
+}
+
+/* Tiny colored dot in subtitle */
+.pickerOptionProviderDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Empty search results */
+.pickerNoResults {
+  padding: 20px 12px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  text-align: center;
+  font-style: italic;
+  opacity: 0.7;
 }
 
 .pickerGroupHeader {
@@ -3539,93 +3730,86 @@
   line-height: 1.5;
 }
 
-/* Applied to the model picker dropdown to pin the harness section at top
-   and make only the model list scroll */
-.pickerDropdownSplit {
-  overflow: hidden;
-}
+/* pickerDropdownSplit / pickerScrollArea — superseded by two-panel layout; kept as no-ops for safety */
+.pickerDropdownSplit {}
+.pickerScrollArea {}
 
-.pickerScrollArea {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  flex: 1;
-  min-height: 0;
-}
-
-/* Harness segmented control inside the model picker dropdown */
-.harnessRow {
+/* Harness radio-list inside the model picker dropdown.
+   Vertical layout scales to any number of harnesses. */
+.harnessOption {
   display: flex;
-  gap: 4px;
-  padding: 4px 6px 2px;
-}
-
-.harnessBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  flex: 1;
-  padding: 5px 10px;
-  font-size: 11px;
-  font-weight: 500;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
   font-family: inherit;
+  border: none;
   border-radius: 5px;
-  border: 1px solid var(--border);
   background: transparent;
-  color: var(--muted-foreground);
   cursor: pointer;
-  transition: border-color 0.1s, background 0.1s, color 0.1s;
-  white-space: nowrap;
+  text-align: left;
+  transition: background 0.1s;
 }
 
-.harnessBtn:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--primary) 50%, transparent);
-  color: var(--foreground);
+.harnessOption:hover:not(:disabled) {
+  background: var(--accent);
 }
 
-.harnessBtnActive {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 10%, transparent);
-  color: var(--primary);
-  font-weight: 600;
+.harnessOptionActive {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
-.harnessBtnLocked {
-  opacity: 0.4;
+.harnessOptionActive:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 13%, transparent);
+}
+
+.harnessOptionLocked {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-.harnessCheckIcon {
+.harnessOptionIcon {
+  width: 14px;
+  flex-shrink: 0;
+  padding-top: 1px;
   color: var(--primary);
-  flex-shrink: 0;
-}
-
-.harnessLockIcon {
-  color: var(--muted-foreground);
-  flex-shrink: 0;
-}
-
-/* Inline explanation when a harness option is locked */
-.harnessLockNote {
   display: flex;
   align-items: flex-start;
-  gap: 5px;
-  padding: 4px 8px 6px;
-  font-size: 10px;
-  color: var(--muted-foreground);
-  line-height: 1.4;
 }
 
-.harnessLockNoteIcon {
-  flex-shrink: 0;
-  margin-top: 1px;
-  opacity: 0.7;
+.harnessOptionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.harnessOptionName {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--foreground);
+  line-height: 1.3;
+}
+
+.harnessOptionActive .harnessOptionName {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.harnessOptionDesc {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  line-height: 1.35;
+  white-space: normal;
 }
 
 .pickerOptionLabel {
   flex: 1;
   text-align: left;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .pickerCostBadge {
