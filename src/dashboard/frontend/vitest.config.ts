@@ -21,6 +21,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@panctl/contracts': path.resolve(__dirname, '../../../packages/contracts/src/index.ts'),
     },
   },
 });

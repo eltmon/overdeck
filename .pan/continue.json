@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-10T00:03:30.715Z",
+  "updated": "2026-05-10T00:18:44.000Z",
   "gitState": {
     "branch": "feature/pan-1044",
-    "sha": "2b5ba992f",
+    "sha": "8754a53ec",
     "dirty": true
   },
   "decisions": [
@@ -162,6 +162,12 @@
       "timestamp": "2026-05-10T00:03:30.715Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-10T00:18:44.000Z",
+      "reason": "feedback-fix",
+      "note": "Fixed repeated test verification failure where Vitest import analysis resolved @panctl/contracts through package exports and failed when generated dist artifacts were absent. Root and frontend Vitest configs now alias @panctl/contracts to packages/contracts/src/index.ts. Verified targeted contracts reducer test with contracts dist absent, frontend ProjectOverview test, npm test, and npm run build.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []

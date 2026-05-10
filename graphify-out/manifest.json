@@ -8,8 +8,8 @@
     "hash": "a7bbad0123b6b89e9ffa40bceb1ae7bf"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/vitest.config.ts": {
-    "mtime": 1778289162.8344636,
-    "hash": "8b62b2eee4ba4e899fb3103e9b7ed3ea"
+    "mtime": 1778371953.4461722,
+    "hash": "f041db660f2608d4831e1c302450c095"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/vitest.workspace.ts": {
     "mtime": 1778289162.8344636,
@@ -896,7 +896,7 @@
     "hash": "912dd048fc5f1898876a9d587eeafcc0"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/scripts/record-cost-event.d.ts": {
-    "mtime": 1778371074.1398046,
+    "mtime": 1778372182.7830188,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/scripts/notify-complete": {
@@ -2312,8 +2312,8 @@
     "hash": "f2ba985b7cb2a8ad4459e621745d7092"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/src/dashboard/frontend/vitest.config.ts": {
-    "mtime": 1778289162.782462,
-    "hash": "baa76621e03baea7950758dc1a8c5f5a"
+    "mtime": 1778371957.495311,
+    "hash": "2ca29329f5d3bfebbfe3fbe9be528bf8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1044/src/dashboard/frontend/vite.config.ts": {
     "mtime": 1778289162.782462,
