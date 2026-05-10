@@ -322,6 +322,32 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
     }
   }, [agentId, conversation.name, conversation.sessionAlive, harness]);
 
+  /**
+   * Atomic model+harness swap. Used by the picker's auto-resolve flow when
+   * a single click would otherwise fire two switch-model API calls that race
+   * on the tmux session lifecycle (PAN-1067).
+   */
+  const handleComboChange = useCallback((newModel: string, _effortLevels: readonly string[], newHarness: Harness) => {
+    setModel(newModel);
+    saveStoredModel(newModel);
+    setHarness(newHarness);
+    saveStoredHarness(newHarness);
+    if (conversation.sessionAlive) {
+      setSending(true);
+      void switchModel(conversation.name, newModel, agentId, newHarness)
+        .catch((err: unknown) => {
+          console.error('[ComposerFooter] Failed to switch model+harness:', err);
+          toast.error(err instanceof Error ? err.message : 'Failed to switch model+harness');
+          // Roll back to keep UI in sync with backend on failure.
+          setModel(model);
+          setHarness(harness);
+        })
+        .finally(() => {
+          setSending(false);
+        });
+    }
+  }, [agentId, conversation.name, conversation.sessionAlive, harness, model]);
+
   const handlePaste = useCallback((event: ClipboardEvent<HTMLDivElement>) => {
     if (sending) {
       event.preventDefault();
@@ -545,7 +571,14 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
 
         {/* Toolbar inside the box */}
         <div className={styles.composerToolbar}>
-          <ModelPicker value={model} onChange={handleModelChange} disabled={isDisabled} harness={harness} onHarnessChange={handleHarnessChange} />
+          <ModelPicker
+            value={model}
+            onChange={handleModelChange}
+            onComboChange={handleComboChange}
+            disabled={isDisabled}
+            harness={harness}
+            onHarnessChange={handleHarnessChange}
+          />
           <div className={styles.composerToolbarDivider} />
           <EffortPicker value={effort} onChange={setEffort} disabled={isDisabled} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 

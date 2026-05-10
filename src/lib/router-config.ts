@@ -64,7 +64,7 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
       apiKey: settings.api_keys.openai.startsWith('$')
         ? settings.api_keys.openai
         : settings.api_keys.openai,
-      models: ['gpt-5.5', 'gpt-5.5-mini', 'gpt-5.5-nano', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'o3'],
+      models: ['gpt-5.5', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-pro', 'gpt-5.3-codex', 'gpt-5.2', 'o3', 'o4-mini'],
     });
   }
 
@@ -131,7 +131,7 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
       name: 'openai',
       baseURL: 'https://api.openai.com/v1',
       apiKey: apiKeys.openai.startsWith('$') ? apiKeys.openai : apiKeys.openai,
-      models: ['gpt-5.5', 'gpt-5.5-mini', 'gpt-5.5-nano', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'o3'],
+      models: ['gpt-5.5', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-pro', 'gpt-5.3-codex', 'gpt-5.2', 'o3', 'o4-mini'],
     });
   }
 

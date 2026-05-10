@@ -117,13 +117,11 @@ export function getFriendlyModelName(fullModel: string | undefined | null): stri
 
   // OpenAI models
   if (backingModel.includes('gpt-5.5-pro')) return 'GPT-5.5 Pro';
-  if (backingModel.includes('gpt-5.5-mini')) return 'GPT-5.5 Mini';
-  if (backingModel.includes('gpt-5.5-nano')) return 'GPT-5.5 Nano';
   if (backingModel.includes('gpt-5.5')) return 'GPT-5.5';
   if (backingModel.includes('gpt-5.4-pro')) return 'GPT-5.4 Pro';
   if (backingModel.includes('gpt-5.4-mini')) return 'GPT-5.4 Mini';
-  if (backingModel.includes('gpt-5.4-nano')) return 'GPT-5.4 Nano';
   if (backingModel.includes('gpt-5.4')) return 'GPT-5.4';
+  if (backingModel.includes('gpt-5.3-codex')) return 'GPT-5.3 Codex';
   if (backingModel.includes('gpt-5.3')) return 'GPT-5.3';
   if (backingModel.includes('gpt-5.2')) return 'GPT-5.2';
   if (backingModel.includes('gpt-5.1')) return 'GPT-5.1';

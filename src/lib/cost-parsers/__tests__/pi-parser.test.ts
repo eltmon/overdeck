@@ -46,7 +46,7 @@ describe('parsePiSession', () => {
     expect(result).not.toBeNull()
     expect(result!.messageCount).toBe(2)
     expect(Object.keys(result!.modelBreakdown!)).toEqual(
-      expect.arrayContaining(['claude-sonnet-4-6', 'gpt-5.5-mini']),
+      expect.arrayContaining(['claude-sonnet-4-6', 'gpt-5.4-mini']),
     )
     expect(result!.modelBreakdown!['claude-sonnet-4-6']).toEqual({
       cost: 0.00045,
@@ -54,13 +54,13 @@ describe('parsePiSession', () => {
       outputTokens: 10,
       messageCount: 1,
     })
-    expect(result!.modelBreakdown!['gpt-5.5-mini']).toEqual({
+    expect(result!.modelBreakdown!['gpt-5.4-mini']).toEqual({
       cost: 0.00065,
       inputTokens: 300,
       outputTokens: 50,
       messageCount: 1,
     })
-    expect(result!.model).toBe('claude-sonnet-4-6 → gpt-5.5-mini')
+    expect(result!.model).toBe('claude-sonnet-4-6 → gpt-5.4-mini')
   })
 
   it('compaction session: input tokens are NOT double-counted across the boundary (AC4)', () => {

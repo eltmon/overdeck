@@ -124,7 +124,7 @@ async function writePiAgentPrompt(agentId: string, prompt: string, timeoutSec = 
     throw new Error(`Pi agent ${agentId} did not become ready within ${timeoutSec}s`);
   }
   try {
-    writePiCommand(agentId, { cmd: 'prompt', text: prompt });
+    writePiCommand(agentId, { id: randomUUID(), type: 'prompt', message: prompt });
   } catch (err) {
     if (err instanceof PiNotReady) {
       throw new Error(`Pi agent ${agentId} reader gone before prompt could be delivered: ${err.message}`);

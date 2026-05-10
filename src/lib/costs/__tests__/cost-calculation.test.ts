@@ -307,21 +307,23 @@ describe('Cost Calculation Accuracy', () => {
     });
 
     it('should handle models without cache pricing', () => {
-      const pricing = getPricing('openai', 'gpt-5.4');
+      // gpt-5.2 has no cache pricing in our table — used here to verify the
+      // calculator correctly skips cache tokens when no cache rate exists.
+      const pricing = getPricing('openai', 'gpt-5.2');
       expect(pricing).toBeDefined();
 
       const usage: TokenUsage = {
         inputTokens: 1000,
         outputTokens: 500,
-        cacheReadTokens: 100, // OpenAI models don't have cache pricing
+        cacheReadTokens: 100,
         cacheWriteTokens: 50
       };
 
       const cost = calculateCost(usage, pricing!);
 
       // Should only calculate input/output, ignore cache tokens
-      // (1000/1M)*2.5 + (500/1M)*15 = 0.0025 + 0.0075 = 0.01
-      expect(cost).toBeCloseTo(0.01, 6);
+      // (1000/1M)*1.25 + (500/1M)*10 = 0.00125 + 0.005 = 0.00625
+      expect(cost).toBeCloseTo(0.00625, 6);
     });
   });
 

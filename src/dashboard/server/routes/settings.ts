@@ -51,18 +51,17 @@ const readJsonBody = Effect.gen(function* () {
 
 /** Model ID to API model ID mapping */
 const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
-  // OpenAI models — gpt-5.x family maps to real API model names
-  'gpt-5.5-pro': { apiModel: 'gpt-4o' },
-  'gpt-5.5': { apiModel: 'gpt-4o' },
-  'gpt-5.5-mini': { apiModel: 'gpt-4o-mini' },
-  'gpt-5.5-nano': { apiModel: 'gpt-4o-mini' },
-  'gpt-5.4-pro': { apiModel: 'gpt-4o' },
-  'gpt-5.4': { apiModel: 'gpt-4o' },
-  'gpt-5.4-mini': { apiModel: 'gpt-4o-mini' },
-  'gpt-5.4-nano': { apiModel: 'gpt-4o-mini' },
+  // OpenAI models — gpt-5.x are real OpenAI model IDs (identity map).
+  // Codex sign-in routes through CLIProxy; API key routes direct.
+  'gpt-5.5-pro': { apiModel: 'gpt-5.5-pro' },
+  'gpt-5.5': { apiModel: 'gpt-5.5' },
+  'gpt-5.4-pro': { apiModel: 'gpt-5.4-pro' },
+  'gpt-5.4': { apiModel: 'gpt-5.4' },
+  'gpt-5.4-mini': { apiModel: 'gpt-5.4-mini' },
+  'gpt-5.3-codex': { apiModel: 'gpt-5.3-codex' },
+  'gpt-5.2': { apiModel: 'gpt-5.2' },
   'o3': { apiModel: 'o3' },
   'o4-mini': { apiModel: 'o4-mini' },
-  'gpt-5.2-codex': { apiModel: 'gpt-4o' },
   'o3-deep-research': { apiModel: 'gpt-4o' },
   'gpt-4o': { apiModel: 'gpt-4o' },
   'gpt-4o-mini': { apiModel: 'gpt-4o-mini' },

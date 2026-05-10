@@ -76,7 +76,7 @@ export interface ConversationsConfig {
 export interface TtsSummarizerConfig {
   /** Whether the TTS summarizer is active */
   enabled?: boolean;
-  /** Model ID to use for summarization (default: gpt-5.5-nano) */
+  /** Model ID to use for summarization (default: gpt-5.4-mini) */
   model?: ModelId;
   /** Seconds to batch activity before summarizing (default: 15) */
   batch_window_seconds?: number;
@@ -536,7 +536,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   },
   ttsSummarizer: {
     enabled: false,
-    model: 'gpt-5.5-nano',
+    model: 'gpt-5.4-mini',
     batchWindowSeconds: 15,
   },
   resources: {

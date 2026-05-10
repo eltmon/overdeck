@@ -40,7 +40,7 @@ describe('getAgentRuntimeBaseCommand harness routing (PAN-636)', () => {
   })
 
   it('pi harness emits no claude permission flags', async () => {
-    const cmd = await getAgentRuntimeBaseCommand('gpt-5.5-mini', undefined, undefined, 'pi')
+    const cmd = await getAgentRuntimeBaseCommand('gpt-5.4-mini', undefined, undefined, 'pi')
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/--permission-mode/)
     expect(cmd).toMatch(/^pi --mode rpc /)

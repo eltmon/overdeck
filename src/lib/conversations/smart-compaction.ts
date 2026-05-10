@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -657,7 +658,7 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
         resolve(summary);
       });
 
-      child.stdin.end(`${JSON.stringify({ cmd: 'prompt', text: prompt })}\n`);
+      child.stdin.end(`${JSON.stringify({ id: randomUUID(), type: 'prompt', message: prompt })}\n`);
     });
   } finally {
     await rm(sessionDir, { recursive: true, force: true }).catch(() => undefined);
