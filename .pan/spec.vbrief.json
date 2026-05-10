@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-10T01:56:07.187Z"
+    "updated": "2026-05-10T01:58:09.526Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 97,
+    "sequence": 128,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-10T01:56:07.187Z",
+    "updated": "2026-05-10T01:58:09.526Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -113,7 +113,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.187Z"
+        "completed": "2026-05-10T01:58:09.526Z"
       },
       {
         "id": "f2-agentstate-role-field",
@@ -155,7 +155,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.180Z"
+        "completed": "2026-05-10T01:58:09.516Z"
       },
       {
         "id": "f3-default-config-seed",
@@ -205,7 +205,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.179Z"
+        "completed": "2026-05-10T01:58:09.515Z"
       },
       {
         "id": "v1-convoy-agents-migration",
@@ -255,7 +255,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.185Z"
+        "completed": "2026-05-10T01:58:09.525Z"
       },
       {
         "id": "r1-role-plan-md",
@@ -297,7 +297,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.184Z"
+        "completed": "2026-05-10T01:58:09.523Z"
       },
       {
         "id": "r2-role-work-md-jidoka",
@@ -363,7 +363,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.183Z"
+        "completed": "2026-05-10T01:58:09.519Z"
       },
       {
         "id": "r3-role-review-md-convoy",
@@ -421,7 +421,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.177Z"
+        "completed": "2026-05-10T01:58:09.512Z"
       },
       {
         "id": "r4-role-test-md-uat",
@@ -463,7 +463,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.182Z"
+        "completed": "2026-05-10T01:58:09.518Z"
       },
       {
         "id": "r5-role-ship-md-human-merge",
@@ -513,7 +513,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.181Z"
+        "completed": "2026-05-10T01:58:09.517Z"
       },
       {
         "id": "s1-wire-plan-end-to-end",
@@ -587,7 +587,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.175Z"
+        "completed": "2026-05-10T01:58:09.512Z"
       },
       {
         "id": "s2-wire-work-end-to-end",
@@ -653,7 +653,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.174Z"
+        "completed": "2026-05-10T01:58:09.511Z"
       },
       {
         "id": "s3-wire-review-end-to-end",
@@ -719,7 +719,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.170Z"
+        "completed": "2026-05-10T01:58:09.507Z"
       },
       {
         "id": "s4-wire-test-end-to-end",
@@ -773,7 +773,7 @@
             "completed": "2026-05-09T21:48:25.322Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.174Z"
+        "completed": "2026-05-10T01:58:09.510Z"
       },
       {
         "id": "s5-wire-ship-end-to-end",
@@ -827,7 +827,7 @@
             "completed": "2026-05-09T21:41:12.083Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.173Z"
+        "completed": "2026-05-10T01:58:09.509Z"
       },
       {
         "id": "c1-reactive-cloister-scheduler",
@@ -890,7 +890,7 @@
             "completed": "2026-05-09T21:59:42.907Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.163Z"
+        "completed": "2026-05-10T01:58:09.503Z"
       },
       {
         "id": "c2-delete-specialist-machinery",
@@ -980,7 +980,7 @@
             "completed": "2026-05-09T23:11:34.000Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.161Z"
+        "completed": "2026-05-10T01:58:09.501Z"
       },
       {
         "id": "u1-workhorse-panel-component",
@@ -1030,7 +1030,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.178Z"
+        "completed": "2026-05-10T01:58:09.514Z"
       },
       {
         "id": "u2-roles-panel-with-cards",
@@ -1096,7 +1096,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.172Z"
+        "completed": "2026-05-10T01:58:09.508Z"
       },
       {
         "id": "u3-settings-page-rewire",
@@ -1141,7 +1141,7 @@
             "completed": "2026-05-09T23:41:48.183Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.165Z"
+        "completed": "2026-05-10T01:58:09.504Z"
       },
       {
         "id": "u4-delete-agentcards-components",
@@ -1186,7 +1186,7 @@
             "completed": "2026-05-09T23:58:01.261Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.162Z"
+        "completed": "2026-05-10T01:58:09.502Z"
       },
       {
         "id": "u5-api-settings-workhorses-roles",
@@ -1244,7 +1244,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.177Z"
+        "completed": "2026-05-10T01:58:09.513Z"
       },
       {
         "id": "d1-delete-work-types-and-router",
@@ -1298,7 +1298,7 @@
             "completed": "2026-05-09T23:33:20.935Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.160Z"
+        "completed": "2026-05-10T01:58:09.500Z"
       },
       {
         "id": "e1-delete-panopticon-agent-type",
@@ -1334,7 +1334,7 @@
             "completed": "2026-05-10T00:12:51.808Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.168Z"
+        "completed": "2026-05-10T01:58:09.506Z"
       },
       {
         "id": "e2-delete-specialist-type",
@@ -1388,7 +1388,7 @@
             "completed": "2026-05-10T00:34:17.242Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.159Z"
+        "completed": "2026-05-10T01:58:09.499Z"
       },
       {
         "id": "e3-delete-launcher-agent-type",
@@ -1442,7 +1442,7 @@
             "completed": "2026-05-10T01:10:30.000Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.167Z"
+        "completed": "2026-05-10T01:58:09.505Z"
       },
       {
         "id": "e4-confirm-work-type-id-gone",
@@ -1487,7 +1487,7 @@
             "completed": "2026-05-10T00:49:46.940Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.157Z"
+        "completed": "2026-05-10T01:58:09.497Z"
       },
       {
         "id": "e5-delete-activity-source",
@@ -1532,7 +1532,7 @@
             "completed": "2026-05-10T00:57:06.782Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.166Z"
+        "completed": "2026-05-10T01:58:09.505Z"
       },
       {
         "id": "k1-contracts-agent-phase-to-role",
@@ -1587,7 +1587,7 @@
           }
         ],
         "updated": "2026-05-09T20:09:12.788Z",
-        "completed": "2026-05-10T01:56:07.156Z"
+        "completed": "2026-05-10T01:58:09.496Z"
       },
       {
         "id": "m1-state-json-hard-cut",
@@ -1665,7 +1665,7 @@
             "updated": "2026-05-10T01:42:12.000Z"
           }
         ],
-        "completed": "2026-05-10T01:56:07.155Z",
+        "completed": "2026-05-10T01:58:09.495Z",
         "updated": "2026-05-10T01:42:12.000Z"
       },
       {
@@ -1751,7 +1751,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.158Z"
+        "completed": "2026-05-10T01:58:09.498Z"
       },
       {
         "id": "z2-move-prd-canonical",
@@ -1793,7 +1793,7 @@
             }
           }
         ],
-        "completed": "2026-05-10T01:56:07.153Z"
+        "completed": "2026-05-10T01:58:09.494Z"
       }
     ],
     "edges": [
