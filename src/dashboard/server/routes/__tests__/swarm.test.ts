@@ -254,7 +254,12 @@ describe('swarm route helpers', () => {
           itemTitle: 'Prepare slot input',
           sessionName: 'agent-pan-971-1',
           workspace: '/tmp/feature-pan-971-slot-1',
-          status: 'completed',
+          // PAN-977 round-14 blocker: a 'completed' slot is one whose tmux
+          // pane exited but whose branch is NOT yet merged into the parent
+          // feature branch. Auto-advance MUST wait for 'merged' (the
+          // /api/swarm/slot-merged callback) before dispatching downstream
+          // slots; otherwise dependents see stale parent-branch files.
+          status: 'merged',
           startedAt: '2026-05-07T00:00:00Z',
           completedAt: '2026-05-07T00:05:00Z',
         },
@@ -400,6 +405,51 @@ describe('swarm route helpers', () => {
 
     // And only AFTER persistence does the issue leave the active registry.
     expect(__testInternals.getActiveSwarmIssueIds().has('PAN-971')).toBe(false);
+  });
+
+  // PAN-977 round-14 blocker: a slot whose tmux pane exited cleanly is
+  // 'completed' — its commits are NOT yet on the parent feature branch.
+  // Auto-advance MUST NOT dispatch downstream slots until the slot
+  // transitions to 'merged' via /api/swarm/slot-merged. Otherwise the
+  // downstream slot is created against stale parent-branch files and the
+  // DAG dependency order is silently broken.
+  it('does not auto-advance while a non-synthesis slot is only completed (not yet merged)', async () => {
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    writeFileSync(swarmStatePath, JSON.stringify({
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-0-item',
+          itemTitle: 'Prepare slot input',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          // Pane exited but branch not merged → must NOT trigger dispatch.
+          status: 'completed',
+          phase: 'implementation',
+          startedAt: '2026-05-07T00:00:00Z',
+          completedAt: '2026-05-07T00:05:00Z',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    }, null, 2));
+
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(true);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['0']);
+
+    const { __testInternals } = await import('../swarm.js');
+    await __testInternals.pollSwarmAutoAdvance();
+
+    // wave-1-item must NOT have been dispatched — the upstream slot is
+    // only locally completed, the merge callback has not landed.
+    expect(agents.spawnAgent).not.toHaveBeenCalled();
+    const nextState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(nextState.slots.some((s) => s.itemId === 'wave-1-item')).toBe(false);
   });
 
   it('does not advance while current wave still has running slots', async () => {
@@ -571,7 +621,10 @@ describe('swarm route helpers', () => {
           itemTitle: 'Prepare slot input',
           sessionName: 'agent-pan-971-1',
           workspace: '/tmp/feature-pan-971-slot-1',
-          status: 'completed',
+          // PAN-977 round-14: 'merged' (not 'completed') is what triggers
+          // downstream auto-advance, since 'completed' means pane exited
+          // but branch is not yet on the parent feature branch.
+          status: 'merged',
         },
       ],
       createdAt: '2026-05-07T00:00:00Z',
@@ -643,8 +696,10 @@ describe('swarm route helpers', () => {
       { itemId: 'wave-0-item-b', itemTitle: 'Deferred slot item' },
     ]);
 
-    // Mark the dispatched slot as completed in the canonical runtime so the
-    // next poll re-dispatches the deferred item.
+    // PAN-977 round-14: only 'merged' slots satisfy DAG dependencies and
+    // gate auto-advance — a slot that merely 'completed' (pane exited)
+    // has not yet landed on the parent feature branch, so dispatching
+    // dependents would race against stale upstream files.
     const initialState = (await __testInternals.loadSwarmState('PAN-971'))!;
     const completedState = {
       ...initialState,
@@ -654,7 +709,7 @@ describe('swarm route helpers', () => {
         itemTitle: 'First slot item',
         sessionName: 'agent-pan-971-1',
         workspace: '',
-        status: 'completed' as const,
+        status: 'merged' as const,
       }],
     };
     await __testInternals.persistSwarmRuntime(

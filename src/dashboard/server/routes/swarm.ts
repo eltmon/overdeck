@@ -594,12 +594,18 @@ async function dispatchSwarmWave(
   const waves = groupItemsByWave(annotatedDoc);
   const existingState = await loadSwarmState(issueUpper);
   const continueState = await loadWorkspaceContinue(mainWorkspace, issueUpper);
+  // PAN-977 round-14 blocker: only 'merged' slots may satisfy DAG dependencies.
+  // A 'completed' slot is one whose tmux pane exited cleanly in its own
+  // worktree — the slot's commits are NOT yet on the parent feature branch
+  // until /api/swarm/slot-merged transitions it to 'merged'. Treating
+  // 'completed' as merged here would dispatch downstream slots against stale
+  // parent-branch files and break dependency ordering.
   const mergedItemIds = new Set<string>([
     ...(continueState.swarmRuntime?.slots ?? [])
       .filter(slot => slot.status === 'merged')
       .map(slot => slot.itemId),
     ...(existingState?.slots ?? [])
-      .filter(slot => slot.status === 'completed' || slot.status === 'merged')
+      .filter(slot => slot.status === 'merged')
       .map(slot => slot.itemId),
   ]);
   const runningItems = (continueState.swarmRuntime?.slots ?? [])
@@ -1296,10 +1302,18 @@ async function pollSwarmAutoAdvance(): Promise<void> {
       continue;
     }
 
-    const allSlotsCompleted = state.slots.length > 0 && state.slots.every(
-      (slot) => slot.status === 'completed',
+    // PAN-977 round-14 blocker: 'completed' means the slot agent's tmux pane
+    // exited cleanly — its work has NOT yet landed on the parent feature
+    // branch. Auto-advance MUST wait for 'merged' (the
+    // /api/swarm/slot-merged callback) before dispatching the next DAG item;
+    // otherwise downstream slots get dispatched against stale parent-branch
+    // files. Synthesis slots end at 'completed' by design (they only
+    // produce context, never merge), so allow them as ready-to-advance.
+    const allSlotsReadyToAdvance = state.slots.length > 0 && state.slots.every(
+      (slot) => slot.status === 'merged'
+        || (slot.status === 'completed' && slot.phase === 'synthesis'),
     );
-    if (!allSlotsCompleted) continue;
+    if (!allSlotsReadyToAdvance) continue;
 
     autoAdvanceInFlight.add(state.issueId);
     try {
