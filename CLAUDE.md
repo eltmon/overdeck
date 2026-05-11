@@ -98,7 +98,7 @@ Sub-roles are configuration slots under a role, not standalone pipeline stages. 
 - **`work.inspect` / `work.inspect-deep`** — Claude Code subagents invoked from inside a `work` session via the `Agent` tool at Jidoka gates. Definitions live in `.claude/agents/inspect.md` and `inspect-deep.md`.
 - **`review.security` / `review.correctness` / `review.performance` / `review.requirements`** — harness-agnostic prompt templates the orchestrator reads from `roles/review-<subRole>.md` and inlines into each convoy spawn message. They are **never** loaded via Claude's `--agent` flag and never synced into project workspaces — they belong to Panopticon, are delivered as part of the workflow, and stay invisible to the work agent's session.
 
-`.claude/agents/` is a workspace sync target for the Claude Code harness, not a source of truth — anything placed there becomes ambient in every Claude Code session, which is the wrong shape for prompts that should only fire at a specific moment in the workflow.
+`.claude/agents/` and `.claude/skills/` are workspace sync targets for the Claude Code harness, not sources of truth — anything placed there becomes ambient in every Claude Code session, which is the wrong shape for prompts and skills that should only fire at a specific moment in the workflow.
 
 The full mental model — Role vs Claude subagent vs Panopticon pipeline agent — lives in [docs/ROLES.md](docs/ROLES.md). For review specifically, see [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md).
 
