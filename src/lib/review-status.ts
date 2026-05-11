@@ -209,31 +209,16 @@ export function setReviewStatus(
   }
   while (history.length > 10) history.shift();
 
-  // readyForMerge is true when all required gates pass.
-  // If uatStatus exists (UAT specialist has been involved), it must also be 'passed'.
-  // NOTE: we intentionally do NOT check verificationStatus here. Verification can fail
-  // on pre-existing test breakage or environment issues, but the test specialist's pass
-  // is the authoritative signal. The post-rebase gate in triggerMerge() is the real
-  // quality check. Blocking readyForMerge on a stale verificationStatus causes issues
-  // to get stuck after tests pass (PAN-714).
-  // PAN-905: GitHub-native blockers (failing checks, merge conflicts, etc.) always
-  // override readyForMerge to false, even if the caller explicitly passed true.
+  // PAN-1048: readyForMerge is only set explicitly by the ship role after
+  // rebase/verify/push. Auto-derivation from review+test gate status is removed —
+  // the ship role is the single authority.
+  // PAN-905: GitHub-native blockers always override readyForMerge to false.
   const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
   const readyForMerge = hasBlockers
     ? false
     : (update.readyForMerge !== undefined
         ? update.readyForMerge
-        : (
-            merged.reviewStatus === 'passed' &&
-            merged.testStatus === 'passed' &&
-            merged.mergeStatus !== 'merged' &&
-            // Don't auto-recompute rfm=true when the previous merge attempt failed —
-            // cycling: check-status gate → mergeStatus=failed → deacon restore → rfm=true → retry.
-            // checkFailedMergeRetry() handles transient retries explicitly with readyForMerge: true.
-            merged.mergeStatus !== 'failed' &&
-            // If UAT has been initiated, it must pass too
-            (merged.uatStatus === undefined || merged.uatStatus === 'passed')
-          ));
+        : merged.readyForMerge ?? false);
 
   const updated: ReviewStatus = normalizeReviewStatus({
     ...merged,

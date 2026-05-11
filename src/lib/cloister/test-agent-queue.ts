@@ -37,10 +37,10 @@ Required steps:
 3. Run the configured project gates (at minimum typecheck, lint, and tests when present/applicable).
 4. Decide whether browser UAT is required from acceptance criteria, issue notes, PR notes, or UI/dashboard wording.
 5. If UAT is required, use the Playwright MCP tools available to the test role. Do not spawn or wake a separate UAT agent.
-6. On success, mark tests passed and ready for the human Merge button:
+6. On success, mark tests passed (the ship role handles merge preparation):
    curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
      -H "Content-Type: application/json" \\
-     -d '{"testStatus":"passed","readyForMerge":true}'
+     -d '{"testStatus":"passed"}'
 7. On failure, mark tests failed with actionable notes:
    curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
      -H "Content-Type: application/json" \\

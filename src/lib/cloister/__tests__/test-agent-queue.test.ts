@@ -34,7 +34,8 @@ describe('test role dispatch', () => {
     expect(prompt).toContain('use the Playwright MCP tools available to the test role');
     expect(prompt).toContain('Do not spawn or wake a separate UAT agent');
     expect(prompt).toContain('/api/review/PAN-503/status');
-    expect(prompt).toContain('"testStatus":"passed","readyForMerge":true');
+    expect(prompt).toContain('"testStatus":"passed"');
+    expect(prompt).not.toContain('readyForMerge');
     expect(prompt).toContain('Do NOT spawn, wake, or delegate to test-agent or uat-agent specialists');
   });
 
