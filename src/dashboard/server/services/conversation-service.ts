@@ -62,6 +62,10 @@ export interface ParseState {
   permissionMode?: string;
   /** Map assistant message ID → file paths touched by file-modifying tool_use calls in that turn. */
   fileEditsByAssistantId: Map<string, Array<{ tool: string; filePath: string }>>;
+  /** ID of the current pendingAssistant message (carried across incremental parses for file-edit tracking). */
+  pendingAssistantId?: string;
+  /** Orphaned tool_use entry UUIDs awaiting re-keying (carried across incremental parses). */
+  orphanToolUseIds?: Set<string>;
 }
 
 export interface ConversationActivitySummary {
@@ -309,7 +313,13 @@ export async function parseConversationMessages(
   const FILE_EDIT_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
   // Tool_use entries arrive with their own UUID, separate from the text entry that follows.
   // We track these UUIDs so we can re-key edits when the text entry merges them into one message.
-  const orphanToolUseIds = new Set<string>();
+  const orphanToolUseIds = priorState?.orphanToolUseIds
+    ? new Set(priorState.orphanToolUseIds)
+    : new Set<string>();
+  // Restore pendingAssistant ID from prior incremental parse for correct file-edit tracking
+  if (priorState?.pendingAssistantId && !pendingAssistant) {
+    pendingAssistant = { id: priorState.pendingAssistantId } as ChatMessage;
+  }
 
   for (const line of lines) {
     let entry: JsonlEntry;
@@ -749,6 +759,8 @@ export async function parseConversationMessages(
     compactBoundaries,
     permissionMode,
     fileEditsByAssistantId,
+    pendingAssistantId: pendingAssistant?.id,
+    orphanToolUseIds: orphanToolUseIds.size > 0 ? orphanToolUseIds : undefined,
   };
 }
 
