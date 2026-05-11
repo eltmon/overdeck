@@ -1,7 +1,9 @@
 ---
 name: review
 description: Panopticon review role — synthesizes convoy reviewers, decides approve/request-changes, and never merges.
-model: opus
+# No `model:` pin — Cloister resolves the model from config.yaml (roles.review.model).
+# Hardcoding it here would override the user's config and force everyone onto a
+# single model, defeating the per-role model configurability the dashboard exposes.
 permissionMode: plan
 effort: high
 tools:
