@@ -17,10 +17,16 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { killAllReviewSessions } from '../../../src/lib/cloister/review-agent.js';
+import {
+  buildConvoyPrompt,
+  killAllReviewSessions,
+  spawnReviewSubRoleForIssue,
+} from '../../../src/lib/cloister/review-agent.js';
 
-const { mockKillSessionAsync } = vi.hoisted(() => ({
+const { mockKillSessionAsync, mockSpawnRun, mockNotifyPipeline } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
+  mockSpawnRun: vi.fn().mockResolvedValue({ id: 'agent-pan-1059-review-security' }),
+  mockNotifyPipeline: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -36,6 +42,19 @@ vi.mock('../../../src/lib/tmux.js', async () => {
   };
 });
 
+vi.mock('../../../src/lib/agents.js', () => ({
+  spawnRun: mockSpawnRun,
+}));
+
+vi.mock('../../../src/lib/config-yaml.js', () => ({
+  loadConfig: vi.fn(() => ({ config: {} })),
+  resolveModel: vi.fn(() => 'configured-reviewer-model'),
+}));
+
+vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
+  notifyPipeline: mockNotifyPipeline,
+}));
+
 // ── killAllReviewSessions ─────────────────────────────────────────────────────
 // PAN-931: pan down must kill review sessions so they don't survive dashboard
 // restart and block new review dispatch. The legacy coordinator naming pattern
@@ -45,6 +64,29 @@ vi.mock('../../../src/lib/tmux.js', async () => {
 describe('killAllReviewSessions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
+    mockKillSessionAsync.mockResolvedValue(undefined);
+  });
+
+  it('kills current role-primitive review sessions', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'agent-pan-999-review',
+      'agent-pan-999-review-security',
+      'agent-pan-999-review-correctness',
+      'agent-pan-999',
+      'agent-pan-999-work',
+    ]);
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toEqual(expect.arrayContaining([
+      'agent-pan-999-review',
+      'agent-pan-999-review-security',
+      'agent-pan-999-review-correctness',
+    ]));
+    expect(result.killed).toHaveLength(3);
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(3);
   });
 
   it('kills coordinator sessions', async () => {
@@ -293,6 +335,58 @@ describe('template/output contract', () => {
         expect(content).toMatch(/Write exactly one final report to the output file/i);
       });
     }
+  });
+});
+
+// ── convoy orchestration ──────────────────────────────────────────────────────
+
+describe('convoy orchestration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
+  });
+
+  it('builds a manifest-scoped convoy prompt for one sub-role', async () => {
+    const prompt = await buildConvoyPrompt({
+      issueId: 'PAN-1059',
+      subRole: 'security',
+      outputPath: '/workspace/.pan/review/run-1/security.md',
+      contextManifestPath: '/workspace/.pan/review/run-1/context.json',
+    });
+
+    expect(prompt).toContain('REVIEW TASK for PAN-1059 — SECURITY REVIEW');
+    expect(prompt).toContain('/workspace/.pan/review/run-1/security.md');
+    expect(prompt).toContain('/workspace/.pan/review/run-1/context.json');
+    expect(prompt).toContain('Write exactly one final report to the output file');
+    expect(prompt).not.toContain('.claude/reviews/');
+  });
+
+  it('spawns a reviewer as a review sub-role session with the resolved model', async () => {
+    const result = await spawnReviewSubRoleForIssue({
+      issueId: 'PAN-1059',
+      workspace: '/workspace',
+      subRole: 'security',
+      runId: 'agent-pan-1059-review-abcdef12',
+      outputPath: '/workspace/.pan/review/agent-pan-1059-review-abcdef12/security.md',
+      contextManifestPath: '/workspace/.pan/review/agent-pan-1059-review-abcdef12/context.json',
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      sessionId: 'agent-pan-1059-review-security',
+    });
+    expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
+      workspace: '/workspace',
+      subRole: 'security',
+      model: 'configured-reviewer-model',
+      prompt: expect.stringContaining('REVIEW TASK for PAN-1059 — SECURITY REVIEW'),
+    }));
+    expect(mockNotifyPipeline).toHaveBeenCalledWith({
+      type: 'reviewer_started',
+      issueId: 'PAN-1059',
+      role: 'security',
+      sessionName: 'agent-pan-1059-review-security',
+    });
   });
 });
 

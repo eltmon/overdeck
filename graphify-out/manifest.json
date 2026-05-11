@@ -600,8 +600,8 @@
     "hash": "cc974748d4543670a0686c7c39c357d0"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/tests/lib/cloister/review-agent.test.ts": {
-    "mtime": 1778529476.3394604,
-    "hash": "d02aedd8c8bf3a2ead5141cbb3945f6b"
+    "mtime": 1778534934.4845328,
+    "hash": "ecd90d5e108875e29136e75e566facaf"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/tests/lib/cloister/deacon-ci-retry.test.ts": {
     "mtime": 1778529476.3394604,
@@ -799,6 +799,10 @@
     "mtime": 1778529476.3366022,
     "hash": "1d2827b1fe265bcca47d6e6eb374bd1f"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/tests/cli/commands/review-spawn-reviewer.test.ts": {
+    "mtime": 1778534946.9429615,
+    "hash": "79a6c6b91b900520ab86723679dabc9e"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/tests/cli/commands/release-command-parsing.test.ts": {
     "mtime": 1778529476.336643,
     "hash": "b7c8893bedb903137c1bc0c75672e91a"
@@ -824,8 +828,8 @@
     "hash": "53d192494146256b205dd2b9812ea1d3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/tests/cli/commands/specialists/done.test.ts": {
-    "mtime": 1778531849.0482771,
-    "hash": "1439b4398dd4d8f21ec24c8df7e41f13"
+    "mtime": 1778534966.9946513,
+    "hash": "e36340495f371cde79cf7f3df63f701b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/skills/session-health/scripts/check_sessions.py": {
     "mtime": 1778529476.255599,
@@ -1624,8 +1628,8 @@
     "hash": "de0836b619d4769cc1e545725b06de28"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/cloister/review-agent.ts": {
-    "mtime": 1778530039.0357687,
-    "hash": "9c9d6fc20c766f46096f5bb1d2403a92"
+    "mtime": 1778534894.3361516,
+    "hash": "94bcb2ab53ce0bdd61a1168698de90e0"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/cloister/specialist-logs.ts": {
     "mtime": 1778529476.3216624,
@@ -1776,8 +1780,8 @@
     "hash": "fa931ee4f0c823c9cfb534b87a2f0f24"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/cloister/__tests__/review-monitor.test.ts": {
-    "mtime": 1778529476.319648,
-    "hash": "f926a49b0707206480ab6b4fcad04211"
+    "mtime": 1778534957.6963315,
+    "hash": "dc71232e3438aebf69f4e813f6dbb8cb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/cloister/__tests__/review-context.test.ts": {
     "mtime": 1778529476.319648,

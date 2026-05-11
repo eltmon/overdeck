@@ -155,6 +155,40 @@ describe('waitForReviewerOutputs', () => {
     }
   });
 
+  it('returns mixed done, missing, and stalled statuses in one convoy wait', async () => {
+    vi.setSystemTime(new Date('2026-05-11T21:00:00Z'));
+    const now = Date.now();
+    mockExistsSync.mockImplementation((path: string) => (
+      path.endsWith('/security.md')
+      || path.endsWith('/performance.md')
+      || path.endsWith('/requirements.md')
+    ));
+    mockStat.mockImplementation(async (path: string) => {
+      if (path.endsWith('/performance.md')) return { mtimeMs: now - 1_000 };
+      return { mtimeMs: now - 10 * 60 * 1000 };
+    });
+    mockIsPaneDeadAsync.mockResolvedValue(true);
+
+    const resultPromise = waitForReviewerOutputs({
+      issueId: 'PAN-1059',
+      runId: RUN_ID,
+      workspace: WORKSPACE,
+      pollIntervalMs: 50,
+      staleAfterMs: 5 * 60 * 1000,
+      timeoutMs: 500,
+    });
+
+    await vi.runAllTimersAsync();
+    const results = await resultPromise;
+
+    expect(results.map(r => [r.subRole, r.status])).toEqual([
+      ['security', 'done'],
+      ['correctness', 'missing'],
+      ['performance', 'stalled'],
+      ['requirements', 'done'],
+    ]);
+  });
+
   it('only waits on requested sub-roles', async () => {
     mockExistsSync.mockReturnValue(true);
     mockStat.mockResolvedValue({ mtimeMs: Date.now() - 10 * 60 * 1000 });

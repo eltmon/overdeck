@@ -463,6 +463,7 @@ export async function killAllReviewerSessions(
  * surviving a dashboard restart and blocking new review dispatch (PAN-931).
  *
  * Targets:
+ *   - agent-<issueId>-review and agent-<issueId>-review-<role> (current role primitive)
  *   - review-coordinator-<issueId>-<timestamp> (legacy coordinator naming
  *     from the deleted dispatchParallelReview path; pattern kept so we
  *     reap leftover sessions from systems running pre-R6 builds)
@@ -484,6 +485,7 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
   }
 
   const reviewPatterns = [
+    /^agent-[a-z0-9-]+-review(?:-(?:security|correctness|performance|requirements))?$/i,
     /^review-coordinator-/,
     /^specialist-.+-review-/,
     /^review-[A-Z0-9]+-\d+-\d+/, // legacy: review-PAN-999-1713456789000-correctness

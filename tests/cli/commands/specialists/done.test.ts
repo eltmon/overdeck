@@ -52,4 +52,40 @@ describe('specialists done command', () => {
       prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059',
     });
   });
+
+  it('delivers synthesis feedback when review signals failed status', async () => {
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('review', 'pan-1059', {
+      status: 'failed',
+      notes: 'synthesis crashed',
+    });
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
+      reviewStatus: 'failed',
+      reviewNotes: 'synthesis crashed',
+    });
+    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
+      issueId: 'PAN-1059',
+      verdict: 'failed',
+      notes: 'synthesis crashed',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059',
+    });
+  });
+
+  it('does not deliver feedback when review passes', async () => {
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('review', 'pan-1059', {
+      status: 'passed',
+      notes: 'approved',
+    });
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
+      reviewStatus: 'passed',
+      reviewNotes: 'approved',
+      reviewedAtCommit: undefined,
+    });
+    expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
+  });
 });
