@@ -309,7 +309,6 @@ describe('cleanupOrphanedReviewSessions', () => {
     mockListSessionNamesAsync.mockResolvedValue([
       'specialist-panopticon-PAN-879-review-correctness',
       'specialist-panopticon-PAN-879-review-synthesis',
-      'specialist-panopticon-PAN-879-review-coordinator',
     ]);
 
     const actions = await cleanupOrphanedReviewSessions();
@@ -317,11 +316,25 @@ describe('cleanupOrphanedReviewSessions', () => {
     expect(mockKillSessionAsync).toHaveBeenCalledTimes(2);
     expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-correctness');
     expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-synthesis');
-    expect(mockKillSessionAsync).not.toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-coordinator');
     expect(actions).toEqual([
       'Killed orphaned specialist-panopticon-PAN-879-review-correctness (work agent agent-pan-879 not running)',
       'Killed orphaned specialist-panopticon-PAN-879-review-synthesis (work agent agent-pan-879 not running)',
     ]);
+  });
+
+  it('kills orphaned PAN-1059 convoy reviewer sessions', async () => {
+    mockListSessionNamesAsync.mockResolvedValue([
+      'agent-pan-879-review-security',
+      'agent-pan-879-review-correctness',
+      'agent-pan-879-review-performance',
+      'agent-pan-879-review-requirements',
+    ]);
+
+    const actions = await cleanupOrphanedReviewSessions();
+
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(4);
+    expect(actions).toHaveLength(4);
+    expect(actions[0]).toContain('agent-pan-879-review-security');
   });
 
   it('keeps canonical reviewer sessions when the work agent still exists', async () => {

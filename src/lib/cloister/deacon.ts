@@ -1140,8 +1140,9 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
  * still alive or a review is in flight, and kills sessions that have been
  * alive for more than one hour with no owner.
  *
- * This is a safety net for crashes where runParallelReview's finally block
- * or /api/specialists/done cleanup did not run.
+ * Safety net for orphaned convoy reviewer sessions (agent-<id>-review-<subRole>)
+ * whose synthesis session already ended but whose sub-role session outlived the
+ * stop-hook reaper (e.g. reaper race, tmux busy, dashboard restart).
  */
 export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
   const actions: string[] = [];
@@ -1179,10 +1180,9 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
   const { parseReviewerSessionName } = await import('./specialists.js');
 
   for (const sessionName of sessions) {
-    // Only consider reviewer/specialist sessions
-    const isReviewer = sessionName.includes('-review-');
-    const isCoordinator = sessionName.startsWith('review-coordinator-');
-    if (!isReviewer && !isCoordinator) continue;
+    // PAN-1059: convoy sub-role sessions are agent-<id>-review-<subRole>.
+    // Legacy specialist sessions matched specialist-*-review-*. Both contain -review-.
+    if (!sessionName.includes('-review-')) continue;
 
     // Check age
     const createdMs = creationTimes.get(sessionName);
@@ -1191,14 +1191,20 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
     // Extract issueId from session name
     let issueId: string | null = null;
 
-    // Try canonical reviewer pattern first
-    const parsedReviewer = parseReviewerSessionName(sessionName);
-    if (parsedReviewer) {
-      issueId = parsedReviewer.issueId.toUpperCase();
+    // PAN-1059 convoy pattern: agent-<issueId>-review-<subRole>
+    const convoyMatch = sessionName.match(/^agent-([a-z0-9]+-\d+)-review-(?:security|correctness|performance|requirements)$/);
+    if (convoyMatch) {
+      issueId = convoyMatch[1].toUpperCase();
     } else {
-      // Fall back to generic issue-id regex extraction
-      const match = sessionName.match(/([A-Z0-9]+-\d+)/);
-      if (match) issueId = match[1].toUpperCase();
+      // Legacy specialist pattern: specialist-<project>-<issueId>-review-<role>
+      const parsedReviewer = parseReviewerSessionName(sessionName);
+      if (parsedReviewer) {
+        issueId = parsedReviewer.issueId.toUpperCase();
+      } else {
+        // Generic fallback
+        const match = sessionName.match(/([A-Z0-9]+-\d+)/i);
+        if (match) issueId = match[1].toUpperCase();
+      }
     }
 
     if (!issueId) continue;
@@ -1219,7 +1225,7 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
     try {
       await killSessionAsync(sessionName);
       const ageMin = Math.round((now - createdMs) / 60000);
-      const msg = `Killed orphan ${isReviewer ? 'reviewer' : 'coordinator'} session ${sessionName} (${ageMin}m old)`;
+      const msg = `Killed orphan reviewer session ${sessionName} (${ageMin}m old)`;
       actions.push(msg);
       console.log(`[deacon] ${msg}`);
     } catch (err) {
@@ -1747,7 +1753,7 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
 /**
  * Detect issues stuck in `reviewing` status with no active review session.
  *
- * When `dispatchParallelReview` sets `reviewing` + `reviewSpawnedAt` but the
+ * When `spawnReviewRoleForIssue` sets `reviewing` + `reviewSpawnedAt` but the
  * spawn crashes or the review agent exits without updating status, the issue
  * can remain in `reviewing` forever. This check uses `reviewSpawnedAt` as a
  * heartbeat: if it's >30 minutes old and no review session is active, reset
@@ -1785,10 +1791,8 @@ export async function checkStuckReviewing(): Promise<string[]> {
         activeReviewIssues.add(rState.currentIssue.toUpperCase());
       }
     }
-    // PAN-1048 R5: detect role-primitive review runs (agent-<id>-review).
-    // Replaces the legacy review-coordinator-* / review-<id>-<role> session
-    // pattern matching that depended on dispatchParallelReview's tmux-coordinator
-    // architecture (now retired).
+    // Detect active review runs: agent-<id>-review (synthesis) and
+    // agent-<id>-review-<subRole> (PAN-1059 convoy).
     try {
       const { listRunningAgentsAsync } = await import('../agents.js');
       const agents = await listRunningAgentsAsync();
@@ -3701,8 +3705,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   }
 
   // Periodic orphan reviewer/specialist session sweep (PAN-846).
-  // Safety net for crashes where runParallelReview finally or
-  // /api/specialists/done cleanup did not run.
+  // Safety net for convoy sessions the stop-hook reaper missed.
   if (Math.random() < 0.01) {
     const orphanActions = await cleanupOrphanReviewerSessions();
     actions.push(...orphanActions);
@@ -4098,27 +4101,25 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
 }
 
 /**
- * Kill orphaned parallel-review sessions whose work agent is no longer running.
+ * Kill orphaned review sessions whose work agent is no longer running.
  *
- * Review sessions are named `review-<issueId>-<timestamp>-<role>` (e.g.
- * `review-PAN-540-1713456789000-correctness`). They are created by
- * `runParallelReview()` but can leak when:
- *   - `waitForReviewer()` fails to kill (race, tmux busy, swallowed exception)
- *   - The work agent is stopped/killed but review sessions survive
- *   - A retry generates a new reviewId, leaving old sessions behind
+ * Covers three naming patterns:
+ *   - PAN-1059 convoy: `agent-<issueId>-review-<subRole>` (current)
+ *   - Legacy specialist: `specialist-*-review-*` (retired)
+ *   - Legacy batch: `review-<issueId>-<timestamp>-<role>` (retired)
  *
- * A review session is "orphaned" when the corresponding work agent session
- * `agent-<issueLower>` does not exist. We only check existence (not state)
- * because a stopped agent may still have its tmux session alive transiently.
+ * A session is "orphaned" when the corresponding work-agent session
+ * `agent-<issueLower>` does not exist.
  */
 export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
   const actions: string[] = [];
   let reviewSessions: string[];
   try {
     const allSessions = await listSessionNamesAsync();
+    const convoyReviewSessions = allSessions.filter(s => /^agent-.*-review-(?:security|correctness|performance|requirements)$/.test(s));
     const legacyReviewSessions = allSessions.filter(s => /^review-/.test(s));
-    const canonicalReviewSessions = allSessions.filter(s => /^specialist-.*-review-/.test(s) && !s.includes('coordinator'));
-    reviewSessions = [...new Set([...legacyReviewSessions, ...canonicalReviewSessions])];
+    const canonicalReviewSessions = allSessions.filter(s => /^specialist-.*-review-/.test(s));
+    reviewSessions = [...new Set([...convoyReviewSessions, ...legacyReviewSessions, ...canonicalReviewSessions])];
   } catch {
     return actions;
   }
@@ -4128,13 +4129,21 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
   for (const reviewSession of reviewSessions) {
     let issueId: string | null = null;
 
-    const legacyMatch = reviewSession.match(/^review-([A-Za-z0-9]+-\d+)-\d+/);
-    if (legacyMatch) {
-      issueId = legacyMatch[1].toUpperCase();
+    // PAN-1059 convoy pattern
+    const convoyMatch = reviewSession.match(/^agent-([a-z0-9]+-\d+)-review-(?:security|correctness|performance|requirements)$/);
+    if (convoyMatch) {
+      issueId = convoyMatch[1].toUpperCase();
     } else {
-      const canonicalMatch = reviewSession.match(/^specialist-(.+)-([A-Za-z0-9]+-\d+)-review-[a-z-]+$/);
-      if (canonicalMatch) {
-        issueId = canonicalMatch[2].toUpperCase();
+      // Legacy batch pattern: review-<issueId>-<timestamp>
+      const legacyMatch = reviewSession.match(/^review-([A-Za-z0-9]+-\d+)-\d+/);
+      if (legacyMatch) {
+        issueId = legacyMatch[1].toUpperCase();
+      } else {
+        // Legacy specialist pattern: specialist-<project>-<issueId>-review-<role>
+        const canonicalMatch = reviewSession.match(/^specialist-(.+)-([A-Za-z0-9]+-\d+)-review-[a-z-]+$/);
+        if (canonicalMatch) {
+          issueId = canonicalMatch[2].toUpperCase();
+        }
       }
     }
 
