@@ -23,7 +23,7 @@ import { setReviewStatus } from '../review-status.js';
 import { withBdMutex } from '../bd-mutex.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import {
-  buildTmuxCommandString,
+  createSessionAsync,
   killSessionAsync,
   sessionExistsAsync,
 } from '../tmux.js';
@@ -233,7 +233,7 @@ export async function spawnInspectAgent(
         setTerminalEnv: true,
         unsetProviderEnv: true,
         providerExports: Object.entries(providerEnv)
-          .map(([k, v]) => `export ${k}="${v}"`)
+          .map(([k, v]) => `export ${k}='${v.replace(/'/g, "'\"'\"'")}'`)
           .join('\n') + (Object.keys(providerEnv).length ? '\n' : ''),
         panopticonEnv: {
           agentId: tmuxSession,
@@ -254,21 +254,13 @@ export async function spawnInspectAgent(
       PANOPTICON_SESSION_TYPE: subRole,
       ...providerEnv,
     };
-    const envFlags = Object.entries(envForTmux)
-      .map(([k, v]) => ` -e ${k}="${v.replace(/"/g, '\\"')}"`)
-      .join('');
 
-    const newSessionCmd = buildTmuxCommandString([
-      'new-session',
-      '-d',
-      '-s',
+    await createSessionAsync(
       tmuxSession,
-      '-c',
       context.workspace,
-    ]);
-    await execAsync(`${newSessionCmd}${envFlags} "bash '${launcherScript}'"`, {
-      encoding: 'utf-8',
-    });
+      `bash '${launcherScript}'`,
+      { env: envForTmux },
+    );
 
     saveAgentRuntimeState(tmuxSession, {
       state: 'active',
