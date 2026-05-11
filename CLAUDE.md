@@ -104,6 +104,17 @@ The full mental model — Role vs Claude subagent vs Panopticon pipeline agent �
 
 Legacy specialist wake/session/queue machinery has been removed. Use `spawnRun(issueId, role, opts)` and lifecycle state transitions instead of waking named specialists.
 
+## Skills ↔ CLI Convention
+
+The `pan` binary's subcommands and Claude Code's `pan-*` skills follow a strict convention:
+
+- **`pan <verb>`** (CLI subcommand) is wrapped by **`/pan-<verb>`** (a skill at `skills/pan-<verb>/SKILL.md`).
+- The `pan-` prefix is also a namespace for workflow / reference / topical skills (`/pan-workflow`, `/pan-code-review`, `/pan-network`) that don't map 1:1 to a single verb.
+- Not every CLI verb gets a wrapper skill — only verbs where the skill adds non-trivial guidance beyond `--help`. The current exclusion list and the criteria are documented in [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md).
+- **When the CLI changes, the wrapper skill changes in the same commit.** `scripts/lint-skills.sh` (wired into `npm run lint`) enforces this by cross-checking every flag and subcommand a wrapper SKILL.md mentions against the actual `pan <verb> --help` output. Drift fails CI.
+
+See [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) for the full rules, shapes (CLI-wrapper / CLI-sub-wrapper / Workflow / Reference / Topical), and creating-a-new-skill checklist.
+
 ## Project Structure
 
 - **Stack**: TypeScript, Node.js 22+, React dashboard, SQLite, Effect.js
