@@ -72,6 +72,11 @@ const PANOPTICON_INFRA_DENY_PATTERNS = [
   'Bash(rm ~/.claude/projects/:*)',
   'Bash(rm -rf ~/.claude/projects/:*)',
   'Bash(rm -r ~/.claude/projects/:*)',
+  // Agents may observe tmux state, but they must not drive another session's input.
+  'Bash(tmux send-keys:*)',
+  'Bash(tmux -L panopticon send-keys:*)',
+  'Bash(tmux paste-buffer:*)',
+  'Bash(tmux -L panopticon paste-buffer:*)',
 ];
 
 // Legacy invalid patterns from PAN-1024 first-pass that Claude Code rejects

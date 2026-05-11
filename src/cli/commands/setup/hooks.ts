@@ -4,7 +4,7 @@ import { join, dirname } from 'path';
 import { execSync } from 'child_process';
 import { homedir } from 'os';
 
-interface HookConfig {
+export interface HookConfig {
   matcher: string;  // Regex pattern, e.g. ".*" for all tools or "Bash" for specific
   hooks: Array<{
     type: string;
@@ -18,7 +18,7 @@ interface McpServer {
   env?: Record<string, string>;
 }
 
-interface ClaudeSettings {
+export interface ClaudeSettings {
   hooks?: {
     PreToolUse?: HookConfig[];
     PostToolUse?: HookConfig[];
@@ -111,6 +111,25 @@ function isHookConfigured(
       (hook.command?.includes(`panopticon/bin/${scriptName}`) ?? false)
     )
   );
+}
+
+export function addPanopticonHookIfMissing(
+  settings: ClaudeSettings,
+  hookType: keyof NonNullable<ClaudeSettings['hooks']>,
+  binDir: string,
+  scriptName: string,
+  matcher: string = '.*',
+): boolean {
+  if (!settings.hooks) {
+    settings.hooks = {};
+  }
+  if (isHookConfigured(settings, hookType, binDir, scriptName)) return false;
+  const list = (settings.hooks[hookType] ??= []);
+  list.push({
+    matcher,
+    hooks: [{ type: 'command', command: join(binDir, scriptName) }],
+  });
+  return true;
 }
 
 /**
@@ -322,13 +341,9 @@ export async function setupHooksCommand(): Promise<void> {
     scriptName: string,
     matcher: string = '.*',
   ): void => {
-    if (isHookConfigured(settings, hookType, binDir, scriptName)) return;
-    const list = (settings.hooks![hookType] ??= []);
-    list.push({
-      matcher,
-      hooks: [{ type: 'command', command: join(binDir, scriptName) }],
-    });
-    added.push(`${hookType}:${scriptName}`);
+    if (addPanopticonHookIfMissing(settings, hookType, binDir, scriptName, matcher)) {
+      added.push(`${hookType}:${scriptName}`);
+    }
   };
 
   // PAN-982: PreToolUse, PostToolUse, and Stop hooks are NO LONGER registered in

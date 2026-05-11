@@ -78,6 +78,13 @@ If no continue file exists, check the issue tracker for requirements.
 - If you need authenticated/browser state, recreate it inside your own isolated session.
 - If Playwright reports browser/profile contention, treat it as a tooling/config bug to fix — do not skip UI verification.
 
+## CRITICAL: Never Approve Permission Prompts
+
+- NEVER answer, approve, deny, dismiss, or drive a permission prompt by sending keystrokes to any Claude Code session.
+- NEVER run `tmux send-keys`, `tmux paste-buffer`, `sendKeys`, `sendKeysAsync`, or any equivalent session-input mechanism to interact with a permission dialog.
+- If a permission prompt appears in your own session, wait for the harness/user to handle it; if it appears in another agent, treat that as a system bug and fix the permissions path, not the prompt.
+- Do not ask an inspector, reviewer, test agent, or any subagent to approve a prompt. Permission decisions belong to the harness/user path only.
+
 {{#TLDR_AVAILABLE}}
 ## TLDR: Token-Efficient Code Analysis
 

@@ -61,6 +61,8 @@ describe('role definitions', () => {
     expect(body).toContain("resolveModel('work', 'inspect')");
     expect(body).toContain("resolveModel('work', 'inspect-deep')");
     expect(body).toContain('one undifferentiated mode');
+    expect(body).toContain('Never approve, deny, dismiss, or answer permission prompts');
+    expect(body).toContain('tmux send-keys');
     for (const phase of ['exploration', 'implementation', 'testing', 'documentation', 'review-response']) {
       expect(body.toLowerCase()).not.toContain(phase);
     }
