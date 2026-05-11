@@ -58,10 +58,12 @@ import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
 import { abortReviewCommand } from './commands/abort-review.js';
 // PAN-1048 R5: `pan review run` removed. Review now runs as the role primitive
-// via spawnRun(issueId, 'review', …) → roles/review.md → Agent tool convoy.
+// via spawnRun(issueId, 'review', …) → roles/review.md, with convoy reviewers
+// spawned by the review role through `pan review spawn-reviewer`.
 // The blocking-orchestrator CLI was the only caller of runParallelReview /
 // parseReviewSynthesis (now also retired).
 import { reviewRestartCommand } from './commands/review-restart.js';
+import { reviewSpawnReviewerCommand } from './commands/review-spawn-reviewer.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -273,6 +275,17 @@ review
   .option('--model <model>', 'Override model for all reviewers (e.g. gpt-5.4, claude-sonnet-4-6)')
   .option('--role <role>', 'Restart only a specific reviewer role (correctness/security/performance/requirements)')
   .action(reviewRestartCommand);
+
+review
+  .command('spawn-reviewer <id>', { hidden: true })
+  .description('Internal: spawn one review convoy sub-role')
+  .requiredOption('--sub-role <role>', 'Reviewer sub-role (security/correctness/performance/requirements)')
+  .requiredOption('--run-id <id>', 'Review run ID')
+  .option('--workspace <path>', 'Workspace path')
+  .option('--output <path>', 'Reviewer output path')
+  .option('--context <path>', 'Context manifest path')
+  .option('--model <model>', 'Override reviewer model')
+  .action(reviewSpawnReviewerCommand);
 
 // PAN-1048 R5: `pan review run` removed (see import note above).
 

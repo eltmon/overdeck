@@ -22,10 +22,10 @@
  * Every active review surface — POST /api/review/:issueId/trigger, the
  * reactive scheduler review branch, the dashboard kanban "Review again"
  * button, postMergeLifecycle's review-temp stash drop — flows through
- * spawnReviewRoleForIssue → spawnRun(issueId, 'review'). The four
- * code-review-* sub-agents are launched as isolated review sub-role sessions;
- * synthesis writes the report and signals the verdict via Panopticon's CLI
- * inside the role itself (see roles/review.md).
+ * spawnReviewRoleForIssue → spawnRun(issueId, 'review'). The review role
+ * launches four isolated review sub-role sessions via `pan review spawn-reviewer`,
+ * then writes the report and signals the verdict via Panopticon's CLI inside
+ * the role itself (see roles/review.md).
  *
  * Surface area kept:
  *   - spawnReviewRoleForIssue       — the only review entry point
@@ -50,7 +50,7 @@ import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequen
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
 import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { buildReviewContext } from './review-context.js';
-import { REVIEW_SUB_ROLES, reviewerOutputPath } from './review-monitor.js';
+import { REVIEW_SUB_ROLES, reviewerOutputPath, type ReviewSubRole } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { packageRoot } from '../paths.js';
 
@@ -142,9 +142,7 @@ export async function cleanupReviewTempStash(issueId: string, workspace: string)
  * references abstractly: the assigned output file path and the shared
  * context manifest path.
  */
-type ConvoyModels = { security: string; correctness: string; performance: string; requirements: string };
-
-async function buildConvoyPrompt(opts: {
+export async function buildConvoyPrompt(opts: {
   issueId: string;
   subRole: string;
   outputPath: string;
@@ -191,6 +189,11 @@ function buildReviewRolePrompt(opts: {
   contextManifestPath?: string;
 }): string {
   const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${opts.reviewDir}/${r}.md`).join('\n');
+  const spawnCommands = REVIEW_SUB_ROLES.map((r) => {
+    const outputPath = reviewerOutputPath(opts.workspace, opts.runId, r);
+    const contextArg = opts.contextManifestPath ? ` --context "${opts.contextManifestPath}"` : '';
+    return `  pan review spawn-reviewer ${opts.issueId} --sub-role ${r} --run-id "${opts.runId}" --workspace "${opts.workspace}" --output "${outputPath}"${contextArg}`;
+  }).join('\n');
   const synthesisPath = join(opts.reviewDir, 'synthesis.md');
   return [
     `REVIEW TASK for ${opts.issueId}:`,
@@ -199,12 +202,16 @@ function buildReviewRolePrompt(opts: {
     `Branch: ${opts.branch}`,
     `Workspace: ${opts.workspace}`,
     opts.prUrl ? `PR: ${opts.prUrl}` : `PR: (resolve via: gh pr view ${opts.branch})`,
+    `Run ID: ${opts.runId}`,
     `Review directory: ${opts.reviewDir}`,
     `Synthesis output file: ${synthesisPath}`,
     opts.contextManifestPath ? `Context manifest: ${opts.contextManifestPath}` : 'Context manifest: (missing — block review per roles/review.md)',
     '',
-    'Convoy reviewer output files (already running in separate sessions — poll for these):',
+    'Convoy reviewer output files:',
     subRoleFiles,
+    '',
+    'Spawn the convoy reviewers with these commands before waiting for their output files:',
+    spawnCommands,
     '',
     'Follow roles/review.md exactly.',
     '',
@@ -218,15 +225,57 @@ function buildReviewRolePrompt(opts: {
 
 /**
  * Spawn the `review` role for an issue using the unified role primitive
- * (spawnRun). The review role launches the four code-review-* sub-role
- * sessions, synthesizes their findings, and signals the verdict through
- * `pan specialists done review`. This wrapper carries the orchestration concerns
+ * (spawnRun). The review role launches the four review sub-role sessions,
+ * synthesizes their findings, and signals the verdict through
+ * `pan specialists done review`. This wrapper carries the lifecycle concerns
  * the deleted dispatchParallelReview owned (idempotency check, feedback
  * archive, review-temp stash, reviewing-status flip, pipeline event).
  *
  * On failure: cleanup review-temp stash, flip status to failed with the
  * spawn error in reviewNotes so the dashboard surfaces the breakage.
  */
+export async function spawnReviewSubRoleForIssue(opts: {
+  issueId: string;
+  workspace: string;
+  subRole: ReviewSubRole;
+  runId: string;
+  outputPath?: string;
+  contextManifestPath?: string;
+  model?: string;
+}): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
+  try {
+    const { spawnRun } = await import('../agents.js');
+    const cfg = loadYamlConfig().config;
+    const outputPath = opts.outputPath ?? reviewerOutputPath(opts.workspace, opts.runId, opts.subRole);
+    const model = opts.model ?? resolveModel('review', opts.subRole, cfg);
+    const prompt = await buildConvoyPrompt({
+      issueId: opts.issueId,
+      subRole: opts.subRole,
+      outputPath,
+      contextManifestPath: opts.contextManifestPath,
+    });
+    const run = await spawnRun(opts.issueId, 'review', {
+      workspace: opts.workspace,
+      subRole: opts.subRole,
+      prompt,
+      model,
+    });
+    try {
+      const { notifyPipeline } = await import('../pipeline-notifier.js');
+      notifyPipeline({ type: 'reviewer_started', issueId: opts.issueId, role: opts.subRole, sessionName: run.id });
+    } catch {
+      // Non-fatal
+    }
+    return { success: true, message: `Review ${opts.subRole} spawned: ${run.id}`, sessionId: run.id };
+  } catch (err) {
+    return {
+      success: false,
+      message: `Failed to spawn review ${opts.subRole}`,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 export async function spawnReviewRoleForIssue(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string },
 ): Promise<{ success: boolean; message: string; error?: string }> {
@@ -306,13 +355,6 @@ export async function spawnReviewRoleForIssue(
 
   try {
     const { spawnRun } = await import('../agents.js');
-    const cfg = loadYamlConfig().config;
-    const convoyModels: ConvoyModels = {
-      security:     resolveModel('review', 'security',     cfg),
-      correctness:  resolveModel('review', 'correctness',  cfg),
-      performance:  resolveModel('review', 'performance',  cfg),
-      requirements: resolveModel('review', 'requirements', cfg),
-    };
 
     // Build the shared context manifest before spawning so all reviewers
     // read one pre-built diff+AC object instead of each running git diff
@@ -343,33 +385,6 @@ export async function spawnReviewRoleForIssue(
       console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will block on missing shared context:`, ctxErr);
     }
 
-    // Spawn convoy sub-role sessions first so they're running before the
-    // synthesis agent starts polling for their output files (PAN-1059).
-    // buildConvoyPrompt reads the harness-agnostic sub-role template from
-    // packageRoot/roles/ asynchronously, so resolve all four prompts before
-    // fanning out the spawnRun calls.
-    const convoyResults = await Promise.allSettled(
-      REVIEW_SUB_ROLES.map(async (subRole) => {
-        const outputPath = reviewerOutputPath(opts.workspace, runId, subRole);
-        const prompt = await buildConvoyPrompt({ issueId: opts.issueId, subRole, outputPath, contextManifestPath });
-        return spawnRun(opts.issueId, 'review', {
-          workspace: opts.workspace,
-          subRole,
-          prompt,
-          model: convoyModels[subRole],
-        });
-      }),
-    );
-    convoyResults.forEach((result, i) => {
-      const subRole = REVIEW_SUB_ROLES[i];
-      if (result.status === 'rejected') {
-        console.warn(`[review-agent] Convoy ${subRole} spawn failed for ${opts.issueId}:`, result.reason);
-      } else {
-        console.log(`[review-agent] Convoy ${subRole} spawned for ${opts.issueId}: ${result.value.id}`);
-      }
-    });
-
-    // Spawn synthesis last — it polls for convoy output files.
     const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath });
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,

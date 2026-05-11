@@ -43,10 +43,9 @@ export function derivePipelinePhase(
   const specialistSession = (role: string): string =>
     projectKey ? `specialist-${projectKey}-${issueId}-${role}` : `specialist-${role}`;
 
-  // Parallel review sessions use review-<issueId>-<timestamp>-<role> naming.
-  // Prefer actual discovered session names from the backend when available.
-  // The coordinator is the top-level Review tab; per-role reviewer sessions
-  // render as child review tabs.
+  // Review sessions use agent-<issueId>-review for the orchestrator and
+  // agent-<issueId>-review-<role> for convoy reviewers. Prefer actual
+  // discovered session names from the backend when available.
   const reviewCoordinatorSession = reviewStatus?.reviewCoordinatorSessionName ?? null;
   const reviewSessionNames = reviewStatus?.reviewSessionNames;
   const liveReviewerSession = reviewSessionNames?.find(s => !deadSessions.has(s)) ?? null;

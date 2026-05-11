@@ -159,12 +159,12 @@ describe('derivePipelinePhase precedence table', () => {
       const input = makeInput({
         reviewStatus: makeReviewStatus({
           reviewStatus: 'reviewing',
-          reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+          reviewCoordinatorSessionName: 'agent-pan-509-review',
         }),
       });
       const { phase, activeSession } = derivePipelinePhase(input);
       expect(phase).toBe('reviewing');
-      expect(activeSession).toBe('review-coordinator-pan-509-1234567890');
+      expect(activeSession).toBe('agent-pan-509-review');
     });
 
     it('does NOT return reviewing when reviewStatus !== reviewing', () => {
@@ -186,10 +186,10 @@ describe('derivePipelinePhase precedence table', () => {
       const input = makeInput({
         reviewStatus: makeReviewStatus({
           reviewStatus: 'reviewing',
-          reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+          reviewCoordinatorSessionName: 'agent-pan-509-review',
         }),
       });
-      const dead = new Set(['review-coordinator-pan-509-1234567890']);
+      const dead = new Set(['agent-pan-509-review']);
       const { activeSession } = derivePipelinePhase(input, dead);
       expect(activeSession).toBeNull();
     });
@@ -476,7 +476,7 @@ describe('derivePipelinePhase availableTerminals', () => {
     const input = makeInput({
       reviewStatus: makeReviewStatus({
         reviewStatus: 'reviewing',
-        reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+        reviewCoordinatorSessionName: 'agent-pan-509-review',
       }),
     });
     const { availableTerminals } = derivePipelinePhase(input);
@@ -488,18 +488,18 @@ describe('derivePipelinePhase availableTerminals', () => {
     const input = makeInput({
       reviewStatus: makeReviewStatus({
         reviewStatus: 'reviewing',
-        reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+        reviewCoordinatorSessionName: 'agent-pan-509-review',
         reviewSessionNames: [
-          'review-pan-509-1234567891-correctness',
-          'review-pan-509-1234567891-security',
-          'review-pan-509-1234567891-performance',
-          'review-pan-509-1234567891-requirements',
+          'agent-pan-509-review-correctness',
+          'agent-pan-509-review-security',
+          'agent-pan-509-review-performance',
+          'agent-pan-509-review-requirements',
         ],
       }),
     });
     const { activeSession, availableTerminals } = derivePipelinePhase(input);
-    expect(activeSession).toBe('review-coordinator-pan-509-1234567890');
-    expect(availableTerminals.find(t => t.id === 'reviewing')?.sessionName).toBe('review-coordinator-pan-509-1234567890');
+    expect(activeSession).toBe('agent-pan-509-review');
+    expect(availableTerminals.find(t => t.id === 'reviewing')?.sessionName).toBe('agent-pan-509-review');
     expect(availableTerminals.find(t => t.id === 'reviewing-correctness')).toBeTruthy();
     expect(availableTerminals.find(t => t.id === 'reviewing-security')).toBeTruthy();
     expect(availableTerminals.find(t => t.id === 'reviewing-performance')).toBeTruthy();
