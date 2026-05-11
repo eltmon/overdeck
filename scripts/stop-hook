@@ -114,4 +114,17 @@ if [[ "$AGENT_ID" == planning-* ]]; then
   fi
 fi
 
+# PAN-1059 session-reaper: when the review synthesis session ends, kill any
+# convoy sub-reviewer sessions (agent-<id>-review-{security,correctness,...}).
+# Pattern: agent-<issueId>-review   (no trailing sub-role suffix → synthesis)
+if [[ "$AGENT_ID" =~ ^agent-(.+)-review$ ]]; then
+  REVIEW_ISSUE="${BASH_REMATCH[1]}"
+  for SUBROLE in security correctness performance requirements; do
+    CONVOY_SESSION="agent-${REVIEW_ISSUE}-review-${SUBROLE}"
+    tmux -L panopticon kill-session -t "$CONVOY_SESSION" 2>/dev/null || true
+  done
+  echo "[$(date -Iseconds)] stop-hook: $AGENT_ID synthesis ended — killed convoy for $REVIEW_ISSUE" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+fi
+
 exit 0
