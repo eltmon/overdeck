@@ -382,16 +382,17 @@ Panopticon uses **vBRIEF v0.5** for machine-readable work plans. Key references:
 - **Extension proposal:** [deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)
 - **Panopticon docs:** [docs/VBRIEF.md](docs/VBRIEF.md) — full schema, lifecycle, and migration notes
 
-### The four-artifact model (PAN-967 + PAN-946)
+### The five-artifact model (PAN-967 + PAN-946)
 
-There are four artifacts. They are distinct — do not conflate them.
+There are five artifacts. They are distinct — do not conflate them.
 
 | Artifact | Location | Writer | Mutability |
 | --- | --- | --- | --- |
 | **PRD draft** (`.md`) | `<projectRoot>/.pan/drafts/<issue>.md` | Human or planning agent | Free-form narrative, human-mutable |
 | **vBRIEF spec** (`.json`) on main | `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` | Pipeline only (single writer) | Status changes are atomic field flips on the same file — files do NOT move between directories |
+| **Project-side continue state** (`.json`) | `<projectRoot>/.pan/continues/<issue-lowercase>.vbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback — one canonical file per issue, never moves |
 | **Workspace working copy** (`.json`) | `<workspace>/.pan/spec.vbrief.json` | Work agent (one per issue) | Copied from main at branch creation; mutated during work; never reaches back into main's spec |
-| **Continue state** (`.json`) | `<workspace>/.pan/continue.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback |
+| **Workspace-side continue state** (`.json`) | `<workspace>/.pan/continue.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback |
 
 **The PAN-946 invariant — workspace mutations never reach lifecycle directories.** `findPlan`, `readWorkspacePlan`, `updateItemStatus`, and `updateSubItemStatus` resolve ONLY the workspace-local `.pan/spec.vbrief.json`. Lifecycle/archive lookups go through `findVBriefByIssue` in `lifecycle-io.ts` (read-only) or `findVBriefByIssueAsync` in `vbrief-index.ts` (read-only, indexed). Conflating these two surfaces caused a high-severity correctness bug; the comment at `src/lib/vbrief/io.ts:5-17` is the canonical reminder.
 
@@ -419,7 +420,7 @@ PAN-967 unified everything under `.pan/`. The following are gone or read-only le
 
 - `.planning/plan.vbrief.json` — **DELETED.** Replaced by `.pan/spec.vbrief.json`.
 - `docs/prds/planned/`, `docs/prds/active/` — no longer a Panopticon convention. PRD drafts live in `.pan/drafts/`. Projects may keep their own `docs/prds/` for human archival, but Panopticon does not read or write it.
-- `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyVBriefByIssue` for backward compatibility during migration; pipeline writes target `.pan/specs/` only. Continue files on the main side still live at `vbrief/active/continue-<issue>.vbrief.json` until the continue-state migration phase ships.
+- `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyVBriefByIssue` for backward compatibility during migration; pipeline writes target `.pan/specs/` only. Legacy spec files (non-continue) remain at these paths as read-only fallback.
 
 If you see an agent referencing `.planning/`, `docs/prds/planned/*.vbrief.json`, or planning a "copy PRD vBRIEF into workspace .planning" step, the agent is reading a pre-PAN-967 problem statement and needs to be redirected at `docs/VBRIEF.md`.
 

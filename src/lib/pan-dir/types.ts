@@ -10,6 +10,7 @@ import type { ContinueSessionEntry, ContinueState } from '../vbrief/continue-sta
 export const PAN_DIRNAME = '.pan'
 export const PAN_SPECS_DIRNAME = 'specs'
 export const PAN_DRAFTS_DIRNAME = 'drafts'
+export const PAN_CONTINUES_DIRNAME = 'continues'
 export const PAN_FEEDBACK_DIRNAME = 'feedback'
 export const PAN_SPEC_FILENAME = 'spec.vbrief.json'
 export const PAN_CONTINUE_FILENAME = 'continue.json'
@@ -66,6 +67,7 @@ export interface ProjectPanPaths {
   panDir: string
   specsDir: string
   draftsDir: string
+  continuesDir: string
 }
 
 export function isPanSpecStatus(value: unknown): value is PanSpecStatus {

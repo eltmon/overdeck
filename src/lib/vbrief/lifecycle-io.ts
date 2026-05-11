@@ -1,10 +1,10 @@
 /**
  * vBRIEF Lifecycle IO
  *
- * Phase 2 of PAN-967 makes `.pan/specs/` the canonical store for scope specs.
- * Legacy `vbrief/<lifecycle>/` directories remain as read fallbacks during the
- * transition, and continue files still live beside the legacy lifecycle state
- * until the later continue-state migration phase.
+ * PAN-967 finished the migration: `.pan/specs/` is the canonical store for scope
+ * specs and `.pan/continues/` is the canonical store for project-side continue
+ * files. Legacy `vbrief/<lifecycle>/` directories remain as read-only fallback
+ * for legacy spec files only (no continue files — those are at `.pan/continues/`).
  */
 
 import { exec, spawn } from 'child_process';
@@ -13,7 +13,7 @@ import { promisify } from 'util';
 import { copyFileSync, existsSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from 'fs';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/index.js';
 
-import { appendFeedbackEntry, appendSessionEntry, clearFeedback, continueFilePath, continueFilename, readContinueState, writeContinueState, type ContinueFeedbackEntry, type ContinueSessionEntry, type ContinueState } from './continue-state.js';
+import { appendFeedbackEntry, appendSessionEntry, clearFeedback, continueFilename, readContinueState, writeContinueState, type ContinueFeedbackEntry, type ContinueSessionEntry, type ContinueState } from './continue-state.js';
 import {
   VBRIEF_LIFECYCLE_DIRS,
   ensureVBriefDirs,
@@ -27,6 +27,7 @@ import { readPlan } from './io.js';
 import { invalidateVBriefIndex } from './vbrief-index.js';
 import type { VBriefDocument } from './types.js';
 import { findSpecByIssue, getProjectPanPaths, updateSpecStatus, writeSpecForIssue } from '../pan-dir/specs.js';
+import { getContinueFilePath, getContinuesDir } from '../pan-dir/continues.js';
 
 const execAsync = promisify(exec);
 
@@ -115,35 +116,6 @@ function ensurePanSpecForIssue(projectRoot: string, found: FoundVBrief): EnsureP
   };
 }
 
-function moveContinueFile(
-  projectRoot: string,
-  issueId: string,
-  fromDir: VBriefLifecycleDir,
-  toDir: VBriefLifecycleDir,
-): { movedContinue: boolean; fromPath: string | null; toPath: string | null } {
-  const fromContinuePath = continueFilePath(resolveVBriefDir(projectRoot, fromDir), issueId);
-  const toContinuePath = continueFilePath(resolveVBriefDir(projectRoot, toDir), issueId);
-
-  if (fromContinuePath === toContinuePath) {
-    return {
-      movedContinue: existsSync(toContinuePath),
-      fromPath: null,
-      toPath: existsSync(toContinuePath) ? toContinuePath : null,
-    };
-  }
-
-  if (!existsSync(fromContinuePath)) {
-    return { movedContinue: false, fromPath: null, toPath: null };
-  }
-
-  renameSync(fromContinuePath, toContinuePath);
-  return {
-    movedContinue: true,
-    fromPath: fromContinuePath,
-    toPath: toContinuePath,
-  };
-}
-
 export function updatePlanStatus(filePath: string, newStatus: string): void {
   const doc = readPlan(filePath);
   const now = new Date().toISOString();
@@ -160,7 +132,7 @@ export async function moveVBrief(
   projectRoot: string,
   issueId: string,
   targetDir: VBriefLifecycleDir,
-): Promise<{ from: FoundVBrief; toPath: string; movedContinue: boolean }> {
+): Promise<{ from: FoundVBrief; toPath: string }> {
   const found = findVBriefByIssue(projectRoot, issueId);
   if (!found) {
     throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
@@ -173,18 +145,14 @@ export async function moveVBrief(
     throw new Error(`Failed to update pan spec status for ${issueId}`);
   }
 
-  const continueMove = moveContinueFile(projectRoot, issueId, found.lifecycleDir, targetDir);
   const stagePaths = [updatedSpec.path];
   if (ensured.removedLegacyPath) stagePaths.push(ensured.removedLegacyPath);
-  if (continueMove.fromPath) stagePaths.push(continueMove.fromPath);
-  if (continueMove.toPath) stagePaths.push(continueMove.toPath);
   await runGitAdd(projectRoot, stagePaths);
 
   invalidateVBriefIndex(projectRoot);
   return {
     from: found,
     toPath: updatedSpec.path,
-    movedContinue: continueMove.movedContinue,
   };
 }
 
@@ -198,7 +166,7 @@ export function moveVBriefFilesOnly(
   projectRoot: string,
   issueId: string,
   targetDir: VBriefLifecycleDir,
-): { from: FoundVBrief; toPath: string; movedContinue: boolean } {
+): { from: FoundVBrief; toPath: string } {
   const found = findVBriefByIssue(projectRoot, issueId);
   if (!found) {
     throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
@@ -211,12 +179,10 @@ export function moveVBriefFilesOnly(
     throw new Error(`Failed to update pan spec status for ${issueId}`);
   }
 
-  const continueMove = moveContinueFile(projectRoot, issueId, found.lifecycleDir, targetDir);
   invalidateVBriefIndex(projectRoot);
   return {
     from: found,
     toPath: updatedSpec.path,
-    movedContinue: continueMove.movedContinue,
   };
 }
 
@@ -231,7 +197,7 @@ export function deleteVBrief(projectRoot: string, issueId: string): boolean {
     unlinkSync(found.path);
   }
 
-  const continuePath = continueFilePath(resolveVBriefDir(projectRoot, found.lifecycleDir), issueId);
+  const continuePath = getContinueFilePath(projectRoot, issueId);
   if (existsSync(continuePath)) unlinkSync(continuePath);
   invalidateVBriefIndex(projectRoot);
   return true;
@@ -241,7 +207,6 @@ export interface VBriefTransitionResult {
   fromDir: VBriefLifecycleDir;
   toDir: VBriefLifecycleDir;
   toPath: string;
-  movedContinue: boolean;
   statusUpdated: boolean;
   committed: boolean;
   moved: boolean;
@@ -278,8 +243,7 @@ export async function transitionVBriefOnMain(
     updatePlanStatus(toPath, newStatus);
   }
 
-  const continueMove = moveContinueFile(projectRoot, issueId, found.lifecycleDir, targetDir);
-  const changed = ensured.createdPanSpec || needsMove || needsStatus || continueMove.movedContinue;
+  const changed = ensured.createdPanSpec || needsMove || needsStatus;
 
   let committed = false;
   if (changed) {
@@ -292,8 +256,6 @@ export async function transitionVBriefOnMain(
       if (currentBranch === 'main') {
         const stageList: string[] = [toPath];
         if (ensured.removedLegacyPath) stageList.push(ensured.removedLegacyPath);
-        if (continueMove.toPath) stageList.push(continueMove.toPath);
-        if (continueMove.fromPath) stageList.push(continueMove.fromPath);
         await runGitAdd(projectRoot, stageList);
 
         const quotedAll = stageList
@@ -341,7 +303,6 @@ export async function transitionVBriefOnMain(
     fromDir: found.lifecycleDir,
     toDir: targetDir,
     toPath,
-    movedContinue: continueMove.movedContinue,
     statusUpdated: needsStatus,
     committed,
     moved: needsMove,
@@ -378,12 +339,10 @@ export function promoteVBriefToProposed(
 
   const promoted = writeSpecForIssue(projectRoot, planDoc, 'proposed', canonicalFilename);
 
-  const continueName = continueFilename(upperIssueId);
   const sourceContinue = join(panDir, PAN_CONTINUE_FILENAME);
   let destContinue: string | null = null;
   if (existsSync(sourceContinue)) {
-    ensureVBriefDirs(projectRoot);
-    destContinue = join(resolveVBriefDir(projectRoot, 'proposed'), continueName);
+    destContinue = getContinueFilePath(projectRoot, upperIssueId);
     copyFileSync(sourceContinue, destContinue);
   }
 
@@ -391,12 +350,8 @@ export function promoteVBriefToProposed(
   return { destVBrief: promoted.path, destContinue, canonicalFilename };
 }
 
-export function resolveContinueStateDir(projectRoot: string, issueId: string): string {
-  const found = findVBriefByIssue(projectRoot, issueId);
-  if (found) {
-    return resolveVBriefDir(projectRoot, found.lifecycleDir);
-  }
-  return resolveVBriefDir(projectRoot, 'active');
+export function resolveContinueStateDir(projectRoot: string, _issueId: string): string {
+  return getContinuesDir(projectRoot);
 }
 
 export function readContinueStateForIssue(
@@ -404,8 +359,7 @@ export function readContinueStateForIssue(
   issueId: string,
 ): ContinueState | null {
   try {
-    const dir = resolveContinueStateDir(projectRoot, issueId);
-    return readContinueState(dir, issueId);
+    return readContinueState(projectRoot, issueId);
   } catch {
     return null;
   }
@@ -416,8 +370,7 @@ export function writeContinueStateForIssue(
   issueId: string,
   state: ContinueState,
 ): void {
-  const dir = resolveContinueStateDir(projectRoot, issueId);
-  writeContinueState(dir, issueId, state);
+  writeContinueState(projectRoot, issueId, state);
 }
 
 export function appendContinueSessionEntryForIssue(
@@ -425,8 +378,7 @@ export function appendContinueSessionEntryForIssue(
   issueId: string,
   entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
 ): ContinueState {
-  const dir = resolveContinueStateDir(projectRoot, issueId);
-  return appendSessionEntry(dir, issueId, entry);
+  return appendSessionEntry(projectRoot, issueId, entry);
 }
 
 export function appendFeedbackEntryForIssue(
@@ -434,14 +386,12 @@ export function appendFeedbackEntryForIssue(
   issueId: string,
   entry: ContinueFeedbackEntry,
 ): ContinueState {
-  const dir = resolveContinueStateDir(projectRoot, issueId);
-  return appendFeedbackEntry(dir, issueId, entry);
+  return appendFeedbackEntry(projectRoot, issueId, entry);
 }
 
 export function clearFeedbackForIssue(
   projectRoot: string,
   issueId: string,
 ): ContinueState | null {
-  const dir = resolveContinueStateDir(projectRoot, issueId);
-  return clearFeedback(dir, issueId);
+  return clearFeedback(projectRoot, issueId);
 }

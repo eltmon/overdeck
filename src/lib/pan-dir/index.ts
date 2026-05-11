@@ -1,6 +1,7 @@
 export {
   PAN_CONTEXT_FILENAME,
   PAN_CONTINUE_FILENAME,
+  PAN_CONTINUES_DIRNAME,
   PAN_DIRNAME,
   PAN_DRAFTS_DIRNAME,
   PAN_FEEDBACK_DIRNAME,
@@ -55,3 +56,12 @@ export {
   writeIssueDraft,
 } from './drafts.js'
 export { readWorkspaceContext, writeWorkspaceContext } from './context.js'
+export {
+  deleteContinueFile,
+  getContinueFilePath,
+  getContinuesDir,
+  hasContinueFile,
+  listContinueFiles,
+  readContinueFile,
+  writeContinueFile,
+} from './continues.js'

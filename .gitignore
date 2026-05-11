@@ -135,4 +135,3 @@ multica/
 .tldr/
 .claude/mcp.json
 graphify-out/cost.json
-vbrief/active/*.vbrief.json

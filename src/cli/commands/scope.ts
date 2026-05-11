@@ -13,7 +13,6 @@ import { join } from 'path';
 import {
   findVBriefByIssue,
   transitionVBriefOnMain,
-  resolveContinueStateDir,
   type VBriefTransitionResult,
 } from '../../lib/vbrief/lifecycle-io.js';
 import { findPlan, readPlan } from '../../lib/vbrief/io.js';
@@ -44,9 +43,6 @@ function formatTransition(result: VBriefTransitionResult, _issueId: string): str
   }
   if (result.statusUpdated) {
     lines.push(`${chalk.green('✓')} Updated plan.status → ${result.toDir}`);
-  }
-  if (result.movedContinue) {
-    lines.push(`${chalk.green('✓')} Moved continue file`);
   }
   if (result.committed) {
     lines.push(`${chalk.green('✓')} Committed on main`);
@@ -353,10 +349,9 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
   }
 
   // Continue-state summary (last session, decisions count, hazards count)
-  const continueDir = resolveContinueStateDir(projectPath, upperId);
   let cs;
   try {
-    cs = readContinueState(continueDir, upperId);
+    cs = readContinueState(projectPath, upperId);
   } catch (err: any) {
     console.log();
     console.log(chalk.bold('Continue State:'));

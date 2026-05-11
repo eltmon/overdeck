@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
@@ -41,11 +41,11 @@ function freshState(issueId: string): ContinueState {
 
 describe('continueFilename / continueFilePath', () => {
   it('builds canonical filename', () => {
-    expect(continueFilename('PAN-946')).toBe('continue-PAN-946.vbrief.json');
+    expect(continueFilename('PAN-946')).toBe('pan-946.vbrief.json');
   });
-  it('joins with dir for path', () => {
-    expect(continueFilePath('/tmp/proj/vbrief/active', 'PAN-946')).toBe(
-      '/tmp/proj/vbrief/active/continue-PAN-946.vbrief.json',
+  it('joins with projectRoot for path', () => {
+    expect(continueFilePath('/tmp/proj', 'PAN-946')).toBe(
+      '/tmp/proj/.pan/continues/pan-946.vbrief.json',
     );
   });
 });
@@ -90,12 +90,14 @@ describe('writeContinueState / readContinueState', () => {
 
   it('throws on corrupt JSON', () => {
     const path = continueFilePath(TEST_DIR, 'PAN-946');
+    mkdirSync(join(TEST_DIR, '.pan', 'continues'), { recursive: true });
     writeFileSync(path, '{not valid', 'utf-8');
     expect(() => readContinueState(TEST_DIR, 'PAN-946')).toThrow();
   });
 
   it('throws on malformed schema', () => {
     const path = continueFilePath(TEST_DIR, 'PAN-946');
+    mkdirSync(join(TEST_DIR, '.pan', 'continues'), { recursive: true });
     writeFileSync(path, JSON.stringify({ version: '999', issueId: 'PAN-946' }), 'utf-8');
     expect(() => readContinueState(TEST_DIR, 'PAN-946')).toThrow();
   });

@@ -229,30 +229,14 @@ describe('reopenWorkspaceState', () => {
     rmSync(wsDir, { recursive: true, force: true });
   });
 
-  // PAN-946 regression: when a continue file already lives beside a vBRIEF in
-  // `vbrief/completed/` (or `vbrief/cancelled/`), reopen MUST append the resume
-  // breadcrumb to that file rather than create a new one in `vbrief/active/`.
-  // Hard-coding `resolveVBriefDir(projectRoot, 'active')` would fork session
-  // history every time a completed issue was reopened.
+  // PAN-946 regression: when a continue file already exists at the canonical path,
+  // reopen MUST append the resume breadcrumb to that file rather than creating
+  // a new one alongside a lifecycle directory.
   describe('lifecycle-aware continue file appends', () => {
-    function seedLifecycleVBrief(
-      projectRoot: string,
-      lifecycleDir: 'proposed' | 'active' | 'completed' | 'cancelled',
-      issueId: string,
-    ): { dir: string; continuePath: string } {
-      const dir = join(projectRoot, 'vbrief', lifecycleDir);
-      mkdirSync(dir, { recursive: true });
-      const slug = `2026-05-04-${issueId}-test-vbrief.vbrief.json`;
-      const planPath = join(dir, slug);
-      writeFileSync(
-        planPath,
-        JSON.stringify({
-          vBRIEFInfo: { version: '0.5', created: '2026-05-04T00:00:00Z' },
-          plan: { id: issueId, title: 'Test', status: 'completed', items: [], edges: [] },
-        }),
-        'utf-8',
-      );
-      const continuePath = join(dir, `continue-${issueId}.vbrief.json`);
+    function seedContinueFile(projectRoot: string, issueId: string): string {
+      const continueDir = join(projectRoot, '.pan', 'continues');
+      mkdirSync(continueDir, { recursive: true });
+      const continuePath = join(continueDir, `${issueId.toLowerCase()}.vbrief.json`);
       writeFileSync(
         continuePath,
         JSON.stringify({
@@ -271,12 +255,12 @@ describe('reopenWorkspaceState', () => {
         }),
         'utf-8',
       );
-      return { dir, continuePath };
+      return continuePath;
     }
 
-    it('appends to a continue file in vbrief/completed/ rather than creating one in vbrief/active/', async () => {
+    it('appends to a continue file in .pan/continues/ rather than creating a new one', async () => {
       const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
-      const { continuePath } = seedLifecycleVBrief(projectRoot, 'completed', 'PAN-901');
+      const continuePath = seedContinueFile(projectRoot, 'PAN-901');
       const activeContinuePath = join(projectRoot, 'vbrief', 'active', 'continue-PAN-901.vbrief.json');
       projectStub = { projectPath: projectRoot };
 
@@ -291,7 +275,7 @@ describe('reopenWorkspaceState', () => {
       // Active dir must NOT have been auto-created with a fresh continue file.
       expect(existsSync(activeContinuePath)).toBe(false);
 
-      // Existing completed/ continue file should have grown by exactly one entry.
+      // Existing continue file in .pan/continues/ should have grown by exactly one entry.
       const updated = JSON.parse(readFileSync(continuePath, 'utf-8'));
       expect(updated.sessionHistory.length).toBe(2);
       const last = updated.sessionHistory[1];
@@ -306,9 +290,9 @@ describe('reopenWorkspaceState', () => {
       rmSync(projectRoot, { recursive: true, force: true });
     });
 
-    it('appends to a continue file in vbrief/cancelled/ rather than creating one in vbrief/active/', async () => {
+    it('appends to existing continue file without creating one in vbrief/active/', async () => {
       const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
-      const { continuePath } = seedLifecycleVBrief(projectRoot, 'cancelled', 'PAN-902');
+      const continuePath = seedContinueFile(projectRoot, 'PAN-902');
       const activeContinuePath = join(projectRoot, 'vbrief', 'active', 'continue-PAN-902.vbrief.json');
       projectStub = { projectPath: projectRoot };
 

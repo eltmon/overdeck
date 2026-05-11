@@ -1,0 +1,70 @@
+{
+  "version": "1",
+  "issueId": "PAN-1024",
+  "created": "2026-05-08T09:40:08.741Z",
+  "updated": "2026-05-10T00:05:03.861Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "gpt-5.4",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-08T09:40:08.741Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-08T09:40:08.792Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:32Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-09T23:32:47.930Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-09T23:32:47.991Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:39Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-09T23:39:41.806Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T00:03Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-10T00:03:31.138Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-10T00:03:31.374Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T00:05Z] review-agent → APPROVED — seq 2",
+      "timestamp": "2026-05-10T00:05:03.861Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-05-10T00:03:31Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1024 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (67894ms):\n\nasElement's getContext() method: without installing the canvas npm package\n\nstderr | src/hooks/useResourceStats.test.ts\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n\nstderr | src/components/__tests__/IssueAgentCard-harness.test.tsx\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n\n⎯⎯⎯⎯⎯⎯ Failed Suites 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL |panopticon-dashboard|  src/components/KanbanBoard.test.tsx [ src/dashboard/frontend/src/components/KanbanBoard.test.tsx ]\n FAIL |panopticon-dashboard|  src/components/__tests__/DetailPanelLayout.test.tsx [ src/dashboard/frontend/src/components/__tests__/DetailPanelLayout.test.tsx ]\nError: Failed to resolve entry for package \"@panctl/contracts\". The package may have incorrect main/module/exports specified in its package.json.\n  Plugin: vite:import-analysis\n  File: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1024/src/dashboard/frontend/src/lib/store.ts\n ❯ packageEntryFailure ../../../node_modules/.bun/vite@5.4.21/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:46638:15\n ❯ resolvePackageEntry ../../../node_modules/.bun/vite@5.4.21/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:46635:3\n ❯ tryNodeResolve ../../../node_modules/.bun/vite@5.4.21/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:46451:16\n ❯ ResolveIdContext.resolveId ../../../node_modules/.bun/vite@5.4.21/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:46201:19\n ❯ PluginContainer.resolveId ../../../node_modules/.bun/vite@5.4.21/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49018:17\n ❯ TransformPluginContext.resolve ../../../node_modules/.bun/vite@5.4.21/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:49178:15\n ❯ normalizeUrl ../../../node_modules/.bun/vite@5.4.21/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64300:26\n ❯ ../../../node_modules/.bun/vite@5.4.21/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:64439:39\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1024 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1024 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "approved",
+      "timestamp": "2026-05-10T00:05:03Z",
+      "markdownBody": "# Verdict: APPROVED\n\n## Summary\nPR #1057 now satisfies PAN-1024: per-turn diff summaries are removed from the WebSocket snapshot and projection-cache payload, retained in bounded per-agent read-model state, served through the existing diffs API, cleaned up on terminal/workspace lifecycle events, and covered by the required 100+ agent serialized snapshot-size regression test. Correctness, security, and requirements reviewers approve; performance found only bounded, non-blocking optimization opportunities in background/request-scoped paths, so the merge is approved.\n\n## Blockers (MUST fix before merge)\n\n_none_\n\n## High Priority (SHOULD fix; synthesis may still approve if justified)\n\n_none_\n\n## Nits (advisory — safe to defer)\n\n- `src/dashboard/server/read-model.ts:530` — `?` — Checkpoint reconciliation is bounded but still serial per retained turn. No action required for PAN-1024; if restart-time reconciliation becomes noticeable for many active agents, consider a small concurrency-limited worker pool rather than unbounded parallel git work. (performance)\n- `packages/contracts/src/event-reducers.ts:1007` — `?` — Per-event dedupe remains bounded by the summary cap. No action required at the default 200-summary cap; consider a Map-backed index only if `PANOPTICON_TURN_DIFF_SUMMARY_LIMIT` is raised substantially. (performance)\n- `src/dashboard/server/routes/diffs.ts:58` — `?` — Per-agent defensive copy is request-scoped and capped. No action recommended; the allocation is bounded and protects read-model state. (performance)\n\n## Cross-cutting groups\n\n**Diff-summary retention and retrieval costs** (bounded by the new cap and kept off the WebSocket snapshot):\n- [nit-1] Checkpoint reconciliation is bounded but still serial per retained turn\n- [nit-2] Per-event dedupe remains bounded by the summary cap\n- [nit-3] Per-agent defensive copy is request-scoped and capped\n\n## What's good\n\n- The broad `DashboardSnapshot` contract no longer carries `turnDiffSummariesByAgentId`, reducing WebSocket and projection-cache payloads while preserving per-agent REST access.\n- The new 100+ agent regression test directly demonstrates serialized snapshot size stays below 5 MB even when retained in-memory summaries exceed that threshold.\n- Checkpoint reconciliation now applies the retention cap before expensive git-backed diff/timestamp work and preserves absolute turn counts.\n- Security and correctness reviewers found no blocking regressions, including in the added merge-agent/test changes.\n\n## Review stats\n\n- Blockers: 0   High: 0   Medium: 0   Nits: 3\n- By reviewer: correctness=0, security=0, performance=3, requirements=0\n- Files touched: 8   Files with findings: 3\n\n## Appendix: individual reviews\n\nSee individual reviewer output files listed in `## Reviewer Output Files` in the Synthesis Context above. Those files contain full per-reviewer detail; this synthesis is the policy layer.\n\n## ✅ CODE APPROVED — YOUR WORK IS COMPLETE\n\n**Do NOT make any more changes.**\n**Do NOT run `pan done` again.**\n**Do NOT run `pan review request`.**\n\nThe specialist pipeline will now run tests. If tests pass, the issue enters the merge queue for human approval.\n"
+    }
+  ]
+}

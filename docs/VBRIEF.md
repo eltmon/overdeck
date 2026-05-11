@@ -400,7 +400,7 @@ Workspace progress writes that "fall through" to the lifecycle directories are a
 
 The legacy `vbrief/{proposed,active,completed,cancelled}/` lifecycle directories at the project root are still read by `findLegacyVBriefByIssue` so in-flight work from before the cutover keeps resolving. All writes target `.pan/specs/` only, and lifecycle status changes are atomic field flips on a single file — files do NOT move between directories.
 
-Continue files on the main side (`vbrief/active/continue-<issue>.vbrief.json`) remain in place until the continue-state migration phase. Workspace-side continue state has already moved to `<workspace>/.pan/continue.json`.
+Continue files on the main side have migrated to `<projectRoot>/.pan/continues/<issue-lowercase>.vbrief.json`. Workspace-side continue state lives at `<workspace>/.pan/continue.json`.
 
 ---
 

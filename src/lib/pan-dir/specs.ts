@@ -7,6 +7,7 @@ import { invalidateVBriefIndex } from '../vbrief/vbrief-index.js'
 import type { VBriefDocument } from '../vbrief/types.js'
 import {
   PAN_DIRNAME,
+  PAN_CONTINUES_DIRNAME,
   PAN_DRAFTS_DIRNAME,
   PAN_SPECS_DIRNAME,
   type PanSpecDocument,
@@ -23,6 +24,7 @@ function projectPanPaths(projectRoot: string): ProjectPanPaths {
     panDir: join(projectRoot, PAN_DIRNAME),
     specsDir: join(projectRoot, PAN_DIRNAME, PAN_SPECS_DIRNAME),
     draftsDir: join(projectRoot, PAN_DIRNAME, PAN_DRAFTS_DIRNAME),
+    continuesDir: join(projectRoot, PAN_DIRNAME, PAN_CONTINUES_DIRNAME),
   }
 }
 
@@ -35,6 +37,7 @@ export function ensurePanDirs(projectRoot: string): ProjectPanPaths {
   mkdirSync(paths.panDir, { recursive: true })
   mkdirSync(paths.specsDir, { recursive: true })
   mkdirSync(paths.draftsDir, { recursive: true })
+  mkdirSync(paths.continuesDir, { recursive: true })
   return paths
 }
 

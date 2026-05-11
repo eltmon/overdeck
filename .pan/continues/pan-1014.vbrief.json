@@ -1,0 +1,24 @@
+{
+  "version": "1",
+  "issueId": "PAN-1014",
+  "created": "2026-05-07T18:21:58.947Z",
+  "updated": "2026-05-08T10:54:10.476Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T18:21Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-07T18:21:58.947Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T18:54Z] review-agent → APPROVED — seq 1",
+      "timestamp": "2026-05-07T18:54:19.344Z"
+    }
+  ]
+}

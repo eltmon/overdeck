@@ -1,0 +1,42 @@
+{
+  "version": "1",
+  "issueId": "PAN-1032",
+  "created": "2026-05-08T07:24:55.820Z",
+  "updated": "2026-05-08T09:40:08.959Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-05-08T07:24:55Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1032 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (36301ms):\n\nng the canvas npm package\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL |root|  tests/fixtures/synced-skills.test.ts > synced skill set fixture > matches the committed fixture line-for-line\nAssertionError: expected 'all-up\\nbeads\\nbeads-completion-check…' to be 'all-up\\nbeads\\nbeads-completion-check…' // Object.is equality\n\n- Expected\n+ Received\n\n  all-up\n  beads\n  beads-completion-check\n  beads-panopticon-guide\n  benchmark\n  bug-fix\n  check-merged\n  clear-writing\n  cliproxy\n  code-review\n  code-review-performance\n  code-review-security\n  conv-lookup\n  crash-investigation\n  dependency-update\n  feature-work\n  github-cli\n  incident-response\n  knowledge-capture\n  myn-standards\n  onboard-codebase\n  pan\n  pan-admin-cloister\n  pan-admin-config\n  pan-admin-hooks\n  pan-admin-tldr\n  pan-admin-tracker\n  pan-approve\n  pan-close\n  pan-code-review\n  pan-convoy-synthesis\n  pan-dev\n  pan-diagnose\n  pan-docker\n  pan-docs\n  pan-done\n  pan-down\n  pan-fly\n  pan-health\n  pan-help\n  pan-install\n  pan-issues\n  pan-kill\n  pan-logs\n  pan-network\n  pan-new-project\n  pan-oversee\n  pan-plan\n  pan-projects\n  pan-quickstart\n  pan-release\n  pan-reload\n  pan-reopen\n  pan-resources\n  pan-restart\n  pan-review\n  pan-show\n  pan-skill-creator\n  pan-start\n  pan-status\n  pan-stop-all-agents\n  pan-subagent-creator\n  pan-sync\n  pan-sync-main\n  pan-tell\n  pan-test-config\n  pan-tts\n  pan-up\n  pan-wipe\n  pan-workspace-config\n+ pipeline-status\n  plan\n  react-best-practices\n  refactor\n  refactor-radar\n  release\n  send-feedback-to-agent\n  session-health\n  skill-creator\n  spec-readiness\n  spec-readiness-setup\n  stitch-design-md\n  stitch-react-components\n  stitch-setup\n  unarchive-conversation\n  web-design-guidelines\n  work-complete\n  workspace-status\n  write-spec\n\n\n ❯ tests/fixtures/synced-skills.test.ts:53:20\n     51| \n     52|     const expected = readFileSync(FIXTURE_PATH, 'utf-8');\n     53|     expect(actual).toBe(expected);\n       |                    ^\n     54|   });\n     55| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n\n## REQUIRED: Fix the failing check, then invoke the /rebase-and-submit skill\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1032 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-1032 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-08T07:24Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-08T07:24:55.820Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-05-08T07:24:56.465Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-05-08T09:40:08.950Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-05-08T09:40:08.959Z"
+    }
+  ]
+}
