@@ -6,6 +6,7 @@
 export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled' | 'in_progress';
 export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
 export type VBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+export type VBriefInspectionPolicy = 'auto' | 'never' | 'fast' | 'deep';
 
 export interface VBriefReference {
   uri: string;
@@ -70,6 +71,7 @@ export interface VBriefDocument {
     updated?: string;
     author?: string;
     description?: string;
+    inspectionPolicy?: VBriefInspectionPolicy;
   };
   plan: VBriefPlan;
   criticalPath?: string[];

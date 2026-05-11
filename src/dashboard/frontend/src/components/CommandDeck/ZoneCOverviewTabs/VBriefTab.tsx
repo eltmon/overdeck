@@ -6,9 +6,9 @@
  * the inner List/DAG/Raw tab strip.
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { VBriefViewer } from '../../vbrief/VBriefViewer';
-import type { VBriefDocument } from '../../vbrief/types';
+import type { VBriefDocument, VBriefInspectionPolicy } from '../../vbrief/types';
 
 interface VBriefTabProps {
   issueId: string;
@@ -24,10 +24,26 @@ async function fetchPlan(issueId: string): Promise<VBriefDocument | null> {
 }
 
 export function VBriefTab({ issueId }: VBriefTabProps) {
+  const queryClient = useQueryClient();
+  const queryKey = ['workspace-plan', issueId];
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['workspace-plan', issueId],
+    queryKey,
     queryFn: () => fetchPlan(issueId),
     refetchInterval: 30_000,
+  });
+  const updateInspectionPolicy = useMutation({
+    mutationFn: async (inspectionPolicy: VBriefInspectionPolicy) => {
+      const res = await fetch(`/api/workspaces/${issueId}/plan/inspection-policy`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inspectionPolicy }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      return res.json() as Promise<VBriefDocument>;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKey, updated);
+    },
   });
 
   if (isLoading) {
@@ -54,7 +70,11 @@ export function VBriefTab({ issueId }: VBriefTabProps) {
 
   return (
     <div data-testid="vbrief-tab" style={{ padding: 16 }}>
-      <VBriefViewer doc={data ?? null} />
+      <VBriefViewer
+        doc={data ?? null}
+        onInspectionPolicyChange={(policy) => updateInspectionPolicy.mutate(policy)}
+        isUpdatingInspectionPolicy={updateInspectionPolicy.isPending}
+      />
     </div>
   );
 }

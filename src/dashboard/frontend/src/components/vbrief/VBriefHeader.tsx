@@ -1,4 +1,4 @@
-import type { VBriefDocument } from './types';
+import type { VBriefDocument, VBriefInspectionPolicy } from './types';
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-bg-muted text-muted-foreground',
@@ -22,9 +22,11 @@ function fmt(ts?: string): string {
 
 interface VBriefHeaderProps {
   doc: VBriefDocument;
+  onInspectionPolicyChange?: (policy: VBriefInspectionPolicy) => void;
+  isUpdatingInspectionPolicy?: boolean;
 }
 
-export function VBriefHeader({ doc }: VBriefHeaderProps) {
+export function VBriefHeader({ doc, onInspectionPolicyChange, isUpdatingInspectionPolicy = false }: VBriefHeaderProps) {
   const { plan, vBRIEFInfo } = doc;
   const badgeCls = STATUS_BADGE[plan.status] ?? 'badge-bg-muted text-muted-foreground';
 
@@ -68,6 +70,25 @@ export function VBriefHeader({ doc }: VBriefHeaderProps) {
             <span className="text-muted-foreground">{fmt(plan.updated)}</span>
           </div>
         )}
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground">inspection </span>
+          {onInspectionPolicyChange ? (
+            <select
+              aria-label="Inspection policy"
+              className="bg-card border border-border rounded px-1 py-0.5 text-xs text-muted-foreground"
+              value={vBRIEFInfo.inspectionPolicy ?? 'auto'}
+              disabled={isUpdatingInspectionPolicy}
+              onChange={(event) => onInspectionPolicyChange(event.target.value as VBriefInspectionPolicy)}
+            >
+              <option value="auto">auto</option>
+              <option value="never">never</option>
+              <option value="fast">fast</option>
+              <option value="deep">deep</option>
+            </select>
+          ) : (
+            <span className="text-muted-foreground">{vBRIEFInfo.inspectionPolicy ?? 'auto'}</span>
+          )}
+        </div>
         {plan.sequence !== undefined && (
           <div>
             <span className="text-muted-foreground">seq </span>
