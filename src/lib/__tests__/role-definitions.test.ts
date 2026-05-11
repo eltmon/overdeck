@@ -82,20 +82,18 @@ describe('role definitions', () => {
       permissionMode: 'plan',
       effort: 'high',
     });
-    // PAN-1059: convoy reviewers run in isolated tmux sessions — synthesis
-    // polls for output files instead of spawning Agent-tool subagents.
-    // Agent is no longer needed in the tools list.
+    // Convoy reviewers run in isolated tmux sessions — synthesis polls for
+    // output files instead of spawning Agent-tool subagents, so Agent is
+    // intentionally absent from the tools list.
     expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash']));
     expect((frontmatter.tools as string[])).not.toContain('Agent');
     expect(frontmatter.hooks).toEqual(expect.any(Object));
-    expect(body).toContain('You are the synthesis agent');
+    expect(body).toContain('You are the review synthesis agent');
     expect(body).toContain('convoy reviewers are already running');
     expect(body.toLowerCase()).toContain('poll');
     expect(body.toLowerCase()).toContain('approve');
-    expect(body.toLowerCase()).toContain('request changes');
-    expect(body).toContain('Review NEVER merges');
-    // PAN-1059: isolated convoy sessions; synthesis reads output files.
-    expect(body).toMatch(/PAN-1059/);
+    expect(body.toLowerCase()).toContain('changes requested');
+    expect(body).toContain('Review never merges');
   });
 
   it('defines the test role as suite verification plus browser UAT', () => {
@@ -150,4 +148,22 @@ describe('role definitions', () => {
     expect(existsSync(join(process.cwd(), 'agents/pan-uat-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'agents/pan-merge-agent.md'))).toBe(true);
   });
+
+  // Convoy sub-role prompt templates are harness-agnostic — no YAML frontmatter,
+  // no Claude `--agent` flag. The orchestrator reads them from packageRoot/roles/
+  // and inlines the body into each convoy spawn message, so the same prompt
+  // drives Claude Code, Pi, and any future harness.
+  it.each(['security', 'correctness', 'performance', 'requirements'])(
+    'defines the review-%s sub-role prompt template with no frontmatter',
+    (subRole) => {
+      const path = `roles/review-${subRole}.md`;
+      expect(existsSync(join(process.cwd(), path))).toBe(true);
+
+      const content = readRepoFile(path);
+      expect(content.startsWith('---')).toBe(false);
+      expect(content).toMatch(/Context manifest/i);
+      expect(content).toMatch(/Write exactly one final report to the output file/i);
+      expect(content).not.toContain('.claude/reviews/');
+    },
+  );
 });

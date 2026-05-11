@@ -24,8 +24,9 @@
 | [Architecture Diagram](./diagrams/panopticon-architecture.png) | Visual overview of Panopticon system architecture (UI → Core → Agents → Infrastructure → Pipeline)
 | [Specialist Pipeline Diagram](./diagrams/panopticon-specialist-pipeline.png) | Visual overview of the work-agent → verification gate → specialist handoff flow |
 | [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) | Newcomer-friendly map of Panopticon agent roles, categories, and where they appear in the workflow |
+| [ROLES.md](./ROLES.md) | Mental model for Roles, sub-roles, and the three on-disk file shapes (`roles/*.md`, `agents/pan-*-agent.md`, `.claude/agents/*.md`) — what each is, when to use it, and how a run actually gets its instructions |
 | [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | Deeper workflow guide for how the work agent and specialist agents interact |
-| [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md) | End-to-end code review architecture: work-agent-as-orchestrator, dashboard-as-view, `pan review run` CLI, prompt primitives, synthesis as the judgment layer |
+| [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md) | End-to-end code review architecture: synthesis-as-review, convoy reviewers as harness-agnostic prompt templates inlined by the orchestrator, output-file contract, and verdict signaling |
 | [SKILL-DISTRIBUTION-ANALYSIS.md](./SKILL-DISTRIBUTION-ANALYSIS.md) | Skill distribution architecture: Claude Code precedence, symlink issues, proposed changes |
 | [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo: `.pan/`, skills hierarchy, `vbrief/` lifecycle dirs, PRD vs vBRIEF, multi-tool sync |
 | [VISION.md](./VISION.md) | Product vision and deployment model roadmap (local → shared → SaaS) |
@@ -160,8 +161,10 @@
 - **"rollback"** / **"revert"** / **"ORIG_HEAD"** → PRD-CLOISTER.md
 - **"baseline"** / **"test baseline"** → PRD-CLOISTER.md
 - **"review pipeline"** / **"specialist pipeline"** → PRD-CLOISTER.md, SPECIALIST_WORKFLOW.md
-- **"review architecture"** / **"review orchestrator"** / **"synthesis model"** / **"pan review run"** / **"review invariants"** / **"prompt primitives"** → REVIEW-AGENT-ARCHITECTURE.md
-- **"reviewer prompts"** / **"synthesis prompt"** / **"prompt-template.md"** → REVIEW-AGENT-ARCHITECTURE.md
+- **"role primitive"** / **"what is a Role"** / **"Role vs subagent"** / **"sub-role"** → ROLES.md
+- **"roles/ directory"** / **"agents/ vs .claude/agents/"** / **"workflow-injected prompt"** → ROLES.md
+- **"review architecture"** / **"review orchestrator"** / **"synthesis model"** / **"review invariants"** → REVIEW-AGENT-ARCHITECTURE.md
+- **"convoy reviewers"** / **"reviewer prompts"** / **"synthesis prompt"** / **"roles/review-*.md"** → REVIEW-AGENT-ARCHITECTURE.md
 - **"dashboard restart"** / **"review survives restart"** → REVIEW-AGENT-ARCHITECTURE.md (invariants)
 - **"planning"** / **"planning agent"** / **"PLANNING_PROMPT"** → SPECIALIST_WORKFLOW.md (Planning → Implementation Transition)
 - **"environment variables"** / **"agent env"** → SPECIALIST_WORKFLOW.md (Agent Environment Variables), CONFIGURATION.md

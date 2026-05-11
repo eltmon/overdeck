@@ -5,8 +5,7 @@ import { homedir } from 'os';
 import {
   SKILLS_DIR, COMMANDS_DIR, AGENTS_DIR, BIN_DIR,
   SOURCE_SCRIPTS_DIR, SOURCE_DEV_SKILLS_DIR, SOURCE_SKILLS_DIR, SOURCE_AGENTS_DIR, SOURCE_RULES_DIR,
-  SOURCE_REVIEW_PROMPTS_DIR,
-  CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, CACHE_RULES_DIR, CACHE_MANIFEST,
+  CACHE_AGENTS_DIR, CACHE_RULES_DIR, CACHE_MANIFEST,
   SYNC_TARGET, isDevMode,
 } from './paths.js';
 import {
@@ -293,22 +292,6 @@ export function refreshCache(): RefreshCacheResult {
     }
   }
 
-  // Copy review prompt templates from repo to cache (see docs/REVIEW-AGENT-ARCHITECTURE.md)
-  if (existsSync(SOURCE_REVIEW_PROMPTS_DIR)) {
-    mkdirSync(CACHE_REVIEW_PROMPTS_DIR, { recursive: true });
-    const reviewPrompts = readdirSync(SOURCE_REVIEW_PROMPTS_DIR, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.prompt-template.md'));
-
-    for (const prompt of reviewPrompts) {
-      copyFileSync(
-        join(SOURCE_REVIEW_PROMPTS_DIR, prompt.name),
-        join(CACHE_REVIEW_PROMPTS_DIR, prompt.name),
-      );
-      result.agents.copied++;
-      result.agents.total++;
-    }
-  }
-
   // Copy rules from repo to cache (directory may not exist yet)
   if (existsSync(SOURCE_RULES_DIR)) {
     const ruleFiles = readdirSync(SOURCE_RULES_DIR, { withFileTypes: true })
@@ -325,7 +308,7 @@ export function refreshCache(): RefreshCacheResult {
   // Generate cache manifest
   const manifest = buildManifestFromDirectory(
     join(SKILLS_DIR, '..'),  // ~/.panopticon/
-    ['skills', 'agent-definitions', 'review-prompts', 'rules'],
+    ['skills', 'agent-definitions', 'rules'],
     'panopticon',
   );
   writeManifest(CACHE_MANIFEST, manifest);

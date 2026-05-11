@@ -93,7 +93,14 @@ Panopticon's pipeline is expressed as five issue-scoped **roles**:
 | `test` | Run automated verification and required browser UAT | `roles/test.md` |
 | `ship` | Rebase/verify/push approved branches for human merge | `roles/ship.md` |
 
-Sub-roles are configuration slots under a role, not standalone pipeline stages. Current sub-roles are `work.inspect`, `work.inspect-deep`, and the review convoy (`review.security`, `review.correctness`, `review.performance`, `review.requirements`). They use role-scoped model settings and Claude Code subagent definitions where needed, but the issue lifecycle still advances through the five roles above.
+Sub-roles are configuration slots under a role, not standalone pipeline stages. Today's sub-roles split into two shapes by how they are delivered:
+
+- **`work.inspect` / `work.inspect-deep`** — Claude Code subagents invoked from inside a `work` session via the `Agent` tool at Jidoka gates. Definitions live in `.claude/agents/inspect.md` and `inspect-deep.md`.
+- **`review.security` / `review.correctness` / `review.performance` / `review.requirements`** — harness-agnostic prompt templates the orchestrator reads from `roles/review-<subRole>.md` and inlines into each convoy spawn message. They are **never** loaded via Claude's `--agent` flag and never synced into project workspaces — they belong to Panopticon, are delivered as part of the workflow, and stay invisible to the work agent's session.
+
+`.claude/agents/` is a workspace sync target for the Claude Code harness, not a source of truth — anything placed there becomes ambient in every Claude Code session, which is the wrong shape for prompts that should only fire at a specific moment in the workflow.
+
+The full mental model — Role vs Claude subagent vs Panopticon pipeline agent — lives in [docs/ROLES.md](docs/ROLES.md). For review specifically, see [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md).
 
 Legacy specialist wake/session/queue machinery has been removed. Use `spawnRun(issueId, role, opts)` and lifecycle state transitions instead of waking named specialists.
 

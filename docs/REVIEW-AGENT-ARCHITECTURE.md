@@ -2,16 +2,19 @@
 
 **How Panopticon runs code review after the Role primitive migration.**
 
-This document describes the end-to-end architecture for automatic code review in the role-based pipeline. The review lifecycle is now owned by the `review` role (`roles/review.md`), with convoy reviewers implemented as Claude Code subagents under `.claude/agents/`.
+This document describes the end-to-end architecture for automatic code review in the role-based pipeline. The review lifecycle is owned by the `review` role (`roles/review.md`). Its four convoy reviewers are harness-agnostic prompt templates owned by Panopticon, inlined into each convoy spawn message by the orchestrator.
+
+For the broader mental model — what a Role is, how it relates to Claude Code subagent files, and why `.claude/agents/` is a sync target rather than a source of truth — see [ROLES.md](./ROLES.md).
 
 ---
 
 ## Invariants
 
 1. **Review is a role, not a server-owned promise.** Lifecycle dispatch starts `spawnRun(issueId, 'review')`; the dashboard observes state and artifacts.
-2. **Synthesis is the review role.** There is no separate synthesis pipeline stage. The `review` role reads the diff, fans out review convoy subagents, synthesizes their findings, and emits the verdict.
+2. **Synthesis is the review role.** There is no separate synthesis pipeline stage. The `review` role reads the manifest, waits on convoy reviewer output files, synthesizes their findings, and emits the verdict.
 3. **Review never merges.** Approved review transitions the issue toward `test`; branch preparation and push work belongs to `ship`, and final merge remains human-gated.
 4. **Convoy outputs are evidence, not votes.** Security/correctness/performance/requirements findings inform synthesis; the review role decides what blocks.
+5. **Convoy prompts are harness-agnostic templates.** The orchestrator reads each `roles/review-<subRole>.md` template at spawn time and inlines its body into the convoy reviewer's first user message. The convoy never relies on Claude Code's `--agent` flag, never reads a file from the agent's workspace, and never appears as an ambient subagent that a work agent could auto-discover.
 
 ---
 
@@ -25,20 +28,20 @@ work role completes beads and signals done
 spawnRun(issueId, 'review')
   │
   ▼
-review role (`roles/review.md`)
+review role (roles/review.md, Claude --agent on Claude Code harness)
   │
-  ├─ reads issue, vBRIEF, PR/diff, and acceptance criteria
-  ├─ runs convoy subagents in parallel:
-  │    • code-review-security
-  │    • code-review-correctness
-  │    • code-review-performance
-  │    • code-review-requirements
-  ├─ synthesizes findings into one verdict
-  ├─ posts the GitHub PR review/comment
-  └─ records review status / lifecycle event
+  ├─ reads the shared context manifest at .pan/review/<runId>/context.json
+  ├─ orchestrator (review-agent.ts) launches four convoy sub-role sessions in parallel:
+  │    • review.security      ← roles/review-security.md (inlined)
+  │    • review.correctness   ← roles/review-correctness.md (inlined)
+  │    • review.performance   ← roles/review-performance.md (inlined)
+  │    • review.requirements  ← roles/review-requirements.md (inlined)
+  ├─ polls .pan/review/<runId>/<subRole>.md for each reviewer's report
+  ├─ synthesizes the findings into one verdict
+  └─ signals via Panopticon's CLI
         │
-        ├─ approved → transition toward `test`
-        └─ changes requested → notify `work` with blockers
+        ├─ pan specialists done review <id> --status passed  → review.approved → test role
+        └─ pan specialists done review <id> --status blocked → notify `work` with blockers
 ```
 
 The dashboard displays the current review status from persisted review state and domain events. It does not own the review decision.
@@ -47,32 +50,32 @@ The dashboard displays the current review status from persisted review state and
 
 ## Instruction layout
 
-The review role instruction file is:
+Two distinct on-disk shapes drive review behavior:
 
 ```
-roles/review.md
+roles/
+├── review.md                  # synthesis role definition (Claude frontmatter
+│                              # for tools/hooks; loaded via --agent on Claude Code)
+├── review-security.md         # convoy sub-role prompt template (harness-agnostic,
+│                              # no frontmatter; inlined into spawn message)
+├── review-correctness.md
+├── review-performance.md
+└── review-requirements.md
 ```
 
-The convoy reviewer definitions live in:
+The convoy templates are read by `src/lib/cloister/review-agent.ts` via `readConvoySubRoleTemplate(subRole)`, which resolves them from `packageRoot/roles/` — Panopticon's own install, **not** the agent's workspace. This keeps the prompts:
 
-```
-.claude/agents/
-├── code-review-correctness.md
-├── code-review-security.md
-├── code-review-performance.md
-├── code-review-requirements.md
-└── code-review-synthesis.md
-```
+- **Harness-agnostic.** The same body is delivered to a Claude Code reviewer, a Pi reviewer, or any future harness as its first user message. The harness never has to parse Panopticon-specific frontmatter.
+- **Workflow-injected, not auto-discovered.** Work agents running in project workspaces never see these files in their tree, so there is no risk of a work agent ambiently spawning a reviewer subagent or "self-reviewing" before the convoy fires.
+- **Versioned with code.** Behavior changes ship in the same commit as the role file change, reviewed under the same gates.
 
-`code-review-synthesis.md` is retained as a Claude Code agent definition for compatibility with prompt resolution and review tooling, but synthesis is conceptually the `review` role itself.
-
-The old source prompt-template files under `src/lib/cloister/prompts/review/code-review-*.prompt-template.md` are intentionally gone.
+There is no synthesis sub-role template. Synthesis is the review role itself.
 
 ---
 
 ## Reviewer semantics
 
-Each convoy subagent has a distinct focus and cites the [`deftai/directive`](https://github.com/deftai/directive) verification framework for consistent severity vocabulary and acceptance criteria taxonomy.
+Each convoy reviewer has a distinct focus and uses the same severity/evidence vocabulary across roles, drawn from the [`deftai/directive`](https://github.com/deftai/directive) verification framework.
 
 | Reviewer | Primary focus | Directive link |
 |----------|---------------|----------------|
@@ -106,7 +109,7 @@ Synthesis uses tier as a tiebreaker when the same finding is raised at different
 
 ## Output contract
 
-The review role records a human-readable verdict and machine-readable status through the review-status path used by the dashboard and lifecycle scheduler.
+Each convoy reviewer writes exactly one report to its assigned output file at `.pan/review/<runId>/<subRole>.md`. The synthesis role polls those files, then writes its own report to `.pan/review/<runId>/synthesis.md` and signals the verdict via `pan specialists done review`.
 
 Human-readable review output should include:
 
@@ -136,12 +139,12 @@ Machine-readable status uses the existing review-status fields and lifecycle eve
 
 ## Model and harness configuration
 
-Model selection is role-based:
+Model selection is role-based and resolved through `resolveModel(role, subRole, config)`:
 
 ```yaml
 workhorses:
   expensive: claude-opus-4-7
-  mid: claude-sonnet-4-6
+  mid: claude-sonnet-4-7
   cheap: claude-haiku-4-6
 
 roles:
@@ -158,7 +161,7 @@ roles:
         model: workhorse:mid
 ```
 
-Harness selection follows the same role/sub-role shape. See [`HARNESSES.md`](./HARNESSES.md) for Pi vs Claude Code behavior and ToS rules.
+Harness selection follows the same role/sub-role shape. Because the convoy prompts are inlined, the choice between Claude Code, Pi, or another harness does not change the reviewer's instructions — only the runtime. See [`HARNESSES.md`](./HARNESSES.md) for Pi vs Claude Code behavior and ToS rules.
 
 ---
 
@@ -177,6 +180,6 @@ Restarting the dashboard drops subscriptions and terminal connections, but role 
 
 ## What this replaced
 
-Historical pre-role architecture used `pan review run`, source prompt templates under `src/lib/cloister/prompts/review/`, and detached reviewer/synthesis tmux sessions coordinated outside the role runner. That design was deleted by the Role primitive migration.
+The pre-role architecture used `pan review run`, source prompt templates under `src/lib/cloister/prompts/review/`, and detached reviewer/synthesis tmux sessions coordinated outside the role runner. The Role primitive migration (PAN-1048) replaced that with a single lifecycle entry point: `spawnRun(issueId, 'review')`.
 
-The current architecture has one lifecycle entry point: `spawnRun(issueId, 'review')`.
+The first cut of the role migration parked the convoy prompts as Claude Code subagent files under `.claude/agents/code-review-*.md`. That worked for the Claude Code harness in panopticon-cli's own workspaces but coupled the prompt format to one harness's `--agent` mechanism and made the prompts auto-discoverable inside any session. The current layout — `roles/review-<subRole>.md`, inlined by the orchestrator, never synced into project workspaces — keeps the prompts harness-agnostic and orchestrator-owned.

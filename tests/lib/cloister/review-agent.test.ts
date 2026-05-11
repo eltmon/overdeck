@@ -1,25 +1,18 @@
 /**
  * Tests for the surviving review-agent.ts surface area.
  *
- * PAN-1048 R7 retired every legacy convoy helper (parseReviewerTemplate,
- * resolveReviewerModel, parseReviewSynthesis, getReviewAgents,
- * reviewResultToReviewStatus, getFilesChangedFromPR, buildReviewFeedbackBody,
- * resolvePromptTemplatePath, spawnSingleReviewer, waitForReviewer,
- * selectCompletedReviewers, archiveReviewerRound, parseAgentOutput,
- * buildReviewBaseCommand, ReviewerOutcome / ReviewerWaitResult /
- * ReviewerFailureReason / ReviewContext / ReviewResult / ReviewerTemplate /
- * ReviewerRoundArtifact / ReviewHistoryEntry types, DEFAULT_REVIEW_AGENTS,
- * REVIEW_TIMEOUT_MS, REVIEW_HISTORY_DIR / FILE, SPECIALISTS_DIR). Their
- * tests went with them. The reviewer/dispatcher behavior they used to model
- * now lives inside the review role itself (roles/review.md plus the four
- * .claude/agents/code-review-*.md sub-agent definitions).
+ * PAN-1048 R7 retired every legacy convoy helper. The reviewer/dispatcher
+ * behavior they used to model now lives inside the review role itself
+ * (roles/review.md for synthesis, plus the four harness-agnostic sub-role
+ * templates roles/review-<flavor>.md that the orchestrator inlines into
+ * each convoy spawn message).
  *
  * What remains here:
  *   - killAllReviewSessions: pan-down review session reaper
  *   - pan-down integration: cli/index.ts wires the reaper at the right point
  *   - passed-state rerun: workspaces.ts rerun route uses spawnReviewRoleForIssue
  *   - dispatch failure / type-safety regressions on the rerun route
- *   - template/output contract for the four code-review-* sub-agent definitions
+ *   - template/output contract for the four review sub-role prompt templates
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -245,44 +238,50 @@ describe('passed-state rerun regression', () => {
 });
 
 // ── template/output contract ──────────────────────────────────────────────────
-// PAN-1059 convoy reviewers run in isolated sessions. Each code-review-* agent
-// reads the shared context manifest and writes one report to its assigned output
+// Convoy sub-role prompts are harness-agnostic templates owned by Panopticon.
+// They live in roles/review-<sub-role>.md and are inlined into each convoy
+// spawn message by the orchestrator. Each template tells one reviewer to read
+// the shared context manifest and write one report to its assigned output
 // file, which synthesis polls and consumes.
 
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-function readTemplate(name: string): string {
+function readTemplate(subRole: string): string {
   const templatePath = resolve(
     import.meta.dirname,
-    '../../../.claude/agents',
-    `${name}.md`,
+    '../../../roles',
+    `review-${subRole}.md`,
   );
   return readFileSync(templatePath, 'utf-8');
 }
 
 describe('template/output contract', () => {
-  const reviewerTemplates = [
-    { name: 'code-review-correctness', role: 'correctness' },
-    { name: 'code-review-security', role: 'security' },
-    { name: 'code-review-performance', role: 'performance' },
-    { name: 'code-review-requirements', role: 'requirements' },
-  ];
+  const reviewerSubRoles = ['correctness', 'security', 'performance', 'requirements'];
 
-  describe('reviewer templates write one manifest-scoped report (PAN-1059)', () => {
-    for (const { name, role } of reviewerTemplates) {
+  describe('sub-role templates are harness-agnostic prompts (no Claude frontmatter)', () => {
+    for (const role of reviewerSubRoles) {
+      it(`${role}: has no YAML frontmatter (orchestrator inlines the body, no --agent load)`, () => {
+        const content = readTemplate(role);
+        expect(content.startsWith('---')).toBe(false);
+      });
+    }
+  });
+
+  describe('sub-role templates write one manifest-scoped report', () => {
+    for (const role of reviewerSubRoles) {
       it(`${role}: does NOT hardcode .claude/reviews/ path`, () => {
-        const content = readTemplate(name);
+        const content = readTemplate(role);
         expect(content).not.toContain('.claude/reviews/');
       });
 
-      it(`${role}: has Write tool for its assigned output file`, () => {
-        const content = readTemplate(name);
-        expect(content).toMatch(/\n\s+- Write\n/);
+      it(`${role}: instructs writing to an assigned output file`, () => {
+        const content = readTemplate(role);
+        expect(content).toMatch(/output file/i);
       });
 
       it(`${role}: reads the context manifest before review`, () => {
-        const content = readTemplate(name);
+        const content = readTemplate(role);
         expect(content).toMatch(/Context manifest/i);
         expect(content).toMatch(/read this first/i);
         expect(content).not.toMatch(/complete 3 review passes/i);
@@ -290,7 +289,7 @@ describe('template/output contract', () => {
       });
 
       it(`${role}: instructs exactly one final output-file report`, () => {
-        const content = readTemplate(name);
+        const content = readTemplate(role);
         expect(content).toMatch(/Write exactly one final report to the output file/i);
       });
     }

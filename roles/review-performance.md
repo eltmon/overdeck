@@ -1,14 +1,3 @@
----
-name: code-review-performance
-description: Reviews code for performance issues including algorithms, N+1 queries, and memory leaks
-model: haiku
-tools:
-  - Read
-  - Grep
-  - Glob
-  - Write
----
-
 # Code Review: Performance
 
 You are the performance reviewer. Find performance regressions introduced by the current PR only.

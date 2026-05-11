@@ -41,6 +41,26 @@ describe('AgentState role persistence', () => {
     expect(command).not.toContain('pan-review-agent');
   });
 
+  it('does not pass --agent for review convoy sub-roles (prompts are harness-agnostic templates inlined by the orchestrator)', async () => {
+    const { getRoleRuntimeBaseCommand, roleAgentDefinitionPath } = await import('../agents.js');
+
+    for (const subRole of ['security', 'correctness', 'performance', 'requirements'] as const) {
+      expect(roleAgentDefinitionPath('review', subRole)).toBeNull();
+
+      const command = await getRoleRuntimeBaseCommand(
+        'claude-sonnet-4-7',
+        `agent-pan-1059-review-${subRole}`,
+        'review',
+        'claude-code',
+        subRole,
+      );
+      expect(command).not.toContain('--agent');
+      expect(command).not.toContain('.claude/agents');
+      expect(command).toContain('--model claude-sonnet-4-7');
+      expect(command).toContain(`--name agent-pan-1059-review-${subRole}`);
+    }
+  });
+
   it('requires role and strips legacy state fields when persisting state.json', async () => {
     const { getAgentState, saveAgentState } = await import('../agents.js');
 

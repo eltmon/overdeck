@@ -40,6 +40,7 @@
  */
 
 import { exec } from 'child_process';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
 import { killSessionAsync, listSessionNamesAsync, isPaneDeadAsync } from '../tmux.js';
@@ -51,6 +52,23 @@ import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { buildReviewContext } from './review-context.js';
 import { REVIEW_SUB_ROLES, reviewerOutputPath } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
+import { packageRoot } from '../paths.js';
+
+/**
+ * Read a convoy sub-role prompt template from the panopticon-cli install.
+ *
+ * Sub-role prompts are harness-agnostic templates owned by Panopticon. The
+ * orchestrator reads them from its own install (packageRoot/roles/) and
+ * inlines the body into the spawn message — they never live in the agent's
+ * workspace, and they are never loaded via the Claude-specific `--agent` flag.
+ * That keeps the same prompt content driving Claude Code, Pi, Codex, or any
+ * future harness, and prevents a work agent from ambiently discovering its
+ * own reviewer prompts in the workspace tree.
+ */
+async function readConvoySubRoleTemplate(subRole: string): Promise<string> {
+  const path = join(packageRoot, 'roles', `review-${subRole}.md`);
+  return readFile(path, 'utf-8');
+}
 
 const execAsync = promisify(exec);
 
@@ -112,28 +130,34 @@ export async function cleanupReviewTempStash(issueId: string, workspace: string)
 }
 
 /**
- * PAN-1048 R3: Build the context-only prompt the review role agent receives
- * at spawn. Behavior — convoy launch, synthesis, and verdict signaling —
- * lives in roles/review.md and the .claude/agents/code-review-* sub-agent
- * definitions. This prompt only carries identifiers and a pointer to those
- * instructions, so review behavior changes are managed in role files (which
- * version-control with the repo) rather than scattered through prompt strings.
+ * Build the spawn message for one convoy sub-role reviewer.
+ *
+ * The body of `roles/review-<subRole>.md` is the harness-agnostic prompt
+ * template Panopticon owns. The orchestrator reads it and inlines it here
+ * so every harness (Claude Code, Pi, Codex) receives the same instructions
+ * as the first user message. No `--agent` flag, no workspace file lookup,
+ * no auto-discovered subagent — the prompt arrives through the workflow.
+ *
+ * The wrapper around the body supplies the per-run identifiers the template
+ * references abstractly: the assigned output file path and the shared
+ * context manifest path.
  */
 type ConvoyModels = { security: string; correctness: string; performance: string; requirements: string };
 
-function buildConvoyPrompt(opts: {
+async function buildConvoyPrompt(opts: {
   issueId: string;
   subRole: string;
   outputPath: string;
   contextManifestPath?: string;
-}): string {
+}): Promise<string> {
+  const template = await readConvoySubRoleTemplate(opts.subRole);
   return [
     `REVIEW TASK for ${opts.issueId} — ${opts.subRole.toUpperCase()} REVIEW:`,
     '',
     `Issue: ${opts.issueId}`,
     `Sub-role: ${opts.subRole}`,
     '',
-    'Output file — WRITE YOUR FULL FINDINGS HERE when done (Write tool):',
+    'Output file — write your full findings here when done:',
     `  ${opts.outputPath}`,
     '',
     opts.contextManifestPath
@@ -144,8 +168,15 @@ function buildConvoyPrompt(opts: {
         ].join('\n')
       : 'No context manifest available. Write a blocked reviewer report explaining that the shared review context is missing.',
     '',
-    `Follow .claude/agents/code-review-${opts.subRole}.md for review methodology.`,
-    'Write exactly one final report to the output file using the Write tool.',
+    '─────────────────────────────────────────────────────────────',
+    'REVIEW METHODOLOGY (inlined from roles/review-' + opts.subRole + '.md):',
+    '─────────────────────────────────────────────────────────────',
+    '',
+    template.trim(),
+    '',
+    '─────────────────────────────────────────────────────────────',
+    '',
+    'Write exactly one final report to the output file shown above.',
     'Only the output file is consumed by synthesis; your chat response is not the review report.',
   ].filter(Boolean).join('\n');
 }
@@ -314,13 +345,17 @@ export async function spawnReviewRoleForIssue(
 
     // Spawn convoy sub-role sessions first so they're running before the
     // synthesis agent starts polling for their output files (PAN-1059).
+    // buildConvoyPrompt reads the harness-agnostic sub-role template from
+    // packageRoot/roles/ asynchronously, so resolve all four prompts before
+    // fanning out the spawnRun calls.
     const convoyResults = await Promise.allSettled(
-      REVIEW_SUB_ROLES.map((subRole) => {
+      REVIEW_SUB_ROLES.map(async (subRole) => {
         const outputPath = reviewerOutputPath(opts.workspace, runId, subRole);
+        const prompt = await buildConvoyPrompt({ issueId: opts.issueId, subRole, outputPath, contextManifestPath });
         return spawnRun(opts.issueId, 'review', {
           workspace: opts.workspace,
           subRole,
-          prompt: buildConvoyPrompt({ issueId: opts.issueId, subRole, outputPath, contextManifestPath }),
+          prompt,
           model: convoyModels[subRole],
         });
       }),

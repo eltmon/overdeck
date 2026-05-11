@@ -1,41 +1,42 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { describe, expect, it } from 'vitest';
-import { parse } from 'yaml';
 
-// PAN-1048 R2: synthesis is the review role itself — there is no
-// .claude/agents/code-review-synthesis.md sub-agent to validate.
-const REVIEW_FLAVORS = ['security', 'correctness', 'performance', 'requirements'] as const;
-const LEGACY_TEMPLATE_FLAVORS = [...REVIEW_FLAVORS, 'synthesis'] as const;
+// Convoy reviewer prompts are harness-agnostic templates owned by Panopticon
+// and inlined by the orchestrator at spawn time. They live under `roles/`,
+// not `.claude/agents/`, so they cannot be auto-discovered as ambient Claude
+// Code subagents and the same body drives Claude Code, Pi, and any future
+// harness uniformly. See docs/ROLES.md and docs/REVIEW-AGENT-ARCHITECTURE.md.
+const REVIEW_SUB_ROLES = ['security', 'correctness', 'performance', 'requirements'] as const;
+const LEGACY_TEMPLATE_FLAVORS = [...REVIEW_SUB_ROLES, 'synthesis'] as const;
 
 function readRepoFile(path: string): string {
   return readFileSync(join(process.cwd(), path), 'utf-8');
 }
 
-function splitFrontmatter(content: string): { frontmatter: Record<string, unknown>; body: string } {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!match) throw new Error('missing frontmatter');
-  return {
-    frontmatter: parse(match[1]!) as Record<string, unknown>,
-    body: match[2]!,
-  };
-}
+describe('code review convoy sub-role prompt templates', () => {
+  for (const subRole of REVIEW_SUB_ROLES) {
+    it(`defines roles/review-${subRole}.md as a frontmatter-free prompt template`, () => {
+      const path = `roles/review-${subRole}.md`;
+      expect(existsSync(join(process.cwd(), path))).toBe(true);
 
-describe('code review Claude Code agent definitions', () => {
-  for (const flavor of REVIEW_FLAVORS) {
-    it(`defines code-review-${flavor} with valid frontmatter`, () => {
-      const agent = splitFrontmatter(readRepoFile(`.claude/agents/code-review-${flavor}.md`));
+      const content = readRepoFile(path);
+      // No YAML frontmatter — these are inlined into the spawn message, never
+      // loaded by Claude's --agent flag, so frontmatter would only be noise.
+      expect(content.startsWith('---')).toBe(false);
+      expect(content.trim().length).toBeGreaterThan(100);
 
-      expect(agent.frontmatter.name).toBe(`code-review-${flavor}`);
-      expect(agent.frontmatter.description).toEqual(expect.any(String));
-      expect(agent.frontmatter.model).toEqual(expect.any(String));
-      // PAN-1059: convoy reviewers run in isolated tmux sessions and write
-      // findings to .pan/review/<runId>/<subRole>.md via the Write tool.
-      // Tools list must include the read primitives AND Write.
-      expect(agent.frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Glob', 'Write']));
-      expect(agent.body.trim().length).toBeGreaterThan(100);
+      // Output-file + context-manifest contract every sub-role must enforce.
+      expect(content).toMatch(/Context manifest/i);
+      expect(content).toMatch(/Write exactly one final report to the output file/i);
     });
   }
+
+  it('does not keep legacy .claude/agents/code-review-* subagent files', () => {
+    for (const subRole of REVIEW_SUB_ROLES) {
+      expect(existsSync(join(process.cwd(), `.claude/agents/code-review-${subRole}.md`))).toBe(false);
+    }
+  });
 
   it('does not keep legacy source prompt-template files', () => {
     for (const flavor of LEGACY_TEMPLATE_FLAVORS) {
@@ -43,7 +44,8 @@ describe('code review Claude Code agent definitions', () => {
     }
   });
 
-  it('does not ship a separate code-review-synthesis sub-agent (PAN-1048 R2)', () => {
+  it('does not ship a separate code-review-synthesis sub-agent (synthesis is the review role itself)', () => {
     expect(existsSync(join(process.cwd(), '.claude/agents/code-review-synthesis.md'))).toBe(false);
+    expect(existsSync(join(process.cwd(), 'roles/review-synthesis.md'))).toBe(false);
   });
 });

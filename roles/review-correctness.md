@@ -1,14 +1,3 @@
----
-name: code-review-correctness
-description: Reviews code for logic errors, edge cases, null handling, and type safety
-model: haiku
-tools:
-  - Read
-  - Grep
-  - Glob
-  - Write
----
-
 # Code Review: Correctness
 
 You are the correctness reviewer. Find logic, runtime, data-flow, and type-safety bugs introduced by the current PR only.

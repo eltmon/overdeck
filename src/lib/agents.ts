@@ -247,10 +247,28 @@ export async function getAgentRuntimeBaseCommand(
   return `claude ${permissionFlags} --model ${model}${nameFlag}`;
 }
 
-export function roleAgentDefinitionPath(role: Role, subRole?: string): string {
-  // Review convoy sub-roles use .claude/agents/code-review-<flavor>.md (PAN-1059)
+/**
+ * Resolve the role's Claude-harness agent-definition path.
+ *
+ * Returns the file Claude Code's `--agent` flag should load to seed the run
+ * with the role's frontmatter (permissions, tools, hooks, default model).
+ * Returns `null` when the role does not have a Claude agent definition — for
+ * example, the review convoy sub-roles, whose prompts are harness-agnostic
+ * templates the orchestrator inlines into the spawn message (see
+ * `buildConvoyPrompt` in `src/lib/cloister/review-agent.ts`). Sub-role
+ * templates live in `roles/review-<subRole>.md`; they are deliberately not
+ * loaded via `--agent` so the same content drives Claude Code, Pi, and
+ * future harnesses uniformly and never auto-discovers as an ambient Claude
+ * subagent inside a work agent's session.
+ *
+ * Without a sub-role the return is always the top-level role file; callers
+ * can rely on the overload to avoid null-handling on that path.
+ */
+export function roleAgentDefinitionPath(role: Role): string;
+export function roleAgentDefinitionPath(role: Role, subRole: string | undefined): string | null;
+export function roleAgentDefinitionPath(role: Role, subRole?: string): string | null {
   if (role === 'review' && subRole) {
-    return `.claude/agents/code-review-${subRole}.md`;
+    return null;
   }
   return `roles/${role}.md`;
 }
@@ -268,18 +286,24 @@ export async function getRoleRuntimeBaseCommand(
   }
 
   const provider = getProviderForModel(model);
-  const agentFlag = ` --agent ${roleAgentDefinitionPath(role, subRole)}`;
+  const definitionPath = roleAgentDefinitionPath(role, subRole);
+  const agentFlag = definitionPath ? ` --agent ${definitionPath}` : '';
   const nameFlag = ` --name ${agentName}`;
-  const bypassWithAgent = resolvePermissionMode() === 'bypass'
+  // The convoy sub-roles have no `--agent` definition, so claude won't pick up
+  // a frontmatter permissionMode. Fall back to the global Claude permission
+  // flags in that case so the run still launches with the user's bypass/plan
+  // settings honored.
+  const permissionFlags = definitionPath ? '' : ` ${getClaudePermissionFlagsString()}`;
+  const bypassWithAgent = definitionPath && resolvePermissionMode() === 'bypass'
     ? ' --dangerously-skip-permissions'
     : '';
 
   if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
-    return `claude${bypassWithAgent}${agentFlag} --model ${resolvedModel}${nameFlag}`;
+    return `claude${bypassWithAgent}${agentFlag}${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  return `claude${bypassWithAgent}${agentFlag} --model ${model}${nameFlag}`;
+  return `claude${bypassWithAgent}${agentFlag}${permissionFlags} --model ${model}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
