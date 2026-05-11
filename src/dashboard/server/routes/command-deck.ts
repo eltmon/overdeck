@@ -332,7 +332,7 @@ export async function fetchActivityDataWithContext(
       sections.push({
         type: sectionType,
         sessionId: checkId,
-        model: state.model || state.runtime || 'unknown',
+        model: state.model || 'unknown',
         startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
         duration: state.startedAt ? (() => {
           const ms = Date.now() - new Date(state.startedAt).getTime();

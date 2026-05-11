@@ -6,8 +6,10 @@
  * proceeds to the next bead.
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
+import { homedir } from 'os';
+import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -17,9 +19,22 @@ import {
   getCurrentHead,
   saveCheckpoint,
 } from './inspect-checkpoints.js';
-import { spawnEphemeralSpecialist, type SpecialistType } from './specialists.js';
 import { setReviewStatus } from '../review-status.js';
 import { withBdMutex } from '../bd-mutex.js';
+import { generateLauncherScript } from '../launcher-generator.js';
+import {
+  createSessionAsync,
+  killSessionAsync,
+  sessionExistsAsync,
+} from '../tmux.js';
+import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
+import {
+  getProviderForModel,
+  setupCredentialFileAuth,
+  clearCredentialFileAuth,
+} from '../providers.js';
+import type { ModelId } from '../settings.js';
+import { getProviderEnvForModel, saveAgentRuntimeState } from '../agents.js';
 
 const execAsync = promisify(exec);
 
@@ -147,31 +162,127 @@ export async function buildInspectPrompt(context: InspectContext): Promise<strin
 }
 
 /**
- * Spawn the inspect specialist for a bead.
+ * PAN-1048 R1: spawn the inspect sub-role for a bead.
+ *
+ * Replaces the legacy spawnEphemeralSpecialist call. Inspect is a work
+ * sub-role: ephemeral, single-bead-scoped, runs the
+ * .claude/agents/inspect.md (or inspect-deep.md) Claude Code subagent
+ * definition in its own tmux session, signals back via pan tell. None of
+ * the heavy specialist registry/run-log/grace machinery applies here, so
+ * we use a minimal launcher path instead of the deleted generic
+ * specialist dispatcher.
+ *
+ * Model resolves through resolveModel('work', 'inspect') (or 'inspect-deep'),
+ * so the workhorse cascade and per-sub-role overrides work as designed.
  */
-export async function spawnInspectAgent(context: InspectContext): Promise<{
+export async function spawnInspectAgent(
+  context: InspectContext,
+  opts: { deep?: boolean } = {},
+): Promise<{
   success: boolean;
   runId?: string;
   tmuxSession?: string;
   message: string;
   error?: string;
 }> {
-  // Build the prompt
-  const prompt = await buildInspectPrompt(context);
+  const subRole = opts.deep ? 'inspect-deep' : 'inspect';
+  const issueLower = context.issueId.toLowerCase();
+  const beadSlug = context.beadId.replace(/[^a-z0-9-]/gi, '-').toLowerCase().slice(0, 24);
+  const tmuxSession = `inspect-${issueLower}-${beadSlug}`;
 
-  // Update status to inspecting
-  setReviewStatus(context.issueId.toUpperCase(), {
-    inspectStatus: 'inspecting',
-    inspectNotes: `Inspecting bead ${context.beadId}`,
-  });
+  try {
+    if (await sessionExistsAsync(tmuxSession)) {
+      // Stale session left behind by a previous inspection run — clear it.
+      await killSessionAsync(tmuxSession).catch(() => {});
+    }
 
-  // Spawn the ephemeral specialist
-  return spawnEphemeralSpecialist(context.projectKey, 'inspect-agent' as SpecialistType, {
-    issueId: context.issueId,
-    branch: context.branch,
-    workspace: context.workspace,
-    promptOverride: prompt,
-  });
+    const prompt = await buildInspectPrompt(context);
+    setReviewStatus(context.issueId.toUpperCase(), {
+      inspectStatus: 'inspecting',
+      inspectNotes: `Inspecting bead ${context.beadId}`,
+    });
+
+    // Resolve model via the role primitive: work.<inspect|inspect-deep>.
+    const { config } = loadYamlConfig();
+    const model = resolveModel('work', subRole, config);
+
+    // Provider env (BASE_URL/AUTH_TOKEN) for non-Anthropic models routed via cliproxy.
+    const providerEnv = await getProviderEnvForModel(model);
+    const provider = getProviderForModel(model as ModelId);
+    if (provider.authType === 'credential-file') {
+      setupCredentialFileAuth(provider, context.workspace);
+    } else {
+      clearCredentialFileAuth(context.workspace);
+    }
+
+    // Per-agent dir for prompt + launcher artifacts.
+    const agentDir = join(homedir(), '.panopticon', 'agents', tmuxSession);
+    mkdirSync(agentDir, { recursive: true });
+
+    const promptFile = join(agentDir, 'task-prompt.md');
+    writeFileSync(promptFile, prompt);
+
+    const launcherScript = join(agentDir, 'launcher.sh');
+    const sessionId = randomUUID();
+    writeFileSync(
+      launcherScript,
+      generateLauncherScript({
+        role: 'work',
+        workingDir: context.workspace,
+        setCi: true,
+        setTerminalEnv: true,
+        unsetProviderEnv: true,
+        providerExports: Object.entries(providerEnv)
+          .map(([k, v]) => `export ${k}='${v.replace(/'/g, "'\"'\"'")}'`)
+          .join('\n') + (Object.keys(providerEnv).length ? '\n' : ''),
+        panopticonEnv: {
+          agentId: tmuxSession,
+          issueId: context.issueId,
+          sessionType: subRole,
+        },
+        promptFile,
+        baseCommand: `claude --agent .claude/agents/${subRole}.md`,
+        sessionId,
+        model,
+      }),
+      { mode: 0o755 },
+    );
+
+    const envForTmux: Record<string, string> = {
+      PANOPTICON_AGENT_ID: tmuxSession,
+      PANOPTICON_ISSUE_ID: context.issueId,
+      PANOPTICON_SESSION_TYPE: subRole,
+      ...providerEnv,
+    };
+
+    await createSessionAsync(
+      tmuxSession,
+      context.workspace,
+      `bash '${launcherScript}'`,
+      { env: envForTmux },
+    );
+
+    saveAgentRuntimeState(tmuxSession, {
+      state: 'active',
+      lastActivity: new Date().toISOString(),
+      currentIssue: context.issueId,
+    });
+
+    return {
+      success: true,
+      runId: sessionId,
+      tmuxSession,
+      message: `Spawned ${subRole} for ${context.issueId} bead ${context.beadId}`,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      tmuxSession,
+      message: `Failed to spawn ${subRole}: ${message}`,
+      error: message,
+    };
+  }
 }
 
 /**

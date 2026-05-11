@@ -1,4 +1,3 @@
-import { access, readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import { notifyPipeline } from './pipeline-notifier.js';
@@ -15,6 +14,20 @@ import {
   getReviewStatusFromDbAsync,
 } from './database/review-status-db.js';
 import { normalizeReviewStatus } from './review-status-normalize.js';
+
+async function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): Promise<void> {
+  try {
+    const { initEventStore } = await import('../dashboard/server/event-store.js');
+    const store = await initEventStore();
+    await store.appendAsync({
+      type,
+      timestamp: new Date().toISOString(),
+      payload: { issueId },
+    } as any);
+  } catch (error) {
+    console.warn(`[review-status] Failed to emit ${type} for ${issueId}:`, error);
+  }
+}
 
 export interface StatusHistoryEntry {
   type: 'review' | 'test' | 'merge' | 'inspect' | 'uat';
@@ -196,31 +209,16 @@ export function setReviewStatus(
   }
   while (history.length > 10) history.shift();
 
-  // readyForMerge is true when all required gates pass.
-  // If uatStatus exists (UAT specialist has been involved), it must also be 'passed'.
-  // NOTE: we intentionally do NOT check verificationStatus here. Verification can fail
-  // on pre-existing test breakage or environment issues, but the test specialist's pass
-  // is the authoritative signal. The post-rebase gate in triggerMerge() is the real
-  // quality check. Blocking readyForMerge on a stale verificationStatus causes issues
-  // to get stuck after tests pass (PAN-714).
-  // PAN-905: GitHub-native blockers (failing checks, merge conflicts, etc.) always
-  // override readyForMerge to false, even if the caller explicitly passed true.
+  // PAN-1048: readyForMerge is only set explicitly by the ship role after
+  // rebase/verify/push. Auto-derivation from review+test gate status is removed —
+  // the ship role is the single authority.
+  // PAN-905: GitHub-native blockers always override readyForMerge to false.
   const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
   const readyForMerge = hasBlockers
     ? false
     : (update.readyForMerge !== undefined
         ? update.readyForMerge
-        : (
-            merged.reviewStatus === 'passed' &&
-            merged.testStatus === 'passed' &&
-            merged.mergeStatus !== 'merged' &&
-            // Don't auto-recompute rfm=true when the previous merge attempt failed —
-            // cycling: check-status gate → mergeStatus=failed → deacon restore → rfm=true → retry.
-            // checkFailedMergeRetry() handles transient retries explicitly with readyForMerge: true.
-            merged.mergeStatus !== 'failed' &&
-            // If UAT has been initiated, it must pass too
-            (merged.uatStatus === undefined || merged.uatStatus === 'passed')
-          ));
+        : merged.readyForMerge ?? false);
 
   const updated: ReviewStatus = normalizeReviewStatus({
     ...merged,
@@ -292,7 +290,7 @@ export function setReviewStatus(
       blocked:   { level: 'warn',    msg: `${issueId} — review blocked (changes requested)`, tts: `${issueId} review blocked` },
     };
     const entry = rMap[update.reviewStatus];
-    if (entry) emitActivityEntry({ source: 'review-specialist', level: entry.level, message: entry.msg, details: update.reviewNotes, issueId });
+    if (entry) emitActivityEntry({ source: 'review', level: entry.level, message: entry.msg, details: update.reviewNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.testStatus && update.testStatus !== status.testStatus) {
@@ -304,7 +302,7 @@ export function setReviewStatus(
       dispatch_failed: { level: 'warn',    msg: `${issueId} — test dispatch failed` },
     };
     const entry = tMap[update.testStatus];
-    if (entry) emitActivityEntry({ source: 'test-specialist', level: entry.level, message: entry.msg, details: update.testNotes, issueId });
+    if (entry) emitActivityEntry({ source: 'test', level: entry.level, message: entry.msg, details: update.testNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
@@ -316,7 +314,7 @@ export function setReviewStatus(
       failed:    { level: 'error',   msg: `${issueId} — merge failed`, tts: `${issueId} merge failed` },
     };
     const entry = mMap[update.mergeStatus];
-    if (entry) emitActivityEntry({ source: 'merge-agent', level: entry.level, message: entry.msg, details: update.mergeNotes, issueId });
+    if (entry) emitActivityEntry({ source: 'ship', level: entry.level, message: entry.msg, details: update.mergeNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.readyForMerge === true && !status.readyForMerge) {
@@ -324,15 +322,8 @@ export function setReviewStatus(
     emitActivityTts({ utterance: `${issueId} ready for merge`, priority: 1, issueId });
   }
 
-  // Dispatch test-agent when review transitions to 'passed'.
-  // This fires regardless of how setReviewStatus() is called (API or direct import),
-  // ensuring test-agent is dispatched even when review-agent bypasses the specialist
-  // dispatch endpoint.
-  //
-  // OPTIMIZATION: If reviewedAtCommit matches lastVerifiedCommit, no code changed
-  // between the pre-review verification gate and review completion (review is
-  // read-only). Skip the redundant test-agent and mark tests as passed directly.
-  // The post-rebase verification in triggerMerge() is the real quality gate.
+  // Reactive Cloister owns review→test and test→ship scheduling. setReviewStatus
+  // emits the lifecycle event here so API and direct-import callers share one path.
   if (
     update.reviewStatus === 'passed' &&
     status.reviewStatus !== 'passed' &&
@@ -344,52 +335,17 @@ export function setReviewStatus(
       updated.reviewedAtCommit === updated.lastVerifiedCommit;
 
     if (canSkipTests) {
-      console.log(`[review-status] Skipping test-agent for ${issueId} — no code drift since verification (HEAD=${updated.reviewedAtCommit!.slice(0, 8)})`);
+      console.log(`[review-status] Skipping test role for ${issueId} — no code drift since verification (HEAD=${updated.reviewedAtCommit!.slice(0, 8)})`);
       emitActivityEntry({ source: 'cloister', level: 'info', message: `${issueId} — tests skipped (no code change since verification gate)`, issueId });
-      setReviewStatus(issueId, { testStatus: 'passed', testNotes: 'Skipped: no code changed since pre-review verification gate', readyForMerge: true });
+      setReviewStatus(issueId, { testStatus: 'passed', testNotes: 'Skipped: no code changed since pre-review verification gate' });
+      void emitReactiveLifecycleEvent('test.passed', issueId);
     } else {
-      (async () => {
-        try {
-          const { spawnEphemeralSpecialist } = await import('./cloister/specialists.js');
-          const { resolveProjectFromIssue } = await import('./projects.js');
-          const workAgentId = `agent-${issueId.toLowerCase()}`;
-          const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
-          let workspace: string | undefined;
-          let branch: string | undefined;
-          try {
-            await access(workStateFile);
-            const workState = JSON.parse(await readFile(workStateFile, 'utf-8'));
-            workspace = workState.workspace;
-            branch = workState.branch || `feature/${issueId.toLowerCase()}`;
-          } catch {}
-
-          const resolved = resolveProjectFromIssue(issueId);
-          if (!resolved) {
-            console.warn(`[review-status] No project configured for ${issueId} — cannot dispatch test-agent`);
-            setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: `No project configured for ${issueId}` });
-            return;
-          }
-          const reason = updated.reviewedAtCommit && updated.lastVerifiedCommit
-            ? `code drift detected (verified=${updated.lastVerifiedCommit.slice(0, 8)}, reviewed=${updated.reviewedAtCommit.slice(0, 8)})`
-            : 'no verification snapshot available';
-          console.log(`[review-status] Dispatching test-agent for ${issueId} — ${reason}`);
-          const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
-            issueId,
-            workspace,
-            branch,
-          });
-          if (result.success) {
-            setReviewStatus(issueId, { testStatus: 'testing' });
-            emitActivityEntry({ source: 'cloister', level: 'info', message: `${issueId} — test-agent dispatched (${reason})`, issueId });
-          } else {
-            console.warn(`[review-status] Failed to dispatch test-agent for ${issueId}: ${result.message}`);
-            setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: `Dispatch failed: ${result.message}` });
-          }
-        } catch (err: any) {
-          console.warn(`[review-status] Failed to dispatch test-agent for ${issueId}: ${err.message}`);
-        }
-      })();
+      void emitReactiveLifecycleEvent('review.approved', issueId);
     }
+  }
+
+  if (update.testStatus === 'passed' && status.testStatus !== 'passed') {
+    void emitReactiveLifecycleEvent('test.passed', issueId);
   }
 
   return updated;

@@ -440,7 +440,8 @@ const postValidateApiKeyRoute = HttpRouter.add(
 
         case 'google': {
           try {
-            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
+            const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview' + ':generateContent';
+            const resp = await fetch(`${endpoint}?key=${apiKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ contents: [{ parts: [{ text: 'test' }] }] }),

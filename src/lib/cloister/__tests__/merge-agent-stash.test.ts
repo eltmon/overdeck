@@ -8,16 +8,20 @@ vi.mock('child_process', async (importOriginal) => {
 });
 
 vi.mock('../specialists.js', () => ({
-  getSessionId: vi.fn(),
-  recordWake: vi.fn(),
+  // PAN-1048 R1: spawnEphemeralSpecialist is gone; merge-agent now spawns
+  // the ship role via spawnRun. The mock keeps only the still-used helpers.
   getTmuxSessionName: vi.fn(() => 'merge-session'),
-  wakeSpecialist: vi.fn(async () => ({ success: true })),
-  spawnEphemeralSpecialist: vi.fn(async () => ({ success: true })),
   isRunning: vi.fn(async () => true),
+  REVIEWER_ROLES: ['security', 'correctness', 'performance', 'requirements'],
 }));
+vi.mock('../review-agent.js', () => ({ killAllReviewerSessions: vi.fn(async () => ({ killed: [] })) }));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitActivityTts: vi.fn(), emitDashboardLifecycle: vi.fn() }));
 vi.mock('../../tmux.js', () => ({ capturePaneAsync: vi.fn(async () => ''), listSessionNamesAsync: vi.fn(async () => []), sendKeysAsync: vi.fn(async () => {}), sessionExists: vi.fn(() => false), sessionExistsAsync: vi.fn(async () => false), killSession: vi.fn() }));
-vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon' })), loadProjectsConfig: vi.fn(() => ({ projects: {} })) }));
+vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/tmp/workspace' })), loadProjectsConfig: vi.fn(() => ({ projects: {} })) }));
+vi.mock('../../agents.js', () => ({
+  spawnRun: vi.fn(async () => ({ id: 'agent-pan-1-ship' })),
+  getAgentState: vi.fn(() => null),
+}));
 vi.mock('../validation.js', () => ({
   runMergeValidation: vi.fn(async () => ({ valid: true, skipped: true })),
   autoRevertMerge: vi.fn(async () => true),
@@ -44,11 +48,10 @@ vi.mock('fs/promises', async (importOriginal) => {
 });
 
 import { postMergeLifecycle, spawnMergeAgentForBranches } from '../merge-agent.js';
-import { createNamedStash, dropStash, popStash, listStashes } from '../../stashes.js';
-import { runMergeValidation, autoRevertMerge, runQualityGates } from '../validation.js';
-import { loadProjectsConfig } from '../../projects.js';
+import { dropStash, listStashes } from '../../stashes.js';
+import { spawnRun } from '../../agents.js';
 
-describe('merge-agent pre-merge stash lifecycle', () => {
+describe('merge-agent ship role and stash lifecycle', () => {
   let setTimeoutSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
@@ -79,38 +82,35 @@ describe('merge-agent pre-merge stash lifecycle', () => {
     setTimeoutSpy.mockRestore();
   });
 
-  it('creates and drops pre-merge stash on successful completion', async () => {
+  it('starts the ship role for branch preparation without merging or stashing', async () => {
     const result = await spawnMergeAgentForBranches('/tmp/workspace', 'feature/pan-1', 'main', 'PAN-1', { skipDoneReport: true });
 
     expect(result.success).toBe(true);
-    expect(createNamedStash).toHaveBeenCalledWith('/tmp/workspace', 'pre-merge:PAN-1:2026-04-27T14:15:16Z', true);
-    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
-    expect(popStash).not.toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
+    expect(result.reason).toBe('ship role started as agent-pan-1-ship');
+    expect(spawnRun).toHaveBeenCalledWith('PAN-1', 'ship', expect.objectContaining({
+      workspace: '/tmp/workspace/workspaces/feature-pan-1',
+      prompt: expect.stringContaining('Prepare this already-reviewed branch for the dashboard\'s human Merge button'),
+    }));
+    const prompt = vi.mocked(spawnRun).mock.calls[0]?.[2]?.prompt as string;
+    expect(prompt).toContain('curl -s -X POST');
+    expect(prompt).toContain('/api/review/PAN-1/status');
+    expect(prompt).toContain('"readyForMerge":true');
+    expect(prompt).toContain('Do NOT run gh pr merge');
+    expect(dropStash).not.toHaveBeenCalled();
   });
 
-  it('drops pre-merge stash after quality-gate rollback', async () => {
-    vi.mocked(runMergeValidation).mockResolvedValueOnce({ valid: true, skipped: true });
-    vi.mocked(loadProjectsConfig).mockReturnValueOnce({
-      projects: {
-        panopticon: {
-          name: 'Panopticon',
-          path: '/tmp/workspace',
-          quality_gates: {
-            lint: { command: 'npm run lint', phase: 'pre_push', required: true },
-          },
-        },
-      },
-    } as any);
-    vi.mocked(runQualityGates).mockResolvedValueOnce([
-      { name: 'lint', passed: false, required: true, output: 'fail', durationMs: 1, error: 'lint failed' },
-    ]);
+  it('does not start the ship role when the source branch is missing on the remote', async () => {
+    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
+      const callback = (typeof _opts === 'function' ? _opts : cb)!;
+      if (cmd.startsWith('git ls-remote --heads origin feature/pan-1')) return callback(null, { stdout: '', stderr: '' });
+      callback(null, { stdout: '', stderr: '' });
+    });
 
     const result = await spawnMergeAgentForBranches('/tmp/workspace', 'feature/pan-1', 'main', 'PAN-1', { skipDoneReport: true });
 
     expect(result.success).toBe(false);
-    expect(autoRevertMerge).toHaveBeenCalledWith('/tmp/workspace');
-    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
-    expect(popStash).not.toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
+    expect(result.reason).toContain('Branch feature/pan-1 is not pushed to remote');
+    expect(spawnRun).not.toHaveBeenCalled();
   });
 
   it('drops lingering pre-merge stashes during post-merge lifecycle', async () => {

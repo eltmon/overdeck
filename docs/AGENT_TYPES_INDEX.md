@@ -1,108 +1,91 @@
 # Agent Types Index
 
-High-level map of the kinds of agents and routed jobs you will encounter in Panopticon.
+High-level map of the roles, sub-roles, and helper agents you will encounter in Panopticon.
 
 This document is for someone who is new to Panopticon and wants to understand:
-- what kinds of agents exist,
-- what role each one plays,
-- when each one shows up in the workflow,
-- and what kind of instructions it runs on.
+- which lifecycle roles exist,
+- what each role does,
+- when each role shows up in the workflow,
+- and which instruction source it runs on.
 
 If you want implementation details, routing settings, or workflow internals, use the related docs linked at the end.
 
 ## The big picture
 
-Panopticon has a few different layers of "agent types," and they are easy to mix up if everything is listed in one flat table.
+Panopticon no longer models the issue pipeline as a flat collection of named agent types. The runtime primitive is the issue-scoped role:
 
-- **Primary agents** do the main planning and implementation work.
-- **Specialist agents** validate work at important checkpoints.
-- **Convoy reviewers** are parallel review lenses, not the main workflow engine.
-- **Subagents** are short-lived helpers for focused tasks.
-- **Workflow jobs and CLI contexts** are routable slots used by the system, but they are not standalone Panopticon runtime agents in the same sense as the planning, work, or specialist agents.
+```ts
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship'
+```
 
-## Runtime agent inventory
+There are three layers to keep distinct:
 
-These are the agent types a new Panopticon user is most likely to care about first.
+- **Lifecycle roles** advance issue state and own pipeline transitions.
+- **Sub-roles** are model/configuration slots inside a lifecycle role.
+- **Claude Code subagents** are short-lived helpers launched from inside a role session.
 
-| Type | Category | Status | When it runs | Instruction basis |
-|---|---|---|---|---|
-| `planning-agent` | primary | Active | Runs when Panopticon is turning an issue or request into an execution plan | Uses planning instructions, project context, and planning artifacts to produce a vBRIEF-backed plan |
-| `work-agent` | primary | Active | Runs when actual issue work begins and code needs to be implemented | Uses the main work prompt plus the current phase context, issue context, and workspace state |
-| `inspect-agent` | specialist | Active | Runs during implementation **only on beads flagged `metadata.requiresInspection: true`** in the vBRIEF — Jidoka gate for foundational beads (PAN-382, revised 2026-05-08) | Uses per-bead inspection instructions focused on spec fidelity, constraints, and quick verification |
-| `review-agent` | specialist | Active | Runs after implementation is submitted for review | Uses review instructions focused on code quality, correctness, security, and change coverage |
-| `test-agent` | specialist | Active | Runs after review approval to verify the work through tests | Uses test-focused instructions for running checks, interpreting failures, and reporting test status |
-| `uat-agent` | specialist | Active | Runs after tests pass when Panopticon wants real-browser validation | Uses browser/UAT instructions for requirement verification, visual checks, auth flows, and real-user behavior |
-| `merge-agent` | specialist | Active | Runs at the end of the pipeline when work is ready for merge preparation and completion steps | Uses merge-focused instructions for final validation, merge prep, and post-merge lifecycle work |
+## Runtime role inventory
 
-## What each category is for
+These are the roles a new Panopticon user is most likely to care about first.
 
-### Primary agents
+| Role | Status | When it runs | Instruction basis |
+|---|---|---|---|
+| `plan` | Active | Turns an issue or request into an execution plan | `roles/plan.md` plus the planning template in `src/lib/cloister/prompts/planning.md` |
+| `work` | Active | Implements beads in the issue workspace | `roles/work.md`, `.pan/continue.json`, and the active vBRIEF |
+| `review` | Active | Reviews the completed branch and decides approve vs changes requested | `roles/review.md` plus review convoy subagents |
+| `test` | Active | Runs automated checks and required browser UAT | `roles/test.md` |
+| `ship` | Active | Rebases, verifies, and pushes approved work for human merge | `roles/ship.md` |
 
-These are the main workers in the system.
+## Sub-roles
 
-- **planning-agent** decides what should be done and how the work should be broken down.
-- **work-agent** does the actual implementation work once planning is complete.
+Sub-roles are not standalone Panopticon pipeline stages. They are model and instruction slots that a parent role may invoke.
 
-If you are trying to understand the normal day-to-day Panopticon workflow, start here.
+| Sub-role | Parent role | Purpose |
+|---|---|---|
+| `work.inspect` | `work` | Per-bead spec verification for beads flagged `metadata.requiresInspection: true` |
+| `work.inspect-deep` | `work` | Stronger inspection path for high-risk beads |
+| `review.security` | `review` | Security-focused review lens |
+| `review.correctness` | `review` | Correctness and edge-case review lens |
+| `review.performance` | `review` | Performance and scalability review lens |
+| `review.requirements` | `review` | Acceptance-criteria and vBRIEF fulfillment review lens |
 
-### Specialist agents
-
-These are quality gates and validation stages around the main implementation flow.
-
-- **inspect-agent** checks work incrementally during implementation — but only on the foundational beads the planning agent flagged with `metadata.requiresInspection: true`. Mechanical beads skip this gate.
-- **review-agent** performs a dedicated review pass.
-- **test-agent** verifies the work through automated checks.
-- **uat-agent** validates the result in a real browser from a user perspective.
-- **merge-agent** handles the final merge-stage responsibilities.
-
-A useful mental model is: the work agent builds, and the specialists decide whether that work is actually ready to move forward.
-
-### Support and routing-only types
-
-Panopticon also has other routed job types that matter for configuration and model selection, but are easier to misunderstand if they are treated as full runtime agent types.
-
-- **Convoy reviewers** are parallel review lenses such as security, performance, correctness, and requirements review.
-- **Subagents** are helper jobs used for focused side tasks such as exploration, planning assistance, or shell-heavy work.
-- **Workflow jobs** like `status-review` are system jobs with their own model slot, not a main Panopticon runtime agent you directly think of as part of the agent roster.
-- **CLI contexts** like `cli:interactive` and `cli:quick-command` describe direct user interaction modes, not autonomous workflow agents.
+A useful mental model is: lifecycle roles move the issue forward; sub-roles help one lifecycle role do its job.
 
 ## Typical workflow
 
 A newcomer-friendly way to think about the normal flow is:
 
-1. **planning-agent** turns the issue into a plan.
-2. **work-agent** implements the planned work.
-3. **inspect-agent** verifies progress on flagged beads during implementation (only beads with `metadata.requiresInspection: true`).
-4. **review-agent** performs a dedicated review pass.
-5. **test-agent** verifies the work through tests.
-6. **uat-agent** checks the result in a real browser.
-7. **merge-agent** handles the final merge-stage checks and completion work.
+1. **`plan`** turns the issue into a vBRIEF plan and beads.
+2. **`work`** implements the planned beads.
+3. **`work.inspect` / `work.inspect-deep`** verify flagged beads during implementation.
+4. **`review`** performs code review and synthesizes the convoy findings.
+5. **`test`** runs project verification and any required browser UAT.
+6. **`ship`** prepares the branch for human merge.
 
-Not every project or run will emphasize every stage equally, but this is the core mental model.
+Not every project or run will emphasize every sub-role equally, but the five lifecycle roles are the core mental model.
 
-## Important distinction: runtime agents vs routed work types
+## Important distinction: roles vs helper subagents
 
-Some names you will see in settings are not part of the main runtime agent roster.
+Some names you will see in settings or `.claude/agents/` are not lifecycle roles.
 
 Examples:
-- `status-review`
 - `review:security`
 - `review:requirements`
 - `subagent:explore`
 - `cli:interactive`
 
-These are still real and important, but they are better understood as **routed job types or contexts** than as the primary Panopticon agents a newcomer should picture first.
+These are real and important, but they are better understood as **role-internal helpers or routed contexts** than as the primary Panopticon roles a newcomer should picture first.
 
 ## Where model selection fits
 
 Model choice is configured separately from this document.
 
-Panopticon uses work types and settings to decide which model should handle each kind of job. That is an important system concept, but it is separate from the question of **what each agent type is for**.
+Panopticon uses three workhorse model slots (`expensive`, `mid`, `cheap`) plus per-role and per-sub-role overrides. Role launch resolves the final model at spawn time, so changing a workhorse slot changes every role that references it.
 
 If you want to tune or override models, use the routing/configuration docs rather than this page.
 
 ## Related docs
 
-- [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) — deeper explanation of how specialist stages work together
-- [WORK-TYPES.md](./WORK-TYPES.md) — model-routing slots, overrides, and what each routed work type controls
+- [HARNESSES.md](./HARNESSES.md) — harness selection and ToS rules
 - [CONFIGURATION.md](./CONFIGURATION.md) — provider setup, overrides, and routing behavior
+- [KANBAN-MODEL.md](./KANBAN-MODEL.md) — issue lifecycle states and dashboard columns

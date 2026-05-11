@@ -33,7 +33,6 @@ vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitAct
 vi.mock('../../config.js', () => ({ loadConfig: vi.fn(() => ({ trackers: { primary: 'linear', linear: { type: 'linear', api_key_env: 'LINEAR_API_KEY' } } })) }));
 vi.mock('../../tracker/factory.js', () => ({ createTracker: vi.fn() }));
 vi.mock('../specialists.js', () => ({
-  SpecialistType: {},
   getTmuxSessionName: vi.fn((t: string) => `specialist-${t}`),
   isRunning: vi.fn(async () => false),
   getAllProjectSpecialistStatuses: vi.fn(async () => []),

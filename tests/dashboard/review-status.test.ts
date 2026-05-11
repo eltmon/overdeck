@@ -125,10 +125,11 @@ describe('setReviewStatus', () => {
     expect(result.history![3]).toMatchObject({ type: 'test', status: 'passed' });
   });
 
-  it('computes readyForMerge correctly', () => {
+  it('does not auto-derive readyForMerge from review+test pass (PAN-1048: ship role is the gate)', () => {
     setReviewStatus('PAN-109', { reviewStatus: 'passed' }, statusFile);
     const result = setReviewStatus('PAN-109', { testStatus: 'passed' }, statusFile);
-    expect(result.readyForMerge).toBe(true);
+    // readyForMerge stays false until the ship role explicitly sets it
+    expect(result.readyForMerge).toBe(false);
   });
 
   it('readyForMerge is false when test fails', () => {
@@ -174,16 +175,14 @@ describe('setReviewStatus', () => {
     expect(result.readyForMerge).toBe(true);
   });
 
-  it('does not block readyForMerge when verification is pending (not yet run)', () => {
-    // 'pending' means "not yet run this cycle" — not a failure.
-    // Only 'failed' blocks readyForMerge. This matches verificationSatisfied() in review-status.ts.
+  it('does not auto-derive readyForMerge when verification is pending (PAN-1048: ship role sets it)', () => {
     const result = setReviewStatus('PAN-113b', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       verificationStatus: 'pending',
     }, statusFile);
 
-    expect(result.readyForMerge).toBe(true);
+    expect(result.readyForMerge).toBe(false);
   });
 
   it('blocks readyForMerge when blockerReasons is non-empty (PAN-905)', () => {
@@ -197,14 +196,16 @@ describe('setReviewStatus', () => {
     expect(result.readyForMerge).toBe(false);
   });
 
-  it('allows readyForMerge when blockerReasons is empty (PAN-905)', () => {
+  it('does not auto-derive readyForMerge when blockerReasons is empty (PAN-1048: ship role sets it)', () => {
+    // Without an explicit readyForMerge:true, the ship-role invariant holds: blockers=[] alone
+    // does not flip the flag. Passing readyForMerge:true explicitly still works (PAN-905 guard).
     const result = setReviewStatus('PAN-115', {
       reviewStatus: 'passed',
       testStatus: 'passed',
       blockerReasons: [],
     }, statusFile);
 
-    expect(result.readyForMerge).toBe(true);
+    expect(result.readyForMerge).toBe(false);
   });
 
   it('round-trips blockerReasons through getReviewStatus (PAN-905)', () => {
@@ -246,7 +247,7 @@ describe('clearReviewStatus', () => {
 
 describe('stale branch auto-pass', () => {
   it('sets reviewStatus to passed with stale branch notes', () => {
-    // Simulates what the stale branch pre-check in wakeSpecialistWithTask does
+    // Simulates what the stale branch pre-check records when review is a no-op
     const result = setReviewStatus('PAN-STALE', {
       reviewStatus: 'passed',
       reviewNotes: 'No changes to review — branch identical to main (already merged or stale)',

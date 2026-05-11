@@ -526,7 +526,7 @@ export default function App() {
   // Toast notification when a planning agent needs user input
   useEffect(() => {
     const planningAgentsNeedingInput = agents.filter(
-      (a) => a.agentPhase === 'planning' && a.hasPendingQuestion && a.status !== 'stopped'
+      (a) => a.role === 'plan' && a.hasPendingQuestion && a.status !== 'stopped'
     );
 
     for (const agent of planningAgentsNeedingInput) {

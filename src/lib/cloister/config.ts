@@ -284,8 +284,8 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
       expert: 'opus',
     },
     specialist_models: {
-      // PAN-754: no hardcoded defaults. User config.yaml overrides are authoritative.
-      // Resolution falls through to work-type-router, then to the global fallback model.
+      // PAN-754: no hardcoded defaults. User config.yaml role settings are authoritative.
+      // Resolution falls through to role model config, then to the global fallback model.
     },
     specialist_harnesses: {
       // PAN-636: every role defaults to 'claude-code' when not overridden in

@@ -283,9 +283,9 @@ describe('router-config', () => {
 
       const config = generateRouterConfig(settings);
 
-      expect(config.router['specialist-review-agent'].model).toBe('claude-sonnet-4-5');
-      expect(config.router['specialist-test-agent'].model).toBe('gpt-4o-mini');
-      expect(config.router['specialist-merge-agent'].model).toBe('gemini-3-flash-preview');
+      expect(config.router['role:review'].model).toBe('claude-sonnet-4-5');
+      expect(config.router['role:test'].model).toBe('gpt-4o-mini');
+      expect(config.router['role:ship'].model).toBe('gemini-3-flash-preview');
     });
 
     it('should map complexity levels to configured models', async () => {
@@ -313,11 +313,8 @@ describe('router-config', () => {
 
       const config = generateRouterConfig(settings);
 
-      expect(config.router['complexity-trivial'].model).toBe('gpt-4o-mini');
-      expect(config.router['complexity-simple'].model).toBe('claude-haiku-4-5');
-      expect(config.router['complexity-medium'].model).toBe('gpt-4o');
-      expect(config.router['complexity-complex'].model).toBe('claude-sonnet-4-5');
-      expect(config.router['complexity-expert'].model).toBe('gpt-5.3-codex');
+      expect(config.router['role:work'].model).toBe('gpt-4o');
+      expect(config.router['role:plan'].model).toBe('claude-sonnet-4-5');
     });
 
     it('should create all router rules', async () => {
@@ -343,16 +340,13 @@ describe('router-config', () => {
 
       const config = generateRouterConfig(settings);
 
-      // Should have 3 specialists + 5 complexity = 8 rules (planning removed)
-      expect(Object.keys(config.router)).toHaveLength(8);
-      expect(config.router).toHaveProperty('specialist-review-agent');
-      expect(config.router).toHaveProperty('specialist-test-agent');
-      expect(config.router).toHaveProperty('specialist-merge-agent');
-      expect(config.router).toHaveProperty('complexity-trivial');
-      expect(config.router).toHaveProperty('complexity-simple');
-      expect(config.router).toHaveProperty('complexity-medium');
-      expect(config.router).toHaveProperty('complexity-complex');
-      expect(config.router).toHaveProperty('complexity-expert');
+      // Legacy SettingsConfig maps to the five role router keys.
+      expect(Object.keys(config.router)).toHaveLength(5);
+      expect(config.router).toHaveProperty('role:plan');
+      expect(config.router).toHaveProperty('role:work');
+      expect(config.router).toHaveProperty('role:review');
+      expect(config.router).toHaveProperty('role:test');
+      expect(config.router).toHaveProperty('role:ship');
     });
   });
 

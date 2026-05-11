@@ -14,7 +14,6 @@ import type {
   DomainEvent,
   ResourceStats,
   ReviewStatusSnapshot,
-  SpecialistSnapshot,
 } from '@panctl/contracts'
 import {
   type ReadModelState,
@@ -114,10 +113,14 @@ export const selectAgentById =
   (s: DashboardState): AgentSnapshot | undefined =>
     s.agentsById[id]
 
-export const selectSpecialistList = memoizeArraySelector<DashboardState, 'specialistsByName', SpecialistSnapshot[]>(
-  'specialistsByName',
-  (specs) => Object.values(specs),
-)
+/**
+ * PAN-1048 — selectSpecialistList retired. Consumers derive role-based lists
+ * from `selectAgentList` filtered by `agent.role` (review / test / ship).
+ */
+export const selectAgentsByRole =
+  (role: 'review' | 'test' | 'ship' | 'work' | 'plan') =>
+  (s: DashboardState): AgentSnapshot[] =>
+    Object.values(s.agentsById).filter((a) => a.role === role)
 
 export const selectReviewStatus =
   (issueId: string) =>

@@ -317,7 +317,7 @@ export class PiRuntime implements AgentRuntime {
     }
 
     const launcherScript = generateLauncherScript({
-      agentType: 'work',
+      role: 'work',
       workingDir: config.workspace,
       harness: 'pi',
       piExtensionPath,

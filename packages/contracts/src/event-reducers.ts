@@ -17,7 +17,6 @@ import type {
   DomainEvent,
   ResourceStats,
   ReviewStatusSnapshot,
-  SpecialistSnapshot,
   TurnDiffSummary,
 } from './index'
 
@@ -26,7 +25,7 @@ import type {
 export interface ResolvedChannelPermissionDecision {
   requestId: string
   agentId: string
-  issueId: string
+  issueId?: string
   behavior: 'allow' | 'deny'
 }
 
@@ -39,7 +38,6 @@ export interface ReadModelState {
    * would cause the whole AgentSnapshot to re-diff on the frontend.
    */
   agentRuntimeById: Record<string, AgentRuntimeSnapshot>
-  specialistsByName: Record<string, SpecialistSnapshot>
   reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>
   resources: ResourceStats | null
   agentOutputById: Record<string, string[]>
@@ -75,7 +73,6 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   sequence: 0,
   agentsById: {},
   agentRuntimeById: {},
-  specialistsByName: {},
   reviewStatusByIssueId: {},
   resources: null,
   agentOutputById: {},
@@ -169,11 +166,6 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     agentsById[agent.id] = agent
   }
 
-  const specialistsByName: Record<string, SpecialistSnapshot> = {}
-  for (const spec of snapshot.specialists) {
-    specialistsByName[spec.name] = spec
-  }
-
   const reviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {}
   for (const rs of snapshot.reviewStatuses) {
     reviewStatusByIssueId[rs.issueId] = rs
@@ -191,7 +183,6 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     ...state,
     sequence: snapshot.sequence,
     agentsById,
-    specialistsByName,
     reviewStatusByIssueId,
     agentRuntimeById: snapshot.agentRuntimeById ?? state.agentRuntimeById,
     channelPermissionRequestsById,
@@ -241,7 +232,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           ...state.agentsById,
           [event.payload.agentId]: {
             ...agent,
-            agentPhase: event.payload.agentPhase,
+            role: event.payload.role ?? agent.role,
             hasPendingQuestion: event.payload.hasPendingQuestion,
             pendingQuestionCount: event.payload.pendingQuestionCount,
             pendingQuestionPrompt: event.payload.pendingQuestionPrompt,
@@ -418,41 +409,14 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'merge.ready':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
+    // PAN-1048 — specialist.* events still flow but no longer feed a separate
+    // projection. The same lifecycle is now visible via agent.started /
+    // agent.stopped + role-filtered agentsById. Sequence-only update keeps
+    // clients in lockstep.
     case 'specialist.started':
-      return {
-        ...state,
-        sequence: Math.max(state.sequence, event.sequence),
-        specialistsByName: {
-          ...state.specialistsByName,
-          [event.payload.specialist.name]: event.payload.specialist,
-        },
-      }
-
-    case 'specialist.completed': {
-      const spec = state.specialistsByName[event.payload.name]
-      if (!spec) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
-      return {
-        ...state,
-        sequence: Math.max(state.sequence, event.sequence),
-        specialistsByName: {
-          ...state.specialistsByName,
-          [event.payload.name]: { ...spec, state: 'sleeping', isRunning: false, currentIssue: undefined },
-        },
-      }
-    }
-
-    case 'specialist.failed': {
-      const spec = state.specialistsByName[event.payload.name]
-      if (!spec) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
-      return {
-        ...state,
-        sequence: Math.max(state.sequence, event.sequence),
-        specialistsByName: {
-          ...state.specialistsByName,
-          [event.payload.name]: { ...spec, state: 'sleeping', isRunning: false },
-        },
-      }
-    }
+    case 'specialist.completed':
+    case 'specialist.failed':
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
     case 'resources.updated':
       return {
@@ -521,7 +485,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               status: 'running',
               startedAt: event.timestamp,
               runtime: 'claude-code',
-              agentPhase: 'planning' as const,
+              role: 'plan' as const,
             },
           },
         }

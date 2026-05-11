@@ -18,17 +18,11 @@ export type SequenceNumber = typeof SequenceNumber.Type
 export const AgentStatus = Schema.Literals(["starting", "running", "stopped", "error", "unknown"])
 export type AgentStatus = typeof AgentStatus.Type
 
-export const AgentPhase = Schema.Literals(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push", "review", "review-response", "merge"])
-export type AgentPhase = typeof AgentPhase.Type
+export const Role = Schema.Literals(["plan", "work", "review", "test", "ship"])
+export type Role = typeof Role.Type
 
 export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"])
 export type AgentResolution = typeof AgentResolution.Type
-
-export const SpecialistType = Schema.Literals(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"])
-export type SpecialistType = typeof SpecialistType.Type
-
-export const SpecialistState = Schema.Literals(["active", "sleeping", "uninitialized"])
-export type SpecialistState = typeof SpecialistState.Type
 
 export const ReviewStatusValue = Schema.Literals(["pending", "reviewing", "passed", "failed", "blocked"])
 export type ReviewStatusValue = typeof ReviewStatusValue.Type
@@ -274,10 +268,9 @@ export const AgentSnapshot = Schema.Struct({
   branch: Schema.optional(Schema.String),
   costSoFar: Schema.optional(Schema.Number),
   sessionId: Schema.optional(Schema.String),
-  phase: Schema.optional(AgentPhase),
+  role: Schema.optional(Role),
   runtimeState: Schema.optional(Schema.String),
   // Enrichment fields (PAN-440)
-  agentPhase: Schema.optional(AgentPhase),
   hasPendingQuestion: Schema.optional(Schema.Boolean),
   pendingQuestionCount: Schema.optional(Schema.Number),
   pendingQuestionPrompt: Schema.optional(Schema.String),
@@ -289,17 +282,6 @@ export const AgentSnapshot = Schema.Struct({
   runtimeSnapshotSequence: Schema.optional(SequenceNumber),
 })
 export type AgentSnapshot = typeof AgentSnapshot.Type
-
-// ─── Specialist ───────────────────────────────────────────────────────────────
-
-export const SpecialistSnapshot = Schema.Struct({
-  name: SpecialistType,
-  state: SpecialistState,
-  isRunning: Schema.Boolean,
-  currentIssue: Schema.optional(Schema.String),
-  lastWake: Schema.optional(Schema.String),
-})
-export type SpecialistSnapshot = typeof SpecialistSnapshot.Type
 
 // ─── Review / Pipeline ────────────────────────────────────────────────────────
 
@@ -389,7 +371,7 @@ export type TurnDiffSummary = typeof TurnDiffSummary.Type
 export const DashboardSnapshot = Schema.Struct({
   sequence: SequenceNumber,
   agents: Schema.Array(AgentSnapshot),
-  specialists: Schema.Array(SpecialistSnapshot),
+  specialists: Schema.Array(Schema.Unknown),
   reviewStatuses: Schema.Array(ReviewStatusSnapshot),
   issues: Schema.Array(Schema.Unknown),  // Issues are complex — pass through unvalidated
   resources: Schema.optional(Schema.Unknown),

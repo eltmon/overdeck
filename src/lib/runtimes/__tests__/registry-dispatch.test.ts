@@ -54,7 +54,7 @@ function writeAgentState(agentId: string, fields: Record<string, unknown>): void
       id: agentId,
       issueId: 'PAN-X',
       workspace: '/tmp',
-      runtime: 'claude',
+      role: 'work',
       model: 'sonnet',
       status: 'running',
       startedAt: new Date().toISOString(),

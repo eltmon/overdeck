@@ -14,7 +14,7 @@ Panopticon supports two **coding-agent harnesses** — the underlying CLI that d
 ### Claude Code (default)
 - Shipped by Anthropic; Panopticon installs no special integration — drop in `claude` and run.
 - Works with both subscription auth (Claude Code OAuth) and API-key auth.
-- All specialists (review/test/merge/inspect/uat) default here.
+- All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
 
 ### Pi (alternative)
 - Adds RPC mode (`pi --mode rpc`) so Panopticon can write structured commands to Pi's stdin via a named pipe (`mkfifo` at `~/.panopticon/agents/<agentId>/rpc.in`).
@@ -61,8 +61,8 @@ The harness is chosen **per spawn** at four user-initiated surfaces:
 
 There is **no per-issue lock** — an issue planned with Pi can have a Claude Code review agent on the same PR, and vice versa.
 
-### Specialists (review / test / merge / inspect / uat)
-Pipeline-spawned specialists do **not** prompt at runtime. They read per-role harness + model defaults from the dashboard Settings page. Add a `harness` selector next to each role's existing model dropdown to mix and match. The config persists in `cloister.toml` under `model_selection.specialist_harnesses`.
+### Role runs (plan / work / review / test / ship)
+Pipeline-spawned roles do **not** prompt at runtime. They read per-role harness + model defaults from the dashboard Settings page. Add a `harness` selector next to each role's model dropdown to mix and match. Sub-roles such as `work.inspect` and `review.security` inherit from the parent role unless configured more specifically.
 
 ---
 
@@ -82,7 +82,7 @@ This is required by the Claude Code subscription terms — only the `claude-code
 | pi | Anthropic | subscription | 🚫 |
 | pi | Anthropic | unset (no Anthropic auth) | ✅ |
 
-The gate is evaluated at every spawn entry point and at every picker UI so a stale Settings selection cannot bypass it. When the pipeline routes a specialist into the blocked cell, it falls back to `claude-code` and emits a `console.warn` rather than failing the whole pipeline.
+The gate is evaluated at every spawn entry point and at every picker UI so a stale Settings selection cannot bypass it. When the pipeline routes a role run into the blocked cell, it falls back to `claude-code` and emits a `console.warn` rather than failing the whole pipeline.
 
 ### Auth mode is exclusive
 Anthropic auth is exclusively subscription **or** API key, never both. If you log into the Claude Code subscription, Panopticon ignores any `ANTHROPIC_API_KEY` in the environment. This is existing behavior reaffirmed for Pi — set one or the other, not both.
@@ -122,9 +122,9 @@ The downside: a reader-less fifo throws `ENXIO` immediately, so `writePiCommand`
 Both Pi (with native multi-provider routing) and Claude Code (via the CLIProxy auth shim) can drive non-Anthropic models. Pi gives you provider routing without an extra middleware process; CLIProxy gives you Claude Code's tooling/UX with non-Anthropic providers. Pick by which UX you want — there is no correctness difference today.
 
 ### When to pick which
-- **Default to `claude-code`** for Anthropic-subscription users and for any specialist where the existing prompts are tuned to Claude Code behavior.
+- **Default to `claude-code`** for Anthropic-subscription users and for roles whose instructions rely on Claude Code agent definitions.
 - **Switch to `pi`** when you need a non-Anthropic provider, when you want Pi's compact-context behavior, or when you're driving a long-running session where the named-pipe RPC is materially faster than paste-buffer delivery.
-- **Mix per-specialist** in Settings if you want, e.g., a Pi work agent feeding Claude Code review.
+- **Mix per role** in Settings if you want, e.g., a Pi work role feeding a Claude Code review role.
 
 ---
 

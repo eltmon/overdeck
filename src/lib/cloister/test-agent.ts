@@ -1,8 +1,8 @@
 /**
  * Test command detection for the test-agent specialist.
  *
- * The actual test-agent spawning path lives in the specialist dispatch
- * system (see specialists.ts / wakeSpecialistWithTask). This module only
+ * The actual test-agent spawning path lives in the role runner / ephemeral
+ * specialist bridge. This module only
  * exposes `detectTestCommand`, which inspects a project's build files to
  * pick a sane default test command when one isn't configured in
  * cloister.toml.

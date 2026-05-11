@@ -11,7 +11,6 @@ import { homedir } from 'os';
 import yaml from 'js-yaml';
 import { loadSettings, type SettingsConfig } from './settings.js';
 import { type YamlConfig } from './config-yaml.js';
-import { type WorkTypeId } from './work-types.js';
 import { type ModelId } from './settings.js';
 
 /** Path to legacy settings file */

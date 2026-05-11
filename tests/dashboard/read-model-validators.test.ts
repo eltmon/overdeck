@@ -10,10 +10,10 @@ import { describe, it, expect } from 'vitest'
 import type { ReviewStatus } from '../../src/lib/review-status.js'
 import {
   toAgentStatus,
-  toAgentPhase,
+  toRole,
   toAgentResolution,
-  toSpecialistType,
-  toSpecialistState,
+  toSpecialistAgentName,
+  toSpecialistLifecycleState,
   toReviewStatus,
   toTestStatus,
   toMergeStatus,
@@ -42,80 +42,64 @@ describe('toAgentStatus', () => {
   })
 })
 
-// ─── toAgentPhase ─────────────────────────────────────────────────────────────
+// ─── toRole ──────────────────────────────────────────────────────────────────
 
-describe('toAgentPhase', () => {
-  it('passes through valid phases', () => {
-    expect(toAgentPhase('planning')).toBe('planning')
-    expect(toAgentPhase('exploration')).toBe('exploration')
-    expect(toAgentPhase('implementation')).toBe('implementation')
-    expect(toAgentPhase('testing')).toBe('testing')
-    expect(toAgentPhase('documentation')).toBe('documentation')
-    expect(toAgentPhase('pre_push')).toBe('pre_push')
-    expect(toAgentPhase('post_push')).toBe('post_push')
+describe('toRole', () => {
+  it('passes through valid roles', () => {
+    expect(toRole('plan')).toBe('plan')
+    expect(toRole('work')).toBe('work')
+    expect(toRole('review')).toBe('review')
+    expect(toRole('test')).toBe('test')
+    expect(toRole('ship')).toBe('ship')
   })
 
-  it('passes through specialist/work-agent phases (review, review-response, merge)', () => {
-    expect(toAgentPhase('review')).toBe('review')
-    expect(toAgentPhase('review-response')).toBe('review-response')
-    expect(toAgentPhase('merge')).toBe('merge')
-  })
-
-  it('returns undefined for invalid values', () => {
-    expect(toAgentPhase('coding')).toBeUndefined()
-    expect(toAgentPhase('IMPLEMENTATION')).toBeUndefined()
-    expect(toAgentPhase(null)).toBeUndefined()
-    expect(toAgentPhase(undefined)).toBeUndefined()
-    expect(toAgentPhase('')).toBeUndefined()
-  })
-
-  // Regression: persisted review/merge phases must survive snapshot bootstrap.
-  // Before the fix, VALID_AGENT_PHASES only contained work-agent phases
-  // (planning…post_push), so toAgentPhase('review') returned undefined and the
-  // phase was silently dropped when hydrating agent snapshots after a restart.
-  it('regression: persisted review/merge phases are not silently dropped on bootstrap', () => {
-    for (const phase of ['review', 'review-response', 'merge'] as const) {
-      const result = toAgentPhase(phase)
-      expect(result, `phase '${phase}' must not be dropped by toAgentPhase`).toBe(phase)
-    }
+  it('returns undefined for legacy phases and invalid values', () => {
+    expect(toRole('planning')).toBeUndefined()
+    expect(toRole('implementation')).toBeUndefined()
+    expect(toRole('review-response')).toBeUndefined()
+    expect(toRole('merge')).toBeUndefined()
+    expect(toRole('WORK')).toBeUndefined()
+    expect(toRole(null)).toBeUndefined()
+    expect(toRole(undefined)).toBeUndefined()
+    expect(toRole('')).toBeUndefined()
   })
 })
 
-// ─── toSpecialistType ─────────────────────────────────────────────────────────
+// ─── toSpecialistAgentName ─────────────────────────────────────────────────────────
 
-describe('toSpecialistType', () => {
-  it('passes through valid specialist types', () => {
-    expect(toSpecialistType('review-agent')).toBe('review-agent')
-    expect(toSpecialistType('test-agent')).toBe('test-agent')
-    expect(toSpecialistType('merge-agent')).toBe('merge-agent')
-    expect(toSpecialistType('inspect-agent')).toBe('inspect-agent')
-    expect(toSpecialistType('uat-agent')).toBe('uat-agent')
+describe('toSpecialistAgentName', () => {
+  it('passes through valid specialist names', () => {
+    expect(toSpecialistAgentName('review-agent')).toBe('review-agent')
+    expect(toSpecialistAgentName('test-agent')).toBe('test-agent')
+    expect(toSpecialistAgentName('merge-agent')).toBe('merge-agent')
+    expect(toSpecialistAgentName('inspect-agent')).toBe('inspect-agent')
+    expect(toSpecialistAgentName('uat-agent')).toBe('uat-agent')
   })
 
   it('returns undefined for invalid values', () => {
-    expect(toSpecialistType('deploy-agent')).toBeUndefined()
-    expect(toSpecialistType('REVIEW-AGENT')).toBeUndefined()
-    expect(toSpecialistType(null)).toBeUndefined()
-    expect(toSpecialistType(undefined)).toBeUndefined()
-    expect(toSpecialistType('')).toBeUndefined()
+    expect(toSpecialistAgentName('deploy-agent')).toBeUndefined()
+    expect(toSpecialistAgentName('REVIEW-AGENT')).toBeUndefined()
+    expect(toSpecialistAgentName(null)).toBeUndefined()
+    expect(toSpecialistAgentName(undefined)).toBeUndefined()
+    expect(toSpecialistAgentName('')).toBeUndefined()
   })
 })
 
-// ─── toSpecialistState ────────────────────────────────────────────────────────
+// ─── toSpecialistLifecycleState ────────────────────────────────────────────────────────
 
-describe('toSpecialistState', () => {
+describe('toSpecialistLifecycleState', () => {
   it('passes through valid states', () => {
-    expect(toSpecialistState('active')).toBe('active')
-    expect(toSpecialistState('sleeping')).toBe('sleeping')
-    expect(toSpecialistState('uninitialized')).toBe('uninitialized')
+    expect(toSpecialistLifecycleState('active')).toBe('active')
+    expect(toSpecialistLifecycleState('sleeping')).toBe('sleeping')
+    expect(toSpecialistLifecycleState('uninitialized')).toBe('uninitialized')
   })
 
   it('returns "uninitialized" for invalid values', () => {
-    expect(toSpecialistState('idle')).toBe('uninitialized')
-    expect(toSpecialistState('ACTIVE')).toBe('uninitialized')
-    expect(toSpecialistState(null)).toBe('uninitialized')
-    expect(toSpecialistState(undefined)).toBe('uninitialized')
-    expect(toSpecialistState('')).toBe('uninitialized')
+    expect(toSpecialistLifecycleState('idle')).toBe('uninitialized')
+    expect(toSpecialistLifecycleState('ACTIVE')).toBe('uninitialized')
+    expect(toSpecialistLifecycleState(null)).toBe('uninitialized')
+    expect(toSpecialistLifecycleState(undefined)).toBe('uninitialized')
+    expect(toSpecialistLifecycleState('')).toBe('uninitialized')
   })
 })
 

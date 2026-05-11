@@ -12,11 +12,11 @@ import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
-import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
 import { MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
+import type { Role } from './agents.js';
 import type { RuntimeName } from './runtimes/types.js';
 export type { SubscriptionPlan, AuthMode };
 
@@ -82,6 +82,76 @@ export interface TtsSummarizerConfig {
   batch_window_seconds?: number;
 }
 
+export type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
+export type ModelRef = string;
+
+/**
+ * Canonical workhorse slot list. Anything outside this set is rejected by
+ * config-load validation (PAN-1048 review feedback 003 / REQ-18).
+ */
+export const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'] as const;
+
+export type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
+
+export interface RoleSubConfig {
+  model: ModelRef;
+}
+
+export interface RoleConfig {
+  model: ModelRef;
+  harness?: 'claude-code' | 'pi';
+  sub?: Record<string, RoleSubConfig>;
+}
+
+export type RolesConfig = Partial<Record<Role, RoleConfig>>;
+
+export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
+  plan: 'workhorse:expensive',
+  work: 'workhorse:mid',
+  review: 'workhorse:expensive',
+  test: 'workhorse:mid',
+  ship: 'workhorse:mid',
+};
+
+export const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
+  expensive: 'claude-opus-4-7',
+  mid: 'claude-sonnet-4-7',
+  cheap: 'claude-haiku-4-5',
+};
+
+export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
+  plan: { model: 'workhorse:expensive' },
+  work: {
+    model: 'workhorse:mid',
+    sub: {
+      inspect: { model: 'workhorse:cheap' },
+      'inspect-deep': { model: 'workhorse:mid' },
+    },
+  },
+  review: {
+    model: 'workhorse:expensive',
+    sub: {
+      security: { model: 'workhorse:expensive' },
+      correctness: { model: 'workhorse:mid' },
+      performance: { model: 'workhorse:mid' },
+      requirements: { model: 'workhorse:mid' },
+    },
+  },
+  test: { model: 'workhorse:mid' },
+  ship: { model: 'workhorse:mid' },
+};
+
+function cloneRoles(roles: RolesConfig): RolesConfig {
+  const cloned: RolesConfig = {};
+  for (const [role, roleConfig] of Object.entries(roles) as Array<[Role, RoleConfig]>) {
+    cloned[role] = {
+      ...roleConfig,
+      sub: roleConfig.sub ? { ...roleConfig.sub } : undefined,
+    };
+  }
+  return cloned;
+}
+
 export interface ResourcesConfig {
   /** Available RAM threshold that triggers a warning state/guardrail (GiB) */
   memory_warn_gb?: number;
@@ -112,10 +182,7 @@ export interface YamlConfig {
     };
 
     /** Per-work-type overrides (explicit model for specific tasks) */
-    overrides?: Partial<Record<WorkTypeId, ModelId>>;
-
-    /** Per-work-type harness overrides */
-    harness_overrides?: Partial<Record<WorkTypeId, RuntimeName>>;
+    overrides?: Partial<Record<string, ModelId>>;
 
     /** Gemini thinking level (1-4) */
     gemini_thinking_level?: 1 | 2 | 3 | 4;
@@ -178,6 +245,12 @@ export interface YamlConfig {
   tts?: {
     summarizer?: TtsSummarizerConfig;
   };
+
+  /** Workhorse model slots for role model indirection. */
+  workhorses?: WorkhorsesConfig;
+
+  /** Role-specific model and harness configuration. */
+  roles?: RolesConfig;
 
   /** Resource thresholds for dashboard health + spawn guardrails */
   resources?: ResourcesConfig;
@@ -303,11 +376,14 @@ export interface NormalizedConfig {
   /** OpenRouter favorite model IDs (shown in ModelPicker) */
   openrouterFavorites: string[];
 
-  /** Per-work-type overrides */
-  overrides: Partial<Record<WorkTypeId, ModelId>>;
+  /** Optional workhorse model slots used by role model references. */
+  workhorses?: WorkhorsesConfig;
 
-  /** Per-work-type harness overrides */
-  harnessOverrides: Partial<Record<WorkTypeId, RuntimeName>>;
+  /** Optional role model/harness configuration. */
+  roles?: RolesConfig;
+
+  /** Per-work-type overrides */
+  overrides: Partial<Record<string, ModelId>>;
 
   /** Gemini thinking level */
   geminiThinkingLevel: 1 | 2 | 3 | 4;
@@ -396,7 +472,7 @@ export interface MigrationResult {
   /** List of migrated model IDs */
   migrated: Array<{
     /** Work type that was migrated */
-    workType: WorkTypeId;
+    workType: string;
     /** Old (deprecated) model ID */
     from: string;
     /** New (current) model ID */
@@ -428,8 +504,9 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   providerAuth: {},
   providerPlan: {},
   openrouterFavorites: [],
+  workhorses: { ...DEFAULT_WORKHORSES },
+  roles: cloneRoles(DEFAULT_ROLES),
   overrides: {},
-  harnessOverrides: {},
   geminiThinkingLevel: 3,
   trackerKeys: {},
   conversations: {
@@ -647,16 +724,124 @@ function mergeCavemanConfig(
   }
 }
 
+function isWorkhorseRef(ref: ModelRef): boolean {
+  return ref.startsWith('workhorse:');
+}
+
+function workhorseSlotFromRef(ref: ModelRef): WorkhorseSlot | string {
+  return ref.slice('workhorse:'.length);
+}
+
+export function derefWorkhorse(
+  ref: ModelRef,
+  config: Pick<NormalizedConfig, 'workhorses'>,
+  fieldPath = 'model',
+): ModelId {
+  if (!isWorkhorseRef(ref)) return resolveModelId(ref) as ModelId;
+
+  const slot = workhorseSlotFromRef(ref) as WorkhorseSlot;
+  const resolved = config.workhorses?.[slot];
+  if (!resolved) {
+    throw new Error(`config.yaml: ${fieldPath} references ${ref} but workhorses.${slot} is not defined`);
+  }
+  if (isWorkhorseRef(resolved)) {
+    throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
+  }
+  return resolveModelId(resolved) as ModelId;
+}
+
+export function resolveModel(
+  role: Role,
+  subRole?: string,
+  config: Pick<NormalizedConfig, 'roles' | 'workhorses'> = {},
+): ModelId {
+  const roleConfig = config.roles?.[role];
+  const subModel = subRole ? roleConfig?.sub?.[subRole]?.model : undefined;
+  const roleModel = roleConfig?.model;
+  const ref = subModel ?? roleModel ?? DEFAULT_MODEL_REFS[role];
+  const fieldPath = subModel
+    ? `roles.${role}.sub.${subRole}.model`
+    : roleModel
+      ? `roles.${role}.model`
+      : `defaults.${role}.model`;
+  return derefWorkhorse(ref, config, fieldPath);
+}
+
+function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): void {
+  if (!config?.workhorses && !config?.roles) return;
+
+  if (config.workhorses) {
+    // PAN-1048 review feedback 003 (REQ-18): reject any workhorse key outside
+    // the canonical three slots (expensive | mid | cheap). The Settings API
+    // already gates this on the HTTP path; the config-load path was silently
+    // accepting hand-edited config.yaml values like workhorses.tiny: claude-…
+    // and propagating them into the merged registry, where derefWorkhorse()
+    // would later miss because the role config only references the canonical
+    // slots. Failing fast at load time gives a precise field error instead.
+    const unknownSlots = Object.keys(config.workhorses).filter(
+      (slot): slot is string => !(WORKHORSE_SLOTS as readonly string[]).includes(slot),
+    );
+    if (unknownSlots.length > 0) {
+      throw new Error(
+        `config.yaml: unknown workhorse slot${unknownSlots.length > 1 ? 's' : ''} ` +
+          unknownSlots.map((s) => `workhorses.${s}`).join(', ') +
+          `. Valid slots: ${WORKHORSE_SLOTS.join(', ')}.`,
+      );
+    }
+    result.workhorses = {
+      ...(result.workhorses ?? {}),
+      ...config.workhorses,
+    };
+  }
+
+  if (config.roles) {
+    result.roles = { ...(result.roles ?? {}) };
+    for (const [role, roleConfig] of Object.entries(config.roles) as Array<[Role, RoleConfig]>) {
+      const existing = result.roles[role];
+      result.roles[role] = {
+        ...existing,
+        ...roleConfig,
+        sub: {
+          ...(existing?.sub ?? {}),
+          ...(roleConfig.sub ?? {}),
+        },
+      };
+    }
+  }
+}
+
+function validateRoleModelRefs(config: NormalizedConfig): void {
+  for (const [slot, ref] of Object.entries(config.workhorses ?? {}) as Array<[WorkhorseSlot, ModelRef]>) {
+    if (isWorkhorseRef(ref)) {
+      throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
+    }
+    resolveModelId(ref);
+  }
+
+  for (const [role, roleConfig] of Object.entries(config.roles ?? {}) as Array<[Role, RoleConfig]>) {
+    if (roleConfig.model) {
+      derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
+    }
+    for (const [subRole, subConfig] of Object.entries(roleConfig.sub ?? {})) {
+      if (subConfig.model) {
+        derefWorkhorse(subConfig.model, config, `roles.${role}.sub.${subRole}.model`);
+      }
+    }
+  }
+}
+
 /**
  * Merge multiple configs with precedence: project > global > defaults
  */
-function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
+export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
     tmux: {
       ...DEFAULT_CONFIG.tmux,
     },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
+    workhorses: { ...DEFAULT_WORKHORSES },
+    roles: cloneRoles(DEFAULT_ROLES),
     shadow: {
       enabled: DEFAULT_CONFIG.shadow.enabled,
       trackers: { ...DEFAULT_CONFIG.shadow.trackers },
@@ -814,6 +999,9 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       result.openrouterFavorites = config.openrouter.favorites;
     }
 
+    // Merge role/workhorse model configuration
+    mergeRoleConfig(result, config);
+
     // Merge legacy API keys (for backward compatibility)
     // Only enable providers that weren't explicitly disabled in models.providers
     if (config.api_keys) {
@@ -866,13 +1054,6 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       result.overrides = {
         ...result.overrides,
         ...config.models.overrides,
-      };
-    }
-
-    if (config.models?.harness_overrides) {
-      result.harnessOverrides = {
-        ...result.harnessOverrides,
-        ...config.models.harness_overrides,
       };
     }
 
@@ -948,35 +1129,9 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
     }
   }
 
+  validateRoleModelRefs(result);
+
   return { config: result, explicitlyDisabled };
-}
-
-/** Renamed work-type keys from the convoy→review migration */
-const CONVOY_KEY_MIGRATION: Record<string, WorkTypeId> = {
-  'convoy:security-reviewer': 'review:security',
-  'convoy:performance-reviewer': 'review:performance',
-  'convoy:correctness-reviewer': 'review:correctness',
-  'convoy:requirements-reviewer': 'review:requirements',
-  'convoy:synthesis-agent': 'review:synthesis',
-};
-
-/**
- * Migrate legacy convoy:* override keys → review:* equivalents.
- * Mutates config in-place and returns true if any keys were migrated.
- */
-function migrateConvoyKeys(config: YamlConfig): boolean {
-  if (!config.models?.overrides) return false;
-
-  let migrated = false;
-  for (const [oldKey, newKey] of Object.entries(CONVOY_KEY_MIGRATION)) {
-    if (oldKey in config.models.overrides) {
-      const value = (config.models.overrides as Record<string, string>)[oldKey];
-      delete (config.models.overrides as Record<string, string>)[oldKey];
-      (config.models.overrides as Record<string, string>)[newKey] = value;
-      migrated = true;
-    }
-  }
-  return migrated;
 }
 
 /**
@@ -985,7 +1140,7 @@ function migrateConvoyKeys(config: YamlConfig): boolean {
  * Returns array of migrations to perform, or empty array if none found.
  */
 function detectDeprecatedModels(config: YamlConfig | null): Array<{
-  workType: WorkTypeId;
+  workType: string;
   from: string;
   to: string;
 }> {
@@ -993,12 +1148,12 @@ function detectDeprecatedModels(config: YamlConfig | null): Array<{
     return [];
   }
 
-  const migrations: Array<{ workType: WorkTypeId; from: string; to: string }> = [];
+  const migrations: Array<{ workType: string; from: string; to: string }> = [];
 
   for (const [workType, modelId] of Object.entries(config.models.overrides)) {
     if (modelId && MODEL_DEPRECATIONS[modelId]) {
       migrations.push({
-        workType: workType as WorkTypeId,
+        workType,
         from: modelId,
         to: MODEL_DEPRECATIONS[modelId],
       });
@@ -1013,7 +1168,7 @@ function detectDeprecatedModels(config: YamlConfig | null): Array<{
  */
 function applyMigrations(
   config: YamlConfig,
-  migrations: Array<{ workType: WorkTypeId; from: string; to: string }>
+  migrations: Array<{ workType: string; from: string; to: string }>
 ): void {
   if (!config.models) {
     config.models = {};
@@ -1126,33 +1281,24 @@ export function loadConfig(): ConfigLoadResult {
   let globalConfig = loadGlobalConfig();
   const projectConfig = loadProjectConfig();
 
-  // Check for deprecated models and legacy key names in global config
+  // Check for deprecated models in global config
   let migrationResult: MigrationResult | undefined;
   if (globalConfig && hasGlobalConfig()) {
-    const convoyMigrated = migrateConvoyKeys(globalConfig);
     const migrations = detectDeprecatedModels(globalConfig);
 
-    if (convoyMigrated || migrations.length > 0) {
+    if (migrations.length > 0) {
       const backedUp = backupGlobalConfig();
 
-      if (migrations.length > 0) {
-        applyMigrations(globalConfig, migrations);
-      }
-
+      applyMigrations(globalConfig, migrations);
       writeGlobalConfig(globalConfig);
 
-      if (convoyMigrated) {
-        console.log('\n🔄 Work-type key migration: convoy:* → review:*');
-      }
       if (migrations.length > 0) {
         console.log('\n🔄 Model ID Migration:');
         for (const { workType, from, to } of migrations) {
           console.log(`  ${workType}: ${from} → ${to}`);
         }
       }
-      if (convoyMigrated || migrations.length > 0) {
-        console.log('');
-      }
+      console.log('');
 
       migrationResult = { migrated: migrations, backedUp };
     }

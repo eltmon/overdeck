@@ -13,8 +13,8 @@ import { promisify } from 'util';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { getAgentState } from '../agents.js';
-import type { SpecialistType } from './specialists.js';
-import { getTmuxSessionName, setSessionId } from './specialists.js';
+import type { SpecialistAgentName } from './specialists.js';
+import { getTmuxSessionName } from './specialists.js';
 import { killSessionAsync } from '../tmux.js';
 
 const execAsync = promisify(exec);
@@ -202,7 +202,7 @@ export async function buildMergeAgentMemory(
  * @returns Rotation result
  */
 export async function rotateSpecialistSession(
-  specialistName: SpecialistType,
+  specialistName: SpecialistAgentName,
   workingDir?: string
 ): Promise<SessionRotationResult> {
   const agentId = `specialist-${specialistName}`;
@@ -263,11 +263,6 @@ export async function rotateSpecialistSession(
 
     console.log(`Started fresh session: ${newAgent.sessionId.substring(0, 8)}`);
 
-    // Persist the new session ID so subsequent wakes use --resume
-    if (newAgent.sessionId && newAgent.sessionId !== 'unknown') {
-      setSessionId(specialistName, newAgent.sessionId);
-    }
-
     return {
       success: true,
       oldSessionId,
@@ -291,7 +286,7 @@ export async function rotateSpecialistSession(
  * @returns Rotation result if rotated, null if not needed
  */
 export async function checkAndRotateIfNeeded(
-  specialistName: SpecialistType,
+  specialistName: SpecialistAgentName,
   workingDir?: string
 ): Promise<SessionRotationResult | null> {
   const agentId = `specialist-${specialistName}`;

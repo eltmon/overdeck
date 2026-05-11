@@ -3,7 +3,6 @@ import {
   Activity,
   AgentChannelReply,
   AgentId,
-  AgentPhase,
   AgentResolution,
   AgentRuntimeSnapshot,
   AgentSnapshot,
@@ -13,9 +12,8 @@ import {
   IssueId,
   ResourceStats,
   ReviewStatusSnapshot,
+  Role,
   SequenceNumber,
-  SpecialistSnapshot,
-  SpecialistType,
   WaitingReason,
 } from "./types"
 
@@ -38,6 +36,42 @@ export const AgentStoppedEvent = Schema.Struct({
   payload: Schema.Struct({ agentId: AgentId, issueId: IssueId }),
 })
 export type AgentStoppedEvent = typeof AgentStoppedEvent.Type
+
+/** Role lifecycle — work agent completed implementation and is ready for review. */
+export const WorkCompletedEvent = Schema.Struct({
+  type: Schema.Literal("work.completed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId, agentId: Schema.optional(AgentId) }),
+})
+export type WorkCompletedEvent = typeof WorkCompletedEvent.Type
+
+/** Role lifecycle — generic agent completion signal, normalized by Cloister by role. */
+export const AgentCompletedEvent = Schema.Struct({
+  type: Schema.Literal("agent.completed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId, agentId: Schema.optional(AgentId), role: Schema.optional(Role) }),
+})
+export type AgentCompletedEvent = typeof AgentCompletedEvent.Type
+
+/** Role lifecycle — review approved the branch and testing should start. */
+export const ReviewApprovedEvent = Schema.Struct({
+  type: Schema.Literal("review.approved"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId }),
+})
+export type ReviewApprovedEvent = typeof ReviewApprovedEvent.Type
+
+/** Role lifecycle — tests passed and shipping should prepare the branch. */
+export const TestPassedEvent = Schema.Struct({
+  type: Schema.Literal("test.passed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId }),
+})
+export type TestPassedEvent = typeof TestPassedEvent.Type
 
 /** Replaces socket.io `godview:status-change` */
 export const AgentStatusChangedEvent = Schema.Struct({
@@ -68,7 +102,7 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     agentId: AgentId,
-    agentPhase: Schema.optional(AgentPhase),
+    role: Schema.optional(Role),
     hasPendingQuestion: Schema.Boolean,
     pendingQuestionCount: Schema.Number,
     pendingQuestionPrompt: Schema.optional(Schema.String),
@@ -481,31 +515,39 @@ export type ReviewCoordinatorDiedEvent = typeof ReviewCoordinatorDiedEvent.Type
 
 // ─── Specialist Events ────────────────────────────────────────────────────────
 
-/** New — specialist became active */
+const SpecialistLifecycleState = Schema.Literals(["active", "sleeping", "uninitialized"])
+
+/** New — role-backed specialist became active */
 export const SpecialistStartedEvent = Schema.Struct({
   type: Schema.Literal("specialist.started"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ specialist: SpecialistSnapshot }),
+  payload: Schema.Struct({
+    name: Role,
+    state: SpecialistLifecycleState,
+    isRunning: Schema.Boolean,
+    currentIssue: Schema.optional(Schema.String),
+    lastWake: Schema.optional(Schema.String),
+  }),
 })
 export type SpecialistStartedEvent = typeof SpecialistStartedEvent.Type
 
-/** New — specialist completed work */
+/** New — role-backed specialist completed work */
 export const SpecialistCompletedEvent = Schema.Struct({
   type: Schema.Literal("specialist.completed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ name: SpecialistType, issueId: Schema.optional(IssueId) }),
+  payload: Schema.Struct({ name: Role, issueId: Schema.optional(IssueId) }),
 })
 export type SpecialistCompletedEvent = typeof SpecialistCompletedEvent.Type
 
-/** New — specialist failed */
+/** New — role-backed specialist failed */
 export const SpecialistFailedEvent = Schema.Struct({
   type: Schema.Literal("specialist.failed"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
   payload: Schema.Struct({
-    name: SpecialistType,
+    name: Role,
     issueId: Schema.optional(IssueId),
     error: Schema.String,
   }),
@@ -777,6 +819,10 @@ export const DomainEvent = Schema.Union([
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,
   AgentStoppedEvent,
+  WorkCompletedEvent,
+  AgentCompletedEvent,
+  ReviewApprovedEvent,
+  TestPassedEvent,
   AgentStatusChangedEvent,
   AgentOutputReceivedEvent,
   // PAN-800 runtime events

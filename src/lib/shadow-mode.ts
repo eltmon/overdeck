@@ -145,7 +145,7 @@ export async function getShadowModeStatus(options: ShadowModeOptions = {}): Prom
   }
 
   const sourceLabels: Record<string, string> = {
-    cli: 'CLI flag',
+    'cli': 'CLI flag',
     existing: 'existing shadow state',
     project: 'project config',
     global: 'global config',

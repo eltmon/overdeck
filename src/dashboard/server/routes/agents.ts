@@ -52,6 +52,7 @@ import {
   DomainEvent,
   normalizeChannelReplyPayload,
 } from '@panctl/contracts';
+import type { Role } from '@panctl/contracts';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfig } from '../../../lib/cloister/config.js';
@@ -67,6 +68,7 @@ import {
   deliverAgentPermissionDecision,
   saveAgentRuntimeState,
   saveAgentState,
+  saveAgentStateAsync,
   getActivity,
   saveSessionId,
   getSessionId,
@@ -425,7 +427,12 @@ const getAgentsRoute = HttpRouter.add(
                   const state = JSON.parse(yield* Effect.promise(() => readFile(localStateFile, 'utf-8')));
                   if (state.status === 'starting') {
                     startingAgentIds.push(dir);
-                  } else if (state.status === 'failed') {
+                  } else if (state.status === 'error' || state.status === 'failed') {
+                    // PAN-1048 review feedback 004 (C2): contract AgentStatus
+                    // is starting | running | stopped | error | unknown. Writers
+                    // now persist 'error'; the legacy 'failed' literal is
+                    // accepted here for backward compatibility with state.json
+                    // files written by older builds.
                     failedAgentIds.push(dir);
                   }
                 } catch {}
@@ -441,7 +448,7 @@ const getAgentsRoute = HttpRouter.add(
             const isPlanning = name.startsWith('planning-');
             const stateFile = join(homedir(), '.panopticon', 'agents', name, 'state.json');
             const healthFile = join(homedir(), '.panopticon', 'agents', name, 'health.json');
-            let state: any = { runtime: 'claude', model: isPlanning ? 'opus' : 'sonnet', workspace: process.cwd() };
+            let state: any = { model: isPlanning ? 'opus' : 'sonnet', workspace: process.cwd() };
             let health: any = { consecutiveFailures: 0, killCount: 0 };
 
             if (existsSync(stateFile)) {
@@ -479,7 +486,7 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: name,
               issueId,
-              runtime: state.runtime || 'claude',
+              runtime: 'claude',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'healthy' as const,
               startedAt,
@@ -489,7 +496,7 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation,
               git: gitStatus,
               type: 'agent',
-              agentPhase: enrichment.agentPhase || (isPlanning ? 'planning' : (state.phase || 'implementation')),
+              role: state.role,
               hasPendingQuestion: enrichment.hasPendingQuestion,
               pendingQuestionCount: enrichment.pendingQuestionCount,
               pendingQuestionPrompt: enrichment.pendingQuestionPrompt,
@@ -524,7 +531,7 @@ const getAgentsRoute = HttpRouter.add(
                 vmName: state.vmName,
                 git: null,
                 type: 'agent',
-                agentPhase: isPlanning ? 'planning' : 'implementation',
+                role: state.role ?? (isPlanning ? 'plan' : 'work'),
                 hasPendingQuestion: false,
                 pendingQuestionCount: 0,
                 remote: true,
@@ -588,7 +595,7 @@ const getAgentsRoute = HttpRouter.add(
               stoppedAgents.push({
                 id: dir,
                 issueId,
-                runtime: state.runtime || 'claude',
+                runtime: 'claude',
                 model: state.model || (isPlanning ? 'opus' : 'sonnet'),
                 status: 'stopped' as const,
                 startedAt: state.startedAt || new Date().toISOString(),
@@ -598,7 +605,7 @@ const getAgentsRoute = HttpRouter.add(
                 workspaceLocation: 'local',
                 git: null,
                 type: 'agent',
-                agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
+                role: state.role ?? (isPlanning ? 'plan' : 'work'),
                 hasPendingQuestion: needsInput,
                 pendingQuestionCount: 0,
                 pendingQuestionPrompt,
@@ -622,7 +629,7 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: dir,
               issueId,
-              runtime: state.runtime || 'claude',
+              runtime: 'claude',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'starting' as const,
               startedAt: state.startedAt || new Date().toISOString(),
@@ -632,7 +639,7 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation: 'local',
               git: null,
               type: 'agent',
-              agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
+              role: state.role ?? (isPlanning ? 'plan' : 'work'),
               hasPendingQuestion: false,
               pendingQuestionCount: 0,
               message: state.message || 'Starting...',
@@ -650,9 +657,9 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: dir,
               issueId,
-              runtime: state.runtime || 'claude',
+              runtime: 'claude',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
-              status: 'failed' as const,
+              status: 'error' as const,
               startedAt: state.startedAt || new Date().toISOString(),
               consecutiveFailures: 0,
               killCount: 0,
@@ -660,7 +667,7 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation: state.location || 'local',
               git: null,
               type: 'agent',
-              agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
+              role: state.role ?? (isPlanning ? 'plan' : 'work'),
               hasPendingQuestion: false,
               pendingQuestionCount: 0,
               error: state.error || 'Unknown error',
@@ -827,13 +834,18 @@ const deleteAgentRoute = HttpRouter.add(
     const stateBeforeStop = yield* Effect.promise(() => getAgentStateAsync(id));
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.delete_requested'));
     yield* Effect.promise(() => stopAgentAsync(id));
+    // PAN-1048 review feedback 004 (C1): AgentStoppedEvent requires both
+    // agentId AND issueId on the payload (packages/contracts/src/events.ts:36);
+    // ws-rpc drops events that fail Schema validation, so emits without issueId
+    // never reach subscribers and the dashboard misses the stop transition.
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.stopped',
       timestamp: new Date().toISOString(),
-      payload: { agentId: id },
+      payload: { agentId: id, issueId: stateBeforeStop?.issueId ?? '' },
     })));
     const issueId = stateBeforeStop?.issueId;
-    const phaseLabel = stateBeforeStop?.phase === 'planning' ? 'planning' : 'work';
+    // PAN-1048: derive label from role; legacy state.phase no longer exists.
+    const phaseLabel = stateBeforeStop?.role === 'plan' ? 'planning' : 'work';
     emitActivityEntry({
       source: 'dashboard',
       level: 'info',
@@ -1435,6 +1447,9 @@ const postAgentSuspendRoute = HttpRouter.add(
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.suspend_requested', { sessionId: effectiveSessionId }));
     saveSessionId(id, effectiveSessionId);
+    // PAN-1048 review feedback 004 (C1): resolve issueId before kill so we can
+    // include it on the agent.stopped payload (the contract requires it).
+    const suspendIssueId = (yield* Effect.promise(() => getAgentStateAsync(id)))?.issueId ?? '';
     yield* Effect.promise(() => killSessionAsync(id).catch(() => { /* no tmux session to kill */ }));
     saveAgentRuntimeState(id, {
       state: 'suspended',
@@ -1444,7 +1459,7 @@ const postAgentSuspendRoute = HttpRouter.add(
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.stopped',
       timestamp: new Date().toISOString(),
-      payload: { agentId: id },
+      payload: { agentId: id, issueId: suspendIssueId },
     })));
 
     invalidateAgentsCache();
@@ -1495,12 +1510,11 @@ const postAgentResumeRoute = HttpRouter.add(
             id,
             issueId: agentState?.issueId || id.replace('agent-', '').toUpperCase(),
             workspace: agentState?.workspace,
-            runtime: agentState?.runtime,
             model: agentState?.model,
             status: 'running',
             startedAt: agentState?.startedAt,
             lastActivity: new Date().toISOString(),
-            phase: agentState?.phase,
+            role: agentState?.role ?? 'work',
           },
         },
       })));
@@ -1568,7 +1582,7 @@ const postAgentRestartRoute = HttpRouter.add(
           await Effect.runPromise(eventStore.append({
             type: 'agent.stopped',
             timestamp: new Date().toISOString(),
-            payload: { agentId: id },
+            payload: { agentId: id, issueId: agentState.issueId },
           }));
 
           const result = await restartAgent(id, { model, graceful: true, message });
@@ -1586,12 +1600,15 @@ const postAgentRestartRoute = HttpRouter.add(
                   id,
                   issueId: updatedState?.issueId || agentState.issueId,
                   workspace: updatedState?.workspace || agentState.workspace,
-                  runtime: updatedState?.runtime || agentState.runtime,
+                  // PAN-1048 review feedback 004 (C3): same as quick-restart
+                  // below — surface the actual harness so Pi agents do not
+                  // get mis-labelled as Claude Code on graceful restart.
+                  runtime: updatedState?.harness ?? agentState.harness ?? 'claude-code',
                   model: model || updatedState?.model || agentState.model,
                   status: 'running',
                   startedAt: updatedState?.startedAt || agentState.startedAt,
                   lastActivity: new Date().toISOString(),
-                  phase: updatedState?.phase || agentState.phase,
+                  role: updatedState?.role ?? agentState.role,
                 },
               },
             }));
@@ -1619,7 +1636,7 @@ const postAgentRestartRoute = HttpRouter.add(
       yield* Effect.promise(() => Effect.runPromise(eventStore.append({
         type: 'agent.stopped',
         timestamp: new Date().toISOString(),
-        payload: { agentId: id },
+        payload: { agentId: id, issueId: updatedState?.issueId || agentState.issueId },
       })));
       yield* Effect.promise(() => Effect.runPromise(eventStore.append({
         type: 'agent.started',
@@ -1632,12 +1649,16 @@ const postAgentRestartRoute = HttpRouter.add(
             id,
             issueId: updatedState?.issueId || agentState.issueId,
             workspace: updatedState?.workspace || agentState.workspace,
-            runtime: updatedState?.runtime || agentState.runtime,
+            // PAN-1048 review feedback 004 (C3): preserve the agent's actual
+            // harness instead of hard-coding 'claude'. AgentSnapshot.runtime
+            // is what getHarness() reads, so a Pi agent restarted through
+            // this path was being mis-labelled as Claude Code.
+            runtime: updatedState?.harness ?? agentState.harness ?? 'claude-code',
             model: model || updatedState?.model || agentState.model,
             status: 'running',
             startedAt: updatedState?.startedAt || agentState.startedAt,
             lastActivity: new Date().toISOString(),
-            phase: updatedState?.phase || agentState.phase,
+            role: updatedState?.role ?? agentState.role,
           },
         },
       })));
@@ -1868,6 +1889,18 @@ const postAgentsRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }
 
+    const legacyFields = ['workType', 'phase', 'agentType'].filter((field) => field in (body as Record<string, unknown>));
+    if (legacyFields.length > 0) {
+      return jsonResponse({
+        error: `Legacy start-agent field(s) are no longer accepted: ${legacyFields.join(', ')}. Send role: 'work' instead.`,
+      }, { status: 400 });
+    }
+
+    const role = (body as any).role ?? 'work';
+    if (role !== 'work') {
+      return jsonResponse({ error: `Unsupported agent role "${String(role)}". POST /api/agents only starts role: 'work'.` }, { status: 400 });
+    }
+
     // Reject bare numeric IDs (e.g. "484") — they have no project prefix, so tracker
     // routing and workspace naming both fail. Require "PAN-484" style.
     if (/^\d+$/.test(String(issueId))) {
@@ -2004,10 +2037,24 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (!hasBeads) {
+      // PAN-1048 C6: Beads are a hard requirement for the work role — without
+      // them the agent has nothing to claim, no Jidoka inspection scope, and
+      // commits would batch across multiple beads. Recovery already attempted
+      // above via createBeadsFromVBrief; if that failed the workspace's vBRIEF
+      // is missing or malformed, which is a planning bug that must surface to
+      // the operator. Refuse the spawn with 422 instead of starting a half-
+      // configured work agent that will silently misbehave.
       const detail = recoveryError
         ? ` Beads recovery failed: ${recoveryError}.`
         : ' No beads exist for this issue.';
-      console.warn(`[agents] Starting direct work agent for ${issueId} without beads.${detail}`);
+      console.warn(`[agents] Refusing to start work agent for ${issueId} without beads.${detail}`);
+      return jsonResponse({
+        success: false,
+        error: 'beads_required',
+        message: `Cannot start work agent for ${issueId} without beads.${detail} `
+          + 'Re-run planning so beads can be materialized from the vBRIEF plan, then retry.',
+        ...(recoveryError ? { recoveryError } : {}),
+      }, { status: 422 });
     }
 
     const health = yield* readModel.getSnapshot.pipe(
@@ -2035,13 +2082,9 @@ const postAgentsRoute = HttpRouter.add(
       }, { status: spawnGuardrails.status });
     }
 
-    const spawnPhase = (body as any).phase || 'implementation';
     const spawnModel = determineModel({
       model: (body as any).model,
-      workType: (body as any).workType,
-      phase: spawnPhase,
-      agentType: (body as any).agentType,
-      difficulty: (body as any).difficulty,
+      role,
     });
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
@@ -2210,22 +2253,55 @@ const postAgentsRoute = HttpRouter.add(
         issueId,
         workspace: workspaceMetadata,
         prompt: agentPrompt,
+        model: spawnModel,
       }));
 
-      // Update issue status via IssueLifecycle service (PAN-449)
+      // Write canonical state.json so activeRoleRunExists() sees this remote
+      // work agent as active before we emit the lifecycle transition below.
+      // spawnRemoteAgent only writes remote-state.json; without state.json the
+      // Cloister duplicate-spawn guard misses the in-flight remote agent and
+      // would spawn a second local work run when in_progress is emitted.
+      yield* Effect.promise(() => saveAgentStateAsync({
+        id: state.id,
+        issueId: state.issueId,
+        workspace: workspacePath,
+        role: 'work',
+        model: spawnModel,
+        status: 'starting',
+        startedAt: state.startedAt,
+        harness: 'claude-code',
+      }));
+
+      // PAN-1048: lifecycle.transitionTo() is the single source of issue.transitioned.
+      // The redundant issue.statusChanged emit was racing with reactive Cloister:
+      // Cloister mapped 'in_progress' → 'work' role and tried to spawn a second
+      // run while activeRoleRunExists() still saw no state.json for the
+      // in-flight spawn above. state.json is now written before this emit.
       yield* Effect.promise(() => Effect.runPromise(
         lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catch(() => Effect.void))
       ));
 
+      // PAN-1048 review feedback 003: emit a contract-compliant agent.started
+      // event. The reducer writes event.payload.agent into agentsById keyed by
+      // event.payload.agentId — the previous shape ({ agentId: issueId, issueId })
+      // omitted .agent and used the issue ID as the key, inserting `undefined`
+      // into the read model and breaking dashboard consumers.
       yield* Effect.promise(() => Effect.runPromise(eventStore.append({
         type: 'agent.started',
         timestamp: new Date().toISOString(),
-        payload: { agentId: issueId, issueId },
-      })));
-      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-        type: 'issue.statusChanged',
-        timestamp: new Date().toISOString(),
-        payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
+        payload: {
+          agentId: state.id,
+          issueId: state.issueId,
+          agent: {
+            id: state.id,
+            issueId: state.issueId,
+            role: 'work' as const,
+            model: spawnModel,
+            status: state.status,
+            startedAt: state.startedAt,
+            lastActivity: state.lastActivity,
+          },
+        },
       })));
       try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
       invalidateAgentsCache();
@@ -2243,13 +2319,12 @@ const postAgentsRoute = HttpRouter.add(
     // Local workspace
     const devScript = join(workspacePath, 'dev');
     const hasPlanning = existsSync(join(workspacePath, PAN_DIRNAME));
-    const phase = (body as any).phase || (hasPlanning ? 'implementation' : 'exploration');
 
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_requested', {
       issueId,
       workspacePath,
       hasPlanning,
-      phase,
+      role,
     }));
 
     const agentLifecycle = getWorkAgentLifecycleState(agentSessionName);
@@ -2321,19 +2396,25 @@ const postAgentsRoute = HttpRouter.add(
       console.warn(`[start-agent] Failed to create pre-spawn stash for ${issueId}: ${message}`);
     }
 
+    // PAN-1048 review feedback 003: the route only resolves harness when the
+    // dashboard launch panel explicitly chose one. Otherwise pass nothing and
+    // let pan start → spawnAgent resolve from roles.work.harness (the new
+    // single source of truth for per-role harness). The legacy `phase`
+    // variable and the workType/harnessOverrides map are gone — the
+    // legacy-field guard above (line 1872) blocks any client still sending
+    // them. Note: when bodyHarness is set we still run it through
+    // canUseHarness() so we can fail fast on a model+harness incompatibility
+    // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
-    const workType = ((body as any).workType || `issue-agent:${phase}`) as string;
-    const savedHarness = yield* Effect.promise(async () => {
-      const { loadConfig: loadPanConfig } = await import('../../../lib/config-yaml.js');
-      return loadPanConfig().config.harnessOverrides[workType as any];
-    });
-    const requestedHarness = (bodyHarness === 'pi' || bodyHarness === 'claude-code')
-      ? bodyHarness
-      : (savedHarness === 'pi' || savedHarness === 'claude-code' ? savedHarness : 'claude-code');
-    const harnessDecision = yield* Effect.promise(async () =>
-      canUseHarness(requestedHarness, spawnModel, await getProviderAuthMode(spawnModel))
-    );
-    const effectiveHarness = harnessDecision.allowed ? requestedHarness : 'claude-code';
+    const userPickedHarness: 'claude-code' | 'pi' | null =
+      bodyHarness === 'pi' || bodyHarness === 'claude-code' ? bodyHarness : null;
+    let effectiveHarness: 'claude-code' | 'pi' | null = null;
+    if (userPickedHarness !== null) {
+      const harnessDecision = yield* Effect.promise(async () =>
+        canUseHarness(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))
+      );
+      effectiveHarness = harnessDecision.allowed ? userPickedHarness : 'claude-code';
+    }
 
     // Spawn pan start command
     const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
@@ -2350,7 +2431,7 @@ const postAgentsRoute = HttpRouter.add(
       child.on('error', (error) => {
         void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_error', {
           issueId,
-          phase,
+          role,
           workspacePath,
           activityId,
           error: error.message,
@@ -2362,7 +2443,7 @@ const postAgentsRoute = HttpRouter.add(
       child.once('spawn', () => {
         void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_spawned', {
           issueId,
-          phase,
+          role,
           workspacePath,
           activityId,
           pid: child.pid,
@@ -2374,7 +2455,7 @@ const postAgentsRoute = HttpRouter.add(
       child.once('close', (code, signal) => {
         void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_closed', {
           issueId,
-          phase,
+          role,
           workspacePath,
           activityId,
           code,
@@ -2461,13 +2542,18 @@ const postAgentsRoute = HttpRouter.add(
           yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
             id: earlyAgentId,
             issueId,
-            runtime: effectiveHarness,
-            harness: effectiveHarness,
+            // PAN-1048 R2: legacy `runtime` field removed from state.json writes;
+            // AgentState shape carries `harness` instead and parseAgentState drops
+            // unknown fields. PAN-1055: persist the user-picked harness when set,
+            // so a Pi-locked spawn does not race-degrade to claude-code on restart.
+            // When the user did not pick, omit the field — saveAgentState() will
+            // backfill it from roles.work.harness on the next write.
+            ...(effectiveHarness ? { harness: effectiveHarness } : {}),
             model: 'pending-container-start',
             status: 'starting',
             startedAt: new Date().toISOString(),
             workspace: workspacePath,
-            phase,
+            role,
             message: 'Waiting for containers to start...',
             ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
             ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
@@ -2477,7 +2563,7 @@ const postAgentsRoute = HttpRouter.add(
             issueId,
             featureName,
             workspacePath,
-            phase,
+            role,
           }));
 
               const containerActivityId = `containers-${Date.now()}`;
@@ -2531,13 +2617,14 @@ const postAgentsRoute = HttpRouter.add(
                     await writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
                       id: earlyAgentId,
                       issueId,
-                      runtime: effectiveHarness,
-                      harness: effectiveHarness,
+                      // PAN-1048 R2: legacy `runtime` removed; PAN-1055: persist
+                      // the user-picked harness only when set (see comment above).
+                      ...(effectiveHarness ? { harness: effectiveHarness } : {}),
                       model: 'pending-container-start',
-                      status: 'failed',
+                      status: 'error',
                       startedAt: new Date().toISOString(),
                       workspace: workspacePath,
-                      phase,
+                      role,
                       message: 'Container startup timed out before work agent spawn',
                       error: `Containers for ${issueId} did not become healthy within ${maxWaitMs}ms`,
                       ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
@@ -2566,11 +2653,15 @@ const postAgentsRoute = HttpRouter.add(
 
                   await appendAgentLifecycleLog(earlyAgentId, 'agent.work_spawn_requested_after_containers', {
                     issueId,
-                    phase,
+                    role,
                     workspacePath,
                     harness: effectiveHarness,
                   });
-                  await spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel, '--harness', effectiveHarness], workspacePath);
+                  await spawnPanCommand(
+                    ['start', issueId, '--local', '--model', spawnModel,
+                      ...(effectiveHarness ? ['--harness', effectiveHarness] : [])],
+                    workspacePath,
+                  );
                   await updateIssueStatus();
                 } catch (err: any) {
                   const errorMessage = err instanceof Error ? err.message : String(err);
@@ -2581,12 +2672,12 @@ const postAgentsRoute = HttpRouter.add(
                   await writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
                     id: earlyAgentId,
                     issueId,
-                    runtime: 'claude',
+                    // PAN-1048 R2: legacy `runtime` removed from state.json writes.
                     model: 'pending-container-start',
-                    status: 'failed',
+                    status: 'error',
                     startedAt: new Date().toISOString(),
                     workspace: workspacePath,
-                    phase,
+                    role,
                     message: 'Container startup failed before work agent spawn',
                     error: errorMessage,
                     ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
@@ -2620,10 +2711,14 @@ const postAgentsRoute = HttpRouter.add(
     // Containers already ready or no containers needed
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_requested', {
       issueId,
-      phase,
+      role,
       workspacePath,
     }));
-    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel, '--harness', effectiveHarness], workspacePath));
+    const activityId = yield* Effect.promise(() => spawnPanCommand(
+      ['start', issueId, '--local', '--model', spawnModel,
+        ...(effectiveHarness ? ['--harness', effectiveHarness] : [])],
+      workspacePath,
+    ));
 
     // Write early state.json so the dashboard immediately shows agent-<id> as the
     // active agent. Without this there's a race window between spawnPanCommand returning
@@ -2635,13 +2730,14 @@ const postAgentsRoute = HttpRouter.add(
     yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
       id: earlyAgentId,
       issueId,
-      runtime: effectiveHarness,
-      harness: effectiveHarness,
+      // PAN-1048 R2: legacy `runtime` removed; PAN-1055: persist the user-picked
+      // harness only when set (see container-startup branch above for rationale).
+      ...(effectiveHarness ? { harness: effectiveHarness } : {}),
       model: 'pending-work-spawn',
       status: 'starting',
       startedAt: new Date().toISOString(),
       workspace: workspacePath,
-      phase,
+      role,
       message: 'Work agent spawn requested',
       ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
       ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
@@ -2649,22 +2745,40 @@ const postAgentsRoute = HttpRouter.add(
     }, null, 2)));
     yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {
       issueId,
-      phase,
+      role,
       workspacePath,
       activityId,
     }));
 
     yield* Effect.promise(() => updateIssueStatus());
 
+    // PAN-1048: lifecycle.transitionTo() inside updateIssueStatus() is the
+    // single source of issue.transitioned. The duplicate issue.statusChanged
+    // emit raced with reactive Cloister: the early state.json above (with
+    // role: 'work', status: 'starting') is already on disk, so any code path
+    // that wants to know about the in-flight spawn can read it. Removing the
+    // redundant emit collapses two-source-of-truth into one.
+    //
+    // PAN-1048 review feedback 003: emit a contract-compliant agent.started
+    // payload (agentId = session name, agent = AgentSnapshot) so the read-model
+    // reducer writes a real snapshot into agentsById instead of `undefined`.
+    // Mirrors the early state.json shape we just wrote at line 2693.
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.started',
       timestamp: new Date().toISOString(),
-      payload: { agentId: issueId, issueId },
-    })));
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-      type: 'issue.statusChanged',
-      timestamp: new Date().toISOString(),
-      payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
+      payload: {
+        agentId: earlyAgentId,
+        issueId,
+        agent: {
+          id: earlyAgentId,
+          issueId,
+          workspace: workspacePath,
+          status: 'starting',
+          startedAt: new Date().toISOString(),
+          role,
+          ...(effectiveHarness ? { runtime: effectiveHarness } : {}),
+        },
+      },
     })));
     try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
     invalidateAgentsCache();
@@ -2805,11 +2919,12 @@ const postAgentResetSessionRoute = HttpRouter.add(
         .catch(() => { /* no session to kill */ })
     );
 
-    // Emit event so dashboard updates
+    // Emit event so dashboard updates. PAN-1048 review feedback 004 (C1):
+    // include issueId — without it AgentStoppedEvent fails Schema validation.
     yield* Effect.promise(() => Effect.runPromise(eventStore.append({
       type: 'agent.stopped',
       timestamp: new Date().toISOString(),
-      payload: { agentId: id },
+      payload: { agentId: id, issueId: agentState.issueId },
     })));
 
     console.log(`[reset-session] Cleared session for ${id} (was: ${previousSessionId.slice(0, 8)}...)`);
@@ -2853,7 +2968,7 @@ const postAgentSwitchModelRoute = HttpRouter.add(
       yield* Effect.promise(() => Effect.runPromise(eventStore.append({
         type: 'agent.stopped',
         timestamp: new Date().toISOString(),
-        payload: { agentId: id },
+        payload: { agentId: id, issueId: agentState.issueId },
       })));
     }
 

@@ -87,12 +87,13 @@ function levelBadgeClass(level: ActivityEntry['level']): string {
 }
 
 const SOURCE_COLORS: Record<string, string> = {
-  'merge-agent':       'bg-purple-500/20 text-purple-400',
-  'cloister':         'bg-blue-500/20 text-blue-400',
-  'review-specialist':'bg-green-500/20 text-green-400',
-  'test-specialist':   'bg-orange-500/20 text-orange-400',
-  'dashboard':        'bg-gray-500/20 text-gray-400',
-  'deploy-script':    'bg-cyan-500/20 text-cyan-400',
+  plan:        'bg-indigo-500/20 text-indigo-400',
+  work:        'bg-blue-500/20 text-blue-400',
+  review:     'bg-green-500/20 text-green-400',
+  test:       'bg-orange-500/20 text-orange-400',
+  ship:       'bg-purple-500/20 text-purple-400',
+  cloister:   'bg-blue-500/20 text-blue-400',
+  dashboard:  'bg-gray-500/20 text-gray-400',
 };
 
 function SourceBadge({ source }: { source: string }) {
@@ -124,7 +125,7 @@ function formatTimestamp(iso: string): string {
 
 type LevelFilter = 'all' | ActivityEntry['level'];
 type SourceFilter = 'all' | string;
-type CategoryFilter = 'all' | 'git' | 'specialist' | 'sync';
+type CategoryFilter = 'all' | 'git' | 'role' | 'sync';
 
 interface FilterState {
   level: LevelFilter;
@@ -139,7 +140,7 @@ export function inferCategory(entry: ActivityEntry): string {
   if (entry.category) return entry.category;
   const src = entry.source ?? '';
   if (src === 'git') return 'git';
-  if (src.includes('specialist') || src.includes('merge-agent') || src.includes('review') || src.includes('test')) return 'specialist';
+  if (src === 'plan' || src === 'work' || src === 'review' || src === 'test' || src === 'ship') return 'role';
   if (src.includes('sync') || src.includes('pull')) return 'sync';
   return 'other';
 }
@@ -429,7 +430,7 @@ export function ActivityPanel({ onClose }: ActivityPanelProps) {
           >
             <option value="all">All types</option>
             <option value="git">Git</option>
-            <option value="specialist">Specialist</option>
+            <option value="role">Roles</option>
             <option value="sync">Sync</option>
           </select>
 

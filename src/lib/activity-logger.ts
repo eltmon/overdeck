@@ -1,27 +1,26 @@
 /**
  * Shared activity logger — emits activity.entry events to the SQLite event store.
  *
- * Replaces flat-file logActivity() in merge-agent.ts and provides a unified
- * activity logging API for all Panopticon components (merge-agent, cloister,
- * specialists, dashboard).
+ * Replaces flat-file logActivity() in the ship-role merge path and provides a unified
+ * activity logging API for all Panopticon components (roles, cloister, dashboard).
  *
  * Activity entries are persisted to the event store and flow through:
  *   event store → PubSub → WebSocket → EventRouter → Zustand store → ActivityPanel
  *
  * Usage:
  *   import { emitActivityEntry } from '../lib/activity-logger.js';
- *   emitActivityEntry({ source: 'merge-agent', level: 'info', message: '...', issueId: 'PAN-123' });
+ *   emitActivityEntry({ source: 'ship', level: 'info', message: '...', issueId: 'PAN-123' });
  */
 
 import { randomUUID } from 'crypto';
 import { getEventStore } from '../dashboard/server/event-store.js';
 import type { DomainEvent } from '@panctl/contracts';
+import type { Role } from './agents.js';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';
-export type ActivitySource = 'merge-agent' | 'cloister' | 'review-specialist' | 'test-specialist' | 'dashboard' | 'deploy-script' | 'planning-agent' | 'work-agent';
 
 export interface EmitActivityOptions {
-  source: ActivitySource;
+  source: Role | 'cloister' | 'dashboard';
   level: ActivityLevel;
   message: string;
   details?: string;
@@ -128,7 +127,7 @@ export function emitActivityTts(options: EmitTtsOptions): void {
 
 /**
  * Emit a dashboard lifecycle event (started, completed, failed).
- * Used by pending-lifecycle.ts and merge-agent.ts.
+ * Used by pending-lifecycle.ts and the ship-role merge path.
  */
 export function emitDashboardLifecycle(
   status: 'started' | 'completed' | 'failed',

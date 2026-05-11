@@ -53,6 +53,27 @@ interface PlanningStatus {
 
 type Step = 'checking' | 'ready' | 'starting' | 'setting-up' | 'planning' | 'error';
 
+type SettingsResponse = {
+  workhorses?: Record<string, string>;
+  roles?: {
+    plan?: {
+      model?: string;
+      // PAN-1055: per-role harness override surfaced through Settings → Roles.
+      harness?: 'claude-code' | 'pi';
+    };
+  };
+};
+
+function resolveSettingsModelRef(
+  modelRef: string | undefined,
+  workhorses: Record<string, string> | undefined,
+): string | undefined {
+  if (!modelRef) return undefined;
+  if (!modelRef.startsWith('workhorse:')) return modelRef;
+  const slot = modelRef.slice('workhorse:'.length);
+  return workhorses?.[slot] ?? modelRef;
+}
+
 // Default for startDocker - can be overridden by localStorage
 const getDefaultStartDocker = (): boolean => {
   const stored = localStorage.getItem('panopticon.planning.startDocker');
@@ -91,18 +112,23 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const queryClient = useQueryClient();
   const confirm = useConfirm();
 
-  // Fetch settings to know the default planning-agent model
+  // Fetch settings to know the default plan role model.
   const settingsQuery = useQuery({
     queryKey: ['settings'],
     queryFn: async () => {
       const res = await fetch('/api/settings');
       if (!res.ok) throw new Error('Failed to load settings');
-      return res.json() as Promise<{ models: { overrides: Record<string, string>; harness_overrides?: Record<string, Harness> } }>;
+      return res.json() as Promise<SettingsResponse>;
     },
     staleTime: 60000,
   });
-  const defaultPlanningModel = settingsQuery.data?.models?.overrides?.['planning-agent'] || 'claude-opus-4-6';
-  const defaultPlanningHarness = settingsQuery.data?.models?.harness_overrides?.['planning-agent'];
+  const defaultPlanningModel = resolveSettingsModelRef(
+    settingsQuery.data?.roles?.plan?.model,
+    settingsQuery.data?.workhorses,
+  ) || 'claude-opus-4-7';
+  // PAN-1055: Honor the role-level harness override so PlanDialog opens with
+  // the harness configured for the plan role under Settings → Roles.
+  const defaultPlanningHarness = settingsQuery.data?.roles?.plan?.harness;
 
   useEffect(() => {
     if (harnessOverrideTouched.current) return;
@@ -826,6 +852,13 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                           harnessPolicy={planningPolicyQuery.data}
                           modelLabel="Model"
                         />
+                        {/* PAN-1048: surface that no per-spawn override is set so
+                            users can tell at a glance which model is being used. */}
+                        {!modelOverride && defaultPlanningModel && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Settings default ({defaultPlanningModel})
+                          </p>
+                        )}
                         {!planningHarnessDecision.allowed && (
                           <p className="text-xs text-warning mt-1">{planningHarnessDecision.reason}</p>
                         )}

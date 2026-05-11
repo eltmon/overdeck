@@ -289,10 +289,12 @@ describe('ReadModel checkpoint reconciliation', () => {
                 branch: 'feature/pan-1024',
                 costSoFar: 0,
                 sessionId: 'session-1',
-                phase: 'implementation',
+                harness: 'claude-code',
+                role: 'work',
               },
             ]),
-            warnOnBareNumericIssueIds: vi.fn(),
+            // PAN-1048 P2: now async.
+            warnOnBareNumericIssueIds: vi.fn(async () => {}),
           }))
         },
       },

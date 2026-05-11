@@ -48,10 +48,18 @@ export function extractAcceptanceCriteria(workspacePath: string): AcceptanceCrit
 /**
  * Extract AC from an already-loaded document (avoids re-reading the file).
  */
+function isDeferredOrCancelledItem(item: VBriefItem): boolean {
+  const status = String(item.status);
+  return status === 'cancelled'
+    || status === 'deferred'
+    || item.metadata?.deferred === true;
+}
+
 export function extractACFromDocument(doc: VBriefDocument): AcceptanceCriterion[] {
   const criteria: AcceptanceCriterion[] = [];
 
   for (const item of doc.plan.items) {
+    if (isDeferredOrCancelledItem(item)) continue;
     if (!item.subItems) continue;
     for (const sub of item.subItems) {
       if (sub.metadata?.kind === 'acceptance_criterion') {

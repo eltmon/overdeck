@@ -671,9 +671,6 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         url: linearIssue.url,
         source: 'linear',
       };
-
-      // Transition to "In Planning" state
-      yield* lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void));
     }
 
     const issuePrefix = extractPrefix(issue.identifier) ?? issue.identifier.split('-')[0];
@@ -681,6 +678,35 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     const issueLower = issue.identifier.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     const sessionName = `planning-${issueLower}`;
+
+    // PAN-1048: Write preliminary agent state BEFORE lifecycle.transitionTo so
+    // reactive Cloister sees role: 'plan' for this issue the moment it observes
+    // the in_planning transition. Writing state.json AFTER transitionTo opened
+    // a small race window where Cloister's onIssueStateChange could run
+    // activeRoleRunExists() and find no plan agent, then spawn a duplicate
+    // planning run via spawnRun (session name 'agent-pan-X-plan') alongside
+    // the route's own planning-pan-x session.
+    // state.json must declare role: 'plan' — parseAgentState() drops state files
+    // lacking a valid role, so writing the legacy type/agentPhase shape would
+    // make the dashboard discard this planning session on the next startup scan.
+    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
+    yield* Effect.promise(() => mkdir(agentStateDir, { recursive: true }));
+    yield* Effect.promise(() => writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
+      id: sessionName,
+      issueId: issue.identifier,
+      workspace: workspacePath,
+      status: 'starting',
+      startedAt: new Date().toISOString(),
+      role: 'plan',
+      location: workspaceLocation,
+    }, null, 2)));
+
+    if (issue.source === 'linear') {
+      // Transition to "In Planning" state — emits issue.transitioned which
+      // reactive Cloister consumes. State.json was written above so the
+      // observer can see role: 'plan' before mapping in_planning → plan role.
+      yield* lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void));
+    }
 
     yield* eventStore.append({
       type: 'workspace.created',
@@ -692,27 +718,15 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       timestamp: new Date().toISOString(),
       payload: { issueId: id, sessionName },
     });
-    yield* eventStore.append({
-      type: 'issue.statusChanged',
-      timestamp: new Date().toISOString(),
-      payload: { issueId: issue.identifier, status: newStateName, canonicalStatus: 'in_progress' },
-    });
+    // PAN-1048: lifecycle.transitionTo(id, 'in_planning') above already emits
+    // issue.transitioned with state 'in_planning'. The redundant
+    // issue.statusChanged emit (formerly broadcasting canonicalStatus
+    // 'in_progress', not 'in_planning') was a second source of truth that
+    // raced with reactive Cloister: 'in_progress' maps to the work role,
+    // so Cloister could spawn a work agent while the planning agent was
+    // still being created. Removed in favor of the single transitionTo emit.
 
-    // Write preliminary agent state so status endpoint knows planning is starting
-    const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
-    yield* Effect.promise(() => mkdir(agentStateDir, { recursive: true }));
-    yield* Effect.promise(() => writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
-      id: sessionName,
-      issueId: issue.identifier,
-      workspace: workspacePath,
-      status: 'starting',
-      startedAt: new Date().toISOString(),
-      type: 'planning',
-      agentPhase: 'planning',
-      location: workspaceLocation,
-    }, null, 2)));
-
-    try { getIssueDataService().patchIssue(issue.identifier, { status: newStateName, canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
+    try { getIssueDataService().patchIssue(issue.identifier, { status: newStateName, canonicalStatus: 'in_planning' }); } catch { /* non-fatal */ }
 
     // SSE stream: await spawnPlanningSession and stream progress events
     const encoder = new TextEncoder();
@@ -1215,7 +1229,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
 
     // Emit activity + TTS for planning completion
     emitActivityEntry({
-      source: 'planning-agent',
+      source: 'plan',
       level: 'info',
       message: `${id} planning complete — ready for work`,
       issueId: id,

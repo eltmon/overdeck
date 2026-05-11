@@ -30,14 +30,12 @@ export function StoppedAgentsBanner() {
     prevApiErrorAgentsRef.current = currentApiErrorAgents;
   }, [agents]);
 
-  /** Phases where an agent is considered actively in the pipeline.
-   *  Stopped agents in these phases + not completed = likely crashed/orphaned.
-   *  'review-response' is excluded because agents intentionally enter it on
-   *  pan done (standby for UAT tweaks), not because they crashed. */
-  const PIPELINE_PHASES = new Set([
-    'planning', 'exploration', 'implementation', 'testing',
-    'documentation', 'review', 'pre_push', 'post_push',
-  ]);
+  /** PAN-1048: roles that indicate active pipeline work. A stopped agent in
+   *  one of these roles + not completed = likely crashed/orphaned. Standby
+   *  (work agent with a live tmux session post-pan-done) is filtered separately
+   *  by the lifecycle.hasLiveTmuxSession check below — those are intentional
+   *  pauses, not crashes. */
+  const PIPELINE_ROLES = new Set(['plan', 'work', 'review', 'test', 'ship']);
 
   const RECENT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -47,9 +45,11 @@ export function StoppedAgentsBanner() {
     if (a.runtimeState === 'completed') return false;
     if (a.resolution === 'completed' || a.resolution === 'done') return false;
     if (a.lifecycle?.isCompleted) return false;
-    // Only care about agents that were in an active pipeline phase
-    if (!a.agentPhase) return false;
-    if (!PIPELINE_PHASES.has(a.agentPhase)) return false;
+    // Exclude work agents in standby (live tmux session after pan done)
+    if (a.role === 'work' && a.lifecycle?.hasLiveTmuxSession) return false;
+    // Only care about agents that have a known pipeline role
+    if (!a.role) return false;
+    if (!PIPELINE_ROLES.has(a.role)) return false;
     // Only show recently-active agents — old state files are historical debris
     const lastActivity = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
     const startedAt = a.startedAt ? new Date(a.startedAt).getTime() : 0;

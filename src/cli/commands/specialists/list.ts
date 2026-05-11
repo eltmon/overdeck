@@ -5,7 +5,7 @@
  */
 
 import chalk from 'chalk';
-import { getAllSpecialistStatus, type SpecialistStatus } from '../../../lib/cloister/specialists.js';
+import { getAllSpecialistStatus, type LegacySpecialistRuntimeStatus } from '../../../lib/cloister/specialists.js';
 
 interface ListOptions {
   json?: boolean;
@@ -34,7 +34,7 @@ export async function listCommand(options: ListOptions): Promise<void> {
   console.log('');
 }
 
-function displaySpecialist(specialist: SpecialistStatus): void {
+function displaySpecialist(specialist: LegacySpecialistRuntimeStatus): void {
   const statusIcon = getStatusIcon(specialist);
   const statusColor = getStatusColor(specialist);
   const enabledBadge = specialist.enabled ? chalk.green('enabled') : chalk.dim('disabled');
@@ -69,14 +69,14 @@ function displaySpecialist(specialist: SpecialistStatus): void {
   console.log('');
 }
 
-function getStatusIcon(specialist: SpecialistStatus): string {
+function getStatusIcon(specialist: LegacySpecialistRuntimeStatus): string {
   if (!specialist.enabled) return chalk.dim('○');
   if (specialist.isRunning) return chalk.green('●');
   if (specialist.state === 'sleeping') return chalk.yellow('●');
   return chalk.dim('○');
 }
 
-function getStatusColor(specialist: SpecialistStatus): (text: string) => string {
+function getStatusColor(specialist: LegacySpecialistRuntimeStatus): (text: string) => string {
   if (specialist.isRunning) return chalk.green;
   if (specialist.state === 'sleeping') return chalk.yellow;
   return chalk.dim;

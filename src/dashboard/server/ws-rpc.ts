@@ -112,9 +112,8 @@ function mapEventToDelta(event: StoredEvent): SessionTreeDelta | null {
       };
     }
     case 'specialist.started': {
-      const specialist = p['specialist'] as Record<string, unknown> | undefined;
-      const name = specialist?.['name'] as string | undefined;
-      const currentIssue = specialist?.['currentIssue'] as string | undefined;
+      const name = p['name'] as string | undefined;
+      const currentIssue = p['currentIssue'] as string | undefined;
       if (!name) return null;
       return {
         kind: 'session_added',

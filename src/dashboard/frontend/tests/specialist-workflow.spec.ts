@@ -18,7 +18,7 @@ const TEST_ISSUE_ID = 'PAN-53';
 /**
  * Specialist status from /api/specialists
  */
-interface SpecialistStatus {
+interface SpecialistApiStatus {
   name: string;
   displayName: string;
   description: string;
@@ -31,14 +31,14 @@ interface SpecialistStatus {
 /**
  * Poll /api/specialists until a condition is met or timeout
  */
-async function pollSpecialistStatus(
-  predicate: (specialists: SpecialistStatus[]) => boolean,
+async function pollSpecialistApiStatus(
+  predicate: (specialists: SpecialistApiStatus[]) => boolean,
   options: {
     timeout?: number;
     interval?: number;
     description?: string;
   } = {}
-): Promise<SpecialistStatus[]> {
+): Promise<SpecialistApiStatus[]> {
   const { timeout = 30000, interval = 500, description = 'condition' } = options;
   const startTime = Date.now();
 
@@ -48,7 +48,7 @@ async function pollSpecialistStatus(
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      const specialists: SpecialistStatus[] = await response.json();
+      const specialists: SpecialistApiStatus[] = await response.json();
 
       if (predicate(specialists)) {
         console.log(`✓ ${description} (after ${Date.now() - startTime}ms)`);
@@ -68,7 +68,7 @@ async function pollSpecialistStatus(
 /**
  * Get specialist by name from status array
  */
-function getSpecialist(specialists: SpecialistStatus[], name: string): SpecialistStatus | undefined {
+function getSpecialist(specialists: SpecialistApiStatus[], name: string): SpecialistApiStatus | undefined {
   return specialists.find(s => s.name === name);
 }
 
@@ -84,7 +84,7 @@ test.describe('Specialist Workflow', () => {
     console.log('\n[1/5] Checking initial specialist states...');
     const initialResponse = await fetch(`${API_URL}/api/specialists`);
     expect(initialResponse.ok).toBeTruthy();
-    const initialSpecialists: SpecialistStatus[] = await initialResponse.json();
+    const initialSpecialists: SpecialistApiStatus[] = await initialResponse.json();
 
     console.log('Initial states:');
     initialSpecialists.forEach(s => {
@@ -113,7 +113,7 @@ test.describe('Specialist Workflow', () => {
         console.log('    This test primarily validates the specialist activation mechanism');
 
         // Still verify that specialists exist and have valid states
-        const specialists = await pollSpecialistStatus(
+        const specialists = await pollSpecialistApiStatus(
           (specs) => specs.length >= 3,
           { description: 'at least 3 specialists registered', timeout: 5000 }
         );
@@ -133,7 +133,7 @@ test.describe('Specialist Workflow', () => {
 
     // 3. Poll for review-agent to become active
     console.log('\n[3/5] Waiting for review-agent to activate...');
-    const reviewActive = await pollSpecialistStatus(
+    const reviewActive = await pollSpecialistApiStatus(
       (specialists) => {
         const review = getSpecialist(specialists, 'review-agent');
         return review?.isRunning === true || review?.state === 'active';
@@ -150,7 +150,7 @@ test.describe('Specialist Workflow', () => {
 
     // 4. Poll for test-agent to become active (comes after review-agent)
     console.log('\n[4/5] Waiting for test-agent to activate...');
-    const testActive = await pollSpecialistStatus(
+    const testActive = await pollSpecialistApiStatus(
       (specialists) => {
         const test = getSpecialist(specialists, 'test-agent');
         return test?.isRunning === true || test?.state === 'active';
@@ -167,7 +167,7 @@ test.describe('Specialist Workflow', () => {
 
     // 5. Poll for merge-agent to become active (comes after test-agent)
     console.log('\n[5/5] Waiting for merge-agent to activate...');
-    const mergeActive = await pollSpecialistStatus(
+    const mergeActive = await pollSpecialistApiStatus(
       (specialists) => {
         const merge = getSpecialist(specialists, 'merge-agent');
         return merge?.isRunning === true || merge?.state === 'active';
@@ -191,7 +191,7 @@ test.describe('Specialist Workflow', () => {
     // (They may complete quickly and go back to sleeping)
     await page.waitForTimeout(2000);
     const finalResponse = await fetch(`${API_URL}/api/specialists`);
-    const finalSpecialists: SpecialistStatus[] = await finalResponse.json();
+    const finalSpecialists: SpecialistApiStatus[] = await finalResponse.json();
 
     console.log('\nFinal states:');
     finalSpecialists.forEach(s => {

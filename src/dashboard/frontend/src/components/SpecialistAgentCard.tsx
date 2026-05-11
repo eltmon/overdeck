@@ -52,7 +52,7 @@ const STATE_COLOR = {
   suspended: 'text-warning',
 };
 
-async function wakeSpecialist(name: string): Promise<void> {
+async function requestLegacySpecialistWake(name: string): Promise<void> {
   const res = await fetch(`/api/specialists/${name}/wake`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -255,7 +255,7 @@ export function SpecialistAgentCard({
   const [activityExpanded, setActivityExpanded] = useState(false);
 
   const wakeMutation = useMutation({
-    mutationFn: () => wakeSpecialist(specialist.name),
+    mutationFn: () => requestLegacySpecialistWake(specialist.name),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['specialists'] });
       queryClient.invalidateQueries({ queryKey: ['agents'] });

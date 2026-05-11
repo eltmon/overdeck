@@ -342,8 +342,9 @@ export class ClaudeCodeRuntime implements AgentRuntime {
     const state = await spawnAgentImpl({
       issueId: config.agentId.replace(/^agent-/, ''),
       workspace: config.workspace,
-      runtime: 'claude',
+      harness: 'claude-code',
       model: config.model || 'sonnet',
+      role: 'work',
       prompt: config.prompt,
     });
 

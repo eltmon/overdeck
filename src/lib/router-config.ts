@@ -2,8 +2,7 @@ import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { SettingsConfig, ModelId } from './settings.js';
-import { getAllWorkTypes, WorkTypeId } from './work-types.js';
-import { WorkTypeRouter } from './work-type-router.js';
+import { loadConfig, resolveModel } from './config-yaml.js';
 
 // claude-code-router config directory
 const ROUTER_CONFIG_DIR = join(homedir(), '.claude-code-router');
@@ -83,50 +82,37 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
 
   // See src/lib/providers.ts for direct API configuration
 
-  // Router rules: Map agent types to configured models
-
-  // Specialist agents
-  router['specialist-review-agent'] = {
+  // Legacy SettingsConfig still exposes historical keys; convert them to role keys
+  // so generated CCR config no longer depends on the removed WorkType registry.
+  router['role:review'] = {
     model: settings.models.specialists.review_agent,
   };
-  router['specialist-test-agent'] = {
+  router['role:test'] = {
     model: settings.models.specialists.test_agent,
   };
-  router['specialist-merge-agent'] = {
+  router['role:ship'] = {
     model: settings.models.specialists.merge_agent,
   };
-
-  // Complexity-based routing (for backward compatibility)
-  router['complexity-trivial'] = {
-    model: settings.models.complexity.trivial,
-  };
-  router['complexity-simple'] = {
-    model: settings.models.complexity.simple,
-  };
-  router['complexity-medium'] = {
-    model: settings.models.complexity.medium,
-  };
-  router['complexity-complex'] = {
+  router['role:plan'] = {
     model: settings.models.complexity.complex,
   };
-  router['complexity-expert'] = {
-    model: settings.models.complexity.expert,
+  router['role:work'] = {
+    model: settings.models.complexity.medium,
   };
 
   return { providers, router };
 }
 
 /**
- * Generate claude-code-router config from work types
+ * Generate claude-code-router config from role routing.
  *
- * This is the new work-type-based router configuration.
- * It generates routing rules for all 23 work types using the
- * WorkTypeRouter to resolve models.
+ * @deprecated Kept for CLI compatibility with older CCR setup commands. The
+ * role primitive owns model resolution; emitted router keys are role-based.
  */
 export function generateRouterConfigFromWorkTypes(): RouterConfig {
-  const workTypeRouter = new WorkTypeRouter();
-  const apiKeys = workTypeRouter.getApiKeys();
-  const enabledProviders = workTypeRouter.getEnabledProviders();
+  const { config } = loadConfig();
+  const apiKeys = config.apiKeys;
+  const enabledProviders = config.enabledProviders;
 
   const providers: Provider[] = [];
   const router: Record<string, RouterRule> = {};
@@ -159,16 +145,14 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
     });
   }
 
-  // Kimi provider uses direct API, not router
-  // See src/lib/providers.ts for direct API configuration
-
-  // Generate router rules for all 23 work types
-  const allWorkTypes = getAllWorkTypes();
-  for (const workType of allWorkTypes) {
-    const resolution = workTypeRouter.getModel(workType);
-    router[workType] = {
-      model: resolution.model,
-    };
+  for (const role of ['plan', 'work', 'review', 'test', 'ship'] as const) {
+    router[`role:${role}`] = { model: resolveModel(role, undefined, config) };
+  }
+  for (const subRole of ['inspect', 'inspect-deep'] as const) {
+    router[`role:work.${subRole}`] = { model: resolveModel('work', subRole, config) };
+  }
+  for (const subRole of ['security', 'correctness', 'performance', 'requirements'] as const) {
+    router[`role:review.${subRole}`] = { model: resolveModel('review', subRole, config) };
   }
 
   return { providers, router };

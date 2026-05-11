@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef, createContext, useContext } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
+import { useDashboardStore, selectAgentList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
 /* Drag-and-drop disabled pending rework (PAN-TODO)
 import {
   DndContext,
@@ -27,7 +27,8 @@ import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, 
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
-import { SpecialistAgent } from './SpecialistAgentCard';
+// PAN-1048 — SpecialistAgent type retired; specialist-style indicators now
+// derive directly from role-tagged AgentSnapshots (review / test / ship).
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
@@ -880,7 +881,8 @@ export function ListIssueRow({
   issue: Issue;
   issueWorkAgentsById?: Map<string, Agent[]>;
   agents: Agent[];
-  specialists: SpecialistAgent[];
+  /** PAN-1048 — role-tagged agents (review / test / ship) for the visible cycle. */
+  specialists: Agent[];
   issueCosts: Record<string, IssueCost>;
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
@@ -918,15 +920,21 @@ export function ListIssueRow({
     }
     return getIssueWorkAgentMap(agents).get(issueIdLower) ?? [];
   }, [agents, issueWorkAgentsById, issueIdLower]);
+  // PAN-1048: standby = work agent that finished its run but kept its tmux session
+  // alive for review/UAT response. Replaces the legacy agentPhase === 'review-response'
+  // signal — agentPhase no longer exists after the role primitive hard cut.
   const standbyAgent = workAgents.find(
-    (workAgent) => workAgent.status === 'stopped' && workAgent.agentPhase === 'review-response',
+    (workAgent) =>
+      workAgent.status === 'stopped' &&
+      (workAgent.role ?? 'work') === 'work' &&
+      !!workAgent.lifecycle?.hasLiveTmuxSession,
   );
   const isRunning = workAgents.some(isAgentSessionAttachable) || !!standbyAgent;
   const hasMultipleWorkAgents = workAgents.length > 1;
 
-  // Check for specialists
+  // Check for specialists — PAN-1048 — role-tagged agents whose issueId matches.
   const issueSpecialists = specialists.filter(
-    s => s.currentIssue?.toLowerCase() === issueIdLower
+    (s) => s.issueId?.toLowerCase() === issueIdLower && s.status !== 'stopped'
   );
 
   // Parse difficulty from labels
@@ -1007,10 +1015,10 @@ export function ListIssueRow({
         </span>
       )}
 
-      {/* Specialist indicators */}
-      {issueSpecialists.map(s => (
-        <span key={s.name} className="text-xs text-primary shrink-0" title={`${s.displayName} specialist`}>
-          {s.name === 'review-agent' ? '👁️' : s.name === 'test-agent' ? '🧪' : s.name === 'merge-agent' ? '🔀' : '🤖'}
+      {/* Specialist indicators — PAN-1048 keyed on role primitive */}
+      {issueSpecialists.map((s) => (
+        <span key={s.id} className="text-xs text-primary shrink-0" title={`${s.role} agent`}>
+          {s.role === 'review' ? '👁️' : s.role === 'test' ? '🧪' : s.role === 'ship' ? '🔀' : '🤖'}
         </span>
       ))}
 
@@ -1160,7 +1168,14 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   // Event-sourced state from Zustand store (PAN-433 read model)
   const issues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
-  const specialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
+  // PAN-1048 — derive specialist-role agents (review / test / ship) from the
+  // unified agent list. Replaces the retired specialistsByName projection.
+  const specialists = useMemo(
+    () => agents.filter(
+      (a) => a.role === 'review' || a.role === 'test' || a.role === 'ship',
+    ),
+    [agents],
+  );
   const reviewStatusByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
 
   // Bulk selection state — key based on filters so selection survives data refreshes
@@ -2004,7 +2019,8 @@ function ColumnContent({
   issues: Issue[];
   issueWorkAgentsById: Map<string, Agent[]>;
   agents: Agent[];
-  specialists: SpecialistAgent[];
+  /** PAN-1048 — role-tagged agents (review / test / ship). */
+  specialists: Agent[];
   issueCosts: Record<string, IssueCost>;
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
@@ -2030,7 +2046,7 @@ function ColumnContent({
       (a) => a.issueId?.toLowerCase() === issueIdLower && a.id?.startsWith('planning-')
     );
     const issueSpecialists = specialists.filter(
-      (s) => s.currentIssue?.toLowerCase() === issueIdLower
+      (s) => s.issueId?.toLowerCase() === issueIdLower && s.status !== 'stopped'
     );
 
     return (
@@ -2653,7 +2669,8 @@ interface IssueCardProps {
   workAgent?: Agent;
   workAgents?: Agent[];
   planningAgent?: Agent;
-  specialists?: SpecialistAgent[];
+  /** PAN-1048 — role-tagged agents (review / test / ship) for this issue. */
+  specialists?: Agent[];
   cost?: IssueCost;
   costsLoading?: boolean;
   isSelected: boolean;
@@ -2714,8 +2731,12 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   // Determine which agent is relevant based on issue status
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
   const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0];
+  // PAN-1048: see comment on the earlier standbyAgent — derive from role + live tmux.
   const standbyAgent = issueWorkAgents.find(
-    (candidate) => candidate.status === 'stopped' && candidate.agentPhase === 'review-response' && !!candidate.lifecycle?.hasLiveTmuxSession,
+    (candidate) =>
+      candidate.status === 'stopped' &&
+      (candidate.role ?? 'work') === 'work' &&
+      !!candidate.lifecycle?.hasLiveTmuxSession,
   );
   const isStandby = !!standbyAgent;
   const isRunning = issueWorkAgents.some(isAgentSessionAttachable) || isStandby;
@@ -2855,7 +2876,14 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
 
   const startAgentMutation = useMutation({
     mutationFn: async () => {
-      const requestBody = { issueId: issue.identifier, model: launchModel, harness: launchHarness };
+      // PAN-1048 + PAN-1055: role-aware spawn body that also threads the
+      // user-selected model + harness from the launch panel.
+      const requestBody = {
+        issueId: issue.identifier,
+        role: 'work',
+        model: launchModel,
+        harness: launchHarness,
+      };
       let lastRequestBody: Record<string, unknown> = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
@@ -3168,7 +3196,11 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                 });
               }
               for (const spec of specialists) {
-                const specType = spec.name.replace('-agent', '') as 'review' | 'test' | 'merge';
+                // PAN-1048 — role primitive directly maps to the AgentBadge type.
+                // Map ship → merge for the legacy badge palette so reviewers
+                // still see the familiar "merge" indicator.
+                const specType = (spec.role === 'ship' ? 'merge' : spec.role) as 'review' | 'test' | 'merge';
+                if (specType !== 'review' && specType !== 'test' && specType !== 'merge') continue;
                 badges.push({ type: specType, name: specType });
               }
 

@@ -1,7 +1,7 @@
 /**
  * Tests for PAN-343: test-agent delivery failure silently treated as success.
  * Updated for PAN-369: retry logic, dispatch_failed status.
- * Updated for PAN-722: queue removal — direct ephemeral dispatch only.
+ * Updated for PAN-1048: role-based test dispatch via spawnRun(issue, 'test').
  *
  * Tests the exported `dispatchTestAgentAndNotify` function from
  * src/lib/cloister/test-agent-queue.ts — the production code extracted from
@@ -9,24 +9,23 @@
  *
  * Coverage:
  *  1. Spawn succeeds: testStatus='testing', agent notified
- *  2. First spawn fails (non-busy), retry succeeds: testStatus='testing', agent notified
- *  3. specialist_busy: sets dispatch_failed immediately (no retry)
- *  4. Both spawn attempts fail: testStatus='dispatch_failed', agent NOT notified
- *  5. No project configured: dispatch_failed, agent NOT notified
- *  6. Exception path: catch block sets testStatus='dispatch_failed' and does NOT notify agent
- *  7. Exception + setReviewStatus throws: nested catch prevents outer throw, agent NOT notified
+ *  2. Existing test role run is treated as successful delivery
+ *  3. Spawn failure: testStatus='dispatch_failed', agent NOT notified
+ *  4. No project configured: dispatch_failed, agent NOT notified
+ *  5. Exception path: catch block sets testStatus='dispatch_failed' and does NOT notify agent
+ *  6. Exception + setReviewStatus throws: nested catch prevents outer throw, agent NOT notified
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---------------------------------------------------------------------------
-// Mock the specialists module (imported statically by test-agent-queue.ts)
+// Mock the role runner (imported statically by test-agent-queue.ts)
 // ---------------------------------------------------------------------------
 
-const mockSpawnEphemeralSpecialist = vi.fn();
+const mockSpawnRun = vi.fn();
 
-vi.mock('../../../src/lib/cloister/specialists.js', () => ({
-  spawnEphemeralSpecialist: (...args: unknown[]) => mockSpawnEphemeralSpecialist(...args),
+vi.mock('../../../src/lib/agents.js', () => ({
+  spawnRun: (...args: unknown[]) => mockSpawnRun(...args),
 }));
 
 // ---------------------------------------------------------------------------
@@ -89,11 +88,15 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
 
   it('sets testStatus to testing and notifies agent when spawn succeeds', async () => {
     setupProjectResolved();
-    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: true, message: 'spawned' });
+    mockSpawnRun.mockResolvedValue({ id: 'agent-pan-343-test' });
     const notify = makeNotify();
 
     await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
+    expect(mockSpawnRun).toHaveBeenCalledWith(ISSUE, 'test', expect.objectContaining({
+      workspace: WS,
+      prompt: expect.stringContaining(`TEST TASK for ${ISSUE}`),
+    }));
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
     expect(notify).toHaveBeenCalledWith(
       `agent-${ISSUE.toLowerCase()}`,
@@ -101,74 +104,30 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     );
   });
 
-  it('sets testStatus to testing and notifies agent on retry when first spawn fails', async () => {
-    vi.useFakeTimers();
+  it('sets testStatus to testing and notifies agent when the test role is already running', async () => {
     setupProjectResolved();
-    mockSpawnEphemeralSpecialist
-      .mockResolvedValueOnce({ success: false, message: 'busy' })
-      .mockResolvedValueOnce({ success: true, message: 'spawned on retry' });
-    const notify = makeNotify();
-
-    const promise = dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
-    await vi.advanceTimersByTimeAsync(2000);
-    await promise;
-    vi.useRealTimers();
-
-    expect(mockSpawnEphemeralSpecialist).toHaveBeenCalledTimes(2);
-    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
-    expect(notify).toHaveBeenCalled();
-  });
-
-  it('sets dispatch_failed immediately without retry when specialist_busy', async () => {
-    setupProjectResolved();
-    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: false, error: 'specialist_busy' });
+    mockSpawnRun.mockRejectedValue(new Error('Role run agent-pan-343-test already running'));
     const notify = makeNotify();
 
     await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
-    // specialist_busy should NOT trigger a retry
-    expect(mockSpawnEphemeralSpecialist).toHaveBeenCalledTimes(1);
-    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
-      testStatus: 'dispatch_failed',
-      testNotes: expect.stringContaining('deacon will retry'),
-    });
-    expect(notify).not.toHaveBeenCalled();
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
+    expect(notify).toHaveBeenCalled();
   });
 
-  it('retries once then sets dispatch_failed when both spawn attempts fail', async () => {
-    vi.useFakeTimers();
+  it('sets dispatch_failed when spawnRun rejects and does not notify', async () => {
     setupProjectResolved();
-    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: false, message: 'spawn failed' });
+    mockSpawnRun.mockRejectedValue(new Error('spawn failed'));
     const notify = makeNotify();
 
-    const promise = dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
-    await vi.advanceTimersByTimeAsync(2000);
-    await promise;
-    vi.useRealTimers();
+    await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
-    // Both spawn attempts must be made
-    expect(mockSpawnEphemeralSpecialist).toHaveBeenCalledTimes(2);
-    // Should set dispatch_failed after both attempts fail
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
       testStatus: 'dispatch_failed',
       testNotes: expect.stringContaining('spawn failed'),
     });
-    // Must NOT notify agent on failure
-    expect(notify).not.toHaveBeenCalled();
-  });
-
-  it('sets dispatch_failed when both spawn attempts fail and does not notify', async () => {
-    vi.useFakeTimers();
-    setupProjectResolved();
-    mockSpawnEphemeralSpecialist.mockResolvedValue({ success: false, message: 'all busy' });
-    const notify = makeNotify();
-
-    const promise = dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
-    await vi.advanceTimersByTimeAsync(2000);
-    await promise;
-    vi.useRealTimers();
-
-    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, expect.objectContaining({ testStatus: 'dispatch_failed' }));
     expect(notify).not.toHaveBeenCalled();
   });
 
@@ -178,7 +137,7 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
 
     await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
 
-    expect(mockSpawnEphemeralSpecialist).not.toHaveBeenCalled();
+    expect(mockSpawnRun).not.toHaveBeenCalled();
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
       testStatus: 'dispatch_failed',
       testNotes: expect.stringContaining('No project configured'),
@@ -186,9 +145,9 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it('sets testStatus to dispatch_failed and does NOT notify agent when specialists module throws', async () => {
+  it('sets testStatus to dispatch_failed and does NOT notify agent when role runner throws', async () => {
     setupProjectResolved();
-    mockSpawnEphemeralSpecialist.mockRejectedValue(new Error('specialists module unavailable'));
+    mockSpawnRun.mockRejectedValue(new Error('role runner unavailable'));
     const notify = makeNotify();
 
     await dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify);
@@ -198,13 +157,13 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     // PAN-369: exception must set dispatch_failed so deacon can recover
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
       testStatus: 'dispatch_failed',
-      testNotes: expect.stringContaining('specialists module unavailable'),
+      testNotes: expect.stringContaining('role runner unavailable'),
     });
   });
 
   it('does not throw and does not notify agent when setReviewStatus itself throws in the catch block', async () => {
     setupProjectResolved();
-    mockSpawnEphemeralSpecialist.mockRejectedValue(new Error('specialists unavailable'));
+    mockSpawnRun.mockRejectedValue(new Error('role runner unavailable'));
     // setReviewStatus throws when trying to persist dispatch_failed
     mockSetReviewStatus.mockImplementation(() => {
       throw new Error('status file write failed');

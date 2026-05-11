@@ -161,7 +161,7 @@ export async function createReviewArtifactsForIssue(
     if (artifact.created) {
       const repoSuffix = mergeSet.repos.length > 1 ? ` (${repo.repoKey})` : '';
       emitActivityEntry({
-        source: 'merge-agent',
+        source: 'ship',
         level: 'info',
         message: `Merge request created for ${issueId}${repoSuffix}`,
         details: artifact.url,

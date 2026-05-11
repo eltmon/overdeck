@@ -32,11 +32,13 @@ const STATUS_GLOW: Record<string, string> = {
   running: 'gv-breathe-healthy',
 };
 
-const PHASE_COLORS: Record<string, string> = {
-  planning: 'var(--gv-amber)',
-  implementation: 'var(--gv-blue)',
-  exploration: 'var(--gv-purple)',
-  testing: 'var(--gv-green)',
+// PAN-1048: colors are now keyed by Role, not legacy phase strings.
+const ROLE_COLORS: Record<string, string> = {
+  plan: 'var(--gv-amber)',
+  work: 'var(--gv-blue)',
+  review: 'var(--gv-purple)',
+  test: 'var(--gv-green)',
+  ship: 'var(--gv-orange)',
 };
 
 function UptimeCounter({ startedAt }: { startedAt: string }) {
@@ -82,7 +84,7 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
   const terminalLines = agentOutput[agent.id] || [];
   const liveStatus = agentStatuses[agent.id] || agent.status;
 
-  const phaseColor = agent.agentPhase ? PHASE_COLORS[agent.agentPhase] || 'var(--gv-blue)' : 'var(--gv-blue)';
+  const roleColor = agent.role ? ROLE_COLORS[agent.role] || 'var(--gv-blue)' : 'var(--gv-blue)';
 
   const now = useSharedTick();
   const lastHeardTooltip = (() => {
@@ -93,7 +95,7 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
   })();
   const cardTooltip = [
     agent.issueId || agent.id,
-    agent.agentPhase ? `Phase: ${agent.agentPhase}` : '',
+    agent.role ? `Role: ${agent.role}` : '',
     lastHeardTooltip,
   ].filter(Boolean).join(' · ');
 
@@ -109,12 +111,12 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
       onClick={onClick}
       title={cardTooltip}
       className={`gv-glass cursor-pointer p-3 flex flex-col gap-2 relative overflow-hidden ${STATUS_GLOW[liveStatus] || ''}`}
-      style={{ borderColor: phaseColor + '44' }}
+      style={{ borderColor: roleColor + '44' }}
     >
       {/* Project color border accent (left) */}
       <div
         className="absolute left-0 top-0 bottom-0 w-0.5"
-        style={{ backgroundColor: phaseColor }}
+        style={{ backgroundColor: roleColor }}
       />
 
       {/* Header row */}
@@ -122,16 +124,16 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
         <div className="flex items-center gap-1.5 min-w-0">
           <span
             className="text-xs font-bold truncate"
-            style={{ color: phaseColor, fontFamily: 'var(--gv-font-mono)' }}
+            style={{ color: roleColor, fontFamily: 'var(--gv-font-mono)' }}
           >
             {agent.issueId || agent.id}
           </span>
-          {agent.agentPhase && (
+          {agent.role && (
             <span
               className="text-[9px] px-1.5 py-0.5 rounded font-medium uppercase"
-              style={{ color: phaseColor, background: phaseColor + '22' }}
+              style={{ color: roleColor, background: roleColor + '22' }}
             >
-              {agent.agentPhase}
+              {agent.role}
             </span>
           )}
         </div>

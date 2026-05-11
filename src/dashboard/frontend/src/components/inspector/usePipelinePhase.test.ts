@@ -321,10 +321,11 @@ describe('derivePipelinePhase precedence table', () => {
     });
 
     it('prefers the first active swarm slot over an earlier standby slot during merge', () => {
+      // PAN-1048: standby is now derived from role + lifecycle.hasLiveTmuxSession.
       const input = makeInput({
-        agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+        agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', role: 'work', lifecycle: { hasLiveTmuxSession: true } as any }),
         workAgents: [
-          makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+          makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', role: 'work', lifecycle: { hasLiveTmuxSession: true } as any }),
           makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'healthy' }),
         ],
         reviewStatus: makeReviewStatus({ mergeStatus: 'merging' }),
@@ -514,9 +515,9 @@ describe('derivePipelinePhase availableTerminals', () => {
 
   it('follows the first active swarm slot when an earlier slot is only standby-attachable', () => {
     const input = makeInput({
-      agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+      agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', role: 'work', lifecycle: { hasLiveTmuxSession: true } as any }),
       workAgents: [
-        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', role: 'work', lifecycle: { hasLiveTmuxSession: true } as any }),
         makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'healthy' }),
       ],
     });
@@ -532,7 +533,7 @@ describe('derivePipelinePhase availableTerminals', () => {
       agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped' }),
       workAgents: [
         makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped' }),
-        makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+        makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'stopped', role: 'work', lifecycle: { hasLiveTmuxSession: true } as any }),
       ],
     });
 
@@ -585,10 +586,10 @@ describe('usePipelinePhase hook', () => {
     vi.useRealTimers();
   });
 
-  it('recomputes when agentPhase changes without a status change', async () => {
+  it('recomputes when role/lifecycle changes without a status change', async () => {
     const initialInput = makeInput({
-      agent: makeAgent({ status: 'stopped', agentPhase: 'implementation' }),
-      workAgents: [makeAgent({ status: 'stopped', agentPhase: 'implementation' })],
+      agent: makeAgent({ status: 'stopped', role: 'work' }),
+      workAgents: [makeAgent({ status: 'stopped', role: 'work' })],
     });
 
     const { result, rerender } = renderHook(
@@ -601,8 +602,8 @@ describe('usePipelinePhase hook', () => {
 
     rerender({
       input: makeInput({
-        agent: makeAgent({ status: 'stopped', agentPhase: 'review-response' }),
-        workAgents: [makeAgent({ status: 'stopped', agentPhase: 'review-response' })],
+        agent: makeAgent({ status: 'stopped', role: 'work', lifecycle: { hasLiveTmuxSession: true } as any }),
+        workAgents: [makeAgent({ status: 'stopped', role: 'work', lifecycle: { hasLiveTmuxSession: true } as any })],
       }),
     });
 

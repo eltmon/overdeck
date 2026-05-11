@@ -10,15 +10,12 @@
  *   pan specialists done merge PAN-83 --status passed
  */
 
-import { existsSync } from 'fs';
-import { join } from 'path';
 import chalk from 'chalk';
 import {
   setReviewStatus,
   getReviewStatus,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
 
 interface DoneOptions {
   status: 'passed' | 'failed';
@@ -73,18 +70,7 @@ export async function doneCommand(
       if (options.notes) update.testNotes = options.notes;
       if (options.status === 'passed') {
         console.log(chalk.green(`✓ Tests ${options.status} for ${normalizedIssueId}`));
-        // Mirror server route logic: mark ready for merge when tests pass
-        const project = resolveProjectFromIssue(normalizedIssueId);
-        if (project) {
-          const workspacePath = join(
-            project.projectPath,
-            'workspaces',
-            `feature-${normalizedIssueId.toLowerCase()}`,
-          );
-          if (existsSync(workspacePath)) {
-            update.readyForMerge = true;
-          }
-        }
+        // readyForMerge is set only by the ship role after rebase/verify/push (PAN-1048).
       } else {
         console.log(chalk.yellow(`✗ Tests ${options.status} for ${normalizedIssueId}`));
       }
@@ -116,7 +102,6 @@ export async function doneCommand(
       update.uatStatus = options.status as ReviewStatus['uatStatus'];
       if (options.notes) update.uatNotes = options.notes;
       if (options.status === 'passed') {
-        update.readyForMerge = true;
         console.log(chalk.green(`✓ UAT passed for ${normalizedIssueId}`));
         console.log(chalk.dim('  Ready for merge'));
       } else {

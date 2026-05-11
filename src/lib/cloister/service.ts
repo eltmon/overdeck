@@ -25,7 +25,9 @@ import { getDatabase, closeDatabase } from '../database/index.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgents, getAgentState, getAgentRuntimeState, saveAgentRuntimeState } from '../agents.js';
+import { listRunningAgents, getAgentState, getAgentStateAsync, getAgentRuntimeState, saveAgentRuntimeState } from '../agents.js';
+import type { Role } from '../agents.js';
+import { resolveProjectFromIssue } from '../projects.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEvent, createHandoffEvent } from './handoff-logger.js';
@@ -59,6 +61,7 @@ import {
 } from './deacon.js';
 import { PANOPTICON_HOME } from '../paths.js';
 import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync, statSync } from 'fs';
+import { rm } from 'fs/promises';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
@@ -67,6 +70,11 @@ import { emitActivityEntry } from '../activity-logger.js';
 
 // State file for cross-process communication
 const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');
+const LEGACY_SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
+
+async function cleanupLegacySpecialistsDirectory(): Promise<void> {
+  await rm(LEGACY_SPECIALISTS_DIR, { recursive: true, force: true });
+}
 
 /**
  * Pure helper: from a map of review statuses, return the issue IDs that are
@@ -115,6 +123,244 @@ export function parseSpecialistAgentSession(name: string): {
   }
 
   return null;
+}
+
+export type ReactiveIssueState =
+  | 'todo'
+  | 'open'
+  | 'in_planning'
+  | 'in_progress'
+  | 'in_review'
+  | 'testing'
+  | 'shipping'
+  | 'closed'
+  | 'canceled';
+
+export interface CloisterDomainEventLike {
+  type: string;
+  payload?: unknown;
+}
+
+const ROLE_RUN_STATES: Record<ReactiveIssueState, Role | null> = {
+  todo: null,
+  open: null,
+  in_planning: 'plan',
+  in_progress: 'work',
+  in_review: 'review',
+  testing: 'test',
+  shipping: 'ship',
+  closed: null,
+  canceled: null,
+};
+
+/**
+ * Map issue lifecycle state to the role that should own that state.
+ */
+export function stateToRole(state: string): Role | null {
+  const normalized = state.toLowerCase().replace(/[ -]/g, '_') as ReactiveIssueState;
+  return ROLE_RUN_STATES[normalized] ?? null;
+}
+
+function normalizeIssueId(issueId: string): string {
+  return issueId.trim().toUpperCase();
+}
+
+function roleFromAgentId(agentId: string, issueId: string): Role | null {
+  const base = `agent-${issueId.toLowerCase()}`;
+  if (agentId === base) return 'work';
+  const role = agentId.slice(base.length + 1);
+  return ['plan', 'review', 'test', 'ship'].includes(role) ? role as Role : null;
+}
+
+/**
+ * PAN-1048 performance fix: O(1) direct state lookup instead of scanning
+ * all agent directories. Roles use canonical IDs: agent-<issue-lower> for
+ * work, agent-<issue-lower>-<role> for all others.
+ *
+ * Intentionally does NOT require tmuxActive — spawn routes write state.json
+ * with status:'starting' before the tmux session attaches, so filtering on
+ * tmuxActive would race-spawn a second run.
+ */
+async function activeRoleRunExists(issueId: string, role: Role): Promise<boolean> {
+  const issueLower = issueId.toLowerCase();
+
+  // C1: For 'plan', also check the legacy planning-pan-X session format
+  // alongside the canonical agent-pan-X-plan format. The start-planning route
+  // writes to planning-pan-X while spawnRun uses agent-pan-X-plan.
+  if (role === 'plan') {
+    const legacyId = `planning-${issueLower}`;
+    const legacyState = await getAgentStateAsync(legacyId);
+    if (legacyState?.role === 'plan' && legacyState.status !== 'stopped' && legacyState.status !== 'error') {
+      // S1: if stuck at 'starting' with no live tmux session, treat as not-alive
+      // so the next retry can spawn a fresh run without being blocked.
+      if (legacyState.status === 'starting' && !(await sessionExistsAsync(legacyId))) {
+        return false;
+      }
+      return true;
+    }
+  }
+
+  const candidateId = role === 'work'
+    ? `agent-${issueLower}`
+    : `agent-${issueLower}-${role}`;
+
+  const state = await getAgentStateAsync(candidateId);
+  if (!state) return false;
+
+  const stateRole = state.role ?? roleFromAgentId(candidateId, issueId);
+
+  // S1: treat a 'starting' state with no live tmux session as not-alive.
+  if (stateRole === role && state.status === 'starting' && !(await sessionExistsAsync(candidateId))) {
+    return false;
+  }
+
+  return stateRole === role && state.status !== 'stopped' && state.status !== 'error';
+}
+
+function buildReactiveRolePrompt(issueId: string, state: string, role: Role): string {
+  return `${role.toUpperCase()} TASK for ${issueId}:
+
+The issue lifecycle transitioned to ${state}. Run the ${role} role for this issue.
+
+Required steps:
+1. Work only in the workspace configured for ${issueId}.
+2. Read .pan/continue.json, .pan/spec.vbrief.json, project instructions, and issue context.
+3. Follow the boundaries and success criteria in roles/${role}.md exactly.
+4. Report the role-specific terminal status when done.`;
+}
+
+/**
+ * Resolve the workspace path for an issue from agent state, then fall back
+ * to the canonical `<projectPath>/workspaces/feature-<issueLower>` layout.
+ * Mirrors the resolution used by startup recovery (service.ts:583-609) so
+ * the reactive scheduler dispatches review/test wrappers with the same
+ * workspace contract those wrappers receive on the manual code path.
+ */
+async function resolveWorkspaceForIssue(issueId: string): Promise<string | null> {
+  const issueLower = issueId.toLowerCase();
+  const agentState = await getAgentStateAsync(`agent-${issueLower}`);
+  if (agentState?.workspace) return agentState.workspace;
+  const resolved = resolveProjectFromIssue(issueId);
+  if (!resolved) return null;
+  return `${resolved.projectPath}/workspaces/feature-${issueLower}`;
+}
+
+/**
+ * Reactive Cloister entrypoint: start the role that owns a new issue state.
+ *
+ * PAN-1048 review feedback 003: review and test roles dispatch through their
+ * dedicated wrappers (spawnReviewRoleForIssue, dispatchTestAgentAndNotify)
+ * instead of bare spawnRun(). The wrappers carry the contract pieces the
+ * reactive path was previously dropping — review-temp stash, reviewSpawnedAt,
+ * feedback archival, status-posting prompt, idempotency guards, and the
+ * `/api/review/:issueId/status` integration that flips readyForMerge.
+ */
+export async function onIssueStateChange(issueId: string, newState: string): Promise<void> {
+  const normalizedIssueId = normalizeIssueId(issueId);
+  const role = stateToRole(newState);
+  if (!role) {
+    console.log(`[cloister] ${normalizedIssueId}: no role for issue state '${newState}'`);
+    return;
+  }
+
+  if (await activeRoleRunExists(normalizedIssueId, role)) {
+    const message = `${normalizedIssueId}: ${role} role already active; skipping lifecycle spawn`;
+    console.log(`[cloister] ${message}`);
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    return;
+  }
+
+  try {
+    if (role === 'review') {
+      const workspace = await resolveWorkspaceForIssue(normalizedIssueId);
+      if (!workspace) {
+        const failure = `${normalizedIssueId}: cannot dispatch review role — no workspace or project resolved`;
+        console.error(`[cloister] ${failure}`);
+        emitActivityEntry({ source: 'cloister', level: 'error', message: failure, issueId: normalizedIssueId });
+        return;
+      }
+      const branch = `feature/${normalizedIssueId.toLowerCase()}`;
+      const { spawnReviewRoleForIssue } = await import('./review-agent.js');
+      const result = await spawnReviewRoleForIssue({ issueId: normalizedIssueId, workspace, branch });
+      const message = `${normalizedIssueId}: review role dispatched from lifecycle state '${newState}' (${result.message})`;
+      console.log(`[cloister] ${message}`);
+      emitActivityEntry({ source: 'cloister', level: result.success ? 'info' : 'error', message, issueId: normalizedIssueId });
+      return;
+    }
+
+    if (role === 'test') {
+      const workspace = (await resolveWorkspaceForIssue(normalizedIssueId)) ?? undefined;
+      const branch = `feature/${normalizedIssueId.toLowerCase()}`;
+      const { dispatchTestAgentAndNotify } = await import('./test-agent-queue.js');
+      await dispatchTestAgentAndNotify(normalizedIssueId, workspace, branch);
+      const message = `${normalizedIssueId}: test role dispatched from lifecycle state '${newState}'`;
+      console.log(`[cloister] ${message}`);
+      emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+      return;
+    }
+
+    const { spawnRun } = await import('../agents.js');
+    const run = await spawnRun(normalizedIssueId, role, {
+      prompt: buildReactiveRolePrompt(normalizedIssueId, newState, role),
+    });
+    const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
+    console.log(`[cloister] ${message}`);
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('already running')) {
+      const skipMessage = `${normalizedIssueId}: ${role} role already running; skipping lifecycle spawn`;
+      console.log(`[cloister] ${skipMessage}`);
+      emitActivityEntry({ source: 'cloister', level: 'info', message: skipMessage, issueId: normalizedIssueId });
+      return;
+    }
+    console.error(`[cloister] Failed to start ${role} role for ${normalizedIssueId}:`, error);
+    emitActivityEntry({ source: 'cloister', level: 'error', message: `${normalizedIssueId}: failed to start ${role} role: ${message}`, issueId: normalizedIssueId });
+  }
+}
+
+function payloadRecord(event: CloisterDomainEventLike): Record<string, unknown> {
+  return event.payload && typeof event.payload === 'object' ? event.payload as Record<string, unknown> : {};
+}
+
+export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike): { issueId: string; state: string } | null {
+  const payload = payloadRecord(event);
+  const issueId = typeof payload.issueId === 'string' ? payload.issueId : null;
+  if (!issueId) return null;
+
+  switch (event.type) {
+    case 'issue.transitioned':
+      return typeof payload.state === 'string' ? { issueId, state: payload.state } : null;
+    case 'issue.statusChanged':
+      return typeof payload.canonicalStatus === 'string' ? { issueId, state: payload.canonicalStatus } : null;
+    case 'issue.closed':
+      return { issueId, state: 'closed' };
+    case 'agent.completed': {
+      // PAN-1048 review feedback 003: agent.completed is emitted by every
+      // role's lifecycle (work, review, test, ship). Map it to in_review only
+      // when the work role completes — letting other roles land here would
+      // ricochet back into review the moment a review or test role finished.
+      const role = typeof payload.role === 'string' ? payload.role : undefined;
+      if (role === undefined || role === 'work') {
+        return { issueId, state: 'in_review' };
+      }
+      return null;
+    }
+    case 'work.completed':
+      return { issueId, state: 'in_review' };
+    case 'review.approved':
+      return { issueId, state: 'testing' };
+    case 'test.passed':
+      return { issueId, state: 'shipping' };
+    default:
+      return null;
+  }
+}
+
+export async function handleCloisterDomainEvent(event: CloisterDomainEventLike): Promise<void> {
+  const change = issueStateChangeFromDomainEvent(event);
+  if (!change) return;
+  await onIssueStateChange(change.issueId, change.state);
 }
 
 /**
@@ -240,6 +486,7 @@ export class CloisterService {
   private processedCompletions: Map<string, number> = new Map(); // Track completion marker retry counts (Infinity = done)
   private healthCheckCount: number = 0;
   private lastPokeTimestamps: Map<string, number> = new Map(); // agentId → last poke timestamp (ms)
+  private domainEventUnsubscribe: (() => void) | null = null;
 
   // ─── Status cache ────────────────────────────────────────────────────────────
   // getStatus() does sync file I/O + tmux calls for every agent. Cache for 3s
@@ -282,6 +529,13 @@ export class CloisterService {
       console.error('  ✗ Failed to initialize panopticon database:', error);
     }
 
+    try {
+      await cleanupLegacySpecialistsDirectory();
+      console.log('  ✓ Removed legacy ~/.panopticon/specialists directory');
+    } catch (error) {
+      console.error('  ✗ Failed to remove legacy specialists directory:', error);
+    }
+
     // PAN-493: Reset orphaned verificationStatus === 'running' states.
     // If Cloister dies mid-verification, the status is left stuck at 'running' and the
     // pipeline halts indefinitely. On startup, reset any such states to 'pending' so
@@ -306,8 +560,8 @@ export class CloisterService {
     // PAN-511: Clear stale currentIssue from specialist agents that are not actually running.
     // If Cloister dies while a specialist is between tasks or mid-run, the specialist's
     // runtime.json may retain currentIssue and state='active' even though the process is dead.
-    // wakeSpecialistOrQueue and spawnEphemeralSpecialist check these fields to decide whether
-    // to queue or dispatch — a stale 'active' state permanently blocks new dispatches.
+    // spawnEphemeralSpecialist checks these fields to decide whether
+    // to dispatch — a stale 'active' state permanently blocks new dispatches.
     // On startup, clear currentIssue and reset state from any specialist agent that is:
     //   (a) idle — safe: idle means no active task, currentIssue is leftover
     //   (b) active but tmux session no longer running — state is stale from a crash
@@ -360,7 +614,6 @@ export class CloisterService {
       const reviewStatuses = loadReviewStatuses();
       const { resolveProjectFromIssue } = await import('../projects.js');
       const { getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
-      const { dispatchParallelReview } = await import('./review-agent.js');
 
       // Build set of issue IDs actively being reviewed by a running specialist
       const activeReviewIssues = new Set<string>();
@@ -380,13 +633,17 @@ export class CloisterService {
           activeReviewIssues.add(globalRs.currentIssue.toUpperCase());
         }
 
-        // Also detect ad-hoc parallel review sessions spawned by dispatchParallelReview.
-        // These never register runtime state, so they're invisible to the checks above.
-        const { listSessionNamesAsync } = await import('../tmux.js');
-        const { getActiveParallelReviewIssues } = await import('./review-agent.js');
-        const allSessions = await listSessionNamesAsync();
-        for (const issueId of getActiveParallelReviewIssues(allSessions)) {
-          activeReviewIssues.add(issueId);
+        // PAN-1048 R5: detect role-primitive review runs (agent-<id>-review).
+        // Replaces the legacy getActiveParallelReviewIssues helper that scanned
+        // tmux for dispatchParallelReview's coordinator session naming pattern.
+        const { listRunningAgentsAsync } = await import('../agents.js');
+        const agents = await listRunningAgentsAsync();
+        for (const agent of agents) {
+          if (agent.status === 'stopped' || agent.status === 'error') continue;
+          const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : null);
+          if (role !== 'review') continue;
+          const issueId = (agent.issueId ?? '').trim().toUpperCase();
+          if (issueId) activeReviewIssues.add(issueId);
         }
       } catch {
         // Non-fatal: if we can't check active sessions, re-dispatch all orphaned
@@ -420,8 +677,12 @@ export class CloisterService {
           }
 
           const branch = `feature/${issueId.toLowerCase()}`;
-          await dispatchParallelReview({ issueId, workspace, branch });
-          // dispatchParallelReview sets reviewStatus='reviewing' internally
+          // PAN-1048 R4: startup recovery now spawns the review role primitive
+          // (loads roles/review.md → Agent tool fans out to convoy reviewers)
+          // instead of the legacy `pan review run` coordinator.
+          const { spawnReviewRoleForIssue } = await import('./review-agent.js');
+          await spawnReviewRoleForIssue({ issueId, workspace, branch });
+          // spawnReviewRoleForIssue sets reviewStatus='reviewing' internally
           console.log(`  ✓ Re-dispatched recovery review for ${issueId}`);
           emitActivityEntry({ source: 'cloister', level: 'info', message: `Re-dispatched recovery review for ${issueId}`, issueId });
         }
@@ -452,8 +713,37 @@ export class CloisterService {
     this.emit({ type: 'started' });
     emitActivityEntry({ source: 'cloister', level: 'info', message: 'Cloister agent watchdog started' });
 
+    await this.subscribeToDomainEvents();
+
     // Start monitoring loop
     this.startMonitoringLoop();
+  }
+
+  private async subscribeToDomainEvents(): Promise<void> {
+    if (this.domainEventUnsubscribe) return;
+
+    try {
+      const { initEventStore } = await import('../../dashboard/server/event-store.js');
+      const store = await initEventStore();
+      this.domainEventUnsubscribe = store.subscribe((event) => {
+        void handleCloisterDomainEvent(event).catch((error) => {
+          console.error('[cloister] Reactive lifecycle event handling failed:', error);
+          emitActivityEntry({
+            source: 'cloister',
+            level: 'error',
+            message: `Reactive lifecycle event handling failed: ${error instanceof Error ? error.message : String(error)}`,
+          });
+        });
+      });
+      console.log('  ✓ Cloister reactive lifecycle scheduler subscribed to domain events');
+    } catch (error) {
+      console.error('  ✗ Failed to subscribe Cloister reactive lifecycle scheduler:', error);
+      emitActivityEntry({
+        source: 'cloister',
+        level: 'error',
+        message: `Failed to subscribe reactive lifecycle scheduler: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
   }
 
   /**
@@ -476,6 +766,11 @@ export class CloisterService {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
+    }
+
+    if (this.domainEventUnsubscribe) {
+      this.domainEventUnsubscribe();
+      this.domainEventUnsubscribe = null;
     }
 
     // Stop deacon health monitor
@@ -1130,7 +1425,7 @@ export class CloisterService {
       if (previousState === undefined || previousState !== currentState) {
         // Determine source from heartbeat
         const source = health.heartbeat?.source
-          ? this.mapActivitySource(health.heartbeat.source)
+          ? this.mapHeartbeatSource(health.heartbeat.source)
           : 'unknown';
 
         writeHealthEvent({
@@ -1235,9 +1530,9 @@ export class CloisterService {
   }
 
   /**
-   * Map ActivitySource to database source string
+   * Map heartbeat source to database source string
    */
-  private mapActivitySource(source: string): string {
+  private mapHeartbeatSource(source: string): string {
     switch (source) {
       case 'jsonl':
         return 'jsonl_mtime';

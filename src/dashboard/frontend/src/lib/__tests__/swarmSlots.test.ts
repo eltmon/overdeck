@@ -90,8 +90,16 @@ describe('swarmSlots helpers', () => {
     expect(getWorkSessionLabel(makeAgent({ id: 'agent-pan-971' }))).toBe('Work');
   });
 
-  it('treats review-response standby sessions as attachable', () => {
-    expect(isAgentSessionAttachable(makeAgent({ status: 'stopped', agentPhase: 'review-response' }))).toBe(true);
-    expect(isAgentSessionAttachable(makeAgent({ status: 'stopped', agentPhase: 'implementation' }))).toBe(false);
+  it('treats stopped work agents with a live tmux session as attachable (PAN-1048 standby)', () => {
+    expect(isAgentSessionAttachable(makeAgent({
+      status: 'stopped',
+      role: 'work',
+      lifecycle: { hasLiveTmuxSession: true } as any,
+    }))).toBe(true);
+    expect(isAgentSessionAttachable(makeAgent({
+      status: 'stopped',
+      role: 'work',
+      lifecycle: { hasLiveTmuxSession: false } as any,
+    }))).toBe(false);
   });
 });
