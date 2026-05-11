@@ -530,21 +530,25 @@ export function SessionNode({
             }
           }}
         >
-          {expandable && (
-            <span
-              role="button"
-              tabIndex={-1}
-              onClick={(e) => { e.stopPropagation(); onToggleExpand?.(); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onToggleExpand?.(); } }}
-              style={{ display: 'inline-flex', flexShrink: 0, cursor: 'pointer' }}
-            >
-              {expanded
-                ? <ChevronDown size={12} style={{ color: 'var(--muted-foreground)' }} />
-                : <ChevronRight size={12} style={{ color: 'var(--muted-foreground)' }} />}
-            </span>
-          )}
-          <ReviewerVerdict session={session} dotStatus={dotStatus} runtime={runtime} />
-          <span title={sessionLabelTitle} style={{ display: 'inline-flex', flexShrink: 0 }}>
+          <span className={styles.sessionToggleSlot}>
+            {expandable && (
+              <span
+                role="button"
+                tabIndex={-1}
+                onClick={(e) => { e.stopPropagation(); onToggleExpand?.(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onToggleExpand?.(); } }}
+                className={styles.sessionToggleButton}
+              >
+                {expanded
+                  ? <ChevronDown size={12} style={{ color: 'var(--muted-foreground)' }} />
+                  : <ChevronRight size={12} style={{ color: 'var(--muted-foreground)' }} />}
+              </span>
+            )}
+          </span>
+          <span className={styles.sessionDotSlot}>
+            <ReviewerVerdict session={session} dotStatus={dotStatus} runtime={runtime} />
+          </span>
+          <span className={styles.sessionIconSlot} title={sessionLabelTitle}>
             <TypeIcon type={session.type} role={session.role} />
           </span>
           <span className={styles.sessionLabel} title={sessionLabelTitle}>
