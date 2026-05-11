@@ -1,6 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { buildChildEnv, buildChildEnvWithoutTmux, BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
-import { getClaudePermissionFlagsString, resolvePermissionMode } from '../../../lib/claude-permissions.js';
+import { getClaudePermissionFlagsString, resolvePermissionMode, DSP_FLAG, BYPASS_PERMISSION_MODE } from '../../../lib/claude-permissions.js';
 /**
  * Conversations route module — Effect HttpRouter.Layer (PAN-416)
  *
@@ -806,9 +806,10 @@ async function spawnConversationSession(
     // (direct/CLIProxy/--agent/claudish), so in a healthy build the appends below are
     // no-ops. They exist as a belt-and-braces guard for future code paths that might
     // forget to thread the resolved mode through. The critical safety property:
-    // NEVER add --dangerously-skip-permissions when the resolved mode is 'auto'.
-    // Enterprise users rely on Auto being honored; a silent escalation to bypass is
-    // a P0 trust violation.
+    // The DSP literal lives in claude-permissions.ts only; reference it via
+    // the imported constants so the lint guard stays tight.
+    // NEVER add DSP when the resolved mode is 'auto'. Enterprise users rely
+    // on Auto being honored; a silent escalation to bypass is a P0 trust violation.
     const mode = resolvePermissionMode();
     if (mode === 'auto') {
       if (!runtimeCommand.includes('--permission-mode')) {
@@ -817,17 +818,17 @@ async function spawnConversationSession(
       // Refuse to run with mixed signals: if the base command already contains DSP
       // while the user explicitly chose Auto, that is a substrate bug that must
       // surface, not be silently downgraded.
-      if (runtimeCommand.includes('--dangerously-skip-permissions')) {
+      if (runtimeCommand.includes(DSP_FLAG)) {
         throw new Error(
-          `Refusing to spawn ${tmuxSession}: resolved mode is 'auto' but base command for model "${model}" contains --dangerously-skip-permissions. This is a substrate bug; do not silently bypass user Settings.`,
+          `Refusing to spawn ${tmuxSession}: resolved mode is 'auto' but base command for model "${model}" contains ${DSP_FLAG}. This is a substrate bug; do not silently bypass user Settings.`,
         );
       }
     } else {
-      if (!runtimeCommand.includes('--dangerously-skip-permissions')) {
-        runtimeCommand = `${runtimeCommand} --dangerously-skip-permissions`;
+      if (!runtimeCommand.includes(DSP_FLAG)) {
+        runtimeCommand = `${runtimeCommand} ${DSP_FLAG}`;
       }
       if (!runtimeCommand.includes('--permission-mode')) {
-        runtimeCommand = `${runtimeCommand} --permission-mode bypassPermissions`;
+        runtimeCommand = `${runtimeCommand} --permission-mode ${BYPASS_PERMISSION_MODE}`;
       }
     }
     providerExportsStr = (await getProviderExportsForModel(model)).trim();

@@ -28,6 +28,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
 import { loadConfig } from '../../lib/config.js';
+import { buildClaudeUserSettings } from '../../lib/claude-permissions.js';
 import { createFlyProviderFromConfig, isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import {
@@ -1153,17 +1154,16 @@ with open(path, "w") as f:
     const patchBase64 = Buffer.from(onboardingPatch).toString('base64');
     await fly.ssh(vmName, `echo '${patchBase64}' | base64 -d | python3`);
 
-    // Set theme preference and bypass permissions in settings.json
-    const claudeSettings = JSON.stringify({
-      theme: 'dark',
-      permissions: {
-        defaultMode: 'bypassPermissions',
-      },
-    });
+    // Write ~/.claude/settings.json on the remote VM honoring the user's
+    // Panopticon permission mode. defaultMode here is what `claude` uses when
+    // an invocation omits --permission-mode; hardcoding 'bypassPermissions'
+    // would silently escalate any unflagged claude invocation on the VM
+    // (interactive shells, future helper scripts) even when the user chose Auto.
+    const claudeSettings = JSON.stringify(buildClaudeUserSettings());
     const settingsBase64 = Buffer.from(claudeSettings).toString('base64');
     await fly.ssh(vmName, `echo '${settingsBase64}' | base64 -d > ~/.claude/settings.json`);
 
-    // Configure Claude Code for autonomous operation (bypass permissions + skip onboarding)
+    // Configure Claude Code for autonomous operation (onboarding-complete + permission mode per user setting)
     await fly.configureClaudeCode(vmName);
 
     // Step 4.7: Copy essential skills to remote VM

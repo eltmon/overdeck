@@ -7,7 +7,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { getClaudePermissionFlagsString, resolvePermissionMode } from './claude-permissions.js';
+import { getClaudePermissionFlagsString, resolvePermissionMode, bypassPrefixForAgentFlag } from './claude-permissions.js';
 import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
@@ -217,9 +217,7 @@ export async function getAgentRuntimeBaseCommand(
   // cross-directory reads (e.g. ~/.panopticon/cliproxy/, ~/pan-tts/) still prompt without
   // DSP. The flag is passed through ahead of --agent so it applies before frontmatter is
   // resolved.
-  const bypassWithAgent = agentDefinition && resolvePermissionMode() === 'bypass'
-    ? ' --dangerously-skip-permissions'
-    : '';
+  const bypassWithAgent = agentDefinition ? bypassPrefixForAgentFlag() : '';
 
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
   // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
@@ -294,9 +292,7 @@ export async function getRoleRuntimeBaseCommand(
   // flags in that case so the run still launches with the user's bypass/plan
   // settings honored.
   const permissionFlags = definitionPath ? '' : ` ${getClaudePermissionFlagsString()}`;
-  const bypassWithAgent = definitionPath && resolvePermissionMode() === 'bypass'
-    ? ' --dangerously-skip-permissions'
-    : '';
+  const bypassWithAgent = definitionPath ? bypassPrefixForAgentFlag() : '';
 
   if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
@@ -1602,9 +1598,13 @@ export async function buildAgentLaunchConfig(opts: {
     // Match the fresh-spawn path: when permissionMode resolves to 'bypass'
     // (PAN_YOLO=true OR claude.permissionMode=bypass in config), prepend
     // --dangerously-skip-permissions on resume too.
-    const bypassFlag = resolvePermissionMode() === 'bypass'
-      ? '--dangerously-skip-permissions '
-      : '';
+    // Use the shared helper so the only string literal for DSP lives in
+    // claude-permissions.ts (see scripts/lint-permissions.sh allowlist).
+    // bypassPrefixForAgentFlag returns ' --dangerously-skip-permissions' (leading
+    // space) or ''; the resume command needs it as a TRAILING-space token, so
+    // re-trim and re-append.
+    const bypassPrefix = bypassPrefixForAgentFlag();
+    const bypassFlag = bypassPrefix ? `${bypassPrefix.trim()} ` : '';
     const launcherContent = generateLauncherScript({
       role: launchRole,
       spawnMode: 'resume',
