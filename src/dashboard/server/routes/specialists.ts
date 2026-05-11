@@ -598,21 +598,29 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       }
     }
 
-    // When review fails or is blocked, send feedback to work agent so it can fix the issues
-    if (specialist === 'review' && (status === 'failed' || status === 'blocked') && notes) {
+    if (specialist === 'review' && (status === 'failed' || status === 'blocked')) {
       yield* Effect.promise(async () => {
         try {
-          const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-          const { sessionExistsAsync } = await import('../../../lib/tmux.js');
-          const { messageAgent } = await import('../../../lib/agents.js');
-
-          if (await sessionExistsAsync(workAgentId)) {
-            const reviewMsg = `REVIEW FEEDBACK: The review specialist found issues that must be fixed:\n\n${notes}\n\nPlease address all issues, push your changes, then re-request review with: pan review request ${normalizedIssueId} -m "Fixed review issues"`;
-            await messageAgent(workAgentId, reviewMsg);
-            console.log(`[specialists/done] Sent review feedback to ${workAgentId}`);
-          }
+          const project = resolveProjectFromIssue(normalizedIssueId);
+          const workspacePath = project
+            ? join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`)
+            : undefined;
+          const { deliverReviewVerdictFeedback } = await import(
+            '../../../lib/cloister/review-verdict-feedback.js'
+          );
+          const result = await deliverReviewVerdictFeedback({
+            issueId: normalizedIssueId,
+            verdict: status === 'failed' ? 'failed' : 'blocked',
+            notes,
+            workspacePath,
+            prUrl: updatedStatus.prUrl,
+          });
+          console.log(
+            `[specialists/done] Delivered review verdict feedback for ${normalizedIssueId}` +
+              ` (feedback=${result.feedbackPath ?? 'none'}, synthesis=${result.synthesisPath ?? 'none'}, prComment=${result.prCommentPosted})`,
+          );
         } catch (err: any) {
-          console.warn(`[specialists/done] Failed to send review feedback: ${err.message}`);
+          console.warn(`[specialists/done] Failed to deliver review verdict feedback: ${err.message}`);
         }
       });
     }

@@ -168,11 +168,13 @@ describe('getCostsByIssueFromDb', () => {
   it('includes model and stage breakdowns', () => {
     insertEvent({ issueId: 'PAN-BD', model: 'model-a', sessionType: 'review' });
     insertEvent({ issueId: 'PAN-BD', model: 'model-b', sessionType: 'work' });
+    insertEvent({ issueId: 'PAN-BD', model: 'model-c', sessionType: 'review.security' });
     const all = getCostsByIssueFromDb();
     expect(all['PAN-BD'].models).toHaveProperty('model-a');
     expect(all['PAN-BD'].models).toHaveProperty('model-b');
     expect(all['PAN-BD'].stages).toHaveProperty('review');
     expect(all['PAN-BD'].stages).toHaveProperty('work');
+    expect(all['PAN-BD'].stages).toHaveProperty('review.security');
   });
 });
 

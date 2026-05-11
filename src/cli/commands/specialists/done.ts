@@ -120,6 +120,21 @@ export async function doneCommand(
 
   const status = setReviewStatus(normalizedIssueId, update);
 
+  if (specialist === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
+    try {
+      const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
+      await deliverReviewVerdictFeedback({
+        issueId: normalizedIssueId,
+        verdict: options.status,
+        notes: options.notes,
+        prUrl: status.prUrl,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(chalk.yellow(`Could not deliver review feedback: ${message}`));
+    }
+  }
+
   if (specialist === 'test' && status.readyForMerge) {
     console.log(chalk.green('✓ Ready for merge!'));
   }

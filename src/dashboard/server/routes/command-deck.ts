@@ -60,7 +60,7 @@ import {
 } from '../services/resource-discovery.js';
 import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
-import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
+import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { findPlan } from '../../../lib/vbrief/io.js';
 
@@ -438,8 +438,8 @@ export async function fetchActivityDataWithContext(
     const taskFileIndex: Record<string, number> = { review: 0, test: 0, merge: 0 };
 
     // PAN-830: Reviewer panes are canonical (`specialist-<projectKey>-<issueId>-review-<role>`)
-    // and persist across review rounds, so we emit exactly five reviewer nodes
-    // (one per role) anchored to the *most recent* review section in history.
+    // and persist across review rounds, so we emit exactly four convoy reviewer
+    // nodes anchored to the *most recent* review section in history.
     // Earlier review sections are skipped to avoid duplicate role nodes.
     const lastReviewIndex = specialistSections.reduce(
       (idx, s, i) => (s.type === 'review' ? i : idx),
@@ -488,14 +488,13 @@ export async function fetchActivityDataWithContext(
         transcriptParts.push(`\n--- Results ---\n${ss.notes}`);
       }
 
-      // PAN-830: For review sections, emit the five canonical reviewer nodes
-      // exactly once (anchored to the latest review section in history). Earlier
+      // PAN-830: For review sections, emit the four canonical convoy reviewer
+      // nodes exactly once (anchored to the latest review section in history). Earlier
       // review sections are absorbed into the round metadata read from
       // `~/.panopticon/agents/<reviewer-id>/round-N.json`.
       if (ss.type === 'review') {
         if (i !== lastReviewIndex) continue;
-        // Emit the orchestrator parent node (type 'review') so the tree shows
-        // six nodes total: 1 orchestrator + 5 roles (blocker-1).
+        const synthesisRoundMetadata = await readSynthesisRounds(issueId, reviewerProjectKey);
         const orchestratorSessionName = getTmuxSessionName('review-agent', reviewerProjectKey);
         const orchestratorPresence: SessionNodePresence = tmuxSessionNames.has(orchestratorSessionName)
           ? (ss.status === 'running' ? 'active' : 'idle')
@@ -514,6 +513,7 @@ export async function fetchActivityDataWithContext(
             : null,
           status: ss.status,
           presence: orchestratorPresence,
+          roundMetadata: synthesisRoundMetadata,
         });
         const reviewerNodes = await buildReviewerNodes({
           issueId,
