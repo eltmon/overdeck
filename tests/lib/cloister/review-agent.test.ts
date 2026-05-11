@@ -245,11 +245,9 @@ describe('passed-state rerun regression', () => {
 });
 
 // ── template/output contract ──────────────────────────────────────────────────
-// The four code-review-* sub-agent definitions are read-only (no Write tool
-// in their frontmatter) and must NOT instruct the agent to write to any output
-// file. They surface findings as their agent response, which the review role
-// synthesizes programmatically. PAN-1048 R5 C1 superseded the older PAN-540
-// "write to **Output file**" contract.
+// PAN-1059 convoy reviewers run in isolated sessions. Each code-review-* agent
+// reads the shared context manifest and writes one report to its assigned output
+// file, which synthesis polls and consumes.
 
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -271,23 +269,29 @@ describe('template/output contract', () => {
     { name: 'code-review-requirements', role: 'requirements' },
   ];
 
-  describe('reviewer templates return findings as agent response (PAN-1048 R5 C1)', () => {
+  describe('reviewer templates write one manifest-scoped report (PAN-1059)', () => {
     for (const { name, role } of reviewerTemplates) {
       it(`${role}: does NOT hardcode .claude/reviews/ path`, () => {
         const content = readTemplate(name);
         expect(content).not.toContain('.claude/reviews/');
       });
 
-      it(`${role}: does NOT instruct the agent to write to a file`, () => {
+      it(`${role}: has Write tool for its assigned output file`, () => {
         const content = readTemplate(name);
-        expect(content).not.toMatch(/\*\*Output file\*\*/);
+        expect(content).toMatch(/\n\s+- Write\n/);
       });
 
-      it(`${role}: instructs the agent to return findings as its response`, () => {
+      it(`${role}: reads the context manifest before review`, () => {
         const content = readTemplate(name);
-        // The new tail "Returning your review" tells the reviewer to surface
-        // findings in the agent response, not to a file.
-        expect(content).toMatch(/Returning your review/i);
+        expect(content).toMatch(/Context manifest/i);
+        expect(content).toMatch(/read this first/i);
+        expect(content).not.toMatch(/complete 3 review passes/i);
+        expect(content).not.toMatch(/changed file for context/i);
+      });
+
+      it(`${role}: instructs exactly one final output-file report`, () => {
+        const content = readTemplate(name);
+        expect(content).toMatch(/Write exactly one final report to the output file/i);
       });
     }
   });

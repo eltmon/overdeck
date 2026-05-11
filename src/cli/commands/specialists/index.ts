@@ -38,11 +38,11 @@ export function registerSpecialistsCommands(program: Command): void {
     .option('--all', 'Reset ALL specialists (wipe all context)')
     .action(resetCommand);
 
-  // pan specialists done <type> <issueId> --status <passed|failed> [--notes "..."]
+  // pan specialists done <type> <issueId> --status <passed|failed|blocked> [--notes "..."]
   specialists
     .command('done <type> <issueId>')
     .description('Signal specialist completion (deterministic status update)')
-    .requiredOption('--status <status>', 'Result status: passed or failed')
+    .requiredOption('--status <status>', 'Result status: passed, failed, or review-only blocked')
     .option('--notes <notes>', 'Optional notes about the result')
     .action(doneCommand);
 

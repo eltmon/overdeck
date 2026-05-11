@@ -6,6 +6,7 @@
  *
  * Usage:
  *   pan specialists done review MIN-665 --status passed --notes "Code looks good"
+ *   pan specialists done review MIN-665 --status blocked --notes "Changes requested"
  *   pan specialists done test PAN-97 --status failed --notes "3 tests failing"
  *   pan specialists done merge PAN-83 --status passed
  */
@@ -18,7 +19,7 @@ import {
 } from '../../../lib/review-status.js';
 
 interface DoneOptions {
-  status: 'passed' | 'failed';
+  status: 'passed' | 'failed' | 'blocked';
   notes?: string;
 }
 
@@ -36,18 +37,20 @@ export async function doneCommand(
   }
 
   if (!options.status) {
-    console.error(chalk.red('--status is required (passed or failed)'));
+    console.error(chalk.red('--status is required'));
     process.exit(1);
   }
 
-  if (!['passed', 'failed'].includes(options.status)) {
-    console.error(chalk.red(`Invalid status: ${options.status}`));
-    console.error(chalk.dim('Valid options: passed, failed'));
-    process.exit(1);
-  }
-
-  // Normalize issue ID (e.g., min-665 -> MIN-665)
   const normalizedIssueId = issueId.toUpperCase();
+  const validStatuses = specialist === 'review'
+    ? ['passed', 'failed', 'blocked']
+    : ['passed', 'failed'];
+
+  if (!validStatuses.includes(options.status)) {
+    console.error(chalk.red(`Invalid status: ${options.status}`));
+    console.error(chalk.dim(`Valid options for ${specialist}: ${validStatuses.join(', ')}`));
+    process.exit(1);
+  }
 
   // Build the atomic update — setReviewStatus handles history, SQLite,
   // computed readyForMerge, and JSON persistence in one call.
@@ -59,9 +62,13 @@ export async function doneCommand(
     case 'review':
       update.reviewStatus = options.status as ReviewStatus['reviewStatus'];
       if (options.notes) update.reviewNotes = options.notes;
-      console.log(chalk.green(`✓ Review ${options.status} for ${normalizedIssueId}`));
       if (options.status === 'passed') {
+        console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
         console.log(chalk.dim('  Test agent can now proceed'));
+      } else if (options.status === 'blocked') {
+        console.log(chalk.yellow(`✗ Review blocked for ${normalizedIssueId}`));
+      } else {
+        console.log(chalk.red(`✗ Review failed for ${normalizedIssueId}`));
       }
       break;
 

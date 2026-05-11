@@ -23,8 +23,8 @@
  * reactive scheduler review branch, the dashboard kanban "Review again"
  * button, postMergeLifecycle's review-temp stash drop — flows through
  * spawnReviewRoleForIssue → spawnRun(issueId, 'review'). The four
- * code-review-* sub-agents are launched as Agent-tool subagents inside that
- * Claude Code session; synthesis and the /api/review/:id/status post happen
+ * code-review-* sub-agents are launched as isolated review sub-role sessions;
+ * synthesis writes the report and signals the verdict via Panopticon's CLI
  * inside the role itself (see roles/review.md).
  *
  * Surface area kept:
@@ -113,7 +113,7 @@ export async function cleanupReviewTempStash(issueId: string, workspace: string)
 
 /**
  * PAN-1048 R3: Build the context-only prompt the review role agent receives
- * at spawn. Behavior — convoy launch, synthesis, /api/review/:id/status —
+ * at spawn. Behavior — convoy launch, synthesis, and verdict signaling —
  * lives in roles/review.md and the .claude/agents/code-review-* sub-agent
  * definitions. This prompt only carries identifiers and a pointer to those
  * instructions, so review behavior changes are managed in role files (which
@@ -138,15 +138,15 @@ function buildConvoyPrompt(opts: {
     '',
     opts.contextManifestPath
       ? [
-          'Context manifest (READ THIS first — do NOT run git diff yourself):',
+          'Context manifest (read this first; do not run git diff yourself):',
           `  ${opts.contextManifestPath}`,
-          'The manifest contains the full diff, per-file risk ranking, and acceptance criteria.',
+          'The manifest contains the full diff, per-file risk ranking, TLDR summaries when available, and acceptance criteria.',
         ].join('\n')
-      : 'No context manifest available — run git diff to obtain the branch diff.',
+      : 'No context manifest available. Write a blocked reviewer report explaining that the shared review context is missing.',
     '',
     `Follow .claude/agents/code-review-${opts.subRole}.md for review methodology.`,
-    'When complete, write your full findings to the output file using the Write tool.',
-    'The synthesis agent polls for that file — it MUST exist before you stop.',
+    'Write exactly one final report to the output file using the Write tool.',
+    'Only the output file is consumed by synthesis; your chat response is not the review report.',
   ].filter(Boolean).join('\n');
 }
 
@@ -159,8 +159,8 @@ function buildReviewRolePrompt(opts: {
   reviewDir: string;
   contextManifestPath?: string;
 }): string {
-  const port = process.env.API_PORT || process.env.PORT || '3011';
   const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${opts.reviewDir}/${r}.md`).join('\n');
+  const synthesisPath = join(opts.reviewDir, 'synthesis.md');
   return [
     `REVIEW TASK for ${opts.issueId}:`,
     '',
@@ -168,35 +168,28 @@ function buildReviewRolePrompt(opts: {
     `Branch: ${opts.branch}`,
     `Workspace: ${opts.workspace}`,
     opts.prUrl ? `PR: ${opts.prUrl}` : `PR: (resolve via: gh pr view ${opts.branch})`,
-    opts.contextManifestPath ? `Context manifest: ${opts.contextManifestPath}` : '',
+    `Review directory: ${opts.reviewDir}`,
+    `Synthesis output file: ${synthesisPath}`,
+    opts.contextManifestPath ? `Context manifest: ${opts.contextManifestPath}` : 'Context manifest: (missing — block review per roles/review.md)',
     '',
     'Convoy reviewer output files (already running in separate sessions — poll for these):',
     subRoleFiles,
     '',
     'Follow roles/review.md exactly.',
     '',
-    'When you have a verdict, post it through the review status API:',
+    'After writing the synthesis report, signal the verdict with Panopticon CLI:',
+    `  pan specialists done review ${opts.issueId} --status passed --notes "<one-line summary>"`,
+    `  pan specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>"`,
     '',
-    'APPROVED:',
-    `  curl -s -X POST http://127.0.0.1:${port}/api/review/${opts.issueId}/status \\`,
-    `    -H 'Content-Type: application/json' \\`,
-    `    -d '{"reviewStatus":"passed"}'`,
-    '',
-    'CHANGES REQUESTED:',
-    `  curl -s -X POST http://127.0.0.1:${port}/api/review/${opts.issueId}/status \\`,
-    `    -H 'Content-Type: application/json' \\`,
-    `    -d '{"reviewStatus":"blocked","reviewNotes":"<one-line summary>"}'`,
-    '',
-    'After posting reviewStatus=passed, reactive Cloister automatically dispatches',
-    'the test role. Do NOT queue a test specialist yourself; never edit code.',
+    'Reactive Cloister dispatches the test role after review passes. Never queue tests yourself and never edit code.',
   ].filter(Boolean).join('\n');
 }
 
 /**
  * Spawn the `review` role for an issue using the unified role primitive
- * (spawnRun). The review role launches the four code-review-* sub-agents
- * via the Agent tool, synthesizes their findings, and posts the verdict to
- * /api/review/:id/status. This wrapper carries the orchestration concerns
+ * (spawnRun). The review role launches the four code-review-* sub-role
+ * sessions, synthesizes their findings, and signals the verdict through
+ * `pan specialists done review`. This wrapper carries the orchestration concerns
  * the deleted dispatchParallelReview owned (idempotency check, feedback
  * archive, review-temp stash, reviewing-status flip, pipeline event).
  *
@@ -250,9 +243,9 @@ export async function spawnReviewRoleForIssue(
   }
 
   // Set reviewing here so callers don't race against the async role spawn.
-  // The review role posts /api/review/:id/status with the terminal verdict
-  // when it finishes, which transitions reviewStatus to passed/blocked/failed
-  // and fires the review.approved lifecycle event for reactive Cloister.
+  // The review role signals the terminal verdict with Panopticon's CLI, which
+  // transitions reviewStatus to passed/blocked/failed and fires the review.approved
+  // lifecycle event for reactive Cloister.
   try {
     setReviewStatus(opts.issueId, {
       reviewStatus: 'reviewing',
@@ -316,7 +309,7 @@ export async function spawnReviewRoleForIssue(
       contextManifestPath = manifest.manifestPath;
       console.log(`[review-agent] Context manifest built: ${contextManifestPath} (${manifest.changedFiles.length} files, truncated=${manifest.diff.truncated})`);
     } catch (ctxErr) {
-      console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will use raw git diff:`, ctxErr);
+      console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will block on missing shared context:`, ctxErr);
     }
 
     // Spawn convoy sub-role sessions first so they're running before the
