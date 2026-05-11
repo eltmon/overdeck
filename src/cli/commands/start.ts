@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { promisify } from 'util';
-import { exec } from 'child_process';
+import { exec, execFileSync } from 'child_process';
 
 const execAsync = promisify(exec);
 import { spawnAgent } from '../../lib/agents.js';
@@ -461,10 +461,13 @@ import {
  * Uses `bd list` to query the beads database directly (storage-backend agnostic).
  * Exported for testing.
  */
-export function hasBeadsTasks(workspacePath: string): boolean {
+export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean {
+  const label = issueId?.toLowerCase();
   try {
-    const { execSync } = require('child_process');
-    const output = execSync('bd list --json --limit 1', {
+    const args = label
+      ? ['list', '--json', '-l', label, '--status', 'all', '--limit', '1']
+      : ['list', '--json', '--limit', '1'];
+    const output = execFileSync('bd', args, {
       cwd: workspacePath,
       encoding: 'utf-8',
       timeout: 10000,
@@ -473,8 +476,21 @@ export function hasBeadsTasks(workspacePath: string): boolean {
     const tasks = JSON.parse(output.trim() || '[]');
     return tasks.length > 0;
   } catch {
-    // Fallback: check for .beads directory existence (bd not installed or server down)
-    return existsSync(join(workspacePath, '.beads'));
+    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+    if (!existsSync(jsonlPath)) return false;
+    if (!label) return readFileSync(jsonlPath, 'utf-8').trim().length > 0;
+
+    for (const line of readFileSync(jsonlPath, 'utf-8').split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        const labels: string[] = Array.isArray(entry.labels) ? entry.labels : [];
+        if (labels.some((candidate) => candidate.toLowerCase() === label || candidate.toLowerCase() === `workspace:${label}`)) {
+          return true;
+        }
+      } catch { /* skip malformed lines */ }
+    }
+    return false;
   }
 }
 
@@ -731,7 +747,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
-    if (!hasBeadsTasks(workspace)) {
+    if (!hasBeadsTasks(workspace, id)) {
       // If no planning was done, this is a simple issue — auto-create a bead so the agent can start
       const hasPlanningState = existsSync(getWorkspacePanPaths(workspace).specPath);
       if (!hasPlanningState) {

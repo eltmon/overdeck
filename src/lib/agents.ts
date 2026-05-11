@@ -34,6 +34,7 @@ import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge
 import { canUseHarness } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtimes/pi-fifo.js';
+import { assertIssueHasBeads } from './beads-query.js';
 
 const execAsync = promisify(exec);
 
@@ -1837,6 +1838,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   initHook(agentId);
 
   const role: 'work' = options.role ?? 'work';
+  await assertIssueHasBeads(options.workspace, options.issueId);
 
   // Determine model based on role configuration
   const selectedModel = determineModel({ model: options.model, role });
