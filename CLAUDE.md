@@ -332,7 +332,7 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
 5. **Linear/GitHub status** — issue status reset to Todo/Open
 
-**The scope vBRIEF** in `.pan/specs/` on main survives deep-wipe — it's committed to the project repo independently of the workspace. The docs-level PRD (e.g., `myn/docs/prds/planned/MIN-XXX-*.md`) also survives. The workspace `.pan/` directory (spec, continue state) and `.beads/` are destroyed.
+**The scope vBRIEF** in `.pan/specs/` on main survives deep-wipe — it's committed to the project repo independently of the workspace. Project-level PRD archives (e.g., a team's own `docs/prds/` if they keep one for narrative archival) also survive; the Panopticon-managed PRD draft at `<projectRoot>/.pan/drafts/<issue>.md` survives too. The workspace `.pan/` directory (spec, continue state) and `.beads/` are destroyed.
 
 **Rules:**
 - **NEVER call deep-wipe programmatically** without the user explicitly requesting it
@@ -375,43 +375,68 @@ When TLDR is available, you'll have these MCP tools:
 
 ## vBRIEF Plans & Lifecycle
 
-Panopticon uses **vBRIEF v0.5** for machine-readable work plans with a filesystem-as-state lifecycle model. Key references:
+Panopticon uses **vBRIEF v0.5** for machine-readable work plans. Key references:
 
 - **Canonical spec:** [github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)
 - **Our fork:** [github.com/eltmon/vBRIEF](https://github.com/eltmon/vBRIEF)
 - **Extension proposal:** [deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)
-- **Panopticon docs:** [docs/VBRIEF.md](docs/VBRIEF.md)
+- **Panopticon docs:** [docs/VBRIEF.md](docs/VBRIEF.md) — full schema, lifecycle, and migration notes
 
-### Lifecycle Directories
+### The four-artifact model (PAN-967 + PAN-946)
 
-Scope vBRIEFs live in `vbrief/` at the project root and move between directories as work progresses:
+There are four artifacts. They are distinct — do not conflate them.
 
-- `vbrief/proposed/` — planning complete, awaiting approval
-- `vbrief/active/` — agent is working on it
-- `vbrief/completed/` — merged/closed
-- `vbrief/cancelled/` — abandoned
+| Artifact | Location | Writer | Mutability |
+| --- | --- | --- | --- |
+| **PRD draft** (`.md`) | `<projectRoot>/.pan/drafts/<issue>.md` | Human or planning agent | Free-form narrative, human-mutable |
+| **vBRIEF spec** (`.json`) on main | `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` | Pipeline only (single writer) | Status changes are atomic field flips on the same file — files do NOT move between directories |
+| **Workspace working copy** (`.json`) | `<workspace>/.pan/spec.vbrief.json` | Work agent (one per issue) | Copied from main at branch creation; mutated during work; never reaches back into main's spec |
+| **Continue state** (`.json`) | `<workspace>/.pan/continue.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback |
 
-Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
+**The PAN-946 invariant — workspace mutations never reach lifecycle directories.** `findPlan`, `readWorkspacePlan`, `updateItemStatus`, and `updateSubItemStatus` resolve ONLY the workspace-local `.pan/spec.vbrief.json`. Lifecycle/archive lookups go through `findVBriefByIssue` in `lifecycle-io.ts` (read-only) or `findVBriefByIssueAsync` in `vbrief-index.ts` (read-only, indexed). Conflating these two surfaces caused a high-severity correctness bug; the comment at `src/lib/vbrief/io.ts:5-17` is the canonical reminder.
 
-### Continue State
+### Status is a JSON field, not a directory
 
-`continue-<issueId>.vbrief.json` replaces STATE.md as the structured session history. Lives alongside the scope vBRIEF in the same lifecycle directory. Contains git state, decisions, hazards, resume point, beads mapping, agent model, and session history.
+`plan.status` advances through one canonical file via atomic single-commit updates on main. Files do not move between directories.
+
+```
+draft (in .pan/drafts/*.md) ──► proposed ──► approved ──► active/running ──► completed
+                                       │                                          │
+                                       └──────────► cancelled ◄───────────────────┘
+```
+
+| Transition | Trigger | What changes |
+| --- | --- | --- |
+| (new) → draft | `pan plan` starts | Markdown PRD written to `<projectRoot>/.pan/drafts/<issue>.md` |
+| draft → proposed | Planning completes | vBRIEF created in `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"` |
+| proposed → approved/running | `pan start` | Status field flipped on main; spec copied to workspace `.pan/spec.vbrief.json` |
+| running → completed | PR merges | Status field flipped to `"completed"` on main |
+| any → cancelled | Issue closed | Status field flipped to `"cancelled"` on main |
+
+### Legacy paths
+
+PAN-967 unified everything under `.pan/`. The following are gone or read-only legacy:
+
+- `.planning/plan.vbrief.json` — **DELETED.** Replaced by `.pan/spec.vbrief.json`.
+- `docs/prds/planned/`, `docs/prds/active/` — no longer a Panopticon convention. PRD drafts live in `.pan/drafts/`. Projects may keep their own `docs/prds/` for human archival, but Panopticon does not read or write it.
+- `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyVBriefByIssue` for backward compatibility during migration; pipeline writes target `.pan/specs/` only. Continue files on the main side still live at `vbrief/active/continue-<issue>.vbrief.json` until the continue-state migration phase ships.
+
+If you see an agent referencing `.planning/`, `docs/prds/planned/*.vbrief.json`, or planning a "copy PRD vBRIEF into workspace .planning" step, the agent is reading a pre-PAN-967 problem statement and needs to be redirected at `docs/VBRIEF.md`.
 
 ### Auto-Behaviors
 
-- `io.ts` (`updateItemStatus`/`updateSubItemStatus`) auto-increments `plan.sequence` and sets `updated` timestamps on every write
-- `complete-planning` promotes vBRIEF to `vbrief/proposed/` on main with an issue-keyed filename
-- `start-agent` transitions vBRIEF from `proposed/` to `active/` and sets `plan.status` to `approved`/`running`
-- `postMergeLifecycle` transitions vBRIEF from `active/` to `completed/` on main
-- `start-planning` discovers PRDs from `docs/prds/planned/` and `docs/prds/active/` matching the issue ID and copies to `.pan/prd.md`
-- `findPlan()` resolves vBRIEFs from `.pan/specs/` on main first, falling back to workspace `.pan/spec.vbrief.json`
+- `io.ts` (`updateItemStatus`/`updateSubItemStatus`) auto-increments `plan.sequence` and sets `updated` timestamps on every write.
+- `complete-planning` writes the vBRIEF to `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"`.
+- `start-agent` materializes the workspace working copy at `<workspace>/.pan/spec.vbrief.json` (copying from the canonical spec on main, importing from `.pan/drafts/` PRDs when needed — PAN-945) and flips the main-side status field.
+- `postMergeLifecycle` flips the main-side `plan.status` to `"completed"` after merge.
+- `findPlan(workspacePath)` returns the workspace-local spec only. Read-only lifecycle lookups go through `findVBriefByIssue(projectRoot, issueId)` in `lifecycle-io.ts`.
 
 ### Dashboard Viewer
 
 VBriefViewer components at `src/dashboard/frontend/src/components/vbrief/`:
 - Accessible via **vBRIEF button** on kanban issue cards and InspectorPanel
 - List / DAG / Raw JSON tabs
-- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from lifecycle dirs first, then workspace)
+- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from `.pan/specs/` first via the read-only lifecycle helpers, then workspace `.pan/spec.vbrief.json`)
 
 ## Issue Creation from PRDs
 
