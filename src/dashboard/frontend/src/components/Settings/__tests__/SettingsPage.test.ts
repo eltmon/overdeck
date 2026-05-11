@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { buildMiniMaxFormData } from '../SettingsPage';
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
@@ -41,7 +42,7 @@ const DEPRECATED_MODEL_IDS = [
 ];
 
 const SETTINGS_PAGE_SOURCE = readFileSync(
-  resolve(process.cwd(), 'src/dashboard/frontend/src/components/Settings/SettingsPage.tsx'),
+  resolve(fileURLToPath(import.meta.url), '../../SettingsPage.tsx'),
   'utf8',
 );
 
