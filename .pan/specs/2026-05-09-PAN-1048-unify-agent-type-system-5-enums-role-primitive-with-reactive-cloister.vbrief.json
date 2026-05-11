@@ -4,17 +4,17 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T17:57:46.968Z"
+    "updated": "2026-05-11T02:18:07.499Z"
   },
   "plan": {
     "id": "pan-1048",
     "title": "Unify agent type system: 5 enums → Role primitive with reactive Cloister",
-    "status": "proposed",
+    "status": "completed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T19:06:32.359Z",
+    "updated": "2026-05-11T02:18:07.499Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -1991,5 +1991,6 @@
       "canonicalFilename": "2026-05-09-PAN-1048-unify-agent-type-system-5-enums-role-primitive-with-reactive-cloister.vbrief.json"
     }
   },
-  "updated": "2026-05-09T19:06:32.359Z"
+  "updated": "2026-05-09T19:06:32.359Z",
+  "status": "completed"
 }

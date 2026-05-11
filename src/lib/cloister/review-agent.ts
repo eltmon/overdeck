@@ -293,7 +293,17 @@ export async function spawnReviewRoleForIssue(
     // Build the shared context manifest before spawning so all reviewers
     // read one pre-built diff+AC object instead of each running git diff
     // independently (PAN-1059).
-    const runId = `agent-${opts.issueId.toLowerCase()}-review`;
+    //
+    // Include HEAD SHA in runId so re-reviews of the same issue get their own
+    // directory and don't overwrite round-1 files (collision prevention).
+    let headSha = 'unknown';
+    try {
+      const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: opts.workspace, encoding: 'utf-8' });
+      headSha = stdout.trim();
+    } catch { /* non-fatal — fall back to static runId */ }
+    const runId = headSha !== 'unknown'
+      ? `agent-${opts.issueId.toLowerCase()}-review-${headSha}`
+      : `agent-${opts.issueId.toLowerCase()}-review`;
     const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', runId);
     let contextManifestPath: string | undefined;
     try {

@@ -119,12 +119,19 @@ fi
 # Pattern: agent-<issueId>-review   (no trailing sub-role suffix → synthesis)
 if [[ "$AGENT_ID" =~ ^agent-(.+)-review$ ]]; then
   REVIEW_ISSUE="${BASH_REMATCH[1]}"
+  KILLED_ANY=false
   for SUBROLE in security correctness performance requirements; do
     CONVOY_SESSION="agent-${REVIEW_ISSUE}-review-${SUBROLE}"
-    tmux -L panopticon kill-session -t "$CONVOY_SESSION" 2>/dev/null || true
+    if tmux -L panopticon kill-session -t "$CONVOY_SESSION" 2>/dev/null; then
+      KILLED_ANY=true
+      echo "[$(date -Iseconds)] stop-hook: $AGENT_ID killed convoy $CONVOY_SESSION" \
+        >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+    fi
   done
-  echo "[$(date -Iseconds)] stop-hook: $AGENT_ID synthesis ended — killed convoy for $REVIEW_ISSUE" \
-    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+  if [ "$KILLED_ANY" = "true" ]; then
+    echo "[$(date -Iseconds)] stop-hook: $AGENT_ID synthesis ended — convoy reaped for $REVIEW_ISSUE" \
+      >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+  fi
 fi
 
 exit 0

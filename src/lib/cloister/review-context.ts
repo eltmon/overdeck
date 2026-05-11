@@ -23,6 +23,10 @@ const execAsync = promisify(exec);
 // Reviewers read per-file diffs on demand for anything larger.
 const MAX_DIFF_BYTES = 128 * 1024;
 
+const RISK_HIGH = 5;
+const RISK_MED  = 3;
+const RISK_LOW  = 1;
+
 // Patterns that raise a file's risk score
 const HIGH_RISK_PATTERNS = [
   /auth/i, /password/i, /token/i, /secret/i, /crypt/i,
@@ -68,10 +72,10 @@ export interface ReviewContextManifest {
 }
 
 function riskScore(filePath: string): number {
-  if (LOW_RISK_PATTERNS.some(p => p.test(filePath))) return 1;
-  if (HIGH_RISK_PATTERNS.some(p => p.test(filePath))) return 5;
-  if (MED_RISK_PATTERNS.some(p => p.test(filePath))) return 3;
-  return 2;
+  if (LOW_RISK_PATTERNS.some(p => p.test(filePath))) return RISK_LOW;
+  if (HIGH_RISK_PATTERNS.some(p => p.test(filePath))) return RISK_HIGH;
+  if (MED_RISK_PATTERNS.some(p => p.test(filePath))) return RISK_MED;
+  return 2; // default: between low and medium
 }
 
 async function getHeadSha(cwd: string): Promise<string> {

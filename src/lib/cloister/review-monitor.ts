@@ -122,8 +122,11 @@ export async function waitForReviewerOutputs(
         if (dead) {
           s.settled = true;
           if (!existsSync(s.outputPath)) {
-            s.stalledAt = now;
+            s.stalledAt = now; // → missing
+          } else if (s.lastModifiedMs > 0 && now - s.lastModifiedMs <= staleAfterMs) {
+            s.stalledAt = now; // session died before file settled → stalled
           }
+          // else: file exists and mtime settled → done
           continue;
         }
       } catch {
