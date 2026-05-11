@@ -1,7 +1,9 @@
 ---
 name: health-monitor
 description: Monitors agent health, detects stuck agents, analyzes logs
-model: haiku
+# No `model:` pin — Cloister resolves the model from config.yaml (the invoking role/runtime config).
+# Hardcoding it here would override the user's config and force everyone onto a
+# single model, defeating the per-role model configurability the dashboard exposes.
 tools:
   - Bash
   - Read

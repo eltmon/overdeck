@@ -1,7 +1,9 @@
 ---
 name: work
 description: Panopticon work role — claims beads, writes code, commits per bead, and runs Jidoka inspection gates.
-model: sonnet
+# No `model:` pin — Cloister resolves the model from config.yaml (roles.work.model).
+# Hardcoding it here would override the user's config and force everyone onto a
+# single model, defeating the per-role model configurability the dashboard exposes.
 permissionMode: bypassPermissions
 effort: high
 hooks:

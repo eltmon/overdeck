@@ -1,7 +1,9 @@
 ---
 name: inspect-deep
 description: Deep Jidoka inspection for high-risk beads — verifies the deed was done correctly and safely.
-model: sonnet
+# No `model:` pin — Cloister resolves the model from config.yaml (roles.work.sub.inspect-deep.model).
+# Hardcoding it here would override the user's config and force everyone onto a
+# single model, defeating the per-role model configurability the dashboard exposes.
 tools:
   - Read
   - Grep
