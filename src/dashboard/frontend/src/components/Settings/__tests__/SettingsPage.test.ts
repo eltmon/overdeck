@@ -41,7 +41,7 @@ const DEPRECATED_MODEL_IDS = [
 ];
 
 const SETTINGS_PAGE_SOURCE = readFileSync(
-  resolve(process.cwd(), 'src/components/Settings/SettingsPage.tsx'),
+  resolve(process.cwd(), 'src/dashboard/frontend/src/components/Settings/SettingsPage.tsx'),
   'utf8',
 );
 
