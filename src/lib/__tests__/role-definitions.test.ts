@@ -147,12 +147,13 @@ describe('role definitions', () => {
   });
 
   it('keeps legacy pan plan/work/review/inspect/test/uat/merge agent definitions until spawn migration deletes them', () => {
-    expect(existsSync(join(process.cwd(), '.claude/agents/pan-planning-agent.md'))).toBe(true);
-    expect(existsSync(join(process.cwd(), '.claude/agents/pan-work-agent.md'))).toBe(true);
-    expect(existsSync(join(process.cwd(), '.claude/agents/pan-review-agent.md'))).toBe(true);
-    expect(existsSync(join(process.cwd(), '.claude/agents/pan-inspect-agent.md'))).toBe(true);
-    expect(existsSync(join(process.cwd(), '.claude/agents/pan-test-agent.md'))).toBe(true);
-    expect(existsSync(join(process.cwd(), '.claude/agents/pan-uat-agent.md'))).toBe(true);
-    expect(existsSync(join(process.cwd(), '.claude/agents/pan-merge-agent.md'))).toBe(true);
+    // Check agents/ (the committed source); .claude/agents/ is gitignored and populated by pan install.
+    expect(existsSync(join(process.cwd(), 'agents/pan-planning-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), 'agents/pan-work-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), 'agents/pan-review-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), 'agents/pan-inspect-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), 'agents/pan-test-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), 'agents/pan-uat-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), 'agents/pan-merge-agent.md'))).toBe(true);
   });
 });
