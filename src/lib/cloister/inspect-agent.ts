@@ -28,6 +28,7 @@ import {
   sessionExistsAsync,
 } from '../tmux.js';
 import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
+import { bypassPrefixForAgentFlag } from '../claude-permissions.js';
 import {
   getProviderForModel,
   setupCredentialFileAuth,
@@ -241,7 +242,11 @@ export async function spawnInspectAgent(
           sessionType: subRole,
         },
         promptFile,
-        baseCommand: `claude --agent .claude/agents/${subRole}.md`,
+        // PAN-1082: bypassPrefixForAgentFlag() injects --dangerously-skip-permissions
+        // when claude.permissionMode === 'bypass'. Without it, the inspect subagent
+        // falls back to Claude Code's default prompting behavior and may hit
+        // permission prompts mid-run — exactly what happened in the PAN-1059 incident.
+        baseCommand: `claude${bypassPrefixForAgentFlag()} --agent .claude/agents/${subRole}.md`,
         sessionId,
         model,
       }),
