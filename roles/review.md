@@ -130,10 +130,10 @@ After writing `synthesis.md`, use the local Panopticon CLI to signal the verdict
 
 ```bash
 # Approved
-pan specialists done review <issueId> --status passed --notes "<one-line summary>"
+pan admin specialists done review <issueId> --status passed --notes "<one-line summary>"
 
 # Changes requested
-pan specialists done review <issueId> --status blocked --notes "<one-line top blocker>"
+pan admin specialists done review <issueId> --status blocked --notes "<one-line top blocker>"
 ```
 
 ## Boundaries
