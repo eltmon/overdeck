@@ -50,6 +50,15 @@ src/dashboard/restart.sh
 # Workspace-specific generated files
 CLAUDE.md
 
+# Workspace-only vBRIEF + continue state (per the five-artifact model in CLAUDE.md).
+# These files are mutated by the work agent and must never reach main — otherwise
+# every new worktree inherits the last-committed workspace's spec and pan start
+# refuses with "Workspace planning artifacts are for PAN-XXXX". See PAN-1073.
+# The canonical lifecycle artifacts (.pan/specs/, .pan/continues/, .pan/drafts/)
+# remain tracked — only the workspace working copies are excluded.
+.pan/spec.vbrief.json
+.pan/continue.json
+
 # Planning artifacts — tracked on feature branches, excluded from merges to main.
 # postMergeLifecycle removes them from main programmatically (PAN-337).
 # DO NOT gitignore .planning/ — agents and dashboard need these files throughout

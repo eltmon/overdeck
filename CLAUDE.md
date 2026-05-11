@@ -407,6 +407,8 @@ There are five artifacts. They are distinct — do not conflate them.
 
 **The PAN-946 invariant — workspace mutations never reach lifecycle directories.** `findPlan`, `readWorkspacePlan`, `updateItemStatus`, and `updateSubItemStatus` resolve ONLY the workspace-local `.pan/spec.vbrief.json`. Lifecycle/archive lookups go through `findVBriefByIssue` in `lifecycle-io.ts` (read-only) or `findVBriefByIssueAsync` in `vbrief-index.ts` (read-only, indexed). Conflating these two surfaces caused a high-severity correctness bug; the comment at `src/lib/vbrief/io.ts:5-17` is the canonical reminder.
 
+**Gitignore policy.** The two workspace-only files (`.pan/spec.vbrief.json` and `.pan/continue.json`) are listed in `.gitignore` and must NEVER be tracked in main. If they leak into main's tree, every new git worktree inherits the most-recently-committed workspace's spec and `pan start` refuses with a misleading "workspace planning artifacts are for PAN-XXXX" error (see PAN-1073 for the cleanup). The lifecycle artifacts (`.pan/specs/`, `.pan/continues/`, `.pan/drafts/`) remain tracked — they're the canonical record of plans, continue states, and PRD drafts at rest.
+
 ### Status is a JSON field, not a directory
 
 `plan.status` advances through one canonical file via atomic single-commit updates on main. Files do not move between directories.
