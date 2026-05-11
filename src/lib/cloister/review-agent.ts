@@ -131,7 +131,7 @@ function buildReviewRolePrompt(opts: {
     `Issue: ${opts.issueId}`,
     `Branch: ${opts.branch}`,
     `Workspace: ${opts.workspace}`,
-    opts.prUrl ? `PR: ${opts.prUrl}` : 'PR: (resolve via gh pr view ${branch})',
+    opts.prUrl ? `PR: ${opts.prUrl}` : `PR: (resolve via: gh pr view ${opts.branch})`,
     '',
     'Convoy reviewer models (resolved from Panopticon config at spawn time):',
     `  security:     ${opts.convoyModels.security}`,

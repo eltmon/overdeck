@@ -183,6 +183,23 @@ function roleFromAgentId(agentId: string, issueId: string): Role | null {
  */
 async function activeRoleRunExists(issueId: string, role: Role): Promise<boolean> {
   const issueLower = issueId.toLowerCase();
+
+  // C1: For 'plan', also check the legacy planning-pan-X session format
+  // alongside the canonical agent-pan-X-plan format. The start-planning route
+  // writes to planning-pan-X while spawnRun uses agent-pan-X-plan.
+  if (role === 'plan') {
+    const legacyId = `planning-${issueLower}`;
+    const legacyState = await getAgentStateAsync(legacyId);
+    if (legacyState?.role === 'plan' && legacyState.status !== 'stopped' && legacyState.status !== 'error') {
+      // S1: if stuck at 'starting' with no live tmux session, treat as not-alive
+      // so the next retry can spawn a fresh run without being blocked.
+      if (legacyState.status === 'starting' && !(await sessionExistsAsync(legacyId))) {
+        return false;
+      }
+      return true;
+    }
+  }
+
   const candidateId = role === 'work'
     ? `agent-${issueLower}`
     : `agent-${issueLower}-${role}`;
@@ -191,6 +208,12 @@ async function activeRoleRunExists(issueId: string, role: Role): Promise<boolean
   if (!state) return false;
 
   const stateRole = state.role ?? roleFromAgentId(candidateId, issueId);
+
+  // S1: treat a 'starting' state with no live tmux session as not-alive.
+  if (stateRole === role && state.status === 'starting' && !(await sessionExistsAsync(candidateId))) {
+    return false;
+  }
+
   return stateRole === role && state.status !== 'stopped' && state.status !== 'error';
 }
 

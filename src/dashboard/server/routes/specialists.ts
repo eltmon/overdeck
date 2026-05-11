@@ -478,26 +478,35 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       });
     }
 
-    // When test specialist reports success, mark as ready for merge.
-    // The post-rebase verification in triggerMerge() is the real quality gate —
-    // don't block readyForMerge based on a potentially stale verification status.
+    // When test specialist reports success, emit test.passed so reactive Cloister
+    // dispatches the ship role (which sets readyForMerge: true).  PAN-1048 invariant:
+    // ONLY the ship role sets readyForMerge: true — no direct assignment here.
     if (specialist === 'test' && status === 'passed') {
-      try {
-        const project = resolveProjectFromIssue(normalizedIssueId);
-        if (project) {
-          const workspacePath = join(
-            project.projectPath,
-            'workspaces',
-            `feature-${normalizedIssueId.toLowerCase()}`,
-          );
-          if (existsSync(workspacePath)) {
-            setReviewStatusBase(normalizedIssueId, { readyForMerge: true });
-            console.log(`[specialists/done] ${normalizedIssueId} marked ready for merge after tests passed`);
+      yield* Effect.promise(async () => {
+        try {
+          const project = resolveProjectFromIssue(normalizedIssueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${normalizedIssueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              setReviewStatusBase(normalizedIssueId, { testStatus: 'passed' });
+              const { initEventStore } = await import('../services/domain-services.js');
+              const store = await initEventStore();
+              await store.appendAsync({
+                type: 'test.passed',
+                timestamp: new Date().toISOString(),
+                payload: { issueId: normalizedIssueId },
+              } as any);
+              console.log(`[specialists/done] ${normalizedIssueId} emitted test.passed; ship role dispatched`);
+            }
           }
+        } catch (err) {
+          console.error(`[specialists/done] Error emitting test.passed for ${normalizedIssueId}:`, err);
         }
-      } catch (err) {
-        console.error(`[specialists/done] Error marking ready for merge:`, err);
-      }
+      });
     }
 
     // When merge specialist reports success, run post-merge lifecycle ONCE.
@@ -876,14 +885,16 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
         setReviewStatusBase(issueId, {
           testStatus: testPassed ? 'passed' : 'failed',
           testNotes: `Auto-detected: ${status}`,
-          // Set readyForMerge when test passes. Post-rebase verification in
-          // triggerMerge() is the real quality gate, not stale pre-merge verification.
-          // Without this, issues that go through per-project specialists never
-          // transition to readyForMerge (PAN-615).
-          ...(testPassed ? { readyForMerge: true } : {}),
         });
         if (testPassed) {
-          console.log(`[specialists] ${issueId} marked ready for merge after auto-detected test pass`);
+          // Emit test.passed so reactive Cloister dispatches the ship role
+          // (ship sets readyForMerge: true per the PAN-1048 invariant).
+          yield* eventStore.append({
+            type: 'test.passed',
+            timestamp: new Date().toISOString(),
+            payload: { issueId },
+          });
+          console.log(`[specialists] ${issueId} emitted test.passed after auto-detected test pass`);
         }
       }
     }

@@ -28,11 +28,11 @@ export function useResolvedModels(): Record<string, string | null> {
 }
 
 export function resolveWorkTypeKey(session: Pick<SessionNode, 'type' | 'role'>): string | null {
-  return session.type === 'review' ? 'specialist-review-agent'
-    : session.type === 'reviewer' && session.role ? `review:${session.role}`
-    : session.type === 'work' ? 'issue-agent:implementation'
-    : session.type === 'planning' ? 'planning-agent'
-    : session.type === 'test' ? 'specialist-test-agent'
-    : session.type === 'merge' ? 'specialist-merge-agent'
+  return session.type === 'review' ? 'role:review'
+    : session.type === 'reviewer' && session.role ? `role:review.${session.role}`
+    : session.type === 'work' ? 'role:work'
+    : session.type === 'planning' ? 'role:plan'
+    : session.type === 'test' ? 'role:test'
+    : session.type === 'merge' ? 'role:ship'
     : null;
 }
