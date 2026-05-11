@@ -1416,10 +1416,7 @@ export async function buildCavemanExports(
  * is a real configuration bug the user must see.
  */
 export function determineModel(options: { model?: string; role?: Role } = {}): string {
-  console.log(`[DEBUG] determineModel called with:`, { model: options.model, role: options.role ?? 'work' });
-
   if (options.model) {
-    console.log(`[DEBUG] Using explicit model: ${options.model}`);
     return options.model;
   }
 

@@ -1128,8 +1128,8 @@
     "hash": "da862d544a549a96182555b069029dc6"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/agents.ts": {
-    "mtime": 1778529476.3172312,
-    "hash": "2ce53da01c8ca0943926e6c484556910"
+    "mtime": 1778535974.1333265,
+    "hash": "db6c9fe60f9994d47c8f3e581b6ca278"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/git-activity.ts": {
     "mtime": 1778529476.3262908,
@@ -2056,16 +2056,16 @@
     "hash": "115a2b409e072a3f4bdabc90ec66f582"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/__tests__/agent-state-role.test.ts": {
-    "mtime": 1778529476.3172312,
-    "hash": "a578b8196b7dd41aedc9c13fd1003576"
+    "mtime": 1778535943.713278,
+    "hash": "53402a8b84605c772e7bea2909c48d80"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/__tests__/permission-mode-leak.test.ts": {
     "mtime": 1778529476.3172312,
     "hash": "ea0307daa860b13dc8ce729aecea0373"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/__tests__/role-definitions.test.ts": {
-    "mtime": 1778529476.3172312,
-    "hash": "71c15061c8e00b0fc7054cfc38e865f9"
+    "mtime": 1778535970.0621862,
+    "hash": "f7335750ae17559b513ff54df2b89776"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/__tests__/manifest.test.ts": {
     "mtime": 1778529476.3172312,

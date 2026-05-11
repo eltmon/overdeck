@@ -21,6 +21,18 @@ describe('AgentState role persistence', () => {
   });
 
   it('resolves the work role model through role config defaults', async () => {
+    vi.doMock('../config-yaml.js', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('../config-yaml.js')>();
+      return {
+        ...actual,
+        loadConfig: () => ({
+          config: {
+            workhorses: actual.DEFAULT_WORKHORSES,
+            roles: actual.DEFAULT_ROLES,
+          },
+        }),
+      };
+    });
     const { determineModel } = await import('../agents.js');
 
     // PAN-1048 R4: default workhorse:mid is claude-sonnet-4-7.

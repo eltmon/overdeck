@@ -83,10 +83,10 @@ describe('role definitions', () => {
 
     expect(frontmatter).toMatchObject({
       name: 'review',
-      model: 'opus',
       permissionMode: 'plan',
       effort: 'high',
     });
+    expect(frontmatter.model).toBeUndefined();
     // Convoy reviewers run in isolated tmux sessions — synthesis polls for
     // output files instead of spawning Agent-tool subagents, so Agent is
     // intentionally absent from the tools list.
@@ -94,7 +94,7 @@ describe('role definitions', () => {
     expect((frontmatter.tools as string[])).not.toContain('Agent');
     expect(frontmatter.hooks).toEqual(expect.any(Object));
     expect(body).toContain('You are the review synthesis agent');
-    expect(body).toContain('convoy reviewers are already running');
+    expect(body).toContain('pan review spawn-reviewer');
     expect(body.toLowerCase()).toContain('poll');
     expect(body.toLowerCase()).toContain('approve');
     expect(body.toLowerCase()).toContain('changes requested');
