@@ -12,7 +12,8 @@
  * to synthesize findings.
  */
 
-import { existsSync, statSync } from 'fs';
+import { existsSync } from 'fs';
+import { stat } from 'fs/promises';
 import { join } from 'path';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { sessionExistsAsync, isPaneDeadAsync } from '../tmux.js';
@@ -102,7 +103,7 @@ export async function waitForReviewerOutputs(
 
       if (existsSync(s.outputPath)) {
         try {
-          const mtime = statSync(s.outputPath).mtimeMs;
+          const mtime = (await stat(s.outputPath)).mtimeMs;
           if (mtime === s.lastModifiedMs && now - mtime > staleAfterMs) {
             // File stopped growing — reviewer is done or stuck
             s.settled = true;

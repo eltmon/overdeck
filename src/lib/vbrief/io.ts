@@ -17,6 +17,7 @@
  */
 
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
@@ -60,6 +61,23 @@ export function readPlan(planPath: string): VBriefDocument {
   }
 
   // Non-spec format — reject with helpful error
+  throw new Error(
+    `Invalid vBRIEF format in ${planPath}: missing 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
+    `vBRIEF v0.5 requires exactly { "vBRIEFInfo": { "version": "0.5" }, "plan": { ... } }. ` +
+    `See docs/VBRIEF.md for the correct format.`
+  );
+}
+
+/** Async variant of readPlan — safe to call from server-hot-path code. */
+export async function readPlanAsync(planPath: string): Promise<VBriefDocument> {
+  const raw = await readFile(planPath, 'utf-8');
+  if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
+    throw new VBriefMergeConflictError(planPath);
+  }
+  const parsed = JSON.parse(raw);
+  if (parsed.vBRIEFInfo && parsed.plan) {
+    return parsed as VBriefDocument;
+  }
   throw new Error(
     `Invalid vBRIEF format in ${planPath}: missing 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
     `vBRIEF v0.5 requires exactly { "vBRIEFInfo": { "version": "0.5" }, "plan": { ... } }. ` +

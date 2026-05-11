@@ -8,11 +8,12 @@
  */
 
 import { exec } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { existsSync } from 'fs';
+import { mkdir, readFile, writeFile } from 'fs/promises';
+import { join } from 'path';
 import { promisify } from 'util';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { findPlan, readPlan } from '../vbrief/io.js';
+import { findPlan, readPlanAsync } from '../vbrief/io.js';
 import { findVBriefByIssue } from '../vbrief/lifecycle-io.js';
 import { getDevrootPath } from '../config.js';
 
@@ -192,12 +193,12 @@ async function getDiff(cwd: string, base: string): Promise<{ raw: string; stat: 
   return { raw, stat, truncated: false };
 }
 
-function extractAcceptanceCriteria(workspace: string, issueId: string): string[] {
+async function extractAcceptanceCriteria(workspace: string, issueId: string): Promise<string[]> {
   // Try workspace-local spec first
   const planPath = findPlan(workspace);
   if (planPath) {
     try {
-      const doc = readPlan(planPath);
+      const doc = await readPlanAsync(planPath);
       return flattenAC(doc);
     } catch {
       // Fall through to lifecycle lookup
@@ -240,14 +241,14 @@ function flattenAC(doc: { plan?: { items?: PanItem[] } }): string[] {
   return acs;
 }
 
-function readPolicyNotes(workspace: string): string[] {
+async function readPolicyNotes(workspace: string): Promise<string[]> {
   const notes: string[] = [];
 
   // Pull CRITICAL rules from CLAUDE.md
   const claudeMdPath = join(workspace, 'CLAUDE.md');
   if (existsSync(claudeMdPath)) {
     try {
-      const content = readFileSync(claudeMdPath, 'utf-8');
+      const content = await readFile(claudeMdPath, 'utf-8');
       const criticalLines = content
         .split('\n')
         .filter(l => l.startsWith('## CRITICAL') || l.startsWith('**NEVER') || l.startsWith('**CRITICAL'))
@@ -293,11 +294,13 @@ export async function buildReviewContext(opts: BuildReviewContextOpts): Promise<
     getDiff(workspace, diffBase),
   ]);
 
-  const acceptanceCriteria = extractAcceptanceCriteria(workspace, issueId);
-  const policyNotes = readPolicyNotes(workspace);
+  const [acceptanceCriteria, policyNotes] = await Promise.all([
+    extractAcceptanceCriteria(workspace, issueId),
+    readPolicyNotes(workspace),
+  ]);
 
   const manifestDir = join(workspace, PAN_DIRNAME, 'review', runId);
-  mkdirSync(manifestDir, { recursive: true });
+  await mkdir(manifestDir, { recursive: true });
   const manifestPath = join(manifestDir, 'context.json');
 
   const manifest: ReviewContextManifest = {
@@ -313,7 +316,7 @@ export async function buildReviewContext(opts: BuildReviewContextOpts): Promise<
     manifestPath,
   };
 
-  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
 
   return manifest;
 }
