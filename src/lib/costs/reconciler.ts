@@ -135,7 +135,10 @@ function buildSessionIndex(): Map<string, SessionMapping> {
 
     // Determine session type: prefer state.json role, then infer from agent directory name
     let sessionType = stateRole || 'work';
-    if (agentDir.startsWith('planning-')) {
+    const reviewSubRole = agentDir.match(/-review-(security|correctness|performance|requirements)$/i)?.[1]?.toLowerCase();
+    if (reviewSubRole) {
+      sessionType = `review.${reviewSubRole}`;
+    } else if (agentDir.startsWith('planning-')) {
       sessionType = 'planning';
     } else if (agentDir.includes('review')) {
       sessionType = 'review';

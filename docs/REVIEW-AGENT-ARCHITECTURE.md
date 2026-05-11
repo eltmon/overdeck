@@ -165,6 +165,23 @@ Harness selection follows the same role/sub-role shape. Because the convoy promp
 
 ---
 
+## Cost attribution
+
+Review cost events use `PANOPTICON_SESSION_TYPE` as the stage key. The synthesis
+role records as `review`; convoy reviewers record as `review.security`,
+`review.correctness`, `review.performance`, and `review.requirements`.
+
+`pan cost issue <issueId>` reads the cost-event aggregate first and prints a
+**By Review Role** section when any review stages are present. The display maps
+`review` to `synthesis` so a full run can be compared as one synthesis cost plus
+four reviewer costs.
+
+Baseline on 2026-05-11 for PAN-1059: the local cost database has no historical
+PAN-1059 events, so there is no reliable pre-change per-reviewer measurement.
+The measurable baseline after this change is the five-stage split above.
+
+---
+
 ## Dashboard restart invariant
 
 The dashboard is a projection layer:

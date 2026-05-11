@@ -248,8 +248,8 @@
     "hash": "e542f9c9b749de3ffbf025285dce93d5"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/tests/unit/lib/database/cost-events-db.test.ts": {
-    "mtime": 1778529476.344253,
-    "hash": "27bd042c84b2436554b15a0965e4a7fd"
+    "mtime": 1778535241.6541014,
+    "hash": "48d67493bf11b381c1114d1d225e8c14"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/tests/unit/lib/lifecycle/workflows.test.ts": {
     "mtime": 1778529476.3446875,
@@ -778,6 +778,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/tests/dashboard/utils/vtt-parser.test.ts": {
     "mtime": 1778529476.3377573,
     "hash": "bae0d00450d28926eb8eded003ef5776"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/tests/cli/commands/cost.test.ts": {
+    "mtime": 1778535236.5939274,
+    "hash": "1754f009c94ee84250c00e6724ac864d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/tests/cli/commands/review-reset.test.ts": {
     "mtime": 1778529476.336643,
@@ -2268,8 +2272,8 @@
     "hash": "3597efb7eceaed391eb3d8994ab117bb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/costs/reconciler.ts": {
-    "mtime": 1778529476.3245404,
-    "hash": "52a77ccf1cffa3358462e72107bc556f"
+    "mtime": 1778535207.7479348,
+    "hash": "3a542aa49bdbae7d36c1a712b4e1c7f8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/lib/costs/__tests__/retention.test.ts": {
     "mtime": 1778529476.3245404,
@@ -4288,8 +4292,8 @@
     "hash": "3fad1ffb3b71d0b715ccd9627e4e71e3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/cli/commands/cost.ts": {
-    "mtime": 1778529476.2588847,
-    "hash": "4bc1d7731d4330b844dfd640becced8e"
+    "mtime": 1778535227.9476297,
+    "hash": "3ce936d1312c2e3efd194b1e6a6d5cf6"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/src/cli/commands/start.ts": {
     "mtime": 1778529476.261113,
@@ -4808,8 +4812,8 @@
     "hash": "f3647da1042e275ad27ab6c091e99212"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/docs/REVIEW-AGENT-ARCHITECTURE.md": {
-    "mtime": 1778529475.9531753,
-    "hash": "09896e0b2cb5e6a2f657cabd271a3535"
+    "mtime": 1778535257.6936533,
+    "hash": "a66260065cd5b8361321ea711f6e8adb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1059/docs/TESTING.md": {
     "mtime": 1778529475.9546843,
