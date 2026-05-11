@@ -135,6 +135,7 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
       correctness: { model: 'workhorse:mid' },
       performance: { model: 'workhorse:mid' },
       requirements: { model: 'workhorse:mid' },
+      synthesis: { model: 'workhorse:expensive' },
     },
   },
   test: { model: 'workhorse:mid' },

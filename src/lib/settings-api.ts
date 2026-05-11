@@ -130,7 +130,7 @@ const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship'];
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
 const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
   work: ['inspect', 'inspect-deep'],
-  review: ['security', 'performance', 'correctness', 'requirements'],
+  review: ['security', 'performance', 'correctness', 'requirements', 'synthesis'],
 };
 function seededWorkhorses(config: Pick<ReturnType<typeof loadConfig>['config'], 'workhorses'>): WorkhorsesConfig {
   return { ...DEFAULT_WORKHORSES, ...(config.workhorses ?? {}) };

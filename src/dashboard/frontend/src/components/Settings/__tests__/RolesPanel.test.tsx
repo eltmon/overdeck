@@ -31,10 +31,17 @@ const settingsPayload = {
         correctness: { model: 'workhorse:mid' },
         performance: { model: 'workhorse:mid' },
         requirements: { model: 'workhorse:mid' },
+        synthesis: { model: 'workhorse:expensive' },
       },
     },
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
+  },
+  models: {
+    providers: {
+      anthropic: false,
+      kimi: true,
+    },
   },
 };
 
@@ -104,6 +111,8 @@ describe('RolesPanel', () => {
       'title',
       'Workhorse: Expensive = claude-opus-4-7',
     );
+    expect(screen.getAllByText('Resolved: claude-opus-4-7').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('alert')[0]).toHaveTextContent('Anthropic is not configured');
   });
 
   it('expands work and review cards to show configured sub-role defaults', async () => {
@@ -120,6 +129,7 @@ describe('RolesPanel', () => {
     expect(screen.getByLabelText('Review Correctness model')).toHaveValue('workhorse:mid');
     expect(screen.getByLabelText('Review Performance model')).toHaveValue('workhorse:mid');
     expect(screen.getByLabelText('Review Requirements model')).toHaveValue('workhorse:mid');
+    expect(screen.getByLabelText('Review Synthesis model')).toHaveValue('workhorse:expensive');
   });
 
   it('round-trips nested role edits through PUT /api/settings', async () => {

@@ -36,6 +36,12 @@ describe('WorkhorsePanel', () => {
               mid: 'claude-sonnet-4-6',
               cheap: 'claude-haiku-4-5',
             },
+            models: {
+              providers: {
+                anthropic: false,
+                kimi: true,
+              },
+            },
           }),
         } as Response);
       }
@@ -68,6 +74,7 @@ describe('WorkhorsePanel', () => {
     expect(screen.getByText('Fast & cheap — universal inspect')).toBeInTheDocument();
     expect(screen.getAllByText('Anthropic > Claude Opus 4.7').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Kimi > Kimi K2.6 Flash').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('alert')[0]).toHaveTextContent('Anthropic is not configured');
   });
 
   it('round-trips workhorse edits through PUT /api/settings', async () => {
