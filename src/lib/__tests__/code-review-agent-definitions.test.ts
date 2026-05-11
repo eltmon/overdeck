@@ -29,11 +29,10 @@ describe('code review Claude Code agent definitions', () => {
       expect(agent.frontmatter.name).toBe(`code-review-${flavor}`);
       expect(agent.frontmatter.description).toEqual(expect.any(String));
       expect(agent.frontmatter.model).toEqual(expect.any(String));
-      // PAN-1048 R5 C1: code-review-* sub-agents are read-only — they return
-      // findings as the agent's response and never write files. Tools list
-      // must include the read primitives (Read, Glob) but MUST NOT include Write.
-      expect(agent.frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Glob']));
-      expect(agent.frontmatter.tools).not.toEqual(expect.arrayContaining(['Write']));
+      // PAN-1059: convoy reviewers run in isolated tmux sessions and write
+      // findings to .pan/review/<runId>/<subRole>.md via the Write tool.
+      // Tools list must include the read primitives AND Write.
+      expect(agent.frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Glob', 'Write']));
       expect(agent.body.trim().length).toBeGreaterThan(100);
     });
   }

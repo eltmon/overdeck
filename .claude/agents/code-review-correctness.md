@@ -6,6 +6,7 @@ tools:
   - Read
   - Grep
   - Glob
+  - Write
 ---
 
 # Code Review: Correctness
@@ -227,19 +228,18 @@ return user?.email ?? null;
 ```
 ## Returning your review
 
-The review role invokes you via the Agent tool and reads your response
-directly — there is no output file, no coordinator, and no synthesis sub-agent.
+You run in an isolated tmux session. The synthesis agent polls for your output file — **you MUST write to it before stopping**.
+
+Your spawn prompt contains:
+- `Output file` — the path where you write your findings
+- `Context manifest` — read this instead of running `git diff` yourself
 
 When you have completed your passes:
 
 1. Compile your findings into the format described above.
-2. Return them as the full body of your agent response. The review role's
-   `Agent({ subagent_type: 'code-review-<axis>' })` call surfaces the response
-   verbatim in the conversation; that is the canonical record.
-3. If you found nothing, still return a structured "no findings" report —
-   include the severity tally and a single line summary so the review role
-   can fold it into its synthesis. An empty response is treated as a failure.
+2. Write the full report to the output file path using the `Write` tool.
+3. If you found nothing, still write a structured "no findings" report — include the severity tally and a one-line summary so synthesis can confirm you completed.
 
-Do NOT use the `Write` tool to persist a review file. Do NOT wait for a
-synthesis coordinator. Do NOT stop after analyzing in chat — your last
-message IS the review.
+**An empty or missing output file is treated as a reviewer failure** — synthesis will request changes citing your sub-role as non-completing.
+
+Do NOT stop without writing the output file. Your response body is ignored — only the file matters.

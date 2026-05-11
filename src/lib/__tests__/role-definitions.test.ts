@@ -82,25 +82,19 @@ describe('role definitions', () => {
       permissionMode: 'plan',
       effort: 'high',
     });
-    expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash', 'Agent']));
+    // PAN-1059: convoy reviewers run in isolated tmux sessions — synthesis
+    // polls for output files instead of spawning Agent-tool subagents.
+    // Agent is no longer needed in the tools list.
+    expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash']));
+    expect((frontmatter.tools as string[])).not.toContain('Agent');
     expect(frontmatter.hooks).toEqual(expect.any(Object));
-    expect(body).toContain('The review role is the synthesis agent');
-    expect(body).toContain("subagent_type: 'code-review-security'");
-    expect(body).toContain("subagent_type: 'code-review-correctness'");
-    expect(body).toContain("subagent_type: 'code-review-performance'");
-    expect(body).toContain("subagent_type: 'code-review-requirements'");
-    expect(body).toContain('Launch the convoy in parallel');
-    expect(body).toContain('Approve');
-    expect(body).toContain('Request changes');
+    expect(body).toContain('You are the synthesis agent');
+    expect(body).toContain('convoy reviewers are already running');
+    expect(body.toLowerCase()).toContain('poll');
+    expect(body.toLowerCase()).toContain('approve');
+    expect(body.toLowerCase()).toContain('request changes');
     expect(body).toContain('Review NEVER merges');
-    // PAN-1048 R7 follow-up: spawnReviewRoleForIssue now resolves the four
-    // convoy models from config.yaml at spawn time via
-    // resolveModel('review', '<flavor>') and injects them into this role's
-    // prompt. The Agent-tool subagents receive that resolved model as a
-    // per-call override on top of their .claude/agents/code-review-*.md
-    // frontmatter. Full per-reviewer tmux isolation remains tracked under
-    // PAN-1059. Assert both invariants are still discoverable in the doc.
-    expect(body).toMatch(/resolveModel\(['"]review['"],\s*['"]<flavor>['"]\)/);
+    // PAN-1059: isolated convoy sessions; synthesis reads output files.
     expect(body).toMatch(/PAN-1059/);
   });
 

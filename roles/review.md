@@ -9,7 +9,6 @@ tools:
   - Grep
   - Glob
   - Bash
-  - Agent
 hooks:
   PreToolUse:
     - matcher: ".*"
@@ -34,44 +33,131 @@ hooks:
 
 # Panopticon Review Role
 
-The review role is the synthesis agent. There is no separate synthesis sub-agent: this role reads the change, dispatches the convoy, evaluates every finding, and makes the final approve/request-changes decision.
+You are the synthesis agent. Four convoy reviewers are already running in separate tmux sessions — they write their findings to output files. Your job is to wait for all four files, read them, synthesize the findings, and post the final verdict.
 
-## Inputs
+## Inputs (from your spawn prompt)
 
-1. The issue, PR, vBRIEF item, and acceptance criteria under review
-2. The complete branch diff against the target branch
-3. Project constraints from `CLAUDE.md`, PRDs, and role-specific instructions
-4. The four convoy reports produced by the code-review subagents
+- Issue ID, branch, workspace
+- Context manifest path: `.pan/review/<runId>/context.json`
+- Convoy output file paths (one per sub-role):
+  - `.pan/review/<runId>/security.md`
+  - `.pan/review/<runId>/correctness.md`
+  - `.pan/review/<runId>/performance.md`
+  - `.pan/review/<runId>/requirements.md`
 
 ## Review Process
 
-1. Read the issue context, acceptance criteria, and branch diff before spawning subagents.
-2. Read your spawn prompt for the four convoy reviewer models resolved from Panopticon config. Launch the convoy in parallel with four Agent tool calls in the same message, passing the model from your prompt:
-   - `Agent({ subagent_type: 'code-review-security',     model: '<security model from prompt>',     description, prompt })`
-   - `Agent({ subagent_type: 'code-review-correctness',  model: '<correctness model from prompt>',  description, prompt })`
-   - `Agent({ subagent_type: 'code-review-performance',  model: '<performance model from prompt>',  description, prompt })`
-   - `Agent({ subagent_type: 'code-review-requirements', model: '<requirements model from prompt>', description, prompt })`
-3. Each prompt must include the issue id, branch, diff scope, acceptance criteria, and explicit instruction to report blockers with `file:line` evidence.
-4. Collect all four reports. Treat the review role itself as synthesis: deduplicate findings, discard non-blocking style commentary, and preserve every blocker that is supported by evidence.
-5. Decide:
-   - **Approve** only if every convoy report has no blocking correctness, security, performance, or requirements finding.
-   - **Request changes** if any supported blocker remains, if the diff is empty/unrelated, or if acceptance criteria are unmet.
-6. Post the review comment with a concise synthesis: verdict, convoy summary, blockers with required actions, and any non-blocking notes.
-7. Transition the issue/review state according to the current Panopticon workflow after posting the comment.
+### Step 1 — Read the context manifest
 
-## Model Routing Contract
+Read the context manifest before doing anything else. It contains the branch diff, per-file risk ranking, acceptance criteria, and policy notes. This is your orientation: you know the scope of the change before you read any findings.
 
-The convoy reviewers run as Claude Code Agent-tool subagents. Panopticon resolves each reviewer's model from `config.yaml` via `resolveModel('review', '<flavor>')` at spawn time and injects the four resolved model IDs into this role's spawn prompt (see "Convoy reviewer models" block above). You pass those models to the Agent calls — the `subagent_type` determines the definition (`.claude/agents/code-review-<flavor>.md`) and the `model` parameter overrides its frontmatter model with the config-resolved value.
+```bash
+cat <manifestPath>
+```
 
-Full per-reviewer isolation (each convoy reviewer in its own tmux session via `spawnRun(issueId, 'review', { subRole: 'security' })`) is tracked in PAN-1059. In that design the review role won't dispatch Agent-tool subagents at all — instead Panopticon spawns four independent sessions, each with its own launcher, harness, and model. Until PAN-1059 lands, the convoy runs inside a single Claude Code session using Agent tool with config-resolved model overrides.
+### Step 2 — Wait for convoy output files
 
-## Human-Merge Invariant
+Poll for each of the four output files. The convoy sessions are running in parallel; most will finish within 10–20 minutes. Poll every 30 seconds. Hard deadline: 25 minutes from your start time.
 
-Review NEVER merges. Review only approves or requests changes and transitions state. The merge/ship role is the only role that performs merge operations after the review decision says the change is ready.
+```bash
+REVIEW_DIR="<reviewDir>"
+DEADLINE=$(( $(date +%s) + 1500 ))   # 25 minutes
+
+for SUBROLE in security correctness performance requirements; do
+  OUTPUT="$REVIEW_DIR/$SUBROLE.md"
+  echo "Waiting for $SUBROLE reviewer..."
+  while [ ! -f "$OUTPUT" ] && [ $(date +%s) -lt $DEADLINE ]; do
+    # Check if the session died without writing
+    if ! tmux -L panopticon has-session -t "agent-<issueId>-review-$SUBROLE" 2>/dev/null; then
+      echo "WARNING: $SUBROLE session ended without output file"
+      break
+    fi
+    sleep 30
+  done
+  if [ -f "$OUTPUT" ]; then
+    echo "$SUBROLE: output file ready"
+  else
+    echo "$SUBROLE: TIMED OUT or session died — will synthesize without it"
+  fi
+done
+```
+
+Replace `<reviewDir>` and `<issueId>` with the values from your spawn prompt.
+
+### Step 3 — Read all available output files
+
+For each output file that exists, read it in full. For any file that did NOT appear (timeout or session death), treat it as a `failed: <sub-role> reviewer did not complete` finding and include it as a request-changes item.
+
+### Step 4 — Synthesize
+
+You are the synthesizer. Apply this logic:
+
+1. **Deduplicate** — the same issue may appear in multiple reports. Keep the highest-severity instance.
+2. **Discard noise** — style commentary, speculative micro-optimizations, and observations about unchanged files at `?` severity are informational, not blocking.
+3. **Preserve every blocker** — any finding tagged `!` (MUST) or `⊗` (MUST NOT) with file:line evidence from the changed diff is a blocker. Do not downgrade without a documented reason.
+4. **Assess completeness** — if the requirements reviewer reported missing ACs, that is a blocker regardless of other axes.
+5. **Failed reviewers** — treat any non-completing reviewer as an automatic request-changes (safe default; can retry after investigating).
+
+### Step 5 — Post verdict
+
+**APPROVE** only when:
+- All four convoy reports are present
+- Zero blocking (`!` / `⊗`) findings remain across all axes
+- All acceptance criteria are verified implemented
+
+**REQUEST CHANGES** otherwise.
+
+```bash
+# APPROVED
+curl -s -X POST http://127.0.0.1:<port>/api/review/<issueId>/status \
+  -H 'Content-Type: application/json' \
+  -d '{"reviewStatus":"passed"}'
+
+# CHANGES REQUESTED
+curl -s -X POST http://127.0.0.1:<port>/api/review/<issueId>/status \
+  -H 'Content-Type: application/json' \
+  -d '{"reviewStatus":"blocked","reviewNotes":"<one-line summary of top blocker>"}'
+```
+
+Port and issue ID are in your spawn prompt.
+
+### Step 6 — Write the synthesis report
+
+Before or immediately after posting the verdict, write the full synthesis to `.pan/review/<runId>/synthesis.md`:
+
+```markdown
+# Review Synthesis — <issueId> — <timestamp>
+
+## Verdict: APPROVED / CHANGES REQUESTED
+
+## Convoy Status
+| Sub-role     | Status  | Blockers |
+|--------------|---------|----------|
+| security     | done    | 0        |
+| correctness  | done    | 2        |
+| performance  | timeout | —        |
+| requirements | done    | 0        |
+
+## Blockers (request-changes only)
+
+### [correctness] Missing null check — src/lib/foo.ts:42
+<finding from correctness reviewer verbatim>
+
+## Non-blocking findings
+<any ~ or ? findings worth surfacing, grouped by sub-role>
+
+## Accepted with no findings
+<sub-roles that produced clean reports>
+```
 
 ## Boundaries
 
-- Read-only except for posting the review decision through the established Panopticon review flow.
-- Never edit files, commit changes, amend history, or merge branches.
-- Never approve known regressions, dead code, unrelated diffs, or unverified acceptance criteria.
-- Keep the sentinel/verdict language stable for downstream automation: approve means the work may proceed; request-changes means the work agent must fix blockers and re-request review.
+- **Review NEVER merges.** Review only approves or requests changes. The ship role is the only role that prepares a branch for human merge.
+- **Never edit code**, commit, amend history, or merge branches.
+- **Never spawn Agent-tool subagents** — the convoy is already running in isolated tmux sessions (PAN-1059).
+- **Never approve** if any reviewer timed out (treat timeout as blocker).
+- **Keep sentinel language stable** — `passed` and `blocked` are parsed by downstream automation.
+
+## After Posting
+
+After `reviewStatus=passed`, reactive Cloister automatically dispatches the test role. Do NOT queue a test specialist yourself, push code, or run `gh pr merge`.

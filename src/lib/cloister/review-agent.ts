@@ -40,6 +40,7 @@
  */
 
 import { exec } from 'child_process';
+import { join } from 'path';
 import { promisify } from 'util';
 import { killSessionAsync, listSessionNamesAsync, isPaneDeadAsync } from '../tmux.js';
 import { emitActivityEntry } from '../activity-logger.js';
@@ -48,6 +49,8 @@ import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequen
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
 import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { buildReviewContext } from './review-context.js';
+import { REVIEW_SUB_ROLES, reviewerOutputPath } from './review-monitor.js';
+import { PAN_DIRNAME } from '../pan-dir/types.js';
 
 const execAsync = promisify(exec);
 
@@ -118,15 +121,46 @@ export async function cleanupReviewTempStash(issueId: string, workspace: string)
  */
 type ConvoyModels = { security: string; correctness: string; performance: string; requirements: string };
 
+function buildConvoyPrompt(opts: {
+  issueId: string;
+  subRole: string;
+  outputPath: string;
+  contextManifestPath?: string;
+}): string {
+  return [
+    `REVIEW TASK for ${opts.issueId} — ${opts.subRole.toUpperCase()} REVIEW:`,
+    '',
+    `Issue: ${opts.issueId}`,
+    `Sub-role: ${opts.subRole}`,
+    '',
+    'Output file — WRITE YOUR FULL FINDINGS HERE when done (Write tool):',
+    `  ${opts.outputPath}`,
+    '',
+    opts.contextManifestPath
+      ? [
+          'Context manifest (READ THIS first — do NOT run git diff yourself):',
+          `  ${opts.contextManifestPath}`,
+          'The manifest contains the full diff, per-file risk ranking, and acceptance criteria.',
+        ].join('\n')
+      : 'No context manifest available — run git diff to obtain the branch diff.',
+    '',
+    `Follow .claude/agents/code-review-${opts.subRole}.md for review methodology.`,
+    'When complete, write your full findings to the output file using the Write tool.',
+    'The synthesis agent polls for that file — it MUST exist before you stop.',
+  ].filter(Boolean).join('\n');
+}
+
 function buildReviewRolePrompt(opts: {
   issueId: string;
   workspace: string;
   branch: string;
   prUrl?: string;
-  convoyModels: ConvoyModels;
+  runId: string;
+  reviewDir: string;
   contextManifestPath?: string;
 }): string {
   const port = process.env.API_PORT || process.env.PORT || '3011';
+  const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${opts.reviewDir}/${r}.md`).join('\n');
   return [
     `REVIEW TASK for ${opts.issueId}:`,
     '',
@@ -134,30 +168,12 @@ function buildReviewRolePrompt(opts: {
     `Branch: ${opts.branch}`,
     `Workspace: ${opts.workspace}`,
     opts.prUrl ? `PR: ${opts.prUrl}` : `PR: (resolve via: gh pr view ${opts.branch})`,
+    opts.contextManifestPath ? `Context manifest: ${opts.contextManifestPath}` : '',
     '',
-    opts.contextManifestPath
-      ? [
-          'Context manifest (pre-built — READ THIS before spawning convoy):',
-          `  ${opts.contextManifestPath}`,
-          '',
-          'The manifest contains the branch diff, per-file risk ranking, and acceptance',
-          'criteria. Pass the manifest path to each convoy reviewer so they read it',
-          'instead of re-running git diff independently.',
-        ].join('\n')
-      : '',
-    'Convoy reviewer models (resolved from Panopticon config at spawn time):',
-    `  security:     ${opts.convoyModels.security}`,
-    `  correctness:  ${opts.convoyModels.correctness}`,
-    `  performance:  ${opts.convoyModels.performance}`,
-    `  requirements: ${opts.convoyModels.requirements}`,
+    'Convoy reviewer output files (already running in separate sessions — poll for these):',
+    subRoleFiles,
     '',
-    'Follow roles/review.md exactly. The four convoy reviewers are launched',
-    'via Agent tool calls with the model values above:',
-    '  Agent({ subagent_type: "code-review-security",     model: "<security model above>",     ... })',
-    '  Agent({ subagent_type: "code-review-correctness",  model: "<correctness model above>",  ... })',
-    '  Agent({ subagent_type: "code-review-performance",  model: "<performance model above>",  ... })',
-    '  Agent({ subagent_type: "code-review-requirements", model: "<requirements model above>", ... })',
-    'Synthesis is your job — there is no separate synthesis sub-agent.',
+    'Follow roles/review.md exactly.',
     '',
     'When you have a verdict, post it through the review status API:',
     '',
@@ -169,11 +185,10 @@ function buildReviewRolePrompt(opts: {
     'CHANGES REQUESTED:',
     `  curl -s -X POST http://127.0.0.1:${port}/api/review/${opts.issueId}/status \\`,
     `    -H 'Content-Type: application/json' \\`,
-    `    -d '{"reviewStatus":"blocked","reviewNotes":"<one-line summary; full details go through /send-feedback-to-agent>"}'`,
+    `    -d '{"reviewStatus":"blocked","reviewNotes":"<one-line summary>"}'`,
     '',
     'After posting reviewStatus=passed, reactive Cloister automatically dispatches',
-    'the test role from the resulting review.approved lifecycle event. Do NOT',
-    'queue a test specialist yourself; do NOT run gh pr merge; never edit code.',
+    'the test role. Do NOT queue a test specialist yourself; never edit code.',
   ].filter(Boolean).join('\n');
 }
 
@@ -275,10 +290,11 @@ export async function spawnReviewRoleForIssue(
       requirements: resolveModel('review', 'requirements', cfg),
     };
 
-    // Build the shared context manifest before spawning so the synthesis
-    // agent and all convoy reviewers read one pre-built diff+AC object
-    // instead of each running git diff independently (PAN-1059).
+    // Build the shared context manifest before spawning so all reviewers
+    // read one pre-built diff+AC object instead of each running git diff
+    // independently (PAN-1059).
     const runId = `agent-${opts.issueId.toLowerCase()}-review`;
+    const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', runId);
     let contextManifestPath: string | undefined;
     try {
       const manifest = await buildReviewContext({
@@ -293,13 +309,36 @@ export async function spawnReviewRoleForIssue(
       console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will use raw git diff:`, ctxErr);
     }
 
-    const prompt = buildReviewRolePrompt({ ...opts, convoyModels, contextManifestPath });
+    // Spawn convoy sub-role sessions first so they're running before the
+    // synthesis agent starts polling for their output files (PAN-1059).
+    const convoyResults = await Promise.allSettled(
+      REVIEW_SUB_ROLES.map((subRole) => {
+        const outputPath = reviewerOutputPath(opts.workspace, runId, subRole);
+        return spawnRun(opts.issueId, 'review', {
+          workspace: opts.workspace,
+          subRole,
+          prompt: buildConvoyPrompt({ issueId: opts.issueId, subRole, outputPath, contextManifestPath }),
+          model: convoyModels[subRole],
+        });
+      }),
+    );
+    convoyResults.forEach((result, i) => {
+      const subRole = REVIEW_SUB_ROLES[i];
+      if (result.status === 'rejected') {
+        console.warn(`[review-agent] Convoy ${subRole} spawn failed for ${opts.issueId}:`, result.reason);
+      } else {
+        console.log(`[review-agent] Convoy ${subRole} spawned for ${opts.issueId}: ${result.value.id}`);
+      }
+    });
+
+    // Spawn synthesis last — it polls for convoy output files.
+    const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath });
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,
       ...(opts.model ? { model: opts.model } : {}),
     });
-    console.log(`[review-agent] Review role spawned for ${opts.issueId}: ${run.id}`);
+    console.log(`[review-agent] Review role (synthesis) spawned for ${opts.issueId}: ${run.id}`);
     emitActivityEntry({ source: 'review', level: 'info', message: `Review role spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
     return {
       success: true,
