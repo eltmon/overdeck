@@ -47,6 +47,7 @@ import { getReviewerSessionName, REVIEWER_ROLES } from './specialists.js';
 import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
 import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
+import { buildReviewContext } from './review-context.js';
 
 const execAsync = promisify(exec);
 
@@ -123,6 +124,7 @@ function buildReviewRolePrompt(opts: {
   branch: string;
   prUrl?: string;
   convoyModels: ConvoyModels;
+  contextManifestPath?: string;
 }): string {
   const port = process.env.API_PORT || process.env.PORT || '3011';
   return [
@@ -133,6 +135,16 @@ function buildReviewRolePrompt(opts: {
     `Workspace: ${opts.workspace}`,
     opts.prUrl ? `PR: ${opts.prUrl}` : `PR: (resolve via: gh pr view ${opts.branch})`,
     '',
+    opts.contextManifestPath
+      ? [
+          'Context manifest (pre-built — READ THIS before spawning convoy):',
+          `  ${opts.contextManifestPath}`,
+          '',
+          'The manifest contains the branch diff, per-file risk ranking, and acceptance',
+          'criteria. Pass the manifest path to each convoy reviewer so they read it',
+          'instead of re-running git diff independently.',
+        ].join('\n')
+      : '',
     'Convoy reviewer models (resolved from Panopticon config at spawn time):',
     `  security:     ${opts.convoyModels.security}`,
     `  correctness:  ${opts.convoyModels.correctness}`,
@@ -162,7 +174,7 @@ function buildReviewRolePrompt(opts: {
     'After posting reviewStatus=passed, reactive Cloister automatically dispatches',
     'the test role from the resulting review.approved lifecycle event. Do NOT',
     'queue a test specialist yourself; do NOT run gh pr merge; never edit code.',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 /**
@@ -262,7 +274,26 @@ export async function spawnReviewRoleForIssue(
       performance:  resolveModel('review', 'performance',  cfg),
       requirements: resolveModel('review', 'requirements', cfg),
     };
-    const prompt = buildReviewRolePrompt({ ...opts, convoyModels });
+
+    // Build the shared context manifest before spawning so the synthesis
+    // agent and all convoy reviewers read one pre-built diff+AC object
+    // instead of each running git diff independently (PAN-1059).
+    const runId = `agent-${opts.issueId.toLowerCase()}-review`;
+    let contextManifestPath: string | undefined;
+    try {
+      const manifest = await buildReviewContext({
+        runId,
+        issueId: opts.issueId,
+        workspace: opts.workspace,
+        branch: opts.branch,
+      });
+      contextManifestPath = manifest.manifestPath;
+      console.log(`[review-agent] Context manifest built: ${contextManifestPath} (${manifest.changedFiles.length} files, truncated=${manifest.diff.truncated})`);
+    } catch (ctxErr) {
+      console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will use raw git diff:`, ctxErr);
+    }
+
+    const prompt = buildReviewRolePrompt({ ...opts, convoyModels, contextManifestPath });
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,

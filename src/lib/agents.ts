@@ -247,7 +247,11 @@ export async function getAgentRuntimeBaseCommand(
   return `claude ${permissionFlags} --model ${model}${nameFlag}`;
 }
 
-export function roleAgentDefinitionPath(role: Role): string {
+export function roleAgentDefinitionPath(role: Role, subRole?: string): string {
+  // Review convoy sub-roles use .claude/agents/code-review-<flavor>.md (PAN-1059)
+  if (role === 'review' && subRole) {
+    return `.claude/agents/code-review-${subRole}.md`;
+  }
   return `roles/${role}.md`;
 }
 
@@ -257,13 +261,14 @@ export async function getRoleRuntimeBaseCommand(
   agentName: string,
   role: Role,
   harness: 'claude-code' | 'pi' = 'claude-code',
+  subRole?: string,
 ): Promise<string> {
   if (harness === 'pi') {
     return `pi --mode rpc --model ${model}`;
   }
 
   const provider = getProviderForModel(model);
-  const agentFlag = ` --agent ${roleAgentDefinitionPath(role)}`;
+  const agentFlag = ` --agent ${roleAgentDefinitionPath(role, subRole)}`;
   const nameFlag = ` --name ${agentName}`;
   const bypassWithAgent = resolvePermissionMode() === 'bypass'
     ? ' --dangerously-skip-permissions'
@@ -1332,6 +1337,13 @@ export interface SpawnRunOptions {
   model?: string;
   prompt?: string;
   agentId?: string;
+  /**
+   * Sub-role within the review convoy (PAN-1059).
+   * When set alongside role='review', each convoy reviewer gets its own
+   * isolated tmux session using the code-review-<subRole> agent definition.
+   * Values: 'security' | 'correctness' | 'performance' | 'requirements'
+   */
+  subRole?: string;
 }
 
 /**
@@ -1633,10 +1645,11 @@ function defaultRunWorkspace(issueId: string): string {
   return join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
 }
 
-function runAgentId(issueId: string, role: Role): string {
-  return role === 'work'
+function runAgentId(issueId: string, role: Role, subRole?: string): string {
+  const base = role === 'work'
     ? `agent-${issueId.toLowerCase()}`
     : `agent-${issueId.toLowerCase()}-${role}`;
+  return subRole ? `${base}-${subRole}` : base;
 }
 
 /**
@@ -1657,7 +1670,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     });
   }
 
-  const agentId = options.agentId ?? runAgentId(issueId, role);
+  const agentId = options.agentId ?? runAgentId(issueId, role, options.subRole);
   if (await sessionExistsAsync(agentId)) {
     throw new Error(`Role run ${agentId} already running. Use 'pan tell' to message it.`);
   }
@@ -1747,8 +1760,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setTerminalEnv: true,
     providerExports,
     promptFile,
-    panopticonEnv: { agentId, issueId, sessionType: role },
-    baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness),
+    panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
+    baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
     ...piLauncherFields,
   });
 
