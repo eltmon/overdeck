@@ -110,4 +110,47 @@ if [[ -n "$violations" ]]; then
   exit 1
 fi
 
-echo "✓ permission-flag lint passed (no leaks outside allowlist)"
+# Positive-shape guard: files that construct Claude Code invocations must consult
+# claude-permissions.ts, even if they forgot to emit any forbidden literal. This
+# catches the PAN-1082 class where a spawn builder omitted the resolver entirely.
+spawn_candidates=$(
+  { git grep -nE --untracked \
+      -e "baseCommand:[[:space:]]*['\"\x60]claude" \
+      -e "exec claude" \
+      -e "command[[:space:]]*=[[:space:]]*['\"]claude['\"]" \
+      -e "execa\(['\"]claude['\"]" \
+      -e "spawn\(['\"]claude['\"]" \
+      -- src/lib src/cli packages; } || true
+)
+
+spawn_files=$(
+  printf '%s\n' "$spawn_candidates" | perl -ne '
+    next unless length;
+    my ($path, $line, $content) = /^([^:]+):(\d+):(.*)$/ ? ($1, $2, $3) : next;
+    next if $content =~ m{^\s*(?://|\*)};
+    next if $content =~ m{^\s*/\*};
+    next if $path =~ m{(^|/)__tests__/};
+    next if $path =~ m{(^|/)node_modules/};
+    print "$path\n";
+  ' | sort -u
+)
+
+resolver_violations=""
+while IFS= read -r file; do
+  [[ -z "$file" ]] && continue
+  if ! git grep -q "claude-permissions" -- "$file"; then
+    resolver_violations+="$file\n"
+  fi
+done <<< "$spawn_files"
+
+if [[ -n "$resolver_violations" ]]; then
+  echo "✗ permission resolver omission: Claude spawn builder lacks claude-permissions import" >&2
+  echo "" >&2
+  printf '%b' "$resolver_violations" >&2
+  echo "" >&2
+  echo "Any shipped source file that constructs a Claude Code invocation must import" >&2
+  echo "from src/lib/claude-permissions.ts and use the shared resolver helpers." >&2
+  exit 1
+fi
+
+echo "✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)"
