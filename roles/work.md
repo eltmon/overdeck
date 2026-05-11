@@ -93,4 +93,5 @@ pan done <ISSUE-ID> -c "<terse summary>"
 - Fix root causes, not symptoms; no bandaids.
 - Never delete `.jsonl` Claude session files.
 - Never send destructive HTTP requests speculatively.
+- Never approve, deny, dismiss, or answer permission prompts with `tmux send-keys`, `tmux paste-buffer`, `sendKeys`, `sendKeysAsync`, or any other session-input mechanism.
 - Do not self-review in place of the pipeline; Jidoka only checks the bead before handoff.
