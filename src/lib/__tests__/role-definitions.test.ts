@@ -31,12 +31,17 @@ describe('role definitions', () => {
     });
     expect(frontmatter.description).toEqual(expect.any(String));
     expect(frontmatter.hooks).toEqual(expect.any(Object));
-    expect(body).toContain('Read the issue, the linked PRD');
+    expect(body).toContain('Read the issue and the PRD draft');
+    expect(body).toContain('.pan/drafts/');
     expect(body).toContain('AskUserQuestion');
     expect(body).toContain('vBRIEF plan');
     expect(body).toContain('Beads');
     expect(body).toContain('pan plan-finalize <ISSUE-ID>');
     expect(body).toContain('Stop after planning is complete');
+    // Status-as-field model — files do not move between directories
+    expect(body).toContain('Files never move between directories');
+    // Output instructions must point at the canonical .pan/specs/ path, not legacy directories
+    expect(body).toMatch(/Promote.*\.pan\/specs\/|\.pan\/specs\/.*proposed/i);
   });
 
   it('defines the work role with Jidoka inspection gates and no phase labels', () => {

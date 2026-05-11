@@ -271,7 +271,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 ### continue.vbrief.json Format
 
-The continue file is a **structured replacement for STATE.md**. It lives at `.pan/continue.json` and is copied to the lifecycle continue file (`./vbrief/proposed/continue-{issue-id}.vbrief.json`) when planning completes.
+The continue file is a **structured replacement for STATE.md**. It lives at `.pan/continue.json` in the workspace; the pipeline mirrors a project-level continue file on main as part of plan finalization. You do not write that mirror yourself — `pan plan-finalize` handles it.
 
 ```json
 {

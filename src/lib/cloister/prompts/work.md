@@ -62,12 +62,12 @@ Before starting any work, you MUST read these files to understand the full conte
 These files contain critical context that may have been updated since the last session.
 {{/LOCAL}}
 {{#REMOTE}}
-Your workspace is at /workspace. Check for planning artifacts:
-- /workspace/.pan/continue.json - Structured planning context (decisions, hazards)
-- /workspace/.pan/spec.vbrief.json - Contains the workspace vBRIEF plan
-- /workspace/docs/prds/ - May contain PRD documents
+Your workspace is at /workspace. Check for planning artifacts under `/workspace/.pan/`:
+- `/workspace/.pan/continue.json` — structured planning context (decisions, hazards, resumePoint)
+- `/workspace/.pan/spec.vbrief.json` — workspace working copy of the vBRIEF plan
+- `/workspace/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
 
-Start by reading the continue file to understand the plan, then begin implementation.
+Start by reading `.pan/continue.json` to understand the plan, then begin implementation.
 If no continue file exists, check the issue tracker for requirements.
 {{/REMOTE}}
 

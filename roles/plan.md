@@ -32,20 +32,26 @@ Research-only agent that produces an executable plan for an issue. Never writes 
 
 ## Outputs
 
-1. **PRD** in `docs/prds/planned/<ISSUE-ID>-<slug>.md` if missing
-2. **vBRIEF plan** in `.pan/spec.vbrief.json` with items, acceptance criteria, and dependency edges
+1. **PRD draft** in `<projectRoot>/.pan/drafts/<ISSUE-ID>.md` if missing (markdown narrative)
+2. **vBRIEF plan** in `.pan/spec.vbrief.json` with items, acceptance criteria, and dependency edges (workspace working copy)
 3. **Continue context** in `.pan/continue.json` with decisions, hazards, and a clear `resumePoint` for the implementation agent
 4. **Beads** created with `bd create` and labelled with the issue id, one per `items[]` entry, with edges that mirror the plan's `edges`
 
+`pan plan-finalize` writes the canonical spec to `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` with `plan.status: "proposed"`. You do not write to `.pan/specs/` directly. See docs/VBRIEF.md for the four-artifact model.
+
 ## Process
 
-1. Read the issue, the linked PRD if any, and any existing scope vBRIEFs in `vbrief/proposed/`
+1. Read the issue and the PRD draft at `<projectRoot>/.pan/drafts/<ISSUE-ID>.md` if it exists. For cross-issue context, look up existing specs by issue ID via the read-only lifecycle index — never write or move files in `.pan/specs/`.
 2. Explore the codebase with Read/Grep/Glob — never edit
 3. Empirically test risky assumptions (use `claude --print` to probe CLI behavior, run the dev server briefly to check shape)
 4. Surface ambiguities to the user via AskUserQuestion before committing to an approach
-5. Materialize the plan: write spec.vbrief.json, continue.json, beads
-6. Run `pan plan-finalize <ISSUE-ID>` to promote the vBRIEF to `vbrief/proposed/` via the standard helper
+5. Materialize the plan: write `.pan/spec.vbrief.json`, `.pan/continue.json`, beads (workspace-local)
+6. Run `pan plan-finalize <ISSUE-ID>` — that promotes the workspace spec to the canonical `<projectRoot>/.pan/specs/` location with `plan.status: "proposed"`
 7. Stop after planning is complete; do not start implementation work
+
+## State model
+
+Status is a JSON field, not a directory. `plan.status` advances `draft → proposed → approved → running → completed/cancelled` via atomic field flips on the same spec file. **Files never move between directories.** Legacy paths (`docs/prds/planned/`, `vbrief/proposed/`, `.planning/`) are retired — do not write to them.
 
 ## Boundaries
 
