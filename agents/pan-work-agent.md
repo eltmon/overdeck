@@ -21,10 +21,6 @@ hooks:
           command: "$HOME/.panopticon/bin/heartbeat-hook"
         - type: command
           command: "$HOME/.panopticon/bin/permission-event-hook"
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/inspect-on-bead-close"
     - matcher: "Edit|Write"
       hooks:
         - type: command
