@@ -68,6 +68,7 @@ import {
   deliverAgentPermissionDecision,
   saveAgentRuntimeState,
   saveAgentState,
+  saveAgentStateAsync,
   getActivity,
   saveSessionId,
   getSessionId,
@@ -2252,14 +2253,30 @@ const postAgentsRoute = HttpRouter.add(
         issueId,
         workspace: workspaceMetadata,
         prompt: agentPrompt,
+        model: spawnModel,
+      }));
+
+      // Write canonical state.json so activeRoleRunExists() sees this remote
+      // work agent as active before we emit the lifecycle transition below.
+      // spawnRemoteAgent only writes remote-state.json; without state.json the
+      // Cloister duplicate-spawn guard misses the in-flight remote agent and
+      // would spawn a second local work run when in_progress is emitted.
+      yield* Effect.promise(() => saveAgentStateAsync({
+        id: state.id,
+        issueId: state.issueId,
+        workspace: workspacePath,
+        role: 'work',
+        model: spawnModel,
+        status: 'starting',
+        startedAt: state.startedAt,
+        harness: 'claude-code',
       }));
 
       // PAN-1048: lifecycle.transitionTo() is the single source of issue.transitioned.
       // The redundant issue.statusChanged emit was racing with reactive Cloister:
       // Cloister mapped 'in_progress' → 'work' role and tried to spawn a second
-      // run while activeRoleRunExists() still saw no tmux session for the
-      // in-flight spawn above. Single emit + state.json already written by
-      // spawnRemoteAgent makes the spawn the single source of truth.
+      // run while activeRoleRunExists() still saw no state.json for the
+      // in-flight spawn above. state.json is now written before this emit.
       yield* Effect.promise(() => Effect.runPromise(
         lifecycle.transitionTo(issueId, 'in_progress').pipe(Effect.catch(() => Effect.void))
       ));
@@ -2278,7 +2295,8 @@ const postAgentsRoute = HttpRouter.add(
           agent: {
             id: state.id,
             issueId: state.issueId,
-            model: state.model,
+            role: 'work' as const,
+            model: spawnModel,
             status: state.status,
             startedAt: state.startedAt,
             lastActivity: state.lastActivity,
