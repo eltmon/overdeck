@@ -25,10 +25,10 @@ describe('role definitions', () => {
 
     expect(frontmatter).toMatchObject({
       name: 'plan',
-      model: 'sonnet',
       permissionMode: 'bypassPermissions',
       effort: 'high',
     });
+    expect(frontmatter.model).toBeUndefined();
     expect(frontmatter.description).toEqual(expect.any(String));
     expect(frontmatter.hooks).toEqual(expect.any(Object));
     expect(body).toContain('Read the issue and the PRD draft');
@@ -49,15 +49,16 @@ describe('role definitions', () => {
 
     expect(frontmatter).toMatchObject({
       name: 'work',
-      model: 'sonnet',
       permissionMode: 'bypassPermissions',
       effort: 'high',
     });
+    expect(frontmatter.model).toBeUndefined();
     expect(frontmatter.hooks).toEqual(expect.any(Object));
     expect(body).toContain('## Per-Bead Workflow');
-    expect(body).toContain("subagent_type: 'inspect'");
-    expect(body).toContain("subagent_type: 'inspect-deep'");
-    expect(body).toContain('bead.metadata.requiresInspection === true');
+    expect(body).toContain('metadata.requiresInspection === true');
+    expect(body).toContain('inspectionDepth: "deep"');
+    expect(body).toContain('pan inspect <ISSUE-ID> --bead <bead-id>');
+    expect(body).toContain('pan inspect --deep');
     expect(body).toContain("resolveModel('work', 'inspect')");
     expect(body).toContain("resolveModel('work', 'inspect-deep')");
     expect(body).toContain('one undifferentiated mode');
@@ -73,7 +74,7 @@ describe('role definitions', () => {
       const { frontmatter, body } = splitFrontmatter(readRepoFile(`.claude/agents/${name}.md`));
       expect(frontmatter.name).toBe(name);
       expect(frontmatter.description).toEqual(expect.any(String));
-      expect(frontmatter.model).toEqual(expect.any(String));
+      expect(frontmatter.model).toBeUndefined();
       expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash']));
       expect(body).toContain('INSPECTION PASSED');
       expect(body).toContain('INSPECTION BLOCKED');
@@ -108,10 +109,10 @@ describe('role definitions', () => {
 
     expect(frontmatter).toMatchObject({
       name: 'test',
-      model: 'sonnet',
       permissionMode: 'bypassPermissions',
       effort: 'high',
     });
+    expect(frontmatter.model).toBeUndefined();
     expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash']));
     expect(frontmatter.hooks).toEqual(expect.any(Object));
     expect(frontmatter.mcpServers).toEqual(expect.any(Array));
@@ -129,10 +130,10 @@ describe('role definitions', () => {
 
     expect(frontmatter).toMatchObject({
       name: 'ship',
-      model: 'sonnet',
       permissionMode: 'bypassPermissions',
       effort: 'high',
     });
+    expect(frontmatter.model).toBeUndefined();
     expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash', 'Edit']));
     expect(frontmatter.hooks).toEqual(expect.any(Object));
     expect(body).toContain('Ship NEVER merges');

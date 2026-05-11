@@ -43,7 +43,7 @@ Sub-roles are not standalone Panopticon pipeline stages. They are model and inst
 | Sub-role | Parent role | Purpose |
 |---|---|---|
 | `work.inspect` | `work` | Per-bead spec verification for beads flagged `metadata.requiresInspection: true` |
-| `work.inspect-deep` | `work` | Stronger inspection path for high-risk beads |
+| `work.inspect-deep` | `work` | Stronger inspection path for high-risk beads flagged with `metadata.inspectionDepth: "deep"` |
 | `review.security` | `review` | Security-focused review lens |
 | `review.correctness` | `review` | Correctness and edge-case review lens |
 | `review.performance` | `review` | Performance and scalability review lens |

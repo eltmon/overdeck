@@ -189,6 +189,8 @@ For each sub-task, estimate difficulty using this rubric:
 
 **You MUST set this field explicitly on every bead.** Omitting it is a planning error — the work prompt requires it. Default to `false` for the typical mechanical bead; flip to `true` only when one of the criteria above genuinely applies. Most plans will have 0–2 beads with `requiresInspection: true`. If a plan has more than 3, ask yourself whether you've under-decomposed — large beads are more often the actual problem.
 
+When `requiresInspection` is `true`, set `metadata.inspectionDepth` to `"fast"` unless the bead needs a broader architecture/safety review. Use `"deep"` only for high-risk foundation, security, schema, or cross-cutting protocol beads where the inspector should answer “was this done correctly?” rather than only “was the deed done?”
+
 ### Phase 3: Generate Artifacts (NO CODE!)
 When discovery is complete:
 1. Create **continue.json** at `.pan/continue.json` with decisions, hazards, and approach context (see format below).
@@ -238,7 +240,8 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
         "metadata": {
           "difficulty": "trivial|simple|medium|complex|expert",
           "issueLabel": "{{ISSUE_ID_LOWER}}",
-          "requiresInspection": false
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
         },
         "narrative": { "Action": "<what needs to be done>" },
         "subItems": [
@@ -265,8 +268,9 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
 - `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled
 - Acceptance criteria MUST be `subItems` with `metadata.kind: "acceptance_criterion"`
-- `metadata.difficulty`, `metadata.issueLabel`, and `metadata.requiresInspection` are Panopticon extensions to the vBRIEF spec
+- `metadata.difficulty`, `metadata.issueLabel`, `metadata.requiresInspection`, and `metadata.inspectionDepth` are Panopticon extensions to the vBRIEF spec
 - `metadata.requiresInspection` is REQUIRED on every plan item — see the "Inspection Requirement" section above for the decision criteria. Default to `false` unless the bead lays a foundation other beads depend on, encodes an architectural decision, has spec ambiguity, touches a security/auth boundary, or defines a cross-cutting protocol/schema.
+- `metadata.inspectionDepth` defaults to `"fast"` when omitted. Set it to `"deep"` only when `requiresInspection` is true and the bead needs a stronger architecture/safety review.
 - Edge types: `blocks` (hard dependency), `informs` (soft), `invalidates`, `suggests`
 
 ### continue.vbrief.json Format

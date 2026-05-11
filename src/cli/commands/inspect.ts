@@ -14,6 +14,7 @@ import { getDiffBase, getDiffStats } from '../../lib/cloister/inspect-checkpoint
 interface InspectOptions {
   bead: string;
   workspace?: string;
+  deep?: boolean;
 }
 
 export function registerInspectCommand(program: Command): void {
@@ -22,6 +23,7 @@ export function registerInspectCommand(program: Command): void {
     .description('Request inspection of a completed bead before proceeding to the next')
     .requiredOption('--bead <beadId>', 'Bead ID to inspect')
     .option('--workspace <path>', 'Workspace path (auto-detected if not provided)')
+    .option('--deep', 'Use the deep inspection sub-role')
     .action(async (issueId: string, options: InspectOptions) => {
       try {
         await inspectCommand(issueId, options);
@@ -32,7 +34,7 @@ export function registerInspectCommand(program: Command): void {
     });
 }
 
-async function inspectCommand(issueId: string, options: InspectOptions): Promise<void> {
+export async function inspectCommand(issueId: string, options: InspectOptions): Promise<void> {
   const normalizedIssueId = issueId.toUpperCase();
 
   // Resolve project from issue ID
@@ -69,6 +71,7 @@ async function inspectCommand(issueId: string, options: InspectOptions): Promise
   console.log(chalk.bold('Requesting inspection'));
   console.log(chalk.dim(`  Issue:     ${normalizedIssueId}`));
   console.log(chalk.dim(`  Bead:      ${options.bead}`));
+  console.log(chalk.dim(`  Depth:     ${options.deep ? 'deep' : 'fast'}`));
   console.log(chalk.dim(`  Workspace: ${workspacePath}`));
   console.log(chalk.dim(`  Diff from: ${diffBase.substring(0, 8)}`));
   console.log('');
@@ -86,7 +89,7 @@ async function inspectCommand(issueId: string, options: InspectOptions): Promise
     branch: `feature/${normalizedIssueId.toLowerCase()}`,
   };
 
-  const result = await spawnInspectAgent(context);
+  const result = await spawnInspectAgent(context, { deep: options.deep === true });
 
   if (result.success) {
     console.log(chalk.green('✓ Inspect specialist spawned'));
