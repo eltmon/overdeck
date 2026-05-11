@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockSetReviewStatus } = vi.hoisted(() => ({
+const { mockSetReviewStatus, mockDeliverReviewVerdictFeedback } = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
+  mockDeliverReviewVerdictFeedback: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   setReviewStatus: mockSetReviewStatus,
   getReviewStatus: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/cloister/review-verdict-feedback.js', () => ({
+  deliverReviewVerdictFeedback: mockDeliverReviewVerdictFeedback,
 }));
 
 describe('specialists done command', () => {
@@ -19,6 +24,12 @@ describe('specialists done command', () => {
       testStatus: 'pending',
       updatedAt: new Date().toISOString(),
       readyForMerge: false,
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059',
+    });
+    mockDeliverReviewVerdictFeedback.mockResolvedValue({
+      feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
+      prCommentPosted: true,
+      agentMessageSent: true,
     });
   });
 
@@ -33,6 +44,12 @@ describe('specialists done command', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'blocked',
       reviewNotes: 'correctness blocker',
+    });
+    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
+      issueId: 'PAN-1059',
+      verdict: 'blocked',
+      notes: 'correctness blocker',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/1059',
     });
   });
 });
