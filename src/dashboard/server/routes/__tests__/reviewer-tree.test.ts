@@ -6,6 +6,7 @@ import { join } from 'path';
 import {
   extractReviewerRole,
   readReviewerRounds,
+  readSynthesisRounds,
   buildReviewerNodes,
 } from '../reviewer-tree.js';
 import { REVIEWER_ROLES, getReviewerSessionName } from '../../../../lib/cloister/specialists.js';
@@ -141,7 +142,7 @@ describe('readReviewerRounds (PAN-830)', () => {
 });
 
 describe('buildReviewerNodes (PAN-830)', () => {
-  it('returns exactly five nodes in REVIEWER_ROLES order', async () => {
+  it('returns exactly four convoy nodes without a synthesis child', async () => {
     const nodes = await buildReviewerNodes({
       issueId: ISSUE_ID,
       projectKey: PROJECT_KEY,
@@ -152,8 +153,8 @@ describe('buildReviewerNodes (PAN-830)', () => {
       agentsDirOverride: agentsDir,
     });
 
-    expect(nodes).toHaveLength(5);
-    expect(nodes.map(n => n.role)).toEqual([...REVIEWER_ROLES]);
+    expect(nodes).toHaveLength(4);
+    expect(nodes.map(n => n.role)).toEqual(['correctness', 'security', 'performance', 'requirements']);
     expect(nodes.every(n => n.type === 'reviewer')).toBe(true);
     expect(nodes.every(n => n.model === 'specialist')).toBe(true);
   });
@@ -250,13 +251,27 @@ describe('buildReviewerNodes (PAN-830)', () => {
     expect(security.roundMetadata).toBeUndefined();
   });
 
-  it('exposes roundMetadata with sorted history when multiple rounds present', async () => {
+  it('reads synthesis round metadata separately for the parent review node', async () => {
     const synthesis = getReviewerSessionName('synthesis', PROJECT_KEY, ISSUE_ID);
     await mkdir(join(agentsDir, synthesis), { recursive: true });
     await writeFile(join(agentsDir, synthesis, 'round-2.json'),
       JSON.stringify({ round: 2, status: 'completed', success: true }));
     await writeFile(join(agentsDir, synthesis, 'round-1.json'),
       JSON.stringify({ round: 1, status: 'failed', success: false }));
+
+    const metadata = await readSynthesisRounds(ISSUE_ID, PROJECT_KEY, agentsDir);
+
+    expect(metadata!.roundCount).toBe(2);
+    expect(metadata!.latestRound).toBe(2);
+    expect(metadata!.history.map(h => h.round)).toEqual([1, 2]);
+    expect(metadata!.history.map(h => h.status)).toEqual(['failed', 'completed']);
+  });
+
+  it('omits synthesis from child nodes', async () => {
+    const synthesis = getReviewerSessionName('synthesis', PROJECT_KEY, ISSUE_ID);
+    await mkdir(join(agentsDir, synthesis), { recursive: true });
+    await writeFile(join(agentsDir, synthesis, 'round-1.json'),
+      JSON.stringify({ round: 1, status: 'completed', success: true }));
 
     const nodes = await buildReviewerNodes({
       issueId: ISSUE_ID,
@@ -268,12 +283,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
       agentsDirOverride: agentsDir,
     });
 
-    const synthesisNode = nodes.find(n => n.role === 'synthesis')!;
-    expect(synthesisNode.status).toBe('stopped');
-    expect(synthesisNode.roundMetadata!.roundCount).toBe(2);
-    expect(synthesisNode.roundMetadata!.latestRound).toBe(2);
-    expect(synthesisNode.roundMetadata!.history.map(h => h.round)).toEqual([1, 2]);
-    expect(synthesisNode.roundMetadata!.history.map(h => h.status)).toEqual(['failed', 'completed']);
+    expect(nodes.find(n => n.role === 'synthesis')).toBeUndefined();
   });
 
   it('computes duration from startedAt/endedAt', async () => {

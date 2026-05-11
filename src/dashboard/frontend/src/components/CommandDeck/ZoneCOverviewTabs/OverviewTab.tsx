@@ -57,7 +57,6 @@ const REVIEWER_ROLES: readonly string[] = [
   'security',
   'performance',
   'requirements',
-  'synthesis',
 ];
 
 function ReviewerRoleLabel({ role }: { role: string }) {
@@ -995,7 +994,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             data-testid="overview-reviewer-grid"
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+              gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
               gap: 8,
             }}
           >
