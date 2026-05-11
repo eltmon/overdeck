@@ -24,7 +24,8 @@ import { StopAgentButton } from '../StopAgentButton';
 import { RecoverButton } from '../RecoverButton';
 import { RestartFromPlanButton } from '../RestartFromPlanButton';
 import { ResetIssueButton } from '../ResetIssueButton';
-import { useAvailableModels } from '../shared/ModelPicker/ModelPicker';
+import { useAvailableModels, HarnessSelect } from '../shared/ModelPicker/ModelPicker';
+import type { Harness } from '../shared/ModelPicker';
 import { useSwitchModel } from '../../hooks/useSwitchModel';
 import { useRestartAgent } from '../../hooks/useRestartAgent';
 
@@ -49,6 +50,8 @@ export function ZoneActionStrip({
   const [resumeMessage, setResumeMessage] = useState('');
   const [showResumeModelDropdown, setShowResumeModelDropdown] = useState(false);
   const [showRestartModelDropdown, setShowRestartModelDropdown] = useState(false);
+  const [restartHarness, setRestartHarness] = useState<Harness>((agent?.harness as Harness) || 'claude-code');
+  const [restartModel] = useState(agent?.model || '');
 
   const {
     workspace,
@@ -75,7 +78,7 @@ export function ZoneActionStrip({
     onSyncMain,
   } = useZoneAActions(issueId, agent, issue);
 
-  const { groups } = useAvailableModels();
+  const { groups, harnessPolicy } = useAvailableModels();
   const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
   const { restartMutation, isPending: isRestarting } = useRestartAgent(agent?.id);
 
@@ -428,11 +431,11 @@ export function ZoneActionStrip({
               {isRestarting ? 'Restarting...' : 'Restart Agent'}
             </button>
             <button
-              data-testid="zone-a-restart-model-dropdown"
+              data-testid="zone-a-restart-harness-dropdown"
               onClick={() => setShowRestartModelDropdown(v => !v)}
               disabled={isRestarting}
               className="flex items-center px-1 py-1 text-xs text-warning rounded hover:bg-warning hover:text-warning-foreground transition-colors disabled:opacity-50 border-l border-warning/30"
-              title="Restart with a different model"
+              title="Restart with harness/model"
             >
               <ChevronDown className="w-3 h-3" />
             </button>
@@ -443,24 +446,30 @@ export function ZoneActionStrip({
                   onClick={() => setShowRestartModelDropdown(false)}
                 />
                 <div
-                  className="absolute left-0 top-full mt-1 min-w-[220px] bg-popover border border-border rounded-md shadow-lg z-50 max-h-64 overflow-y-auto"
+                  className="absolute left-0 top-full mt-1 min-w-[240px] bg-popover border border-border rounded-md shadow-lg z-50 max-h-80 overflow-y-auto"
                 >
-                  <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Restart with model…
+                  <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
+                    Restart with harness + model
                   </div>
-                  <button
-                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent border-b border-border text-destructive"
-                    onClick={() => {
-                      setShowRestartModelDropdown(false);
-                      restartMutation.mutate({ graceful: false });
-                    }}
-                    disabled={isRestarting}
-                  >
-                    Force Restart (no warning)
-                  </button>
+                  {/* Harness selector */}
+                  <div className="px-3 py-2 border-b border-border">
+                    <div className="text-[10px] font-medium text-muted-foreground mb-1">Harness</div>
+                    <HarnessSelect
+                      value={restartHarness}
+                      onChange={(h) => {
+                        setRestartHarness(h);
+                        setShowRestartModelDropdown(false);
+                        restartMutation.mutate({ harness: h, graceful: true });
+                      }}
+                      modelId={restartModel || agent?.model || 'claude-sonnet-4-6'}
+                      groups={groups}
+                      harnessPolicy={harnessPolicy}
+                    />
+                  </div>
+                  {/* Model groups */}
                   {groups.map((group) => (
                     <div key={group.provider}>
-                      <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground/80 border-t border-border">
+                      <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground/80 border-t border-border">
                         {group.label}
                       </div>
                       {group.models.map((m) => (
@@ -469,7 +478,7 @@ export function ZoneActionStrip({
                           className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent flex items-center justify-between"
                           onClick={() => {
                             setShowRestartModelDropdown(false);
-                            restartMutation.mutate({ model: m.id, graceful: true });
+                            restartMutation.mutate({ model: m.id, harness: restartHarness, graceful: true });
                           }}
                           disabled={isRestarting}
                         >
@@ -481,6 +490,17 @@ export function ZoneActionStrip({
                       ))}
                     </div>
                   ))}
+                  {/* Force restart */}
+                  <button
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent border-t border-border text-destructive"
+                    onClick={() => {
+                      setShowRestartModelDropdown(false);
+                      restartMutation.mutate({ harness: restartHarness, graceful: false });
+                    }}
+                    disabled={isRestarting}
+                  >
+                    Force Restart (no warning)
+                  </button>
                 </div>
               </>
             )}

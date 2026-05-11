@@ -1558,8 +1558,9 @@ const postAgentRestartRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
-    const { model, graceful = true, message } = body as {
+    const { model, harness, graceful = true, message } = body as {
       model?: string;
+      harness?: 'claude-code' | 'pi';
       graceful?: boolean;
       message?: string;
     };
@@ -1585,7 +1586,7 @@ const postAgentRestartRoute = HttpRouter.add(
             payload: { agentId: id, issueId: agentState.issueId },
           }));
 
-          const result = await restartAgent(id, { model, graceful: true, message });
+          const result = await restartAgent(id, { model, harness, graceful: true, message });
 
           if (result.success) {
             const updatedState = getAgentState(id);

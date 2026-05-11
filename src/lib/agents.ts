@@ -2722,6 +2722,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
 export interface RestartAgentOptions {
   model?: string;
+  harness?: 'claude-code' | 'pi';
   graceful?: boolean;
   message?: string;
 }
@@ -2731,7 +2732,7 @@ export async function restartAgent(
   opts: RestartAgentOptions = {},
 ): Promise<{ success: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
-  const { graceful = true, model: newModel, message } = opts;
+  const { graceful = true, model: newModel, harness: newHarness, message } = opts;
 
   const agentState = getAgentState(normalizedId);
   if (!agentState) {
@@ -2741,7 +2742,7 @@ export async function restartAgent(
     return { success: false, error: `Agent workspace missing: ${agentState.workspace}` };
   }
 
-  logAgentLifecycle(normalizedId, `restartAgent called (graceful=${graceful}, model=${newModel || 'unchanged'})`);
+  logAgentLifecycle(normalizedId, `restartAgent called (graceful=${graceful}, model=${newModel || 'unchanged'}, harness=${newHarness || 'unchanged'})`);
 
   if (graceful && await sessionExistsAsync(normalizedId)) {
     const warning = 'Restarting in 30s. Update .pan/continue.json now with all progress, decisions, hazards, and resume point.';
@@ -2764,7 +2765,8 @@ export async function restartAgent(
   await stopAgentAsync(normalizedId);
 
   const effectiveModel = newModel || agentState.model || 'claude-sonnet-4-6';
-  const effectiveHarness = await resolveEffectiveHarness(agentState.harness, effectiveModel);
+  const requestedHarness = newHarness ?? agentState.harness;
+  const effectiveHarness = await resolveEffectiveHarness(requestedHarness, effectiveModel);
   if (newModel && newModel !== agentState.model) {
     agentState.model = newModel;
   }
