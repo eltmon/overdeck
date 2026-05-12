@@ -1,8 +1,8 @@
 ---
-name: pan-health
-description: "pan doctor — check Panopticon system health, dependencies, and configuration"
+name: pan-doctor
+description: "pan doctor [options] — check Panopticon system health, dependencies, and configuration"
 triggers:
-  - pan health
+  - pan doctor
   - system health
   - health check
   - panopticon status

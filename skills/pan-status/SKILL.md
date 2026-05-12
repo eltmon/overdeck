@@ -54,7 +54,7 @@ pan status
 pan status
 
 # Verbose output with resource usage
-pan status --verbose
+pan status --context
 
 # Check system health
 pan doctor
@@ -215,7 +215,7 @@ docker ps | grep panopticon
 
 ```bash
 # Verbose status with CPU/memory
-pan status --verbose
+pan status --context
 
 # Check Docker resources
 docker stats
@@ -508,4 +508,4 @@ Based on status:
 - Dashboard: http://localhost:3001
 - Run `pan status --help` for more options
 - Run `pan doctor` for system health
-- Use `pan status --verbose` for detailed info
+- Use `pan status --context` for detailed info

@@ -40,14 +40,11 @@ When you run `pan down`, the following services stop:
 # Stop all Panopticon services
 pan down
 
-# Stop services and workspace containers
-pan down --all
+# Stop dashboard and Traefik
+pan down
 
-# Stop services but keep Traefik running
-pan down --no-traefik
-
-# Force stop (kill processes)
-pan down --force
+# Stop dashboard but keep Traefik running
+pan down --skip-traefik
 ```
 
 ## Step-by-Step Workflow
@@ -157,10 +154,10 @@ docker-compose -f ~/.panopticon/traefik/docker-compose.yml down
 ### Stop and Clean Up Workspaces
 
 ```bash
-# Stop services and all workspace containers
-pan down --all
+# Stop dashboard and Traefik
+pan down
 
-# Manually stop workspace containers
+# Remove a workspace separately when needed
 pan workspace list
 pan workspace destroy <id>
 
@@ -174,7 +171,7 @@ If services won't stop gracefully:
 
 ```bash
 # Force kill all processes
-pan down --force
+pan down
 
 # Or manually force kill
 pkill -9 -f panopticon
@@ -292,8 +289,8 @@ pan up
 # Method 2: Restart command (if available)
 pan restart
 
-# Method 3: Force restart
-pan down --force && pan up
+# Method 3: Explicit stop/start
+pan down && pan up
 ```
 
 ## Graceful vs Forceful Shutdown
@@ -313,19 +310,9 @@ pan down
 
 **When to use:** Normal shutdown, routine maintenance
 
-### Forceful Shutdown
+### Hung Shutdown
 
-```bash
-pan down --force
-```
-
-**What happens:**
-- Sends SIGKILL to processes
-- Immediately terminates all processes
-- No cleanup or state saving
-- May leave orphaned resources
-
-**When to use:** Services hung, emergency shutdown, debugging
+`pan down` does not expose a force flag. If services hang, inspect the failing process and fix the underlying startup/shutdown problem instead of relying on a force-stop shortcut.
 
 ## Cleanup After Shutdown
 
