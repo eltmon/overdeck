@@ -33,7 +33,9 @@ async function runConnectivityProbe(workspacePath: string): Promise<{ ok: boolea
   } catch (pingErr: any) {
     const pingErrRaw = String(pingErr?.message ?? pingErr?.stderr ?? '');
     // v1.0.2 does not have `bd ping` — detect and fall back gracefully.
-    if (/unknown command/.test(pingErrRaw) || /not found/.test(pingErrRaw)) {
+    // Only match shell-level "command not found" errors, not SQL "table not found"
+    // (which can appear in v1.0.4 DB-layer errors and would incorrectly trigger fallback).
+    if (/unknown command/.test(pingErrRaw) || /command not found/i.test(pingErrRaw)) {
       try {
         await execFileAsync('bd', ['list', '--json', '--limit', '0'], {
           encoding: 'utf-8', cwd: workspacePath, timeout: 8000,

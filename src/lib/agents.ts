@@ -594,6 +594,24 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   }
 }
 
+/**
+ * Read agent state without the `isRole` guard. Returns the raw parsed state
+ * (or null on parse error) so callers can apply their own validation.
+ * Used by deacon's autoResumeStoppedWorkAgents to infer the role for legacy
+ * states that predate the mandatory role field.
+ */
+export function readRawAgentState(agentId: string): Partial<AgentState> | null {
+  const normalizedId = normalizeAgentId(agentId);
+  const stateFile = join(getAgentDir(normalizedId), 'state.json');
+  if (!existsSync(stateFile)) return null;
+  try {
+    const content = readFileSync(stateFile, 'utf8');
+    return JSON.parse(content) as Partial<AgentState>;
+  } catch {
+    return null;
+  }
+}
+
 export function getAgentState(agentId: string): AgentState | null {
   const normalizedId = normalizeAgentId(agentId);
   const stateFile = join(getAgentDir(normalizedId), 'state.json');

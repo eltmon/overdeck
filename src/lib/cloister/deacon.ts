@@ -40,7 +40,7 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent, maybeInferRole } from '../agents.js';
+import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent, maybeInferRole, readRawAgentState } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, isPaneDeadAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
@@ -4430,28 +4430,30 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   logDeaconEvent(`autoResumeStoppedWorkAgents started: scanning ${dirs.length} agent directorie(s)`);
 
   for (const agentId of dirs) {
-    const state = getAgentState(agentId);
-    if (!state) {
+    // Use readRawAgentState (not getAgentState) to get the raw JSON without the
+    // isRole guard — legacy states with missing/invalid role fields are still
+    // visible here so we can infer their role and resume them.
+    const raw = readRawAgentState(agentId);
+    if (!raw) {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — no state.json`);
       continue;
     }
-    if (state.status !== 'stopped') {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — status=${state.status} (not stopped)`);
+    if (!raw.status || raw.status !== 'stopped') {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — status=${raw.status ?? 'undefined'} (not stopped)`);
       continue;
     }
     // Infer role for legacy states that predate the mandatory role field
-    const effectiveRole = state.role ?? maybeInferRole(state, agentId);
+    const effectiveRole = raw.role ?? maybeInferRole(raw, agentId);
     if (effectiveRole !== 'work') {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — role=${effectiveRole} (not work)`);
       continue;
     }
-
     // Skip if the agent has a completed marker (or processed completion) — unless
     // review or test found issues that need fixing (blocked / failed).
     const completedFile = join(getAgentDir(agentId), 'completed');
     const processedFile = join(getAgentDir(agentId), 'completed.processed');
+    let review = raw.issueId ? getReviewStatus(raw.issueId) : undefined;
     if (existsSync(completedFile) || existsSync(processedFile)) {
-      const review = getReviewStatus(state.issueId);
       const needsFix =
         review?.reviewStatus === 'blocked' ||
         review?.reviewStatus === 'failed' ||
@@ -4472,13 +4474,13 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     }
 
     // Skip if workspace is missing
-    if (!state.workspace || !existsSync(state.workspace)) {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — workspace missing (${state.workspace || 'undefined'})`);
+    if (!raw.workspace || !existsSync(raw.workspace)) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — workspace missing (${raw.workspace || 'undefined'})`);
       continue;
     }
 
     // Skip if already merge-ready (review+test passed) or already merged
-    const review = getReviewStatus(state.issueId);
+    if (!review) review = raw.issueId ? getReviewStatus(raw.issueId) : undefined;
     if (review?.readyForMerge && review.reviewStatus === 'passed' && review.testStatus === 'passed') {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — already merge-ready`);
       continue;
@@ -4494,19 +4496,19 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     // squash-detection races) and doesn't depend on shadow-state being up to
     // date (old issues may have no shadow file). Saw 10 spurious work agents
     // get respawned for already-merged issues during a mergeStatus flap window.
-    if ((state as any).merged === true) {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — agent state has merged=true (mergedAt=${(state as any).mergedAt ?? 'unknown'})`);
+    if ((raw as any).merged === true) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — agent state has merged=true (mergedAt=${(raw as any).mergedAt ?? 'unknown'})`);
       continue;
     }
 
-    const shadowState = await getShadowState(state.issueId);
+    const shadowState = raw.issueId ? await getShadowState(raw.issueId) : undefined;
     const issueClosed = shadowState?.trackerStatus === 'closed';
     if (issueClosed) {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${state.issueId} is CLOSED on tracker`);
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${raw.issueId} is CLOSED on tracker`);
       continue;
     }
 
-    const deliberatelyStopped = state.stoppedByUser === true;
+    const deliberatelyStopped = raw.stoppedByUser === true;
     if (deliberatelyStopped) {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
       continue;
@@ -4534,7 +4536,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     }
 
     const runtimeStateForLog = getAgentRuntimeState(agentId);
-    logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} candidate — calling resumeAgent (issueId=${state.issueId}, runtime.state=${runtimeStateForLog?.state || 'null'})`);
+    logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} candidate — calling resumeAgent (issueId=${raw.issueId}, runtime.state=${runtimeStateForLog?.state || 'null'})`);
     try {
       const result = await resumeAgent(agentId);
       if (result.success) {
@@ -4543,7 +4545,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
         console.log(`[deacon] ${msg}`);
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${msg}`);
         logAgentLifecycle(agentId, `resumed by deacon auto-recovery (session restored after system event)`);
-        const issueId = state.issueId;
+        const issueId = raw.issueId;
         emitActivityEntry({
           source: 'cloister',
           level: 'info',
