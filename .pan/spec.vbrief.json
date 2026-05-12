@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T20:55:19.765Z"
+    "updated": "2026-05-12T20:55:59.027Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a4f2c8d1-7b3e-4a90-b5f6-2e1d9c0a8374",
     "author": "agent:claude-opus-4-7",
-    "sequence": 38,
+    "sequence": 66,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T20:55:19.765Z",
+    "updated": "2026-05-12T20:55:59.027Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -86,7 +86,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.765Z"
+        "completed": "2026-05-12T20:55:59.027Z"
       },
       {
         "id": "moonshine-sidecar-build",
@@ -128,7 +128,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.763Z"
+        "completed": "2026-05-12T20:55:59.025Z"
       },
       {
         "id": "transcription-ts",
@@ -178,7 +178,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.760Z"
+        "completed": "2026-05-12T20:55:59.022Z"
       },
       {
         "id": "turn-queue-ts",
@@ -220,7 +220,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.765Z"
+        "completed": "2026-05-12T20:55:59.026Z"
       },
       {
         "id": "transcription-manager-ts",
@@ -262,7 +262,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.759Z"
+        "completed": "2026-05-12T20:55:59.020Z"
       },
       {
         "id": "ws-voice-ts",
@@ -312,7 +312,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.758Z"
+        "completed": "2026-05-12T20:55:59.019Z"
       },
       {
         "id": "voice-settings-route",
@@ -346,7 +346,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.764Z"
+        "completed": "2026-05-12T20:55:59.026Z"
       },
       {
         "id": "server-wire-ws-voice",
@@ -380,7 +380,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.757Z"
+        "completed": "2026-05-12T20:55:59.018Z"
       },
       {
         "id": "use-voice-transcription",
@@ -438,7 +438,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.756Z"
+        "completed": "2026-05-12T20:55:59.016Z"
       },
       {
         "id": "voice-widget-tsx",
@@ -504,7 +504,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.755Z"
+        "completed": "2026-05-12T20:55:59.015Z"
       },
       {
         "id": "composer-footer-mic",
@@ -554,7 +554,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.754Z"
+        "completed": "2026-05-12T20:55:59.013Z"
       },
       {
         "id": "voice-settings-ui",
@@ -604,7 +604,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.764Z"
+        "completed": "2026-05-12T20:55:59.026Z"
       },
       {
         "id": "autopreso-deps",
@@ -646,7 +646,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.763Z"
+        "completed": "2026-05-12T20:55:59.025Z"
       },
       {
         "id": "whiteboard-elements-ts",
@@ -680,7 +680,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.762Z"
+        "completed": "2026-05-12T20:55:59.024Z"
       },
       {
         "id": "whiteboard-tools-ts",
@@ -730,7 +730,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.760Z"
+        "completed": "2026-05-12T20:55:59.021Z"
       },
       {
         "id": "whiteboard-keywords-ts",
@@ -756,7 +756,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.762Z"
+        "completed": "2026-05-12T20:55:59.024Z"
       },
       {
         "id": "autopreso-session-ts",
@@ -806,7 +806,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.758Z"
+        "completed": "2026-05-12T20:55:59.020Z"
       },
       {
         "id": "autopreso-agent-ts",
@@ -864,7 +864,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.758Z"
+        "completed": "2026-05-12T20:55:59.019Z"
       },
       {
         "id": "autopreso-routes-ts",
@@ -906,7 +906,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.757Z"
+        "completed": "2026-05-12T20:55:59.017Z"
       },
       {
         "id": "ws-autopreso-ts",
@@ -948,7 +948,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.756Z"
+        "completed": "2026-05-12T20:55:59.016Z"
       },
       {
         "id": "server-wire-autopreso",
@@ -982,7 +982,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.755Z"
+        "completed": "2026-05-12T20:55:59.015Z"
       },
       {
         "id": "autopreso-controls-tsx",
@@ -1024,7 +1024,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.761Z"
+        "completed": "2026-05-12T20:55:59.023Z"
       },
       {
         "id": "transcript-panel-tsx",
@@ -1058,7 +1058,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.761Z"
+        "completed": "2026-05-12T20:55:59.023Z"
       },
       {
         "id": "use-autopreso-websocket",
@@ -1108,7 +1108,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.755Z"
+        "completed": "2026-05-12T20:55:59.014Z"
       },
       {
         "id": "autopreso-view-tsx",
@@ -1158,7 +1158,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.754Z"
+        "completed": "2026-05-12T20:55:59.013Z"
       },
       {
         "id": "autopreso-route-nav",
@@ -1200,7 +1200,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.753Z"
+        "completed": "2026-05-12T20:55:59.012Z"
       },
       {
         "id": "google-cloud-stt-ts",
@@ -1250,7 +1250,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.763Z"
+        "completed": "2026-05-12T20:55:59.025Z"
       },
       {
         "id": "transcription-manager-gcp",
@@ -1292,7 +1292,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:55:19.761Z"
+        "completed": "2026-05-12T20:55:59.022Z"
       }
     ],
     "edges": [
