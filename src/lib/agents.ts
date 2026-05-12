@@ -2575,17 +2575,20 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   });
 
-  // Channels: dismiss the dev-channels confirmation dialog before any prompt
-  // delivery. Must run while we are still in the launch path so the channel
-  // listener is registered before deliverAgentMessage starts preferring the
-  // socket. Skipped when the agent was not eligible at launch time.
-  if (state.channelsEnabled) {
-    await dismissDevChannelsDialog(agentId);
-  }
+  // Channels: start dismissing the dev-channels confirmation dialog as soon as
+  // the tmux session exists, but only block on completion when we are about to
+  // deliver an initial prompt. Spawn-only callers should not sit in a 20s poll
+  // loop waiting for a dialog they may never need.
+  const dismissChannelsDialogPromise = state.channelsEnabled
+    ? dismissDevChannelsDialog(agentId).catch(() => undefined)
+    : null;
 
   // Send the initial prompt after Claude's interactive prompt is ready.
   // Wait for the session to be ready by polling tmux output for Claude's prompt.
   if (prompt) {
+    if (dismissChannelsDialogPromise) {
+      await dismissChannelsDialogPromise;
+    }
     // Wait for tmux session to exist and Claude to show its prompt
     let ready = false;
     for (let i = 0; i < 30; i++) {
