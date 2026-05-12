@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T18:43:49.960562Z"
+    "updated": "2026-05-12T18:47:30.852440Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T18:43:49.960562Z",
+    "updated": "2026-05-12T18:47:30.852440Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -377,7 +377,7 @@
       {
         "id": "use-voice-transcription",
         "title": "Implement useVoiceTranscription.ts — WebAudio capture + /ws/voice hook",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -392,7 +392,7 @@
           {
             "id": "use-voice-transcription.ac1",
             "title": "start() requests mic access and opens /ws/voice WebSocket",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -400,7 +400,7 @@
           {
             "id": "use-voice-transcription.ac2",
             "title": "PCM audio sent as binary WebSocket frames at 24kHz mono",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -408,7 +408,7 @@
           {
             "id": "use-voice-transcription.ac3",
             "title": "partialText and committedText state updated from server transcript events",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -416,7 +416,7 @@
           {
             "id": "use-voice-transcription.ac4",
             "title": "analyserNode exposed for waveform visualization",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -424,7 +424,7 @@
           {
             "id": "use-voice-transcription.ac5",
             "title": "stop() closes mic stream and WebSocket cleanly",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -434,7 +434,7 @@
       {
         "id": "voice-widget-tsx",
         "title": "Implement VoiceWidget.tsx — collapsible widget with waveform, preview, Edit+Direct modes",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -449,7 +449,7 @@
           {
             "id": "voice-widget-tsx.ac1",
             "title": "Collapsed state shows mic button with idle/listening/error icons",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -457,7 +457,7 @@
           {
             "id": "voice-widget-tsx.ac2",
             "title": "Expanded state shows waveform canvas animating from AnalyserNode when listening",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -465,7 +465,7 @@
           {
             "id": "voice-widget-tsx.ac3",
             "title": "Partial transcript text updates live during speech",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -473,7 +473,7 @@
           {
             "id": "voice-widget-tsx.ac4",
             "title": "Edit mode: Stop inserts committed text via onInsert()",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -481,7 +481,7 @@
           {
             "id": "voice-widget-tsx.ac5",
             "title": "Direct mode: committed transcript fires onSendDirect() immediately without inserting into editor",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -489,7 +489,7 @@
           {
             "id": "voice-widget-tsx.ac6",
             "title": "Mic device picker populated from navigator.mediaDevices.enumerateDevices()",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

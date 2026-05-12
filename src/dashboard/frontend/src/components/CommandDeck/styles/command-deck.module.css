@@ -3405,40 +3405,39 @@
   color: var(--primary-foreground);
 }
 
-.voiceWaveform {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  height: 44px;
+.voiceWidgetControls {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 8px;
   margin-top: 10px;
-  padding: 0 10px;
+}
+
+.voiceFieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+
+.voiceSelect {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 12px;
+}
+
+.voiceWaveformCanvas {
+  display: block;
+  width: 100%;
+  height: 56px;
+  margin-top: 10px;
   border-radius: 10px;
   background: var(--background);
-  overflow: hidden;
-}
-
-.voiceWaveBar,
-.voiceWaveBarActive {
-  width: 3px;
-  height: 12px;
-  border-radius: 999px;
-  background: var(--muted-foreground);
-  opacity: 0.35;
-}
-
-.voiceWaveBarActive {
-  height: 28px;
-  background: var(--primary);
-  opacity: 0.9;
-  animation: voicePulse 900ms ease-in-out infinite alternate;
-}
-
-.voiceWaveBarActive:nth-child(3n) { animation-delay: 120ms; }
-.voiceWaveBarActive:nth-child(4n) { animation-delay: 240ms; }
-
-@keyframes voicePulse {
-  from { transform: scaleY(0.45); }
-  to { transform: scaleY(1); }
 }
 
 .voiceTranscriptPreview {

@@ -1,5 +1,6 @@
 import { Mic, MicOff, Send, Square, X } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useVoiceTranscription } from '../../hooks/useVoiceTranscription';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -15,28 +16,65 @@ export function VoiceWidget({
   onSendDirect: (text: string) => void;
 }) {
   const [mode, setMode] = useState<VoiceMode>('edit');
-  const [listening, setListening] = useState(false);
-  const [partialText, setPartialText] = useState('');
-  const [committedText, setCommittedText] = useState('');
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [deviceId, setDeviceId] = useState('');
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const directModeRef = useRef(mode);
+  const { start, stop, partialText, committedText, isListening, error, analyserNode, resetTranscript } = useVoiceTranscription({
+    onCommitted: (text) => {
+      if (directModeRef.current === 'direct') onSendDirect(text);
+    },
+  });
+  const previewText = partialText || committedText;
 
-  const stop = useCallback(() => {
-    setListening(false);
-    const text = (committedText || partialText).trim();
-    if (!text) return;
-    if (mode === 'direct') {
-      onSendDirect(text);
-      setCommittedText('');
-      setPartialText('');
-    } else {
-      onInsert(text);
-    }
-  }, [committedText, mode, onInsert, onSendDirect, partialText]);
+  useEffect(() => {
+    directModeRef.current = mode;
+  }, [mode]);
+
+  useEffect(() => {
+    void navigator.mediaDevices?.enumerateDevices?.().then((items) => {
+      setDevices(items.filter((item) => item.kind === 'audioinput'));
+    });
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const analyser = analyserNode;
+    if (!canvas || !analyser || !isListening) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    let frame = 0;
+    const draw = () => {
+      frame = window.requestAnimationFrame(draw);
+      analyser.getByteTimeDomainData(data);
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.strokeStyle = 'hsl(210 100% 62%)';
+      context.lineWidth = 2;
+      context.beginPath();
+      data.forEach((value, index) => {
+        const x = (index / Math.max(1, data.length - 1)) * canvas.width;
+        const y = (value / 255) * canvas.height;
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      });
+      context.stroke();
+    };
+    draw();
+    return () => window.cancelAnimationFrame(frame);
+  }, [analyserNode, isListening]);
+
+  const stopAndApply = useCallback(() => {
+    stop();
+    const text = committedText.trim();
+    if (mode === 'edit' && text) onInsert(text);
+    resetTranscript();
+  }, [committedText, mode, onInsert, resetTranscript, stop]);
 
   const cancel = useCallback(() => {
-    setListening(false);
-    setPartialText('');
-    setCommittedText('');
-  }, []);
+    stop();
+    resetTranscript();
+  }, [resetTranscript, stop]);
 
   return (
     <div className={styles.voiceWidget} data-testid="voice-widget">
@@ -63,38 +101,50 @@ export function VoiceWidget({
         </div>
       </div>
 
-      <div className={styles.voiceWaveform} aria-hidden="true">
-        {Array.from({ length: 24 }, (_, index) => (
-          <span key={index} className={listening ? styles.voiceWaveBarActive : styles.voiceWaveBar} />
-        ))}
+      <div className={styles.voiceWidgetControls}>
+        <label className={styles.voiceFieldLabel}>
+          Mic
+          <select className={styles.voiceSelect} value={deviceId} onChange={(event) => setDeviceId(event.target.value)}>
+            <option value="">Default microphone</option>
+            {devices.map((device) => (
+              <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${devices.indexOf(device) + 1}`}</option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.voiceFieldLabel}>
+          Model
+          <select className={styles.voiceSelect} defaultValue="base">
+            <option value="tiny">tiny</option>
+            <option value="base">base</option>
+          </select>
+        </label>
       </div>
+
+      <canvas ref={canvasRef} className={styles.voiceWaveformCanvas} width={480} height={56} aria-label="Voice waveform" />
 
       <textarea
         className={styles.voiceTranscriptPreview}
-        value={partialText || committedText}
-        onChange={(event) => {
-          setPartialText(event.target.value);
-          setCommittedText(event.target.value);
-        }}
-        placeholder="Live transcript preview will appear here…"
+        value={previewText}
+        readOnly
+        placeholder={error ? `Voice error: ${error}` : 'Live transcript preview will appear here…'}
       />
 
       <div className={styles.voiceWidgetActions}>
         <button
           type="button"
-          className={listening ? styles.voiceStopButton : styles.voiceStartButton}
-          onClick={() => setListening((value) => !value)}
+          className={isListening ? styles.voiceStopButton : styles.voiceStartButton}
+          onClick={() => (isListening ? stopAndApply() : void start(deviceId || undefined))}
         >
-          {listening ? <MicOff size={14} /> : <Mic size={14} />}
-          {listening ? 'Listening' : 'Start'}
+          {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+          {isListening ? 'Listening' : 'Start'}
         </button>
-        <button type="button" className={styles.voiceSecondaryButton} onClick={stop}>
+        <button type="button" className={styles.voiceSecondaryButton} onClick={stopAndApply}>
           <Square size={14} /> Stop
         </button>
         <button type="button" className={styles.voiceSecondaryButton} onClick={cancel}>
           <X size={14} /> Cancel
         </button>
-        <button type="button" className={styles.voiceSendButton} onClick={stop}>
+        <button type="button" className={styles.voiceSendButton} onClick={stopAndApply}>
           <Send size={14} /> Send
         </button>
       </div>
