@@ -39,6 +39,7 @@
  *                                     (pan down)
  */
 
+import { existsSync } from 'fs';
 import { exec } from 'child_process';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
@@ -52,6 +53,7 @@ import { buildReviewContext } from './review-context.js';
 import { REVIEW_SUB_ROLES, reviewerOutputPath, type ReviewSubRole } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { packageRoot } from '../paths.js';
+import { getAgentStateAsync } from '../agents.js';
 
 /**
  * Read a convoy sub-role prompt template from the panopticon-cli install.
@@ -226,6 +228,73 @@ function buildReviewRolePrompt(opts: {
 }
 
 /**
+ * Monitor the synthesis agent for silent exit.
+ *
+ * After spawning the synthesis agent, we run this background task to detect
+ * when it dies WITHOUT producing the synthesis file. In that case we read the
+ * agent's error state and surface it in the review status instead of letting
+ * it look like a 30-minute timeout (deacon's checkStuckReviewing).
+ *
+ * This closes the detection gap that allowed PAN-457: all four reviewers
+ * "exited before producing" because the synthesis agent itself crashed
+ * silently — but we had no idea until the deacon fired 30 minutes later.
+ *
+ * The monitor polls every 10 seconds. It stops as soon as the synthesis
+ * output file exists (normal completion) or the session dies (silent failure).
+ */
+async function monitorSynthesisAgent(opts: {
+  issueId: string;
+  sessionId: string;
+  synthesisPath: string;
+}): Promise<void> {
+  const pollIntervalMs = 10_000;
+
+  while (true) {
+    await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
+
+    try {
+      // Has the synthesis session died?
+      const dead = await isPaneDeadAsync(opts.sessionId);
+      if (!dead) continue; // Still running normally
+
+      // Session died. Did it produce the synthesis file before exiting?
+      if (!existsSync(opts.synthesisPath)) {
+        // Silent failure — synthesis agent crashed before writing output.
+        // Surface the actual error from the agent state.
+        let errorNote = 'Synthesis agent exited before producing a report.';
+        try {
+          const state = await getAgentStateAsync(opts.sessionId);
+          if (state) {
+            if (state.status === 'error') {
+              errorNote = `Synthesis agent error. Last activity: ${state.lastActivity ?? 'unknown'}.`;
+            } else if (state.status === 'stopped' && !state.stoppedByUser) {
+              errorNote = `Synthesis agent stopped unexpectedly. Last activity: ${state.lastActivity ?? 'unknown'}.`;
+            } else if (state.stoppedByUser) {
+              errorNote = 'Synthesis agent was stopped by user before producing a report.';
+            } else {
+              errorNote = `Synthesis agent exited with status '${state.status}'.`;
+            }
+          }
+        } catch {
+          // State unreadable — keep the default note
+        }
+
+        console.error(`[review-agent] Silent synthesis exit detected for ${opts.issueId}: ${errorNote}`);
+        setReviewStatus(opts.issueId, {
+          reviewStatus: 'failed',
+          reviewNotes: errorNote,
+        });
+      }
+      // Session died AND synthesis file exists — normal completion, we're done
+      break;
+    } catch (err) {
+      // Pane may not exist yet or other transient error — keep polling
+      console.warn(`[review-agent] monitorSynthesisAgent poll error for ${opts.issueId}:`, err instanceof Error ? err.message : String(err));
+    }
+  }
+}
+
+/**
  * Spawn the `review` role for an issue using the unified role primitive
  * (spawnRun). The review role launches the four review sub-role sessions,
  * synthesizes their findings, and signals the verdict through
@@ -395,6 +464,18 @@ export async function spawnReviewRoleForIssue(
     });
     console.log(`[review-agent] Review role (synthesis) spawned for ${opts.issueId}: ${run.id}`);
     emitActivityEntry({ source: 'review', level: 'info', message: `Review role spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+
+    // Background monitor: detect silent synthesis exits before the 30-minute deacon
+    // threshold and surface the actual error instead of "exited before producing".
+    const synthesisPath = join(reviewDir, 'synthesis.md');
+    monitorSynthesisAgent({
+      issueId: opts.issueId,
+      sessionId: run.id,
+      synthesisPath,
+    }).catch((err) => {
+      console.error(`[review-agent] monitorSynthesisAgent threw for ${opts.issueId}:`, err instanceof Error ? err.message : String(err));
+    });
+
     return {
       success: true,
       message: `Review role spawned: ${run.id}`,
