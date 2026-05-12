@@ -4,9 +4,10 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { promisify } from 'util';
-import { exec, execFileSync } from 'child_process';
+import { exec, execFile, execFileSync } from 'child_process';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 import { spawnAgent } from '../../lib/agents.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../lib/projects.js';
@@ -555,6 +556,37 @@ function validateAndCleanStateFile(workspacePath: string, issueId: string): { va
   }
 }
 
+interface PostCreateValidationFailureOptions {
+  spinner: Ora;
+  issueId: string;
+  projectRoot: string;
+  workspaceCreatedThisRun: boolean;
+  message: string;
+  printDetails: () => void;
+}
+
+async function failPostCreateValidation(options: PostCreateValidationFailureOptions): Promise<never> {
+  options.spinner.fail(options.message);
+  options.printDetails();
+
+  if (options.workspaceCreatedThisRun) {
+    const nodeDir = dirname(process.execPath);
+    try {
+      await execFileAsync('pan', ['workspace', 'destroy', options.issueId, '--force', '--project', options.projectRoot], {
+        cwd: options.projectRoot,
+        encoding: 'utf-8',
+        timeout: 120000,
+        env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` },
+      });
+      console.log(chalk.dim(`Rolled back workspace created for ${options.issueId}.`));
+    } catch (rollbackErr: any) {
+      console.warn(chalk.yellow(`Warning: failed to roll back workspace for ${options.issueId}: ${rollbackErr.message}`));
+    }
+  }
+
+  process.exit(1);
+}
+
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   // PAN-636 — validate --harness up front. canUseHarness gates the
   // {harness, model, authMode} combination; invalid combos exit non-zero
@@ -614,6 +646,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     const projectRoot = findProjectRoot(id);
     let workspace = workspacePath;
     const workspaceExisted = !!workspace;
+    let workspaceCreatedThisRun = false;
 
     if (!workspace) {
       spinner.text = `Creating workspace for ${id}...`;
@@ -625,6 +658,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           { cwd: projectRoot, encoding: 'utf-8', timeout: 60000, env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` } }
         );
         workspace = expectedWorkspacePath;
+        workspaceCreatedThisRun = true;
       } catch (wsErr) {
         spinner.fail(`Failed to create workspace for ${id}: ${(wsErr as Error).message}`);
         process.exit(1);
@@ -683,15 +717,22 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         } catch { /* ignore sub-repo check errors */ }
 
         if (!hasFeatureBranch) {
-          spinner.fail(`Workspace is on ${branch} branch`);
-          console.log('');
-          console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
-          console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
-          console.log('');
-          console.log(chalk.bold('To fix:'));
-          console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
-          console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
-          process.exit(1);
+          await failPostCreateValidation({
+            spinner,
+            issueId: id,
+            projectRoot,
+            workspaceCreatedThisRun,
+            message: `Workspace is on ${branch} branch`,
+            printDetails: () => {
+              console.log('');
+              console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
+              console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
+              console.log('');
+              console.log(chalk.bold('To fix:'));
+              console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
+              console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
+            },
+          });
         }
       } else {
         spinner.text = `Found workspace on branch: ${branch}`;
@@ -735,15 +776,31 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Validate spec.vbrief.json belongs to this issue (prevent stale workspace plan state from the wrong issue)
     const planValidation = validatePlanMatchesIssue(workspace, id);
     if (!planValidation.valid) {
-      spinner.fail(`Workspace planning artifacts are for ${planValidation.wrongIssue}, not ${id}`);
-      console.log('');
-      console.log(chalk.red(`The workspace contains a stale plan from a different issue.`));
-      console.log(chalk.dim(`This can happen when a workspace is reused or a branch is repurposed.`));
-      console.log('');
-      console.log(chalk.bold('To fix this:'));
-      console.log(`  ${chalk.cyan(`1. Clean the workspace planning artifacts`)}`);
-      console.log(`  ${chalk.cyan(`2. Run planning again: pan plan ${id}`)}`);
-      process.exit(1);
+      await failPostCreateValidation({
+        spinner,
+        issueId: id,
+        projectRoot,
+        workspaceCreatedThisRun,
+        message: `Workspace planning artifacts are for ${planValidation.wrongIssue}, not ${id}`,
+        printDetails: () => {
+          console.log('');
+          console.log(chalk.red(`The workspace contains a stale plan from a different issue.`));
+          if (workspaceExisted) {
+            console.log(chalk.dim(`This can happen when a workspace is reused or a branch is repurposed.`));
+            console.log('');
+            console.log(chalk.bold('To fix this:'));
+            console.log(`  ${chalk.cyan(`1. Clean the workspace planning artifacts`)}`);
+            console.log(`  ${chalk.cyan(`2. Run planning again: pan plan ${id}`)}`);
+          } else {
+            console.log(chalk.dim(`A freshly-created workspace inherited the wrong .pan/spec.vbrief.json from the project tree.`));
+            console.log('');
+            console.log(chalk.bold('To fix this:'));
+            console.log(`  ${chalk.cyan(`1. Remove workspace-only .pan/spec.vbrief.json from the main worktree`)}`);
+            console.log(`  ${chalk.cyan(`2. Ensure .pan/spec.vbrief.json is ignored`)}`);
+            console.log(`  ${chalk.cyan(`3. Run planning again: pan plan ${id}`)}`);
+          }
+        },
+      });
     }
 
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
@@ -761,8 +818,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
             stdio: ['pipe', 'pipe', 'pipe'],
           });
         } catch (bdErr) {
-          spinner.fail(`No beads tasks found for ${id} and auto-create failed`);
-          process.exit(1);
+          await failPostCreateValidation({
+            spinner,
+            issueId: id,
+            projectRoot,
+            workspaceCreatedThisRun,
+            message: `No beads tasks found for ${id} and auto-create failed`,
+            printDetails: () => {},
+          });
         }
       } else {
         // Planning was done but no beads — attempt auto-recovery from vBRIEF (matches dashboard agents.ts path)
@@ -773,25 +836,39 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           if (recovery.created.length > 0) {
             spinner.succeed(`Recovered ${recovery.created.length} beads from vBRIEF plan`);
           } else {
-            spinner.fail(`No beads tasks found for ${id} and recovery from vBRIEF failed`);
-            if (recovery.errors.length > 0) {
-              console.log(chalk.dim(`  Errors: ${recovery.errors.join(', ')}`));
-            }
-            console.log('');
-            console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
-            console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
-            console.log('');
-            console.log(chalk.bold('To re-run planning:'));
-            console.log(`  ${chalk.cyan(`Open the dashboard and click 'Plan' for ${id}`)}`);
-            process.exit(1);
+            await failPostCreateValidation({
+              spinner,
+              issueId: id,
+              projectRoot,
+              workspaceCreatedThisRun,
+              message: `No beads tasks found for ${id} and recovery from vBRIEF failed`,
+              printDetails: () => {
+                if (recovery.errors.length > 0) {
+                  console.log(chalk.dim(`  Errors: ${recovery.errors.join(', ')}`));
+                }
+                console.log('');
+                console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
+                console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
+                console.log('');
+                console.log(chalk.bold('To re-run planning:'));
+                console.log(`  ${chalk.cyan(`Open the dashboard and click 'Plan' for ${id}`)}`);
+              },
+            });
           }
         } catch (recoveryErr: any) {
-          spinner.fail(`No beads tasks found for ${id}`);
-          console.log(chalk.dim(`  Recovery error: ${recoveryErr.message}`));
-          console.log('');
-          console.log(chalk.bold('To re-run planning:'));
-          console.log(`  ${chalk.cyan(`pan plan ${id}`)}`);
-          process.exit(1);
+          await failPostCreateValidation({
+            spinner,
+            issueId: id,
+            projectRoot,
+            workspaceCreatedThisRun,
+            message: `No beads tasks found for ${id}`,
+            printDetails: () => {
+              console.log(chalk.dim(`  Recovery error: ${recoveryErr.message}`));
+              console.log('');
+              console.log(chalk.bold('To re-run planning:'));
+              console.log(`  ${chalk.cyan(`pan plan ${id}`)}`);
+            },
+          });
         }
       }
     }
@@ -854,3 +931,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exit(1);
   }
 }
+
+export const __testInternals = {
+  failPostCreateValidation,
+};
