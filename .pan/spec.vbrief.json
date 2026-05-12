@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T20:56:26.643Z"
+    "updated": "2026-05-12T21:01:35.754Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a4f2c8d1-7b3e-4a90-b5f6-2e1d9c0a8374",
     "author": "agent:claude-opus-4-7",
-    "sequence": 94,
+    "sequence": 95,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T20:56:26.643Z",
+    "updated": "2026-05-12T21:01:35.754Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -646,7 +646,7 @@
             }
           }
         ],
-        "completed": "2026-05-12T20:56:26.641Z"
+        "completed": "2026-05-12T21:01:35.754Z"
       },
       {
         "id": "whiteboard-elements-ts",
