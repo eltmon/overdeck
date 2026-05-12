@@ -76,6 +76,17 @@ describe('isValidAgentDirectoryName', () => {
     expect(isValidAgentDirectoryName('merge-pan-646')).toBe(false);
   });
 
+  it('accepts specialist role directories (review/test/ship convoy)', () => {
+    expect(isValidAgentDirectoryName('agent-pan-457-review')).toBe(true);
+    expect(isValidAgentDirectoryName('agent-pan-457-review-correctness')).toBe(true);
+    expect(isValidAgentDirectoryName('agent-pan-457-review-security')).toBe(true);
+    expect(isValidAgentDirectoryName('agent-pan-457-review-performance')).toBe(true);
+    expect(isValidAgentDirectoryName('agent-pan-457-review-requirements')).toBe(true);
+    expect(isValidAgentDirectoryName('agent-pan-457-test')).toBe(true);
+    expect(isValidAgentDirectoryName('agent-pan-457-ship')).toBe(true);
+    expect(isValidAgentDirectoryName('agent-min-215-work-1')).toBe(true);
+  });
+
   it('rejects multi-word test directories', () => {
     expect(isValidAgentDirectoryName('agent-pan-test-1')).toBe(false);
     expect(isValidAgentDirectoryName('agent-pan-sagox-1')).toBe(false);

@@ -72,6 +72,14 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
   };
 }
 
+/** Agent-managed conversation names that should not appear in the user conversation list. */
+const AGENT_CONVERSATION_PREFIXES = ['agent-', 'planning-', 'specialist-'];
+
+/** True if the conversation name belongs to an orchestrator-managed agent session. */
+export function isAgentConversationName(name: string): boolean {
+  return AGENT_CONVERSATION_PREFIXES.some((p) => name.startsWith(p));
+}
+
 // ─── Read operations ──────────────────────────────────────────────────────────
 
 export function listConversations(options?: { limit?: number; offset?: number }): Conversation[] {
@@ -82,6 +90,9 @@ export function listConversations(options?: { limit?: number; offset?: number })
               fork_status, fork_error, harness
        FROM conversations
        WHERE archived_at IS NULL
+         AND name NOT LIKE 'agent-%'
+         AND name NOT LIKE 'planning-%'
+         AND name NOT LIKE 'specialist-%'
        ORDER BY created_at DESC`;
   const params: number[] = [];
   if (options?.limit !== undefined) {

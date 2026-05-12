@@ -108,13 +108,25 @@ services:
       - bun-store:/root/.bun/install/cache
       # Shadow root node_modules only — Bun hoists all deps here
       - container-node-modules:/workspaces/panopticon/node_modules
-      # Mount required host paths for workspace/agent management
+      # Mount required host paths for workspace/agent management.
+      # NOTE: Do NOT mount ${HOME}/.panopticon into workspace containers — the container's
+      # dashboard server would run its own Deacon patrol against shared host agent state
+      # using a different tmux server, marking every host agent as "orphaned" and racing
+      # auto-resume against the host. (Bug originally observed in PAN-821 loop on
+      # 2026-04-25; recurred in PAN-698 on 2026-05-12 because the template never
+      # inherited the host's fix.) PANOPTICON_DISABLE_DEACON below is belt-and-suspenders
+      # in case someone re-adds the mount.
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ${HOME}/.panopticon:/home/node/.panopticon
       - {{PROJECTS_DIR}}:{{PROJECTS_DIR}}:ro
     environment:
       - NODE_ENV=development
       - PORT=3011
+      # Single-deacon invariant: the host's `pan up` owns agent lifecycle. The
+      # workspace devcontainer mounts the same ~/.panopticon directory but its
+      # tmux server is isolated, so a second deacon would see every agent as
+      # orphaned and resume them every cycle — duelling the host. Container
+      # dashboard runs as a read/UI peer only.
+      - PANOPTICON_DISABLE_DEACON=1
       - LINEAR_API_KEY=${LINEAR_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
     networks:

@@ -43,7 +43,7 @@ import {
 import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntry } from '../activity-logger.js';
-import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
+import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, isPaneDeadAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 
 // ============================================================================
@@ -1832,6 +1832,123 @@ export async function checkStuckReviewing(): Promise<string[]> {
 }
 
 // ============================================================================
+// Completed-but-unsignaled review detection
+// ============================================================================
+
+/**
+ * Detect review specialists that wrote synthesis.md but never called
+ * `pan specialists done review`. The review role prompt instructs the agent
+ * to signal completion after writing the synthesis, but agents occasionally
+ * forget (idle at prompt with reports already on disk). This leaves the
+ * issue stuck in `reviewing` status forever.
+ *
+ * Recovery: read the synthesis verdict and nudge the review agent to signal
+ * completion. If the agent session is dead, we auto-complete by updating the
+ * review status directly so the pipeline isn't permanently blocked.
+ *
+ * Guards:
+ *   - Only fires when reviewStatus === 'reviewing'
+ *   - synthesis.md must exist and be >5 min old (gives the agent time to signal)
+ *   - Only nudges once per review cycle (tracked by runId in the review dir)
+ */
+const unsignaledReviewNudges = new Map<string, number>();
+
+export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
+  const actions: string[] = [];
+  const SYNTHESIS_SETTLE_MS = 5 * 60 * 1000; // 5 minutes
+
+  try {
+    const statuses = loadReviewStatuses();
+    const now = Date.now();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.reviewStatus !== 'reviewing') continue;
+
+      const resolved = resolveProjectFromIssue(issueId);
+      if (!resolved) continue;
+      const wsPath = findWorkspacePath(resolved.projectPath, issueId.toLowerCase());
+      if (!wsPath) continue;
+
+      const reviewBaseDir = join(wsPath, '.pan', 'review');
+      if (!existsSync(reviewBaseDir)) continue;
+
+      // Find the most recently modified review run directory
+      let latestDir: string | null = null;
+      let latestMtime = 0;
+      for (const entry of readdirSync(reviewBaseDir)) {
+        if (!entry.startsWith(`agent-${issueId.toLowerCase()}-review`)) continue;
+        const dirPath = join(reviewBaseDir, entry);
+        const synthPath = join(dirPath, 'synthesis.md');
+        if (!existsSync(synthPath)) continue;
+        const mtime = statSync(synthPath).mtimeMs;
+        if (mtime > latestMtime) {
+          latestMtime = mtime;
+          latestDir = dirPath;
+        }
+      }
+      if (!latestDir) continue;
+
+      // Wait for synthesis to settle before intervening
+      if (now - latestMtime < SYNTHESIS_SETTLE_MS) continue;
+
+      // Deduplicate: only nudge once per directory (one review cycle)
+      const lastNudged = unsignaledReviewNudges.get(latestDir);
+      if (lastNudged && now - lastNudged < 30 * 60 * 1000) continue;
+
+      const synthesisPath = join(latestDir, 'synthesis.md');
+      let verdict: 'passed' | 'blocked' | 'failed' | null = null;
+      let topBlocker = '';
+      try {
+        const content = readFileSync(synthesisPath, 'utf8');
+        const verdictLine = content.match(/## Verdict:\s*(.+)/i);
+        if (verdictLine) {
+          const v = verdictLine[1].trim().toUpperCase();
+          if (v === 'PASSED') verdict = 'passed';
+          else if (v === 'CHANGES REQUESTED') verdict = 'blocked';
+          else if (v === 'FAILED') verdict = 'failed';
+        }
+        const blockerMatch = content.match(/## Blocking Findings\s*\n\s*###\s*\[[^\]]+\]\s*(.+)/);
+        if (blockerMatch) topBlocker = blockerMatch[1].slice(0, 120);
+      } catch {
+        continue;
+      }
+      if (!verdict) continue;
+
+      const reviewSession = `agent-${issueId.toLowerCase()}-review`;
+      const sessionAlive = sessionExists(reviewSession);
+      const paneDead = sessionAlive ? await isPaneDeadAsync(reviewSession).catch(() => true) : true;
+
+      if (sessionAlive && !paneDead) {
+        // Agent is alive but idle — nudge it to signal completion
+        const nudge = `You have already written the synthesis report for ${issueId} (verdict: ${verdict.toUpperCase()}). You MUST now signal completion with:\n\n  pan admin specialists done review ${issueId} --status ${verdict}${verdict === 'blocked' || verdict === 'failed' ? ` --notes "${topBlocker || 'See synthesis.md'}"` : ''}\n\nDo NOT wait for further instructions — run the command now.`;
+        try {
+          const { messageAgent } = await import('../agents.js');
+          await messageAgent(reviewSession, nudge);
+          unsignaledReviewNudges.set(latestDir, now);
+          actions.push(`Nudged ${reviewSession} to signal ${verdict} (synthesis written ${Math.round((now - latestMtime) / 60000)}min ago)`);
+          console.log(`[deacon] Nudged ${reviewSession} to signal ${verdict}`);
+        } catch (err: any) {
+          console.error(`[deacon] Failed to nudge ${reviewSession}:`, err.message);
+        }
+      } else {
+        // Session is dead — auto-complete so the pipeline isn't blocked
+        setReviewStatus(issueId, {
+          reviewStatus: verdict,
+          reviewNotes: topBlocker || `Review auto-completed by deacon: ${verdict} (agent dead, synthesis exists)`,
+        });
+        actions.push(`Auto-completed review for ${issueId}: ${verdict} (dead agent, synthesis written ${Math.round((now - latestMtime) / 60000)}min ago)`);
+        console.log(`[deacon] Auto-completed review for ${issueId}: ${verdict} (dead agent)`);
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error checking completed-but-unsignaled reviews:', msg);
+  }
+
+  return actions;
+}
+
+// ============================================================================
 // Verification/review contradiction (PAN-796)
 // ============================================================================
 
@@ -3580,6 +3697,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const stuckReviewActions = await checkStuckReviewing();
   actions.push(...stuckReviewActions);
   for (const a of stuckReviewActions) addLog('action', a, state.patrolCycle);
+
+  // Detect review specialists that wrote synthesis.md but never signaled completion
+  const unsignaledReviewActions = await checkCompletedButUnsignaledReviews();
+  actions.push(...unsignaledReviewActions);
+  for (const a of unsignaledReviewActions) addLog('action', a, state.patrolCycle);
 
   // PAN-796: Bypass review for issues where verification passed but review infra keeps failing
   const verifContradictionActions = await checkVerificationReviewContradiction();
