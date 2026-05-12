@@ -1,7 +1,9 @@
 import http from 'node:http';
 import { Buffer } from 'node:buffer';
 import { WebSocket, WebSocketServer } from 'ws';
-import { createMoonshineTranscription, type ITurnEmitter } from '../../voice/transcription.js';
+import { createTranscriptionManager, type TranscriptionManager } from '../../voice/transcription-manager.js';
+import { loadVoiceSettings } from './routes/voice.js';
+import { isTrustedOriginForHost } from './routes/origin-validation.js';
 
 function sendJson(ws: WebSocket, payload: unknown): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -16,10 +18,10 @@ function rawDataToBuffer(data: WebSocket.RawData): Buffer {
   return Buffer.from(data);
 }
 
-function parseModel(request: http.IncomingMessage): string {
-  const url = new URL(request.url || '', `http://${request.headers.host}`);
-  const model = url.searchParams.get('model')?.trim();
-  return model === 'tiny' ? 'tiny' : 'base';
+function isTrustedWebSocketOrigin(request: http.IncomingMessage): boolean {
+  const origin = request.headers.origin;
+  if (!origin) return true;
+  return isTrustedOriginForHost(origin, request.headers.host);
 }
 
 export function setupVoiceWebSocket(server: http.Server): void {
@@ -41,26 +43,40 @@ export function setupVoiceWebSocket(server: http.Server): void {
   originalOn('upgrade', (request: http.IncomingMessage, socket: import('net').Socket, head: Buffer) => {
     const url = new URL(request.url || '', `http://${request.headers.host}`);
     if (url.pathname !== '/ws/voice') return;
+    if (!isTrustedWebSocketOrigin(request)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit('connection', ws, request);
     });
   });
 
-  wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
-    let transcription: ITurnEmitter;
-    try {
-      transcription = createMoonshineTranscription(parseModel(request));
-    } catch (error) {
-      sendJson(ws, { type: 'error', error: error instanceof Error ? error.message : String(error) });
-      ws.close(1011, 'Voice transcription unavailable');
-      return;
-    }
-
-    transcription.onPartial((text) => sendJson(ws, { type: 'transcript:partial', text }));
-    transcription.onCommitted((text) => sendJson(ws, { type: 'transcript:committed', text }));
-    transcription.onError((error) => sendJson(ws, { type: 'error', error: error.message }));
+  wss.on('connection', (ws: WebSocket) => {
+    let manager: TranscriptionManager | null = null;
+    void loadVoiceSettings()
+      .then((settings) => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        manager = createTranscriptionManager(settings);
+        manager.applyCurrent();
+        const transcription = manager.getActive();
+        if (!transcription) throw new Error('Voice transcription unavailable');
+        transcription.onPartial((text) => sendJson(ws, { type: 'transcript:partial', text }));
+        transcription.onCommitted((text) => sendJson(ws, { type: 'transcript:committed', text }));
+        transcription.onError((error) => sendJson(ws, { type: 'error', error: error.message }));
+      })
+      .catch((error) => {
+        sendJson(ws, { type: 'error', error: error instanceof Error ? error.message : String(error) });
+        ws.close(1011, 'Voice transcription unavailable');
+      });
 
     ws.on('message', (data, isBinary) => {
+      const transcription = manager?.getActive();
+      if (!transcription) {
+        sendJson(ws, { type: 'error', error: 'Voice transcription is not ready' });
+        return;
+      }
       if (isBinary) {
         transcription.sendAudio(rawDataToBuffer(data));
         return;
@@ -79,7 +95,7 @@ export function setupVoiceWebSocket(server: http.Server): void {
       }
     });
 
-    ws.on('close', () => transcription.close());
-    ws.on('error', () => transcription.close());
+    ws.on('close', () => manager?.close());
+    ws.on('error', () => manager?.close());
   });
 }

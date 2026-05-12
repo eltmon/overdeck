@@ -1,10 +1,11 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { getPanopticonHome } from '../../../lib/paths.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
+import { validateOrigin } from './origin-validation.js';
 
 export interface VoiceSettings {
   stt: {
@@ -67,7 +68,7 @@ function normalizeVoiceSettings(value: VoiceSettings): VoiceSettings {
   };
 }
 
-async function loadVoiceSettings(): Promise<VoiceSettings> {
+export async function loadVoiceSettings(): Promise<VoiceSettings> {
   try {
     const raw = await readFile(voiceSettingsPath(), 'utf8');
     const parsed = JSON.parse(raw) as unknown;
@@ -81,28 +82,65 @@ async function loadVoiceSettings(): Promise<VoiceSettings> {
 }
 
 async function saveVoiceSettings(settings: VoiceSettings): Promise<VoiceSettings> {
-  const normalized = normalizeVoiceSettings(settings);
+  const existing = await loadVoiceSettings();
+  const normalized = normalizeVoiceSettings({
+    ...settings,
+    stt: {
+      ...settings.stt,
+      googleCloud: {
+        ...settings.stt.googleCloud,
+        apiKey: settings.stt.googleCloud.apiKey || existing.stt.googleCloud.apiKey,
+      },
+    },
+  });
   const path = voiceSettingsPath();
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
+  await writeFile(path, `${JSON.stringify(normalized, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+  await chmod(path, 0o600);
   return normalized;
+}
+
+function redactVoiceSettings(settings: VoiceSettings): VoiceSettings & { stt: VoiceSettings['stt'] & { googleCloud: VoiceSettings['stt']['googleCloud'] & { hasApiKey: boolean } } } {
+  return {
+    stt: {
+      ...settings.stt,
+      googleCloud: {
+        ...settings.stt.googleCloud,
+        apiKey: '',
+        hasApiKey: settings.stt.googleCloud.apiKey.trim().length > 0,
+      },
+    },
+  };
+}
+
+function requireTrustedOrigin(request: HttpServerRequest.HttpServerRequest) {
+  const originCheck = validateOrigin(request);
+  return originCheck.ok ? null : jsonResponse({ error: originCheck.error }, { status: 403 });
 }
 
 const getVoiceSettingsRoute = HttpRouter.add(
   'GET',
   '/api/voice/settings',
-  httpHandler(Effect.promise(async () => jsonResponse(await loadVoiceSettings()))),
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
+    return yield* Effect.promise(async () => jsonResponse(redactVoiceSettings(await loadVoiceSettings())));
+  })),
 );
 
 const putVoiceSettingsRoute = HttpRouter.add(
   'PUT',
   '/api/voice/settings',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedOrigin(request);
+    if (originError) return originError;
     const body = yield* readJsonBody;
     if (!isVoiceSettings(body)) {
       return jsonResponse({ error: 'Invalid voice settings payload' }, { status: 400 });
     }
-    return yield* Effect.promise(async () => jsonResponse(await saveVoiceSettings(body)));
+    return yield* Effect.promise(async () => jsonResponse(redactVoiceSettings(await saveVoiceSettings(body))));
   })),
 );
 

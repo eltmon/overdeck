@@ -88,7 +88,6 @@ class MoonshineTranscription implements ITurnEmitter {
   stop(): void {
     this.stopping = true;
     this.writeJson({ type: 'stop' });
-    this.stopping = false;
   }
 
   close(): void {
