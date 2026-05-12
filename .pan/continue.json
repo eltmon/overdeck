@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1053",
   "created": "2026-05-09T16:09:08.344Z",
-  "updated": "2026-05-12T18:21:50.928640Z",
+  "updated": "2026-05-12T18:24:00.269141Z",
   "gitState": {
     "branch": "feature/pan-1053",
-    "sha": "7d419dcc5",
+    "sha": "232af731d",
     "dirty": true
   },
   "decisions": [
@@ -83,12 +83,10 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-wf5e / moonshine-sidecar-build; next vBRIEF dependency is transcription-ts.",
-    "beadId": "workspace-wf5e",
+    "description": "Completed bead workspace-cyn8 / transcription-ts; inspection is required before proceeding to transcription-manager-ts.",
+    "beadId": "workspace-cyn8",
     "filesToRead": [
-      "scripts/build-moonshine-sidecars.js",
-      "scripts/moonshine-sidecar.py",
-      "package.json",
+      "src/voice/transcription.ts",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -117,6 +115,12 @@
       "timestamp": "2026-05-12T18:21:50.928640Z",
       "reason": "bead-complete",
       "note": "Added npm run build:sidecar, a Linux x64 PyInstaller build script with managed venv/pip freeze on failure, and a JSONL Moonshine sidecar implementing ready/audio/partial/committed/stop protocol. Verified with node --check and python3 -m py_compile.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-12T18:24:00.269141Z",
+      "reason": "bead-complete",
+      "note": "Implemented ITurnEmitter and createMoonshineTranscription with sidecar binary resolution, JSONL audio writes, partial/committed callbacks, and unexpected sidecar exit error callbacks. Verified module with focused tsc command.",
       "agentModel": "gpt-5.5"
     }
   ],
