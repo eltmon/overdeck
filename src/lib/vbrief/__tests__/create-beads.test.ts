@@ -205,4 +205,59 @@ describe('createBeadsFromVBrief', () => {
     expect(result.created).toContain('PAN-IDEM: Rebuilt task');
     expect(result.beadIds.get('item-1')).toBe('fresh-bead-1');
   });
+
+  it('defaults missing inspection policy to auto and preserves per-item metadata', async () => {
+    setupRedirect(WORKSPACE_DIR);
+    const doc = makeDoc('PAN-AUTO', [{ id: 'item-1', title: 'Auto task' }]);
+    doc.plan.items[0].metadata = {
+      difficulty: 'simple',
+      issueLabel: 'pan-auto',
+      requiresInspection: true,
+      inspectionDepth: 'deep',
+    };
+    writePlan(WORKSPACE_DIR, doc);
+
+    mockExecAsync
+      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'bead-auto\n', stderr: '' });
+
+    await createBeadsFromVBrief(WORKSPACE_DIR);
+
+    const createCall = mockExecAsync.mock.calls.find(
+      ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',
+    );
+    const metadata = JSON.parse(createCall![1][createCall![1].indexOf('--metadata') + 1]);
+    expect(metadata.requiresInspection).toBe(true);
+    expect(metadata.inspectionDepth).toBe('deep');
+  });
+
+  it('materializes global inspection policy into bead metadata', async () => {
+    setupRedirect(WORKSPACE_DIR);
+    const doc = makeDoc('PAN-DEEP', [{ id: 'item-1', title: 'Deep task' }]);
+    doc.vBRIEFInfo.inspectionPolicy = 'deep';
+    doc.plan.items[0].metadata = {
+      difficulty: 'simple',
+      issueLabel: 'pan-deep',
+      requiresInspection: false,
+      inspectionDepth: 'fast',
+    };
+    writePlan(WORKSPACE_DIR, doc);
+
+    mockExecAsync
+      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'bead-deep\n', stderr: '' });
+
+    await createBeadsFromVBrief(WORKSPACE_DIR);
+
+    const createCall = mockExecAsync.mock.calls.find(
+      ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',
+    );
+    const metadata = JSON.parse(createCall![1][createCall![1].indexOf('--metadata') + 1]);
+    expect(metadata.requiresInspection).toBe(true);
+    expect(metadata.inspectionDepth).toBe('deep');
+  });
 });

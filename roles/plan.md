@@ -1,7 +1,9 @@
 ---
 name: plan
 description: Panopticon planning role — researches the issue, writes the vBRIEF plan, creates beads. Never writes implementation code.
-model: sonnet
+# No `model:` pin — Cloister resolves the model from config.yaml (roles.plan.model).
+# Hardcoding it here would override the user's config and force everyone onto a
+# single model, defeating the per-role model configurability the dashboard exposes.
 permissionMode: bypassPermissions
 effort: high
 hooks:

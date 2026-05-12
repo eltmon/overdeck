@@ -120,6 +120,9 @@ export interface VBriefPlan {
   edges: VBriefEdge[];
 }
 
+export const VBRIEF_INSPECTION_POLICIES = ['auto', 'never', 'fast', 'deep'] as const;
+export type VBriefInspectionPolicy = typeof VBRIEF_INSPECTION_POLICIES[number];
+
 export interface VBriefDocument {
   vBRIEFInfo: {
     version: string;
@@ -131,6 +134,8 @@ export interface VBriefDocument {
     author?: string;
     /** Human-readable description of the plan */
     description?: string;
+    /** Panopticon inspection routing policy. Defaults to auto when omitted. */
+    inspectionPolicy?: VBriefInspectionPolicy;
   };
   plan: VBriefPlan;
 }

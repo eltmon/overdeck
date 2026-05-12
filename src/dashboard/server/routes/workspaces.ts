@@ -10,6 +10,7 @@ import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
  *   GET    /api/workspaces/:issueId
  *   POST   /api/workspaces
  *   GET    /api/workspaces/:issueId/plan
+ *   PATCH  /api/workspaces/:issueId/plan/inspection-policy
  *   GET    /api/workspaces/:issueId/clean/preview
  *   POST   /api/workspaces/:issueId/clean
  *   POST   /api/workspaces/:issueId/containerize
@@ -90,8 +91,9 @@ import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js
 import { getCostsForIssue } from '../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPlan, readPlan, readWorkspacePlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
-import type { VBriefDocument } from '../../../lib/vbrief/types.js';
+import { findPlan, readPlan, readPlanAsync, readWorkspacePlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { VBRIEF_INSPECTION_POLICIES } from '../../../lib/vbrief/types.js';
+import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief/types.js';
 import { findVBriefByIssueAsync, readVBriefDocumentAsync } from '../../../lib/vbrief/vbrief-index.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
@@ -1614,6 +1616,28 @@ const getWorkspaceInferenceMdRoute = HttpRouter.add(
   }))
 );
 
+function resolvePlanLocation(projectPath: string, issueId: string): Promise<{ path: string; lifecycleDir: string; doc: VBriefDocument } | null> {
+  return findVBriefByIssueAsync(projectPath, issueId).then(async found => {
+    if (found) {
+      return {
+        path: found.path,
+        lifecycleDir: found.lifecycleDir,
+        doc: await readVBriefDocumentAsync(found.path),
+      };
+    }
+
+    const issueLower = issueId.toLowerCase();
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    const planPath = findPlan(workspacePath);
+    if (!planPath) return null;
+    return {
+      path: planPath,
+      lifecycleDir: 'workspace',
+      doc: await readPlanAsync(planPath),
+    };
+  });
+}
+
 const getWorkspacePlanRoute = HttpRouter.add(
   'GET',
   '/api/workspaces/:issueId/plan',
@@ -1625,42 +1649,67 @@ const getWorkspacePlanRoute = HttpRouter.add(
     }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
-    const issueLower = issueId.toLowerCase();
-    const workspaceName = `feature-${issueLower}`;
-    const workspacePath = join(projectPath, 'workspaces', workspaceName);
 
-    // Resolve from lifecycle specs first (cached/async), then fall back to the
-    // workspace-local `.pan/spec.vbrief.json` when planning is still in progress.
-    let planPath: string | null = null;
-    let lifecycleDir: string | null = null;
-    let doc: VBriefDocument | null = null;
-
-    const found = yield* Effect.promise(() => findVBriefByIssueAsync(projectPath, issueId));
-    if (found) {
-      planPath = found.path;
-      lifecycleDir = found.lifecycleDir;
-      doc = yield* Effect.promise(() => readVBriefDocumentAsync(found.path));
-    } else {
-      planPath = findPlan(workspacePath);
-      if (planPath) {
-        lifecycleDir = 'workspace';
-        const planPathConst = planPath;
-        doc = yield* Effect.promise(async () => {
-          const raw = await readFile(planPathConst, 'utf-8');
-          return JSON.parse(raw) as VBriefDocument;
-        });
-      }
-    }
-
-    if (!doc) {
+    const location = yield* Effect.promise(() => resolvePlanLocation(projectPath, issueId));
+    if (!location) {
       return jsonResponse(
         { error: 'No vBRIEF plan found for this workspace' },
         { status: 404 }
       );
     }
 
-    const cp = criticalPath(doc);
-    return jsonResponse({ ...doc, criticalPath: cp, lifecycleDir });
+    const cp = criticalPath(location.doc);
+    return jsonResponse({ ...location.doc, criticalPath: cp, lifecycleDir: location.lifecycleDir });
+  }))
+);
+
+const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
+  'PATCH',
+  '/api/workspaces/:issueId/plan/inspection-policy',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedMutationOrigin(request);
+    if (originError) return originError;
+
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+
+    const body = yield* readJsonBody;
+    const policy = (body as { inspectionPolicy?: unknown }).inspectionPolicy;
+    if (!VBRIEF_INSPECTION_POLICIES.includes(policy as VBriefInspectionPolicy)) {
+      return jsonResponse({ error: 'Invalid inspection policy' }, { status: 400 });
+    }
+
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const location = yield* Effect.promise(() => resolvePlanLocation(projectPath, issueId));
+    if (!location) {
+      return jsonResponse(
+        { error: 'No vBRIEF plan found for this workspace' },
+        { status: 404 }
+      );
+    }
+
+    const now = new Date().toISOString();
+    const updated: VBriefDocument = {
+      ...location.doc,
+      vBRIEFInfo: {
+        ...location.doc.vBRIEFInfo,
+        inspectionPolicy: policy as VBriefInspectionPolicy,
+        updated: now,
+      },
+      plan: {
+        ...location.doc.plan,
+        updated: now,
+      },
+    };
+
+    yield* Effect.promise(() => writeFile(location.path, JSON.stringify(updated, null, 2) + '\n', 'utf-8'));
+    const cp = criticalPath(updated);
+    return jsonResponse({ ...updated, criticalPath: cp, lifecycleDir: location.lifecycleDir });
   }))
 );
 
@@ -5738,6 +5787,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceStateMdRoute,
   getWorkspaceInferenceMdRoute,
   getWorkspacePlanRoute,
+  patchWorkspacePlanInspectionPolicyRoute,
   getWorkspaceStashesRoute,
   postWorkspaceRecoverStashRoute,
   deleteWorkspaceStashRoute,

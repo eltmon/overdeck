@@ -20,7 +20,7 @@ import type {
   Agent,
   ActivitySource,
 } from './types.js';
-import { getAgentState, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentState, saveAgentRuntimeState } from '../agents.js';
+import { getAgentState, getAgentDir, spawnAgent as spawnAgentImpl, saveAgentState, saveAgentRuntimeState, determineModel } from '../agents.js';
 import { sessionExists, killSession, sendKeys, sendKeysAsync, getAgentSessions } from '../tmux.js';
 import { parseClaudeSession, getSessionFiles, getProjectDirs } from '../cost-parsers/jsonl-parser.js';
 
@@ -343,7 +343,7 @@ export class ClaudeCodeRuntime implements AgentRuntime {
       issueId: config.agentId.replace(/^agent-/, ''),
       workspace: config.workspace,
       harness: 'claude-code',
-      model: config.model || 'sonnet',
+      model: determineModel({ model: config.model, role: 'work' }),
       role: 'work',
       prompt: config.prompt,
     });

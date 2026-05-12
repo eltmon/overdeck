@@ -1,7 +1,9 @@
 ---
 name: inspect
 description: Fast Jidoka self-inspection for a single bead — verifies the deed was done before the work role continues.
-model: haiku
+# No `model:` pin — Cloister resolves the model from config.yaml (roles.work.sub.inspect.model).
+# Hardcoding it here would override the user's config and force everyone onto a
+# single model, defeating the per-role model configurability the dashboard exposes.
 tools:
   - Read
   - Grep

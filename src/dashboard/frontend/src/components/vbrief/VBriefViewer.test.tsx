@@ -178,6 +178,19 @@ describe('VBriefHeader', () => {
     expect(screen.getByText('3')).toBeTruthy();
   });
 
+  it('renders default inspection policy', () => {
+    render(<VBriefHeader doc={makeDoc()} />);
+    expect(screen.getByText('inspection')).toBeTruthy();
+    expect(screen.getByText('auto')).toBeTruthy();
+  });
+
+  it('allows editing inspection policy', () => {
+    const onInspectionPolicyChange = vi.fn();
+    render(<VBriefHeader doc={makeDoc()} onInspectionPolicyChange={onInspectionPolicyChange} />);
+    fireEvent.change(screen.getByLabelText('Inspection policy'), { target: { value: 'never' } });
+    expect(onInspectionPolicyChange).toHaveBeenCalledWith('never');
+  });
+
   it('omits uid row when uid is absent', () => {
     const doc = makeDoc({ uid: undefined });
     render(<VBriefHeader doc={doc} />);

@@ -1,7 +1,9 @@
 ---
 name: ship
 description: Panopticon ship role — prepares an approved PR for human merge without performing the merge.
-model: sonnet
+# No `model:` pin — Cloister resolves the model from config.yaml (roles.ship.model).
+# Hardcoding it here would override the user's config and force everyone onto a
+# single model, defeating the per-role model configurability the dashboard exposes.
 permissionMode: bypassPermissions
 effort: high
 tools:

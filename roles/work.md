@@ -1,7 +1,9 @@
 ---
 name: work
 description: Panopticon work role — claims beads, writes code, commits per bead, and runs Jidoka inspection gates.
-model: sonnet
+# No `model:` pin — Cloister resolves the model from config.yaml (roles.work.model).
+# Hardcoding it here would override the user's config and force everyone onto a
+# single model, defeating the per-role model configurability the dashboard exposes.
 permissionMode: bypassPermissions
 effort: high
 hooks:
@@ -21,10 +23,6 @@ hooks:
           command: "$HOME/.panopticon/bin/heartbeat-hook"
         - type: command
           command: "$HOME/.panopticon/bin/permission-event-hook"
-    - matcher: "Bash"
-      hooks:
-        - type: command
-          command: "$HOME/.panopticon/bin/inspect-on-bead-close"
     - matcher: "Edit|Write"
       hooks:
         - type: command
@@ -53,27 +51,26 @@ For every bead:
 3. Implement only that bead.
 4. `git add` specific files and `git commit` — one bead = one commit.
 5. Update `.pan/continue.json` (`resumePoint`, decisions, hazards, sessionHistory).
-6. Run the universal Jidoka inspection gate with the Agent tool:
-   `Agent({ subagent_type: 'inspect', description, prompt })`.
-7. If `bead.metadata.requiresInspection === true`, also run the deep Jidoka inspection gate with:
-   `Agent({ subagent_type: 'inspect-deep', description, prompt })`.
-8. Fix any blocked finding with a new commit before closing the bead.
-9. `bd close <bead-id> --reason="…"`.
-10. Continue with the next ready bead.
+6. Re-read this bead's metadata in `.pan/spec.vbrief.json` after the commit.
+7. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
+8. If `metadata.requiresInspection === false`, skip inspection and continue.
+9. Fix any blocked finding with a new commit before closing the bead.
+10. `bd close <bead-id> --reason="…"`.
+11. Continue with the next ready bead.
 
 Never batch multiple beads into a single commit. A one-bead diff is what makes inspection, review, and rollback tractable.
 
 ## Jidoka Inspection Gates
 
-### Universal gate: `inspect`
+### Fast depth: `inspect`
 
-Every bead runs a cheap self-inspection after the bead commit and before claiming more work. The question is deliberately narrow: **was the deed done?** The inspect sub-run checks the bead narrative and acceptance criteria against the just-created diff and blocks if the commit is missing required artifacts, includes unrelated files, or leaves obvious broken behavior.
+Beads tagged `metadata.requiresInspection: true` with `metadata.inspectionDepth: "fast"` or no depth run the fast inspector after the bead commit and before claiming more work. The question is deliberately narrow: **was the deed done?** The inspect sub-run checks the bead narrative and acceptance criteria against the just-created diff and blocks if the commit is missing required artifacts, includes unrelated files, or leaves obvious broken behavior.
 
-### Deep gate: `inspect-deep`
+### Deep depth: `inspect-deep`
 
-Beads tagged `metadata.requiresInspection: true` run an additional deep inspection. The question is broader: **was it done correctly?** The deep sub-run examines architecture, edge cases, safety invariants, and whether the change is robust enough for downstream beads to rely on.
+Beads tagged `metadata.requiresInspection: true` with `metadata.inspectionDepth: "deep"` run the deep inspector instead. The question is broader: **was it done correctly?** The deep sub-run examines architecture, edge cases, safety invariants, and whether the change is robust enough for downstream beads to rely on.
 
-The work role does not choose models for these gates. The `subagent_type` is the contract: `inspect` resolves through `resolveModel('work', 'inspect')`, and `inspect-deep` resolves through `resolveModel('work', 'inspect-deep')`.
+The work role does not choose models for these gates. The selected `pan inspect` command controls the sub-role: `pan inspect` resolves through `resolveModel('work', 'inspect')`, and `pan inspect --deep` resolves through `resolveModel('work', 'inspect-deep')`.
 
 ## Completion
 

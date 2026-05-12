@@ -31,6 +31,12 @@ describe('criticalPath', () => {
     expect(criticalPath(doc)).toEqual([]);
   });
 
+  it('returns [] when legacy workspace plans omit edges', () => {
+    const doc = makeDoc([{ id: 'a' }], []);
+    delete (doc.plan as Partial<typeof doc.plan>).edges;
+    expect(criticalPath(doc)).toEqual([]);
+  });
+
   it('returns linear chain [a, b, c] for a→b→c', () => {
     const doc = makeDoc(
       [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
