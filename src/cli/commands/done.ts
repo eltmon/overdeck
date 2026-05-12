@@ -618,6 +618,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.log(chalk.dim(`  Could not auto-trigger review: ${error.message}`));
     }
 
+    await restoreTrackedBeadsExport(workspacePath);
+
   } catch (error: any) {
     spinner.fail(error.message);
     process.exit(1);
