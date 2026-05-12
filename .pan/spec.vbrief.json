@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T19:08:34.805472Z"
+    "updated": "2026-05-12T19:12:00.724431Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a4f2c8d1-7b3e-4a90-b5f6-2e1d9c0a8374",
     "author": "agent:claude-opus-4-7",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T19:08:34.805472Z",
+    "updated": "2026-05-12T19:12:00.724431Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -221,7 +221,7 @@
       {
         "id": "transcription-manager-ts",
         "title": "Implement src/voice/transcription-manager.ts — hot-swappable provider factory",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -236,7 +236,7 @@
           {
             "id": "transcription-manager-ts.ac1",
             "title": "createTranscriptionManager() returns { applyCurrent, getActive, close }",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -244,7 +244,7 @@
           {
             "id": "transcription-manager-ts.ac2",
             "title": "applyCurrent() tears down old ITurnEmitter and creates new one based on settings.stt.provider",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -252,7 +252,7 @@
           {
             "id": "transcription-manager-ts.ac3",
             "title": "VoiceSettings type exported: { stt: { provider: 'moonshine'|'google-cloud', moonshine: {model:string}, googleCloud: {apiKey:string, model:string} } }",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

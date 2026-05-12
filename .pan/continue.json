@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1053",
   "created": "2026-05-09T16:09:08.344Z",
-  "updated": "2026-05-12T19:08:34.805472Z",
+  "updated": "2026-05-12T19:12:00.724431Z",
   "gitState": {
     "branch": "feature/pan-1053",
-    "sha": "9d56f8ad4",
+    "sha": "8436c18d1",
     "dirty": true
   },
   "decisions": [
@@ -83,13 +83,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed AutoPreso server wiring implementation for workspace-xn14; next agent should close already-implemented autopreso route/ws beads if they become ready, then continue with bd ready -l pan-1053.",
-    "beadId": "workspace-xn14",
+    "description": "Completed transcription manager implementation for workspace-rlxe; inspection required before dependent Google Cloud STT work should proceed.",
+    "beadId": "workspace-rlxe",
     "filesToRead": [
-      "src/dashboard/server/server.ts",
-      "src/dashboard/server/ws-autopreso.ts",
-      "src/dashboard/server/routes/autopreso.ts",
-      "src/autopreso/session.ts"
+      "src/voice/transcription-manager.ts",
+      "src/voice/transcription.ts"
     ]
   },
   "beadsMapping": {},
@@ -165,6 +163,12 @@
       "timestamp": "2026-05-12T19:08:34.805472Z",
       "reason": "bead-complete",
       "note": "Implemented AutoPreso server wiring: added singleton session, /ws/autopreso raw WebSocket, AutoPreso HTTP routes, and registered setupAutoPresoWebSocket plus autopresoRouteLayer in server.ts. ESLint passed for touched files.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-12T19:12:00.724431Z",
+      "reason": "bead-complete",
+      "note": "Implemented createTranscriptionManager with VoiceSettings type, applyCurrent/getActive/close lifecycle, Moonshine provider creation, and explicit Google Cloud placeholder for the follow-up provider bead. ESLint passed for the new file.",
       "agentModel": "gpt-5.5"
     }
   ],
