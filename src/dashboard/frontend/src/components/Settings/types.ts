@@ -17,6 +17,22 @@ export interface ProvidersConfig {
   openrouter: boolean;
 }
 
+export type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
+export type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship';
+export type ModelRef = string;
+
+export interface RoleSubConfig {
+  model?: ModelRef;
+}
+
+export interface RoleConfig {
+  model?: ModelRef;
+  sub?: Record<string, RoleSubConfig>;
+}
+
+export type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
+export type RolesConfig = Partial<Record<RoleId, RoleConfig>>;
+
 export interface ModelsConfig {
   providers: ProvidersConfig;
   /** Legacy model-route overrides are accepted only to preserve form round-trips. */
@@ -49,6 +65,8 @@ export interface DeprecationWarning {
 }
 
 export interface SettingsConfig {
+  workhorses?: WorkhorsesConfig;
+  roles?: RolesConfig;
   models: ModelsConfig;
   api_keys: ApiKeysConfig;
   openrouter?: {

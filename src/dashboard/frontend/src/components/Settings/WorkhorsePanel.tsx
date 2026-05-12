@@ -25,6 +25,9 @@ type WorkhorsesConfig = Record<WorkhorseSlot, string>;
 
 interface SettingsResponse {
   workhorses?: Partial<WorkhorsesConfig>;
+  models?: {
+    providers?: Partial<Record<string, boolean>>;
+  };
 }
 
 interface AvailableModel {
@@ -57,6 +60,24 @@ async function fetchAvailableModels(): Promise<AvailableModelsResponse> {
   const res = await fetch('/api/settings/available-models');
   if (!res.ok) throw new Error('Failed to fetch available models');
   return res.json();
+}
+
+function providerForModel(modelId: string, groups: Array<{ provider: string; models: AvailableModel[] }>): string | null {
+  return groups.find((group) => group.models.some((model) => model.id === modelId))?.provider ?? null;
+}
+
+function providerWarning(
+  modelId: string | undefined,
+  groups: Array<{ provider: string; label: string; models: AvailableModel[] }>,
+  providers: Partial<Record<string, boolean>> | undefined,
+): string | null {
+  if (!modelId) return null;
+  const provider = providerForModel(modelId, groups);
+  if (!provider) return null;
+  const label = PROVIDER_LABELS[provider] ?? provider;
+  if (providers?.[provider] === false) return `${label} is not configured; roles using this workhorse will not be reachable until the provider is enabled with credentials.`;
+  if (provider === 'anthropic') return 'Anthropic model selected; roles using this workhorse may incur Anthropic spend.';
+  return null;
 }
 
 async function saveWorkhorse(slot: WorkhorseSlot, modelId: string): Promise<void> {
@@ -136,17 +157,21 @@ export function WorkhorsePanel() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-3">
-          {WORKHORSE_SLOTS.map((slot) => (
+          {WORKHORSE_SLOTS.map((slot) => {
+            const value = workhorses[slot.id];
+            const warning = providerWarning(value, providerGroups, settingsQuery.data?.models?.providers);
+
+            return (
             <label key={slot.id} className="space-y-1.5">
               <span className="text-xs font-medium text-foreground">{slot.label}</span>
               <select
                 aria-label={slot.label}
-                value={workhorses[slot.id] ?? ''}
+                value={value ?? ''}
                 onChange={(event) => saveMutation.mutate({ slot: slot.id, modelId: event.target.value })}
                 disabled={saveMutation.isPending || providerGroups.length === 0}
                 className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
               >
-                {!workhorses[slot.id] && <option value="">Select a model…</option>}
+                {!value && <option value="">Select a model…</option>}
                 {providerGroups.map((group) => (
                   <optgroup key={group.provider} label={group.label}>
                     {group.models.map((model) => (
@@ -158,8 +183,14 @@ export function WorkhorsePanel() {
                 ))}
               </select>
               <p className="text-[11px] leading-snug text-muted-foreground">{slot.description}</p>
+              {warning && (
+                <p className="text-[11px] leading-snug text-warning" role="alert">
+                  {warning}
+                </p>
+              )}
             </label>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -80,6 +80,10 @@ vi.mock('../styles/command-deck.module.css', () => ({
   default: {
     sessionNode: 'sessionNode',
     sessionNodeSelected: 'sessionNodeSelected',
+    sessionToggleSlot: 'sessionToggleSlot',
+    sessionToggleButton: 'sessionToggleButton',
+    sessionDotSlot: 'sessionDotSlot',
+    sessionIconSlot: 'sessionIconSlot',
     sessionTypeIcon: 'sessionTypeIcon',
     sessionLabel: 'sessionLabel',
     sessionStatus: 'sessionStatus',
@@ -184,6 +188,27 @@ describe('SessionNode', () => {
       'title',
       'Session ended cleanly and is no longer live.',
     );
+  });
+
+  it('keeps Work and expandable Review status dots in the same grid slot', () => {
+    render(
+      <div>
+        <SessionNode session={makeSession({ sessionId: 'work-1', type: 'work' })} />
+        <SessionNode
+          session={makeSession({ sessionId: 'review-1', type: 'review' })}
+          expandable
+          expanded
+        />
+      </div>,
+    );
+
+    const workRow = screen.getByText('Work (sonnet-4-6)').closest('button');
+    const reviewRow = screen.getByText('Review (sonnet-4-6)').closest('button');
+
+    expect(workRow?.children[1]).toHaveClass('sessionDotSlot');
+    expect(reviewRow?.children[1]).toHaveClass('sessionDotSlot');
+    expect(workRow?.children[1]?.querySelector('[data-testid="status-dot"]')).toBeTruthy();
+    expect(reviewRow?.children[1]?.querySelector('[data-testid="status-dot"]')).toBeTruthy();
   });
 
   it('adds contextual error tooltip text to the session status pill', () => {

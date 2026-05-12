@@ -22,6 +22,9 @@ type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
 interface SettingsResponse {
   roles?: RolesConfig;
   workhorses?: WorkhorsesConfig;
+  models?: {
+    providers?: Partial<Record<string, boolean>>;
+  };
   [key: string]: unknown;
 }
 
@@ -91,6 +94,7 @@ const ROLES: RoleDefinition[] = [
       { id: 'correctness', name: 'Correctness', description: 'Logic and behavior validation.', defaultModel: 'workhorse:mid' },
       { id: 'performance', name: 'Performance', description: 'Performance and scalability review.', defaultModel: 'workhorse:mid' },
       { id: 'requirements', name: 'Requirements', description: 'Acceptance criteria and vBRIEF coverage.', defaultModel: 'workhorse:mid' },
+      { id: 'synthesis', name: 'Synthesis', description: 'Combines reviewer findings into the final verdict.', defaultModel: 'workhorse:expensive' },
     ],
   },
   {
@@ -176,6 +180,31 @@ function modelExists(value: ModelRef, groups: Array<{ models: AvailableModel[] }
   return groups.some((group) => group.models.some((model) => model.id === value));
 }
 
+function resolveModelRef(value: ModelRef, workhorses: Required<Record<WorkhorseSlot, ModelRef>>): ModelRef {
+  if (!isWorkhorseRef(value)) return value;
+  const slot = value.replace('workhorse:', '') as WorkhorseSlot;
+  return workhorses[slot];
+}
+
+function providerForModel(value: ModelRef, groups: Array<{ provider: string; models: AvailableModel[] }>): string | null {
+  return groups.find((group) => group.models.some((model) => model.id === value))?.provider ?? null;
+}
+
+function providerWarning(
+  value: ModelRef,
+  workhorses: Required<Record<WorkhorseSlot, ModelRef>>,
+  groups: Array<{ provider: string; label: string; models: AvailableModel[] }>,
+  providers: Partial<Record<string, boolean>> | undefined,
+): string | null {
+  const resolved = resolveModelRef(value, workhorses);
+  const provider = providerForModel(resolved, groups);
+  if (!provider) return null;
+  const label = PROVIDER_LABELS[provider] ?? provider;
+  if (providers?.[provider] === false) return `${label} is not configured; this model will not be reachable until the provider is enabled with credentials.`;
+  if (provider === 'anthropic') return 'Anthropic model selected; verify this is intentional for non-Anthropic budget control.';
+  return null;
+}
+
 async function saveRoleModel(role: RoleId, modelRef: ModelRef, subRole?: string): Promise<void> {
   const settings = await fetchSettings();
   const currentRole = settings.roles?.[role] ?? {};
@@ -219,12 +248,15 @@ interface ModelPickerProps {
   value: ModelRef;
   workhorses: Required<Record<WorkhorseSlot, ModelRef>>;
   providerGroups: Array<{ provider: string; label: string; models: AvailableModel[] }>;
+  providers?: Partial<Record<string, boolean>>;
   disabled: boolean;
   onChange: (value: ModelRef) => void;
 }
 
-function ModelPicker({ label, value, workhorses, providerGroups, disabled, onChange }: ModelPickerProps) {
+function ModelPicker({ label, value, workhorses, providerGroups, providers, disabled, onChange }: ModelPickerProps) {
   const currentSpecificModelMissing = value && !isWorkhorseRef(value) && !modelExists(value, providerGroups);
+  const resolved = resolveModelRef(value, workhorses);
+  const warning = providerWarning(value, workhorses, providerGroups, providers);
 
   return (
     <label className="space-y-1.5">
@@ -260,6 +292,12 @@ function ModelPicker({ label, value, workhorses, providerGroups, disabled, onCha
           </optgroup>
         ))}
       </select>
+      <p className="text-[11px] leading-snug text-muted-foreground">Resolved: {resolved}</p>
+      {warning && (
+        <p className="text-[11px] leading-snug text-warning" role="alert">
+          {warning}
+        </p>
+      )}
     </label>
   );
 }
@@ -369,6 +407,7 @@ export function RolesPanel() {
                       value={roleModel}
                       workhorses={workhorses}
                       providerGroups={providerGroups}
+                      providers={settings?.models?.providers}
                       disabled={saveMutation.isPending}
                       onChange={(modelRef) => saveMutation.mutate({ role: role.id, modelRef })}
                     />
@@ -399,6 +438,7 @@ export function RolesPanel() {
                               value={subModel}
                               workhorses={workhorses}
                               providerGroups={providerGroups}
+                              providers={settings?.models?.providers}
                               disabled={saveMutation.isPending}
                               onChange={(modelRef) => saveMutation.mutate({ role: role.id, subRole: subRole.id, modelRef })}
                             />

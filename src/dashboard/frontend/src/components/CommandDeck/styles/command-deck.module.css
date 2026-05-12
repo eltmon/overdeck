@@ -868,9 +868,10 @@
 
 /* Session Node (child of FeatureItem) */
 .sessionNode {
-  display: flex;
+  display: grid;
+  grid-template-columns: 12px 12px 16px minmax(0, 1fr) auto auto auto;
   align-items: center;
-  gap: 6px;
+  column-gap: 6px;
   padding: 4px 8px 4px calc(8px + 24px);
   cursor: pointer;
   transition: background 0.1s;
@@ -888,6 +889,22 @@
 
 .sessionNodeSelected {
   background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.sessionToggleSlot,
+.sessionDotSlot,
+.sessionIconSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.sessionToggleButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 
 .sessionTypeBadge {
@@ -915,8 +932,6 @@
 .sessionStatus {
   font-size: 10px;
   color: var(--muted-foreground);
-  flex-shrink: 0;
-  margin-left: auto;
   text-transform: lowercase;
   padding: 1px 6px;
   border-radius: 3px;

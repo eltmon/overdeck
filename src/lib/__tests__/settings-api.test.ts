@@ -29,7 +29,7 @@ vi.mock('../config-yaml.js', () => ({
   DEFAULT_ROLES: {
     plan: { model: 'workhorse:expensive' },
     work: { model: 'workhorse:mid', sub: { inspect: { model: 'workhorse:cheap' }, 'inspect-deep': { model: 'workhorse:mid' } } },
-    review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' } } },
+    review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' }, synthesis: { model: 'workhorse:expensive' } } },
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
   },
@@ -142,8 +142,23 @@ describe('loadSettingsApi', () => {
     });
     expect(settings.roles).toMatchObject({
       plan: { model: 'workhorse:expensive' },
-      work: { model: 'workhorse:mid' },
-      review: { model: 'workhorse:expensive' },
+      work: {
+        model: 'workhorse:mid',
+        sub: {
+          inspect: { model: 'workhorse:cheap' },
+          'inspect-deep': { model: 'workhorse:mid' },
+        },
+      },
+      review: {
+        model: 'workhorse:expensive',
+        sub: {
+          security: { model: 'workhorse:expensive' },
+          correctness: { model: 'workhorse:mid' },
+          performance: { model: 'workhorse:mid' },
+          requirements: { model: 'workhorse:mid' },
+          synthesis: { model: 'workhorse:expensive' },
+        },
+      },
       test: { model: 'workhorse:mid' },
       ship: { model: 'workhorse:mid' },
     });
@@ -206,7 +221,7 @@ describe('validateSettingsApi', () => {
     roles: {
       plan: { model: 'workhorse:expensive' },
       work: { model: 'workhorse:mid', sub: { inspect: { model: 'claude-haiku-4-5' } } },
-      review: { model: 'workhorse:expensive', sub: { security: { model: 'claude-opus-4-7' } } },
+      review: { model: 'workhorse:expensive', sub: { security: { model: 'claude-opus-4-7' }, synthesis: { model: 'workhorse:expensive' } } },
       test: { model: 'workhorse:mid' },
       ship: { model: 'workhorse:mid' },
     },
