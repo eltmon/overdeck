@@ -20,18 +20,31 @@ interface AgentOutputPanelProps {
   agentId: string;
 }
 
-// Parse role-run tmux session name: agent-{projectKey}-{issueId}(-{subrole})?
-// e.g. agent-pan-1069-review, agent-pan-1069-review-correctness, agent-pan-1069-test
+// Parse specialist/role-run tmux session names.
+//
+// New pattern (PAN-1048+): agent-{projectKey}-{issueId}(-{subrole})?
+//   e.g. agent-pan-1069-review, agent-pan-1069-review-correctness, agent-pan-1069-test
+//
+// Legacy pattern: specialist-{projectKey}-{issueId}-review-{role}
+//   e.g. specialist-panopticon-cli-PAN-1069-review-correctness
 function parseSpecialistSession(agentId: string): { projectKey: string; issueId: string; type: string } | null {
-  // Match new pattern: agent-{projectKey}-{issueId}(-{subrole})?
-  const match = agentId.match(/^agent-(.+)-([A-Z]+-\d+)(?:-(review|correctness|security|performance|requirements|test|ship|merge))?$/);
-  if (!match) return null;
-  const subrole = match[3];
-  // Derive type: bare 'review' is the orchestrator; 'correctness'/'security'/etc are sub-roles
-  const type = subrole && subrole !== 'review'
-    ? `review-${subrole}` // correctness → review-correctness, etc.
-    : 'orchestrator';
-  return { projectKey: match[1], issueId: match[2], type };
+  // Try new agent- pattern first
+  const newMatch = agentId.match(/^agent-(.+)-([A-Z]+-\d+)(?:-(review|correctness|security|performance|requirements|test|ship|merge))?$/);
+  if (newMatch) {
+    const subrole = newMatch[3];
+    const type = subrole && subrole !== 'review'
+      ? `review-${subrole}`
+      : 'orchestrator';
+    return { projectKey: newMatch[1], issueId: newMatch[2], type };
+  }
+
+  // Try legacy specialist- pattern
+  const legacyMatch = agentId.match(/^specialist-(.+)-([A-Z]+-\d+)-review-(correctness|security|performance|requirements|synthesis)$/);
+  if (legacyMatch) {
+    return { projectKey: legacyMatch[1], issueId: legacyMatch[2], type: `review-${legacyMatch[3]}` };
+  }
+
+  return null;
 }
 
 // Derive issueId for role runs: agent-pan-505 → PAN-505, agent-pan-505-test → PAN-505.
