@@ -144,8 +144,8 @@ Model selection is role-based and resolved through `resolveModel(role, subRole, 
 ```yaml
 workhorses:
   expensive: claude-opus-4-7
-  mid: claude-sonnet-4-7
-  cheap: claude-haiku-4-6
+  mid: claude-sonnet-4-6
+  cheap: claude-haiku-4-5
 
 roles:
   review:
