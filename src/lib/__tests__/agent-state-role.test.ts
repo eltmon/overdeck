@@ -139,7 +139,7 @@ describe('AgentState role persistence', () => {
     });
   });
 
-  it('treats state.json without a valid role as missing', async () => {
+  it('infers work role when state.json lacks a role field and ID has no known suffix', async () => {
     const { getAgentState } = await import('../agents.js');
     const dir = join(tempHome, 'agents', 'agent-pan-legacy');
     mkdirSync(dir, { recursive: true });
@@ -152,7 +152,12 @@ describe('AgentState role persistence', () => {
       startedAt: '2026-05-09T00:00:00.000Z',
     }));
 
-    expect(getAgentState('agent-pan-legacy')).toBeNull();
+    // dd73abfec: parseAgentState infers role from ID suffix when role is absent.
+    // 'agent-pan-legacy' has no recognized suffix (-review/-test/-ship/-plan),
+    // so it defaults to 'work'.
+    const state = getAgentState('agent-pan-legacy');
+    expect(state).not.toBeNull();
+    expect(state!.role).toBe('work');
   });
 
   it('drops legacy agent state directories missing role during startup scan', async () => {
