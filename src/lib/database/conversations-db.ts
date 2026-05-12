@@ -201,12 +201,15 @@ export function createConversation(opts: {
 }): Conversation {
   const db = getDatabase();
   const now = new Date().toISOString();
-  const result = db
-    .prepare(
-      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_source, title_seed, model, effort, fork_status, harness)
-       VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
+
+  // title_source is NOT NULL but has a DB-side default of 'auto'. Omit from
+  // INSERT column list when not provided so the default applies.
+  let sql: string;
+  let params: unknown[];
+  if (opts.titleSource !== undefined) {
+    sql = `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_source, title_seed, model, effort, fork_status, harness)
+           VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    params = [
       opts.name,
       opts.tmuxSession,
       opts.cwd,
@@ -214,13 +217,33 @@ export function createConversation(opts: {
       now,
       opts.claudeSessionId ?? null,
       opts.title ?? null,
-      opts.titleSource ?? null,
+      opts.titleSource,
       opts.titleSeed ?? null,
       opts.model ?? null,
       opts.effort ?? null,
       opts.forkStatus ?? null,
       opts.harness ?? null,
-    );
+    ];
+  } else {
+    sql = `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_seed, model, effort, fork_status, harness)
+           VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    params = [
+      opts.name,
+      opts.tmuxSession,
+      opts.cwd,
+      opts.issueId ?? null,
+      now,
+      opts.claudeSessionId ?? null,
+      opts.title ?? null,
+      opts.titleSeed ?? null,
+      opts.model ?? null,
+      opts.effort ?? null,
+      opts.forkStatus ?? null,
+      opts.harness ?? null,
+    ];
+  }
+
+  const result = db.prepare(sql).run(...params);
   const conv = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
