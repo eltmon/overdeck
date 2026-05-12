@@ -535,6 +535,10 @@ describe('IssueCard', () => {
     ...overrides,
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   function renderIssueCard(props: Partial<ComponentProps<typeof IssueCard>> = {}) {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -557,6 +561,39 @@ describe('IssueCard', () => {
 
     return defaultProps;
   }
+
+  it('passes auto mode when Auto-plan is clicked', () => {
+    const onPlan = vi.fn();
+    renderIssueCard({
+      issue: createMockIssue({ status: 'Todo' }),
+      onPlan,
+    });
+
+    fireEvent.click(screen.getByTestId('action-auto-plan-TEST-123'));
+
+    expect(onPlan).toHaveBeenCalledWith(true);
+  });
+
+  it('sends auto=true when Auto-start is clicked', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify({ success: true })),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderIssueCard({
+      issue: createMockIssue({ status: 'Todo', hasPlan: true, hasBeads: true }),
+      planningState: { hasPlan: true, hasBeads: true, planningComplete: true },
+    });
+
+    fireEvent.click(screen.getByTestId('card-auto-start-agent-TEST-123'));
+
+    await waitFor(() => {
+      const startCall = fetchMock.mock.calls.find(([url]) => url === '/api/agents');
+      expect(startCall).toBeTruthy();
+      expect(JSON.parse((startCall?.[1] as RequestInit).body as string)).toMatchObject({ auto: true });
+    });
+  });
 
   it('opens the inspector rather than the planning dialog for planning-only input', () => {
     const onSelect = vi.fn();

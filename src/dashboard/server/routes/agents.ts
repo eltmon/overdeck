@@ -90,6 +90,7 @@ import { getProviderForModel } from '../../../lib/providers.js';
 import { validateProviderHealth, ProviderHealthError } from '../../../lib/provider-health.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { findPlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { writeAutoStartVBrief } from '../../../lib/vbrief/auto-synthesize.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
 import type { ContinueState } from '../../../lib/vbrief/continue-state.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
@@ -1884,6 +1885,7 @@ const postAgentsRoute = HttpRouter.add(
     const readModel = yield* ReadModelService;
 
     const { issueId, projectId } = body as any;
+    const autoStart = (body as any).auto === true;
     const guardrailAcknowledged = (body as any).guardrailAcknowledged === true;
 
     if (!issueId) {
@@ -1968,7 +1970,18 @@ const postAgentsRoute = HttpRouter.add(
       }
     }
 
-    const planPath = findPlan(workspacePath);
+    let planPath = findPlan(workspacePath);
+    if (autoStart && !planPath) {
+      const issueTitle = cachedIssue?.title || issueId;
+      const issueBody = cachedIssue?.description || '';
+      yield* Effect.promise(() => writeAutoStartVBrief(projectPath, workspacePath, {
+        issueId,
+        title: issueTitle,
+        body: issueBody,
+        url: cachedIssue?.url,
+      }));
+      planPath = findPlan(workspacePath);
+    }
     const hasPlan = planPath !== null;
     // Planning has finished when plan.status is any of:
     // proposed/approved/pending/running/completed/blocked.

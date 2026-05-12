@@ -116,6 +116,8 @@ export interface SpawnPlanningOptions {
   harness?: 'claude-code' | 'pi';
   /** Optional effort level — controls how thorough the planning agent is. */
   effort?: 'low' | 'medium' | 'high';
+  /** Non-interactive planning: choose defensible defaults and record inferred choices. */
+  auto?: boolean;
   /** Optional callback for streaming progress events to the client. */
   onProgress?: (event: PlanningProgress) => void;
 }
@@ -157,7 +159,7 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high'): Promise<string> {
+export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false): Promise<string> {
   const issueLower = issue.identifier.toLowerCase();
   const version = await getPackageVersion();
   const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
@@ -264,6 +266,17 @@ ${effort === 'high'
     ? `,\n      ${prdFiles.map(p => `{ "uri": "${p.path}", "label": "${p.label}", "type": "prd" }`).join(',\n      ')}`
     : '';
 
+  const autoSection = auto ? `
+## Auto Planning Mode
+
+The user invoked \`pan plan --auto\`. Complete planning end-to-end without asking the user questions or waiting for interactive confirmation.
+
+- Do not use AskUserQuestion.
+- When normal planning would ask a question, choose the most defensible default and record it in \`plan.autoDecisions[]\` as \`{ "summary": "...", "rationale": "..." }\`.
+- Halt only for a genuine contradiction between authoritative inputs, such as the issue body requiring one behavior while a linked PRD requires the opposite. If that happens, write the contradiction into continue.json hazards and stop with a clear escalation message so the dashboard surfaces it.
+- Still produce the same complete vBRIEF and beads via \`pan plan-finalize\` when no contradiction exists.
+` : '';
+
   return renderPrompt({
     name: 'planning',
     vars: {
@@ -279,6 +292,7 @@ ${effort === 'high'
       CHILD_STORIES_SECTION: childStoriesSection,
       PROJECT_STRUCTURE_SECTION: projectStructureSection,
       EFFORT_SECTION: effortSection,
+      AUTO_SECTION: autoSection,
       PRD_REFERENCES: prdReferences,
     },
   });
@@ -320,7 +334,7 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
 
@@ -474,7 +488,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 4: Configure agent ─────────────────────────────────────────
     progress(4, 'Configuring agent', planningModel);
 
-    const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort);
+    const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true);
 
     // Capture planning prompt in workspace .pan/continue.json.
     writeWorkspaceContinue(workspacePath, {

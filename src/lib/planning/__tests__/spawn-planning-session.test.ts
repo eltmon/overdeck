@@ -68,6 +68,15 @@ describe('buildPlanningPrompt', () => {
     const prompt = await buildPlanningPrompt(storyIssue, '/tmp/workspace');
     expect(prompt).not.toContain('Child Stories');
   });
+
+  it('renders non-interactive auto-planning instructions', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined, undefined, true);
+
+    expect(prompt).toContain('Auto Planning Mode');
+    expect(prompt).toContain('Do not use AskUserQuestion');
+    expect(prompt).toContain('plan.autoDecisions[]');
+    expect(prompt).toContain('Halt only for a genuine contradiction');
+  });
 });
 
 describe('writeFeatureContext', () => {

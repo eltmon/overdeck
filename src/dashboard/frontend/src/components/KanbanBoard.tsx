@@ -887,7 +887,7 @@ export function ListIssueRow({
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
   onSelectIssue: (id: string | null) => void;
-  onPlan: (issue: Issue) => void;
+  onPlan: (issue: Issue, autoStart?: boolean) => void;
   isBulkSelected?: boolean;
   onBulkToggle?: () => void;
 }) {
@@ -1027,16 +1027,32 @@ export function ListIssueRow({
         {/* Plan/Start button for backlog/todo, plus in_progress issues with no running
             agent (e.g. PAN-977 hit the empty-spawn bug and needs re-planning). */}
         {!isRunning && (canonical === 'backlog' || canonical === 'todo' || canonical === 'in_progress') && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlan(issue);
-            }}
-            className="p-1 text-muted-foreground hover:text-primary transition-colors"
-            title={canonical === 'in_progress' ? 'Re-plan issue' : 'Plan issue'}
-          >
-            <Play className="w-3.5 h-3.5" />
-          </button>
+          <div className="inline-flex items-center rounded border border-border/70 overflow-hidden">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlan(issue);
+              }}
+              className="p-1 text-muted-foreground hover:text-primary transition-colors"
+              title={canonical === 'in_progress' ? 'Re-plan issue' : 'Plan issue'}
+              data-testid={`list-plan-${issue.identifier}`}
+            >
+              <Play className="w-3.5 h-3.5" />
+            </button>
+            {canonical !== 'in_progress' && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPlan(issue, true);
+                }}
+                className="p-1 text-primary hover:text-primary/80 border-l border-border/70 transition-colors"
+                title="Auto-plan issue"
+                data-testid={`list-auto-plan-${issue.identifier}`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         )}
 
         {/* View button */}
@@ -1108,6 +1124,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const [internalSelectedIssue, setInternalSelectedIssue] = useState<string | null>(null);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set()); // Empty = all projects
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null); // Lifted dialog state
+  const [planDialogAutoStart, setPlanDialogAutoStart] = useState(false);
+  const openPlanDialog = useCallback((issue: Issue, autoStart = false) => {
+    setPlanDialogAutoStart(autoStart);
+    setPlanDialogIssue(issue);
+  }, []);
 
   // Notify parent when plan dialog opens/closes so it can suppress the detail panel terminal
   useEffect(() => {
@@ -1764,7 +1785,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
-                    onPlan={setPlanDialogIssue}
+                    onPlan={openPlanDialog}
                     isBulkSelected={bulkSelection.isSelected(issue.identifier)}
                     onBulkToggle={() => bulkSelection.toggle(issue.identifier)}
                   />
@@ -1800,7 +1821,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
-                    onPlan={setPlanDialogIssue}
+                    onPlan={openPlanDialog}
                     isBulkSelected={bulkSelection.isSelected(issue.identifier)}
                     onBulkToggle={() => bulkSelection.toggle(issue.identifier)}
                   />
@@ -1838,7 +1859,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
-                    onPlan={setPlanDialogIssue}
+                    onPlan={openPlanDialog}
                     isBulkSelected={bulkSelection.isSelected(issue.identifier)}
                     onBulkToggle={() => bulkSelection.toggle(issue.identifier)}
                   />
@@ -1901,7 +1922,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
-                    onPlan={setPlanDialogIssue}
+                    onPlan={openPlanDialog}
                     onViewBeads={setBeadsDialogIssue}
                     onViewVBrief={setVbriefDialogIssue}
                     collapsedFeatures={collapsedFeatures}
@@ -1945,12 +1966,17 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         <PlanDialog
           issue={planDialogIssue}
           isOpen={true}
-          onClose={() => setPlanDialogIssue(null)}
+          onClose={() => {
+            setPlanDialogIssue(null);
+            setPlanDialogAutoStart(false);
+          }}
           onComplete={async () => {
             setPlanDialogIssue(null);
+            setPlanDialogAutoStart(false);
             await refreshDashboardState(queryClient);
           }}
           onTerminalReleased={() => onPlanDialogChange?.(null)}
+          autoStart={planDialogAutoStart}
         />
       )}
 
@@ -2025,7 +2051,7 @@ function ColumnContent({
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
   onSelectIssue: (id: string | null) => void;
-  onPlan: (issue: Issue) => void;
+  onPlan: (issue: Issue, autoStart?: boolean) => void;
   onViewBeads: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
   collapsedFeatures: Set<string>;
@@ -2063,7 +2089,7 @@ function ColumnContent({
         onSelect={() => onSelectIssue(
           selectedIssue === issue.identifier ? null : issue.identifier
         )}
-        onPlan={() => onPlan(issue)}
+        onPlan={(autoStart) => onPlan(issue, autoStart)}
         onViewBeads={(i) => onViewBeads(i)}
         onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}
         isBulkSelected={bulkSelectedIds?.has(issue.identifier)}
@@ -2675,7 +2701,7 @@ interface IssueCardProps {
   costsLoading?: boolean;
   isSelected: boolean;
   onSelect: () => void;
-  onPlan: () => void; // Lifted to parent to survive re-renders
+  onPlan: (autoStart?: boolean) => void; // Lifted to parent to survive re-renders
   onViewBeads?: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
   isBulkSelected?: boolean;
@@ -2810,19 +2836,32 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   // an in-progress planning session, not starting over).
   const planLabelExists = hasPlan || issue.labels?.some(l => l.toLowerCase() === 'planned');
   const planChip = (
-    <button
-      data-testid={`action-plan-${issue.identifier}`}
-      onClick={(e) => { e.stopPropagation(); handlePlan(e); }}
-      className={`flex items-center gap-1 text-xs transition-colors ${
-        planLabelExists
-          ? 'text-success hover:text-success/80'
-          : 'text-muted-foreground hover:text-foreground'
-      }`}
-      title={planLabelExists ? 'See plan / continue planning' : 'Plan'}
-    >
-      <FileText className="w-3.5 h-3.5" />
-      {planLabelExists ? 'See Plan' : 'Plan'}
-    </button>
+    <div className="inline-flex items-center rounded border border-border/70 overflow-hidden">
+      <button
+        data-testid={`action-plan-${issue.identifier}`}
+        onClick={(e) => handlePlan(e)}
+        className={`flex items-center gap-1 text-xs transition-colors px-2 py-1 ${
+          planLabelExists
+            ? 'text-success hover:text-success/80'
+            : 'text-muted-foreground hover:text-foreground'
+        }`}
+        title={planLabelExists ? 'See plan / continue planning' : 'Plan'}
+      >
+        <FileText className="w-3.5 h-3.5" />
+        {planLabelExists ? 'See Plan' : 'Plan…'}
+      </button>
+      {!planLabelExists && (
+        <button
+          data-testid={`action-auto-plan-${issue.identifier}`}
+          onClick={(e) => handlePlan(e, true)}
+          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 border-l border-border/70 px-2 py-1 transition-colors"
+          title="Run non-interactive planning"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          Auto-plan
+        </button>
+      )}
+    </div>
   );
 
   // Send message mutation
@@ -2874,8 +2913,8 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     });
   }, [confirm]);
 
-  const startAgentMutation = useMutation({
-    mutationFn: async () => {
+  const startAgentMutation = useMutation<StartAgentResponse, Error, boolean>({
+    mutationFn: async (autoStart = false) => {
       // PAN-1048 + PAN-1055: role-aware spawn body that also threads the
       // user-selected model + harness from the launch panel.
       const requestBody = {
@@ -2883,6 +2922,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
         role: 'work',
         model: launchModel,
         harness: launchHarness,
+        auto: autoStart,
       };
       let lastRequestBody: Record<string, unknown> = requestBody;
       let res = await fetch('/api/agents', {
@@ -3010,14 +3050,14 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
 
   const startButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const handleStartAgent = (e: React.MouseEvent) => {
+  const handleStartAgent = (e: React.MouseEvent, autoStart = false) => {
     e.stopPropagation();
-    startAgentMutation.mutate();
+    startAgentMutation.mutate(autoStart);
   };
 
-  const handlePlan = (e: React.MouseEvent) => {
+  const handlePlan = (e: React.MouseEvent, autoStart = false) => {
     e.stopPropagation();
-    onPlan();
+    onPlan(autoStart);
   };
 
   // Deep wipe is now handled by the DeepWipeDialog component (PAN-461)
@@ -3589,17 +3629,29 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                   modelLabel="Agent model"
                 />
               </div>
-              <button
-                ref={startButtonRef}
-                onClick={handleStartAgent}
-                disabled={startAgentMutation.isPending || isStarting}
-                className="flex items-center gap-1 text-xs font-semibold bg-success hover:bg-success/90 text-foreground transition-colors rounded px-2 py-1 disabled:opacity-50"
-                title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
-                data-testid={`card-start-agent-${issue.identifier}`}
-              >
-                {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}</span>
-              </button>
+              <div className="inline-flex items-center rounded overflow-hidden">
+                <button
+                  ref={startButtonRef}
+                  onClick={(e) => handleStartAgent(e)}
+                  disabled={startAgentMutation.isPending || isStarting}
+                  className="flex items-center gap-1 text-xs font-semibold bg-success hover:bg-success/90 text-foreground transition-colors px-2 py-1 disabled:opacity-50"
+                  title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
+                  data-testid={`card-start-agent-${issue.identifier}`}
+                >
+                  {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start'}</span>
+                </button>
+                <button
+                  onClick={(e) => handleStartAgent(e, true)}
+                  disabled={startAgentMutation.isPending || isStarting}
+                  className="flex items-center gap-1 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground transition-colors border-l border-background/20 px-2 py-1 disabled:opacity-50"
+                  title="Synthesize a minimal vBRIEF from the issue and start the agent"
+                  data-testid={`card-auto-start-agent-${issue.identifier}`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Auto-start
+                </button>
+              </div>
             </>
           )}
           {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
@@ -3650,17 +3702,29 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                   modelLabel="Agent model"
                 />
               </div>
-              <button
-                ref={startButtonRef}
-              onClick={handleStartAgent}
-              disabled={startAgentMutation.isPending || isStarting}
-              className="flex items-center gap-1 text-xs font-semibold bg-success text-success-foreground hover:bg-emerald-500 transition-colors rounded px-2 py-1 disabled:opacity-50"
-              title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
-              data-testid={`card-start-agent-${issue.identifier}`}
-            >
-              {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}</span>
-              </button>
+              <div className="inline-flex items-center rounded overflow-hidden">
+                <button
+                  ref={startButtonRef}
+                  onClick={(e) => handleStartAgent(e)}
+                  disabled={startAgentMutation.isPending || isStarting}
+                  className="flex items-center gap-1 text-xs font-semibold bg-success text-success-foreground hover:bg-emerald-500 transition-colors px-2 py-1 disabled:opacity-50"
+                  title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
+                  data-testid={`card-start-agent-${issue.identifier}`}
+                >
+                  {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start'}</span>
+                </button>
+                <button
+                  onClick={(e) => handleStartAgent(e, true)}
+                  disabled={startAgentMutation.isPending || isStarting}
+                  className="flex items-center gap-1 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground transition-colors border-l border-background/20 px-2 py-1 disabled:opacity-50"
+                  title="Synthesize a minimal vBRIEF from the issue and start the agent"
+                  data-testid={`card-auto-start-agent-${issue.identifier}`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Auto-start
+                </button>
+              </div>
             </>
           ) : null}
           <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />

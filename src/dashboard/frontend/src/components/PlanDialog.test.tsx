@@ -93,12 +93,22 @@ function makeFetchMock(sessionName = 'planning-pan-503', active = true) {
         }),
       } as Response);
     }
+    if (urlStr.includes('/api/issues/') && urlStr.includes('/start-planning')) {
+      return Promise.resolve({
+        ok: true,
+        body: {
+          getReader: () => ({
+            read: vi.fn().mockResolvedValue({ done: true, value: undefined }),
+          }),
+        },
+      } as unknown as Response);
+    }
     // Any other fetch → 404
     return Promise.resolve({ ok: false, json: () => Promise.resolve({}) } as Response);
   });
 }
 
-function renderPlanDialog(isOpen = true, issue: Issue = MOCK_ISSUE) {
+function renderPlanDialog(isOpen = true, issue: Issue = MOCK_ISSUE, autoStart = false) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -109,6 +119,7 @@ function renderPlanDialog(isOpen = true, issue: Issue = MOCK_ISSUE) {
         isOpen={isOpen}
         onClose={vi.fn()}
         onComplete={vi.fn()}
+        autoStart={autoStart}
       />
     </QueryClientProvider>
   );
@@ -144,6 +155,19 @@ describe('PlanDialog — XTerminal rendering', () => {
     });
 
     expect(screen.queryByTestId('activity-view')).not.toBeInTheDocument();
+  });
+
+  it('sends auto=true when opened for auto-planning', async () => {
+    const fetchMock = makeFetchMock('planning-pan-503', false);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    renderPlanDialog(true, { ...MOCK_ISSUE, status: 'Todo' }, true);
+
+    await waitFor(() => {
+      const startCall = fetchMock.mock.calls.find(([url]) => url.toString().includes('/start-planning'));
+      expect(startCall).toBeTruthy();
+      expect(JSON.parse((startCall?.[1] as RequestInit).body as string)).toMatchObject({ auto: true });
+    });
   });
 
   it('shows the plan role model from settings as the default model', async () => {

@@ -75,6 +75,7 @@ import { updateCommand } from './commands/update.js';
 import { restartCommand } from './commands/restart.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
+import { planCommand } from './commands/plan.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
@@ -292,7 +293,15 @@ review
 // pan plan finalize <id>
 const planCmd = program
   .command('plan')
-  .description('Planning lifecycle commands');
+  .description('Planning lifecycle commands')
+  .argument('[id]', 'Issue ID to plan')
+  .option('--auto', 'Run non-interactive planning; inferred choices are recorded in plan.autoDecisions[]')
+  .option('--model <model>', 'Model to use for the planning role')
+  .option('--harness <harness>', 'Planning-agent harness: claude-code (default) | pi')
+  .option('--effort <level>', 'Planning effort: low | medium | high')
+  .option('--remote', 'Use remote planning workspace (Fly.io)')
+  .option('--local', 'Use local planning workspace')
+  .action(planCommand);
 
 planCmd
   .command('finalize')
@@ -400,6 +409,7 @@ program
   .option('--no-shadow', 'Disable shadow mode')
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
+  .option('--auto', 'Skip planning agent by synthesizing a minimal vBRIEF and beads from the issue title/body')
   .action(startCommand);
 
 program

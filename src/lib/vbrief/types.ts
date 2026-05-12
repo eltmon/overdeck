@@ -98,6 +98,11 @@ export interface VBriefPlan {
   /** ISO 8601 datetime, updated on every write */
   updated?: string;
   tags?: string[];
+  autoDecisions?: Array<{
+    summary: string;
+    rationale?: string;
+    [key: string]: unknown;
+  }>;
   narratives?: {
     Problem?: string;
     Proposal?: string;
