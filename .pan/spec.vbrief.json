@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T18:30:06.694000Z"
+    "updated": "2026-05-12T18:36:08.408887Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T18:30:06.694000Z",
+    "updated": "2026-05-12T18:36:08.408887Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -966,7 +966,7 @@
       {
         "id": "autopreso-controls-tsx",
         "title": "Implement AutoPresoControls.tsx — mic, warmup status, staging/live toggle",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -981,7 +981,7 @@
           {
             "id": "autopreso-controls-tsx.ac1",
             "title": "Mic button toggles isListening with visual indicator",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -989,7 +989,7 @@
           {
             "id": "autopreso-controls-tsx.ac2",
             "title": "Warmup status shown as idle/warming/ready/failed with appropriate icon",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -997,7 +997,7 @@
           {
             "id": "autopreso-controls-tsx.ac3",
             "title": "Staging/live toggle calls onStart or onBackToStaging based on current mode",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1007,7 +1007,7 @@
       {
         "id": "transcript-panel-tsx",
         "title": "Implement TranscriptPanel.tsx — live transcript display",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -1022,7 +1022,7 @@
           {
             "id": "transcript-panel-tsx.ac1",
             "title": "Committed turns displayed with timestamps, newest at bottom with auto-scroll",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1030,7 +1030,7 @@
           {
             "id": "transcript-panel-tsx.ac2",
             "title": "Current partial transcript shown in distinct style (italic/dimmed)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1040,7 +1040,7 @@
       {
         "id": "use-autopreso-websocket",
         "title": "Implement useAutoPresoWebSocket.ts — combined audio + whiteboard state hook",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -1055,7 +1055,7 @@
           {
             "id": "use-autopreso-websocket.ac1",
             "title": "Subscribes to /ws/autopreso for whiteboard:snapshot and whiteboard:update",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1063,7 +1063,7 @@
           {
             "id": "use-autopreso-websocket.ac2",
             "title": "elements state updated on whiteboard:update broadcast",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1071,7 +1071,7 @@
           {
             "id": "use-autopreso-websocket.ac3",
             "title": "Voice transcription integrated: partialText and committedTurns tracked",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1079,7 +1079,7 @@
           {
             "id": "use-autopreso-websocket.ac4",
             "title": "Reconnects to /ws/autopreso on disconnect with exponential backoff",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

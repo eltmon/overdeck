@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1053",
   "created": "2026-05-09T16:09:08.344Z",
-  "updated": "2026-05-12T18:30:06.694000Z",
+  "updated": "2026-05-12T18:36:08.408887Z",
   "gitState": {
     "branch": "feature/pan-1053",
-    "sha": "21efa62d6",
+    "sha": "08f6c5cfc",
     "dirty": true
   },
   "decisions": [
@@ -83,12 +83,13 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-jtej / autopreso-view-tsx; next agent should run bd ready -l pan-1053 and claim the next unblocked bead.",
+    "description": "Addressed inspection block for workspace-jtej by wiring AutoPresoView to useAutoPresoWebSocket plus real AutoPresoControls and TranscriptPanel files; reinspection required after commit.",
     "beadId": "workspace-jtej",
     "filesToRead": [
       "src/dashboard/frontend/src/components/autopreso/AutoPresoView.tsx",
-      "src/dashboard/frontend/package.json",
-      ".pan/spec.vbrief.json"
+      "src/dashboard/frontend/src/hooks/useAutoPresoWebSocket.ts",
+      "src/dashboard/frontend/src/components/autopreso/AutoPresoControls.tsx",
+      "src/dashboard/frontend/src/components/autopreso/TranscriptPanel.tsx"
     ]
   },
   "beadsMapping": {},
@@ -128,6 +129,12 @@
       "timestamp": "2026-05-12T18:30:06.694000Z",
       "reason": "bead-complete",
       "note": "Implemented AutoPresoView with Excalidraw canvas, staging/live behavior, controls sidebar, and transcript panel. Added @excalidraw/excalidraw dependency. Frontend build passed and Playwright verified /autopreso renders the AutoPreso nav item, drawing canvas, controls, and transcript panel.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-12T18:36:08.408887Z",
+      "reason": "inspection-fix",
+      "note": "Fixed workspace-jtej inspection block: AutoPresoView now consumes useAutoPresoWebSocket for server-controlled elements/mode/warmup/transcript/listening state, live mode ignores local canvas changes, Go Live/Back/Reset call AutoPreso HTTP routes, and sidebar renders real AutoPresoControls and TranscriptPanel components. Frontend build passes.",
       "agentModel": "gpt-5.5"
     }
   ],
