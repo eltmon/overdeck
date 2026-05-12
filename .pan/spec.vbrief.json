@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-09T17:51:53.320Z"
+    "updated": "2026-05-12T18:15:47.581121Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-09T17:51:53.320Z",
+    "updated": "2026-05-12T18:15:47.581121Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -1138,7 +1138,7 @@
       {
         "id": "autopreso-route-nav",
         "title": "Add /autopreso tab to App.tsx, Header Tab type, and Sidebar nav",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -1153,7 +1153,7 @@
           {
             "id": "autopreso-route-nav.ac1",
             "title": "'autopreso' added to Tab union type in Header.tsx",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1161,7 +1161,7 @@
           {
             "id": "autopreso-route-nav.ac2",
             "title": "'/autopreso' registered in TAB_PATHS, renders AutoPresoView",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1169,7 +1169,7 @@
           {
             "id": "autopreso-route-nav.ac3",
             "title": "AutoPreso nav item with Mic2 icon in Sidebar Operations group",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
