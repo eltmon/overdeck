@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { deriveAgentIssueId } from '../AgentOutputPanel';
 
@@ -158,7 +158,13 @@ describe('AgentOutputPanel — planning agent rendering (AC4)', () => {
     expect(screen.getByText(/No issue associated/)).toBeInTheDocument();
   });
 
-  // The /api/specialists/:project/:issue/:type/status endpoint was retired
-  // in PAN-1048 — specialist running state is now derived from the agent
-  // snapshot's status field. No fetch is expected.
+  it('renders legacy specialist review-agent sessions without retired status polling', () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ isRunning: true }) }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPanel('specialist-panopticon-PAN-509-review-agent');
+
+    expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

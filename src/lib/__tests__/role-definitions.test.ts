@@ -69,14 +69,15 @@ describe('role definitions', () => {
     }
   });
 
-  it('ships a workflow-injected inspect prompt with the Jidoka sentinels', () => {
-    // Sub-roles work.inspect and work.inspect-deep both inline this single
-    // harness-agnostic prompt (no .claude/agents/*.md ambient subagent).
+  it('defines inspection prompts as workflow-injected role sub-runs, not ambient subagents', () => {
+    for (const name of ['inspect', 'inspect-deep']) {
+      expect(existsSync(join(process.cwd(), `.claude/agents/${name}.md`))).toBe(false);
+    }
+
     const body = readRepoFile('src/lib/cloister/prompts/inspect-agent.md');
     expect(body).toContain('INSPECTION PASSED');
     expect(body).toContain('INSPECTION BLOCKED');
-    expect(body).toContain('{{issueId}}');
-    expect(body).toContain('{{beadId}}');
+    expect(body).toContain('pan tell {{issueId}}');
   });
 
   it('defines the review role as convoy synthesis with no merge authority', () => {

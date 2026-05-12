@@ -39,9 +39,10 @@ function parseSpecialistSession(agentId: string): { projectKey: string; issueId:
   }
 
   // Try legacy specialist- pattern
-  const legacyMatch = agentId.match(/^specialist-(.+)-([A-Z]+-\d+)-review-(correctness|security|performance|requirements|synthesis)$/);
+  const legacyMatch = agentId.match(/^specialist-(.+)-([A-Z]+-\d+)-review-(agent|correctness|security|performance|requirements|synthesis)$/);
   if (legacyMatch) {
-    return { projectKey: legacyMatch[1], issueId: legacyMatch[2], type: `review-${legacyMatch[3]}` };
+    const type = legacyMatch[3] === 'agent' ? 'orchestrator' : `review-${legacyMatch[3]}`;
+    return { projectKey: legacyMatch[1], issueId: legacyMatch[2], type };
   }
 
   return null;
