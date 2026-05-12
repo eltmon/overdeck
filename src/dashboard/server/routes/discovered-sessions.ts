@@ -19,8 +19,16 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { EventStoreService } from '../services/domain-services.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
+import type {
+  ScanStartedEvent,
+  ScanProgressEvent,
+  ScanCompleteEvent,
+  EnrichProgressEvent,
+  EnrichCompleteEvent,
+} from '@panctl/contracts';
 import {
   findDiscoveredSessions,
   countDiscoveredSessions,
@@ -180,8 +188,7 @@ const getByIdRoute = HttpRouter.add(
   'GET',
   '/api/discovered-sessions/:id',
   httpHandler(Effect.gen(function* () {
-    const req = yield* HttpServerRequest.HttpServerRequest;
-    const params = req.params as { id?: string };
+    const params = yield* HttpRouter.params;
     const id = parseInt(params.id ?? '', 10);
 
     if (isNaN(id)) {
@@ -204,7 +211,7 @@ const postEnrichByIdRoute = HttpRouter.add(
   '/api/discovered-sessions/:id/enrich',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
-    const params = req.params as { id?: string };
+    const params = yield* HttpRouter.params;
     const id = parseInt(params.id ?? '', 10);
 
     if (isNaN(id)) {
@@ -273,6 +280,16 @@ const postScanRoute = HttpRouter.add(
     const maxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : undefined;
 
     const watchDirs = getConversationsConfig().watchDirs;
+    const eventStore = yield* EventStoreService;
+
+    // Emit ScanStartedEvent
+    const startedEvent: Omit<ScanStartedEvent, 'sequence'> = {
+      type: 'scan.started',
+      timestamp: new Date().toISOString(),
+      payload: { mode, dirs: body.dirs ?? [] },
+    };
+    yield* Effect.promise(() => Effect.runPromise(eventStore.append(startedEvent as ScanStartedEvent)));
+
     const result = yield* Effect.promise(() =>
       scan({
         mode,
@@ -280,8 +297,35 @@ const postScanRoute = HttpRouter.add(
         dirs: body.dirs,
         dryRun: body.dryRun,
         maxParallel,
+        onProgress: (progress) => {
+          const progressEvent: Omit<ScanProgressEvent, 'sequence'> = {
+            type: 'scan.progress',
+            timestamp: new Date().toISOString(),
+            payload: {
+              dirsProcessed: progress.dirsProcessed,
+              dirsTotal: progress.dirsTotal,
+              sessionsFound: progress.sessionsFound,
+              elapsedMs: progress.elapsedMs,
+            },
+          };
+          Effect.runSync(eventStore.append(progressEvent as ScanProgressEvent));
+        },
       }),
     );
+
+    // Emit ScanCompleteEvent
+    const completeEvent: Omit<ScanCompleteEvent, 'sequence'> = {
+      type: 'scan.complete',
+      timestamp: new Date().toISOString(),
+      payload: {
+        inserted: result.inserted,
+        updated: result.updated,
+        skipped: result.skipped,
+        errors: result.errors,
+        durationMs: result.durationMs,
+      },
+    };
+    yield* Effect.promise(() => Effect.runPromise(eventStore.append(completeEvent as ScanCompleteEvent)));
 
     return jsonResponse(result);
   })),
@@ -307,6 +351,7 @@ const postEnrichRoute = HttpRouter.add(
     const tier = rawTier as 1 | 2 | 3;
     const enrichMaxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : undefined;
     const enrichSessionIds = body.sessionIds ? body.sessionIds.slice(0, 500) : undefined;
+    const eventStore = yield* EventStoreService;
 
     try {
       const result = yield* Effect.promise(() =>
@@ -314,8 +359,40 @@ const postEnrichRoute = HttpRouter.add(
           tier,
           sessionIds: enrichSessionIds,
           maxParallel: enrichMaxParallel,
+          onProgress: (progress) => {
+            if (progress.session) {
+              const { session } = progress;
+              const progressEvent: Omit<EnrichProgressEvent, 'sequence'> = {
+                type: 'enrich.progress',
+                timestamp: new Date().toISOString(),
+                payload: {
+                  sessionId: session.sessionId,
+                  level: session.tier,
+                  model: session.model,
+                  cost: session.cost ?? 0,
+                  success: session.success,
+                  error: session.error,
+                },
+              };
+              Effect.runSync(eventStore.append(progressEvent as EnrichProgressEvent));
+            }
+          },
         }),
       );
+
+      // Emit EnrichCompleteEvent
+      const completeEvent: Omit<EnrichCompleteEvent, 'sequence'> = {
+        type: 'enrich.complete',
+        timestamp: new Date().toISOString(),
+        payload: {
+          processed: result.enriched + result.errors,
+          totalCost: 0, // aggregate cost tracking would require session-level cost accumulation
+          failures: result.errors,
+          durationMs: result.durationMs,
+        },
+      };
+      yield* Effect.promise(() => Effect.runPromise(eventStore.append(completeEvent as EnrichCompleteEvent)));
+
       return jsonResponse(result);
     } catch (err) {
       if (err instanceof CostThresholdError) {

@@ -59,6 +59,32 @@ export interface ReadModelState {
   /** Bumped whenever a conversation is created, so the sidebar list can refresh
    * immediately instead of waiting for its poll tick. */
   conversationsListRevision: number
+  /** PAN-457 — active scan progress snapshot */
+  scanProgress: ScanProgressSnapshot | null
+  /** PAN-457 — latest enrichment stats */
+  enrichStats: EnrichStatsSnapshot | null
+}
+
+export interface ScanProgressSnapshot {
+  active: boolean
+  mode: 'targeted' | 'watched' | 'system'
+  dirs: string[]
+  dirsProcessed: number
+  dirsTotal: number
+  sessionsFound: number
+  elapsedMs: number
+  inserted: number
+  updated: number
+  skipped: number
+  errors: number
+  durationMs: number
+}
+
+export interface EnrichStatsSnapshot {
+  processed: number
+  totalCost: number
+  failures: number
+  durationMs: number
 }
 
 export interface DashboardLifecycleState {
@@ -92,6 +118,8 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   conversationsCompactingByName: {},
   conversationsAwaitingPermissionByName: {},
   conversationsListRevision: 0,
+  scanProgress: null,
+  enrichStats: null,
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -1013,6 +1041,91 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return {
         ...state,
         conversationsAwaitingPermissionByName: { ...state.conversationsAwaitingPermissionByName, [conversationName]: true },
+      }
+    }
+
+    // ─── Scan events (PAN-457) ───────────────────────────────────────────────
+
+    case 'scan.started': {
+      const { mode, dirs } = event.payload
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        scanProgress: {
+          active: true,
+          mode,
+          dirs,
+          dirsProcessed: 0,
+          dirsTotal: 0,
+          sessionsFound: 0,
+          elapsedMs: 0,
+          inserted: 0,
+          updated: 0,
+          skipped: 0,
+          errors: 0,
+          durationMs: 0,
+        },
+      }
+    }
+
+    case 'scan.progress': {
+      if (!state.scanProgress) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      const { dirsProcessed, dirsTotal, sessionsFound, elapsedMs } = event.payload
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        scanProgress: {
+          ...state.scanProgress,
+          dirsProcessed,
+          dirsTotal,
+          sessionsFound,
+          elapsedMs,
+        },
+      }
+    }
+
+    case 'scan.complete': {
+      if (!state.scanProgress) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      const { inserted, updated, skipped, errors, durationMs } = event.payload
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        scanProgress: {
+          ...state.scanProgress,
+          active: false,
+          inserted,
+          updated,
+          skipped,
+          errors,
+          durationMs,
+        },
+      }
+    }
+
+    // ─── Enrich events (PAN-457) ─────────────────────────────────────────────
+
+    case 'enrich.progress': {
+      const { sessionId, level, model, cost, success, error } = event.payload
+      void sessionId; void level; void model; void error
+      const prev = state.enrichStats ?? { processed: 0, totalCost: 0, failures: 0, durationMs: 0 }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        enrichStats: {
+          processed: prev.processed + 1,
+          totalCost: prev.totalCost + (success ? cost : 0),
+          failures: prev.failures + (success ? 0 : 1),
+          durationMs: 0, // individual session, no duration tracking
+        },
+      }
+    }
+
+    case 'enrich.complete': {
+      const { processed, totalCost, failures, durationMs } = event.payload
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        enrichStats: { processed, totalCost, failures, durationMs },
       }
     }
 

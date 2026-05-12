@@ -44,6 +44,15 @@ export interface EnrichProgress {
   total: number;
   errors: number;
   elapsedMs: number;
+  /** Per-session details for the session that just completed (optional) */
+  session?: {
+    sessionId: number;
+    tier: EnrichmentTier;
+    model: string;
+    cost?: number;
+    success: boolean;
+    error?: string;
+  };
 }
 
 export interface EnrichResult {
@@ -157,6 +166,14 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       total,
       errors: result.errors,
       elapsedMs: Date.now() - startTs,
+      session: {
+        sessionId: session.id,
+        tier,
+        model: sessionResult.model,
+        cost: sessionResult.error ? undefined : estimateEnrichmentCost(1, tier),
+        success: !sessionResult.error,
+        error: sessionResult.error,
+      },
     });
   });
 
