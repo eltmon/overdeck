@@ -29,7 +29,7 @@ async function restoreTrackedBeadsExport(workspacePath: string): Promise<void> {
       cwd: workspacePath,
       encoding: 'utf-8',
     });
-    if (stdout.trim().startsWith('D')) {
+    if (stdout.split('\n').some((line) => line.slice(0, 2).includes('D'))) {
       await execAsync('git restore -- .beads/issues.jsonl', { cwd: workspacePath });
     }
   } catch {
