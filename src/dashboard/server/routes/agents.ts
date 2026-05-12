@@ -11,7 +11,7 @@ import {
 } from './agent-permissions.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
-import { withBdMutex } from '../../../lib/bd-mutex.js';
+import { withWorkspaceBdMutex } from '../../../lib/bd-mutex.js';
 /**
  * Agents route module — Effect HttpRouter.Layer (PAN-428 B7)
  *
@@ -2021,7 +2021,7 @@ const postAgentsRoute = HttpRouter.add(
 
     let hasBeads = false;
     try {
-      const { stdout: bdOutput } = yield* Effect.promise(() => withBdMutex(() => execAsync(
+      const { stdout: bdOutput } = yield* Effect.promise(() => withWorkspaceBdMutex(workspacePath, () => execAsync(
         `bd list --json -l ${issueId.toLowerCase()} --status all --limit 1`,
         { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
       )));

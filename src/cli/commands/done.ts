@@ -15,26 +15,13 @@ import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
+import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
 import type { MergeSet } from '../../lib/merge-set.js';
 
 interface DoneOptions {
   comment?: string;
   force?: boolean;
-}
-
-async function restoreTrackedBeadsExport(workspacePath: string): Promise<void> {
-  try {
-    const { stdout } = await execAsync('git status --porcelain -- .beads/issues.jsonl', {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-    });
-    if (stdout.split('\n').some((line) => line.slice(0, 2).includes('D'))) {
-      await execAsync('git restore -- .beads/issues.jsonl', { cwd: workspacePath });
-    }
-  } catch {
-    // Best-effort cleanup; completion should not fail if git is unavailable here.
-  }
 }
 
 async function updateLinearToInReview(apiKey: string, issueIdentifier: string, comment?: string): Promise<boolean> {

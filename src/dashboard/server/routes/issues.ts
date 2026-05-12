@@ -30,7 +30,7 @@ import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { withBdMutex } from '../../../lib/bd-mutex.js';
+import { withBdMutex, withWorkspaceBdMutex } from '../../../lib/bd-mutex.js';
 
 import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -1540,13 +1540,13 @@ const postIssueReopenRoute = HttpRouter.add(
           const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
           if (existsSync(workspacePath) && findPlan(workspacePath)) {
             try {
-              const { stdout: bdCheck } = await withBdMutex(() => execAsync(
+              const { stdout: bdCheck } = await withWorkspaceBdMutex(workspacePath, () => execAsync(
                 `bd list --json -l ${issueLower} --limit 1`,
                 { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 },
               ));
               const existing = JSON.parse(bdCheck.trim() || '[]');
               if (existing.length === 0) {
-                const result = await withBdMutex(() => createBeadsFromVBrief(workspacePath));
+                const result = await withWorkspaceBdMutex(workspacePath, () => createBeadsFromVBrief(workspacePath));
                 if (result.created.length > 0) {
                   console.log(`[reopen] Recreated ${result.created.length} beads for ${id} from vBRIEF plan`);
                   return true;
@@ -2497,11 +2497,14 @@ const getIssueBeadsRoute = HttpRouter.add(
     const { beads, querySource } = yield* Effect.promise(async (): Promise<{ beads: any[]; querySource: string }> => {
       try {
         const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
-        const { stdout } = await withBdMutex(() => execAsync(`bd list --json -l "${id.toLowerCase()}" --status all --limit 0`, {
+        const runBdList = () => execAsync(`bd list --json -l "${id.toLowerCase()}" --status all --limit 0`, {
           cwd: bdSearchDir,
           encoding: 'utf-8',
           timeout: 10000,
-        }));
+        });
+        const { stdout } = workspacePath && existsSync(workspacePath)
+          ? await withWorkspaceBdMutex(workspacePath, runBdList)
+          : await withBdMutex(runBdList);
         return { beads: JSON.parse(stdout || '[]'), querySource: 'local' };
       } catch (bdError: any) {
         console.error('bd search failed:', bdError.message);
@@ -2633,7 +2636,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     }
 
     const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
-    const result = yield* Effect.promise(() => withBdMutex(() => createBeadsFromVBrief(workspacePath)));
+    const result = yield* Effect.promise(() => withWorkspaceBdMutex(workspacePath, () => createBeadsFromVBrief(workspacePath)));
 
     if (!result.success || result.created.length === 0) {
       const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];

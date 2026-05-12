@@ -16,7 +16,7 @@ import { resolveProjectFromIssue } from '../projects.js';
 import { resolveVBriefDir } from '../vbrief/lifecycle.js';
 import { readContinueState, type ContinueState } from '../vbrief/continue-state.js';
 import { readWorkspaceContinue } from '../pan-dir/index.js';
-import { withBdMutex } from '../bd-mutex.js';
+import { withWorkspaceBdMutex } from '../bd-mutex.js';
 
 const execAsync = promisify(exec);
 
@@ -111,7 +111,7 @@ export async function captureHandoffContext(
   await captureGitState(context, agentState.workspace);
 
   // Capture beads tasks
-  await captureBeadsTasks(context, agentState.issueId);
+  await captureBeadsTasks(context, agentState.issueId, agentState.workspace);
 
   return context;
 }
@@ -195,13 +195,14 @@ async function captureGitState(context: HandoffContext, workspace: string): Prom
 /**
  * Capture beads tasks state
  */
-async function captureBeadsTasks(context: HandoffContext, issueId: string): Promise<void> {
+async function captureBeadsTasks(context: HandoffContext, issueId: string, workspace: string): Promise<void> {
   try {
     // List all tasks with this issue's label
     const label = issueId.toLowerCase();
-    const { stdout: output } = await execAsync(`bd list --json -l ${label}`, {
+    const { stdout: output } = await withWorkspaceBdMutex(workspace, () => execAsync(`bd list --json -l ${label}`, {
+      cwd: workspace,
       encoding: 'utf-8',
-    });
+    }));
 
     const tasks: BeadsTask[] = JSON.parse(output);
 

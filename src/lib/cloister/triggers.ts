@@ -15,7 +15,7 @@ import { promisify } from 'util';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 import { loadCloisterConfig } from './config.js';
-import { withBdMutex } from '../bd-mutex.js';
+import { withBdMutex, withWorkspaceBdMutex } from '../bd-mutex.js';
 
 const execAsync = promisify(exec);
 
@@ -306,20 +306,25 @@ export async function checkTaskCompletion(
 
   const computePromise = (async (): Promise<TriggerDetection> => {
     try {
-      const { stdout: output } = await withBdMutex(() => execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, {
-        encoding: 'utf-8',
-      }));
-      const tasks = JSON.parse(output);
-      const implementTask = tasks.find((t: any) =>
-        t.title.toLowerCase().includes('implement') ||
-        t.labels?.includes('implementation')
-      );
+      const runBdQueries = async () => {
+        const execOptions = { encoding: 'utf-8' as const, ...(workspace ? { cwd: workspace } : {}) };
+        const { stdout: output } = await execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, execOptions);
+        const tasks = JSON.parse(output);
+        const implementTask = tasks.find((t: any) =>
+          t.title.toLowerCase().includes('implement') ||
+          t.labels?.includes('implementation')
+        );
+
+        if (!implementTask) return { implementTask, openTasks: [] as any[] };
+
+        const { stdout: openOutput } = await execAsync(`bd list --json -l ${issueId.toLowerCase()} --status open`, execOptions);
+        return { implementTask, openTasks: JSON.parse(openOutput) };
+      };
+      const { implementTask, openTasks } = workspace
+        ? await withWorkspaceBdMutex(workspace, runBdQueries)
+        : await withBdMutex(runBdQueries);
 
       if (implementTask) {
-        const { stdout: openOutput } = await execAsync(`bd list --json -l ${issueId.toLowerCase()} --status open`, {
-          encoding: 'utf-8',
-        });
-        const openTasks = JSON.parse(openOutput);
 
         if (openTasks.length === 0) {
           return {
