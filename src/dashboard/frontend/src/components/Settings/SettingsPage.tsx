@@ -200,18 +200,6 @@ async function saveVoiceSettings(settings: VoiceSettings): Promise<VoiceSettings
   return res.json();
 }
 
-async function fetchOptimalDefaults(): Promise<SettingsConfig> {
-  const res = await fetch('/api/settings/optimal-defaults');
-  if (!res.ok) throw new Error('Failed to fetch optimal defaults');
-  return res.json();
-}
-
-async function fetchMiniMaxDefaults(): Promise<SettingsConfig> {
-  const res = await fetch('/api/settings/minimax-defaults');
-  if (!res.ok) throw new Error('Failed to fetch MiniMax defaults');
-  return res.json();
-}
-
 /** Pure merge: apply MiniMax model preset while preserving all non-model settings. */
 export function buildMiniMaxFormData(
   formData: SettingsConfig | null,
