@@ -17,6 +17,7 @@ interface PlanDialogProps {
   onClose: () => void;
   onComplete: () => void;
   onTerminalReleased?: () => void;
+  autoStart?: boolean;
 }
 
 interface StartPlanningResult {
@@ -86,7 +87,7 @@ const getDefaultWorkspaceLocation = (): 'local' | 'remote' => {
   return stored === 'remote' ? 'remote' : 'local'; // Default to local
 };
 
-export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalReleased }: PlanDialogProps) {
+export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalReleased, autoStart = false }: PlanDialogProps) {
   const [step, setStep] = useState<Step>('checking');
   const [result, setResult] = useState<StartPlanningResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +107,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const [showTasksPanel, setShowTasksPanel] = useState(false);
   const [setupSteps, setSetupSteps] = useState<SetupProgressEvent[]>([]);
   const [setupSessionName, setSetupSessionName] = useState<string | null>(null);
+  const autoStartTriggered = useRef(false);
 
   // Track if we've actually connected to a planning session in THIS dialog instance.
   const hasConnectedToSession = useRef(false);
@@ -197,7 +199,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
 
   // Start planning via SSE stream — replaces the old fire-and-forget mutation.
   // Uses fetch with streaming body parsing since EventSource only supports GET.
-  const startPlanningViaSSE = useCallback(async () => {
+  const startPlanningViaSSE = useCallback(async (auto = false) => {
     setStep('setting-up');
     setSetupSteps([]);
     setSetupSessionName(null);
@@ -207,7 +209,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
       const res = await fetch(`/api/issues/${issue.identifier}/start-planning`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode, model: modelOverride || undefined, harness: effectivePlanningHarness, effort }),
+        body: JSON.stringify({ startDocker, workspaceLocation, shadowMode, model: modelOverride || undefined, harness: effectivePlanningHarness, effort, auto }),
       });
 
       if (!res.ok) {
@@ -308,7 +310,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
       setError(err.message || 'Connection failed');
       setStep('error');
     }
-  }, [issue.identifier, startDocker, workspaceLocation, shadowMode, modelOverride, harnessOverride, effort, watchPlanning, queryClient, onClose]);
+  }, [issue.identifier, startDocker, workspaceLocation, shadowMode, modelOverride, effectivePlanningHarness, effort, queryClient, onClose]);
 
   // Legacy mutation wrapper — keeps the same handleStartPlanning interface
   const startPlanningMutation = {
@@ -497,8 +499,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   // premature transitions due to stale cache, Docker network disruption
   // (PAN-207), and PTY disconnect race conditions.
 
-  const handleStartPlanning = () => {
-    startPlanningViaSSE();
+  useEffect(() => {
+    if (!autoStart || autoStartTriggered.current || step !== 'ready') return;
+    autoStartTriggered.current = true;
+    setWatchPlanning(false);
+    watchPlanningRef.current = false;
+    void startPlanningViaSSE(true);
+  }, [autoStart, step, startPlanningViaSSE]);
+
+  const handleStartPlanning = (auto = false) => {
+    startPlanningViaSSE(auto);
   };
 
   const handleStopPlanning = () => {
@@ -726,7 +736,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                           {abortPlanningMutation.isPending ? 'Aborting...' : 'Abort Planning'}
                         </button>
                         <button
-                          onClick={handleStartPlanning}
+                          onClick={() => handleStartPlanning()}
                           className="flex items-center gap-2 px-6 py-3 bg-signal-review hover:bg-signal-review/90 text-signal-review-foreground rounded-lg transition-colors font-medium"
                         >
                           <Play className="w-5 h-5" />
@@ -890,13 +900,23 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         </div>
                       </div>
 
-                      <button
-                        onClick={handleStartPlanning}
-                        className="flex items-center gap-2 px-6 py-3 bg-signal-review hover:bg-signal-review/90 text-signal-review-foreground rounded-lg transition-colors font-medium"
-                      >
-                        <Play className="w-5 h-5" />
-                        Start Planning
-                      </button>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => handleStartPlanning()}
+                          className="flex items-center gap-2 px-6 py-3 bg-signal-review hover:bg-signal-review/90 text-signal-review-foreground rounded-lg transition-colors font-medium"
+                        >
+                          <Play className="w-5 h-5" />
+                          Start Planning
+                        </button>
+                        <button
+                          onClick={() => handleStartPlanning(true)}
+                          className="flex items-center gap-2 px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors font-medium"
+                          title="Run planning without interactive questions"
+                        >
+                          <Sparkles className="w-5 h-5" />
+                          Auto-plan
+                        </button>
+                      </div>
                     </>
                   )}
                 </div>

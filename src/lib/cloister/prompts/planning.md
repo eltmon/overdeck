@@ -15,6 +15,7 @@ optional:
   - CHILD_STORIES_SECTION
   - PROJECT_STRUCTURE_SECTION
   - EFFORT_SECTION
+  - AUTO_SECTION
   - PRD_REFERENCES
 ---
 <!-- panopticon:orchestration-context-start -->
@@ -85,7 +86,7 @@ The review convoy sub-roles (`review.security`, `review.correctness`, `review.pe
 After `pan plan-finalize` and the user clicks **Done**, the pipeline runs without you: `work` → optional `work.inspect`/`work.inspect-deep` on flagged beads → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your vBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.
 
 ---
-{{EFFORT_SECTION}}
+{{EFFORT_SECTION}}{{AUTO_SECTION}}
 ## Issue Details
 - **ID:** {{ISSUE_ID}}
 - **Title:** {{ISSUE_TITLE}}
@@ -230,6 +231,9 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
       "Problem": "<what problem this solves>",
       "Proposal": "<the approach chosen>"
     },
+    "autoDecisions": [
+      { "summary": "<inferred choice made in --auto mode>", "rationale": "<why this default is defensible>" }
+    ],
     "items": [
       {
         "id": "<short-kebab-id>",

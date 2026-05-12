@@ -573,6 +573,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       shadowMode = false,
       model: modelOverride,
       effort,
+      auto = false,
       harness = 'claude-code',
     } = body as any;
     const requestedHarness = harness === 'pi' || harness === 'claude-code' ? harness : 'claude-code';
@@ -779,6 +780,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
             model: modelOverride || undefined,
             harness: effectiveHarness,
             effort: effort || undefined,
+            auto: auto === true,
             onProgress: (event) => {
               console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);
               sendEvent({ type: 'progress', ...event });

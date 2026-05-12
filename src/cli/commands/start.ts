@@ -15,6 +15,8 @@ import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
 import { isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
+import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
+import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -84,6 +86,7 @@ interface IssueOptions {
   shadow?: boolean;
   remote?: boolean;
   local?: boolean;
+  auto?: boolean;
 }
 
 /**
@@ -206,6 +209,39 @@ function findLocalWorkspace(issueId: string, labels: string[] = []): string | nu
  */
 function findWorkspace(issueId: string, labels: string[] = []): string | null {
   return findLocalWorkspace(issueId, labels);
+}
+
+async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIssueInput> {
+  const github = resolveGitHubIssue(issueId);
+  if (github.isGitHub) {
+    try {
+      const { stdout } = await execFileAsync('gh', ['issue', 'view', String(github.number), '--repo', `${github.owner}/${github.repo}`, '--json', 'title,body,url'], {
+        encoding: 'utf-8',
+        timeout: 15000,
+      });
+      const parsed = JSON.parse(stdout) as { title?: string; body?: string; url?: string };
+      return { issueId, title: parsed.title || issueId, body: parsed.body || '', url: parsed.url };
+    } catch {
+      return { issueId, title: issueId, body: '' };
+    }
+  }
+
+  if (isLinearIssue(issueId)) {
+    const apiKey = getLinearApiKey();
+    if (apiKey) {
+      try {
+        const { LinearClient } = await import('@linear/sdk');
+        const client = new LinearClient({ apiKey });
+        const results = await client.searchIssues(issueId, { first: 1 });
+        const issue = results.nodes[0];
+        if (issue) {
+          return { issueId, title: issue.title, body: issue.description ?? '', url: issue.url };
+        }
+      } catch { /* fall through */ }
+    }
+  }
+
+  return { issueId, title: issueId, body: '' };
 }
 
 /**
@@ -801,6 +837,25 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           }
         },
       });
+    }
+
+    if (options.auto && !existsSync(getWorkspacePanPaths(workspace).specPath)) {
+      spinner.text = `Synthesizing minimal vBRIEF for ${id}...`;
+      const issue = await fetchIssueForAutoStart(id);
+      await writeAutoStartVBrief(projectRoot, workspace, issue);
+      const recovery = await createBeadsFromVBrief(workspace);
+      if (recovery.created.length === 0) {
+        await failPostCreateValidation({
+          spinner,
+          issueId: id,
+          projectRoot,
+          workspaceCreatedThisRun,
+          message: `Auto-start synthesized a vBRIEF but no beads were created for ${id}`,
+          printDetails: () => {
+            if (recovery.errors.length > 0) console.log(chalk.dim(`  Errors: ${recovery.errors.join(', ')}`));
+          },
+        });
+      }
     }
 
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
