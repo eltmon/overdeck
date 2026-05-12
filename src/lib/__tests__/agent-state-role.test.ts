@@ -35,8 +35,8 @@ describe('AgentState role persistence', () => {
     });
     const { determineModel } = await import('../agents.js');
 
-    // PAN-1048 R4: default workhorse:mid is claude-sonnet-4-7.
-    expect(determineModel({ role: 'work' })).toBe('claude-sonnet-4-7');
+    // PAN-1048 R4: default workhorse:mid is claude-sonnet-4-6.
+    expect(determineModel({ role: 'work' })).toBe('claude-sonnet-4-6');
     expect(determineModel({ role: 'work', model: 'claude-opus-4-7' })).toBe('claude-opus-4-7');
   });
 
@@ -60,7 +60,7 @@ describe('AgentState role persistence', () => {
       expect(roleAgentDefinitionPath('review', subRole)).toBeNull();
 
       const command = await getRoleRuntimeBaseCommand(
-        'claude-sonnet-4-7',
+        'claude-sonnet-4-6',
         `agent-pan-1059-review-${subRole}`,
         'review',
         'claude-code',
@@ -68,7 +68,7 @@ describe('AgentState role persistence', () => {
       );
       expect(command).not.toContain('--agent');
       expect(command).not.toContain('.claude/agents');
-      expect(command).toContain('--model claude-sonnet-4-7');
+      expect(command).toContain('--model claude-sonnet-4-6');
       expect(command).toContain(`--name agent-pan-1059-review-${subRole}`);
     }
   });
