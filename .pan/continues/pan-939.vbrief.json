@@ -1,0 +1,90 @@
+{
+  "version": "1",
+  "issueId": "PAN-939",
+  "created": "2026-05-12T18:40:29.222Z",
+  "updated": "2026-05-12T19:17:30.860Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "gpt-5.4",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T18:40:29.222Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T18:40:29.222Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T18:58:53.771Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T19:00:54.327Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T19:02:47.589Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T19:05:38.858Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T19:05:38.860Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T19:07:50.839Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T19:10:48.897Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T19:11:39.345Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T19:12:49.268Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T19:14:49.458Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-12; reason: Merged upstream before all local fixes landed: remaining Cloister withBdMutex wraps and command-deck resource-strip test fix are still missing from main",
+      "timestamp": "2026-05-12T19:16:30.717Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T19:17:30.589Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-12T19:17:30.860Z"
+    }
+  ],
+  "feedback": []
+}

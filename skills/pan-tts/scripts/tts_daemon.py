@@ -243,7 +243,13 @@ def _ensure_player() -> tuple[subprocess.Popen, bool]:
     created = False
     if _PLAYER_PROC is None or _PLAYER_PROC.poll() is not None:
         _PLAYER_PROC = subprocess.Popen(
-            ["pw-play", "-"],
+            [
+                "pw-play",
+                "--rate", str(SAMPLE_RATE),
+                "--format", "f32",
+                "--channels", "1",
+                "-",
+            ],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -283,10 +289,9 @@ def play_audio(audio: np.ndarray, volume: float = 1.0) -> None:
         silence = np.zeros(int(SAMPLE_RATE * prepend_secs), dtype=audio.dtype)
         audio_to_play = np.concatenate([silence, audio])
 
-        buf = io.BytesIO()
-        sf.write(buf, audio_to_play, SAMPLE_RATE, format="WAV")
+        raw = audio_to_play.astype(np.float32).tobytes()
         try:
-            player.stdin.write(buf.getvalue())
+            player.stdin.write(raw)
             player.stdin.flush()
             return
         except (BrokenPipeError, OSError):

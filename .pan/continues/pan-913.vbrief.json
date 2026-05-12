@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-913",
   "created": "2026-05-09T23:35:53.171Z",
-  "updated": "2026-05-12T03:48:17.898323+00:00",
+  "updated": "2026-05-12T20:06:38.767Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,14 +10,17 @@
   "beadsMapping": {},
   "feedback": [
     {
-      "timestamp": "2026-05-12T03:48:17.898323+00:00",
-      "note": "RESUME DIRECTIVE (2026-05-12, session 933): The work was paused with PR #916 OPEN, all CI green, but mergeable=CONFLICTING \u2014 there are merge conflicts against current main. Your job: (1) cd to workspaces/feature-pan-913 (you're already there if you've been resumed), (2) git fetch origin main, (3) git rebase origin/main, (4) resolve conflicts \u2014 prefer main's evolved code where it touches permission/inspect spawn paths (PAN-1059, PAN-1082 merged since), preserve THIS PR's Codex auth detection logic, (5) run npm run lint && npm run typecheck && npm test until all clean, (6) git push --force-with-lease origin feature/pan-913, (7) run 'pan done PAN-913' to re-trigger review pipeline. Do NOT run 'pan inspect' on any bead \u2014 set requiresInspection=false on every bead. No Anthropic models \u2014 you're spawned on gpt-5.5. If conflicts are too gnarly OR you can't get tests green, halt and 'pan tell PAN-913' a summary of the blocker rather than guessing."
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-12T19:05:44Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-913\n\n# Review Synthesis — PAN-913 — 2026-05-12T19:25:00Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/.pan/review/agent-pan-913-review-ab98c4b4/context.json`\n- Branch: `feature/pan-913`\n- Workspace: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913`\n- PR: #916 — PAN-913\n\n## Convoy Status\n| Sub-role | Status | Blocking findings |\n| --- | --- | --- |\n| security | done | 0 |\n| correctness | done | 1 |\n| performance | blocked | 1 |\n| requirements | done | 3 |\n\n## Blocking Findings\n\n### [correctness] Codex auth gate blocks non-OpenAI subscription agents — `src/dashboard/server/routes/agents.ts:2105`\nThe route-level spawn guard checks only `providerAuthMode === 'subscription'` before calling `checkCodexAuthStatus()` and returning 429 for expired/burned Codex auth. `getProviderAuthMode(spawnModel)` can return `subscription` for Anthropic subscription-auth models, so normal Claude subscription work agents can be blocked by stale Codex auth even though they do not use Codex or CLIProxy. The equivalent helper in `src/lib/agents.ts:177` correctly scopes the check to OpenAI providers; the dashboard route should apply the same provider constraint or delegate to that helper.\n\n### [performance] Review context is incomplete because the manifest diff is truncated — `context.json`\nThe performance reviewer could not complete the review because `diff.truncated` is `true` and the raw diff contains only 9 of 25 changed file headers. The missing hunks include high-risk performance-sensitive files such as `src/dashboard/server/routes/codex-auth.ts`, `src/dashboard/frontend/src/lib/pending-codex-spawn.ts`, `src/dashboard/server/ws-terminal.ts`, `src/lib/agents.ts`, and `src/lib/work/done-preflight.ts`. The review role forbids independent broad diff discovery, so approval is blocked until the review context includes the changed hunks needed for performance review.\n\n### [requirements] Re-auth re-bridge path still performs sync filesystem I/O — `src/lib/cliproxy.ts:244`\nThe completion route calls `bridgeCodexAuthToCliproxyAsync()` from `src/dashboard/server/routes/codex-auth.ts:159`, but that async bridge still calls sync `ensureDirs()` at `src/lib/cliproxy.ts:244`. `ensureDirs()` uses `mkdirSync` at `src/lib/cliproxy.ts:78-80`, so the server-reachable re-auth completion path can still block the dashboard server event loop. This violates both `reauth-completion.ac3` and the project policy against sync filesystem calls in dashboard server-reachable code.\n\n### [requirements] Duplicate re-auth requests do not return the existing live session — `src/dashboard/server/routes/codex-auth.ts:109`\nThe vBRIEF requires duplicate re-auth requests to return the existing live session details. The endpoint detects an existing re-auth session, but returns HTTP 409 with `{ error: 'A Codex re-authentication session is already running.' }` at `src/dashboard/server/routes/codex-auth.ts:109-114`. This prevents a client from resuming/opening the existing flow through the API response and leaves `reauth-endpoint.ac3` unmet.\n\n### [requirements] Re-auth terminal token is not one-time despite the prior review requirement — `src/dashboard/server/ws-terminal.ts:145`\nThe prior blocker required a server-issued one-time token for `/ws/terminal?session=<name>`. `validateReauthTerminalToken()` only compares the stored token at `src/dashboard/server/routes/codex-auth.ts:69-72`, and `ws-terminal.ts` validates it at `src/dashboard/server/ws-terminal.ts:145-163` without deleting or rotating it. The docs also claim tokens are invalidated on first attach at `skills/cliproxy/SKILL.md:141-143`, which the code does not implement.\n\n## Non-blocking Findings\n\n### [correctness] Broad 429 classifier queues non-Codex spawn failures — `src/dashboard/frontend/src/lib/pending-codex-spawn.ts:88`\n`isCodexBlockedResponse()` treats any `429` with `blocked: true` as a Codex-auth-blocked spawn. The same `/api/agents` route also returns 429/`blocked: true` for other provider health and guardrail failures, so unrelated spawn failures can be saved and retried through the Codex re-auth path. This does not loop indefinitely because `retryPendingSpawn()` clears the pending spawn before retrying.\n\n### [requirements] Settings page does not show the full required Codex status details — `src/dashboard/frontend/src/components/Settings/SettingsPage.tsx:563`\nThe settings UI shows `OAuth`/`OAuth active`, but the requirement asks for `Subscription OAuth`, live status, email, and expiry time. The reviewer found email and status evidence but no `expiresAt` rendering.\n\n### [requirements] Burned-token detection window does not match the stated one-hour requirement — `src/lib/codex-auth.ts:157`\nThe vBRIEF requires treating `refresh token has already been used` as burned when it appears within the last hour. The implementation scans a 500-line window but treats a burn line as stale after 5 minutes, so a 6-60 minute old burn can be ignored unless the requirement is updated.\n\n## Clean Sub-roles\n- security: no findings.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/.pan/review/agent-pan-913-review-ab98c4b4/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-913 -m \"Fixed review issues\"`"
     }
   ],
   "sessionHistory": [
     {
       "reason": "feedback",
-      "note": "[2026-05-09T23:35Z] verification-gate \u2192 FAILED \u2014 seq 1",
+      "note": "[2026-05-09T23:35Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-05-09T23:35:53.172Z"
     },
     {
@@ -27,7 +30,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-09T23:44Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-09T23:44Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-09T23:44:21.815Z"
     },
     {
@@ -37,7 +40,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T00:06Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T00:06Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T00:06:41.657Z"
     },
     {
@@ -47,7 +50,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T00:23Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T00:23Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T00:23:01.982Z"
     },
     {
@@ -57,7 +60,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T01:10Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T01:10Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T01:10:42.226Z"
     },
     {
@@ -67,7 +70,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T04:02Z] verification-gate \u2192 FAILED \u2014 seq 2",
+      "note": "[2026-05-10T04:02Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-05-10T04:02:46.058Z"
     },
     {
@@ -77,7 +80,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T04:16Z] verification-gate \u2192 FAILED \u2014 seq 3",
+      "note": "[2026-05-10T04:16Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-05-10T04:16:09.932Z"
     },
     {
@@ -87,7 +90,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T04:40Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T04:40Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T04:40:29.027Z"
     },
     {
@@ -104,6 +107,266 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-05-10T04:53:52.092Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T18:40:18.346Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-12T18:41Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-12T18:41:48.614Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-12T19:05Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-12T19:05:44.754Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:05:44.805Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:07:39.223Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:09:34.209Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:10:38.707Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:12:39.595Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:14:40.826Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:16:43.387Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:18:41.331Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:20:38.450Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:22:42.188Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:24:34.982Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:25:39.259Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:27:34.370Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:28:34.585Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:30:36.794Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:32:40.115Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:34:37.726Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:35:34.232Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:36:37.519Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:37:34.870Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:38:37.886Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:39:33.036Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:40:38.252Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:41:35.450Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:42:37.427Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:43:35.394Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:44:37.669Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:45:32.296Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:46:37.464Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:47:35.107Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:48:40.690Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:49:37.854Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:50:40.345Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:51:36.387Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:52:38.706Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:53:34.237Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:54:37.581Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:55:32.819Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:56:40.683Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:57:34.045Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:58:38.563Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T19:59:33.584Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T20:00:39.621Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T20:01:37.068Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T20:02:41.604Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T20:03:42.223Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T20:04:34.102Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T20:05:38.468Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T20:06:38.767Z"
     }
   ]
 }
