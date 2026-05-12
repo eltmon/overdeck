@@ -567,39 +567,46 @@ export const REVIEWER_ROLES: readonly ReviewerRole[] = [
 ] as const;
 
 /**
- * Get the canonical reviewer tmux session name (PAN-830).
+ * Get the canonical reviewer tmux session name (PAN-830 / PAN-1048).
  *
- * Pattern: `specialist-<projectKey>-<issueId>-review-<role>`. This is one
- * tmux session per role per issue — sessions are reused across review
- * rounds via `sendKeysAsync` resumption. Round 2 of `review-correctness`
- * does NOT spawn a new session; it injects a follow-up prompt into the
- * existing pane.
+ * Pattern: `agent-<issueId>-review-<role>`. One tmux session per role per
+ * issue — sessions are reused across review rounds via `sendKeysAsync`
+ * resumption. Round 2 of `review-correctness` does NOT spawn a new session;
+ * it injects a follow-up prompt into the existing pane.
  *
  * @param role - One of the canonical reviewer roles
- * @param projectKey - Project key (e.g. `panopticon`)
- * @param issueId - Issue identifier (e.g. `pan-540`)
+ * @param _projectKey - Unused (kept for signature compatibility with existing callers)
+ * @param issueId - Issue identifier (e.g. `pan-540` or `PAN-540`)
  * @returns Canonical tmux session name
  */
 export function getReviewerSessionName(
   role: ReviewerRole,
-  projectKey: string,
+  _projectKey: string,
   issueId: string,
 ): string {
-  return `specialist-${projectKey}-${issueId}-review-${role}`;
+  return `agent-${issueId.toLowerCase()}-review-${role}`;
 }
 
 /**
- * Parse a canonical reviewer session name back into role + project + issue.
- * Returns null if the name does not match the canonical pattern.
+ * Parse a canonical reviewer session name back into role + issue.
+ * Returns null if the name does not match either pattern.
+ * Supports both current `agent-*` format and legacy `specialist-*` format.
  */
 export function parseReviewerSessionName(name: string): {
   role: ReviewerRole;
-  projectKey: string;
   issueId: string;
 } | null {
-  const m = name.match(/^specialist-([\w.-]+?)-([\w.-]+?)-review-(correctness|security|performance|requirements|synthesis)$/);
-  if (!m || !m[1] || !m[2] || !m[3]) return null;
-  return { projectKey: m[1], issueId: m[2], role: m[3] as ReviewerRole };
+  // Current PAN-1048+ pattern: agent-<issueId>-review-<role>
+  const agentMatch = name.match(/^agent-([a-z0-9]+-\d+)-review-(correctness|security|performance|requirements|synthesis)$/i);
+  if (agentMatch) {
+    return { issueId: agentMatch[1]!.toUpperCase(), role: agentMatch[2] as ReviewerRole };
+  }
+  // Legacy PAN-830 pattern: specialist-<projectKey>-<issueId>-review-<role>
+  const legacyMatch = name.match(/^specialist-([\w.-]+?)-([\w.-]+?)-review-(correctness|security|performance|requirements|synthesis)$/);
+  if (legacyMatch) {
+    return { issueId: legacyMatch[2], role: legacyMatch[3] as ReviewerRole };
+  }
+  return null;
 }
 
 /**
