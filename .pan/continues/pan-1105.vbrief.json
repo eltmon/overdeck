@@ -1,0 +1,32 @@
+{
+  "version": "1",
+  "issueId": "PAN-1105",
+  "created": "2026-05-12T17:58:03.726Z",
+  "updated": "2026-05-12T17:58:03.757Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-12T17:58:03Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1105\n\n# Review Synthesis — PAN-1105 — 2026-05-12T18:00:00Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1105/.pan/review/agent-pan-1105-review-c0ae6155/context.json\n- Branch: feature/1105\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1105\n\n## Convoy Status\n| Sub-role | Status | Blocking findings |\n| --- | --- | --- |\n| security | done | 0 |\n| correctness | done | 0 |\n| performance | done | 1 |\n| requirements | done | 3 |\n\n## Blocking Findings\n\n### [performance] Synthesis monitor can leak an unbounded polling loop — `src/lib/cloister/review-agent.ts:249`\nThe new monitor loops forever until `isPaneDeadAsync(opts.sessionId)` returns true. It does not check whether `synthesis.md` already exists until after the pane is dead, so a successful synthesis session that remains alive can leave a permanent timer and tmux poll running every 10 seconds. The cited tmux helper returns false for missing sessions because `listPaneValuesAsync()` returns an empty array on failure and `values.some(...)` is false (`src/lib/tmux.ts:603-620`), so removed sessions can also leave the loop alive indefinitely.\n\nFix by exiting when the synthesis file exists before polling tmux, and by bounding the monitor with a terminal condition such as review status no longer being `reviewing`, session absence, or the review timeout/deacon threshold.\n\n### [requirements] Silent exits are detected but the required cause is not identified — Acceptance criteria\nPAN-1105 requires identifying which stated failure mode caused the silent exit: context budget overflow, first-tool-call crash, wrong/unwriteable output path, or stale workspace gating. The implementation maps only generic agent state fields (`status`, `lastActivity`, `stoppedByUser`) into review notes at `src/lib/cloister/review-agent.ts:261-273`; it does not persist or inspect the terminal/error details needed to classify those causes.\n\nFix by capturing the underlying agent failure signal and mapping it to the explicit accepted causes before reporting the failure.\n\n### [requirements] Underlying errors are not surfaced in the synthesis report — Acceptance criteria\nPAN-1105 requires surfacing the underlying error in the synthesis instead of the generic “exited before producing a non-empty report” failure. The changed code only calls `setReviewStatus()` with `reviewStatus: 'failed'` and `reviewNotes` at `src/lib/cloister/review-agent.ts:280-283`; it does not write a failure `synthesis.md` artifact. Consumers expecting the synthesis report still receive no synthesis file.\n\nFix by writing a failure synthesis report to the expected output path, or by changing the pipeline contract so the synthesized failure artifact is explicitly read from review status with the underlying error included.\n\n### [requirements] Required-output-path failures are not distinguished from any other missing synthesis file — Acceptance criteria\nThe acceptance criteria call out wrong or unwriteable required-output-file paths as a cause to identify. The implementation treats every dead synthesis session with no `synthesis.md` as the same silent failure at `src/lib/cloister/review-agent.ts:258-283`; it does not verify the parent directory, attempted write path, permissions, or write error.\n\nFix by validating/capturing required-output-path write failures and reporting them separately from crashes, context-budget failures, and stale workspace gating.\n\n## Non-blocking Findings\n\n### [requirements]\n~ The optional retry-gating criterion is directionally covered by marking review status `failed` on dead synthesis-without-output at `src/lib/cloister/review-agent.ts:280-283`, but the failure mode is still keyed on file absence plus pane death rather than a classified cause.\n\n## Clean Sub-roles\n- security: no findings.\n- correctness: no findings.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1105/.pan/review/agent-pan-1105-review-c0ae6155/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1105 -m \"Fixed review issues\"`"
+    }
+  ],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-12T17:58Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-12T17:58:03.727Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "minimax-m2.7-highspeed",
+      "timestamp": "2026-05-12T17:58:03.757Z"
+    }
+  ]
+}

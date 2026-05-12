@@ -1,0 +1,121 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-12T17:40:49.746Z",
+    "updated": "2026-05-12T17:40:49.746Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1106: Issue-tree only renders Review sub-roles; work/ship/test/plan agents are hidden under their issue",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1106",
+    "title": "Issue-tree only renders Review sub-roles; work/ship/test/plan agents are hidden under their issue",
+    "status": "proposed",
+    "uid": "2195afb2-40dd-4b69-8783-00ed414d39d3",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 1,
+    "created": "2026-05-12T17:40:49.746Z",
+    "updated": "2026-05-12T17:40:49.746Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1106",
+        "label": "PAN-1106",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-12-PAN-1106-issue-tree-only-renders-review-sub-roles-work-ship-test-plan-agents-are-hidden-under-their-issue.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Symptom\n\nIn the Command Deck issue tree, PAN-457 row expands to:\n\n\\`\\`\\`\nPAN-457  Archived Conversations page — …\n  Review (gpt-5.5)               error\n    Correctness (gpt-5.5)        stopped\n    Security (gpt-5.5)           stopped\n    Performance (gpt-5.5)        stopped\n    Requirements (gpt-5.5)       stopped\n  RESOURCES  1 PR  ·  2 branches\n\\`\\`\\`\n\nThe \\`agent-pan-457-ship\\` and \\`agent-pan-457\\` (work) sessions are running for the same issue at the same time, but they don't appear under the PAN-457 node in the tree. They show up in the flat Conversations list in the sidebar instead.\n\n## Expected\n\nPer \\`docs/ROLES.md\\`, every issue has up to five roles: plan, work, review, test, ship. The issue-tree should render whichever roles exist for that issue (with their model and live status), not just review and its sub-roles.\n\n## Why it matters\n\nIf you don't see the work/ship/test/plan agents under their issue, you can't tell at a glance:\n- Whether the issue has a work agent at all (\\\"why hasn't anything happened on PAN-457?\\\")\n- What model each role is running on\n- Whether ship/test passed\n- Where to click to attach to the right session\n\n## Suspected cause\n\nThe tree-row renderer probably hardcodes review as the only role that gets a sub-row, instead of iterating over the roles defined for the issue. Likely in \\`src/dashboard/frontend/src/components/CommandDeck/\\`.\n\n## Acceptance\n\n- PAN-457 row in the issue tree shows: work, ship, review (with its sub-roles), test, plan — for whichever are present\n- Each role row shows its model, status, and (where applicable) cost\n- Clicking a role row opens the right tmux session / conversation",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T17:40:49.746Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1106",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Symptom\n\nIn the Command Deck issue tree, PAN-457 row expands to:\n\n\\`\\`\\`\nPAN-457  Archived Conversations page — …\n  Review (gpt-5.5)               error\n    Correctness (gpt-5.5)        stopped\n    Security (gpt-5.5)           stopped\n    Performance (gpt-5.5)        stopped\n    Requirements (gpt-5.5)       stopped\n  RESOURCES  1 PR  ·  2 branches\n\\`\\`\\`\n\nThe \\`agent-pan-457-ship\\` and \\`agent-pan-457\\` (work) sessions are running for the same issue at the same time, but they don't appear under the PAN-457 node in the tree. They show up in the flat Conversations list in the sidebar instead.\n\n## Expected\n\nPer \\`docs/ROLES.md\\`, every issue has up to five roles: plan, work, review, test, ship. The issue-tree should render whichever roles exist for that issue (with their model and live status), not just review and its sub-roles.\n\n## Why it matters\n\nIf you don't see the work/ship/test/plan agents under their issue, you can't tell at a glance:\n- Whether the issue has a work agent at all (\\\"why hasn't anything happened on PAN-457?\\\")\n- What model each role is running on\n- Whether ship/test passed\n- Where to click to attach to the right session\n\n## Suspected cause\n\nThe tree-row renderer probably hardcodes review as the only role that gets a sub-row, instead of iterating over the roles defined for the issue. Likely in \\`src/dashboard/frontend/src/components/CommandDeck/\\`.\n\n## Acceptance\n\n- PAN-457 row in the issue tree shows: work, ship, review (with its sub-roles), test, plan — for whichever are present\n- Each role row shows its model, status, and (where applicable) cost\n- Clicking a role row opens the right tmux session / conversation"
+        },
+        "subItems": [
+          {
+            "id": "auto-start.ac1",
+            "title": "Whether the issue has a work agent at all (\\\"why hasn't anything happened on PAN-457?\\\")",
+            "status": "pending",
+            "created": "2026-05-12T17:40:49.746Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "What model each role is running on",
+            "status": "pending",
+            "created": "2026-05-12T17:40:49.746Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "Whether ship/test passed",
+            "status": "pending",
+            "created": "2026-05-12T17:40:49.746Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Where to click to attach to the right session",
+            "status": "pending",
+            "created": "2026-05-12T17:40:49.746Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "PAN-457 row in the issue tree shows: work, ship, review (with its sub-roles), test, plan — for whichever are present",
+            "status": "pending",
+            "created": "2026-05-12T17:40:49.746Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "Each role row shows its model, status, and (where applicable) cost",
+            "status": "pending",
+            "created": "2026-05-12T17:40:49.746Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac7",
+            "title": "Clicking a role row opens the right tmux session / conversation",
+            "status": "pending",
+            "created": "2026-05-12T17:40:49.746Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

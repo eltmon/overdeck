@@ -1,0 +1,85 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-12T17:37:42.378Z",
+    "updated": "2026-05-12T17:37:42.378Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1104: pan reopen <github-issue> mis-routes to Linear (MIN-XXX) for projects that have both trackers",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1104",
+    "title": "pan reopen <github-issue> mis-routes to Linear (MIN-XXX) for projects that have both trackers",
+    "status": "proposed",
+    "uid": "0ca16755-af12-4008-a3e7-499af5bf1e77",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 1,
+    "created": "2026-05-12T17:37:42.378Z",
+    "updated": "2026-05-12T17:37:42.378Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1104",
+        "label": "PAN-1104",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-12-PAN-1104-pan-reopen-github-issue-mis-routes-to-linear-min-xxx-for-projects-that-have-both-trackers.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Repro\n\n\\`pan reopen pan-457\\` (panopticon-cli GitHub issue) printed:\n\n\\`\\`\\`\n✔ Issue MIN-848 moved to In Progress\n✔ Added reopen comment\n✓ MIN-848 reopened and ready for re-work\n\\`\\`\\`\n\nPAN-457 lives on GitHub (eltmon/panopticon-cli). MIN-848 is a Mind Your Now Linear issue in a different project. The reopen command updated the wrong tracker.\n\n## Expected\n\n\\`pan reopen pan-XXX\\` should resolve via the same path as \\`pan start\\` (which correctly logged \\`Transitioned pan-457 to in_progress via GitHub (eltmon/panopticon-cli)\\` immediately after).\n\n## Cause (suspected)\n\n\\`pan reopen\\` is using a different project/issue resolver than \\`pan start\\`. Likely \\`src/cli/commands/reopen.ts\\` (or wherever the reopen command lives) — should call \\`resolveProjectFromIssue()\\` from \\`src/lib/projects.ts\\` like the rest of the pipeline.\n\n## Acceptance\n\n- \\`pan reopen pan-457\\` updates the GitHub issue \\#457 in eltmon/panopticon-cli, not MIN-848 in Linear\n- Workspace state reset side effects (review/test/merge → pending, continue breadcrumb) continue to work\n- Add a unit test that asserts the resolver matches \\`resolveProjectFromIssue\\` for both PAN- and MIN- prefixes",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T17:37:42.378Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1104",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Repro\n\n\\`pan reopen pan-457\\` (panopticon-cli GitHub issue) printed:\n\n\\`\\`\\`\n✔ Issue MIN-848 moved to In Progress\n✔ Added reopen comment\n✓ MIN-848 reopened and ready for re-work\n\\`\\`\\`\n\nPAN-457 lives on GitHub (eltmon/panopticon-cli). MIN-848 is a Mind Your Now Linear issue in a different project. The reopen command updated the wrong tracker.\n\n## Expected\n\n\\`pan reopen pan-XXX\\` should resolve via the same path as \\`pan start\\` (which correctly logged \\`Transitioned pan-457 to in_progress via GitHub (eltmon/panopticon-cli)\\` immediately after).\n\n## Cause (suspected)\n\n\\`pan reopen\\` is using a different project/issue resolver than \\`pan start\\`. Likely \\`src/cli/commands/reopen.ts\\` (or wherever the reopen command lives) — should call \\`resolveProjectFromIssue()\\` from \\`src/lib/projects.ts\\` like the rest of the pipeline.\n\n## Acceptance\n\n- \\`pan reopen pan-457\\` updates the GitHub issue \\#457 in eltmon/panopticon-cli, not MIN-848 in Linear\n- Workspace state reset side effects (review/test/merge → pending, continue breadcrumb) continue to work\n- Add a unit test that asserts the resolver matches \\`resolveProjectFromIssue\\` for both PAN- and MIN- prefixes"
+        },
+        "subItems": [
+          {
+            "id": "auto-start.ac1",
+            "title": "\\pan reopen pan-457\\ updates the GitHub issue \\#457 in eltmon/panopticon-cli, not MIN-848 in Linear",
+            "status": "pending",
+            "created": "2026-05-12T17:37:42.378Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "Workspace state reset side effects (review/test/merge → pending, continue breadcrumb) continue to work",
+            "status": "pending",
+            "created": "2026-05-12T17:37:42.378Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "Add a unit test that asserts the resolver matches \\resolveProjectFromIssue\\ for both PAN- and MIN- prefixes",
+            "status": "pending",
+            "created": "2026-05-12T17:37:42.378Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

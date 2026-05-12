@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-977",
   "created": "2026-05-08T09:40:09.134Z",
-  "updated": "2026-05-12T03:48:17.898323+00:00",
+  "updated": "2026-05-12T17:58:28.562Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -27,7 +27,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-09T22:58Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-09T22:58Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-09T22:58:39.398Z"
     },
     {
@@ -37,7 +37,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-09T23:11Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-09T23:11Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-09T23:11:40.834Z"
     },
     {
@@ -47,7 +47,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T00:01Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T00:01Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T00:01:56.175Z"
     },
     {
@@ -57,7 +57,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T00:29Z] verification-gate \u2192 FAILED \u2014 seq 2",
+      "note": "[2026-05-10T00:29Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-05-10T00:29:58.225Z"
     },
     {
@@ -67,7 +67,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T00:38Z] verification-gate \u2192 FAILED \u2014 seq 1",
+      "note": "[2026-05-10T00:38Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-05-10T00:38:02.369Z"
     },
     {
@@ -77,7 +77,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T01:05Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 2",
+      "note": "[2026-05-10T01:05Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-05-10T01:05:28.824Z"
     },
     {
@@ -92,7 +92,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T03:36Z] verification-gate \u2192 FAILED \u2014 seq 1",
+      "note": "[2026-05-10T03:36Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-05-10T03:36:31.790Z"
     },
     {
@@ -102,7 +102,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T03:48Z] verification-gate \u2192 FAILED \u2014 seq 2",
+      "note": "[2026-05-10T03:48Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-05-10T03:48:45.482Z"
     },
     {
@@ -112,12 +112,12 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T03:49Z] verification-gate \u2192 FAILED \u2014 seq 3",
+      "note": "[2026-05-10T03:49Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-05-10T03:49:47.774Z"
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T03:56Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T03:56Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T03:56:15.361Z"
     },
     {
@@ -127,7 +127,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T04:10Z] verification-gate \u2192 FAILED \u2014 seq 2",
+      "note": "[2026-05-10T04:10Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-05-10T04:10:05.073Z"
     },
     {
@@ -137,7 +137,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T04:46Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T04:46Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T04:46:29.011Z"
     },
     {
@@ -157,7 +157,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T05:50Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T05:50Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T05:50:57.384Z"
     },
     {
@@ -167,7 +167,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T07:35Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T07:35Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T07:35:08.103Z"
     },
     {
@@ -177,7 +177,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T09:02Z] review-agent \u2192 COMMENTED \u2014 seq 1",
+      "note": "[2026-05-10T09:02Z] review-agent → COMMENTED — seq 1",
       "timestamp": "2026-05-10T09:02:09.156Z"
     },
     {
@@ -187,7 +187,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T10:10Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T10:10Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T10:10:30.345Z"
     },
     {
@@ -197,7 +197,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T10:44Z] verification-gate \u2192 FAILED \u2014 seq 2",
+      "note": "[2026-05-10T10:44Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-05-10T10:44:45.630Z"
     },
     {
@@ -207,39 +207,34 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T10:50Z] verification-gate \u2192 FAILED \u2014 seq 3",
+      "note": "[2026-05-10T10:50Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-05-10T10:50:37.078Z"
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T11:09Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T11:09Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T11:09:02.113Z"
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T13:11Z] verification-gate \u2192 FAILED \u2014 seq 1",
+      "note": "[2026-05-10T13:11Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-05-10T13:11:31.238Z"
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T13:53Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T13:53Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T13:53:15.172Z"
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T17:26Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
+      "note": "[2026-05-10T17:26Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-10T17:26:48.379Z"
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T17:31Z] verification-gate \u2192 FAILED \u2014 seq 2",
+      "note": "[2026-05-10T17:31Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-05-10T17:31:23.186Z"
     }
   ],
-  "feedback": [
-    {
-      "timestamp": "2026-05-12T03:48:17.898323+00:00",
-      "note": "RESUME DIRECTIVE (2026-05-12, session 933): The work was paused with PR #1054 OPEN, all CI green, but mergeable=CONFLICTING. This PR is +3606/-549 \u2014 large. Conflicts likely in src/lib/cloister/ files because PAN-1059 (review pipeline refactor) and Meta-A/B/C/D have moved that area significantly since this branch was authored. Your job: (1) cd to workspaces/feature-pan-977 (you're already there if you've been resumed), (2) git fetch origin main, (3) git rebase origin/main, (4) resolve conflicts \u2014 take main's version of the convoy-spawn-via-orchestrator architecture (review-agent.ts is now the orchestrator role, spawnReviewRoleForIssue spawns synthesis only and the orchestrator role runs 'pan review spawn-reviewer' commands itself), preserve THIS PR's DAG-dispatch and per-item-advance logic from PAN-977's scope, (5) npm run lint && npm run typecheck && npm test all clean, (6) git push --force-with-lease origin feature/pan-977, (7) 'pan done PAN-977'. Do NOT run 'pan inspect' on any bead \u2014 requiresInspection=false everywhere. No Anthropic models \u2014 gpt-5.5 only. If conflicts are too complex OR you suspect the PR's design conflicts with the new architecture in ways you can't reconcile, halt and 'pan tell PAN-977' a summary rather than guessing."
-    }
-  ]
+  "feedback": []
 }
