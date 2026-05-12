@@ -2,35 +2,13 @@
   "version": "1",
   "issueId": "PAN-1104",
   "created": "2026-05-12T17:53:08.700Z",
-  "updated": "2026-05-12T21:35:59.577Z",
+  "updated": "2026-05-12T21:48:20.282Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
   "beadsMapping": {},
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-05-12T17:53:08Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1104\n\n# Review Synthesis — PAN-1104 — 2026-05-12T17:58:00Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1104/.pan/review/agent-pan-1104-review-9601c00a/context.json\n- Branch: feature/1104\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1104\n\n## Convoy Status\n| Sub-role | Status | Blocking findings |\n| --- | --- | --- |\n| security | done | 0 |\n| correctness | done | 0 |\n| performance | done | 0 |\n| requirements | done | 1 |\n\n## Blocking Findings\n\n### [requirements] Required resolver parity unit test is missing — Acceptance criterion\nThe issue acceptance criteria require a unit test asserting that the resolver used by `pan reopen` matches `resolveProjectFromIssue` for both PAN and MIN prefixes. The manifest contains only `src/cli/commands/reopen.ts` changes and no test file changes. The requirements reviewer also found that existing `tests/lib/tracker-utils.test.ts:25-112` coverage does not assert parity with `resolveProjectFromIssue` for PAN and MIN. This leaves the stated regression guard absent, so future drift can reintroduce GitHub-to-Linear misrouting without a test failure.\n\n## Non-blocking Findings\n\n### [security] Sanitize untrusted issue text before terminal rendering — `src/cli/commands/reopen.ts:297`\nThe new GitHub path prints remote issue title/body text directly to the operator terminal. This matches the existing Linear behavior but extends low-risk terminal-control exposure to GitHub issue authors. Apply any sanitizer consistently to both tracker display paths if addressed.\n\n### [correctness] Final next-step output is not awaited — `src/cli/commands/reopen.ts:357`\nThe extracted async `printNextSteps(id)` helper is called without `await` in both reopen paths. The reopen operation and workspace reset still complete, but the final guidance can race with command completion and may be omitted.\n\n## Clean Sub-roles\n- performance: no findings.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1104/.pan/review/agent-pan-1104-review-9601c00a/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1104 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-05-12T21:32:35Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1104\n\n# Review Synthesis — PAN-1104 — 2026-05-12T17:58:00Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1104/.pan/review/agent-pan-1104-review-9601c00a/context.json\n- Branch: feature/1104\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1104\n\n## Convoy Status\n| Sub-role | Status | Blocking findings |\n| --- | --- | --- |\n| security | done | 0 |\n| correctness | done | 0 |\n| performance | done | 0 |\n| requirements | done | 1 |\n\n## Blocking Findings\n\n### [requirements] Required resolver parity unit test is missing — Acceptance criterion\nThe issue acceptance criteria require a unit test asserting that the resolver used by `pan reopen` matches `resolveProjectFromIssue` for both PAN and MIN prefixes. The manifest contains only `src/cli/commands/reopen.ts` changes and no test file changes. The requirements reviewer also found that existing `tests/lib/tracker-utils.test.ts:25-112` coverage does not assert parity with `resolveProjectFromIssue` for PAN and MIN. This leaves the stated regression guard absent, so future drift can reintroduce GitHub-to-Linear misrouting without a test failure.\n\n## Non-blocking Findings\n\n### [security] Sanitize untrusted issue text before terminal rendering — `src/cli/commands/reopen.ts:297`\nThe new GitHub path prints remote issue title/body text directly to the operator terminal. This matches the existing Linear behavior but extends low-risk terminal-control exposure to GitHub issue authors. Apply any sanitizer consistently to both tracker display paths if addressed.\n\n### [correctness] Final next-step output is not awaited — `src/cli/commands/reopen.ts:357`\nThe extracted async `printNextSteps(id)` helper is called without `await` in both reopen paths. The reopen operation and workspace reset still complete, but the final guidance can race with command completion and may be omitted.\n\n## Clean Sub-roles\n- performance: no findings.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1104/.pan/review/agent-pan-1104-review-9601c00a/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1104 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 3,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-05-12T21:35:59Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-1104 (attempt 1/10):\n\nFailed check: sync-target-branch\n\nSync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\tinfra/.devcontainer-template/docker-compose.devcontainer.yml.template\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n\n\n## REQUIRED: Fix the sync failure BEFORE resubmitting\n\n1. Run: `git fetch origin main`\n2. Run: `git merge origin/main`\n3. If git reports conflicts, resolve them and verify the merge succeeds cleanly\n4. Run the project's build and tests to verify nothing broke\n5. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-1104 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
-    }
-  ],
+  "feedback": [],
   "sessionHistory": [
     {
       "reason": "feedback",
@@ -61,6 +39,11 @@
       "reason": "feedback",
       "note": "[2026-05-12T21:35Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-05-12T21:35:59.577Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-12T21:43Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-05-12T21:43:21.673Z"
     }
   ]
 }

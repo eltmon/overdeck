@@ -28,7 +28,7 @@ export async function doneCommand(
   issueId: string,
   options: DoneOptions
 ): Promise<void> {
-  const validSpecialists = ['review', 'test', 'merge', 'inspect', 'uat'];
+  const validSpecialists = ['review', 'test', 'merge', 'inspect', 'uat', 'ship'];
 
   if (!validSpecialists.includes(specialist)) {
     console.error(chalk.red(`Invalid specialist: ${specialist}`));
@@ -114,6 +114,16 @@ export async function doneCommand(
       } else {
         console.log(chalk.yellow(`✗ UAT blocked for ${normalizedIssueId}`));
         console.log(chalk.dim('  Agent must fix issues — visual/functional verification failed'));
+      }
+      break;
+
+    case 'ship':
+      if (options.status === 'passed') {
+        update.readyForMerge = true;
+        console.log(chalk.green(`✓ Ship completed for ${normalizedIssueId}`));
+        console.log(chalk.dim('  Ready for merge'));
+      } else {
+        console.log(chalk.yellow(`✗ Ship failed for ${normalizedIssueId}`));
       }
       break;
   }
