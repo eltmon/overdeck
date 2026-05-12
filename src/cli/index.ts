@@ -373,9 +373,9 @@ program
 
 program
   .command('reopen <id>')
-  .description('Re-open issue for rework (resets specialist state)')
+  .description('Re-enter the pipeline for a closed/completed/cancelled issue (resets specialist state). For issues already in progress, use `pan review restart`.')
   .option('--reason <reason>', 'Reason for reopening')
-  .option('--force', 'Skip confirmation prompt')
+  .option('--force', 'Skip the in-progress guard and confirmation prompt')
   .action(reopenCommand);
 
 program

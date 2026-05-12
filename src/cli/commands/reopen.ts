@@ -229,6 +229,35 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
       return;
     }
 
+    // Guard: if the issue is already in an in-progress / open state, `pan reopen`
+    // is almost never the right verb. The user probably wants `pan review restart`
+    // (or `pan review reset`) — both leave the workspace, branch, and PR untouched
+    // and only re-trigger the specialist pipeline. `pan reopen` is meant for issues
+    // that have been closed/completed/cancelled and need to re-enter the pipeline.
+    const stateLower = issue.state.toLowerCase();
+    const inProgressLike =
+      stateLower === 'in progress' ||
+      stateLower === 'in review' ||
+      stateLower === 'todo' ||
+      stateLower === 'backlog' ||
+      stateLower === 'open' ||
+      stateLower.startsWith('in '); // catches "In Test", "In Verification", etc.
+
+    if (inProgressLike && !options.force) {
+      console.log(chalk.yellow(`Heads up: ${issue.identifier} is already in state "${issue.state}".`));
+      console.log('');
+      console.log(`\`pan reopen\` is for re-entering the pipeline after an issue was`);
+      console.log(`closed/completed/cancelled. For an issue that is already open, you`);
+      console.log(`probably want one of:`);
+      console.log('');
+      console.log(`  ${chalk.cyan(`pan review restart ${issue.identifier}`)}   kill stuck reviewers and dispatch a fresh review`);
+      console.log(`  ${chalk.cyan(`pan review reset   ${issue.identifier}`)}   reset review/test/merge cycles (human override)`);
+      console.log(`  ${chalk.cyan(`pan review abort   ${issue.identifier}`)}   kill running reviewers, leave the worker idle`);
+      console.log('');
+      console.log(`If you really want to reset specialist state via reopen anyway, re-run with ${chalk.bold('--force')}.`);
+      return;
+    }
+
     // Confirm reopen
     if (!options.force) {
       const confirm = await inquirer.prompt([
