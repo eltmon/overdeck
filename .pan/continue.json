@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1053",
   "created": "2026-05-09T16:09:08.344Z",
-  "updated": "2026-05-12T18:36:08.408887Z",
+  "updated": "2026-05-12T18:39:33.954862Z",
   "gitState": {
     "branch": "feature/pan-1053",
-    "sha": "08f6c5cfc",
+    "sha": "244149051",
     "dirty": true
   },
   "decisions": [
@@ -83,13 +83,10 @@
     }
   ],
   "resumePoint": {
-    "description": "Addressed inspection block for workspace-jtej by wiring AutoPresoView to useAutoPresoWebSocket plus real AutoPresoControls and TranscriptPanel files; reinspection required after commit.",
+    "description": "Fixed workspace-jtej live Excalidraw scene synchronization and reran requested npx tsc --noEmit && npx eslint . --max-warnings=0; reinspection required after commit.",
     "beadId": "workspace-jtej",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/autopreso/AutoPresoView.tsx",
-      "src/dashboard/frontend/src/hooks/useAutoPresoWebSocket.ts",
-      "src/dashboard/frontend/src/components/autopreso/AutoPresoControls.tsx",
-      "src/dashboard/frontend/src/components/autopreso/TranscriptPanel.tsx"
+      "src/dashboard/frontend/src/components/autopreso/AutoPresoView.tsx"
     ]
   },
   "beadsMapping": {},
@@ -135,6 +132,12 @@
       "timestamp": "2026-05-12T18:36:08.408887Z",
       "reason": "inspection-fix",
       "note": "Fixed workspace-jtej inspection block: AutoPresoView now consumes useAutoPresoWebSocket for server-controlled elements/mode/warmup/transcript/listening state, live mode ignores local canvas changes, Go Live/Back/Reset call AutoPreso HTTP routes, and sidebar renders real AutoPresoControls and TranscriptPanel components. Frontend build passes.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-12T18:39:33.954862Z",
+      "reason": "inspection-fix",
+      "note": "Fixed workspace-jtej reinspection blocker: AutoPresoView now calls excalidrawAPI.updateScene({ elements: serverElements }) whenever live-mode serverElements change, while staging edits remain local to staging mode. Requested tsc and eslint checks passed.",
       "agentModel": "gpt-5.5"
     }
   ],

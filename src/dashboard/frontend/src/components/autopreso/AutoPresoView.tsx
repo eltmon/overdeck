@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AutoPresoControls } from './AutoPresoControls';
 import { TranscriptPanel } from './TranscriptPanel';
 import { useAutoPresoWebSocket, type ExcalidrawElementLike } from '../../hooks/useAutoPresoWebSocket';
@@ -60,6 +60,12 @@ export function AutoPresoView() {
   const handleApi = useCallback((api: ExcalidrawApiLike) => {
     excalidrawApiRef.current = api;
   }, []);
+
+  useEffect(() => {
+    if (mode === 'live') {
+      excalidrawApiRef.current?.updateScene?.({ elements: serverElements });
+    }
+  }, [mode, serverElements]);
 
   return (
     <div className="flex h-full w-full gap-4 overflow-hidden bg-background p-4 text-foreground">
