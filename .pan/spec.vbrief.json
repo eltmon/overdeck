@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T20:35:46.319118Z"
+    "updated": "2026-05-12T20:46:21.848573Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a4f2c8d1-7b3e-4a90-b5f6-2e1d9c0a8374",
     "author": "agent:claude-opus-4-7",
-    "sequence": 9,
+    "sequence": 10,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T20:35:46.319118Z",
+    "updated": "2026-05-12T20:46:21.848573Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -597,7 +597,7 @@
       {
         "id": "autopreso-deps",
         "title": "Add @excalidraw/excalidraw, ai, @ai-sdk/openai, and @google-cloud/speech packages",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -612,7 +612,7 @@
           {
             "id": "autopreso-deps.ac1",
             "title": "@excalidraw/excalidraw in frontend package.json dependencies",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -620,7 +620,7 @@
           {
             "id": "autopreso-deps.ac2",
             "title": "ai, @ai-sdk/openai, @google-cloud/speech in root package.json dependencies",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -628,7 +628,7 @@
           {
             "id": "autopreso-deps.ac3",
             "title": "bun install completes without errors after changes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -638,7 +638,7 @@
       {
         "id": "whiteboard-elements-ts",
         "title": "Implement src/autopreso/whiteboard-elements.ts — Excalidraw element normalization",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -653,7 +653,7 @@
           {
             "id": "whiteboard-elements-ts.ac1",
             "title": "normalizeElements() fills missing required Excalidraw element fields with defaults",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -661,7 +661,7 @@
           {
             "id": "whiteboard-elements-ts.ac2",
             "title": "Warning logged for elements with x/y outside visible canvas range",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -671,7 +671,7 @@
       {
         "id": "whiteboard-tools-ts",
         "title": "Implement src/autopreso/whiteboard-tools.ts — line-numbered ops schema and apply",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -686,7 +686,7 @@
           {
             "id": "whiteboard-tools-ts.ac1",
             "title": "formatLineNumberedWhiteboard() returns numbered lines: '1: rectangle text=\"Box A\" at (100,200)'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -694,7 +694,7 @@
           {
             "id": "whiteboard-tools-ts.ac2",
             "title": "applyWhiteboardEditOperations() supports replace, insert_after, delete ops by line number",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -702,7 +702,7 @@
           {
             "id": "whiteboard-tools-ts.ac3",
             "title": "Op type exported: { action: 'replace'|'insert_after'|'delete', lineNumber: number, element?: ExcalidrawElement }",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -710,7 +710,7 @@
           {
             "id": "whiteboard-tools-ts.ac4",
             "title": "Unit tests cover replace, insert_after, delete on a 3-element canvas",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -720,7 +720,7 @@
       {
         "id": "whiteboard-keywords-ts",
         "title": "Implement src/autopreso/whiteboard-keywords.ts — keyword extraction",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -735,7 +735,7 @@
           {
             "id": "whiteboard-keywords-ts.ac1",
             "title": "extractKeywords() returns text strings from text elements and bound text on shapes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -794,7 +794,7 @@
       {
         "id": "autopreso-agent-ts",
         "title": "Implement src/autopreso/agent.ts — runWhiteboardAgent() with AI SDK tool calls",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -809,7 +809,7 @@
           {
             "id": "autopreso-agent-ts.ac1",
             "title": "runWhiteboardAgent() calls generateText() with whiteboard_apply and whiteboard_overwrite tools",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -817,7 +817,7 @@
           {
             "id": "autopreso-agent-ts.ac2",
             "title": "Provider selection: openai/codex/ollama from settings.autopreso.provider",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -825,7 +825,7 @@
           {
             "id": "autopreso-agent-ts.ac3",
             "title": "Codex reads ~/.codex/auth.json for bearer token",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -833,7 +833,7 @@
           {
             "id": "autopreso-agent-ts.ac4",
             "title": "whiteboard_apply tool applies ops and updates session.elements",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -841,7 +841,7 @@
           {
             "id": "autopreso-agent-ts.ac5",
             "title": "runWhiteboardWarmupOnce() exported for session.ts warmup loop",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

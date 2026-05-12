@@ -83,12 +83,14 @@
     }
   ],
   "resumePoint": {
-    "description": "Fixed AutoPreso session inspection blocker for workspace-sfkn; re-request inspection after committing.",
-    "beadId": "workspace-sfkn",
+    "description": "Completed remaining AutoPreso agent/tooling/dependency beads; continue by refreshing graphify, running full gates, committing, closing beads, and re-requesting inspection.",
+    "beadId": "workspace-edw7",
     "filesToRead": [
-      "src/autopreso/session.ts",
       "src/autopreso/agent.ts",
-      "tests/lib/autopreso-session.test.ts",
+      "src/autopreso/whiteboard-elements.ts",
+      "src/autopreso/whiteboard-tools.ts",
+      "src/autopreso/whiteboard-keywords.ts",
+      "tests/lib/whiteboard-tools.test.ts",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -196,8 +198,14 @@
       "reason": "inspection-fix",
       "note": "Replaced AutoPreso session placeholder with createWhiteboardSession(), direct state fields, async warmup loop with 8 attempts and capped exponential backoff, agentHistory UNDERSTOOD prefix, and canvasDirtyForAgent handling. Added focused fake-timer tests. ESLint, focused vitest, and typecheck passed.",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-12T20:46:21.848573Z",
+      "reason": "bead-complete",
+      "note": "Implemented remaining AutoPreso dependencies and whiteboard agent/tooling: ai and @ai-sdk/openai packages, element normalization, keyword extraction, line-numbered edit operations, and runWhiteboardAgent()/runWhiteboardWarmupOnce() using AI SDK generateText with OpenAI/Codex/Ollama provider selection. Focused vitest and typecheck passed.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": [],
-  "updatedAt": "2026-05-12T20:35:46.319118Z"
+  "updatedAt": "2026-05-12T20:46:21.848573Z"
 }

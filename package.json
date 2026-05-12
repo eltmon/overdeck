@@ -100,6 +100,7 @@
     "moonshine-linux-x64": "workspace:*"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.63",
     "@effect/platform-bun": "4.0.0-beta.45",
     "@effect/platform-node": "4.0.0-beta.45",
     "@effect/platform-node-shared": "4.0.0-beta.45",
@@ -111,6 +112,7 @@
     "@octokit/rest": "^22.0.1",
     "@types/mustache": "^4.2.6",
     "@types/ws": "^8.18.1",
+    "ai": "^6.0.180",
     "better-sqlite3": "^12.6.2",
     "chalk": "^5.6.2",
     "commander": "^12.1.0",

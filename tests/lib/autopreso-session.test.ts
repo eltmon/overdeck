@@ -10,7 +10,7 @@ describe('createWhiteboardSession', () => {
     const snapshot = session.start([{ id: 'one', text: 'Draw launch plan' }]);
     expect(snapshot.mode).toBe('live');
     expect(session.mode).toBe('live');
-    expect(session.elements).toEqual([{ id: 'one', text: 'Draw launch plan' }]);
+    expect(session.elements[0]).toMatchObject({ id: 'one', text: 'Draw launch plan' });
     expect(session.canvasDirtyForAgent).toBe(true);
 
     await vi.waitFor(() => expect(session.warmupStatus).toBe('ready'));

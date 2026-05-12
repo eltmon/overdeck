@@ -1,14 +1,16 @@
 import { runWhiteboardWarmupOnce } from './agent.js';
+import { normalizeElements, type ExcalidrawElement } from './whiteboard-elements.js';
+import { extractKeywordsFromElements } from './whiteboard-keywords.js';
 
 export type AutoPresoMode = 'staging' | 'live';
 export type WarmupStatus = 'idle' | 'warming' | 'ready' | 'failed';
-export type ExcalidrawElementLike = Record<string, unknown>;
+export type ExcalidrawElementLike = Partial<ExcalidrawElement>;
 export type AutoPresoAgentMessage = { role: 'user' | 'assistant'; content: string };
 
 interface AutoPresoSnapshot {
   mode: AutoPresoMode;
   warmupStatus: WarmupStatus;
-  elements: readonly ExcalidrawElementLike[];
+  elements: readonly ExcalidrawElement[];
   agentHistory: readonly AutoPresoAgentMessage[];
   canvasDirtyForAgent: boolean;
 }
@@ -18,7 +20,7 @@ type AutoPresoListener = (snapshot: AutoPresoSnapshot) => void;
 export interface AutoPresoSession {
   mode: AutoPresoMode;
   warmupStatus: WarmupStatus;
-  elements: readonly ExcalidrawElementLike[];
+  elements: ExcalidrawElement[];
   agentHistory: AutoPresoAgentMessage[];
   canvasDirtyForAgent: boolean;
   snapshot(): AutoPresoSnapshot;
@@ -36,24 +38,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function extractKeywords(elements: readonly ExcalidrawElementLike[]): string[] {
-  const words = new Set<string>();
-  for (const element of elements) {
-    for (const value of Object.values(element)) {
-      if (typeof value !== 'string') continue;
-      for (const word of value.toLowerCase().match(/[a-z0-9][a-z0-9-]{2,}/g) ?? []) {
-        words.add(word);
-      }
-    }
-  }
-  return [...words].slice(0, 20);
-}
-
 function createWarmupUserMessage(elements: readonly ExcalidrawElementLike[]): AutoPresoAgentMessage {
-  const keywords = extractKeywords(elements);
+  const normalizedElements = normalizeElements(elements);
+  const keywords = extractKeywordsFromElements(normalizedElements);
   return {
     role: 'user',
-    content: JSON.stringify({ type: 'warmup', keywords, elements }),
+    content: JSON.stringify({ type: 'warmup', keywords, elements: normalizedElements }),
   };
 }
 
@@ -81,7 +71,7 @@ export function createWhiteboardSession(): AutoPresoSession {
       const warmupUserMessage = createWarmupUserMessage(nextElements);
       session.mode = 'live';
       session.warmupStatus = 'warming';
-      session.elements = nextElements;
+      session.elements = normalizeElements(nextElements);
       session.agentHistory = [];
       session.canvasDirtyForAgent = true;
       const current = notify();
