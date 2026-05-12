@@ -1,0 +1,714 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-12T03:15:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-608: Integrate Destructive Command Guard (dcg) with configurable settings",
+    "updated": "2026-05-12T03:07:12.521Z"
+  },
+  "plan": {
+    "id": "pan-608",
+    "title": "Integrate Destructive Command Guard (dcg) with configurable settings",
+    "status": "proposed",
+    "uid": "84b7ce0a-7d94-4991-bdac-2a7578c4dc22",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-12T03:15:00.000Z",
+    "updated": "2026-05-12T03:07:12.521Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/608",
+        "label": "PAN-608",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/Dicklesworthstone/destructive_command_guard",
+        "label": "dcg upstream",
+        "type": "external"
+      }
+    ],
+    "tags": [
+      "safety",
+      "agent-runtime",
+      "config",
+      "dashboard-settings",
+      "claude-code-hooks"
+    ],
+    "narratives": {
+      "Problem": "Panopticon agents run under bypassPermissions; Claude Code's prompt-based guardrails are the only protection against destructive commands. Soft rules in CLAUDE.md are advisory. We need a hard, opt-in safety layer that can block `rm -rf /`, `git reset --hard`, `DROP TABLE`, etc. before the command reaches the shell — without making the system fail-closed in a way that breaks legitimate agent work.",
+      "Proposal": "Integrate dcg (Destructive Command Guard) as an opt-in PreToolUse hook layer for Claude Code agents. Configuration lives under `safety.dcg` in ~/.panopticon/config.yaml with the same normalization+UI pattern as the existing `experimental` flags. Per-role trust profiles (plan/work/review/test/ship) bind to the existing role taxonomy. Blocked commands emit `CommandBlocked` domain events that flow through the existing event store into the dashboard timeline. dcg is fail-open: a guard crash never deadlocks an agent, but it does emit a `CommandGuardError` so the regression is visible. Default-disabled; opt-in via Settings."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use dcg, not ThumbGate.",
+        "rationale": "Issue title and body explicitly scope dcg. Igor's ThumbGate comment is informational — we adopt the config-surface lessons (severity escalation, false-positive recovery) without taking on a second runtime dependency."
+      },
+      {
+        "summary": "Default `safety.dcg.enabled = false`.",
+        "rationale": "First-introduction features that touch every Bash invocation must be opt-in. Existing agents must observe zero behavior change until a user flips the toggle."
+      },
+      {
+        "summary": "Wire dcg as a Claude Code PreToolUse hook, not a shell wrapper.",
+        "rationale": "`.claude/hooks/` is the documented Claude Code extension point and is the layer the existing `claude-settings-overlay.ts:52` comment already names as the proper future guard. Shell-wrapper approaches don't survive Claude Code's tool execution model."
+      },
+      {
+        "summary": "Strip `DCG_BYPASS` from agent env at spawn.",
+        "rationale": "Defense in depth. The hook is enforced by the parent Claude Code process, not the child shell, but removing the env var closes the obvious workaround surface."
+      },
+      {
+        "summary": "Fail-open on dcg crash/timeout.",
+        "rationale": "An agent permanently deadlocked because a Rust binary segfaulted is worse than a missed block. The existing `permissionMode: 'auto'` classifier remains as backstop; `CommandGuardError` events make the regression visible."
+      },
+      {
+        "summary": "Per-role trust profiles: plan/review/test/ship = high (paranoid), work = medium.",
+        "rationale": "Non-implementation roles have no business issuing destructive commands; raise their guard. Work agents do need some destructive ops (rm, git clean inside the worktree), so we run the default packs without paranoid."
+      },
+      {
+        "summary": "Default packs: filesystem, git, postgresql, sqlite, docker, secrets. Cloud/k8s/terraform off by default.",
+        "rationale": "Cloud and IaC packs would block intentional commands (e.g. `terraform destroy` in a sandbox) more often than they'd catch a mistake. Easy to opt in; hard to debug 'why is my terraform command blocked'."
+      },
+      {
+        "summary": "No auto-install of the dcg binary.",
+        "rationale": "Downloading a binary from GitHub releases over the network during agent spawn is a footgun. `pan doctor` and the Settings UI show install status with a copy-pasteable command. Auto-install can be a future issue with proper signature verification."
+      },
+      {
+        "summary": "MVP is Claude Code harness only.",
+        "rationale": "Other harnesses (pi/codex) don't use `.claude/hooks/`. A unified safety story needs a different (shell-wrapper) mechanism for them; that's a follow-up. For now, non-Claude-Code spawns log `CommandGuardSkipped` so the gap is visible in the dashboard."
+      },
+      {
+        "summary": "Always-on allow rule for `~/.claude/projects/**`.",
+        "rationale": "JSONL session files are sacred per CLAUDE.md. dcg must NEVER block a write/read here, regardless of which packs the user enables. Snapshot-tested."
+      }
+    ],
+    "items": [
+      {
+        "id": "config-schema",
+        "title": "Add `safety.dcg` schema to config-yaml.ts with defaults",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T03:15:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-608",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "Extend PanopticonConfig in src/lib/config-yaml.ts with a `safety.dcg` block. Fields: enabled (bool, default false), installPath (string, optional, default `~/.local/bin/dcg`), packs (string[], default ['core.filesystem','core.git','database.postgresql','database.sqlite','containers.docker','secrets']), agentProfiles (record of role-name → {trustLevel: 'low'|'medium'|'high', disabledPacks?: string[], extraPacks?: string[]}), allowlist (string[], default empty). Mirror the existing `experimental` block's pattern: an interface, a normalized interface with concrete defaults, normalization in loadConfig(), defaults in DEFAULT_CONFIG. Export a `getDcgConfig()` helper analogous to `isClaudeCodeChannelsEnabled()`."
+        },
+        "subItems": [
+          {
+            "id": "config-schema.ac1",
+            "title": "PanopticonConfig.safety.dcg interface exists with all five fields and JSDoc comments matching the issue body's spec",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac2",
+            "title": "NormalizedDcgConfig defines concrete defaults (enabled=false, packs=[6 listed], agentProfiles has plan/review/test/ship=high, work=medium)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac3",
+            "title": "loadConfig() correctly merges user config over defaults; unit tests cover (a) empty config, (b) partial override of packs, (c) partial override of one agent profile",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac4",
+            "title": "Allow rule for `~/.claude/projects/**` is materialized into the normalized config's effective allowlist regardless of user input (snapshot test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-schema.ac5",
+            "title": "`npm run typecheck` and `npm run lint` pass; new test file under src/lib/__tests__/ runs green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "event-schema",
+        "title": "Add CommandBlocked / CommandGuardError / CommandGuardSkipped events to @panctl/contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T03:15:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-608",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "Define three new domain event types in packages/contracts/. CommandBlocked: { agentId, role, command, matchedPack, matchedRule, reason, timestamp }. CommandGuardError: { agentId, role, command, errorMessage, fallthrough: true, timestamp }. CommandGuardSkipped: { agentId, role, harness, reason, timestamp }. Wire into the Effect Schema-based event union the read-model already consumes. No emission yet — that's separate beads."
+        },
+        "subItems": [
+          {
+            "id": "event-schema.ac1",
+            "title": "Three new event types defined as Effect Schema in packages/contracts and exported from the events union",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-schema.ac2",
+            "title": "Read model handlers in src/dashboard/server/services/ ignore the new event types without crashing (default-case extensibility)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-schema.ac3",
+            "title": "Round-trip serialization test covers all three events (server → WS → frontend store)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "event-schema.ac4",
+            "title": "`cd packages/contracts && npm run build` succeeds; root typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dcg-config-generator",
+        "title": "Add per-agent dcg config.toml generator with role-trust merging",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T03:15:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-608",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "New module src/lib/safety/dcg-config.ts. Pure function generateDcgConfig({ globalConfig, role, allowlist, alwaysAllow }) → string (TOML). Merges global packs + agentProfile.extraPacks − agentProfile.disabledPacks; concatenates global allowlist + alwaysAllow; sets trust level. No filesystem I/O in this bead — generator only."
+        },
+        "subItems": [
+          {
+            "id": "dcg-config-generator.ac1",
+            "title": "generateDcgConfig produces deterministic TOML output (snapshot tests for: work-role default, plan-role high-trust, work with custom disabledPacks)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-config-generator.ac2",
+            "title": "`~/.claude/projects/**` allow rule is always present in output regardless of inputs (dedicated test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-config-generator.ac3",
+            "title": "TOML output is parseable by a standard TOML parser (test parses the snapshot and asserts shape)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dcg-binary-detect",
+        "title": "Add dcg binary detection to pan doctor and a status RPC for the dashboard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T03:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-608",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "New helper checkDcgBinary(configuredPath?) → { installed: boolean, path?: string, version?: string }. Used by (a) `pan doctor` (prints status + install instructions when missing), (b) a new GET /api/safety/dcg/status route consumed by the Settings page. Use existing `execAsync` from src/lib/exec.ts — NO execSync. When safety.dcg.enabled=true but binary missing, doctor prints a clear remediation; agent spawn proceeds anyway (fail-open) but emits CommandGuardError."
+        },
+        "subItems": [
+          {
+            "id": "dcg-binary-detect.ac1",
+            "title": "checkDcgBinary returns installed:true when binary exists at configured path or in $PATH; returns installed:false with hint otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-binary-detect.ac2",
+            "title": "`pan doctor` output includes a 'dcg' line when safety.dcg.enabled=true; line is omitted when disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-binary-detect.ac3",
+            "title": "GET /api/safety/dcg/status returns 200 with the status object; uses async fs, no execSync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dcg-hook-install",
+        "title": "Install dcg as a Claude Code PreToolUse hook at agent spawn (work role only)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T03:15:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-608",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "Extend spawnAgent() in src/lib/agents.ts (and equivalent role-spawn sites for plan/review/test/ship) so that when safety.dcg.enabled=true and harness=claude-code: (1) write generated TOML to <workspace>/.claude/dcg/config.toml, (2) write a stable-named hook script .claude/hooks/dcg-pretool.sh that invokes dcg with that config, (3) merge the hook into .claude/settings.local.json's `hooks.PreToolUse` block idempotently (same merge pattern as injectPanopticonInfraDeny), (4) for non-Claude-Code harnesses or when disabled, do nothing. End-to-end smoke test: spawn a Claude Code session under bypassPermissions, attempt `rm -rf /tmp/dcg-test-sentinel`, assert dcg blocks AND a CommandBlocked event is emitted. If the smoke test reveals hooks don't run under bypassPermissions, STOP and escalate — do not silently ship a no-op."
+        },
+        "subItems": [
+          {
+            "id": "dcg-hook-install.ac1",
+            "title": "On spawn with safety.dcg.enabled=true + Claude Code harness, .claude/dcg/config.toml exists and matches the role-appropriate generator output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-hook-install.ac2",
+            "title": ".claude/hooks/dcg-pretool.sh exists, is executable (0o755), and invokes the configured dcg binary with the workspace config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-hook-install.ac3",
+            "title": ".claude/settings.local.json hooks.PreToolUse contains a dcg entry; existing permissions.deny, hooks (channels confirmation), and env blocks are preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-hook-install.ac4",
+            "title": "End-to-end smoke test passes: bypassPermissions Claude session + `rm -rf /tmp/dcg-test-sentinel` is blocked and emits CommandBlocked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-hook-install.ac5",
+            "title": "When safety.dcg.enabled=false OR harness != claude-code, none of the above files are written; on non-Claude-Code spawn with enabled=true, a CommandGuardSkipped event is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-hook-install.ac6",
+            "title": "Re-running spawn (workspace already has the files) is idempotent — files match generator output, no orphaned merge artifacts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dcg-env-strip",
+        "title": "Strip DCG_BYPASS (and family) from agent env at spawn",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T03:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-608",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add DCG_BYPASS, DCG_DISABLE, and any documented dcg bypass env vars to the explicit `unset` list in the agent launcher script (the same place we already unset ANTHROPIC_API_KEY leaks for non-Anthropic providers). Source-of-truth list in src/lib/child-env.ts."
+        },
+        "subItems": [
+          {
+            "id": "dcg-env-strip.ac1",
+            "title": "child-env.ts exports DCG_BYPASS_ENV_KEYS array enumerating the bypass env vars",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-env-strip.ac2",
+            "title": "Generated launcher script contains `unset` statements for all DCG_BYPASS_ENV_KEYS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-env-strip.ac3",
+            "title": "Test asserts the launcher script string contains the unset lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dcg-event-emit",
+        "title": "Emit CommandBlocked / CommandGuardError events from the PreToolUse hook script",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T03:15:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-608",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "The hook script (.claude/hooks/dcg-pretool.sh) wraps dcg invocation: on dcg exit-code=block, POST a CommandBlocked event to the dashboard's internal event ingest endpoint (using the existing internal-token auth in src/lib/internal-token.ts). On dcg crash/timeout, POST CommandGuardError and exit 0 (fail-open). The agentId is in env (PANOPTICON_AGENT_ID, already exported by the launcher)."
+        },
+        "subItems": [
+          {
+            "id": "dcg-event-emit.ac1",
+            "title": "Hook script POSTs CommandBlocked with the correct payload shape when dcg blocks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-event-emit.ac2",
+            "title": "Hook script POSTs CommandGuardError and exits 0 when dcg crashes or times out (fail-open)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-event-emit.ac3",
+            "title": "Internal-token auth is used; an unauthenticated POST is rejected by the route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-event-emit.ac4",
+            "title": "Read model records events; subscribeDomainEvents stream delivers them to a connected client",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-timeline",
+        "title": "Render CommandBlocked / CommandGuardError in ActivityPanel with warning styling",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T03:15:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-608",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend src/dashboard/frontend/src/components/ActivityPanel.tsx (and the reducer in @panctl/contracts) so CommandBlocked events render with a yellow/orange warning row showing command, matched pack/rule, and a 'why' tooltip. CommandGuardError renders with a red/error row (the guard itself broke). CommandGuardSkipped is muted/info-only."
+        },
+        "subItems": [
+          {
+            "id": "dashboard-timeline.ac1",
+            "title": "CommandBlocked rows render with warning styling, command text truncated to 80 chars with full text on hover",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-timeline.ac2",
+            "title": "CommandGuardError rows render with error styling and surface the underlying error message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-timeline.ac3",
+            "title": "ActivityPanel test in src/dashboard/frontend/src/components/__tests__/ asserts both event types render correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-ui",
+        "title": "Add Safety section to Settings page with master toggle, packs, per-role profiles, allowlist",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T03:15:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-608",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a new SafetyPanel.tsx under src/dashboard/frontend/src/components/Settings/. Sections: (1) Master toggle (binds to safety.dcg.enabled), (2) Binary status (consumes /api/safety/dcg/status from dcg-binary-detect), (3) Packs (multi-select against the 49 dcg packs — checklist UI, defaults pre-selected per D7), (4) Per-role trust profiles (plan/work/review/test/ship rows with trustLevel dropdowns), (5) Allowlist (string list editor), (6) 'Test command' input that POSTs to /api/safety/dcg/explain and shows whether the command would be blocked. Wire through the existing settings save flow."
+        },
+        "subItems": [
+          {
+            "id": "settings-ui.ac1",
+            "title": "Safety section appears in Settings page; master toggle controls visibility of sub-sections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac2",
+            "title": "Pack checklist shows all 49 packs in groups (filesystem, git, databases, containers, cloud, IaC, CI/CD, secrets); default-on packs are pre-checked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac3",
+            "title": "Per-role trust profiles render five rows (plan/work/review/test/ship) with low/medium/high dropdown; defaults match D6",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac4",
+            "title": "Allowlist editor supports add/remove of string entries; entries persist on save",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac5",
+            "title": "'Test command' input shows blocked/allowed result with the matched rule when blocked; uses dcg explain under the hood",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac6",
+            "title": "Save flow writes the new fields to ~/.panopticon/config.yaml without disturbing other config blocks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dcg-perf-bench",
+        "title": "Benchmark dcg overhead and document baseline in docs/SAFETY-DCG.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-12T03:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-608",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a one-shot benchmark script under scripts/bench-dcg.ts that invokes dcg's check API 1000 times against a representative command corpus (mix of safe and blocked commands taken from agent transcripts). Reports p50/p95/p99. Document the result in a new docs/SAFETY-DCG.md alongside install instructions, architecture, and how to debug a false positive."
+        },
+        "subItems": [
+          {
+            "id": "dcg-perf-bench.ac1",
+            "title": "scripts/bench-dcg.ts runs end-to-end and prints p50/p95/p99 numbers when dcg is installed; gracefully skips when not installed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-perf-bench.ac2",
+            "title": "docs/SAFETY-DCG.md exists with sections: Overview, Install, Config reference, Architecture, Performance baseline, Troubleshooting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dcg-perf-bench.ac3",
+            "title": "Performance baseline section shows recorded numbers; p95 < 5ms and p99 < 20ms are documented as the regression gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-update",
+        "title": "Update pan-admin-config / pan-doctor skills and CLAUDE.md to reference dcg",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-12T03:15:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-608",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a short subsection to CLAUDE.md ('## Destructive Command Guard') pointing at docs/SAFETY-DCG.md and noting the default-off posture. Update skills/pan-admin-config and skills/pan-doctor SKILL.md to mention the safety.dcg config block and the doctor output. Soft-rule file .claude/rules/no-destructive-requests.md gets a one-line cross-reference to the hard layer."
+        },
+        "subItems": [
+          {
+            "id": "skill-update.ac1",
+            "title": "CLAUDE.md has a Destructive Command Guard section that points at docs/SAFETY-DCG.md and states the default-off posture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-update.ac2",
+            "title": "pan-admin-config and pan-doctor SKILL.md mention safety.dcg without drift (lint-skills.sh still passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-update.ac3",
+            "title": ".claude/rules/no-destructive-requests.md notes that dcg is the hard backstop when enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-schema",
+        "to": "dcg-config-generator",
+        "type": "blocks"
+      },
+      {
+        "from": "config-schema",
+        "to": "dcg-binary-detect",
+        "type": "blocks"
+      },
+      {
+        "from": "config-schema",
+        "to": "settings-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "event-schema",
+        "to": "dcg-event-emit",
+        "type": "blocks"
+      },
+      {
+        "from": "event-schema",
+        "to": "dashboard-timeline",
+        "type": "blocks"
+      },
+      {
+        "from": "event-schema",
+        "to": "dcg-hook-install",
+        "type": "blocks"
+      },
+      {
+        "from": "dcg-config-generator",
+        "to": "dcg-hook-install",
+        "type": "blocks"
+      },
+      {
+        "from": "dcg-binary-detect",
+        "to": "dcg-hook-install",
+        "type": "informs"
+      },
+      {
+        "from": "dcg-binary-detect",
+        "to": "settings-ui",
+        "type": "informs"
+      },
+      {
+        "from": "dcg-hook-install",
+        "to": "dcg-event-emit",
+        "type": "blocks"
+      },
+      {
+        "from": "dcg-event-emit",
+        "to": "dashboard-timeline",
+        "type": "blocks"
+      },
+      {
+        "from": "dcg-env-strip",
+        "to": "dcg-hook-install",
+        "type": "informs"
+      },
+      {
+        "from": "dcg-hook-install",
+        "to": "dcg-perf-bench",
+        "type": "informs"
+      },
+      {
+        "from": "dcg-hook-install",
+        "to": "skill-update",
+        "type": "informs"
+      },
+      {
+        "from": "settings-ui",
+        "to": "skill-update",
+        "type": "informs"
+      },
+      {
+        "from": "dcg-perf-bench",
+        "to": "skill-update",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-12-PAN-608-integrate-destructive-command-guard-dcg-with-configurable-settings.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
