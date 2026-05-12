@@ -213,46 +213,23 @@ export function createConversation(opts: {
   const db = getDatabase();
   const now = new Date().toISOString();
 
-  // title_source is NOT NULL but has a DB-side default of 'auto'. Omit from
-  // INSERT column list when not provided so the default applies.
-  let sql: string;
-  let params: unknown[];
-  if (opts.titleSource !== undefined) {
-    sql = `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_source, title_seed, model, effort, fork_status, harness)
-           VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    params = [
-      opts.name,
-      opts.tmuxSession,
-      opts.cwd,
-      opts.issueId ?? null,
-      now,
-      opts.claudeSessionId ?? null,
-      opts.title ?? null,
-      opts.titleSource ?? 'default',
-      opts.titleSeed ?? null,
-      opts.model ?? null,
-      opts.effort ?? null,
-      opts.forkStatus ?? null,
-      opts.harness ?? null,
-    ];
-  } else {
-    sql = `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_seed, model, effort, fork_status, harness)
-           VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-    params = [
-      opts.name,
-      opts.tmuxSession,
-      opts.cwd,
-      opts.issueId ?? null,
-      now,
-      opts.claudeSessionId ?? null,
-      opts.title ?? null,
-      opts.titleSeed ?? null,
-      opts.model ?? null,
-      opts.effort ?? null,
-      opts.forkStatus ?? null,
-      opts.harness ?? null,
-    ];
-  }
+  const sql = `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_source, title_seed, model, effort, fork_status, harness)
+               VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const params = [
+    opts.name,
+    opts.tmuxSession,
+    opts.cwd,
+    opts.issueId ?? null,
+    now,
+    opts.claudeSessionId ?? null,
+    opts.title ?? null,
+    opts.titleSource ?? 'default',
+    opts.titleSeed ?? null,
+    opts.model ?? null,
+    opts.effort ?? null,
+    opts.forkStatus ?? null,
+    opts.harness ?? null,
+  ];
 
   const result = db.prepare(sql).run(...params);
   const conv = db
