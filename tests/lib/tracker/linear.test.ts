@@ -4,7 +4,7 @@ import { TrackerAuthError, IssueNotFoundError } from '../../../src/lib/tracker/i
 
 // Mock the Linear SDK
 vi.mock('@linear/sdk', () => ({
-  LinearClient: vi.fn().mockImplementation(() => ({
+  LinearClient: vi.fn().mockImplementation(function () { return {
     issues: vi.fn(),
     issue: vi.fn(),
     updateIssue: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('@linear/sdk', () => ({
     createAttachment: vi.fn(),
     teams: vi.fn(),
     searchIssues: vi.fn(),
-  })),
+  }; }),
 }));
 
 describe('LinearTracker', () => {

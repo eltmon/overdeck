@@ -46,9 +46,9 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 }));
 
 vi.mock('@linear/sdk', () => ({
-  LinearClient: vi.fn().mockImplementation(() => ({
+  LinearClient: vi.fn().mockImplementation(function () { return {
     issues: vi.fn().mockResolvedValue({ nodes: [] }),
-  })),
+  }; }),
 }));
 
 import { approve, closeOut, deepWipe, close, resetToTodo, __testInternals } from '../../../../src/lib/lifecycle/workflows.js';
@@ -218,9 +218,11 @@ describe('workflows', () => {
     it('should use tracker name in reset issue details when provided', async () => {
       process.env.LINEAR_API_KEY = 'test-key';
       const { LinearClient } = await import('@linear/sdk');
-      vi.mocked(LinearClient).mockImplementation(() => ({
-        issues: vi.fn().mockResolvedValue({ nodes: [] }),
-      }) as any);
+      vi.mocked(LinearClient).mockImplementation(function () {
+        return {
+          issues: vi.fn().mockResolvedValue({ nodes: [] }),
+        } as any;
+      });
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await resetToTodo(ctx, {
         deleteWorkspace: false,

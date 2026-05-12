@@ -4,7 +4,7 @@ import { TrackerAuthError, IssueNotFoundError } from '../../../src/lib/tracker/i
 
 // Mock Octokit
 vi.mock('@octokit/rest', () => ({
-  Octokit: vi.fn().mockImplementation(() => ({
+  Octokit: vi.fn().mockImplementation(function () { return {
     issues: {
       listForRepo: vi.fn(),
       get: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('@octokit/rest', () => ({
       listComments: vi.fn(),
       createComment: vi.fn(),
     },
-  })),
+  }; }),
 }));
 
 describe('GitHubTracker', () => {

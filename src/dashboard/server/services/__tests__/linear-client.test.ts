@@ -15,7 +15,7 @@ const mockSdkCreateIssueLabel = vi.fn();
 // ─── Mock @linear/sdk ─────────────────────────────────────────────────────────
 
 vi.mock('@linear/sdk', () => ({
-  LinearClient: vi.fn().mockImplementation(() => ({
+  LinearClient: vi.fn().mockImplementation(function () { return {
     issue: mockSdkIssue,
     searchIssues: mockSdkSearchIssues,
     team: mockSdkTeam,
@@ -23,7 +23,7 @@ vi.mock('@linear/sdk', () => ({
     createComment: mockSdkCreateComment,
     issueLabels: mockSdkIssueLabels,
     createIssueLabel: mockSdkCreateIssueLabel,
-  })),
+  }; }),
 }));
 
 // ─── Mock tracker-config ──────────────────────────────────────────────────────

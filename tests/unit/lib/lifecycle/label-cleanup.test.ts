@@ -33,11 +33,11 @@ const mockClientIssueLabels = vi.fn();
 const mockClientCreateIssueLabel = vi.fn();
 
 vi.mock('@linear/sdk', () => ({
-  LinearClient: vi.fn().mockImplementation(() => ({
+  LinearClient: vi.fn().mockImplementation(function () { return {
     issues: mockClientIssues,
     issueLabels: mockClientIssueLabels,
     createIssueLabel: mockClientCreateIssueLabel,
-  })),
+  }; }),
 }));
 
 import { cleanupMergedLabels } from '../../../../src/lib/lifecycle/label-cleanup.js';

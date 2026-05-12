@@ -22,7 +22,7 @@ vi.mock('execa', () => ({
 
 // Mock Linear API
 vi.mock('@linear/sdk', () => ({
-  LinearClient: vi.fn().mockImplementation(() => ({
+  LinearClient: vi.fn().mockImplementation(function () { return {
     issue: vi.fn().mockResolvedValue({
       id: 'issue-123',
       identifier: 'TEST-42',
@@ -32,7 +32,7 @@ vi.mock('@linear/sdk', () => ({
       state: Promise.resolve({ name: 'Todo' }),
     }),
     issueUpdate: vi.fn().mockResolvedValue({ success: true }),
-  })),
+  }; }),
 }));
 
 describe('E2E: Work Flow', () => {

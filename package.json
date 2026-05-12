@@ -127,7 +127,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.10.0",
     "@typescript-eslint/parser": "6.21.0",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "^4.1.6",
     "effect": "catalog:",
     "eslint": "^8.55.0",
     "husky": "^9.1.7",
@@ -136,6 +136,6 @@
     "tsx": "^4.6.2",
     "typedoc": "^0.25.0",
     "typescript": "^5.3.2",
-    "vitest": "^2.1.9"
+    "vitest": "^4.1.6"
   }
 }
