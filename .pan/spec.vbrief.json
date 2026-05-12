@@ -1,0 +1,1436 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-09T17:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
+    "updated": "2026-05-09T17:51:53.320Z"
+  },
+  "plan": {
+    "id": "pan-1053",
+    "title": "feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
+    "status": "proposed",
+    "uid": "a4f2c8d1-7b3e-4a90-b5f6-2e1d9c0a8374",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-09T17:00:00.000Z",
+    "updated": "2026-05-09T17:51:53.320Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
+        "label": "PAN-1053",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/kunchenguid/autopreso",
+        "label": "autopreso (MIT)",
+        "type": "reference"
+      },
+      {
+        "uri": "https://github.com/usefulsensors/moonshine",
+        "label": "Moonshine ASR",
+        "type": "reference"
+      }
+    ],
+    "tags": [
+      "voice",
+      "stt",
+      "autopreso",
+      "excalidraw",
+      "moonshine",
+      "google-cloud-stt",
+      "websocket"
+    ],
+    "narratives": {
+      "Problem": "Panopticon has no voice input capability. Users must type every message to agents. There is no visual whiteboard for voice-driven diagram sketching.",
+      "Proposal": "Add a shared voice/STT WebSocket backend (ws-voice) that drives two output surfaces: (1) a collapsible VoiceWidget inside ComposerFooter that transcribes speech into the message composer, and (2) an AutoPreso view (/autopreso tab) that is a voice-driven AI whiteboard powered by Excalidraw. Moonshine ONNX runs on-device as the primary STT provider; Google Cloud Speech-to-Text is the hot-swappable fallback. The whiteboard agent uses @ai-sdk/openai for OpenAI, Codex, and Ollama providers. P4 (Windows sidecar) and P5 (TTS agent voice) are deferred to separate issues."
+    },
+    "items": [
+      {
+        "id": "moonshine-pkg",
+        "title": "Create packages/moonshine-linux-x64 npm package structure",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create packages/moonshine-linux-x64/ with package.json (os: linux, cpu: x64, optional dependency), bin/ directory placeholder, and README. Add as optional dependency in root package.json. This is the npm package shell that will hold the PyInstaller binary."
+        },
+        "subItems": [
+          {
+            "id": "moonshine-pkg.ac1",
+            "title": "packages/moonshine-linux-x64/package.json exists with os: [\"linux\"], cpu: [\"x64\"], version 0.1.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "moonshine-pkg.ac2",
+            "title": "packages/moonshine-linux-x64/bin/ directory exists (placeholder for sidecar binary)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "moonshine-pkg.ac3",
+            "title": "root package.json lists moonshine-linux-x64 as optionalDependencies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "moonshine-sidecar-build",
+        "title": "Write scripts/build-moonshine-sidecars.js and sidecar main.py",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create scripts/build-moonshine-sidecars.js. The script installs moonshine-voice via pip into a venv and runs PyInstaller --onefile to produce packages/moonshine-linux-x64/bin/moonshine-sidecar. Also create the sidecar main.py: reads {type:'audio',encoding:'pcm16le',sampleRate:24000,audio:base64} JSONL from stdin, emits {type:'ready'} on startup, then {type:'transcript:partial',text} and {type:'transcript:committed',text} to stdout. Add npm run build:sidecar in package.json."
+        },
+        "subItems": [
+          {
+            "id": "moonshine-sidecar-build.ac1",
+            "title": "scripts/build-moonshine-sidecars.js creates venv, installs moonshine-voice, runs PyInstaller",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "moonshine-sidecar-build.ac2",
+            "title": "Sidecar main.py implements the JSONL protocol: audio→pcm16le base64 in, ready/partial/committed out",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "moonshine-sidecar-build.ac3",
+            "title": "npm run build:sidecar script defined in package.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcription-ts",
+        "title": "Implement src/voice/transcription.ts — createMoonshineTranscription() + ITurnEmitter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1053",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Create src/voice/transcription.ts. Export ITurnEmitter interface: { onPartial(cb): void, onCommitted(cb): void, sendAudio(pcm: Buffer): void, stop(): void, close(): void }. Export createMoonshineTranscription(modelSize: string): ITurnEmitter — spawns sidecar binary, establishes JSONL stdin/stdout pipe, emits ready, routes partial/committed to callbacks. Emits error event on unexpected sidecar exit. THIS BEAD requires inspection because all downstream modules (ws-voice, transcription-manager, Google Cloud fallback) depend on ITurnEmitter's exact shape."
+        },
+        "subItems": [
+          {
+            "id": "transcription-ts.ac1",
+            "title": "ITurnEmitter interface exported with onPartial(cb), onCommitted(cb), sendAudio(pcm: Buffer), stop(), close()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcription-ts.ac2",
+            "title": "createMoonshineTranscription() resolves sidecar binary path from packages/moonshine-linux-x64/bin/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcription-ts.ac3",
+            "title": "JSONL wire protocol: {type:audio,encoding:pcm16le,sampleRate:24000,audio:base64} to sidecar; partial/committed from sidecar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcription-ts.ac4",
+            "title": "Emits error event if sidecar process exits unexpectedly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "turn-queue-ts",
+        "title": "Implement src/voice/turn-queue.ts — debounce + filler-word filter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/voice/turn-queue.ts. Export createTurnQueue(emitter: ITurnEmitter, onTurn: (text: string) => void) — 150ms debounce on committed events, coalesces buffered chunks. Export isTrivialTranscript(text: string): boolean — filters single-word filler utterances (um, uh, yeah, okay, etc.)."
+        },
+        "subItems": [
+          {
+            "id": "turn-queue-ts.ac1",
+            "title": "createTurnQueue() wraps ITurnEmitter with 150ms debounce on committed events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-queue-ts.ac2",
+            "title": "isTrivialTranscript() returns true for single filler words",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-queue-ts.ac3",
+            "title": "Unit test: two committed events within 150ms coalesce into one onTurn call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcription-manager-ts",
+        "title": "Implement src/voice/transcription-manager.ts — hot-swappable provider factory",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1053",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Create src/voice/transcription-manager.ts. Export VoiceSettings type. Export createTranscriptionManager(settings: VoiceSettings): { applyCurrent(): void, getActive(): ITurnEmitter | null, close(): void }. applyCurrent() tears down old ITurnEmitter and creates new one based on settings.stt.provider. Supports 'moonshine' and 'google-cloud'. THIS BEAD requires inspection because P3 (Google Cloud) plugs into applyCurrent() — wrong interface = redo P3."
+        },
+        "subItems": [
+          {
+            "id": "transcription-manager-ts.ac1",
+            "title": "createTranscriptionManager() returns { applyCurrent, getActive, close }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcription-manager-ts.ac2",
+            "title": "applyCurrent() tears down old ITurnEmitter and creates new one based on settings.stt.provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcription-manager-ts.ac3",
+            "title": "VoiceSettings type exported: { stt: { provider: 'moonshine'|'google-cloud', moonshine: {model:string}, googleCloud: {apiKey:string, model:string} } }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-voice-ts",
+        "title": "Implement src/dashboard/server/ws-voice.ts — raw WebSocket at /ws/voice",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/ws-voice.ts using the same noServer+upgrade pattern as ws-terminal.ts. Export setupVoiceWebSocket(server: http.Server). On client connect: reads current voice settings, creates TranscriptionManager + TurnQueue. Binary WebSocket frames → sendAudio(). JSON back to client: {type:transcript:partial,text} and {type:transcript:committed,text}. On close: transcriptionManager.close(). One active transcription per connection."
+        },
+        "subItems": [
+          {
+            "id": "ws-voice-ts.ac1",
+            "title": "setupVoiceWebSocket(server) exported, registers on /ws/voice upgrade path using noServer pattern",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-voice-ts.ac2",
+            "title": "Binary WebSocket frames forwarded to transcription manager as PCM audio",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-voice-ts.ac3",
+            "title": "JSON frames {type:'transcript:partial'} and {type:'transcript:committed'} sent back to client",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-voice-ts.ac4",
+            "title": "TranscriptionManager torn down on WebSocket close",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "voice-settings-route",
+        "title": "Implement src/dashboard/server/routes/voice.ts — GET/PUT /api/voice/settings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/voice.ts as an Effect HTTP route module. GET /api/voice/settings — reads from ~/.panopticon/voice-settings.json with defaults {stt:{provider:'moonshine',moonshine:{model:'base'},googleCloud:{model:'latest_long',apiKey:''}}}. PUT /api/voice/settings — validates and persists. Follow existing pattern in settings.ts."
+        },
+        "subItems": [
+          {
+            "id": "voice-settings-route.ac1",
+            "title": "GET /api/voice/settings returns VoiceSettings JSON with defaults when file missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-settings-route.ac2",
+            "title": "PUT /api/voice/settings validates payload shape and persists to ~/.panopticon/voice-settings.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-wire-ws-voice",
+        "title": "Wire setupVoiceWebSocket and voice routes into server.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/server.ts, import setupVoiceWebSocket and call it alongside setupTerminalWebSocket before Effect upgrade listeners. Register voice route module in the Effect HTTP router."
+        },
+        "subItems": [
+          {
+            "id": "server-wire-ws-voice.ac1",
+            "title": "setupVoiceWebSocket called in server.ts before Effect upgrade listeners",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-wire-ws-voice.ac2",
+            "title": "Voice settings route registered in Effect HTTP router",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "use-voice-transcription",
+        "title": "Implement useVoiceTranscription.ts — WebAudio capture + /ws/voice hook",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/hooks/useVoiceTranscription.ts. getUserMedia({audio:{deviceId}}), AudioContext at 24kHz (ScriptProcessorNode resampler if needed), /ws/voice WebSocket, binary PCM frames. Returns { start, stop, partialText, committedText, isListening, error, analyserNode }. analyserNode exposes AnalyserNode for waveform canvas."
+        },
+        "subItems": [
+          {
+            "id": "use-voice-transcription.ac1",
+            "title": "start() requests mic access and opens /ws/voice WebSocket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "use-voice-transcription.ac2",
+            "title": "PCM audio sent as binary WebSocket frames at 24kHz mono",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "use-voice-transcription.ac3",
+            "title": "partialText and committedText state updated from server transcript events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "use-voice-transcription.ac4",
+            "title": "analyserNode exposed for waveform visualization",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "use-voice-transcription.ac5",
+            "title": "stop() closes mic stream and WebSocket cleanly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "voice-widget-tsx",
+        "title": "Implement VoiceWidget.tsx — collapsible widget with waveform, preview, Edit+Direct modes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/chat/VoiceWidget.tsx. Collapsed: mic button with idle/listening/processing/error states. Expanded: mic device picker, model picker (tiny/base), waveform canvas (AnalyserNode + requestAnimationFrame), partial transcript preview, Edit/Direct mode toggle, Stop/Cancel/Send buttons. Props: conversation, onInsert(text), onSendDirect(text)."
+        },
+        "subItems": [
+          {
+            "id": "voice-widget-tsx.ac1",
+            "title": "Collapsed state shows mic button with idle/listening/error icons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-widget-tsx.ac2",
+            "title": "Expanded state shows waveform canvas animating from AnalyserNode when listening",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-widget-tsx.ac3",
+            "title": "Partial transcript text updates live during speech",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-widget-tsx.ac4",
+            "title": "Edit mode: Stop inserts committed text via onInsert()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-widget-tsx.ac5",
+            "title": "Direct mode: committed transcript fires onSendDirect() immediately without inserting into editor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-widget-tsx.ac6",
+            "title": "Mic device picker populated from navigator.mediaDevices.enumerateDevices()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-footer-mic",
+        "title": "Integrate VoiceWidget into ComposerFooter",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Modify src/dashboard/frontend/src/components/chat/ComposerFooter.tsx. Add isVoiceWidgetOpen state. Add mic button in composerToolbar div. Render VoiceWidget below toolbar when open. onInsert prefills Lexical editor. onSendDirect calls existing handleSubmit path. handleSubmit() unchanged."
+        },
+        "subItems": [
+          {
+            "id": "composer-footer-mic.ac1",
+            "title": "Mic button visible in ComposerFooter toolbar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-footer-mic.ac2",
+            "title": "Click mic button toggles VoiceWidget expanded/collapsed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-footer-mic.ac3",
+            "title": "onInsert prefills committed text into Lexical editor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-footer-mic.ac4",
+            "title": "onSendDirect sends message through existing handleSubmit path without editor interaction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "voice-settings-ui",
+        "title": "Add Voice Settings section to the Settings page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add a Voice section to the Settings tab. STT provider picker (Moonshine/Google Cloud STT). Moonshine model picker (tiny/base). Google Cloud: API key input + model selector. Hardware device settings in localStorage: input device, output device, volume. Persists backend settings via PUT /api/voice/settings."
+        },
+        "subItems": [
+          {
+            "id": "voice-settings-ui.ac1",
+            "title": "STT provider picker (Moonshine / Google Cloud STT) in Settings > Voice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-settings-ui.ac2",
+            "title": "Moonshine model picker (tiny/base) shown when Moonshine selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-settings-ui.ac3",
+            "title": "Google Cloud API key field shown when Google Cloud STT selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-settings-ui.ac4",
+            "title": "Changes persisted via PUT /api/voice/settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "autopreso-deps",
+        "title": "Add @excalidraw/excalidraw, ai, @ai-sdk/openai, and @google-cloud/speech packages",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Frontend: add @excalidraw/excalidraw to src/dashboard/frontend/package.json. Root (server): add ai (Vercel AI SDK), @ai-sdk/openai, @google-cloud/speech. Run bun install from workspace root."
+        },
+        "subItems": [
+          {
+            "id": "autopreso-deps.ac1",
+            "title": "@excalidraw/excalidraw in frontend package.json dependencies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-deps.ac2",
+            "title": "ai, @ai-sdk/openai, @google-cloud/speech in root package.json dependencies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-deps.ac3",
+            "title": "bun install completes without errors after changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "whiteboard-elements-ts",
+        "title": "Implement src/autopreso/whiteboard-elements.ts — Excalidraw element normalization",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/autopreso/whiteboard-elements.ts. Export normalizeElements(elements) — validates/fills missing Excalidraw fields (id, type, x, y, width, height, version, versionNonce), logs warning for impossible coordinates."
+        },
+        "subItems": [
+          {
+            "id": "whiteboard-elements-ts.ac1",
+            "title": "normalizeElements() fills missing required Excalidraw element fields with defaults",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "whiteboard-elements-ts.ac2",
+            "title": "Warning logged for elements with x/y outside visible canvas range",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "whiteboard-tools-ts",
+        "title": "Implement src/autopreso/whiteboard-tools.ts — line-numbered ops schema and apply",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1053",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Create src/autopreso/whiteboard-tools.ts. Export formatLineNumberedWhiteboard(elements): string. Export applyWhiteboardEditOperations(elements, ops): ExcalidrawElement[]. Export Op type: { action: 'replace'|'insert_after'|'delete', lineNumber: number, element?: ExcalidrawElement }. THIS BEAD requires inspection because the whiteboard agent's AI SDK tool schemas and all downstream prompt construction depend on Op's exact shape."
+        },
+        "subItems": [
+          {
+            "id": "whiteboard-tools-ts.ac1",
+            "title": "formatLineNumberedWhiteboard() returns numbered lines: '1: rectangle text=\"Box A\" at (100,200)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "whiteboard-tools-ts.ac2",
+            "title": "applyWhiteboardEditOperations() supports replace, insert_after, delete ops by line number",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "whiteboard-tools-ts.ac3",
+            "title": "Op type exported: { action: 'replace'|'insert_after'|'delete', lineNumber: number, element?: ExcalidrawElement }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "whiteboard-tools-ts.ac4",
+            "title": "Unit tests cover replace, insert_after, delete on a 3-element canvas",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "whiteboard-keywords-ts",
+        "title": "Implement src/autopreso/whiteboard-keywords.ts — keyword extraction",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/autopreso/whiteboard-keywords.ts. Export extractKeywords(elements: ExcalidrawElement[]): string[] — extracts text labels from type='text' elements and boundElements with text labels. Used to bias STT transcription toward whiteboard vocabulary."
+        },
+        "subItems": [
+          {
+            "id": "whiteboard-keywords-ts.ac1",
+            "title": "extractKeywords() returns text strings from text elements and bound text on shapes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "autopreso-session-ts",
+        "title": "Implement src/autopreso/session.ts — staging/live state machine + warmup loop",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1053",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Create src/autopreso/session.ts. Export createWhiteboardSession(). Manages staging (client scratchpad) and live (server owns state.elements) modes. start() snapshots staging primer, extracts keywords, transitions to live, fires runWhiteboardWarmupOnce(). Warmup: up to 8 attempts, exponential backoff (2s→4s→8s→…→30s cap). After warmup, forces agentHistory to [warmup_user_msg, {role:'assistant',content:'UNDERSTOOD'}]. Exposes canvasDirtyForAgent flag. THIS BEAD requires inspection because the warmup loop and agentHistory prefix are the caching foundation — every subsequent agent turn depends on this exact history."
+        },
+        "subItems": [
+          {
+            "id": "autopreso-session-ts.ac1",
+            "title": "createWhiteboardSession() returns { mode, elements, start, backToStaging, reset, agentHistory, canvasDirtyForAgent }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-session-ts.ac2",
+            "title": "start() transitions mode staging→live and fires warmup loop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-session-ts.ac3",
+            "title": "Warmup retries up to 8 times with exponential backoff, capping at 30s per attempt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-session-ts.ac4",
+            "title": "After warmup completes, agentHistory is exactly [warmup_user_msg, { role:'assistant', content:'UNDERSTOOD' }]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "autopreso-agent-ts",
+        "title": "Implement src/autopreso/agent.ts — runWhiteboardAgent() with AI SDK tool calls",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/autopreso/agent.ts. Export runWhiteboardAgent(transcript, session, settings): Promise<ExcalidrawElement[]>. Three providers via createOpenAI adapter: openai (OPENAI_API_KEY), codex (reads ~/.codex/auth.json bearer), ollama (localhost:11434/v1). Two colocated tools: whiteboard_apply (ops + optional viewport command) and whiteboard_overwrite (full reset). System prompt includes formatLineNumberedWhiteboard() output. On tool call: apply ops via applyWhiteboardEditOperations(), normalize via normalizeElements(). Also export runWhiteboardWarmupOnce(session, settings)."
+        },
+        "subItems": [
+          {
+            "id": "autopreso-agent-ts.ac1",
+            "title": "runWhiteboardAgent() calls generateText() with whiteboard_apply and whiteboard_overwrite tools",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-agent-ts.ac2",
+            "title": "Provider selection: openai/codex/ollama from settings.autopreso.provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-agent-ts.ac3",
+            "title": "Codex reads ~/.codex/auth.json for bearer token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-agent-ts.ac4",
+            "title": "whiteboard_apply tool applies ops and updates session.elements",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-agent-ts.ac5",
+            "title": "runWhiteboardWarmupOnce() exported for session.ts warmup loop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "autopreso-routes-ts",
+        "title": "Implement src/dashboard/server/routes/autopreso.ts — HTTP routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/autopreso.ts. Effect HTTP route module. POST /api/autopreso/start — body {elements, screenshotBase64}, calls session.start(), returns {mode:'live'}. POST /api/autopreso/back-to-staging — returns {mode:'staging'}. POST /api/autopreso/session/reset — returns {mode:'staging'}. One singleton session per server."
+        },
+        "subItems": [
+          {
+            "id": "autopreso-routes-ts.ac1",
+            "title": "POST /api/autopreso/start transitions to live mode and returns {mode:'live'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-routes-ts.ac2",
+            "title": "POST /api/autopreso/back-to-staging transitions to staging and returns {mode:'staging'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-routes-ts.ac3",
+            "title": "POST /api/autopreso/session/reset clears all elements and resets to staging",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-autopreso-ts",
+        "title": "Implement src/dashboard/server/ws-autopreso.ts — whiteboard state broadcast WebSocket",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/ws-autopreso.ts using noServer pattern. Export setupAutoPresoWebSocket(server, session). On connect: send {type:'whiteboard:snapshot', mode, elements}. On whiteboard update (called by runWhiteboardAgent): broadcast {type:'whiteboard:update', elements} to all clients. Multiple tabs see same canvas."
+        },
+        "subItems": [
+          {
+            "id": "ws-autopreso-ts.ac1",
+            "title": "setupAutoPresoWebSocket() registers /ws/autopreso upgrade path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-autopreso-ts.ac2",
+            "title": "On connect: sends {type:'whiteboard:snapshot', mode, elements}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-autopreso-ts.ac3",
+            "title": "On update: broadcasts {type:'whiteboard:update', elements} to all connected clients",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-wire-autopreso",
+        "title": "Wire AutoPreso WebSocket and routes into server.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In server.ts: import and call setupAutoPresoWebSocket() alongside existing WebSocket setups. Register autopreso route module in Effect HTTP router. Singleton session passed between routes and WebSocket handler."
+        },
+        "subItems": [
+          {
+            "id": "server-wire-autopreso.ac1",
+            "title": "setupAutoPresoWebSocket() called in server.ts startup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-wire-autopreso.ac2",
+            "title": "AutoPreso HTTP routes registered in Effect router",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "autopreso-controls-tsx",
+        "title": "Implement AutoPresoControls.tsx — mic, warmup status, staging/live toggle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/autopreso/AutoPresoControls.tsx. Props: mode, warmupStatus (idle/warming/ready/failed), onStart, onBackToStaging, onReset, isListening, onToggleMic. Renders: mic toggle button, warmup status indicator, staging↔live toggle, agent instructions textarea, Reset button."
+        },
+        "subItems": [
+          {
+            "id": "autopreso-controls-tsx.ac1",
+            "title": "Mic button toggles isListening with visual indicator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-controls-tsx.ac2",
+            "title": "Warmup status shown as idle/warming/ready/failed with appropriate icon",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-controls-tsx.ac3",
+            "title": "Staging/live toggle calls onStart or onBackToStaging based on current mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcript-panel-tsx",
+        "title": "Implement TranscriptPanel.tsx — live transcript display",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/autopreso/TranscriptPanel.tsx. Props: turns (committed with timestamps), partialText. Displays committed turns with timestamps, auto-scrolls to bottom. Current partial transcript shown in italic/dimmed style."
+        },
+        "subItems": [
+          {
+            "id": "transcript-panel-tsx.ac1",
+            "title": "Committed turns displayed with timestamps, newest at bottom with auto-scroll",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-panel-tsx.ac2",
+            "title": "Current partial transcript shown in distinct style (italic/dimmed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "use-autopreso-websocket",
+        "title": "Implement useAutoPresoWebSocket.ts — combined audio + whiteboard state hook",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/hooks/useAutoPresoWebSocket.ts. Combines /ws/voice transcription and /ws/autopreso whiteboard state. Receives whiteboard:snapshot and whiteboard:update, merges into elements state. Returns { elements, mode, warmupStatus, partialText, committedTurns, isListening, startListening, stopListening, analyserNode }. Reconnects to /ws/autopreso with exponential backoff. Note: the hook does not POST to /api/autopreso/start — that's called by AutoPresoControls via onStart."
+        },
+        "subItems": [
+          {
+            "id": "use-autopreso-websocket.ac1",
+            "title": "Subscribes to /ws/autopreso for whiteboard:snapshot and whiteboard:update",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "use-autopreso-websocket.ac2",
+            "title": "elements state updated on whiteboard:update broadcast",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "use-autopreso-websocket.ac3",
+            "title": "Voice transcription integrated: partialText and committedTurns tracked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "use-autopreso-websocket.ac4",
+            "title": "Reconnects to /ws/autopreso on disconnect with exponential backoff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "autopreso-view-tsx",
+        "title": "Implement AutoPresoView.tsx — Excalidraw canvas + control panel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/autopreso/AutoPresoView.tsx. Excalidraw canvas (controlled mode, dynamic import to avoid SSR issues) + sidebar with AutoPresoControls + TranscriptPanel. Staging mode: Excalidraw fully interactive. Live mode: elements from server are source of truth, local edits do not override server state. Agent viewport commands (scroll_to_content, zoom) applied via excalidrawAPI."
+        },
+        "subItems": [
+          {
+            "id": "autopreso-view-tsx.ac1",
+            "title": "Excalidraw canvas rendered with controlled elements from useAutoPresoWebSocket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-view-tsx.ac2",
+            "title": "Staging mode: Excalidraw fully interactive (user can draw)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-view-tsx.ac3",
+            "title": "Live mode: server elements are source of truth, local edits do not overwrite server state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-view-tsx.ac4",
+            "title": "AutoPresoControls and TranscriptPanel rendered in sidebar panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "autopreso-route-nav",
+        "title": "Add /autopreso tab to App.tsx, Header Tab type, and Sidebar nav",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add 'autopreso' to Tab union in Header.tsx. Add autopreso: '/autopreso' to TAB_PATHS in App.tsx. Add {activeTab === 'autopreso' && <AutoPresoView />} render block. Add AutoPreso nav item (Mic2 icon) to Operations group in Sidebar NAV_GROUPS."
+        },
+        "subItems": [
+          {
+            "id": "autopreso-route-nav.ac1",
+            "title": "'autopreso' added to Tab union type in Header.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-route-nav.ac2",
+            "title": "'/autopreso' registered in TAB_PATHS, renders AutoPresoView",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "autopreso-route-nav.ac3",
+            "title": "AutoPreso nav item with Mic2 icon in Sidebar Operations group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "google-cloud-stt-ts",
+        "title": "Implement src/voice/google-cloud-transcription.ts — Cloud STT streaming",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/voice/google-cloud-transcription.ts. Export createGoogleCloudTranscription(apiKey: string, modelName: string): ITurnEmitter. Uses @google-cloud/speech StreamingRecognize. Accepts 24kHz PCM, streams to GCP, emits partial/committed matching ITurnEmitter exactly. Integration test gated on GOOGLE_CLOUD_SPEECH_API_KEY env var — skipped if not set."
+        },
+        "subItems": [
+          {
+            "id": "google-cloud-stt-ts.ac1",
+            "title": "createGoogleCloudTranscription() returns ITurnEmitter (same interface as Moonshine)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-cloud-stt-ts.ac2",
+            "title": "Audio streamed to Google Cloud Speech StreamingRecognize API",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-cloud-stt-ts.ac3",
+            "title": "Partial results → onPartial callback, final results → onCommitted callback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-cloud-stt-ts.ac4",
+            "title": "Integration test skipped if GOOGLE_CLOUD_SPEECH_API_KEY not set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcription-manager-gcp",
+        "title": "Wire Google Cloud STT into transcription-manager hot-swap",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1053",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Modify src/voice/transcription-manager.ts. When settings.stt.provider === 'google-cloud', instantiate createGoogleCloudTranscription(settings.stt.googleCloud.apiKey, settings.stt.googleCloud.model). Provider switch tears down old ITurnEmitter and creates new one. /ws/voice connection stays open across swap."
+        },
+        "subItems": [
+          {
+            "id": "transcription-manager-gcp.ac1",
+            "title": "applyCurrent() instantiates createGoogleCloudTranscription() for provider 'google-cloud'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcription-manager-gcp.ac2",
+            "title": "Hot-swap: Moonshine→Google Cloud tears down old ITurnEmitter, creates new one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcription-manager-gcp.ac3",
+            "title": "WebSocket connection remains open across provider swap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "moonshine-pkg",
+        "to": "moonshine-sidecar-build",
+        "type": "blocks"
+      },
+      {
+        "from": "moonshine-sidecar-build",
+        "to": "transcription-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "transcription-ts",
+        "to": "transcription-manager-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-queue-ts",
+        "to": "transcription-manager-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "transcription-manager-ts",
+        "to": "ws-voice-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-voice-ts",
+        "to": "server-wire-ws-voice",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-settings-route",
+        "to": "server-wire-ws-voice",
+        "type": "blocks"
+      },
+      {
+        "from": "server-wire-ws-voice",
+        "to": "use-voice-transcription",
+        "type": "blocks"
+      },
+      {
+        "from": "use-voice-transcription",
+        "to": "voice-widget-tsx",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-widget-tsx",
+        "to": "composer-footer-mic",
+        "type": "blocks"
+      },
+      {
+        "from": "server-wire-ws-voice",
+        "to": "voice-settings-ui",
+        "type": "informs"
+      },
+      {
+        "from": "autopreso-deps",
+        "to": "whiteboard-elements-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-deps",
+        "to": "whiteboard-keywords-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-deps",
+        "to": "autopreso-controls-tsx",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-deps",
+        "to": "transcript-panel-tsx",
+        "type": "blocks"
+      },
+      {
+        "from": "whiteboard-elements-ts",
+        "to": "whiteboard-tools-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "whiteboard-tools-ts",
+        "to": "autopreso-agent-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "whiteboard-keywords-ts",
+        "to": "autopreso-session-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "whiteboard-tools-ts",
+        "to": "autopreso-session-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-session-ts",
+        "to": "autopreso-agent-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-agent-ts",
+        "to": "autopreso-routes-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-agent-ts",
+        "to": "ws-autopreso-ts",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-routes-ts",
+        "to": "server-wire-autopreso",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-autopreso-ts",
+        "to": "server-wire-autopreso",
+        "type": "blocks"
+      },
+      {
+        "from": "server-wire-autopreso",
+        "to": "use-autopreso-websocket",
+        "type": "blocks"
+      },
+      {
+        "from": "server-wire-ws-voice",
+        "to": "use-autopreso-websocket",
+        "type": "blocks"
+      },
+      {
+        "from": "use-autopreso-websocket",
+        "to": "autopreso-view-tsx",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-controls-tsx",
+        "to": "autopreso-view-tsx",
+        "type": "blocks"
+      },
+      {
+        "from": "transcript-panel-tsx",
+        "to": "autopreso-view-tsx",
+        "type": "blocks"
+      },
+      {
+        "from": "autopreso-view-tsx",
+        "to": "autopreso-route-nav",
+        "type": "blocks"
+      },
+      {
+        "from": "transcription-manager-ts",
+        "to": "google-cloud-stt-ts",
+        "type": "informs"
+      },
+      {
+        "from": "google-cloud-stt-ts",
+        "to": "transcription-manager-gcp",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-09-PAN-1053-feat-voice-stt-autopreso-whiteboard-moonshine-primary-google-cloud-stt-fallback.vbrief.json"
+    }
+  }
+}
