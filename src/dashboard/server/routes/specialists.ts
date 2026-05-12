@@ -1472,25 +1472,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     const { killAllReviewerSessions } = yield* Effect.promise(
       () => import('../../../lib/cloister/review-agent.js'),
     );
-    const { getTmuxSessionName } = yield* Effect.promise(
-      () => import('../../../lib/cloister/specialists.js'),
-    );
-
-    // Kill coordinator + all 5 reviewer sessions
-    const coordinatorSession = getTmuxSessionName('review-agent', project, issueId);
-    yield* Effect.promise(() => killSessionAsync(coordinatorSession).catch(() => {}));
     const killResult = yield* Effect.promise(() => killAllReviewerSessions(project, issueId));
-
-    // Also kill any coordinator sessions (review-coordinator-<issueId>-*)
-    const { listSessionNamesAsync: listSessions } = yield* Effect.promise(
-      () => import('../../../lib/tmux.js'),
-    );
-    const sessions = yield* Effect.promise(() => listSessions().catch(() => [] as string[]));
-    for (const s of sessions) {
-      if (s.startsWith(`review-coordinator-${issueId}-`)) {
-        yield* Effect.promise(() => killSessionAsync(s).catch(() => {}));
-      }
-    }
 
     // Resolve workspace info for re-dispatch
     const projectConfig = resolveProjectFromIssue(issueId);

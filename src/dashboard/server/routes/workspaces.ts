@@ -3899,42 +3899,16 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
       return jsonResponse({ success: false, error: 'Workspace does not exist' }, { status: 400 });
     }
 
-    // Kill all reviewer AND coordinator tmux sessions for this issue.
-    // Session name patterns:
-    //   specialist-<projectKey>-<issueId>-review-<role>  (PAN-830 canonical reviewer / synthesis)
-    //   review-<issueId>-<ts>-<role>                     (legacy timestamped reviewer)
-    //   review-<issueId>-<ts>-synthesis                  (legacy timestamped synthesis)
-    //   review-coordinator-<issueId>-<ts>                (detached `pan review run` orchestrator)
-    const legacyReviewerPrefix = `review-${issueId}-`;
-    const coordinatorPrefix = `review-coordinator-${issueId}-`;
     const { resolveProjectFromIssue } = yield* Effect.promise(() =>
       import('../../../lib/projects.js'),
     );
+    const { killAllReviewerSessions } = yield* Effect.promise(() =>
+      import('../../../lib/cloister/review-agent.js'),
+    );
     const resolved = resolveProjectFromIssue(issueId);
-    const projectKey = resolved?.projectKey;
-    // Canonical PAN-830 reviewer/synthesis sessions (PAN-915). Match
-    // case-insensitively on the issueId portion since session names are
-    // composed with the caller-supplied case.
-    const canonicalPrefix = projectKey
-      ? `specialist-${projectKey.toLowerCase()}-${issueId.toLowerCase()}-review-`
-      : null;
-    const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
-    const reviewSessions = allSessions.filter(s => {
-      if (s.startsWith(legacyReviewerPrefix) || s.startsWith(coordinatorPrefix)) return true;
-      if (canonicalPrefix && s.toLowerCase().startsWith(canonicalPrefix)) return true;
-      return false;
-    });
-
-    const killed: string[] = [];
-    const failed: string[] = [];
-    for (const session of reviewSessions) {
-      try {
-        yield* Effect.promise(() => killSessionAsync(session));
-        killed.push(session);
-      } catch {
-        failed.push(session);
-      }
-    }
+    const { killed, failed } = yield* Effect.promise(() =>
+      killAllReviewerSessions(resolved?.projectKey, issueId),
+    );
 
     // Reset only reviewStatus — leave test/merge/verification untouched
     setReviewStatus(issueId, {
