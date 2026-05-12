@@ -3,18 +3,18 @@
     "version": "0.5",
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T20:26:51.412052Z"
+    "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard \u2014 Moonshine primary, Google Cloud STT fallback",
+    "updated": "2026-05-12T20:32:29.609154Z"
   },
   "plan": {
     "id": "pan-1053",
-    "title": "feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
+    "title": "feat: Voice STT + AutoPreso whiteboard \u2014 Moonshine primary, Google Cloud STT fallback",
     "status": "proposed",
     "uid": "a4f2c8d1-7b3e-4a90-b5f6-2e1d9c0a8374",
     "author": "agent:claude-opus-4-7",
-    "sequence": 7,
+    "sequence": 8,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T20:26:51.412052Z",
+    "updated": "2026-05-12T20:32:29.609154Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -112,7 +112,7 @@
           },
           {
             "id": "moonshine-sidecar-build.ac2",
-            "title": "Sidecar main.py implements the JSONL protocol: audio→pcm16le base64 in, ready/partial/committed out",
+            "title": "Sidecar main.py implements the JSONL protocol: audio\u2192pcm16le base64 in, ready/partial/committed out",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -130,7 +130,7 @@
       },
       {
         "id": "transcription-ts",
-        "title": "Implement src/voice/transcription.ts — createMoonshineTranscription() + ITurnEmitter",
+        "title": "Implement src/voice/transcription.ts \u2014 createMoonshineTranscription() + ITurnEmitter",
         "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
@@ -140,7 +140,7 @@
           "requiresInspection": true
         },
         "narrative": {
-          "Action": "Create src/voice/transcription.ts. Export ITurnEmitter interface: { onPartial(cb): void, onCommitted(cb): void, sendAudio(pcm: Buffer): void, stop(): void, close(): void }. Export createMoonshineTranscription(modelSize: string): ITurnEmitter — spawns sidecar binary, establishes JSONL stdin/stdout pipe, emits ready, routes partial/committed to callbacks. Emits error event on unexpected sidecar exit. THIS BEAD requires inspection because all downstream modules (ws-voice, transcription-manager, Google Cloud fallback) depend on ITurnEmitter's exact shape."
+          "Action": "Create src/voice/transcription.ts. Export ITurnEmitter interface: { onPartial(cb): void, onCommitted(cb): void, sendAudio(pcm: Buffer): void, stop(): void, close(): void }. Export createMoonshineTranscription(modelSize: string): ITurnEmitter \u2014 spawns sidecar binary, establishes JSONL stdin/stdout pipe, emits ready, routes partial/committed to callbacks. Emits error event on unexpected sidecar exit. THIS BEAD requires inspection because all downstream modules (ws-voice, transcription-manager, Google Cloud fallback) depend on ITurnEmitter's exact shape."
         },
         "subItems": [
           {
@@ -179,8 +179,8 @@
       },
       {
         "id": "turn-queue-ts",
-        "title": "Implement src/voice/turn-queue.ts — debounce + filler-word filter",
-        "status": "pending",
+        "title": "Implement src/voice/turn-queue.ts \u2014 debounce + filler-word filter",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -189,13 +189,13 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "Create src/voice/turn-queue.ts. Export createTurnQueue(emitter: ITurnEmitter, onTurn: (text: string) => void) — 150ms debounce on committed events, coalesces buffered chunks. Export isTrivialTranscript(text: string): boolean — filters single-word filler utterances (um, uh, yeah, okay, etc.)."
+          "Action": "Create src/voice/turn-queue.ts. Export createTurnQueue(emitter: ITurnEmitter, onTurn: (text: string) => void) \u2014 150ms debounce on committed events, coalesces buffered chunks. Export isTrivialTranscript(text: string): boolean \u2014 filters single-word filler utterances (um, uh, yeah, okay, etc.)."
         },
         "subItems": [
           {
             "id": "turn-queue-ts.ac1",
             "title": "createTurnQueue() wraps ITurnEmitter with 150ms debounce on committed events",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -203,7 +203,7 @@
           {
             "id": "turn-queue-ts.ac2",
             "title": "isTrivialTranscript() returns true for single filler words",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -211,7 +211,7 @@
           {
             "id": "turn-queue-ts.ac3",
             "title": "Unit test: two committed events within 150ms coalesce into one onTurn call",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -220,7 +220,7 @@
       },
       {
         "id": "transcription-manager-ts",
-        "title": "Implement src/voice/transcription-manager.ts — hot-swappable provider factory",
+        "title": "Implement src/voice/transcription-manager.ts \u2014 hot-swappable provider factory",
         "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
@@ -230,7 +230,7 @@
           "requiresInspection": true
         },
         "narrative": {
-          "Action": "Create src/voice/transcription-manager.ts. Export VoiceSettings type. Export createTranscriptionManager(settings: VoiceSettings): { applyCurrent(): void, getActive(): ITurnEmitter | null, close(): void }. applyCurrent() tears down old ITurnEmitter and creates new one based on settings.stt.provider. Supports 'moonshine' and 'google-cloud'. THIS BEAD requires inspection because P3 (Google Cloud) plugs into applyCurrent() — wrong interface = redo P3."
+          "Action": "Create src/voice/transcription-manager.ts. Export VoiceSettings type. Export createTranscriptionManager(settings: VoiceSettings): { applyCurrent(): void, getActive(): ITurnEmitter | null, close(): void }. applyCurrent() tears down old ITurnEmitter and creates new one based on settings.stt.provider. Supports 'moonshine' and 'google-cloud'. THIS BEAD requires inspection because P3 (Google Cloud) plugs into applyCurrent() \u2014 wrong interface = redo P3."
         },
         "subItems": [
           {
@@ -261,7 +261,7 @@
       },
       {
         "id": "ws-voice-ts",
-        "title": "Implement src/dashboard/server/ws-voice.ts — raw WebSocket at /ws/voice",
+        "title": "Implement src/dashboard/server/ws-voice.ts \u2014 raw WebSocket at /ws/voice",
         "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
@@ -271,7 +271,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "Create src/dashboard/server/ws-voice.ts using the same noServer+upgrade pattern as ws-terminal.ts. Export setupVoiceWebSocket(server: http.Server). On client connect: reads current voice settings, creates TranscriptionManager + TurnQueue. Binary WebSocket frames → sendAudio(). JSON back to client: {type:transcript:partial,text} and {type:transcript:committed,text}. On close: transcriptionManager.close(). One active transcription per connection."
+          "Action": "Create src/dashboard/server/ws-voice.ts using the same noServer+upgrade pattern as ws-terminal.ts. Export setupVoiceWebSocket(server: http.Server). On client connect: reads current voice settings, creates TranscriptionManager + TurnQueue. Binary WebSocket frames \u2192 sendAudio(). JSON back to client: {type:transcript:partial,text} and {type:transcript:committed,text}. On close: transcriptionManager.close(). One active transcription per connection."
         },
         "subItems": [
           {
@@ -310,7 +310,7 @@
       },
       {
         "id": "voice-settings-route",
-        "title": "Implement src/dashboard/server/routes/voice.ts — GET/PUT /api/voice/settings",
+        "title": "Implement src/dashboard/server/routes/voice.ts \u2014 GET/PUT /api/voice/settings",
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
@@ -320,7 +320,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "Create src/dashboard/server/routes/voice.ts as an Effect HTTP route module. GET /api/voice/settings — reads from ~/.panopticon/voice-settings.json with defaults {stt:{provider:'moonshine',moonshine:{model:'base'},googleCloud:{model:'latest_long',apiKey:''}}}. PUT /api/voice/settings — validates and persists. Follow existing pattern in settings.ts."
+          "Action": "Create src/dashboard/server/routes/voice.ts as an Effect HTTP route module. GET /api/voice/settings \u2014 reads from ~/.panopticon/voice-settings.json with defaults {stt:{provider:'moonshine',moonshine:{model:'base'},googleCloud:{model:'latest_long',apiKey:''}}}. PUT /api/voice/settings \u2014 validates and persists. Follow existing pattern in settings.ts."
         },
         "subItems": [
           {
@@ -376,7 +376,7 @@
       },
       {
         "id": "use-voice-transcription",
-        "title": "Implement useVoiceTranscription.ts — WebAudio capture + /ws/voice hook",
+        "title": "Implement useVoiceTranscription.ts \u2014 WebAudio capture + /ws/voice hook",
         "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
@@ -433,7 +433,7 @@
       },
       {
         "id": "voice-widget-tsx",
-        "title": "Implement VoiceWidget.tsx — collapsible widget with waveform, preview, Edit+Direct modes",
+        "title": "Implement VoiceWidget.tsx \u2014 collapsible widget with waveform, preview, Edit+Direct modes",
         "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
@@ -637,7 +637,7 @@
       },
       {
         "id": "whiteboard-elements-ts",
-        "title": "Implement src/autopreso/whiteboard-elements.ts — Excalidraw element normalization",
+        "title": "Implement src/autopreso/whiteboard-elements.ts \u2014 Excalidraw element normalization",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
@@ -647,7 +647,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "Create src/autopreso/whiteboard-elements.ts. Export normalizeElements(elements) — validates/fills missing Excalidraw fields (id, type, x, y, width, height, version, versionNonce), logs warning for impossible coordinates."
+          "Action": "Create src/autopreso/whiteboard-elements.ts. Export normalizeElements(elements) \u2014 validates/fills missing Excalidraw fields (id, type, x, y, width, height, version, versionNonce), logs warning for impossible coordinates."
         },
         "subItems": [
           {
@@ -670,7 +670,7 @@
       },
       {
         "id": "whiteboard-tools-ts",
-        "title": "Implement src/autopreso/whiteboard-tools.ts — line-numbered ops schema and apply",
+        "title": "Implement src/autopreso/whiteboard-tools.ts \u2014 line-numbered ops schema and apply",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
@@ -719,7 +719,7 @@
       },
       {
         "id": "whiteboard-keywords-ts",
-        "title": "Implement src/autopreso/whiteboard-keywords.ts — keyword extraction",
+        "title": "Implement src/autopreso/whiteboard-keywords.ts \u2014 keyword extraction",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
@@ -729,7 +729,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "Create src/autopreso/whiteboard-keywords.ts. Export extractKeywords(elements: ExcalidrawElement[]): string[] — extracts text labels from type='text' elements and boundElements with text labels. Used to bias STT transcription toward whiteboard vocabulary."
+          "Action": "Create src/autopreso/whiteboard-keywords.ts. Export extractKeywords(elements: ExcalidrawElement[]): string[] \u2014 extracts text labels from type='text' elements and boundElements with text labels. Used to bias STT transcription toward whiteboard vocabulary."
         },
         "subItems": [
           {
@@ -744,7 +744,7 @@
       },
       {
         "id": "autopreso-session-ts",
-        "title": "Implement src/autopreso/session.ts — staging/live state machine + warmup loop",
+        "title": "Implement src/autopreso/session.ts \u2014 staging/live state machine + warmup loop",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
@@ -754,7 +754,7 @@
           "requiresInspection": true
         },
         "narrative": {
-          "Action": "Create src/autopreso/session.ts. Export createWhiteboardSession(). Manages staging (client scratchpad) and live (server owns state.elements) modes. start() snapshots staging primer, extracts keywords, transitions to live, fires runWhiteboardWarmupOnce(). Warmup: up to 8 attempts, exponential backoff (2s→4s→8s→…→30s cap). After warmup, forces agentHistory to [warmup_user_msg, {role:'assistant',content:'UNDERSTOOD'}]. Exposes canvasDirtyForAgent flag. THIS BEAD requires inspection because the warmup loop and agentHistory prefix are the caching foundation — every subsequent agent turn depends on this exact history."
+          "Action": "Create src/autopreso/session.ts. Export createWhiteboardSession(). Manages staging (client scratchpad) and live (server owns state.elements) modes. start() snapshots staging primer, extracts keywords, transitions to live, fires runWhiteboardWarmupOnce(). Warmup: up to 8 attempts, exponential backoff (2s\u21924s\u21928s\u2192\u2026\u219230s cap). After warmup, forces agentHistory to [warmup_user_msg, {role:'assistant',content:'UNDERSTOOD'}]. Exposes canvasDirtyForAgent flag. THIS BEAD requires inspection because the warmup loop and agentHistory prefix are the caching foundation \u2014 every subsequent agent turn depends on this exact history."
         },
         "subItems": [
           {
@@ -767,7 +767,7 @@
           },
           {
             "id": "autopreso-session-ts.ac2",
-            "title": "start() transitions mode staging→live and fires warmup loop",
+            "title": "start() transitions mode staging\u2192live and fires warmup loop",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -793,7 +793,7 @@
       },
       {
         "id": "autopreso-agent-ts",
-        "title": "Implement src/autopreso/agent.ts — runWhiteboardAgent() with AI SDK tool calls",
+        "title": "Implement src/autopreso/agent.ts \u2014 runWhiteboardAgent() with AI SDK tool calls",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
@@ -850,7 +850,7 @@
       },
       {
         "id": "autopreso-routes-ts",
-        "title": "Implement src/dashboard/server/routes/autopreso.ts — HTTP routes",
+        "title": "Implement src/dashboard/server/routes/autopreso.ts \u2014 HTTP routes",
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
@@ -860,7 +860,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "Create src/dashboard/server/routes/autopreso.ts. Effect HTTP route module. POST /api/autopreso/start — body {elements, screenshotBase64}, calls session.start(), returns {mode:'live'}. POST /api/autopreso/back-to-staging — returns {mode:'staging'}. POST /api/autopreso/session/reset — returns {mode:'staging'}. One singleton session per server."
+          "Action": "Create src/dashboard/server/routes/autopreso.ts. Effect HTTP route module. POST /api/autopreso/start \u2014 body {elements, screenshotBase64}, calls session.start(), returns {mode:'live'}. POST /api/autopreso/back-to-staging \u2014 returns {mode:'staging'}. POST /api/autopreso/session/reset \u2014 returns {mode:'staging'}. One singleton session per server."
         },
         "subItems": [
           {
@@ -891,7 +891,7 @@
       },
       {
         "id": "ws-autopreso-ts",
-        "title": "Implement src/dashboard/server/ws-autopreso.ts — whiteboard state broadcast WebSocket",
+        "title": "Implement src/dashboard/server/ws-autopreso.ts \u2014 whiteboard state broadcast WebSocket",
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
@@ -965,7 +965,7 @@
       },
       {
         "id": "autopreso-controls-tsx",
-        "title": "Implement AutoPresoControls.tsx — mic, warmup status, staging/live toggle",
+        "title": "Implement AutoPresoControls.tsx \u2014 mic, warmup status, staging/live toggle",
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
@@ -975,7 +975,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "Create src/dashboard/frontend/src/components/autopreso/AutoPresoControls.tsx. Props: mode, warmupStatus (idle/warming/ready/failed), onStart, onBackToStaging, onReset, isListening, onToggleMic. Renders: mic toggle button, warmup status indicator, staging↔live toggle, agent instructions textarea, Reset button."
+          "Action": "Create src/dashboard/frontend/src/components/autopreso/AutoPresoControls.tsx. Props: mode, warmupStatus (idle/warming/ready/failed), onStart, onBackToStaging, onReset, isListening, onToggleMic. Renders: mic toggle button, warmup status indicator, staging\u2194live toggle, agent instructions textarea, Reset button."
         },
         "subItems": [
           {
@@ -1006,7 +1006,7 @@
       },
       {
         "id": "transcript-panel-tsx",
-        "title": "Implement TranscriptPanel.tsx — live transcript display",
+        "title": "Implement TranscriptPanel.tsx \u2014 live transcript display",
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
@@ -1039,7 +1039,7 @@
       },
       {
         "id": "use-autopreso-websocket",
-        "title": "Implement useAutoPresoWebSocket.ts — combined audio + whiteboard state hook",
+        "title": "Implement useAutoPresoWebSocket.ts \u2014 combined audio + whiteboard state hook",
         "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
@@ -1049,7 +1049,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "Create src/dashboard/frontend/src/hooks/useAutoPresoWebSocket.ts. Combines /ws/voice transcription and /ws/autopreso whiteboard state. Receives whiteboard:snapshot and whiteboard:update, merges into elements state. Returns { elements, mode, warmupStatus, partialText, committedTurns, isListening, startListening, stopListening, analyserNode }. Reconnects to /ws/autopreso with exponential backoff. Note: the hook does not POST to /api/autopreso/start — that's called by AutoPresoControls via onStart."
+          "Action": "Create src/dashboard/frontend/src/hooks/useAutoPresoWebSocket.ts. Combines /ws/voice transcription and /ws/autopreso whiteboard state. Receives whiteboard:snapshot and whiteboard:update, merges into elements state. Returns { elements, mode, warmupStatus, partialText, committedTurns, isListening, startListening, stopListening, analyserNode }. Reconnects to /ws/autopreso with exponential backoff. Note: the hook does not POST to /api/autopreso/start \u2014 that's called by AutoPresoControls via onStart."
         },
         "subItems": [
           {
@@ -1088,7 +1088,7 @@
       },
       {
         "id": "autopreso-view-tsx",
-        "title": "Implement AutoPresoView.tsx — Excalidraw canvas + control panel",
+        "title": "Implement AutoPresoView.tsx \u2014 Excalidraw canvas + control panel",
         "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
@@ -1178,7 +1178,7 @@
       },
       {
         "id": "google-cloud-stt-ts",
-        "title": "Implement src/voice/google-cloud-transcription.ts — Cloud STT streaming",
+        "title": "Implement src/voice/google-cloud-transcription.ts \u2014 Cloud STT streaming",
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
@@ -1188,7 +1188,7 @@
           "requiresInspection": false
         },
         "narrative": {
-          "Action": "Create src/voice/google-cloud-transcription.ts. Export createGoogleCloudTranscription(apiKey: string, modelName: string): ITurnEmitter. Uses @google-cloud/speech StreamingRecognize. Accepts 24kHz PCM, streams to GCP, emits partial/committed matching ITurnEmitter exactly. Integration test gated on GOOGLE_CLOUD_SPEECH_API_KEY env var — skipped if not set."
+          "Action": "Create src/voice/google-cloud-transcription.ts. Export createGoogleCloudTranscription(apiKey: string, modelName: string): ITurnEmitter. Uses @google-cloud/speech StreamingRecognize. Accepts 24kHz PCM, streams to GCP, emits partial/committed matching ITurnEmitter exactly. Integration test gated on GOOGLE_CLOUD_SPEECH_API_KEY env var \u2014 skipped if not set."
         },
         "subItems": [
           {
@@ -1209,7 +1209,7 @@
           },
           {
             "id": "google-cloud-stt-ts.ac3",
-            "title": "Partial results → onPartial callback, final results → onCommitted callback",
+            "title": "Partial results \u2192 onPartial callback, final results \u2192 onCommitted callback",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1250,7 +1250,7 @@
           },
           {
             "id": "transcription-manager-gcp.ac2",
-            "title": "Hot-swap: Moonshine→Google Cloud tears down old ITurnEmitter, creates new one",
+            "title": "Hot-swap: Moonshine\u2192Google Cloud tears down old ITurnEmitter, creates new one",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"

@@ -495,6 +495,10 @@
     "mtime": 1778342940.3760328,
     "hash": "5e1c9252aac072bf95dd73f4a46e0fc0"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/turn-queue.test.ts": {
+    "mtime": 1778617908.434456,
+    "hash": "42fd1c39a63e58f7e00ad7d54b2f6a05"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/config.test.ts": {
     "mtime": 1778342940.3747826,
     "hash": "005b88c4d325de1621272facdde806c6"
@@ -2298,6 +2302,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/lib/caveman/__tests__/workspace.test.ts": {
     "mtime": 1778342940.359632,
     "hash": "db86cf73631401d7800fe64df31bc89a"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/voice/turn-queue.ts": {
+    "mtime": 1778617908.2824507,
+    "hash": "77d5d865bb20e4dcd51fb5faface35cb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/voice/google-cloud-transcription.ts": {
     "mtime": 1778617473.2485251,
