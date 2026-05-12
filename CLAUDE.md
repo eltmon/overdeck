@@ -117,6 +117,30 @@ The `pan` binary's subcommands and Claude Code's `pan-*` skills follow a strict 
 
 See [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) for the full rules, shapes (CLI-wrapper / CLI-sub-wrapper / Workflow / Reference / Topical), and creating-a-new-skill checklist.
 
+## Planning Modes
+
+Panopticon supports two planning modes:
+
+### Interactive (default)
+```bash
+pan plan <id>
+```
+Launches an interactive planning session where the agent asks Q&A questions before producing a vBRIEF.
+
+### Auto (non-interactive)
+```bash
+pan plan <id> --auto
+```
+Runs the planning agent end-to-end without prompting. If it encounters a contradiction it can't resolve, it escalates to interactive mode. All inferred choices are recorded in `plan.autoDecisions[]` for audit.
+
+### Auto-Start (skip planning)
+```bash
+pan start <id> --auto
+```
+Skips the planning agent entirely. Synthesizes a minimal vBRIEF from the issue title/body, creates beads, and spawns the work agent directly. For trivial issues (typos, version bumps) where full planning is overkill.
+
+**Always verify available flags with `pan <verb> --help`** — the CLI is self-documenting and flags may change between versions.
+
 ## Project Structure
 
 - **Stack**: TypeScript, Node.js 22+, React dashboard, SQLite, Effect.js
