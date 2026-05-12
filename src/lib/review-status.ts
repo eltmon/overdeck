@@ -247,9 +247,12 @@ export function setReviewStatus(
         );
         const sha = stdout.trim();
         if (sha) {
+          // panopticon/review is honest here — review just transitioned to readyForMerge.
+          // The panopticon/tests status is posted separately at the actual test-completion
+          // site (verification-runner success, test-agent POST in workspaces routes) so it
+          // accurately reflects which commit was tested.
           await reportCommitStatus(owner, repo, sha, 'success', 'panopticon/review', 'Review passed');
-          await reportCommitStatus(owner, repo, sha, 'success', 'panopticon/test', 'Tests passed');
-          console.log(`[review-status] Reported commit statuses for ${issueId} (${sha.slice(0, 8)})`);
+          console.log(`[review-status] Reported panopticon/review for ${issueId} (${sha.slice(0, 8)})`);
         }
       } catch (err: any) {
         console.warn(`[review-status] Failed to report commit status: ${err.message}`);

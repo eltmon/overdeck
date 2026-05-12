@@ -89,6 +89,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # If Panopticon's verification gate or test specialist already validated
+      # tests for this exact commit, the panopticon/test commit status will be
+      # success. In that case, skip the redundant vitest run here — but keep
+      # the rest of the job (build, Playwright, smoke test) since those exercise
+      # different surfaces. Falls through to a full run when the status is
+      # absent (non-pipeline pushes) or not success (verification failed).
+      - name: Check for Panopticon test validation
+        id: panopticon-test
+        run: |
+          # In PR events github.sha is the temporary merge commit, not the branch
+          # head — Panopticon posts status against the branch head SHA. Prefer
+          # pull_request.head.sha when present (PR runs), fall back to github.sha
+          # (push to main).
+          sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          state=$(gh api "repos/${{ github.repository }}/commits/${sha}/status" --jq \
+            '.statuses[]? | select(.context == "panopticon/test") | .state' | head -n 1)
+          if [ "$state" = "success" ]; then
+            echo "Panopticon test specialist already validated $sha — skipping vitest."
+            echo "skip_vitest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No panopticon/test=success on $sha (got '${state:-none}') — running vitest."
+            echo "skip_vitest=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Use Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -106,6 +132,7 @@ jobs:
         run: npm run build
 
       - name: Test
+        if: steps.panopticon-test.outputs.skip_vitest != 'true'
         # GitHub Actions runners have limited memory. Vitest config automatically uses 1 fork
         # in CI, preventing OOM. Local development uses up to 4 concurrent workers.
         # Root cause (PAN-805): reconciler tests with real async I/O (Retry-After sleeping)

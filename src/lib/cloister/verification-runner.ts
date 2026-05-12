@@ -484,6 +484,21 @@ export async function runVerificationForIssue(
       ...(lastVerifiedCommit ? { lastVerifiedCommit } : {}),
     });
     console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
+
+    // Post panopticon/tests=success so the GitHub CI test job can self-skip
+    // its redundant vitest run on this exact commit. Non-fatal on failure.
+    void (async () => {
+      try {
+        const project = findProjectByPath(workspacePath);
+        const repo = project?.github_repo;
+        if (!repo || !repo.includes('/')) return;
+        const [owner, name] = repo.split('/');
+        const { postPanopticonTestsStatus } = await import('../github-app.js');
+        await postPanopticonTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed');
+      } catch (err: any) {
+        console.warn(`[${logPrefix}] Failed to post panopticon/tests status: ${err.message}`);
+      }
+    })();
     return { outcome: 'passed' };
 
   } catch (verifyErr: any) {
