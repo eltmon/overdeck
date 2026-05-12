@@ -995,6 +995,11 @@ Required steps:
      -d '{"readyForMerge":true}'
 8. Report SHIP READY with the pushed commit and verification summary.
 
+No-rescan rule:
+- After resolving detected conflict files, do NOT re-scan for additional conflicts.
+- If the rebase produces conflicts beyond the immediately visible set, abort and report SHIP BLOCKED for human triage.
+- Do not loop: resolve once, verify once, push once.
+
 Human-merge invariant:
 - Do NOT run gh pr merge.
 - Do NOT call any merge endpoint or destructive merge API POST.
