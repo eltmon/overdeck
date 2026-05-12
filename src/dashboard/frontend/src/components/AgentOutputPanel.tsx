@@ -9,7 +9,6 @@
  */
 
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { XTerminal } from './XTerminal';
 import { ActivityView } from './CommandDeck/ActivityView';
 import { ConversationPanel } from './chat/ConversationPanel';
@@ -21,11 +20,18 @@ interface AgentOutputPanelProps {
   agentId: string;
 }
 
-// Parse specialist tmux session name: specialist-{projectKey}-{issueId}-{type}
+// Parse role-run tmux session name: agent-{projectKey}-{issueId}(-{subrole})?
+// e.g. agent-pan-1069-review, agent-pan-1069-review-correctness, agent-pan-1069-test
 function parseSpecialistSession(agentId: string): { projectKey: string; issueId: string; type: string } | null {
-  const match = agentId.match(/^specialist-(.+)-([A-Z]+-\d+)-(review-agent|test-agent|merge-agent)$/);
+  // Match new pattern: agent-{projectKey}-{issueId}(-{subrole})?
+  const match = agentId.match(/^agent-(.+)-([A-Z]+-\d+)(?:-(review|correctness|security|performance|requirements|test|ship|merge))?$/);
   if (!match) return null;
-  return { projectKey: match[1], issueId: match[2], type: match[3] };
+  const subrole = match[3];
+  // Derive type: bare 'review' is the orchestrator; 'correctness'/'security'/etc are sub-roles
+  const type = subrole && subrole !== 'review'
+    ? `review-${subrole}` // correctness → review-correctness, etc.
+    : 'orchestrator';
+  return { projectKey: match[1], issueId: match[2], type };
 }
 
 // Derive issueId for role runs: agent-pan-505 → PAN-505, agent-pan-505-test → PAN-505.
@@ -51,20 +57,9 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
     setTerminalFailed(false);
   }
 
-  // Fetch specialist runtime state
-  const { data: specData } = useQuery({
-    queryKey: ['specialist-panel-status', agentId],
-    queryFn: async () => {
-      if (!specialist) return null;
-      const res = await fetch(`/api/specialists/${specialist.projectKey}/${specialist.issueId}/${specialist.type}/status`);
-      if (!res.ok) return null;
-      return res.json() as Promise<{ isRunning: boolean; sessionId?: string }>;
-    },
-    enabled: !!specialist,
-    refetchInterval: 5000,
-  });
-
-  const specialistIsRunning = specData?.isRunning ?? false;
+  // Determine specialist running state from agent snapshot status
+  // (the old /api/specialists/:project/:issueId/:type/status endpoint was retired in PAN-1048)
+  const specialistIsRunning = specialist && agent?.status === 'running';
 
   // Build a Conversation object for specialists so ConversationPanel can fetch the JSONL
   const specialistConversation = useMemo<Conversation | null>(() => {
@@ -79,7 +74,7 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
       createdAt: new Date().toISOString(),
       endedAt: specialistIsRunning ? null : new Date().toISOString(),
       lastAttachedAt: null,
-      sessionAlive: specialistIsRunning,
+      sessionAlive: specialistIsRunning ?? false,
       sessionFile: null, // Backend resolves this from the specialist .session file
     };
   }, [specialist, agentId, specialistIsRunning]);
@@ -90,8 +85,11 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
   const roleRunIssueId = agent?.role === 'test' ? agent.issueId : undefined;
   const workAgentIssueId = specialist ? null : deriveAgentIssueId(agentId, roleRunIssueId ?? agent?.issueId);
 
+  // Build display label for specialist sessions
   const label = specialist
-    ? `${specialist.projectKey} / ${specialist.type.replace('-agent', '')}`
+    ? specialist.type === 'orchestrator'
+      ? `${specialist.projectKey} / review orchestrator`
+      : `${specialist.projectKey} / ${specialist.type.replace('review-', 'review: ')}`
     : agentId;
 
   return (
