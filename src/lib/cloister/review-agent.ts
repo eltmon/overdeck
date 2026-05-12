@@ -40,11 +40,12 @@
  */
 
 import { existsSync } from 'fs';
+import { mkdir, writeFile } from 'fs/promises';
 import { exec } from 'child_process';
 import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { promisify } from 'util';
-import { killSessionAsync, listSessionNamesAsync, isPaneDeadAsync } from '../tmux.js';
+import { killSessionAsync, listSessionNamesAsync, isPaneDeadAsync, capturePaneAsync } from '../tmux.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
@@ -53,7 +54,7 @@ import { buildReviewContext } from './review-context.js';
 import { REVIEW_SUB_ROLES, reviewerOutputPath, type ReviewSubRole } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { packageRoot } from '../paths.js';
-import { getAgentStateAsync } from '../agents.js';
+import { getAgentStateAsync, type AgentState } from '../agents.js';
 
 /**
  * Read a convoy sub-role prompt template from the panopticon-cli install.
@@ -228,70 +229,217 @@ function buildReviewRolePrompt(opts: {
 }
 
 /**
- * Monitor the synthesis agent for silent exit.
+ * Failure modes that can cause a silent synthesis exit (PAN-457 / PAN-1105).
+ * These are the four candidates from the issue plus an unknown catch-all.
+ */
+type SynthesisFailureMode =
+  | 'context_budget_exceeded'
+  | 'first_tool_call_crashed'
+  | 'output_path_unwriteable'
+  | 'stale_workspace_state'
+  | 'unknown';
+
+/**
+ * Classify why the synthesis agent failed by inspecting the tmux pane
+ * output and agent state. This maps the observed evidence to one of the
+ * four explicit failure modes in the acceptance criteria.
+ */
+async function classifySynthesisFailure(opts: {
+  paneOutput: string;
+  synthesisPath: string;
+  workspace: string;
+}): Promise<{ mode: SynthesisFailureMode; detail: string }> {
+  const output = opts.paneOutput.toLowerCase();
+  const { mode, detail } = ((): { mode: SynthesisFailureMode; detail: string } => {
+    // 1. Context budget overflow: model hits context window limit before writing output
+    const contextPatterns = [
+      'context limit', 'maximum context', 'token limit', 'context is full',
+      'too many tokens', 'context window', 'maximum tokens', 'context_length',
+      'context exceeded', 'context overflow', 'message too long',
+    ];
+    if (contextPatterns.some(p => output.includes(p))) {
+      return { mode: 'context_budget_exceeded', detail: 'Model hit context window limit before writing the synthesis report.' };
+    }
+
+    // 2. First-tool-call crash: broken MCP, missing skill, permission error on first tool use
+    const toolCrashPatterns = [
+      'mcp', 'tool error', 'unknown tool', 'cannot find tool',
+      'missing permission', 'access denied', 'forbidden',
+      'cannot read file', 'enoent', 'no such file or directory',
+      'command not found', 'module not found', 'cannot find module',
+    ];
+    if (toolCrashPatterns.some(p => output.includes(p))) {
+      return { mode: 'first_tool_call_crashed', detail: 'Agent crashed on first tool call (broken MCP, missing skill, or permission error).' };
+    }
+
+    // 3. Output path unwriteable: cannot create or write the required output file
+    const pathPatterns = [
+      'cannot write', 'enoent', 'no such file', 'permission denied',
+      'read-only', 'eacces', 'enospc', 'invalid path', 'cannot create',
+    ];
+    if (pathPatterns.some(p => output.includes(p))) {
+      // Distinguish "parent dir missing" from "file not writable"
+      const parentDir = dirname(opts.synthesisPath);
+      if (!existsSync(parentDir)) {
+        return { mode: 'output_path_unwriteable', detail: `Output directory does not exist: ${parentDir}` };
+      }
+      return { mode: 'output_path_unwriteable', detail: 'Output file path is not writable (permission denied or read-only filesystem).' };
+    }
+
+    // 4. Stale workspace state: .beads/ corruption or other workspace-level gating
+    const stalePatterns = [
+      'beads', 'workspace state', 'stale', 'corrupt', 'invalid workspace',
+    ];
+    if (stalePatterns.some(p => output.includes(p))) {
+      return { mode: 'stale_workspace_state', detail: 'Workspace state is stale or corrupted (e.g. .beads/ inconsistency).' };
+    }
+
+    return { mode: 'unknown', detail: 'Cause could not be determined from pane output.' };
+  })();
+
+  return { mode, detail };
+}
+
+/**
+ * Write a failure synthesis report to the expected output path so the
+ * pipeline always has a synthesis artifact to read even when the agent
+ * crashes before writing its own. Follows the format from roles/review.md.
+ */
+async function writeFailureSynthesis(opts: {
+  issueId: string;
+  synthesisPath: string;
+  failureMode: SynthesisFailureMode;
+  failureDetail: string;
+}): Promise<void> {
+  const dir = dirname(opts.synthesisPath);
+  try {
+    await mkdir(dir, { recursive: true });
+  } catch {
+    // Dir may already exist; non-fatal if mkdir fails
+  }
+
+  const timestamp = new Date().toISOString();
+  const modeLabel: Record<SynthesisFailureMode, string> = {
+    context_budget_exceeded: 'CONTEXT BUDGET EXCEEDED',
+    first_tool_call_crashed: 'FIRST-TOOL-CALL CRASH',
+    output_path_unwriteable: 'OUTPUT PATH UNWRITEABLE',
+    stale_workspace_state: 'STALE WORKSPACE STATE',
+    unknown: 'UNKNOWN CAUSE',
+  };
+
+  const body = [
+    `# Review Synthesis — ${opts.issueId} — ${timestamp}`,
+    '',
+    '## Verdict: CHANGES REQUESTED',
+    '',
+    '## Context',
+    `- Synthesis agent crashed before writing a full report.`,
+    `- Failure mode: ${modeLabel[opts.failureMode]}`,
+    `- Detail: ${opts.failureDetail}`,
+    '',
+    '## Convoy Status',
+    '| Sub-role | Status | Blocking findings |',
+    '| --- | --- | --- |',
+    '| security | unknown | — |',
+    '| correctness | unknown | — |',
+    '| performance | unknown | — |',
+    '| requirements | unknown | — |',
+    '',
+    '## Blocking Findings',
+    '',
+    `### [synthesis] ${modeLabel[opts.failureMode]} — synthesis agent`,
+    opts.failureDetail,
+    '',
+    'The synthesis agent crashed or exited before producing its report.',
+    'Convoy reviewers may not have produced output because the synthesis agent',
+    'did not coordinate them before crashing.',
+  ].join('\n');
+
+  await writeFile(opts.synthesisPath, body, 'utf-8');
+}
+
+/**
+ * Monitor the synthesis agent for silent exit (PAN-457 / PAN-1105).
  *
- * After spawning the synthesis agent, we run this background task to detect
- * when it dies WITHOUT producing the synthesis file. In that case we read the
- * agent's error state and surface it in the review status instead of letting
- * it look like a 30-minute timeout (deacon's checkStuckReviewing).
+ * This is an event-driven complement to the stop-hook path. It fires
+ * immediately after the synthesis agent is spawned and runs as a background
+ * task in the dashboard server process. Every 10 seconds it checks whether:
+ *   1. The synthesis file already exists → exit immediately (normal completion)
+ *   2. The synthesis session has died without writing output → classify the
+ *      failure, write a failure synthesis, and update review status
+ *   3. Neither → keep polling, but bound the total wait at 30 minutes
  *
- * This closes the detection gap that allowed PAN-457: all four reviewers
- * "exited before producing" because the synthesis agent itself crashed
- * silently — but we had no idea until the deacon fired 30 minutes later.
- *
- * The monitor polls every 10 seconds. It stops as soon as the synthesis
- * output file exists (normal completion) or the session dies (silent failure).
+ * The monitor stops as soon as either condition 1 or 2 becomes true.
+ * It never runs indefinitely.
  */
 async function monitorSynthesisAgent(opts: {
   issueId: string;
   sessionId: string;
   synthesisPath: string;
+  workspace: string;
 }): Promise<void> {
   const pollIntervalMs = 10_000;
+  const maxWaitMs = 30 * 60 * 1_000; // 30 minutes — matches deacon threshold
+  const deadline = Date.now() + maxWaitMs;
 
-  while (true) {
+  while (Date.now() < deadline) {
+    // Check 1: did the synthesis agent already complete normally?
+    if (existsSync(opts.synthesisPath)) {
+      return; // Normal completion — monitor done
+    }
+
     await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
 
+    // Check 2: did the session die without producing output?
     try {
-      // Has the synthesis session died?
       const dead = await isPaneDeadAsync(opts.sessionId);
-      if (!dead) continue; // Still running normally
+      if (!dead) continue; // Still alive
 
-      // Session died. Did it produce the synthesis file before exiting?
-      if (!existsSync(opts.synthesisPath)) {
-        // Silent failure — synthesis agent crashed before writing output.
-        // Surface the actual error from the agent state.
-        let errorNote = 'Synthesis agent exited before producing a report.';
-        try {
-          const state = await getAgentStateAsync(opts.sessionId);
-          if (state) {
-            if (state.status === 'error') {
-              errorNote = `Synthesis agent error. Last activity: ${state.lastActivity ?? 'unknown'}.`;
-            } else if (state.status === 'stopped' && !state.stoppedByUser) {
-              errorNote = `Synthesis agent stopped unexpectedly. Last activity: ${state.lastActivity ?? 'unknown'}.`;
-            } else if (state.stoppedByUser) {
-              errorNote = 'Synthesis agent was stopped by user before producing a report.';
-            } else {
-              errorNote = `Synthesis agent exited with status '${state.status}'.`;
-            }
-          }
-        } catch {
-          // State unreadable — keep the default note
-        }
+      // Session is dead and synthesis file doesn't exist → silent failure
+      const paneOutput = await capturePaneAsync(opts.sessionId, 50);
+      const state = await getAgentStateAsync(opts.sessionId).catch(() => null);
 
-        console.error(`[review-agent] Silent synthesis exit detected for ${opts.issueId}: ${errorNote}`);
-        setReviewStatus(opts.issueId, {
-          reviewStatus: 'failed',
-          reviewNotes: errorNote,
-        });
+      const { mode, detail } = await classifySynthesisFailure({
+        paneOutput,
+        synthesisPath: opts.synthesisPath,
+        workspace: opts.workspace,
+      });
+
+      let errorNote: string;
+      if (state?.stoppedByUser) {
+        errorNote = `Synthesis agent was stopped by user. Failure: ${mode} — ${detail}`;
+      } else if (state?.status === 'error') {
+        errorNote = `Synthesis agent error. Failure: ${mode} — ${detail}`;
+      } else if (state?.status === 'stopped') {
+        errorNote = `Synthesis agent stopped unexpectedly. Failure: ${mode} — ${detail}`;
+      } else {
+        errorNote = `Synthesis agent exited before producing a report. Failure: ${mode} — ${detail}`;
       }
-      // Session died AND synthesis file exists — normal completion, we're done
-      break;
+
+      console.error(`[review-agent] Silent synthesis exit detected for ${opts.issueId}: ${errorNote}`);
+
+      // Write the failure synthesis so the pipeline always has a report artifact
+      await writeFailureSynthesis({
+        issueId: opts.issueId,
+        synthesisPath: opts.synthesisPath,
+        failureMode: mode,
+        failureDetail: detail,
+      });
+
+      setReviewStatus(opts.issueId, {
+        reviewStatus: 'failed',
+        reviewNotes: errorNote,
+      });
+
+      return; // Done — failure has been reported
     } catch (err) {
-      // Pane may not exist yet or other transient error — keep polling
+      // Pane may not exist yet or transient error — keep polling
       console.warn(`[review-agent] monitorSynthesisAgent poll error for ${opts.issueId}:`, err instanceof Error ? err.message : String(err));
     }
   }
+
+  // Timeout: synthesis took longer than 30 minutes — let the deacon handle it
+  console.warn(`[review-agent] monitorSynthesisAgent timed out for ${opts.issueId} after 30 minutes`);
 }
 
 /**
@@ -472,6 +620,7 @@ export async function spawnReviewRoleForIssue(
       issueId: opts.issueId,
       sessionId: run.id,
       synthesisPath,
+      workspace: opts.workspace,
     }).catch((err) => {
       console.error(`[review-agent] monitorSynthesisAgent threw for ${opts.issueId}:`, err instanceof Error ? err.message : String(err));
     });
