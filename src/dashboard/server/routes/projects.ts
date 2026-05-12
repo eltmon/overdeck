@@ -216,7 +216,7 @@ async function collectSessionTreeNodes(
       sections.push({
         type: sectionType,
         sessionId: checkId,
-        tmuxSession: sectionType === 'work' || sectionType === 'planning' ? checkId : undefined,
+        tmuxSession: sectionType === 'work' || sectionType === 'planning' || sectionType === 'merge' || sectionType === 'test' ? checkId : undefined,
         model: state.model || 'unknown',
         startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
         endedAt: undefined,
