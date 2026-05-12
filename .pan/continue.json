@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1053",
   "created": "2026-05-09T16:09:08.344Z",
-  "updated": "2026-05-12T18:47:30.852440Z",
+  "updated": "2026-05-12T19:02:57.597061Z",
   "gitState": {
     "branch": "feature/pan-1053",
     "sha": "a0902d21c",
@@ -83,12 +83,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-gt8k / voice-widget-tsx; next agent should run bd ready -l pan-1053 and continue with the next unblocked bead.",
-    "beadId": "workspace-gt8k",
+    "description": "Completed voice server wiring implementation for workspace-wrfe; next agent should close already-implemented voice server beads if they become ready, then continue with bd ready -l pan-1053.",
+    "beadId": "workspace-wrfe",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/chat/VoiceWidget.tsx",
-      "src/dashboard/frontend/src/hooks/useVoiceTranscription.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+      "src/dashboard/server/server.ts",
+      "src/dashboard/server/ws-voice.ts",
+      "src/dashboard/server/routes/voice.ts"
     ]
   },
   "beadsMapping": {},
@@ -152,6 +152,12 @@
       "timestamp": "2026-05-12T18:47:30.852440Z",
       "reason": "bead-complete",
       "note": "Implemented VoiceWidget with mic device picker, model picker, AnalyserNode waveform canvas, /ws/voice transcription hook, live partial/committed preview, Edit mode insert on stop, and Direct mode on committed transcript. npx tsc --noEmit and npx eslint . --max-warnings=0 passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-12T19:02:57.597061Z",
+      "reason": "bead-complete",
+      "note": "Implemented voice server wiring: added /ws/voice raw WebSocket setup, GET/PUT /api/voice/settings route, and registered setupVoiceWebSocket plus voiceRouteLayer in server.ts. ESLint passed for touched files; focused tsc still reports pre-existing unrelated dashboard server type errors outside touched files.",
       "agentModel": "gpt-5.5"
     }
   ],

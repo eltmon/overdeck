@@ -29,6 +29,7 @@ import { WorkspaceServiceLive } from './services/workspace-service.js';
 import { OpenRouterServiceLive } from './services/openrouter-service.js';
 import { PanOpenLive } from './services/open.js';
 import { setupTerminalWebSocket } from './ws-terminal.js';
+import { setupVoiceWebSocket } from './ws-voice.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
 import { agentsRouteLayer } from './routes/agents.js'
@@ -40,6 +41,7 @@ import { resourcesRouteLayer } from './routes/resources.js'
 import { commandDeckRouteLayer } from './routes/command-deck.js'
 import { remoteRouteLayer } from './routes/remote.js'
 import { settingsRouteLayer } from './routes/settings.js'
+import { voiceRouteLayer } from './routes/voice.js';
 import { metricsRouteLayer } from './routes/metrics.js'
 import { miscRouteLayer } from './routes/misc.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
@@ -72,6 +74,7 @@ const HttpServerLive = Layer.unwrap(
     ]);
     const nodeServer = NodeHttp.createServer();
     setupTerminalWebSocket(nodeServer);
+    setupVoiceWebSocket(nodeServer);
     return NodeHttpServer.layer(() => nodeServer, {
       host: config.host,
       port: config.port,
@@ -209,6 +212,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   commandDeckRouteLayer,
   remoteRouteLayer,
   settingsRouteLayer,
+  voiceRouteLayer,
   metricsRouteLayer,
   miscRouteLayer,
   conversationsRouteLayer,

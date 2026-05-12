@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T18:47:30.852440Z"
+    "updated": "2026-05-12T19:02:57.597061Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a4f2c8d1-7b3e-4a90-b5f6-2e1d9c0a8374",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T18:47:30.852440Z",
+    "updated": "2026-05-12T19:02:57.597061Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -262,7 +262,7 @@
       {
         "id": "ws-voice-ts",
         "title": "Implement src/dashboard/server/ws-voice.ts — raw WebSocket at /ws/voice",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -277,7 +277,7 @@
           {
             "id": "ws-voice-ts.ac1",
             "title": "setupVoiceWebSocket(server) exported, registers on /ws/voice upgrade path using noServer pattern",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -285,7 +285,7 @@
           {
             "id": "ws-voice-ts.ac2",
             "title": "Binary WebSocket frames forwarded to transcription manager as PCM audio",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -293,7 +293,7 @@
           {
             "id": "ws-voice-ts.ac3",
             "title": "JSON frames {type:'transcript:partial'} and {type:'transcript:committed'} sent back to client",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -301,7 +301,7 @@
           {
             "id": "ws-voice-ts.ac4",
             "title": "TranscriptionManager torn down on WebSocket close",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -311,7 +311,7 @@
       {
         "id": "voice-settings-route",
         "title": "Implement src/dashboard/server/routes/voice.ts — GET/PUT /api/voice/settings",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -326,7 +326,7 @@
           {
             "id": "voice-settings-route.ac1",
             "title": "GET /api/voice/settings returns VoiceSettings JSON with defaults when file missing",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -334,7 +334,7 @@
           {
             "id": "voice-settings-route.ac2",
             "title": "PUT /api/voice/settings validates payload shape and persists to ~/.panopticon/voice-settings.json",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -344,7 +344,7 @@
       {
         "id": "server-wire-ws-voice",
         "title": "Wire setupVoiceWebSocket and voice routes into server.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -359,7 +359,7 @@
           {
             "id": "server-wire-ws-voice.ac1",
             "title": "setupVoiceWebSocket called in server.ts before Effect upgrade listeners",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -367,7 +367,7 @@
           {
             "id": "server-wire-ws-voice.ac2",
             "title": "Voice settings route registered in Effect HTTP router",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
