@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1053",
   "created": "2026-05-09T16:09:08.344Z",
-  "updated": "2026-05-12T19:02:57.597061Z",
+  "updated": "2026-05-12T19:08:34.805472Z",
   "gitState": {
     "branch": "feature/pan-1053",
-    "sha": "a0902d21c",
+    "sha": "9d56f8ad4",
     "dirty": true
   },
   "decisions": [
@@ -83,12 +83,13 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed voice server wiring implementation for workspace-wrfe; next agent should close already-implemented voice server beads if they become ready, then continue with bd ready -l pan-1053.",
-    "beadId": "workspace-wrfe",
+    "description": "Completed AutoPreso server wiring implementation for workspace-xn14; next agent should close already-implemented autopreso route/ws beads if they become ready, then continue with bd ready -l pan-1053.",
+    "beadId": "workspace-xn14",
     "filesToRead": [
       "src/dashboard/server/server.ts",
-      "src/dashboard/server/ws-voice.ts",
-      "src/dashboard/server/routes/voice.ts"
+      "src/dashboard/server/ws-autopreso.ts",
+      "src/dashboard/server/routes/autopreso.ts",
+      "src/autopreso/session.ts"
     ]
   },
   "beadsMapping": {},
@@ -158,6 +159,12 @@
       "timestamp": "2026-05-12T19:02:57.597061Z",
       "reason": "bead-complete",
       "note": "Implemented voice server wiring: added /ws/voice raw WebSocket setup, GET/PUT /api/voice/settings route, and registered setupVoiceWebSocket plus voiceRouteLayer in server.ts. ESLint passed for touched files; focused tsc still reports pre-existing unrelated dashboard server type errors outside touched files.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-12T19:08:34.805472Z",
+      "reason": "bead-complete",
+      "note": "Implemented AutoPreso server wiring: added singleton session, /ws/autopreso raw WebSocket, AutoPreso HTTP routes, and registered setupAutoPresoWebSocket plus autopresoRouteLayer in server.ts. ESLint passed for touched files.",
       "agentModel": "gpt-5.5"
     }
   ],

@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T19:02:57.597061Z"
+    "updated": "2026-05-12T19:08:34.805472Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a4f2c8d1-7b3e-4a90-b5f6-2e1d9c0a8374",
     "author": "agent:claude-opus-4-7",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T19:02:57.597061Z",
+    "updated": "2026-05-12T19:08:34.805472Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -851,7 +851,7 @@
       {
         "id": "autopreso-routes-ts",
         "title": "Implement src/dashboard/server/routes/autopreso.ts — HTTP routes",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -866,7 +866,7 @@
           {
             "id": "autopreso-routes-ts.ac1",
             "title": "POST /api/autopreso/start transitions to live mode and returns {mode:'live'}",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -874,7 +874,7 @@
           {
             "id": "autopreso-routes-ts.ac2",
             "title": "POST /api/autopreso/back-to-staging transitions to staging and returns {mode:'staging'}",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -882,7 +882,7 @@
           {
             "id": "autopreso-routes-ts.ac3",
             "title": "POST /api/autopreso/session/reset clears all elements and resets to staging",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -892,7 +892,7 @@
       {
         "id": "ws-autopreso-ts",
         "title": "Implement src/dashboard/server/ws-autopreso.ts — whiteboard state broadcast WebSocket",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -907,7 +907,7 @@
           {
             "id": "ws-autopreso-ts.ac1",
             "title": "setupAutoPresoWebSocket() registers /ws/autopreso upgrade path",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -915,7 +915,7 @@
           {
             "id": "ws-autopreso-ts.ac2",
             "title": "On connect: sends {type:'whiteboard:snapshot', mode, elements}",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -923,7 +923,7 @@
           {
             "id": "ws-autopreso-ts.ac3",
             "title": "On update: broadcasts {type:'whiteboard:update', elements} to all connected clients",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -933,7 +933,7 @@
       {
         "id": "server-wire-autopreso",
         "title": "Wire AutoPreso WebSocket and routes into server.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -948,7 +948,7 @@
           {
             "id": "server-wire-autopreso.ac1",
             "title": "setupAutoPresoWebSocket() called in server.ts startup",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -956,7 +956,7 @@
           {
             "id": "server-wire-autopreso.ac2",
             "title": "AutoPreso HTTP routes registered in Effect router",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
