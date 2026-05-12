@@ -536,6 +536,14 @@ export interface AgentState {
    * sendKeysAsync. Absent or false means tmux-only delivery (current default).
    */
   channelsEnabled?: boolean;
+
+  /**
+   * The terminal error message from the last agent error, if any.
+   * Set when status transitions to 'error'; cleared on resume.
+   * Used by synthesis failure classification to identify the root cause
+   * (PAN-1105).
+   */
+  lastError?: string;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -566,6 +574,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     preSpawnStashMessage: raw.preSpawnStashMessage,
     preSpawnBaselineHead: raw.preSpawnBaselineHead,
     channelsEnabled: raw.channelsEnabled,
+    lastError: raw.lastError,
   };
 }
 
