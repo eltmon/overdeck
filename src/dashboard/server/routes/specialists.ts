@@ -239,11 +239,12 @@ const postSpecialistsDoneRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
-    const { specialist, issueId, status, notes } = body as {
+    const { specialist, issueId, status, notes, sessionId } = body as {
       specialist: string;
       issueId: string;
       status: string;
       notes?: string;
+      sessionId?: string;
     };
 
     // Validate specialist type
@@ -332,8 +333,39 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         break;
 
       case 'ship':
-        if (status === 'passed') {
-          update.readyForMerge = true;
+        // Ship role completion: capture cost from session file and log to audit log
+        // No reviewStatus field to update for ship - it runs as part of merge flow
+        if (sessionId) {
+          yield* Effect.promise(async () => {
+            try {
+              const { findSessionFile } = await import('../../../lib/cloister/specialists.js');
+              const { parseClaudeSession } = await import('../../../lib/cost-parsers/jsonl-parser.js');
+              const { emitActivityEntry } = await import('../../../lib/activity-logger.js');
+              const sessionFile = findSessionFile(sessionId);
+              if (sessionFile) {
+                const usage = parseClaudeSession(sessionFile);
+                if (usage) {
+                  const cost = usage.cost_v2 ?? usage.cost;
+                  const model = usage.model;
+                  const duration = usage.endTime && usage.startTime
+                    ? Math.round((new Date(usage.endTime).getTime() - new Date(usage.startTime).getTime()) / 1000)
+                    : null;
+                  // Emit activity entry for dashboard visibility
+                  emitActivityEntry({
+                    source: 'ship',
+                    level: status === 'passed' ? 'success' : 'error',
+                    message: `Ship role ${status} for ${normalizedIssueId}: cost $${cost.toFixed(4)} (${model})${duration ? `, ${duration}s` : ''}`,
+                    issueId: normalizedIssueId,
+                  });
+                  console.log(`[specialists/done] Ship role cost captured: $${cost.toFixed(4)} for ${normalizedIssueId} (session: ${sessionId})`);
+                }
+              } else {
+                console.log(`[specialists/done] Ship session file not found for ${sessionId}`);
+              }
+            } catch (err) {
+              console.error(`[specialists/done] Failed to capture ship cost:`, err instanceof Error ? err.message : String(err));
+            }
+          });
         }
         break;
     }

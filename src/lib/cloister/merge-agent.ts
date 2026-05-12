@@ -982,6 +982,11 @@ TARGET BRANCH: ${options.targetBranch}
 
 Prepare this already-reviewed branch for the dashboard's human Merge button.
 
+Bail-out threshold:
+- If total cost exceeds $5.00 USD, stop and report SHIP BLOCKED with the cost and conflict count.
+- If there are more than 10 conflict files, stop and report SHIP BLOCKED — this needs human triage.
+- Do not burn through a workhorse budget on a complex merge.
+
 Required steps:
 1. Work only in ${options.workspacePath}.
 2. Fetch the target branch: git fetch origin ${options.targetBranch}.
@@ -1023,12 +1028,24 @@ ${options.conflictFiles.map(f => `- ${f}`).join('\n')}
 
 Resolve the in-progress sync-main conflict in the workspace branch only.
 
+IMPORTANT - Short-circuit rule:
+- The conflict files listed above are the ONLY files with conflicts. Do NOT run 'git diff --check' or any other conflict-scanning command.
+- Do NOT search for additional conflict markers in other files.
+- If a file is not in the list above, it has no conflicts — trust this.
+- A stale tool call referencing a path that no longer exists means you are using cached state. Always read the actual workspace tree, not training-data memory.
+
 Required steps:
 1. Work only in ${options.workspacePath}.
-2. Inspect the listed conflict files and resolve conflict markers by preserving the feature branch intent and current main behavior.
-3. Run the relevant verification gates from the project instructions.
-4. Commit the sync-main conflict resolution if the merge requires a commit, then push the workspace branch with --force-with-lease if needed.
-5. Report SHIP READY for the sync-main conflict resolution, or SHIP BLOCKED with exact files and reasons.
+2. Use ONLY the conflict files listed above. Do not re-scan.
+3. Resolve conflict markers in each listed file by preserving the feature branch intent and current main behavior.
+4. Run the relevant verification gates from the project instructions.
+5. Commit the sync-main conflict resolution if the merge requires a commit, then push the workspace branch with --force-with-lease if needed.
+6. Report SHIP READY for the sync-main conflict resolution, or SHIP BLOCKED with exact files and reasons.
+
+Bail-out threshold:
+- If total cost exceeds $5.00 USD, stop and report SHIP BLOCKED with the cost and conflict count.
+- If there are more than 10 conflict files, stop and report SHIP BLOCKED — this needs human triage.
+- Do not burn through a workhorse budget on a complex merge.
 
 Human-merge invariant:
 - Do NOT run gh pr merge.

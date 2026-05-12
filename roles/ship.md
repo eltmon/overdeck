@@ -38,6 +38,20 @@ hooks:
 
 The ship role prepares an approved, tested pull request for a human merge. It does not merge. It makes the branch safe, current, verified, pushed, and clearly marked as ready for the dashboard's human Merge button.
 
+## Completion
+
+When finished, report completion by calling:
+```
+pan admin specialists done ship {{issueId}} --status passed --notes "<summary>"
+```
+
+Where `<summary>` describes what was done (e.g., "Rebased onto main, resolved 3 conflicts, pushed").
+
+If blocked, report:
+```
+pan admin specialists done ship {{issueId}} --status failed --notes "<reason>"
+```
+
 ## Inputs
 
 1. The issue id and approved PR for the current feature branch.
@@ -54,7 +68,10 @@ The ship role prepares an approved, tested pull request for a human merge. It do
 5. If the rebase produces broad conflicts (roughly more than five files), abort the rebase and report `SHIP BLOCKED` for human triage.
 6. Re-run verification gates from the project instructions, including typecheck, lint, and tests.
 7. Push the updated feature branch to its remote tracking branch.
-8. Transition the issue/PR state to the workflow state that means **ready-to-merge** so the dashboard renders the Merge button for a human.
+8. Mark the issue ready for merge by calling:
+   ```
+   pan admin specialists done ship {{issueId}} --status passed --notes "<summary>"
+   ```
 9. Exit after reporting the pushed commit, verification results, and ready-to-merge state transition.
 
 ## Human-Merge Invariant
