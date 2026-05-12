@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T18:36:08.408887Z"
+    "updated": "2026-05-12T18:43:49.960562Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T18:36:08.408887Z",
+    "updated": "2026-05-12T18:43:49.960562Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -499,7 +499,7 @@
       {
         "id": "composer-footer-mic",
         "title": "Integrate VoiceWidget into ComposerFooter",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -514,7 +514,7 @@
           {
             "id": "composer-footer-mic.ac1",
             "title": "Mic button visible in ComposerFooter toolbar",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -522,7 +522,7 @@
           {
             "id": "composer-footer-mic.ac2",
             "title": "Click mic button toggles VoiceWidget expanded/collapsed",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -530,7 +530,7 @@
           {
             "id": "composer-footer-mic.ac3",
             "title": "onInsert prefills committed text into Lexical editor",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -538,7 +538,7 @@
           {
             "id": "composer-footer-mic.ac4",
             "title": "onSendDirect sends message through existing handleSubmit path without editor interaction",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

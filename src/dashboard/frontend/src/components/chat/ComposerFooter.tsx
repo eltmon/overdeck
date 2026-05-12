@@ -11,12 +11,13 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { SendHorizontal, X, Loader2 } from 'lucide-react';
+import { Mic, SendHorizontal, X, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
-import { $getRoot } from 'lexical';
+import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
+import { VoiceWidget } from './VoiceWidget';
 import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredHarness, saveStoredModel } from './ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
@@ -162,6 +163,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
+  const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const editorRef = useRef<LexicalEditor | null>(null);
   const pendingImagesRef = useRef<PendingImage[]>([]);
@@ -515,6 +517,43 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
     };
   }, [deleteUploadedImage]);
 
+  const insertVoiceText = useCallback((voiceText: string) => {
+    const trimmed = voiceText.trim();
+    if (!trimmed) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.update(() => {
+      const root = $getRoot();
+      const existing = root.getTextContent().trim();
+      root.clear();
+      const paragraph = $createParagraphNode();
+      paragraph.append($createTextNode([existing, trimmed].filter(Boolean).join(existing ? '\n' : '')));
+      root.append(paragraph);
+    });
+    setText((existing) => [existing.trim(), trimmed].filter(Boolean).join(existing.trim() ? '\n' : ''));
+    editor.focus();
+  }, []);
+
+  const sendVoiceTextDirect = useCallback(async (voiceText: string) => {
+    const trimmed = voiceText.trim();
+    if (!trimmed || isDisabled) return;
+    setSending(true);
+    try {
+      if (model !== conversation.model && conversation.sessionAlive) {
+        await switchModel(conversation.name, model, agentId);
+      }
+      onSend?.(trimmed);
+      await sendConversationMessage(conversation.name, trimmed, agentId);
+    } catch (err) {
+      console.error('[ComposerFooter] Failed to send voice message:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to send voice message');
+      onSendFailed?.(trimmed);
+    } finally {
+      setSending(false);
+      editorRef.current?.focus();
+    }
+  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, isDisabled, model, onSend, onSendFailed]);
+
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
       if (key === 'Enter') void handleSubmit();
@@ -585,6 +624,16 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
           <div className={styles.composerToolbarSpacer} />
 
           <button
+            className={isVoiceWidgetOpen ? styles.voiceToolbarButtonActive : styles.voiceToolbarButton}
+            onClick={() => setIsVoiceWidgetOpen((open) => !open)}
+            disabled={isDisabled}
+            type="button"
+            title="Toggle voice input"
+          >
+            <Mic size={16} />
+          </button>
+
+          <button
             className={styles.sendButton}
             onClick={() => void handleSubmit()}
             disabled={(isEmpty && pendingImages.filter((image) => !!image.serverPath).length === 0) || isDisabled}
@@ -594,6 +643,13 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
             <SendHorizontal size={16} />
           </button>
         </div>
+        {isVoiceWidgetOpen && (
+          <VoiceWidget
+            conversation={conversation}
+            onInsert={insertVoiceText}
+            onSendDirect={(voiceText) => void sendVoiceTextDirect(voiceText)}
+          />
+        )}
       </div>
     </div>
   );
