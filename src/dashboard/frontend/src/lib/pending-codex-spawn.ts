@@ -89,5 +89,9 @@ export function isCodexBlockedResponse(
   res: Response,
   data: StartAgentResponse | Record<string, unknown>,
 ): boolean {
-  return res.status === 429 && (data as StartAgentResponse).blocked === true;
+  const response = data as StartAgentResponse;
+  return res.status === 429
+    && response.blocked === true
+    && typeof response.error === 'string'
+    && response.error.startsWith('Codex authentication ');
 }

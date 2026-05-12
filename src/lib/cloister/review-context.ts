@@ -19,9 +19,10 @@ import { getDevrootPath } from '../config.js';
 
 const execAsync = promisify(exec);
 
-// Max raw diff bytes to embed in the manifest (128 KB).
-// Reviewers read per-file diffs on demand for anything larger.
-const MAX_DIFF_BYTES = 128 * 1024;
+// Max raw diff bytes to embed in the manifest (2 MB). Reviewers are not
+// allowed to perform independent broad diff discovery, so this must cover
+// normal feature branches without hiding changed hunks from sub-reviewers.
+const MAX_DIFF_BYTES = 2 * 1024 * 1024;
 
 const RISK_HIGH = 5;
 const RISK_MED  = 3;

@@ -66,9 +66,11 @@ function cleanupExpiredReauthSessions(): void {
   }
 }
 
-export function validateReauthTerminalToken(sessionName: string, token: string | undefined): boolean {
+export function consumeReauthTerminalToken(sessionName: string, token: string | undefined): boolean {
   const session = getLiveReauthSession(sessionName);
-  return !!session && !!token && session.terminalToken === token;
+  if (!session || !token || session.terminalToken !== token) return false;
+  session.terminalToken = '';
+  return true;
 }
 
 function buildTerminalCookie(sessionName: string, terminalToken: string): string {
@@ -91,10 +93,13 @@ const getCodexAuthRoute = HttpRouter.add(
 
 // ─── Route: POST /api/settings/codex-reauth ────────────────────────────────────
 
-async function hasExistingLiveReauthSession(): Promise<boolean> {
+async function getExistingLiveReauthSession(): Promise<{ sessionName: string; session: ReauthSession } | null> {
   cleanupExpiredReauthSessions();
   const sessions = await listSessionNamesAsync();
-  return [...reauthSessions.keys()].some((name) => sessions.includes(name));
+  for (const [sessionName, session] of reauthSessions.entries()) {
+    if (sessions.includes(sessionName)) return { sessionName, session };
+  }
+  return null;
 }
 
 const postCodexReauthRoute = HttpRouter.add(
@@ -106,11 +111,15 @@ const postCodexReauthRoute = HttpRouter.add(
       const originError = rejectInvalidOrigin(request);
       if (originError) return originError;
 
-      const existing = yield* Effect.promise(() => hasExistingLiveReauthSession());
+      const existing = yield* Effect.promise(() => getExistingLiveReauthSession());
       if (existing) {
-        return jsonResponse({
-          error: 'A Codex re-authentication session is already running.',
-        }, { status: 409 });
+        const headless = !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
+        return jsonResponse(
+          { sessionName: existing.sessionName, statusToken: existing.session.statusToken, headless, existing: true },
+          existing.session.terminalToken
+            ? { headers: { 'Set-Cookie': buildTerminalCookie(existing.sessionName, existing.session.terminalToken) } }
+            : undefined,
+        );
       }
 
       const { sessionName, terminalToken, statusToken } = generateReauthSession();

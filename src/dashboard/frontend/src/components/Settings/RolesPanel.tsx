@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { SensitiveText } from '../SensitiveText';
+import { useCodexAuthStatus, type CodexAuthStatus } from '../../hooks/useCodexAuthStatus';
 
 type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
@@ -205,6 +207,19 @@ function providerWarning(
   return null;
 }
 
+function formatExpiry(expiresAt?: string): string | null {
+  if (!expiresAt) return null;
+  const date = new Date(expiresAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return `Expires ${date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`;
+}
+
+function authStatusVariant(status: CodexAuthStatus['status']): 'success' | 'warning' | 'neutral' {
+  if (status === 'valid') return 'success';
+  if (status === 'expired' || status === 'burned') return 'warning';
+  return 'neutral';
+}
+
 async function saveRoleModel(role: RoleId, modelRef: ModelRef, subRole?: string): Promise<void> {
   const settings = await fetchSettings();
   const currentRole = settings.roles?.[role] ?? {};
@@ -249,14 +264,20 @@ interface ModelPickerProps {
   workhorses: Required<Record<WorkhorseSlot, ModelRef>>;
   providerGroups: Array<{ provider: string; label: string; models: AvailableModel[] }>;
   providers?: Partial<Record<string, boolean>>;
+  codexAuth?: CodexAuthStatus;
   disabled: boolean;
   onChange: (value: ModelRef) => void;
 }
 
-function ModelPicker({ label, value, workhorses, providerGroups, providers, disabled, onChange }: ModelPickerProps) {
+function ModelPicker({ label, value, workhorses, providerGroups, providers, codexAuth, disabled, onChange }: ModelPickerProps) {
   const currentSpecificModelMissing = value && !isWorkhorseRef(value) && !modelExists(value, providerGroups);
   const resolved = resolveModelRef(value, workhorses);
+  const resolvedProvider = providerForModel(resolved, providerGroups);
   const warning = providerWarning(value, workhorses, providerGroups, providers);
+  const isOpenAiModel = resolvedProvider === 'openai';
+  const codexStatus = codexAuth?.status ?? 'unknown';
+  const codexVariant = authStatusVariant(codexStatus);
+  const codexExpiry = formatExpiry(codexAuth?.expiresAt);
 
   return (
     <label className="space-y-1.5">
@@ -293,6 +314,27 @@ function ModelPicker({ label, value, workhorses, providerGroups, providers, disa
         ))}
       </select>
       <p className="text-[11px] leading-snug text-muted-foreground">Resolved: {resolved}</p>
+      {isOpenAiModel && (
+        <div className="flex flex-wrap items-center gap-1 text-[10px] leading-snug text-muted-foreground">
+          <span className="rounded bg-muted/50 px-1.5 py-0.5">OpenAI</span>
+          <span className="rounded bg-muted/50 px-1.5 py-0.5">Subscription OAuth</span>
+          <span
+            className={`rounded px-1.5 py-0.5 ${
+              codexVariant === 'success'
+                ? 'bg-success/10 text-success'
+                : codexVariant === 'warning'
+                  ? 'bg-warning/10 text-warning'
+                  : 'bg-muted/50 text-muted-foreground'
+            }`}
+          >
+            {codexStatus}
+          </span>
+          {codexAuth?.email && (
+            <SensitiveText value={codexAuth.email} className="text-[10px] text-muted-foreground" />
+          )}
+          {codexExpiry && <span>{codexExpiry}</span>}
+        </div>
+      )}
       {warning && (
         <p className="text-[11px] leading-snug text-warning" role="alert">
           {warning}
@@ -315,6 +357,7 @@ export function RolesPanel() {
     queryFn: fetchAvailableModels,
     staleTime: 60000,
   });
+  const codexAuthQuery = useCodexAuthStatus();
 
   const saveMutation = useMutation({
     mutationFn: ({ role, modelRef, subRole }: { role: RoleId; modelRef: ModelRef; subRole?: string }) => (
@@ -408,6 +451,7 @@ export function RolesPanel() {
                       workhorses={workhorses}
                       providerGroups={providerGroups}
                       providers={settings?.models?.providers}
+                      codexAuth={codexAuthQuery.data}
                       disabled={saveMutation.isPending}
                       onChange={(modelRef) => saveMutation.mutate({ role: role.id, modelRef })}
                     />

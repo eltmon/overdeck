@@ -2103,7 +2103,7 @@ const postAgentsRoute = HttpRouter.add(
       role,
     });
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
-    if (providerAuthMode === 'subscription') {
+    if (getProviderForModel(spawnModel).name === 'openai' && providerAuthMode === 'subscription') {
       const codexAuth = yield* Effect.promise(() => checkCodexAuthStatus());
       if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
         return jsonResponse({

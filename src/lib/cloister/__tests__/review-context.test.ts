@@ -134,8 +134,8 @@ describe('buildReviewContext', () => {
     expect(manifest.changedFiles[2].path).toBe('src/README.md');       // LOW=1
   });
 
-  it('truncates diff at 128 KB', async () => {
-    const bigDiff = 'x'.repeat(200 * 1024);
+  it('truncates diff above the manifest budget', async () => {
+    const bigDiff = 'x'.repeat(3 * 1024 * 1024);
     mockGitOutput({
       'rev-parse HEAD': { stdout: 'abc\n' },
       'branch --show-current': { stdout: 'main\n' },

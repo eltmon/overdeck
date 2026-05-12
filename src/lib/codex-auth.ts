@@ -154,11 +154,9 @@ async function applyBurnedTokenOverride(
   // A successful LLM call came AFTER the burn line → auto-retry worked.
   if (lastSuccessIdx > lastBurnIdx) return baseStatus;
 
-  // Burn is the most recent signal. But if it's older than 5 minutes with
-  // no traffic since, treat it as stale (the user hasn't actually tried
-  // anything yet; banner would be a false alarm). The JWT exp check has
-  // already covered actually-expired tokens.
-  const BURN_STALENESS_MS = 5 * 60 * 1000;
+  // Burn is the most recent signal. Treat refresh-token reuse evidence from
+  // the last hour as burned; older log evidence is stale.
+  const BURN_STALENESS_MS = 60 * 60 * 1000;
   if (lastBurnTimestamp !== null && Date.now() - lastBurnTimestamp > BURN_STALENESS_MS) {
     return baseStatus;
   }
