@@ -28,10 +28,10 @@ A sub-role is a configuration slot under a role, not a separate pipeline stage. 
 
 | Role | Sub-roles | Shape |
 |------|-----------|-------|
-| `work` | `inspect`, `inspect-deep` | Claude Code subagents the work role invokes via the `Agent` tool at Jidoka gates. See `.claude/agents/inspect.md` and `inspect-deep.md`. |
+| `work` | `inspect`, `inspect-deep` | Harness-agnostic prompt templates. The orchestrator's `pan inspect` CLI spawns a separate run with the prompt inlined; nothing lives in `.claude/agents/`. |
 | `review` | `security`, `correctness`, `performance`, `requirements` | Harness-agnostic prompt templates the orchestrator inlines into each convoy spawn message. See `roles/review-<subRole>.md`. |
 
-The two shapes serve different needs. Inspect sub-roles fire on demand from within a Claude Code session, so they're Claude Code subagents the harness loads ambient. Review convoy sub-roles fire as separate runs orchestrated by Panopticon, so the prompt belongs in Panopticon's own files and is delivered as part of the workflow.
+All sub-roles share the same delivery shape: **workflow-injected prompts orchestrated by Panopticon**, never ambient subagents auto-discovered by Claude Code. The prompts live in Panopticon's own files and are inlined at spawn time. This is a deliberate choice — see "Why no ambient subagents" below.
 
 ---
 
@@ -57,21 +57,22 @@ These agent definitions still exist for legacy spawn paths; the role primitive w
 
 ### 3. Claude Code subagent — `.claude/agents/*.md`
 
-Files that Claude Code auto-discovers and exposes via the in-session `Agent` tool. In a Panopticon-managed project, this directory is a **sync target, never a source of truth.** Contents come from `agents/` (top-level panopticon source) via `mergeSkillsIntoWorkspace()`, with project-template overlays on top.
+Files that Claude Code auto-discovers and exposes via the in-session `Agent` tool. **Panopticon deliberately ships nothing here.** The directory exists in worktrees only as a sync target the harness may write to, but the Panopticon repo's `.claude/agents/` is empty and stays empty.
 
-Anything you put in `.claude/agents/` becomes ambient — any Claude Code session running in that workspace can call it as a Task subagent. That makes it the right place for tools you want broadly available (inspect gates, codebase explorer) and the wrong place for prompts you want delivered only at a specific moment in a workflow (review convoy reviewers).
+When a role needs a subagent (codebase exploration, general-purpose work), it uses Claude Code's **built-in subagent types** (`Explore`, `general-purpose`), not a custom file. Built-ins inherit the parent's model and routing context properly — including `ANTHROPIC_BASE_URL` for CLIProxy-routed sessions — and avoid the model-pinning hazards that custom subagent files exhibit.
 
 ---
 
-## Why review convoy prompts live in `roles/`, not `.claude/agents/`
+## Why no ambient subagents
 
-Convoy reviewer prompts are role content, not Claude Code subagents. Three properties of `roles/review-<subRole>.md` matter:
+We learned this the hard way. Ambient subagents under `.claude/agents/` cause two problems for a multi-harness, multi-provider system like Panopticon:
 
-1. **Harness-agnostic.** Pi, Codex, and any future harness can run a convoy reviewer because the prompt is just text the orchestrator hands the runtime.
-2. **Workflow-injected, not auto-discovered.** Work agents in project workspaces never see the convoy prompts in their tree, so a work agent cannot ambiently spawn a reviewer subagent on itself.
-3. **Orchestrator-owned.** The prompts live in panopticon-cli (Panopticon's own install). They are not synced into project workspaces. Behavior changes ship with code and are reviewed under the same gates.
+1. **They leak into every session.** Anything in `.claude/agents/` is callable from any Claude Code session in that workspace. A work agent in mid-implementation can ambiently invoke a subagent the workflow never intended to expose at that moment. Workflow-injected prompts, in contrast, only appear when the orchestrator inlines them at the right point.
+2. **They hardcode model assumptions that don't survive provider routing.** A custom subagent with `model: haiku` in frontmatter fails when the parent runs via CLIProxy serving gpt-5.5 — the harness doesn't always thread provider routing through to the subagent call, so the subagent hits a provider error. Built-in subagents (`Explore`, `general-purpose`) inherit the parent's model and routing cleanly; custom subagent files do not, reliably.
 
-Placing these files under `.claude/agents/` makes them auto-discoverable subagents that Claude Code parses for frontmatter — exactly the coupling and ambient exposure we want to avoid.
+The same logic applies to review convoy reviewers — they're harness-agnostic prompt templates the orchestrator inlines, never `.claude/agents/` files. That decision predates this one and was the original motivation; we generalized the policy.
+
+**Practical consequence:** when a role needs subagent help, write the prompt into the role's own message (or use a built-in subagent type), don't add a file under `.claude/agents/`.
 
 ---
 
@@ -119,9 +120,10 @@ Pick the shape that matches the use case before you start writing.
 3. Wire it through `resolveModel()`, the reactive scheduler, and any lifecycle transitions.
 4. Add coverage in `src/lib/__tests__/role-definitions.test.ts`.
 
-**Adding a Claude Code subagent invoked from within a session** (Jidoka-style gate):
-1. Create `.claude/agents/<name>.md` with the standard Claude subagent frontmatter (`name`, `description`, `tools`, optional `model`).
-2. Reference the subagent from the calling role's prompt with the `Agent` tool's `subagent_type` parameter.
+**Adding a subagent invoked from within a session** (Jidoka-style gate, or codebase exploration):
+1. **Do NOT add a file under `.claude/agents/`** — see "Why no ambient subagents" above.
+2. Use Claude Code's built-in subagent types (`Explore`, `general-purpose`) when the role needs subagent help. They inherit the parent's model and routing context.
+3. If the use case truly needs a custom prompt, write the prompt into the calling role's message (workflow-injected pattern) rather than adding an ambient subagent file.
 
 **Adding a convoy-style sub-role** (workflow-orchestrated prompt template):
 1. Create `roles/<role>-<subRole>.md` with the prompt body only — no frontmatter.
@@ -129,4 +131,4 @@ Pick the shape that matches the use case before you start writing.
 3. Do not pass `--agent` for the sub-role from `getRoleRuntimeBaseCommand` — return `null` from `roleAgentDefinitionPath`.
 4. Add coverage in `src/lib/__tests__/role-definitions.test.ts` asserting the file exists with no frontmatter and instructs the manifest/output-file contract.
 
-When in doubt: the workflow-injected pattern is the default for anything Panopticon orchestrates from outside a session. Save `.claude/agents/` for tools that need to be ambient inside a session.
+When in doubt: the workflow-injected pattern is the default for **everything** Panopticon orchestrates. `.claude/agents/` stays empty.

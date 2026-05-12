@@ -93,12 +93,14 @@ Panopticon's pipeline is expressed as five issue-scoped **roles**:
 | `test` | Run automated verification and required browser UAT | `roles/test.md` |
 | `ship` | Rebase/verify/push approved branches for human merge | `roles/ship.md` |
 
-Sub-roles are configuration slots under a role, not standalone pipeline stages. Today's sub-roles split into two shapes by how they are delivered:
+Sub-roles are configuration slots under a role, not standalone pipeline stages. All sub-roles today are delivered as **harness-agnostic prompt templates** that the orchestrator inlines into spawn messages:
 
-- **`work.inspect` / `work.inspect-deep`** — Claude Code subagents invoked from inside a `work` session via the `Agent` tool at Jidoka gates. Definitions live in `.claude/agents/inspect.md` and `inspect-deep.md`.
-- **`review.security` / `review.correctness` / `review.performance` / `review.requirements`** — harness-agnostic prompt templates the orchestrator reads from `roles/review-<subRole>.md` and inlines into each convoy spawn message. They are **never** loaded via Claude's `--agent` flag and never synced into project workspaces — they belong to Panopticon, are delivered as part of the workflow, and stay invisible to the work agent's session.
+- **`review.security` / `review.correctness` / `review.performance` / `review.requirements`** — Panopticon reads `roles/review-<subRole>.md` and inlines the body into each convoy spawn message. Never loaded via Claude's `--agent` flag, never synced into project workspaces.
+- **`work.inspect` / `work.inspect-deep`** — same shape: the inspection prompt is workflow-injected, not auto-discovered.
 
-`.claude/agents/` and `.claude/skills/` are workspace sync targets for the Claude Code harness, not sources of truth — anything placed there becomes ambient in every Claude Code session, which is the wrong shape for prompts and skills that should only fire at a specific moment in the workflow.
+`.claude/agents/` is **deliberately empty** in this repo. The directory exists in worktrees only as a sync target for the Claude Code harness, but Panopticon ships no ambient subagents there. Two reasons: (1) ambient subagents leak into every Claude Code session and can fire at moments the workflow doesn't intend; (2) ambient subagent definitions can hardcode model assumptions (e.g. `model: haiku`) that break on non-Anthropic-routed agents (CLIProxy → gpt-5.5), since the harness doesn't always thread provider routing through to the subagent call. When a role needs codebase exploration or general-purpose subagent work, it uses Claude Code's built-in subagent types (`Explore`, `general-purpose`), which inherit the parent's model and routing context properly.
+
+`.claude/skills/` is also a workspace sync target, not a source of truth — same gitignore policy (PAN-1090).
 
 The full mental model — Role vs Claude subagent vs Panopticon pipeline agent — lives in [docs/ROLES.md](docs/ROLES.md). For review specifically, see [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md).
 
