@@ -148,9 +148,8 @@ describe('createBeadsFromVBrief', () => {
     const dbError = new Error('Error 1146 (HY000): table not found: issues');
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
-      .mockRejectedValueOnce(dbError)                                  // bd ping --json (fails — not "unknown command")
-      .mockRejectedValueOnce(dbError)                                  // bd doctor --fix (also fails)
-      .mockRejectedValueOnce(new Error('unreachable'));                 // bd ping --json (retry after doctor — still fails)
+      .mockRejectedValueOnce(dbError)                                  // bd ping --json (probe fails — not "unknown command", no fallback)
+      .mockRejectedValueOnce(dbError);                                 // bd doctor --fix (also fails)
 
     const result = await createBeadsFromVBrief(workspacePath);
 

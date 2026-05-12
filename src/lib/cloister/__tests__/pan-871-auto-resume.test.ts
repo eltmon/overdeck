@@ -7,6 +7,7 @@ vi.mock('../../../lib/agents.js', () => ({
   listRunningAgents: vi.fn(() => []),
   getAgentDir: vi.fn((agentId: string) => `/tmp/test-agents/${agentId}`),
   getAgentState: vi.fn(),
+  readRawAgentState: vi.fn(),
   saveAgentState: vi.fn(),
   resumeAgent: vi.fn(async () => ({ success: true })),
 }));
@@ -90,11 +91,12 @@ vi.mock('fs', () => ({
 }));
 
 import { autoResumeStoppedWorkAgents } from '../deacon.js';
-import { getAgentState, resumeAgent } from '../../../lib/agents.js';
+import { getAgentState, resumeAgent, readRawAgentState } from '../../../lib/agents.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
 import { getShadowState } from '../../../lib/shadow-state.js';
 
 const mockGetAgentState = getAgentState as any;
+const mockReadRawAgentState = readRawAgentState as any;
 const mockResumeAgent = resumeAgent as any;
 const mockGetReviewStatus = getReviewStatus as any;
 const mockGetShadowState = getShadowState as any;
@@ -102,7 +104,7 @@ const mockGetShadowState = getShadowState as any;
 describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAgentState.mockReturnValue({
+    const defaultState = {
       id: 'agent-pan-871',
       issueId: 'PAN-871',
       workspace: '/tmp/workspace',
@@ -111,7 +113,9 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       model: 'claude-sonnet-4-6',
       status: 'stopped',
       startedAt: new Date().toISOString(),
-    });
+    };
+    mockGetAgentState.mockReturnValue(defaultState);
+    mockReadRawAgentState.mockReturnValue(defaultState);
     mockGetReviewStatus.mockReturnValue({
       issueId: 'PAN-871',
       reviewStatus: 'blocked',
@@ -141,7 +145,7 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
   });
 
   it('does not auto-resume a deliberately stopped agent even when review feedback is pending', async () => {
-    mockGetAgentState.mockReturnValue({
+    const stoppedState = {
       id: 'agent-pan-871',
       issueId: 'PAN-871',
       workspace: '/tmp/workspace',
@@ -151,7 +155,9 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       status: 'stopped',
       startedAt: new Date().toISOString(),
       stoppedByUser: true,
-    });
+    };
+    mockGetAgentState.mockReturnValue(stoppedState);
+    mockReadRawAgentState.mockReturnValue(stoppedState);
 
     const resumed = await autoResumeStoppedWorkAgents();
 
