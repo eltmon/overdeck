@@ -215,8 +215,11 @@ function buildReviewRolePrompt(opts: {
     'Follow roles/review.md exactly.',
     '',
     'After writing the synthesis report, signal the verdict with Panopticon CLI:',
-    `  pan specialists done review ${opts.issueId} --status passed --notes "<one-line summary>"`,
-    `  pan specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>"`,
+    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>"`,
+    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>"`,
+    '',
+    'After signaling the verdict, exit Claude Code cleanly so the tmux session ends:',
+    '  exit',
     '',
     'Reactive Cloister dispatches the test role after review passes. Never queue tests yourself and never edit code.',
   ].filter(Boolean).join('\n');
