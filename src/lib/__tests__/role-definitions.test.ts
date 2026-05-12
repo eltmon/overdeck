@@ -69,16 +69,14 @@ describe('role definitions', () => {
     }
   });
 
-  it('defines inspect and inspect-deep subagents for the work role Jidoka gates', () => {
-    for (const name of ['inspect', 'inspect-deep']) {
-      const { frontmatter, body } = splitFrontmatter(readRepoFile(`.claude/agents/${name}.md`));
-      expect(frontmatter.name).toBe(name);
-      expect(frontmatter.description).toEqual(expect.any(String));
-      expect(frontmatter.model).toBeUndefined();
-      expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash']));
-      expect(body).toContain('INSPECTION PASSED');
-      expect(body).toContain('INSPECTION BLOCKED');
-    }
+  it('ships a workflow-injected inspect prompt with the Jidoka sentinels', () => {
+    // Sub-roles work.inspect and work.inspect-deep both inline this single
+    // harness-agnostic prompt (no .claude/agents/*.md ambient subagent).
+    const body = readRepoFile('src/lib/cloister/prompts/inspect-agent.md');
+    expect(body).toContain('INSPECTION PASSED');
+    expect(body).toContain('INSPECTION BLOCKED');
+    expect(body).toContain('{{issueId}}');
+    expect(body).toContain('{{beadId}}');
   });
 
   it('defines the review role as convoy synthesis with no merge authority', () => {
