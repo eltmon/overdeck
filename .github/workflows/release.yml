@@ -90,6 +90,11 @@ jobs:
         with:
           bun-version: latest
 
+      # npm >= 11.5.1 is required for OIDC trusted publishing. Node 22 LTS
+      # currently ships npm 10.x, so upgrade before any publish step runs.
+      - name: Upgrade npm for OIDC trusted publishing
+        run: npm install -g npm@latest
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -101,6 +106,10 @@ jobs:
           node dist/cli/index.js --version
           node dist/cli/index.js --help
 
+      # Trusted Publishing: no NODE_AUTH_TOKEN. npm authenticates to npmjs.org
+      # using the GitHub OIDC token granted by `id-token: write` above. The
+      # trusted-publisher config on each @panctl/* package on npmjs.com pins
+      # this repo + workflow filename as the only allowed publisher.
       - name: Publish CLI to npm
         run: |
           PKG_NAME=$(node -p "require('./package.json').name")
@@ -114,8 +123,6 @@ jobs:
           else
             npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Build contracts
         run: cd packages/contracts && npm run build
@@ -134,8 +141,6 @@ jobs:
           else
             npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish desktop to npm
         run: |
@@ -152,16 +157,12 @@ jobs:
           else
             npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Deprecate legacy npm packages
-        if: needs.classify.outputs.npm_tag == 'latest'
-        run: |
-          npm deprecate panopticon-cli "Renamed to @panctl/cli — use 'npx @panctl/cli' instead." || true
-          npm deprecate @eltmon/panctl "Use @panctl/cli — same package, official scope." || true
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # The deprecate step is dropped intentionally: it required a long-lived
+      # NPM_TOKEN and OIDC trusted publishing only covers publish, not metadata
+      # writes. panopticon-cli and @eltmon/panctl are already deprecated on
+      # npm (from prior releases) — deprecation is idempotent metadata, not
+      # something to re-assert every release.
 
   desktop:
     needs: classify
