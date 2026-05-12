@@ -23,6 +23,20 @@ interface DoneOptions {
   force?: boolean;
 }
 
+async function restoreTrackedBeadsExport(workspacePath: string): Promise<void> {
+  try {
+    const { stdout } = await execAsync('git status --porcelain -- .beads/issues.jsonl', {
+      cwd: workspacePath,
+      encoding: 'utf-8',
+    });
+    if (stdout.trim().startsWith('D')) {
+      await execAsync('git restore -- .beads/issues.jsonl', { cwd: workspacePath });
+    }
+  } catch {
+    // Best-effort cleanup; completion should not fail if git is unavailable here.
+  }
+}
+
 async function updateLinearToInReview(apiKey: string, issueIdentifier: string, comment?: string): Promise<boolean> {
   try {
     const { LinearClient } = await import('@linear/sdk');
@@ -499,6 +513,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       verificationCycleCount: 0,
       autoRequeueCount: 0,
     });
+
+    await restoreTrackedBeadsExport(workspacePath);
 
     spinner.succeed(`Work complete: ${issueId}`);
     console.log('');
