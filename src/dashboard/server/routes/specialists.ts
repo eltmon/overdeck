@@ -247,7 +247,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     };
 
     // Validate specialist type
-    const validSpecialists = ['review', 'test', 'merge', 'inspect', 'uat'];
+    const validSpecialists = ['review', 'test', 'merge', 'inspect', 'uat', 'ship'];
     if (!validSpecialists.includes(specialist)) {
       return jsonResponse(
         { error: `Invalid specialist: ${specialist}. Valid: ${validSpecialists.join(', ')}` },
@@ -326,6 +326,12 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       case 'uat':
         update.uatStatus = status;
         if (notes) update.uatNotes = notes;
+        if (status === 'passed') {
+          update.readyForMerge = true;
+        }
+        break;
+
+      case 'ship':
         if (status === 'passed') {
           update.readyForMerge = true;
         }
