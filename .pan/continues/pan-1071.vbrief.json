@@ -1,0 +1,29 @@
+{
+  "version": "1",
+  "issueId": "PAN-1071",
+  "created": "2026-05-12T02:42:11.387Z",
+  "updated": "2026-05-12T03:05:19.349Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-12T02:42Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-12T02:42:11.387Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T02:42:11.440Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T03:05:19.349Z"
+    }
+  ]
+}
