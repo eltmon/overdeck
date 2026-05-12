@@ -443,6 +443,10 @@
     "mtime": 1778342940.3747826,
     "hash": "118cb6770a995935a9a3d680189608f2"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/autopreso-session.test.ts": {
+    "mtime": 1778618104.4844716,
+    "hash": "909f1062fd136674118148393f396fec"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/workspace-manager.test.ts": {
     "mtime": 1778342940.3768299,
     "hash": "836358333a506ca65944e0bd48947cfd"
@@ -908,7 +912,7 @@
     "hash": "7931ab290cdb194afbbf233d4b636993"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/record-cost-event.d.ts": {
-    "mtime": 1778617579.682495,
+    "mtime": 1778617989.424353,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/notify-complete": {
@@ -1112,8 +1116,12 @@
     "hash": "f23cde06107702a599133e9bd6f759ce"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/session.ts": {
-    "mtime": 1778612786.8579688,
-    "hash": "5204153e3739958c591c52faecabbc34"
+    "mtime": 1778618092.3280134,
+    "hash": "90d0939cadd4ec5c39aa513ca54a9af8"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/agent.ts": {
+    "mtime": 1778618065.1720493,
+    "hash": "7db714cfad6f92c0da062120d1ab1242"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/core/state-mapping.ts": {
     "mtime": 1778342940.3207378,
