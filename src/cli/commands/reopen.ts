@@ -218,6 +218,16 @@ async function getGitHubToken(): Promise<string> {
 }
 
 /**
+ * Strip ANSI escape codes and terminal control characters from user-provided text
+ * before rendering to prevent terminal escape sequence injection.
+ */
+function sanitizeForTerminal(text: string | null | undefined): string {
+  if (!text) return '';
+  // Remove ANSI escape codes (colors, cursor movement, etc.)
+  return text.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1B[a-zA-Z]/g, '');
+}
+
+/**
  * Format comments for display
  */
 export function formatComments(comments: LinearComment[]): string {
@@ -294,7 +304,7 @@ async function reopenGitHubIssueCommand(id: string, options: ReopenOptions): Pro
     console.log(chalk.bold(`  Reopen: ${id.toUpperCase()}`));
     console.log(chalk.bold('═══════════════════════════════════════════════════════════'));
     console.log('');
-    console.log(chalk.bold('Title:'), issue.title);
+    console.log(chalk.bold('Title:'), sanitizeForTerminal(issue.title));
     console.log(chalk.bold('Current State:'), issue.state);
     console.log(chalk.bold('URL:'), issue.html_url);
     console.log('');
@@ -303,7 +313,7 @@ async function reopenGitHubIssueCommand(id: string, options: ReopenOptions): Pro
     if (issue.body) {
       console.log(chalk.bold('Description:'));
       const descPreview = issue.body.length > 300 ? issue.body.slice(0, 300) + '...' : issue.body;
-      console.log(chalk.dim(descPreview));
+      console.log(chalk.dim(sanitizeForTerminal(descPreview)));
       console.log('');
     }
 
@@ -354,7 +364,7 @@ async function reopenGitHubIssueCommand(id: string, options: ReopenOptions): Pro
     console.log('');
     console.log(chalk.green(`✓ ${id.toUpperCase()} reopened and ready for re-work`));
     console.log('');
-    printNextSteps(id);
+    await printNextSteps(id);
   } catch (error: unknown) {
     if (spinner.isSpinning) spinner.fail();
     const message = error instanceof Error ? error.message : String(error);
@@ -390,7 +400,7 @@ async function reopenLinearIssueCommand(id: string, options: ReopenOptions): Pro
     console.log(chalk.bold(`  Reopen: ${issue.identifier}`));
     console.log(chalk.bold('═══════════════════════════════════════════════════════════'));
     console.log('');
-    console.log(chalk.bold('Title:'), issue.title);
+    console.log(chalk.bold('Title:'), sanitizeForTerminal(issue.title));
     console.log(chalk.bold('Current State:'), issue.state);
     console.log(chalk.bold('URL:'), issue.url);
     console.log('');
@@ -400,7 +410,7 @@ async function reopenLinearIssueCommand(id: string, options: ReopenOptions): Pro
       console.log(chalk.bold('Description:'));
       const descPreview =
         issue.description.length > 300 ? issue.description.slice(0, 300) + '...' : issue.description;
-      console.log(chalk.dim(descPreview));
+      console.log(chalk.dim(sanitizeForTerminal(descPreview)));
       console.log('');
     }
 
@@ -494,7 +504,7 @@ async function reopenLinearIssueCommand(id: string, options: ReopenOptions): Pro
     console.log('');
     console.log(chalk.green(`✓ ${issue.identifier} reopened and ready for re-work`));
     console.log('');
-    printNextSteps(id);
+    await printNextSteps(id);
   } catch (error: unknown) {
     if (spinner.isSpinning) spinner.fail();
     const message = error instanceof Error ? error.message : String(error);
