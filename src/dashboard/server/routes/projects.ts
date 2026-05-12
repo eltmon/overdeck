@@ -170,10 +170,18 @@ async function collectSessionTreeNodes(
     if (slotWorkSessionPattern.test(entry.name)) {
       candidateSessionIds.add(entry.name);
     }
+    // Also collect ship (merge) and test sessions
+    if (entry.name === `agent-${issueLower}-ship` || entry.name === `agent-${issueLower}-test`) {
+      candidateSessionIds.add(entry.name);
+    }
   }
 
   for (const sessionName of context.tmuxSessionNames) {
     if (slotWorkSessionPattern.test(sessionName)) {
+      candidateSessionIds.add(sessionName);
+    }
+    // Also collect ship (merge) and test sessions
+    if (sessionName === `agent-${issueLower}-ship` || sessionName === `agent-${issueLower}-test`) {
       candidateSessionIds.add(sessionName);
     }
   }
@@ -187,7 +195,13 @@ async function collectSessionTreeNodes(
     try {
       const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string };
       const isPlanning = checkId.startsWith('planning-');
-      const sectionType = isPlanning ? 'planning' : 'work';
+      const sectionType: SessionNodeType = isPlanning
+        ? 'planning'
+        : checkId === `agent-${issueLower}-ship`
+          ? 'merge'
+          : checkId === `agent-${issueLower}-test`
+            ? 'test'
+            : 'work';
       if (isPlanning) hasPlanningSection = true;
       const rtState = await getAgentRuntimeStateAsync(checkId);
       const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
