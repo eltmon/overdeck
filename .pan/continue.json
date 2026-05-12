@@ -1,0 +1,199 @@
+{
+  "version": "1",
+  "issueId": "PAN-1052",
+  "created": "2026-05-12T18:13:23.700Z",
+  "updated": "2026-05-12T19:45:00.000Z",
+  "gitState": { "branch": "feature/pan-1052", "sha": "be3e598b4", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Triggers: hybrid hook + central poller, sharing one extraction pipeline and one checkpoint table.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Hooks alone miss mid-turn observations on long (30+ tool call) turns and lock us to harnesses with hook contracts. Watcher-per-session (reference design) wastes a process per agent. Solution: dashboard-side central poller + hook receivers feeding one extractFromTranscriptDelta() function. Hooks are authoritative for turn boundaries; poller fires only for mid-turn 20-activity-line thresholds. Mode is per-agent: hybrid (Claude Code default), hook (hook-only), poll (no-hook harnesses like pi)."
+    },
+    {
+      "id": "D2",
+      "summary": "Identity model: explicit fields, never derive from git branch.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Reference impl had a real bug filtering cross-workspace with `branch != workspaceId` while workspaceId was sometimes a path basename. Every observation row carries projectId, workspaceId, issueId, runId, sessionId, agentRole, agentHarness, gitBranch (as metadata only), sourceTranscriptOffset. Every retrieval predicate uses projectId+workspaceId+issueId — never branch. No first-project fallback scan; agent sessions without explicit identity do not write durable observations."
+    },
+    {
+      "id": "D3",
+      "summary": "Storage: central in ~/.panopticon/memory/<projectId>/<issueId>/, project-level FTS DB.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Survives workspace deep-wipe (observations are audit/memory, not workspace state). Project-level FTS DB at ~/.panopticon/memory/<projectId>/memory-search.db makes same-project sibling search trivial. Worktree only carries a small checkpoint file in .pan/memory-checkpoint.json. Layout: observations/YYYY-MM-DD.jsonl (+ .md mirror), pending/<millis>_<sessionId>.json, status.json, archive/YYYY-MM-DD_<slug>.json, summaries/YYYY-MM-DD.md, rag-runs/YYYY-MM-DD.jsonl, metadata.json, health.json, reset-markers.json."
+    },
+    {
+      "id": "D4",
+      "summary": "Scope: full reference + Panopticon upgrades; cross-project search and pinned docs deferred to PAN-1116 and PAN-1117.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Maximum scope bundles too many consumers on top of the same foundations, compounding cascade risk if foundation defects ship. v1 includes: observations, pending turns, rolling status, FTS5 + recency-decay re-ranker + tag-boost, query expansion, same-project sibling search, spawn-time MEMORY_CONTEXT injection, UserPromptSubmit prompt-time injection, RAG-runs telemetry, domain tags, reset markers, daily summaries, time-bucketed sidebar, workspace status cards, configurable extraction LLM with Settings UI. Out: cross-project search (PAN-1116), pinned docs (PAN-1117)."
+    },
+    {
+      "id": "D5",
+      "summary": "Extraction LLM is configurable from day one via a provider registry.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "User explicitly chose full configurability. Provider registry abstraction (src/lib/memory/providers/) with adapters for Anthropic SDK (default: claude-haiku-4-5-20251001) and cliproxy (gpt-4.1-nano). Settings UI exposes provider+model picker, env-var overrides, per-day cost cap, fallback chain. Per-call cost tracked via existing cost-events-db. Fallback chain: configured-primary → configured-fallback → drop observation (never block agent)."
+    },
+    {
+      "id": "D6",
+      "summary": "Injection on two surfaces: spawn-time Mustache MEMORY_CONTEXT and UserPromptSubmit hook.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Spawn-time injection populates a MEMORY_CONTEXT variable in existing role prompt templates (Panopticon already knows project/issue/workspace/PRD/labels at spawn time — strictly better than the reference's prompt-time-only model). UserPromptSubmit hook adds query expansion + retrieval + budget allocation on every user prompt for in-session refresh. Both write rag-runs/YYYY-MM-DD.jsonl with full decision telemetry (skipped/no-hits/expansion-failed/context-too-large/injected, allocations, source counts)."
+    },
+    {
+      "id": "D7",
+      "summary": "Three durable layers, distinct concepts: observations, pending turns, status.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Observations are durable per-turn records, immediately FTS-indexed, used for retrieval. Pending turns are compressed turn payloads queued for rollup synthesis; deleted after successful rollup. Status is the rolling synthesized workspace state, regenerated every N pending turns (threshold=4), with last 3 archived. Status rollup is idempotent: pending files only clear after the rollup write commits."
+    },
+    {
+      "id": "D8",
+      "summary": "Subagent filter: skip extraction when hook input contains agent_id.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Subagent transcripts produce fragmentary turns that would create misleading workspace-level observations. The hook receiver checks for agent_id presence and returns 204 without invoking the pipeline. Equivalent gate in the poller registry: subagent sessions are never registered."
+    },
+    {
+      "id": "D9",
+      "summary": "Reconciliation sweep on dashboard start and heartbeat-detected agent death.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "When Stop hook never fires (hard crash, kill -9), a Stop-equivalent pass must run. Trigger 1: dashboard startup walks active-but-stale-checkpoint sessions and replays unprocessed transcript deltas. Trigger 2: existing heartbeat-death detection fires reconciliation for the dead session. Idempotent via the same atomic claimRange used by hook+poller."
+    },
+    {
+      "id": "D10",
+      "summary": "Domain tags include Panopticon-specific values.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Extractor prompt instructs the model to use these tags when applicable: review-blocker, test-failure, merge-risk, user-preference, architecture-decision, worktree-state, handoff, regression. Re-ranker scores these as high-signal (1.0 if <72h old) so they survive recency decay longer. Used by review-round convergence and operational telemetry."
+    },
+    {
+      "id": "D11",
+      "summary": "Race-safe extraction via atomic claimRange on the checkpoint table.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Hook and poller can fire on overlapping deltas. claimRange(sessionId, expectedFromOffset) atomically advances the checkpoint and returns the claimed byte range, or returns empty if another caller already advanced past expectedFromOffset. No locks held across the LLM call. Implemented via SQLite UPDATE ... WHERE last_offset = ? with RETURNING."
+    },
+    {
+      "id": "D12",
+      "summary": "FTS5 with porter+unicode61, BM25 + recency decay + tag boost re-rank, overfetch 3x.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Reference choice validated — no vector DB needed for this scale. Schema: content (indexed), display_content (UNINDEXED), source, branch, entry_date, entry_time, entry_type, files, tags (UNINDEXED), doc_type (UNINDEXED), scope (UNINDEXED). Re-rank: score * e^(-0.02 * ageDays); +0.3 per matching tag; high-signal entries exempt from sharp decay. Overfetch limit*3, re-rank, truncate."
+    },
+    {
+      "id": "D13",
+      "summary": "Reset markers exclude historical observations from retrieval/injection without deleting them.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "reset_markers (scope, scopeId, fromTimestamp, reason, createdAt). Every retrieval applies the latest applicable marker. Triggered automatically post-merge (clears review-blocker noise) and manually via `pan memory reset`. Data preserved in JSONL — markers only filter at read time."
+    },
+    {
+      "id": "D14",
+      "summary": "Extraction failure must never block the agent's turn.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Hook handler enqueues work and returns 202 in <100ms. Extraction runs in a dashboard worker pool. Any LLM error, provider timeout, parse failure, or fallback exhaustion is recorded in health.json and dropped silently from the agent's perspective. Telemetry counts: extractions_attempted, extractions_succeeded, extractions_failed_by_reason."
+    },
+    {
+      "id": "D15",
+      "summary": "Time bucketing for sidebar: Just Now / Earlier Today / Yesterday / This Week / This Month / Older.",
+      "recordedAt": "2026-05-12T19:45:00.000Z",
+      "rationale": "Just Now = within last 1h; Earlier Today = today but >1h; Yesterday = yesterday in local time; This Week = within 7 days; This Month = within calendar month; Older = everything else. Buckets render in order, empty buckets are skipped. Sidebar shows actionStatus strings from observations where actionStatus is non-null (null observations are stored but not displayed)."
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Cascade risk: foundation defects (observation schema, identity model, FTS5 schema, checkpoint semantics, domain event shape, storage paths, provider registry contract) propagate through every downstream consumer.",
+      "mitigation": "Beads that lay these foundations have metadata.requiresInspection=true with inspectionDepth=deep. work.inspect must catch foundation defects before subsequent beads consume them. Specifically: bead-event-schema, bead-observation-types, bead-storage-paths, bead-fts5-schema, bead-checkpoint-table, bead-provider-registry."
+    },
+    {
+      "id": "H2",
+      "summary": "Race conditions between hook fire and poller tick on overlapping transcript ranges could produce duplicate observations or missed ranges.",
+      "mitigation": "All extraction triggers go through claimRange(sessionId, expectedFromOffset) — atomic SQLite UPDATE returning the claimed delta or empty. Loser noops. No long-held locks. Test with concurrent hook+poller fires (bead-checkpoint-table includes a concurrency test sub-item)."
+    },
+    {
+      "id": "H3",
+      "summary": "Subagent transcripts could leak into workspace-level observations, producing duplicate/misleading sidebar entries.",
+      "mitigation": "Hook receiver returns 204 when hook input has agent_id. Poller registry excludes subagent sessionIds. Test: spawn a subagent and verify no observation row written (bead-subagent-filter includes this test)."
+    },
+    {
+      "id": "H4",
+      "summary": "LLM extraction cost could blow up if every turn for every agent calls Haiku — at high concurrency this adds real $/hour.",
+      "mitigation": "Per-day cost cap in Settings (default $5/day per project). Per-call cost recorded in existing cost-events-db. Configurable model — operators can choose cheaper providers (gpt-4.1-nano) or disable observations entirely. Mid-turn poller fires capped: max 1 per 60s per session, max 3 per turn."
+    },
+    {
+      "id": "H5",
+      "summary": "Hook latency could slow agent's turn-end if the extraction LLM call blocks the hook handler.",
+      "mitigation": "Hook handler does the minimum sync work: validate, claim range, enqueue. Returns 202 in <100ms. LLM call runs in a worker pool. Hook never awaits the LLM."
+    },
+    {
+      "id": "H6",
+      "summary": "Stop hook may never fire (hard crash, OOM, kill -9, dashboard restart) — observations lost for that turn.",
+      "mitigation": "Reconciliation sweep on dashboard start walks all active-but-stale sessions and replays unprocessed deltas. Heartbeat-death detection triggers per-session reconciliation. Both idempotent via claimRange."
+    },
+    {
+      "id": "H7",
+      "summary": "Workspace deep-wipe should not destroy memory (it's audit/cross-session knowledge), but does need to update the FTS index correctly when a workspace is recreated.",
+      "mitigation": "Storage lives in ~/.panopticon/memory/ — outside the worktree. Deep-wipe never touches memory. Reset markers can be issued on workspace recreate to exclude pre-wipe observations from retrieval by default."
+    },
+    {
+      "id": "H8",
+      "summary": "FTS5 index growth across many active projects could become a maintenance burden.",
+      "mitigation": "Project-level FTS DB (not single global). Retention: observations older than 30 days are removed from FTS but retained in JSONL. Daily summaries promoted into FTS as compact replacements. Database VACUUM scheduled in dashboard maintenance routine."
+    },
+    {
+      "id": "H9",
+      "summary": "UserPromptSubmit injection adds LLM cost (query expansion) and latency on every user prompt — could degrade agent UX.",
+      "mitigation": "Query expansion result cached per session. Expansion uses cheapest configured provider. If expansion fails or returns no terms, retrieval is skipped (logged to rag-runs). Settings toggle to disable prompt-time injection entirely (spawn-time injection still works)."
+    },
+    {
+      "id": "H10",
+      "summary": "JSONL session files at ~/.claude/projects/*/*.jsonl are sacred (CLAUDE.md). Any code reading them must NEVER write, truncate, or delete.",
+      "mitigation": "Read-only file handle in all transcript readers. Code review checklist explicitly verifies no writeFileSync/unlinkSync against ~/.claude/projects paths. Pipeline only writes to ~/.panopticon/memory/."
+    },
+    {
+      "id": "H11",
+      "summary": "Dashboard server is Node 22 only (NEVER Bun) and forbids sync FS calls in route handlers.",
+      "mitigation": "All memory pipeline code (route handlers, services) uses fs/promises, execAsync, and Effect FileSystem. No execSync/readFileSync/writeFileSync/readdirSync in any code reachable from src/dashboard/server/. existsSync is acceptable. CLI commands (pan memory ...) may use sync APIs since they run in their own process."
+    },
+    {
+      "id": "H12",
+      "summary": "Provider registry abstraction is a contract surface — wrong shape breaks every adapter and every consumer.",
+      "mitigation": "bead-provider-registry has requiresInspection=true, inspectionDepth=deep. Define the contract with TypeScript types in packages/contracts, exhaustive Schema validation, and a conformance test that a stub provider must pass."
+    },
+    {
+      "id": "H13",
+      "summary": "Status rollup partial failure could lose pending turns if pending files are cleared before status write commits.",
+      "mitigation": "Status rollup writes status.json + archives previous status FIRST; only after both commits does it clear pending/. If rollup LLM fails, pending stays and the threshold check fires again on the next observation. Idempotent retries."
+    },
+    {
+      "id": "H14",
+      "summary": "Real-time UI updates via /ws/rpc must use Effect RPC domain events, not raw WebSocket (which is reserved for terminal streaming).",
+      "mitigation": "Add MemoryObservationCreatedEvent, MemoryStatusUpdatedEvent, MemoryRollupTriggeredEvent, MemoryResetMarkerCreatedEvent to packages/contracts/src/events.ts. Read-model handles each via shared applyEventReducer. No new WebSocket endpoint."
+    },
+    {
+      "id": "H15",
+      "summary": "Hook installation must survive workspace recreation — settings.json in worktrees can be reset by deep-wipe.",
+      "mitigation": "Hooks injected at workspace start by the same caveman SessionStart pattern that already exists. bead-hook-injection includes a regression test: recreate workspace, confirm Stop/SessionStart/UserPromptSubmit hooks present in settings.json."
+    },
+    {
+      "id": "H16",
+      "summary": "Bead count is high (~35). Risk of work agent skipping later beads (partial implementation).",
+      "mitigation": "CLAUDE.md 'Deliver Complete Features' rule applies. Every bead's acceptance criteria must be met before pan done. Dependencies (edges) are encoded so the order is unambiguous. Late beads (Settings UI, CLI umbrella, daily summaries) explicitly depend on the foundation beads and the pipeline being live."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-12T18:13:23.700Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1052: Activity feed: per-turn observations with time-bucketed sidebar",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-12T19:45:00.000Z",
+      "reason": "planning",
+      "note": "Decisions locked: hybrid hooks+poller, explicit identity model, central memory store, full scope + Panopticon upgrades (cross-project + pinned docs deferred to PAN-1116/PAN-1117), configurable LLM, dual injection surface. Filed PAN-1116 (cross-project search) and PAN-1117 (pinned docs) as followups.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}

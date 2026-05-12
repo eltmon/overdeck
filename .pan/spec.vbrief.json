@@ -1,0 +1,2280 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-12T19:50:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1052: Activity feed: per-turn observations with time-bucketed sidebar",
+    "updated": "2026-05-12T19:14:21.796Z"
+  },
+  "plan": {
+    "id": "pan-1052",
+    "title": "Activity feed: per-turn observations with time-bucketed sidebar",
+    "status": "proposed",
+    "uid": "7c4e9a2f-3d18-4b6e-9f2a-8c5d1e4f7a3b",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-12T19:50:00.000Z",
+    "updated": "2026-05-12T19:14:21.796Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1052",
+        "label": "PAN-1052",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1116",
+        "label": "PAN-1116 (cross-project search follow-up)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1117",
+        "label": "PAN-1117 (pinned docs follow-up)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "memory",
+      "observability",
+      "activity-feed",
+      "fts5",
+      "rag",
+      "dashboard",
+      "ui",
+      "settings"
+    ],
+    "narratives": {
+      "Problem": "The dashboard shows agent state (running, blocked, in review) but not agent progress. Operators cannot triage 8 parallel workspaces without attaching to tmux. Agents have no structured memory across compaction or sessions — context dies with each conversation. There is no retrieval substrate for context injection, no audit of what each agent decided, and no cross-session continuity.",
+      "Proposal": "Add a memory subsystem that captures per-turn LLM-extracted observations from agent transcripts, rolls them into per-workspace status, and surfaces them as a time-bucketed activity sidebar in the dashboard. Architecture: hybrid trigger model (Claude Code Stop hook + central transcript poller fed by a harness-adapter interface) sharing a single atomic-checkpoint-claim extraction pipeline; observation rows are FTS5-indexed in a project-scoped SQLite DB with porter+unicode61 tokenizer and a recency-decay + tag-boost re-ranker; injection runs at agent spawn time via Mustache MEMORY_CONTEXT and on every user prompt via UserPromptSubmit hook with query expansion. Identity is explicit (projectId, workspaceId, issueId, runId, sessionId, agentRole, agentHarness) — git branch is metadata only. Storage is central at ~/.panopticon/memory/<projectId>/<issueId>/ so deep-wipe never destroys audit. Extraction LLM is configurable via a provider registry (Haiku 4.5 default, cliproxy/gpt-4.1-nano alternate, env-var override, per-day cost cap, fallback chain). Cross-project search and pinned docs deferred to PAN-1116 and PAN-1117."
+    },
+    "items": [
+      {
+        "id": "a1-memory-contracts",
+        "title": "Define memory contracts in @panctl/contracts (Observation, Status, PendingTurn, ResetMarker, RagDecision)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "Add packages/contracts/src/memory.ts exporting Schema definitions and TypeScript types for Observation, Status, PendingTurn, ResetMarker, RagDecision, ExtractionProviderConfig. Every observation carries explicit identity (projectId, workspaceId, issueId, runId, sessionId, agentRole, agentHarness, gitBranch, sourceTranscriptOffset). Re-export from packages/contracts/src/index.ts. This is the contract that every downstream bead reads — get it wrong and 30+ beads rebuild."
+        },
+        "subItems": [
+          {
+            "id": "a1-memory-contracts.ac1",
+            "title": "Observation Schema includes id, timestamp, identity fields, actionStatus|null, narrative, summary, files[], tags[], tokens, model, sourceTranscriptOffset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a1-memory-contracts.ac2",
+            "title": "Status Schema includes name, headline, summary, goal|null, phase enum, accomplished[], decided[], open[], nextSteps[], confidence, workingSet[], tags[]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a1-memory-contracts.ac3",
+            "title": "PendingTurn Schema and ResetMarker Schema and RagDecision Schema all defined and exported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a1-memory-contracts.ac4",
+            "title": "ExtractionProviderConfig Schema defines provider, model, env-var override, per-day cost cap, fallback chain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a1-memory-contracts.ac5",
+            "title": "git branch is a metadata field only — no Schema permits using it as identity for lookup or filtering",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a1-memory-contracts.ac6",
+            "title": "packages/contracts build passes; types exported from index.ts; no circular imports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a2-domain-events",
+        "title": "Add memory domain events to @panctl/contracts events union",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add MemoryObservationCreatedEvent, MemoryStatusUpdatedEvent, MemoryRollupTriggeredEvent, MemoryResetMarkerCreatedEvent, MemoryHealthChangedEvent to packages/contracts/src/events.ts and include them in the discriminated union consumed by event-store, read-model, RPC, and the Zustand reducer."
+        },
+        "subItems": [
+          {
+            "id": "a2-domain-events.ac1",
+            "title": "Five new event types defined with type, sequence, timestamp, payload shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a2-domain-events.ac2",
+            "title": "Discriminated union exported and accepted by applyEventReducer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a2-domain-events.ac3",
+            "title": "Effect/Schema validation round-trips all five event payloads in a unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a3-storage-paths",
+        "title": "Storage path resolution module (src/lib/memory/paths.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Export pure functions: resolveMemoryRoot(projectId), resolveIssueMemoryRoot(projectId, issueId), resolveObservationsFile(projectId, issueId, date), resolvePendingDir, resolveStatusFile, resolveArchiveDir, resolveSummariesDir, resolveRagRunsFile, resolveCheckpointFile(workspacePath), resolveFtsDbPath(projectId). All paths under ~/.panopticon/memory/<projectId>/ except the checkpoint, which lives in the worktree's .pan/memory-checkpoint.json."
+        },
+        "subItems": [
+          {
+            "id": "a3-storage-paths.ac1",
+            "title": "All path functions return absolute paths using existing PANOPTICON_HOME from src/lib/paths.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a3-storage-paths.ac2",
+            "title": "Functions do not create directories; ensureDir helpers are separate and idempotent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a3-storage-paths.ac3",
+            "title": "Unit tests cover all path-construction permutations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a4-fts5-schema",
+        "title": "SQLite FTS5 schema and reset_markers table (project-scoped DB)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1052",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "Create migration creating memory_fts virtual table (porter unicode61) with columns: content, display_content UNINDEXED, source, branch, entry_date, entry_time, entry_type, files, tags UNINDEXED, doc_type UNINDEXED, scope UNINDEXED, project_id, workspace_id, issue_id, run_id, session_id, agent_role, agent_harness. Also create reset_markers (scope, scope_id, from_timestamp, reason, created_at) and observation_index (id, observation_path_jsonl, byte_offset) for back-references. DB lives at ~/.panopticon/memory/<projectId>/memory-search.db, opened lazily per project."
+        },
+        "subItems": [
+          {
+            "id": "a4-fts5-schema.ac1",
+            "title": "Migration creates memory_fts with porter+unicode61 tokenizer and the documented columns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a4-fts5-schema.ac2",
+            "title": "reset_markers and observation_index tables created with appropriate indexes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a4-fts5-schema.ac3",
+            "title": "DB connection helper opens per-project DB lazily, caches handles, closes on dashboard shutdown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a4-fts5-schema.ac4",
+            "title": "Async-only DB API — no readFileSync/writeFileSync/execSync in any code path reachable from dashboard routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a4-fts5-schema.ac5",
+            "title": "Migration idempotent on re-run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a5-checkpoint-table",
+        "title": "transcript_checkpoints table and atomic claimRange()",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1052",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "Add transcript_checkpoints (session_id PK, project_id, workspace_id, issue_id, transcript_path, last_offset, last_observation_at, last_mid_turn_at, mid_turn_count_in_current_turn). Implement claimRange(sessionId, expectedFromOffset, toOffset): atomically advances last_offset and returns the claimed byte range or empty if a concurrent caller already advanced past expectedFromOffset. Use SQLite UPDATE ... WHERE last_offset = expectedFromOffset RETURNING. This is the race-safety lynchpin between hook and poller."
+        },
+        "subItems": [
+          {
+            "id": "a5-checkpoint-table.ac1",
+            "title": "claimRange is atomic — concurrent callers with overlapping ranges produce exactly one winner; loser sees empty range",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a5-checkpoint-table.ac2",
+            "title": "Concurrency test fires 50 simultaneous claimRange calls against the same session and asserts no duplicate ranges, no gaps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a5-checkpoint-table.ac3",
+            "title": "Mid-turn rate-limit fields (last_mid_turn_at, mid_turn_count_in_current_turn) included; reset on each Stop-hook claim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a5-checkpoint-table.ac4",
+            "title": "No long-lived locks held across LLM calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b1-turn-compression",
+        "title": "Turn compression: JSONL delta -> compact U/A/Created/Updated text",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/memory/compress.ts: parse a byte range of a Claude Code JSONL transcript into the compressed format `U: <user>\\nA: <assistant>\\nCreated: f1, f2\\nUpdated: f3\\nSubagents: ...\\nMCPs: ...\\nSkills: ...`. Categorize tool calls (Write -> Created, Edit -> Updated). Truncate user content to 40,000 chars. Handle partial trailing lines via offset bookkeeping."
+        },
+        "subItems": [
+          {
+            "id": "b1-turn-compression.ac1",
+            "title": "Reads only the [fromOffset, toOffset] byte range; never the whole file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-turn-compression.ac2",
+            "title": "Returns a structured result {text, eventsConsumed, lastFullLineOffset}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-turn-compression.ac3",
+            "title": "Trailing partial JSONL line is preserved for the next call (returned lastFullLineOffset)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-turn-compression.ac4",
+            "title": "Tool-call categorization covers Write/Edit/MultiEdit/NotebookEdit/Bash; unknown tools annotated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-turn-compression.ac5",
+            "title": "User message > 40,000 chars is truncated with a marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b2-provider-registry",
+        "title": "Extraction LLM provider registry (Anthropic SDK + cliproxy adapters)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1052",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "src/lib/memory/providers/{index.ts, anthropic.ts, cliproxy.ts, types.ts}. Provider interface: extract(prompt, schema, options) -> {data, usage, cost, model}. Anthropic adapter uses @anthropic-ai/sdk with prompt caching. cliproxy adapter posts to local cliproxy /v1/messages. Registry resolves the active provider from Settings or env-var override. Cost is computed per-call from token usage."
+        },
+        "subItems": [
+          {
+            "id": "b2-provider-registry.ac1",
+            "title": "ExtractionProvider interface defined with extract(prompt, jsonSchema, options) returning typed response + usage + cost",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-provider-registry.ac2",
+            "title": "Anthropic adapter uses claude-haiku-4-5-20251001 by default; supports prompt caching; honors model override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-provider-registry.ac3",
+            "title": "Cliproxy adapter routes through local sidecar at default cliproxy port; supports gpt-4.1-nano model option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-provider-registry.ac4",
+            "title": "Env-var override (PANOPTICON_MEMORY_PROVIDER, PANOPTICON_MEMORY_MODEL) takes precedence over Settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-provider-registry.ac5",
+            "title": "Conformance test: a fake stub provider satisfies the interface and round-trips through the registry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-provider-registry.ac6",
+            "title": "Cost recorded per call via existing cost-events-db.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b3-cost-cap-fallback",
+        "title": "Per-day cost cap enforcement and provider fallback chain",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Before each provider call, check today's accumulated memory-extraction spend against the configured per-day cap (default $5/project/day). If at cap, skip extraction and log to health.json. On provider error or timeout, try the configured fallback provider once before dropping. Never block the agent."
+        },
+        "subItems": [
+          {
+            "id": "b3-cost-cap-fallback.ac1",
+            "title": "Per-day spend computed from cost-events-db rows tagged source='memory-extraction'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-cost-cap-fallback.ac2",
+            "title": "When cap reached, extraction returns null with reason='cost-cap'; health.json updated; no agent-visible error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-cost-cap-fallback.ac3",
+            "title": "Provider error triggers single fallback attempt; double-failure drops the observation and records reason='extraction-failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b4-extractor",
+        "title": "Observation extractor: prompt assembly + JSON-schema response",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/memory/extract.ts: assemble the extraction prompt (compressed turn + last 3 observations + branch + agent role) and call the registered provider with a JSON schema demanding {narrative, summary, actionStatus, tags, files}. Returns null actionStatus for non-concrete turns (pure discussion). Validates response against Schema before returning. Domain tags (review-blocker, test-failure, merge-risk, user-preference, architecture-decision, worktree-state, handoff, regression) are listed in the prompt as preferred tag values when applicable."
+        },
+        "subItems": [
+          {
+            "id": "b4-extractor.ac1",
+            "title": "Prompt instructs lead-with-outcomes framing and explicit null-actionStatus rule for discussion turns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-extractor.ac2",
+            "title": "Last 3 observations included as continuity/dedup context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-extractor.ac3",
+            "title": "Response validated against Observation Schema; malformed responses retry once then drop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-extractor.ac4",
+            "title": "Prompt declares the Panopticon domain tags as preferred values when applicable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-extractor.ac5",
+            "title": "Unit test with fixture compressed turn produces a valid observation against the stub provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b5-pipeline",
+        "title": "extractFromTranscriptDelta() orchestrator (single source of truth)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/memory/pipeline.ts: extractFromTranscriptDelta({sessionId, transcriptPath, fromOffset, toOffset, identity, trigger}) chains claimRange -> compress -> extract -> writeObservation -> writePending -> indexFts -> emitDomainEvent -> maybeTriggerRollup. Pure async, awaits nothing harness-blocking, handles all failure modes by logging to health.json and returning a result."
+        },
+        "subItems": [
+          {
+            "id": "b5-pipeline.ac1",
+            "title": "All seven stages wired in order; each stage is independently testable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-pipeline.ac2",
+            "title": "Pipeline never throws; returns {status, observation|null, reason}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-pipeline.ac3",
+            "title": "If claimRange returns empty, pipeline noops immediately and returns {status:'noop'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-pipeline.ac4",
+            "title": "Subagent identity (agent_id present) -> early return with reason='subagent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b6-observation-writer",
+        "title": "Observation writer: append JSONL + render markdown mirror",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Append observation JSON to observations/YYYY-MM-DD.jsonl (atomic via O_APPEND), render a human-readable bullet in observations/YYYY-MM-DD.md (atomic write-temp + rename). All async (fs/promises)."
+        },
+        "subItems": [
+          {
+            "id": "b6-observation-writer.ac1",
+            "title": "JSONL append is atomic and survives concurrent writers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b6-observation-writer.ac2",
+            "title": "Markdown mirror updated in place; rerun does not produce duplicates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b6-observation-writer.ac3",
+            "title": "All file IO is async; no sync calls in code reachable from server routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b7-fts-indexer",
+        "title": "FTS indexer: insert observation row into project memory_fts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "On every observation write, insert a row into the per-project memory_fts table with content=narrative+summary, identity fields, tags, files, doc_type='observation', scope='workspace'. Also write a back-reference row into observation_index pointing at the source JSONL file + byte offset."
+        },
+        "subItems": [
+          {
+            "id": "b7-fts-indexer.ac1",
+            "title": "Insert wired into the pipeline writeObservation step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-fts-indexer.ac2",
+            "title": "Insert failure does not block JSONL write; logged to health.json with reason='fts-index-failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-fts-indexer.ac3",
+            "title": "observation_index back-reference round-trips: id -> jsonl path + byte_offset -> original JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b8-failure-isolation",
+        "title": "Worker pool for extraction; health.json telemetry; never block agent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Single dashboard-side worker queue processes pipeline jobs. Maintains health.json with last_success, last_failure, counts by reason. Bounded concurrency (default 4 concurrent extractions across all sessions). On crash, queue is replayed via reconciliation sweep."
+        },
+        "subItems": [
+          {
+            "id": "b8-failure-isolation.ac1",
+            "title": "Worker queue with bounded concurrency, configurable in Settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b8-failure-isolation.ac2",
+            "title": "health.json tracks extractions_attempted, succeeded, failed_by_reason with timestamps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b8-failure-isolation.ac3",
+            "title": "MemoryHealthChangedEvent emitted on transitions between healthy/degraded/failing states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "c1-hook-receiver",
+        "title": "POST /api/memory/turn — Stop-hook receiver",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Effect route handler that accepts hook input {session_id, transcript_path, stop_hook_active, agent_id?, identity?}, validates, checks subagent filter, enqueues a pipeline job, returns 202 in <100ms. No sync FS calls. The hook handler does NOT await the LLM call."
+        },
+        "subItems": [
+          {
+            "id": "c1-hook-receiver.ac1",
+            "title": "POST /api/memory/turn validates Schema and returns 202 within 100ms in normal path (verified by latency test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c1-hook-receiver.ac2",
+            "title": "Returns 204 (no-op) when agent_id present (subagent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c1-hook-receiver.ac3",
+            "title": "Returns 422 if identity (projectId/issueId/workspaceId) cannot be resolved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "c2-hook-installation",
+        "title": "Install Stop / SessionStart / UserPromptSubmit hooks at workspace setup",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend workspace-start logic (caveman/workspace.ts) to inject memory hooks into worktree .claude/settings.json: Stop hook posts to /api/memory/turn, SessionStart hook registers the session with the central poller and records identity, UserPromptSubmit hook posts to /api/memory/inject. Idempotent — re-running workspace setup does not duplicate hook entries."
+        },
+        "subItems": [
+          {
+            "id": "c2-hook-installation.ac1",
+            "title": "Three hook entries installed at workspace setup, idempotently",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c2-hook-installation.ac2",
+            "title": "Hook scripts emit hook input as JSON to the dashboard endpoint and return immediately",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c2-hook-installation.ac3",
+            "title": "Regression test: deep-wipe workspace, recreate, hooks still present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "c3-subagent-filter",
+        "title": "Subagent filter at hook + poller (agent_id presence)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "When hook input contains agent_id, hook receiver returns 204 and pipeline early-exits. Poller registry never registers subagent sessions. Spawn a subagent and verify no observation row is created."
+        },
+        "subItems": [
+          {
+            "id": "c3-subagent-filter.ac1",
+            "title": "Hook receiver short-circuits on agent_id presence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c3-subagent-filter.ac2",
+            "title": "Poller registry excludes subagent sessionIds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c3-subagent-filter.ac3",
+            "title": "Integration test: spawn a Claude Code subagent (Explore type), verify no observation row was written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "c4-poller",
+        "title": "Central transcript poller (registry-driven, mtime fast-path, rate-limited)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1052",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/memory/poller.ts: single setInterval(2000) walking an in-memory registry of {sessionId, transcriptPath, identity, harness, lastSize, lastMtime}. For each entry: fs.stat first; if unchanged, skip. If grown, tail-read [lastOffset, currentSize], count newlines, fire pipeline only if activity threshold (20 lines since last extraction) AND mid-turn rate limit (max 1/60s, max 3/turn) allow. Registry is lifecycle-gated: only running/working agents in hybrid or poll mode are registered."
+        },
+        "subItems": [
+          {
+            "id": "c4-poller.ac1",
+            "title": "Single setInterval(2000); empty registry means no syscalls, no reads, no LLM calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c4-poller.ac2",
+            "title": "fs.stat short-circuit prevents reads on idle transcripts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c4-poller.ac3",
+            "title": "Mid-turn rate limit enforced: max 1 extraction/60s/session, max 3/turn (turn boundary marked by Stop-hook claim)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c4-poller.ac4",
+            "title": "Registry registration tied to agent lifecycle state; subagents never registered; completed/dead agents removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c4-poller.ac5",
+            "title": "Concurrent fire with Stop hook: claimRange ensures exactly one wins; loser noops",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "c5-harness-adapter",
+        "title": "TranscriptSource harness adapter (Claude Code; pi stub)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Interface TranscriptSource { getActiveTranscripts(): Promise<Entry[]>, parseDelta(buffer): TurnEvent[] }. Claude Code adapter resolves transcript path from session metadata. Pi adapter ships as a stub returning [] (no-op) so the poller compiles for future harness work."
+        },
+        "subItems": [
+          {
+            "id": "c5-harness-adapter.ac1",
+            "title": "TranscriptSource interface defined; Claude Code adapter implemented",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c5-harness-adapter.ac2",
+            "title": "Pi adapter stub present; documented as 'wire when pi transcript surface is defined'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c5-harness-adapter.ac3",
+            "title": "Poller consumes adapters via registry; adding a new harness requires only a new adapter, no poller changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "c6-reconciliation-sweep",
+        "title": "Reconciliation sweep on dashboard start and heartbeat-death",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "On dashboard startup, walk all sessions with checkpoints whose lifecycle is stale, replay unprocessed deltas via the pipeline. Wire into existing heartbeat-death detection so dead sessions get a final extraction pass before the registry removes them. Idempotent via claimRange."
+        },
+        "subItems": [
+          {
+            "id": "c6-reconciliation-sweep.ac1",
+            "title": "Dashboard startup hook invokes the sweep; sweep is bounded and logs progress",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c6-reconciliation-sweep.ac2",
+            "title": "Heartbeat-death event subscriber fires per-session reconciliation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c6-reconciliation-sweep.ac3",
+            "title": "Idempotency test: running the sweep twice produces no duplicate observations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "d1-pending-writer",
+        "title": "Pending turn writer (<millis>_<sessionId>.json)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Write each compressed turn payload to pending/<millis>_<sessionId>.json. Used by status rollup to synthesize the next status update. Distinct from observations."
+        },
+        "subItems": [
+          {
+            "id": "d1-pending-writer.ac1",
+            "title": "Pending file written atomically alongside observation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "d1-pending-writer.ac2",
+            "title": "Filename embeds millis + sessionId for chronological listing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "d2-rollup-trigger",
+        "title": "Status rollup trigger: fire when pending count >= 4 (workspace-wide)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "After each pending write, count pending/*.json. If >= 4 (configurable in Settings), enqueue a status rollup job. Workspace-wide count, not per-session."
+        },
+        "subItems": [
+          {
+            "id": "d2-rollup-trigger.ac1",
+            "title": "Threshold reads from Settings with default 4; updateable without restart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "d2-rollup-trigger.ac2",
+            "title": "Count includes pending files from all sessions in the workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "d2-rollup-trigger.ac3",
+            "title": "Multiple concurrent triggers collapse to a single in-flight rollup per workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "d3-rollup-llm",
+        "title": "Status rollup LLM: synthesize workspace status from observations + pending",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/memory/rollup.ts: call provider with last 20 observations + last 3 archived statuses + new pending turns. Output the full Status Schema (name, headline, summary, goal, phase, accomplished, decided, open, nextSteps, confidence, workingSet, tags). Status is NOT cumulative — each call can ADD/UPDATE/DELETE/NOOP fields relative to previous status."
+        },
+        "subItems": [
+          {
+            "id": "d3-rollup-llm.ac1",
+            "title": "Prompt includes last 3 archived statuses + last 20 observations + new pending turns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "d3-rollup-llm.ac2",
+            "title": "Response validated against Status Schema; malformed responses retry once then drop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "d3-rollup-llm.ac3",
+            "title": "workingSet is refreshed each cycle, NOT cumulative",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "d3-rollup-llm.ac4",
+            "title": "phase is one of exploring|planning|building|verifying|cleaning|shipping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "d4-rollup-idempotent",
+        "title": "Idempotent rollup commit: archive previous, write new, then clear pending",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Rollup commit sequence: (1) archive previous status to archive/YYYY-MM-DD_<slug>.json, (2) write new status.json atomically, (3) emit MemoryStatusUpdatedEvent, (4) clear pending/ entries that were included in this rollup. Any failure before step 4 leaves pending intact so the next observation re-fires the rollup. Keep last 3 archived statuses; older are pruned."
+        },
+        "subItems": [
+          {
+            "id": "d4-rollup-idempotent.ac1",
+            "title": "Failure between step 1 and step 4 leaves pending intact (re-rollup is safe)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "d4-rollup-idempotent.ac2",
+            "title": "archive/ retains last 3 statuses; older statuses pruned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "d4-rollup-idempotent.ac3",
+            "title": "MemoryStatusUpdatedEvent emitted only after status.json commits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e1-fts-query",
+        "title": "FTS query with porter tokenizer + overfetch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "src/lib/memory/search.ts: searchMemory({query, projectId, workspaceId?, issueId?, limit, tags?}) -> hits[]. Builds MATCH query, overfetches limit*3 from FTS, returns rows with raw BM25 + metadata for the re-ranker."
+        },
+        "subItems": [
+          {
+            "id": "e1-fts-query.ac1",
+            "title": "MATCH query escapes user input correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e1-fts-query.ac2",
+            "title": "Overfetch ratio = 3x of requested limit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e1-fts-query.ac3",
+            "title": "Reset markers applied as WHERE timestamp > <latest marker> for the scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2-reranker",
+        "title": "Re-ranker: recency decay + tag boost + high-signal exemption",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Apply score = bm25 * e^(-0.02 * ageDays) + 0.3 * matchingTagCount. High-signal tags (error, decision, blocker, shipped, architecture, review-blocker, test-failure, merge-risk, architecture-decision, regression) get score floor of 1.0 if <72h. Truncate to requested limit after re-rank."
+        },
+        "subItems": [
+          {
+            "id": "e2-reranker.ac1",
+            "title": "Re-rank applied after overfetch; final result count matches requested limit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2-reranker.ac2",
+            "title": "High-signal tags within 72h escape decay (verified in unit test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2-reranker.ac3",
+            "title": "Tag boost: +0.3 per query term matching a tag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e3-query-expander",
+        "title": "Query expansion (cheap LLM call, session-cached)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Before retrieval, expand the user's prompt + last 3 observations into 3-5 BM25 search terms via the configured provider. Cache by (sessionId, contentHash) for the session lifetime. Skip + log if expansion fails."
+        },
+        "subItems": [
+          {
+            "id": "e3-query-expander.ac1",
+            "title": "Cache lookup by (sessionId, contentHash) skips the LLM call on cache hit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e3-query-expander.ac2",
+            "title": "Expansion failure does not block retrieval; falls back to using raw prompt as the BM25 query",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e3-query-expander.ac3",
+            "title": "Expansion decision logged to rag-runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e4-sibling-predicate",
+        "title": "Same-project sibling search predicate",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Search variant: sibling mode applies projectId = currentProjectId AND workspaceId != currentWorkspaceId AND issueId != currentIssueId. Identity-based — NEVER uses git branch. Token budget for sibling hits is separate (default 1500 tokens)."
+        },
+        "subItems": [
+          {
+            "id": "e4-sibling-predicate.ac1",
+            "title": "Predicate uses workspaceId/issueId, never git branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e4-sibling-predicate.ac2",
+            "title": "Current workspace cannot leak into sibling results (regression test against the reference impl bug)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e4-sibling-predicate.ac3",
+            "title": "Sibling hits labeled with workspace/issue provenance in returned results",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e5-reset-markers",
+        "title": "Reset markers: filter retrieval at read time without deleting data",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "reset_markers (scope, scope_id, from_timestamp, reason, created_at). Every retrieval applies AND timestamp > <latest applicable marker>. Auto-marker created on post-merge lifecycle (clears review-blocker noise). Manual via pan memory reset. CLI override --include-archived bypasses the filter."
+        },
+        "subItems": [
+          {
+            "id": "e5-reset-markers.ac1",
+            "title": "Markers applied to all retrieval paths (sibling, prompt-time, spawn-time)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e5-reset-markers.ac2",
+            "title": "Post-merge lifecycle creates a workspace-scoped marker automatically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e5-reset-markers.ac3",
+            "title": "JSONL files are never modified by reset operations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e5-reset-markers.ac4",
+            "title": "MemoryResetMarkerCreatedEvent emitted on marker creation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f1-mustache-spawn-injection",
+        "title": "Spawn-time MEMORY_CONTEXT injection in role prompt templates",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Before each agent spawn (plan, work, review, test, ship), retrieve relevant observations + current status + sibling hints, render into a MEMORY_CONTEXT Mustache variable, inject into the role prompt. Budgets: status 2000, observations 5000, summaries 500, sibling 1500 tokens. Log decisions to rag-runs."
+        },
+        "subItems": [
+          {
+            "id": "f1-mustache-spawn-injection.ac1",
+            "title": "MEMORY_CONTEXT variable available in all five role templates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-mustache-spawn-injection.ac2",
+            "title": "Token budgets enforced per category (status/observations/summaries/sibling)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-mustache-spawn-injection.ac3",
+            "title": "If no relevant memory exists, MEMORY_CONTEXT renders as empty (not 'no context found' boilerplate)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-mustache-spawn-injection.ac4",
+            "title": "Sibling hits rendered as hints with workspace/issue provenance, NOT as authoritative current state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-mustache-spawn-injection.ac5",
+            "title": "Each spawn-time retrieval decision logged to rag-runs with outcome (injected, skipped, no-hits, budget-truncated)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f2-prompt-injection",
+        "title": "UserPromptSubmit prompt-time injection (receiver + budgets + telemetry)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "POST /api/memory/inject accepts user prompt + sessionId, runs query expansion, searches with same-project + sibling, applies budgets, returns context to inject. UserPromptSubmit hook invokes this and feeds the result back into the agent's context. Every decision (skipped, no-hits, expansion-failed, context-too-large, injected) logged to rag-runs/YYYY-MM-DD.jsonl."
+        },
+        "subItems": [
+          {
+            "id": "f2-prompt-injection.ac1",
+            "title": "POST /api/memory/inject returns context within 1s p95 (verified by latency test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f2-prompt-injection.ac2",
+            "title": "Token budgets enforced (status 2k, observations 5k, summaries 500, sibling 1.5k)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f2-prompt-injection.ac3",
+            "title": "rag-runs/YYYY-MM-DD.jsonl records the decision with reasons, expansion result, hit counts, byte allocations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f2-prompt-injection.ac4",
+            "title": "Settings toggle disables prompt-time injection without affecting spawn-time injection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f2-prompt-injection.ac5",
+            "title": "Failure modes (expansion failed, no hits, budget exceeded) never block the agent; rag-runs entry written instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "g1-daily-summary",
+        "title": "Daily summary generator (CLI + dashboard button)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Generate summaries/YYYY-MM-DD.md from the day's observations. Minimum 3 observations required. Regenerate allowed if 20+ new observations since last summary. Promote summaries into FTS as compact replacements for old observations after 30 days."
+        },
+        "subItems": [
+          {
+            "id": "g1-daily-summary.ac1",
+            "title": "Minimum 3 observations enforced; below threshold returns 'insufficient data'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "g1-daily-summary.ac2",
+            "title": "Regeneration only if >= 20 new observations since last summary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "g1-daily-summary.ac3",
+            "title": "Summary indexed into FTS with doc_type='summary'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "h1-rpc-events",
+        "title": "Wire memory events through Effect RPC subscribeDomainEvents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Read-model handles five new event types via shared applyEventReducer. RPC client picks them up automatically through existing subscription. No new endpoints. Snapshot includes memory state for currently-active workspaces."
+        },
+        "subItems": [
+          {
+            "id": "h1-rpc-events.ac1",
+            "title": "Read-model handlers added for all five memory events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h1-rpc-events.ac2",
+            "title": "Snapshot getSnapshot() returns memory state alongside existing state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h1-rpc-events.ac3",
+            "title": "Events flow end-to-end: pipeline emit -> event store -> RPC stream -> Zustand store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "h2-zustand-slice",
+        "title": "Zustand store slice for observations + status + reset markers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add slices to useDashboardStore: observationsByIssueId (rolling buffer of recent obs per issue), statusByIssueId, resetMarkersByScope. Reducers shared from @panctl/contracts. Rolling buffer cap (default 50 per issue) to keep memory bounded."
+        },
+        "subItems": [
+          {
+            "id": "h2-zustand-slice.ac1",
+            "title": "Three slices added with typed reducers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h2-zustand-slice.ac2",
+            "title": "Rolling buffer caps at 50 observations per issue (configurable)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h2-zustand-slice.ac3",
+            "title": "Reducers exported from @panctl/contracts and used by both server read-model and frontend store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "h3-time-bucket",
+        "title": "Time-bucket helper (Just Now / Earlier Today / Yesterday / This Week / This Month / Older)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Pure function bucketByTime(items, nowTs?) -> {justNow:[], earlierToday:[], yesterday:[], thisWeek:[], thisMonth:[], older:[]}. Uses local timezone. Empty buckets omitted in caller's render."
+        },
+        "subItems": [
+          {
+            "id": "h3-time-bucket.ac1",
+            "title": "Six bucket categories returned with documented boundaries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h3-time-bucket.ac2",
+            "title": "Local timezone honored (test with TZ=America/Los_Angeles and TZ=UTC fixtures)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h3-time-bucket.ac3",
+            "title": "Boundary cases tested: exactly 1h, midnight, exactly 7 days, last-of-month",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "h4-activity-sidebar",
+        "title": "ActivityFeedSidebar component (bucketed actionStatus list)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Sidebar component selecting observations from store, filtering actionStatus !== null, bucketing via h3, rendering each bucket as a header + list. Memoized selectors to avoid cascading re-renders. Empty buckets are skipped."
+        },
+        "subItems": [
+          {
+            "id": "h4-activity-sidebar.ac1",
+            "title": "Renders only observations with non-null actionStatus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h4-activity-sidebar.ac2",
+            "title": "Empty buckets do not render their headers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h4-activity-sidebar.ac3",
+            "title": "Memoized selectors verified via React DevTools profile (no unrelated re-renders)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h4-activity-sidebar.ac4",
+            "title": "Each item shows actionStatus + workspace/issue label + relative time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "h5-workspace-status-card",
+        "title": "WorkspaceStatusCard component",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Card rendering: phase icon (colored by phase enum), headline, summary line-clamped to 3 lines, last 3 observations with actionStatus as bullets, stats footer (additions/deletions/commits/PRs). Click navigates to workspace home tab."
+        },
+        "subItems": [
+          {
+            "id": "h5-workspace-status-card.ac1",
+            "title": "Phase icon colored by phase enum (exploring/planning/building/verifying/cleaning/shipping)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h5-workspace-status-card.ac2",
+            "title": "Summary line-clamped to 3 lines with ellipsis overflow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h5-workspace-status-card.ac3",
+            "title": "Up to 3 recent non-null-actionStatus observations rendered as bullets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h5-workspace-status-card.ac4",
+            "title": "Click navigates to workspace home tab (not a specific conversation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h5-workspace-status-card.ac5",
+            "title": "Stale-status indicator shown if last observation > 1h old",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "h6-realtime-updates",
+        "title": "Real-time sidebar updates via existing RPC event stream",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "MemoryObservationCreatedEvent flowing through existing subscribeDomainEvents updates the Zustand store; sidebar re-renders with the new entry in Just Now. No polling. For the global home page, a 2s/3min fallback poller covers the initial-load window where the WebSocket may not yet be connected."
+        },
+        "subItems": [
+          {
+            "id": "h6-realtime-updates.ac1",
+            "title": "New observation event triggers UI update within 500ms in normal path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "h6-realtime-updates.ac2",
+            "title": "Fallback poll runs only for 3 minutes after page load, then disables itself",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "i1-settings-memory",
+        "title": "Settings UI: memory provider + cost cap + feature toggles + rollup threshold",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "New Memory section in dashboard Settings page: provider picker (Anthropic / cliproxy), model picker, env-var override hint, per-day cost cap, fallback provider, feature toggles (disable observations, disable prompt-time injection), rollup threshold (default 4), sidebar refresh interval. Persisted via existing Settings storage."
+        },
+        "subItems": [
+          {
+            "id": "i1-settings-memory.ac1",
+            "title": "All settings persisted and round-trip through the Settings storage layer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "i1-settings-memory.ac2",
+            "title": "Toggling 'disable observations' stops hook/poller registration without restart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "i1-settings-memory.ac3",
+            "title": "Env-var override hint clearly documents PANOPTICON_MEMORY_PROVIDER / PANOPTICON_MEMORY_MODEL precedence over UI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "i1-settings-memory.ac4",
+            "title": "Cost cap field validates numeric input; 0 disables the cap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "j1-pan-memory-cli",
+        "title": "pan memory CLI umbrella (search / status / reset / summary / doctor)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add pan memory verb with subcommands: search (with --project --workspace --issue --tag --sibling), status, reset (creates a reset marker), summary (generates daily summary), doctor (prints health.json + last extraction times + pending counts + provider config). Wrapper SKILL.md at skills/pan-memory/SKILL.md. Lint passes per scripts/lint-skills.sh."
+        },
+        "subItems": [
+          {
+            "id": "j1-pan-memory-cli.ac1",
+            "title": "All five subcommands implemented and wired into the pan dispatcher",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "j1-pan-memory-cli.ac2",
+            "title": "skills/pan-memory/SKILL.md created; npm run lint passes the skills lint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "j1-pan-memory-cli.ac3",
+            "title": "pan memory search supports --sibling for same-project sibling mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "j1-pan-memory-cli.ac4",
+            "title": "pan memory doctor exits non-zero if last successful extraction > 1h ago for any active agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "k1-e2e-test",
+        "title": "End-to-end test: spawn agent, exercise multi-turn flow, verify pipeline + UI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T19:50:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1052",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Vitest + Playwright. Spawn a real Claude Code agent with a stub provider, run 6 simulated turns, assert: 6 observations exist with correct identity, status rollup fired at turn 4, sidebar shows 'Just Now' bucket with 3 most recent items, retrieval returns expected hits, reset marker filters older observations, subagent spawn produces no observation, cost recorded in cost-events-db."
+        },
+        "subItems": [
+          {
+            "id": "k1-e2e-test.ac1",
+            "title": "6 observations written with correct projectId/workspaceId/issueId/sessionId/agentRole",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "k1-e2e-test.ac2",
+            "title": "Status rollup fired exactly once at the 4-turn threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "k1-e2e-test.ac3",
+            "title": "Sidebar renders 3 most recent non-null actionStatus items under Just Now",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "k1-e2e-test.ac4",
+            "title": "Reset marker excludes pre-marker observations from retrieval; --include-archived restores them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "k1-e2e-test.ac5",
+            "title": "Subagent spawn produces no durable observation row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "k1-e2e-test.ac6",
+            "title": "Cost recorded in cost-events-db with source='memory-extraction'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "k1-e2e-test.ac7",
+            "title": "Concurrent hook+poller fire on same delta produces exactly one observation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "a1-memory-contracts",
+        "to": "a2-domain-events",
+        "type": "blocks"
+      },
+      {
+        "from": "a1-memory-contracts",
+        "to": "b2-provider-registry",
+        "type": "blocks"
+      },
+      {
+        "from": "a1-memory-contracts",
+        "to": "b4-extractor",
+        "type": "blocks"
+      },
+      {
+        "from": "a1-memory-contracts",
+        "to": "b5-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "a1-memory-contracts",
+        "to": "h2-zustand-slice",
+        "type": "blocks"
+      },
+      {
+        "from": "a2-domain-events",
+        "to": "h1-rpc-events",
+        "type": "blocks"
+      },
+      {
+        "from": "a2-domain-events",
+        "to": "b5-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "a3-storage-paths",
+        "to": "b5-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "a3-storage-paths",
+        "to": "b6-observation-writer",
+        "type": "blocks"
+      },
+      {
+        "from": "a3-storage-paths",
+        "to": "c1-hook-receiver",
+        "type": "blocks"
+      },
+      {
+        "from": "a3-storage-paths",
+        "to": "c4-poller",
+        "type": "blocks"
+      },
+      {
+        "from": "a3-storage-paths",
+        "to": "d1-pending-writer",
+        "type": "blocks"
+      },
+      {
+        "from": "a4-fts5-schema",
+        "to": "b7-fts-indexer",
+        "type": "blocks"
+      },
+      {
+        "from": "a4-fts5-schema",
+        "to": "e1-fts-query",
+        "type": "blocks"
+      },
+      {
+        "from": "a4-fts5-schema",
+        "to": "e5-reset-markers",
+        "type": "blocks"
+      },
+      {
+        "from": "a5-checkpoint-table",
+        "to": "b5-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "a5-checkpoint-table",
+        "to": "c1-hook-receiver",
+        "type": "blocks"
+      },
+      {
+        "from": "a5-checkpoint-table",
+        "to": "c4-poller",
+        "type": "blocks"
+      },
+      {
+        "from": "a5-checkpoint-table",
+        "to": "c6-reconciliation-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "b1-turn-compression",
+        "to": "b5-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-provider-registry",
+        "to": "b3-cost-cap-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-provider-registry",
+        "to": "b4-extractor",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-provider-registry",
+        "to": "e3-query-expander",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-provider-registry",
+        "to": "d3-rollup-llm",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-provider-registry",
+        "to": "i1-settings-memory",
+        "type": "informs"
+      },
+      {
+        "from": "b3-cost-cap-fallback",
+        "to": "b5-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "b4-extractor",
+        "to": "b5-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "b5-pipeline",
+        "to": "c1-hook-receiver",
+        "type": "blocks"
+      },
+      {
+        "from": "b5-pipeline",
+        "to": "c4-poller",
+        "type": "blocks"
+      },
+      {
+        "from": "b5-pipeline",
+        "to": "c6-reconciliation-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "b6-observation-writer",
+        "to": "b5-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "b7-fts-indexer",
+        "to": "b5-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "b8-failure-isolation",
+        "to": "b5-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "c1-hook-receiver",
+        "to": "c2-hook-installation",
+        "type": "blocks"
+      },
+      {
+        "from": "c2-hook-installation",
+        "to": "f2-prompt-injection",
+        "type": "informs"
+      },
+      {
+        "from": "c5-harness-adapter",
+        "to": "c4-poller",
+        "type": "blocks"
+      },
+      {
+        "from": "d1-pending-writer",
+        "to": "d2-rollup-trigger",
+        "type": "blocks"
+      },
+      {
+        "from": "d1-pending-writer",
+        "to": "b5-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "d2-rollup-trigger",
+        "to": "d3-rollup-llm",
+        "type": "blocks"
+      },
+      {
+        "from": "d3-rollup-llm",
+        "to": "d4-rollup-idempotent",
+        "type": "blocks"
+      },
+      {
+        "from": "e1-fts-query",
+        "to": "e2-reranker",
+        "type": "blocks"
+      },
+      {
+        "from": "e1-fts-query",
+        "to": "e4-sibling-predicate",
+        "type": "blocks"
+      },
+      {
+        "from": "e1-fts-query",
+        "to": "f1-mustache-spawn-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "e1-fts-query",
+        "to": "f2-prompt-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "e1-fts-query",
+        "to": "g1-daily-summary",
+        "type": "blocks"
+      },
+      {
+        "from": "e2-reranker",
+        "to": "f1-mustache-spawn-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "e2-reranker",
+        "to": "f2-prompt-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "e3-query-expander",
+        "to": "f2-prompt-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "e4-sibling-predicate",
+        "to": "f1-mustache-spawn-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "e4-sibling-predicate",
+        "to": "f2-prompt-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "e5-reset-markers",
+        "to": "e1-fts-query",
+        "type": "blocks"
+      },
+      {
+        "from": "h1-rpc-events",
+        "to": "h2-zustand-slice",
+        "type": "blocks"
+      },
+      {
+        "from": "h2-zustand-slice",
+        "to": "h4-activity-sidebar",
+        "type": "blocks"
+      },
+      {
+        "from": "h2-zustand-slice",
+        "to": "h5-workspace-status-card",
+        "type": "blocks"
+      },
+      {
+        "from": "h2-zustand-slice",
+        "to": "h6-realtime-updates",
+        "type": "blocks"
+      },
+      {
+        "from": "h3-time-bucket",
+        "to": "h4-activity-sidebar",
+        "type": "blocks"
+      },
+      {
+        "from": "h1-rpc-events",
+        "to": "h6-realtime-updates",
+        "type": "blocks"
+      },
+      {
+        "from": "b5-pipeline",
+        "to": "k1-e2e-test",
+        "type": "blocks"
+      },
+      {
+        "from": "h4-activity-sidebar",
+        "to": "k1-e2e-test",
+        "type": "blocks"
+      },
+      {
+        "from": "h5-workspace-status-card",
+        "to": "k1-e2e-test",
+        "type": "blocks"
+      },
+      {
+        "from": "i1-settings-memory",
+        "to": "k1-e2e-test",
+        "type": "informs"
+      },
+      {
+        "from": "j1-pan-memory-cli",
+        "to": "k1-e2e-test",
+        "type": "informs"
+      }
+    ],
+    "autoDecisions": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-12-PAN-1052-activity-feed-per-turn-observations-with-time-bucketed-sidebar.vbrief.json"
+    }
+  }
+}
