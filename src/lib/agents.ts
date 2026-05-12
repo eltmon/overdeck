@@ -572,7 +572,17 @@ function cleanAgentState(raw: AgentState): AgentState {
 function parseAgentState(content: string, normalizedId: string): AgentState | null {
   try {
     const state = JSON.parse(content) as Partial<AgentState>;
-    if (!isRole(state.role)) return null;
+    if (!isRole(state.role)) {
+      // Infer role from agent ID suffix for old states created before the role
+      // field was mandatory (e.g. PAN-913 and other pre-PAN-1048 agents).
+      let inferred: Role | undefined;
+      if (normalizedId.endsWith('-review')) inferred = 'review';
+      else if (normalizedId.endsWith('-test')) inferred = 'test';
+      else if (normalizedId.endsWith('-ship')) inferred = 'ship';
+      else if (normalizedId.endsWith('-plan')) inferred = 'plan';
+      else inferred = 'work';
+      state.role = inferred;
+    }
     if (!state.id) state.id = normalizedId;
     return cleanAgentState(state as AgentState);
   } catch {
