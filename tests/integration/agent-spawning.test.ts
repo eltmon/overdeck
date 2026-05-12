@@ -38,6 +38,7 @@ vi.mock('../../src/lib/tmux.js', () => ({
   sessionExistsAsync: vi.fn().mockResolvedValue(false),
   getAgentSessions: vi.fn().mockResolvedValue([]),
   listPaneValuesAsync: vi.fn().mockResolvedValue([]),
+  setOptionAsync: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../src/lib/hooks.js', () => ({
@@ -233,6 +234,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       // DEFAULT_ROLES carries no per-role harness override → must default to
       // claude-code, not be left undefined.
       expect(state.harness).toBe(DEFAULT_ROLES[role].harness ?? 'claude-code');
+      const { setOptionAsync } = await import('../../src/lib/tmux.js');
+      expect(setOptionAsync).toHaveBeenCalledWith(state.id, 'destroy-unattached', 'off');
+      expect(setOptionAsync).toHaveBeenCalledWith(state.id, 'remain-on-exit', 'on');
     });
 
     it('refuses to spawn when a role session is already in tmux', async () => {

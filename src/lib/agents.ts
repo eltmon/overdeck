@@ -8,7 +8,7 @@ import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
 import { getClaudePermissionFlagsString, resolvePermissionMode, bypassPrefixForAgentFlag } from './claude-permissions.js';
-import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
+import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt, setOptionAsync } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
@@ -28,7 +28,7 @@ import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScript } from './launcher-generator.js';
-import { createConversation } from './database/conversations-db.js';
+import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge-token.js';
@@ -1786,7 +1786,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (isSpecialistRole) {
     sessionId = randomUUID();
     try {
-      createConversation({
+      const conversation = {
         name: agentId,
         tmuxSession: agentId,
         cwd: workspace,
@@ -1794,10 +1794,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
         claudeSessionId: sessionId,
         model: selectedModel,
         harness: resolvedHarness,
-      });
+      };
+      if (getConversationByName(agentId)) {
+        reactivateConversationForSpawn(conversation);
+      } else {
+        createConversation(conversation);
+      }
     } catch (err) {
       // Non-fatal: the specialist still runs, but without a conversation record
-      console.warn(`[spawnRun] Failed to create conversation for ${agentId}:`, err instanceof Error ? err.message : String(err));
+      console.warn(`[spawnRun] Failed to register conversation for ${agentId}:`, err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -1837,6 +1842,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       ...providerEnv,
     },
   });
+  await setOptionAsync(agentId, 'destroy-unattached', 'off');
+  await setOptionAsync(agentId, 'remain-on-exit', 'on');
 
   state.status = 'running';
   state.lastActivity = new Date().toISOString();

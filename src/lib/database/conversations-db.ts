@@ -281,6 +281,33 @@ export function markConversationActive(name: string): void {
   ).run(new Date().toISOString(), name);
 }
 
+export function reactivateConversationForSpawn(opts: {
+  name: string;
+  tmuxSession: string;
+  cwd: string;
+  issueId?: string;
+  claudeSessionId?: string;
+  model?: string;
+  harness?: 'claude-code' | 'pi';
+}): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations
+     SET tmux_session = ?, status = 'active', cwd = ?, issue_id = ?, last_attached_at = ?,
+         claude_session_id = ?, model = ?, harness = ?, archived_at = NULL
+     WHERE name = ?`,
+  ).run(
+    opts.tmuxSession,
+    opts.cwd,
+    opts.issueId ?? null,
+    new Date().toISOString(),
+    opts.claudeSessionId ?? null,
+    opts.model ?? null,
+    opts.harness ?? null,
+    opts.name,
+  );
+}
+
 export function updateLastAttached(name: string): void {
   const db = getDatabase();
   db.prepare(
