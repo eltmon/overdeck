@@ -54,6 +54,7 @@ import { hooksRouteLayer } from './routes/hooks.js';
 import { diffsRouteLayer } from './routes/diffs.js';
 import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { swarmRouteLayer } from './routes/swarm.js';
+import { helloRouteLayer } from './routes/hello.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -223,6 +224,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   diffsRouteLayer,
   codexAuthRouteLayer,
   swarmRouteLayer,
+  helloRouteLayer,
   staticRouteLayer,
 );
 
