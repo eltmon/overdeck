@@ -40,7 +40,7 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent } from '../agents.js';
+import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent, maybeInferRole } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, isPaneDeadAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
@@ -4439,8 +4439,10 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — status=${state.status} (not stopped)`);
       continue;
     }
-    if (state.role !== 'work') {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — role=${state.role} (not work)`);
+    // Infer role for legacy states that predate the mandatory role field
+    const effectiveRole = state.role ?? maybeInferRole(state, agentId);
+    if (effectiveRole !== 'work') {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — role=${effectiveRole} (not work)`);
       continue;
     }
 

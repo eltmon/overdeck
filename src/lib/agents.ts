@@ -546,6 +546,20 @@ function isRole(value: unknown): value is Role {
   return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship';
 }
 
+/**
+ * Infer role from agent ID suffix for legacy states created before the role
+ * field was mandatory (e.g. PAN-913 and other pre-PAN-1048 agents).
+ * Returns undefined if role is already valid (no inference needed).
+ */
+export function maybeInferRole(state: Partial<AgentState>, normalizedId: string): Role | undefined {
+  if (isRole(state.role)) return undefined;
+  if (normalizedId.endsWith('-review')) return 'review';
+  if (normalizedId.endsWith('-test')) return 'test';
+  if (normalizedId.endsWith('-ship')) return 'ship';
+  if (normalizedId.endsWith('-plan')) return 'plan';
+  return 'work';
+}
+
 function cleanAgentState(raw: AgentState): AgentState {
   return {
     id: raw.id,
@@ -572,17 +586,7 @@ function cleanAgentState(raw: AgentState): AgentState {
 function parseAgentState(content: string, normalizedId: string): AgentState | null {
   try {
     const state = JSON.parse(content) as Partial<AgentState>;
-    if (!isRole(state.role)) {
-      // Infer role from agent ID suffix for old states created before the role
-      // field was mandatory (e.g. PAN-913 and other pre-PAN-1048 agents).
-      let inferred: Role | undefined;
-      if (normalizedId.endsWith('-review')) inferred = 'review';
-      else if (normalizedId.endsWith('-test')) inferred = 'test';
-      else if (normalizedId.endsWith('-ship')) inferred = 'ship';
-      else if (normalizedId.endsWith('-plan')) inferred = 'plan';
-      else inferred = 'work';
-      state.role = inferred;
-    }
+    if (!isRole(state.role)) return null;
     if (!state.id) state.id = normalizedId;
     return cleanAgentState(state as AgentState);
   } catch {
