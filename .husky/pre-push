@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Pre-push guard: refuse to push a vX.Y.Z tag unless it was produced by
+# `pan release stable` — i.e. all three package.json versions match the tag
+# AND .release/<tag>.md is committed at the tagged commit.
+#
+# Bypass with `git push --no-verify` if you really know what you're doing.
+
+set -e
+
+remote="$1"
+url="$2"
+
+# stdin is "<local_ref> <local_sha> <remote_ref> <remote_sha>" per ref
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_ref" in
+    refs/tags/v*)
+      tag="${local_ref#refs/tags/}"
+      expected="${tag#v}"
+
+      if ! [[ "$expected" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-canary\.[0-9]+)?$ ]]; then
+        # Non-release tag (e.g. v1-archive) — skip the guard.
+        continue
+      fi
+
+      tag_commit="$local_sha"
+      root_v=$(git show "${tag_commit}:package.json" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).version))")
+      desktop_v=$(git show "${tag_commit}:apps/desktop/package.json" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).version))")
+      contracts_v=$(git show "${tag_commit}:packages/contracts/package.json" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).version))")
+      notes_path=".release/${tag}.md"
+      has_notes=0
+      if git cat-file -e "${tag_commit}:${notes_path}" 2>/dev/null; then
+        has_notes=1
+      fi
+
+      fail=0
+      if [ "$root_v" != "$expected" ]; then
+        echo "✗ package.json version at $tag is $root_v, expected $expected" >&2
+        fail=1
+      fi
+      if [ "$desktop_v" != "$expected" ]; then
+        echo "✗ apps/desktop/package.json version at $tag is $desktop_v, expected $expected" >&2
+        fail=1
+      fi
+      if [ "$contracts_v" != "$expected" ]; then
+        echo "✗ packages/contracts/package.json version at $tag is $contracts_v, expected $expected" >&2
+        fail=1
+      fi
+      if [ "$has_notes" -ne 1 ]; then
+        echo "✗ $notes_path is not committed at $tag" >&2
+        fail=1
+      fi
+
+      if [ "$fail" -ne 0 ]; then
+        echo "" >&2
+        echo "Refusing to push $tag — it was not produced by 'pan release stable'." >&2
+        echo "Run: pan release stable --version $expected" >&2
+        echo "(or use 'git push --no-verify' to override, but CI will reject it too)" >&2
+        exit 1
+      fi
+      echo "✓ $tag passes release guard"
+      ;;
+  esac
+done
+
+exit 0
