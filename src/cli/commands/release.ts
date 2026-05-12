@@ -409,7 +409,10 @@ async function releaseCreateCommand(channel: ReleaseChannel, version?: string): 
 
   run('bun install', repoRoot);
 
-  run('git add package.json apps/desktop/package.json packages/contracts/package.json bun.lock', repoRoot);
+  run(
+    `git add package.json apps/desktop/package.json packages/contracts/package.json bun.lock ${releaseNotesPath}`,
+    repoRoot
+  );
   // Idempotent: when retagging the same version after a CI failure, the package
   // bumps and release notes are already on HEAD. Skip the commit if nothing
   // staged. Tagging is still meaningful because the tag may have been deleted.
