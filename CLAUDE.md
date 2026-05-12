@@ -87,7 +87,7 @@ git push origin v0.9.4
 
 - `.husky/pre-push` rejects any `v*` tag whose commit doesn't have matching `package.json` versions and a committed `.release/<tag>.md`.
 - `.github/workflows/release.yml` re-runs the same check on the runner side; tags missing the artifacts cause the release pipeline to fail loudly before any publish.
-- `.husky/pre-commit` rejects commits that change a `package.json` version field unless the subject is `chore: release X.Y.Z`. This catches the failure one step earlier than the push hook.
+- `.husky/commit-msg` rejects commits that change a `package.json` version field unless the subject is `chore: release X.Y.Z`. This catches the failure one step earlier than the push hook.
 
 **If asked to "release", "tag", "bump version", "publish", or anything similar:** the answer is `pan release stable --version X.Y.Z`. Never a workaround, never a manual tag, never `--no-verify`.
 
