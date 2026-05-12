@@ -47,11 +47,26 @@ export function isValidAgentDirectoryName(name: string): boolean {
   const match = name.match(/^agent-(.+)$/);
   if (!match) return false;
 
-  const issueId = match[1]!;
+  const suffix = match[1]!;
   // Current code always lowercases issue IDs before creating directories
-  if (issueId !== issueId.toLowerCase()) return false;
+  if (suffix !== suffix.toLowerCase()) return false;
 
-  return parseIssueId(issueId) !== null;
+  // Direct agent-<issueId> directories (work agents, role orchestrators without suffix)
+  if (parseIssueId(suffix) !== null) return true;
+
+  // Specialist directories: agent-<issueId>-<role> or agent-<issueId>-<role>-<subRole>
+  // e.g. agent-pan-457-review-correctness, agent-pan-457-test, agent-pan-457-ship
+  // Also work agents with slots: agent-pan-457-1
+  const parts = suffix.split('-');
+  for (let i = 2; i <= parts.length; i++) {
+    const candidate = parts.slice(0, i).join('-');
+    if (parseIssueId(candidate) !== null) {
+      const remainder = parts.slice(i).join('-');
+      if (remainder && /^[a-z0-9-]+$/.test(remainder)) return true;
+    }
+  }
+
+  return false;
 }
 
 /**
