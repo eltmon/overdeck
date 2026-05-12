@@ -11,7 +11,21 @@ const { mockExecAsync } = vi.hoisted(() => ({
 
 vi.mock('child_process', () => ({
   exec: vi.fn(),
-  execFile: vi.fn(),
+  execFile: vi.fn().mockImplementation((_file, _args, _opts, callback) => {
+    // Invoke callback based on mockExecAsync's current rejection state.
+    // This is needed because execFile uses a callback API but mockExecAsync
+    // uses promise-based mock rejection — the callback bridges the two.
+    const maybePromise = mockExecAsync(_file, _args, _opts);
+    if (maybePromise && typeof maybePromise.then === 'function') {
+      maybePromise.then(
+        (v: any) => callback(null, v.stdout ?? '', v.stderr ?? ''),
+        (e: any) => callback(e, '', ''),
+      );
+    } else {
+      callback(null, (maybePromise as any)?.stdout ?? '', (maybePromise as any)?.stderr ?? '');
+    }
+    return {};
+  }),
 }));
 
 vi.mock('util', async (importOriginal) => {
@@ -134,8 +148,9 @@ describe('createBeadsFromVBrief', () => {
     const dbError = new Error('Error 1146 (HY000): table not found: issues');
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
-      .mockRejectedValueOnce(dbError)                                  // bd ping --json (fails)
-      .mockRejectedValueOnce(dbError);                                 // bd doctor --fix (also fails — returns error)
+      .mockRejectedValueOnce(dbError)                                  // bd ping --json (fails — not "unknown command")
+      .mockRejectedValueOnce(dbError)                                  // bd doctor --fix (also fails)
+      .mockRejectedValueOnce(new Error('unreachable'));                 // bd ping --json (retry after doctor — still fails)
 
     const result = await createBeadsFromVBrief(workspacePath);
 
@@ -148,7 +163,7 @@ describe('createBeadsFromVBrief', () => {
 
     expect(result.success).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors[0]).toMatch(/ping|doctor/i);
+    expect(result.errors[0]).toMatch(/connectivity|probe/i);
   });
 
   it('runs bd init only when there is no redirect AND no main beads (true fresh install)', async () => {
@@ -292,5 +307,39 @@ describe('createBeadsFromVBrief', () => {
     const metadata = JSON.parse(createCall![1][createCall![1].indexOf('--metadata') + 1]);
     expect(metadata.requiresInspection).toBe(true);
     expect(metadata.inspectionDepth).toBe('deep');
+  });
+
+  it('falls back to bd list --json --limit 0 when bd ping --json fails with unknown command (v1.0.2 compat)', async () => {
+    // v1.0.2 does not have `bd ping`. When ping fails with "unknown command",
+    // the code falls back to the old bd list --json --limit 0 probe.
+    setupRedirect(WORKSPACE_DIR);
+    writePlan(WORKSPACE_DIR, makeDoc('PAN-FALLBACK', [{ id: 'item-1', title: 'Fallback task' }]));
+
+    const unknownCmdError = new Error('Error: unknown command "ping" for "bd"');
+    mockExecAsync
+      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })    // which bd
+      .mockRejectedValueOnce(unknownCmdError)                            // bd ping --json (unknown command — triggers fallback)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })                // bd list --json --limit 0 (fallback succeeds)
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })               // bd list --json -l ... (idempotency)
+      .mockResolvedValueOnce({ stdout: 'bead-fb\n', stderr: '' });      // bd create
+
+    const result = await createBeadsFromVBrief(WORKSPACE_DIR);
+
+    expect(result.success).toBe(true);
+    expect(result.created).toContain('PAN-FALLBACK: Fallback task');
+    expect(result.beadIds.get('item-1')).toBe('bead-fb');
+
+    // Verify bd ping was called first (fallback was triggered by unknown command)
+    const pingCall = mockExecAsync.mock.calls.find(
+      ([file, args]: [string, string[]]) =>
+        file === 'bd' && Array.isArray(args) && args[0] === 'ping',
+    );
+    expect(pingCall).toBeDefined();
+    // And bd list was called as fallback
+    const listCall = mockExecAsync.mock.calls.find(
+      ([file, args]: [string, string[]]) =>
+        file === 'bd' && Array.isArray(args) && args[0] === 'list' && args[2] === '--limit' && args[3] === '0',
+    );
+    expect(listCall).toBeDefined();
   });
 });

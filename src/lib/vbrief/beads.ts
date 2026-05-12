@@ -127,17 +127,36 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
   //     have created the redirect; if it didn't, that's a separate setup bug.
   const issueLabel = plan.id.toLowerCase();
   const redirectExists = existsSync(redirectPath);
+
+  // Connectivity probe: try bd ping --json first (v1.0.3+), fall back to
+  // bd list --json --limit 0 for older installs that don't have bd ping.
+  // v1.0.3+ auto-repairs corrupt manifests on startup, so a failed ping on
+  // those versions means the DB is genuinely unreachable.
+  let probeFailed = false;
+  let probeErrMsg = '';
   try {
-    // Use bd ping --json (v1.0.3+) for connectivity check — replaces the old
-    // `bd list --json --limit 0` probe. v1.0.3 beads auto-repair corrupt manifests
-    // on startup, so a failed ping means the DB is genuinely unreachable.
     await execFileAsync('bd', ['ping', '--json'], {
       encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
     });
   } catch (pingErr: any) {
-    const pingErrMsg = String(pingErr?.message ?? pingErr?.stderr ?? '');
-    const firstLine = pingErrMsg.split('\n')[0] || 'unknown connectivity error';
+    const pingErrRaw = String(pingErr?.message ?? pingErr?.stderr ?? '');
+    // v1.0.2 does not have `bd ping` — detect and fall back gracefully.
+    if (/unknown command/.test(pingErrRaw) || /not found/.test(pingErrRaw)) {
+      try {
+        await execFileAsync('bd', ['list', '--json', '--limit', '0'], {
+          encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
+        });
+      } catch (listErr: any) {
+        probeFailed = true;
+        probeErrMsg = String(listErr?.message ?? listErr?.stderr ?? '').split('\n')[0] || 'unknown connectivity error';
+      }
+    } else {
+      probeFailed = true;
+      probeErrMsg = pingErrRaw.split('\n')[0] || 'unknown connectivity error';
+    }
+  }
 
+  if (probeFailed) {
     if (redirectExists) {
       // Redirect-managed worktree: try bd doctor --fix once (v1.0.4 auto-repairs
       // corrupt manifests, bad perms, and bad metadata defaults). If that still fails,
@@ -147,13 +166,14 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
         await execFileAsync('bd', ['doctor', '--fix'], {
           encoding: 'utf-8', cwd: workspacePath, timeout: 15000,
         });
-        // Doctor succeeded — retry ping to confirm we're healthy
+        // Doctor succeeded — retry ping to confirm we're healthy (doctor --fix
+        // does not run ping for us, so we need to verify).
         await execFileAsync('bd', ['ping', '--json'], {
           encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
         });
       } catch (doctorErr: any) {
         const doctorErrMsg = String(doctorErr?.message ?? doctorErr?.stderr ?? '');
-        const detail = `bd ping failed (${firstLine}) — bd doctor --fix also failed: ${doctorErrMsg.split('\n')[0]}. ` +
+        const detail = `beads connectivity probe failed (${probeErrMsg}) — bd doctor --fix also failed: ${doctorErrMsg.split('\n')[0]}. ` +
           `Redirect is present but main beads is unreachable. Check the main repo's beads DB.`;
         console.warn(`[beads] ${detail}`);
         return { success: false, created: [], errors: [detail], beadIds };
@@ -164,7 +184,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
       const projectRoot = resolve(workspacePath, '..', '..');
       const mainBeadsDir = join(projectRoot, '.beads');
       if (existsSync(mainBeadsDir)) {
-        const detail = `bd ping failed (${firstLine}) — main repo beads exists at ${mainBeadsDir} ` +
+        const detail = `beads connectivity probe failed (${probeErrMsg}) — main repo beads exists at ${mainBeadsDir} ` +
           `but worktree has no redirect. Workspace setup is incomplete; refusing to bd init locally ` +
           `because that would diverge from the main beads DB.`;
         console.warn(`[beads] ${detail}`);
