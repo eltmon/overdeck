@@ -64,7 +64,7 @@ import { abortReviewCommand } from './commands/abort-review.js';
 // parseReviewSynthesis (now also retired).
 import { reviewRestartCommand } from './commands/review-restart.js';
 import { reviewSpawnReviewerCommand } from './commands/review-spawn-reviewer.js';
-import { registerWorkspaceCommands } from './commands/workspace.js';
+import { destroyCommand as destroyWorkspaceCommand, registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
@@ -371,9 +371,17 @@ program
 
 program
   .command('wipe <id>')
-  .description('Destructive: reset all state for an issue. Confirms.')
+  .description('Destructive: removes workspace files, kills processes, deletes branches, clears review state, and resets tracker status')
   .option('--force', 'Skip confirmation')
+  .option('-y, --yes', 'Skip confirmation')
   .action(wipeCommand);
+
+program
+  .command('destroy <id>')
+  .description('Alias for workspace destroy: remove the issue workspace worktree and branch')
+  .option('--force', 'Force removal even with uncommitted changes')
+  .option('--project <path>', 'Explicit project path (overrides registry)')
+  .action(destroyWorkspaceCommand);
 
 program
   .command('close <id>')

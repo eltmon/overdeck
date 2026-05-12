@@ -8,12 +8,14 @@ import { getIssuePrefix } from '../../lib/projects.js';
 interface WipeOptions {
   workspace?: boolean;
   yes?: boolean;
+  force?: boolean;
 }
 
 export async function wipeCommand(issueId: string, options: WipeOptions): Promise<void> {
   console.log(chalk.yellow(`\n🔥 Reset issue to Todo for ${issueId}\n`));
+  console.log(chalk.yellow('This touches workspace files, running processes, git branches, review state, beads, and tracker status.'));
 
-  if (!options.yes) {
+  if (!options.yes && !options.force) {
     const readline = await import('readline');
     const rl = readline.createInterface({
       input: process.stdin,
