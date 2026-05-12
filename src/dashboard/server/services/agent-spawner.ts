@@ -166,9 +166,8 @@ export const AgentSpawnerLive = Layer.effect(
             issueId,
             workspace: workspacePath,
             model: opts.model,
-            phase: opts.phase,
+            role: 'work',
             prompt: opts.prompt,
-            agentType: opts.agentType ?? 'work-agent',
           });
 
           return {

@@ -18,6 +18,7 @@ import {
   writeContinueState,
   type ContinueState,
 } from '../continue-state.js';
+import { getContinueFilePath } from '../../pan-dir/continues.js';
 import {
   ensureVBriefDirs,
   generateVBriefFilename,
@@ -195,15 +196,14 @@ describe('moveVBriefFilesOnly', () => {
       beadsMapping: {},
       sessionHistory: [],
     };
-    writeContinueState(resolveVBriefDir(TEST_DIR, 'proposed'), 'PAN-1', continueState);
+    writeContinueState(TEST_DIR, 'PAN-1', continueState);
 
     const result = moveVBriefFilesOnly(TEST_DIR, 'PAN-1', 'active');
     expect(existsSync(oldPath)).toBe(false);
     expect(existsSync(result.toPath)).toBe(true);
     expect(result.toPath).toBe(join(TEST_DIR, '.pan', 'specs', filename));
-    expect(existsSync(continueFilePath(resolveVBriefDir(TEST_DIR, 'active'), 'PAN-1'))).toBe(true);
-    expect(existsSync(continueFilePath(resolveVBriefDir(TEST_DIR, 'proposed'), 'PAN-1'))).toBe(false);
-    expect(result.movedContinue).toBe(true);
+    // Continue file lives at canonical path; lifecycle dir move has no effect on it
+    expect(existsSync(getContinueFilePath(TEST_DIR, 'pan-1'))).toBe(true);
 
     const movedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as VBriefDocument & { status: string };
     expect(movedDoc.status).toBe('active');
@@ -218,7 +218,6 @@ describe('moveVBriefFilesOnly', () => {
       makePlan('PAN-1', 'foo', 'proposed'),
     );
     const result = moveVBriefFilesOnly(TEST_DIR, 'PAN-1', 'active');
-    expect(result.movedContinue).toBe(false);
     expect(existsSync(result.toPath)).toBe(true);
   });
 
@@ -278,7 +277,7 @@ describe('deleteVBrief', () => {
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
-    writeContinueState(resolveVBriefDir(TEST_DIR, 'proposed'), 'PAN-1', {
+    writeContinueState(TEST_DIR, 'PAN-1', {
       version: '1',
       issueId: 'PAN-1',
       created: '2026-05-03T00:00:00Z',
@@ -292,7 +291,7 @@ describe('deleteVBrief', () => {
     });
     expect(deleteVBrief(TEST_DIR, 'PAN-1')).toBe(true);
     expect(existsSync(path)).toBe(false);
-    expect(existsSync(continueFilePath(resolveVBriefDir(TEST_DIR, 'proposed'), 'PAN-1'))).toBe(false);
+    expect(existsSync(getContinueFilePath(TEST_DIR, 'pan-1'))).toBe(false);
   });
 
   it('returns false when issue has no vBRIEF', () => {
@@ -394,9 +393,7 @@ describe('promoteVBriefToProposed', () => {
 
     const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-4');
 
-    expect(result.destContinue).toBe(
-      join(TEST_DIR, 'vbrief', 'proposed', continueFileName),
-    );
+    expect(result.destContinue).toBe(getContinueFilePath(TEST_DIR, 'pan-4'));
     expect(existsSync(result.destContinue!)).toBe(true);
     const copied = JSON.parse(readFileSync(result.destContinue!, 'utf-8'));
     expect(copied.issueId).toBe('PAN-4');
@@ -411,7 +408,7 @@ describe('promoteVBriefToProposed', () => {
     const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-5');
 
     expect(result.destContinue).toBeNull();
-    expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed', 'continue-PAN-5.vbrief.json'))).toBe(false);
+    expect(existsSync(getContinueFilePath(TEST_DIR, 'pan-5'))).toBe(false);
   });
 
   it('creates canonical .pan/specs storage if it does not exist yet', () => {
@@ -551,7 +548,7 @@ describe('transitionVBriefOnMain', () => {
     expect(doc.plan.status).toBe('approved');
   });
 
-  it('moves continue file alongside vBRIEF when both exist', async () => {
+  it('leaves continue file at canonical path during lifecycle transitions', async () => {
     initGitRepo(TEST_DIR);
     ensureVBriefDirs(TEST_DIR);
     const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
@@ -572,7 +569,7 @@ describe('transitionVBriefOnMain', () => {
       beadsMapping: {},
       sessionHistory: [],
     };
-    writeContinueState(resolveVBriefDir(TEST_DIR, 'proposed'), 'PAN-1', continueState);
+    writeContinueState(TEST_DIR, 'PAN-1', continueState);
     execSync('git add vbrief/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "seed with continue"', { cwd: TEST_DIR });
 
@@ -584,9 +581,11 @@ describe('transitionVBriefOnMain', () => {
       'scope: approve PAN-1 vBRIEF',
     );
 
-    expect(result.movedContinue).toBe(true);
-    expect(existsSync(continueFilePath(resolveVBriefDir(TEST_DIR, 'active'), 'PAN-1'))).toBe(true);
-    expect(existsSync(continueFilePath(resolveVBriefDir(TEST_DIR, 'proposed'), 'PAN-1'))).toBe(false);
+    // Continue file stays at canonical path; lifecycle dir transition has no effect on it
+    expect(existsSync(getContinueFilePath(TEST_DIR, 'pan-1'))).toBe(true);
+    expect(result.moved).toBe(true);
+    expect(result.statusUpdated).toBe(true);
+    expect(result.committed).toBe(true);
   });
 
   it('throws when no vBRIEF exists for the issue', async () => {

@@ -47,9 +47,7 @@ join(packageRoot, "skills");
 join(packageRoot, "dev-skills");
 join(packageRoot, "agents");
 join(packageRoot, "rules");
-join(packageRoot, "src", "lib", "cloister", "prompts", "review");
 join(PANOPTICON_HOME, "agent-definitions");
-join(PANOPTICON_HOME, "review-prompts");
 join(PANOPTICON_HOME, "rules");
 join(PANOPTICON_HOME, ".manifest.json");
 const PRDS_DIR = join(join(PANOPTICON_HOME, "docs"), "prds");
@@ -158,29 +156,16 @@ const DEFAULT_PRICING = [
 	{
 		provider: "openai",
 		model: "gpt-5.5",
-		inputPer1k: .003,
-		outputPer1k: .018,
-		currency: "USD"
-	},
-	{
-		provider: "openai",
-		model: "gpt-5.5-mini",
-		inputPer1k: 5e-4,
-		outputPer1k: .002,
-		currency: "USD"
-	},
-	{
-		provider: "openai",
-		model: "gpt-5.5-nano",
-		inputPer1k: 25e-5,
-		outputPer1k: .0015,
+		inputPer1k: .005,
+		outputPer1k: .03,
+		cacheReadPer1k: 5e-4,
 		currency: "USD"
 	},
 	{
 		provider: "openai",
 		model: "gpt-5.5-pro",
-		inputPer1k: .018,
-		outputPer1k: .22,
+		inputPer1k: .03,
+		outputPer1k: .18,
 		currency: "USD"
 	},
 	{
@@ -188,27 +173,37 @@ const DEFAULT_PRICING = [
 		model: "gpt-5.4",
 		inputPer1k: .0025,
 		outputPer1k: .015,
+		cacheReadPer1k: 25e-5,
 		currency: "USD"
 	},
 	{
 		provider: "openai",
 		model: "gpt-5.4-mini",
-		inputPer1k: 4e-4,
-		outputPer1k: .0016,
-		currency: "USD"
-	},
-	{
-		provider: "openai",
-		model: "gpt-5.4-nano",
-		inputPer1k: 2e-4,
-		outputPer1k: .00125,
+		inputPer1k: 75e-5,
+		outputPer1k: .0045,
+		cacheReadPer1k: 75e-6,
 		currency: "USD"
 	},
 	{
 		provider: "openai",
 		model: "gpt-5.4-pro",
-		inputPer1k: .015,
-		outputPer1k: .195,
+		inputPer1k: .03,
+		outputPer1k: .18,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.3-codex",
+		inputPer1k: .00175,
+		outputPer1k: .014,
+		cacheReadPer1k: 175e-6,
+		currency: "USD"
+	},
+	{
+		provider: "openai",
+		model: "gpt-5.2",
+		inputPer1k: .00125,
+		outputPer1k: .01,
 		currency: "USD"
 	},
 	{
@@ -221,8 +216,9 @@ const DEFAULT_PRICING = [
 	{
 		provider: "openai",
 		model: "o4-mini",
-		inputPer1k: .0011,
-		outputPer1k: .0044,
+		inputPer1k: .004,
+		outputPer1k: .016,
+		cacheReadPer1k: .001,
 		currency: "USD"
 	},
 	{
@@ -537,7 +533,8 @@ function initSchema(db) {
       model            TEXT,                               -- model used to spawn conversation (e.g. 'minimax-m2.7-highspeed')
       effort           TEXT,                               -- effort level (e.g. 'low', 'medium', 'high')
       fork_status      TEXT,                               -- async fork provisioning: summarizing, spawning, injecting, failed (null = not a fork or done)
-      fork_error       TEXT                                -- error message when fork_status='failed'
+      fork_error       TEXT,                               -- error message when fork_status='failed'
+      harness          TEXT                                -- coding harness used for conversation runtime
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -637,7 +634,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 32`);
+	db.pragma(`user_version = 33`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -645,7 +642,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 32) return;
+	if (currentVersion === 33) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -958,7 +955,10 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE review_status ADD COLUMN merge_step TEXT`);
 		} catch {}
 	}
-	db.pragma(`user_version = 32`);
+	if (currentVersion < 33) try {
+		db.exec(`ALTER TABLE conversations ADD COLUMN harness TEXT`);
+	} catch {}
+	db.pragma(`user_version = 33`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

@@ -271,7 +271,7 @@ export function ConversationRow({
         >
           <Pencil size={iconSize} />
         </span>
-        {conv.claudeSessionId && !conv.forkStatus && (
+        {conv.claudeSessionId && conv.harness !== 'pi' && !conv.forkStatus && (
           <span
             role="button"
             tabIndex={0}

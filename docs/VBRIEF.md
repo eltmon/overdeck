@@ -198,7 +198,7 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
     "updated": "2026-04-04T18:30:00Z",
     "references": [
       { "uri": "https://github.com/eltmon/panopticon-cli/issues/436", "label": "PAN-436", "type": "issue" },
-      { "uri": "docs/prds/active/PAN-436-plan.md", "label": "PAN-436-plan.md", "type": "prd" }
+      { "uri": ".pan/drafts/PAN-436.md", "label": "PAN-436 PRD draft", "type": "prd" }
     ],
     "tags": ["frontend", "ux"],
     "narratives": {
@@ -385,17 +385,22 @@ Manual lifecycle transition overrides for vBRIEFs. All commands resolve the proj
 
 ### Plan Resolution
 
-`findSpec()` resolves vBRIEFs with this priority:
+Two functions, two surfaces — do not conflate them (PAN-946):
 
-1. Check `.pan/specs/` on project root (filter by issue ID from filename)
-2. Fall back to workspace `.pan/spec.vbrief.json` (for in-progress work)
+| Function | Module | Returns | Side effects |
+| --- | --- | --- | --- |
+| `findPlan(workspacePath)` | `src/lib/vbrief/io.ts` | The workspace-local `.pan/spec.vbrief.json` path or `null` | None. Workspace-only. Used by every workspace mutation helper. |
+| `findVBriefByIssue(projectRoot, issueId)` | `src/lib/vbrief/lifecycle-io.ts` | The canonical spec from `.pan/specs/` (with legacy `vbrief/<lifecycle>/` fallback) | Read-only. Used by dashboard, start-agent's PRD-import path, and any cross-issue lookup. |
+
+Workspace progress writes that "fall through" to the lifecycle directories are a bug we already paid the high-sev tax to fix — keep the two surfaces separated.
 
 ### Backward Compatibility
 
-During migration from the old `vbrief/` directory structure:
-- All read operations check `.pan/specs/` first, fall back to `vbrief/` then `.planning/`
-- All write operations target `.pan/` only
-- Existing workspaces on feature branches continue to work
+`.planning/plan.vbrief.json` was retired in PAN-967 and is no longer read or written anywhere — workspaces created against current `main` use `.pan/spec.vbrief.json` exclusively.
+
+The legacy `vbrief/{proposed,active,completed,cancelled}/` lifecycle directories at the project root are still read by `findLegacyVBriefByIssue` so in-flight work from before the cutover keeps resolving. All writes target `.pan/specs/` only, and lifecycle status changes are atomic field flips on a single file — files do NOT move between directories.
+
+Continue files on the main side have migrated to `<projectRoot>/.pan/continues/<issue-lowercase>.vbrief.json`. Workspace-side continue state lives at `<workspace>/.pan/continue.json`.
 
 ---
 

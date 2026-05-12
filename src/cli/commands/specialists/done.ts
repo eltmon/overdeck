@@ -6,22 +6,20 @@
  *
  * Usage:
  *   pan specialists done review MIN-665 --status passed --notes "Code looks good"
+ *   pan specialists done review MIN-665 --status blocked --notes "Changes requested"
  *   pan specialists done test PAN-97 --status failed --notes "3 tests failing"
  *   pan specialists done merge PAN-83 --status passed
  */
 
-import { existsSync } from 'fs';
-import { join } from 'path';
 import chalk from 'chalk';
 import {
   setReviewStatus,
   getReviewStatus,
   type ReviewStatus,
 } from '../../../lib/review-status.js';
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
 
 interface DoneOptions {
-  status: 'passed' | 'failed';
+  status: 'passed' | 'failed' | 'blocked';
   notes?: string;
 }
 
@@ -39,18 +37,20 @@ export async function doneCommand(
   }
 
   if (!options.status) {
-    console.error(chalk.red('--status is required (passed or failed)'));
+    console.error(chalk.red('--status is required'));
     process.exit(1);
   }
 
-  if (!['passed', 'failed'].includes(options.status)) {
-    console.error(chalk.red(`Invalid status: ${options.status}`));
-    console.error(chalk.dim('Valid options: passed, failed'));
-    process.exit(1);
-  }
-
-  // Normalize issue ID (e.g., min-665 -> MIN-665)
   const normalizedIssueId = issueId.toUpperCase();
+  const validStatuses = specialist === 'review'
+    ? ['passed', 'failed', 'blocked']
+    : ['passed', 'failed'];
+
+  if (!validStatuses.includes(options.status)) {
+    console.error(chalk.red(`Invalid status: ${options.status}`));
+    console.error(chalk.dim(`Valid options for ${specialist}: ${validStatuses.join(', ')}`));
+    process.exit(1);
+  }
 
   // Build the atomic update — setReviewStatus handles history, SQLite,
   // computed readyForMerge, and JSON persistence in one call.
@@ -62,9 +62,13 @@ export async function doneCommand(
     case 'review':
       update.reviewStatus = options.status as ReviewStatus['reviewStatus'];
       if (options.notes) update.reviewNotes = options.notes;
-      console.log(chalk.green(`✓ Review ${options.status} for ${normalizedIssueId}`));
       if (options.status === 'passed') {
+        console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
         console.log(chalk.dim('  Test agent can now proceed'));
+      } else if (options.status === 'blocked') {
+        console.log(chalk.yellow(`✗ Review blocked for ${normalizedIssueId}`));
+      } else {
+        console.log(chalk.red(`✗ Review failed for ${normalizedIssueId}`));
       }
       break;
 
@@ -73,18 +77,7 @@ export async function doneCommand(
       if (options.notes) update.testNotes = options.notes;
       if (options.status === 'passed') {
         console.log(chalk.green(`✓ Tests ${options.status} for ${normalizedIssueId}`));
-        // Mirror server route logic: mark ready for merge when tests pass
-        const project = resolveProjectFromIssue(normalizedIssueId);
-        if (project) {
-          const workspacePath = join(
-            project.projectPath,
-            'workspaces',
-            `feature-${normalizedIssueId.toLowerCase()}`,
-          );
-          if (existsSync(workspacePath)) {
-            update.readyForMerge = true;
-          }
-        }
+        // readyForMerge is set only by the ship role after rebase/verify/push (PAN-1048).
       } else {
         console.log(chalk.yellow(`✗ Tests ${options.status} for ${normalizedIssueId}`));
       }
@@ -116,7 +109,6 @@ export async function doneCommand(
       update.uatStatus = options.status as ReviewStatus['uatStatus'];
       if (options.notes) update.uatNotes = options.notes;
       if (options.status === 'passed') {
-        update.readyForMerge = true;
         console.log(chalk.green(`✓ UAT passed for ${normalizedIssueId}`));
         console.log(chalk.dim('  Ready for merge'));
       } else {
@@ -127,6 +119,21 @@ export async function doneCommand(
   }
 
   const status = setReviewStatus(normalizedIssueId, update);
+
+  if (specialist === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
+    try {
+      const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
+      await deliverReviewVerdictFeedback({
+        issueId: normalizedIssueId,
+        verdict: options.status,
+        notes: options.notes,
+        prUrl: status.prUrl,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(chalk.yellow(`Could not deliver review feedback: ${message}`));
+    }
+  }
 
   if (specialist === 'test' && status.readyForMerge) {
     console.log(chalk.green('✓ Ready for merge!'));

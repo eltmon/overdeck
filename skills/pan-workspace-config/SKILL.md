@@ -1,3 +1,8 @@
+---
+name: pan-workspace-config
+description: Configure Panopticon workspace settings for repos, services, DNS, Docker, and templates.
+---
+
 # Pan Workspace Config
 
 Configure workspace settings for polyrepo projects, DNS, Docker, services, and more.

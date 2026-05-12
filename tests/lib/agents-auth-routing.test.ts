@@ -198,9 +198,9 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('keeps --agent and --name for direct Kimi launches', async () => {
-    expect(await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-964', 'work')).toBe(
-      'claude --dangerously-skip-permissions --agent pan-work-agent --model kimi-k2.6 --name agent-pan-964'
+  it('keeps role agent definition and --name for direct Kimi launches', async () => {
+    expect(await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-964', 'roles/work.md')).toBe(
+      'claude --dangerously-skip-permissions --agent roles/work.md --model kimi-k2.6 --name agent-pan-964'
     );
   });
 

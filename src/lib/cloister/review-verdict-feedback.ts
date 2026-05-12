@@ -1,0 +1,139 @@
+import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+
+import { messageAgent } from '../agents.js';
+import { resolveProjectFromIssue } from '../projects.js';
+import { getReviewStatus } from '../review-status.js';
+import { PAN_DIRNAME } from '../pan-dir/types.js';
+import { writeFeedbackFile } from './feedback-writer.js';
+
+const execFileAsync = promisify(execFile);
+
+type ReviewVerdict = 'blocked' | 'failed';
+
+export interface DeliverReviewVerdictFeedbackOptions {
+  issueId: string;
+  verdict: ReviewVerdict;
+  notes?: string;
+  workspacePath?: string;
+  prUrl?: string;
+}
+
+export interface DeliverReviewVerdictFeedbackResult {
+  feedbackPath?: string;
+  synthesisPath?: string;
+  prCommentPosted: boolean;
+  agentMessageSent: boolean;
+}
+
+async function findLatestSynthesis(workspacePath: string): Promise<{ path: string; body: string } | null> {
+  const reviewRoot = join(workspacePath, PAN_DIRNAME, 'review');
+  if (!existsSync(reviewRoot)) return null;
+
+  let latest: { path: string; mtimeMs: number } | null = null;
+  const entries = await readdir(reviewRoot, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const synthesisPath = join(reviewRoot, entry.name, 'synthesis.md');
+    if (!existsSync(synthesisPath)) continue;
+    const fileStat = await stat(synthesisPath);
+    if (!latest || fileStat.mtimeMs > latest.mtimeMs) {
+      latest = { path: synthesisPath, mtimeMs: fileStat.mtimeMs };
+    }
+  }
+
+  if (!latest) return null;
+  return { path: latest.path, body: await readFile(latest.path, 'utf-8') };
+}
+
+function parseGitHubPrUrl(prUrl: string | undefined): { owner: string; repo: string; number: string } | null {
+  const match = prUrl?.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+  if (!match) return null;
+  return { owner: match[1]!, repo: match[2]!, number: match[3]! };
+}
+
+function buildReviewFeedbackBody(opts: {
+  issueId: string;
+  verdict: ReviewVerdict;
+  notes?: string;
+  synthesisBody?: string;
+  synthesisPath?: string;
+}): string {
+  const verdictLabel = opts.verdict === 'blocked' ? 'CHANGES REQUESTED' : 'FAILED';
+  const synthesis = opts.synthesisBody?.trim() || opts.notes?.trim() || 'Review did not provide a synthesis summary.';
+  const sourceLine = opts.synthesisPath ? `\n\nSource: ${opts.synthesisPath}` : '';
+
+  return `# Review ${verdictLabel} for ${opts.issueId}\n\n${synthesis}${sourceLine}\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n\`pan review request ${opts.issueId} -m "Fixed review issues"\``;
+}
+
+async function postPrComment(prUrl: string | undefined, body: string): Promise<boolean> {
+  const parsed = parseGitHubPrUrl(prUrl);
+  if (!parsed) return false;
+
+  await execFileAsync(
+    'gh',
+    ['api', `repos/${parsed.owner}/${parsed.repo}/issues/${parsed.number}/comments`, '--field', `body=${body}`],
+    { encoding: 'utf-8' },
+  );
+  return true;
+}
+
+export async function deliverReviewVerdictFeedback(
+  opts: DeliverReviewVerdictFeedbackOptions,
+): Promise<DeliverReviewVerdictFeedbackResult> {
+  const issueId = opts.issueId.toUpperCase();
+  const resolved = resolveProjectFromIssue(issueId);
+  const workspacePath = opts.workspacePath
+    ?? (resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined);
+  const existingStatus = getReviewStatus(issueId);
+  const synthesis = workspacePath && existsSync(workspacePath)
+    ? await findLatestSynthesis(workspacePath)
+    : null;
+  const markdownBody = buildReviewFeedbackBody({
+    issueId,
+    verdict: opts.verdict,
+    notes: opts.notes,
+    synthesisBody: synthesis?.body,
+    synthesisPath: synthesis?.path,
+  });
+
+  let prCommentPosted = false;
+  try {
+    prCommentPosted = await postPrComment(opts.prUrl ?? existingStatus?.prUrl, markdownBody);
+  } catch (err) {
+    console.warn(`[review-verdict-feedback] Failed to post PR comment for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  const fileResult = await writeFeedbackFile({
+    issueId,
+    workspacePath,
+    specialist: 'review-agent',
+    outcome: opts.verdict === 'blocked' ? 'changes-requested' : 'failed',
+    summary: `Review ${opts.verdict.toUpperCase()}: ${(opts.notes ?? synthesis?.body ?? '').slice(0, 80)}`,
+    markdownBody,
+  });
+
+  let agentMessageSent = false;
+  if (fileResult.success && fileResult.filePath) {
+    const agentId = `agent-${issueId.toLowerCase()}`;
+    const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
+    try {
+      await messageAgent(agentId, message);
+      agentMessageSent = true;
+    } catch (err) {
+      console.log(`[review-verdict-feedback] Could not message ${agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  } else if (!fileResult.success) {
+    console.error(`[review-verdict-feedback] Failed to write feedback file for ${issueId}: ${fileResult.error}`);
+  }
+
+  return {
+    feedbackPath: fileResult.filePath,
+    synthesisPath: synthesis?.path,
+    prCommentPosted,
+    agentMessageSent,
+  };
+}

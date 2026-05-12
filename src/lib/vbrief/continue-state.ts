@@ -1,20 +1,25 @@
 /**
  * Continue State Module
  *
- * Replaces STATE.md with a structured `continue-<issue-id>.vbrief.json` that
- * lives alongside the scope vBRIEF in the same lifecycle directory.
+ * Replaces STATE.md with a structured `<issueId-lowercase>.vbrief.json` that
+ * lives at `<projectRoot>/.pan/continues/<issueId-lowercase>.vbrief.json`.
  *
  * The scope vBRIEF stays clean ("here's what we're building"). The continue
  * file is the living session history: git state, decisions, hazards, resume
  * point, beads mapping, agent model, and a session log. It's written during
  * planning, updated on agent session start/end and on crash recovery, and
  * persists through completion for post-mortems.
+ *
+ * PAN-967 finished the migration: project-side continue files now live at
+ * the canonical `.pan/continues/` path. Legacy `vbrief/<lifecycle>/continue-*`
+ * files are read-only fallback for migration purposes only.
  */
 
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-export const CONTINUE_FILENAME_PREFIX = 'continue-';
+import { getContinuesDir } from '../pan-dir/continues.js';
+
 export const CONTINUE_FILENAME_SUFFIX = '.vbrief.json';
 
 /** Snapshot of git state at write time. */
@@ -105,9 +110,8 @@ export interface ContinueSessionEntry {
 /**
  * The continue state document. Structured replacement for STATE.md.
  *
- * The file lives at `<lifecycleDir>/continue-<issueId>.vbrief.json` and
- * follows the same dot-prefixed-suffix convention as the scope vBRIEF so
- * it's discoverable by file-pattern scans.
+ * The file lives at `<projectRoot>/.pan/continues/<issueId-lowercase>.vbrief.json`
+ * and follows the dot-suffix convention so it's discoverable by file-pattern scans.
  */
 export interface ContinueState {
   /** Schema version for future evolution. */
@@ -130,32 +134,29 @@ export interface ContinueState {
   feedback?: ContinueFeedbackEntry[];
 }
 
-/** Build the continue filename for a given issue ID.
+/** Build the continue filename for a given issue ID (lowercase, no prefix).
  *
- * Issue IDs are case-canonical UPPERCASE (e.g. `PAN-1014`) — matches the GitHub
- * tracker, the kanban kard ID, the workspace branch prefix, and the review-status
- * DB key (Run 14 fix `4b660d10` already normalizes those). Some call sites pass
- * lowercase (`pan-1014`) — usually agent state.json or path-derived strings —
- * which previously produced a *second* file `continue-pan-1014.vbrief.json`
- * sitting next to the canonical `continue-PAN-1014.vbrief.json`, defeating
- * lookups and leaving orphan dirt on `main`. Normalize here so both cases land
- * on the same file. */
+ * Canonical form: `<issueId-lowercase>.vbrief.json` (e.g. `pan-1014.vbrief.json`).
+ * All callers normalize to lowercase so both `PAN-1014` and `pan-1014` resolve
+ * to the same file — no duplicate files for case-variant issue IDs.
+ */
 export function continueFilename(issueId: string): string {
-  return `${CONTINUE_FILENAME_PREFIX}${issueId.toUpperCase()}${CONTINUE_FILENAME_SUFFIX}`;
+  return `${issueId.toLowerCase()}${CONTINUE_FILENAME_SUFFIX}`;
 }
 
-/** Build the absolute path for a continue file inside a lifecycle directory. */
-export function continueFilePath(dir: string, issueId: string): string {
-  return join(dir, continueFilename(issueId));
+/** Build the absolute path for a continue file at the canonical project-side location. */
+export function continueFilePath(projectRoot: string, issueId: string): string {
+  return join(getContinuesDir(projectRoot), continueFilename(issueId));
 }
 
 /**
- * Atomically write the continue state to `<dir>/continue-<issueId>.vbrief.json`
+ * Atomically write the continue state to `<projectRoot>/.pan/continues/<issueId-lowercase>.vbrief.json`
  * using temp-file + rename. Sets `updated` to "now" and `created` if absent.
  */
-export function writeContinueState(dir: string, issueId: string, state: ContinueState): void {
+export function writeContinueState(projectRoot: string, issueId: string, state: ContinueState): void {
   const canonicalIssueId = issueId.toUpperCase();
-  const path = continueFilePath(dir, canonicalIssueId);
+  const path = continueFilePath(projectRoot, canonicalIssueId);
+  mkdirSync(getContinuesDir(projectRoot), { recursive: true });
   const now = new Date().toISOString();
   const next: ContinueState = {
     ...state,
@@ -175,8 +176,8 @@ export function writeContinueState(dir: string, issueId: string, state: Continue
  * wrong shape) — callers should handle this rather than silently producing
  * a fresh state.
  */
-export function readContinueState(dir: string, issueId: string): ContinueState | null {
-  const path = continueFilePath(dir, issueId);
+export function readContinueState(projectRoot: string, issueId: string): ContinueState | null {
+  const path = continueFilePath(projectRoot, issueId);
   if (!existsSync(path)) return null;
   const raw = readFileSync(path, 'utf-8');
   let parsed: unknown;
@@ -194,11 +195,11 @@ export function readContinueState(dir: string, issueId: string): ContinueState |
  * fresh continue state if the file doesn't yet exist. Persists atomically.
  */
 export function appendSessionEntry(
-  dir: string,
+  projectRoot: string,
   issueId: string,
   entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
 ): ContinueState {
-  const existing = readContinueState(dir, issueId);
+  const existing = readContinueState(projectRoot, issueId);
   const now = new Date().toISOString();
   const fullEntry: ContinueSessionEntry = {
     ...entry,
@@ -219,7 +220,7 @@ export function appendSessionEntry(
         agentModel: entry.agentModel,
         sessionHistory: [fullEntry],
       };
-  writeContinueState(dir, issueId, next);
+  writeContinueState(projectRoot, issueId, next);
   return next;
 }
 
@@ -228,11 +229,11 @@ export function appendSessionEntry(
  * continue state if the file doesn't yet exist. Persists atomically.
  */
 export function appendFeedbackEntry(
-  dir: string,
+  projectRoot: string,
   issueId: string,
   entry: ContinueFeedbackEntry,
 ): ContinueState {
-  const existing = readContinueState(dir, issueId);
+  const existing = readContinueState(projectRoot, issueId);
   const now = new Date().toISOString();
   const next: ContinueState = existing
     ? { ...existing, feedback: [...(existing.feedback ?? []), entry] }
@@ -249,7 +250,7 @@ export function appendFeedbackEntry(
         feedback: [entry],
         sessionHistory: [],
       };
-  writeContinueState(dir, issueId, next);
+  writeContinueState(projectRoot, issueId, next);
   return next;
 }
 
@@ -257,11 +258,11 @@ export function appendFeedbackEntry(
  * Clear all feedback entries from the continue file. Returns null if the file
  * doesn't exist. Persists atomically.
  */
-export function clearFeedback(dir: string, issueId: string): ContinueState | null {
-  const existing = readContinueState(dir, issueId);
+export function clearFeedback(projectRoot: string, issueId: string): ContinueState | null {
+  const existing = readContinueState(projectRoot, issueId);
   if (!existing) return null;
   const next: ContinueState = { ...existing, feedback: [] };
-  writeContinueState(dir, issueId, next);
+  writeContinueState(projectRoot, issueId, next);
   return next;
 }
 

@@ -75,7 +75,10 @@ vi.mock('./ProjectTree/ProjectNode', () => ({
   ProjectNode: (props: any) => {
     // Simulate tab switch to projects when rendered
     return (
-      <div data-testid="project-node">
+      <div data-testid="project-node" data-selected={props.selectedProject === props.name ? 'true' : 'false'}>
+        <button data-testid={`project-${props.name}`} onClick={() => props.onSelectProject?.(props.name)}>
+          {props.name}
+        </button>
         {props.features.map((f: any) => (
           <div key={f.issueId}>
             <button
@@ -111,6 +114,19 @@ vi.mock('./ConversationList', () => ({
   ),
 }));
 
+vi.mock('./ProjectOverview', () => ({
+  ProjectOverview: (props: any) => (
+    <div
+      data-testid="project-overview"
+      data-project={props.projectName}
+      data-features={props.features.map((feature: any) => feature.issueId).join(',')}
+      data-cost={props.issueCosts['PAN-821']}
+      data-model-cost={props.issueCostDetails['PAN-821']?.byModel?.['claude-sonnet-4-6']?.cost}
+      data-stage-cost={props.issueCostDetails['PAN-821']?.byStage?.implementation?.cost}
+    />
+  ),
+}));
+
 vi.mock('./FeatureMetadata/BadgeBar', () => ({
   BadgeBar: (props: any) => <div data-testid="badge-bar" data-issue={props.issueId} />,
 }));
@@ -131,6 +147,8 @@ vi.mock('../chat/ModelPicker', () => ({
   ),
   loadStoredModel: () => 'claude-sonnet',
   saveStoredModel: () => {},
+  loadStoredHarness: () => 'claude-code',
+  saveStoredHarness: () => {},
 }));
 
 vi.mock('../../lib/store', () => ({
@@ -219,6 +237,21 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
               name: 'test-conv',
             },
           ],
+        };
+      }
+      if (url === '/api/costs/by-issue') {
+        return {
+          ok: true,
+          json: async () => ({
+            issues: [
+              {
+                issueId: 'PAN-821',
+                totalCost: 12.34,
+                byModel: { 'claude-sonnet-4-6': { cost: 7.89, tokens: 1234 } },
+                byStage: { implementation: { cost: 4.45, tokens: 567 } },
+              },
+            ],
+          }),
         };
       }
       if (url === '/api/version') {
@@ -404,6 +437,21 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     expect(screen.queryByTestId('zone-c-overview')).not.toBeInTheDocument();
   });
 
+  it('renders the project overview when a project row is selected', async () => {
+    renderCommandDeck();
+
+    await screen.findAllByTestId('project-node');
+    fireEvent.click(screen.getByTestId('project-test-project'));
+
+    const overview = screen.getByTestId('project-overview');
+    expect(overview).toHaveAttribute('data-project', 'test-project');
+    expect(overview).toHaveAttribute('data-features', 'PAN-821');
+    expect(overview).toHaveAttribute('data-cost', '12.34');
+    expect(overview).toHaveAttribute('data-model-cost', '7.89');
+    expect(overview).toHaveAttribute('data-stage-cost', '4.45');
+    expect(screen.queryByTestId('conversation-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
+  });
 
   it('clears session view when switching to a conversation', async () => {
     renderCommandDeck();

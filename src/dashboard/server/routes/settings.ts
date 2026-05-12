@@ -27,10 +27,11 @@ import {
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
-import { PROVIDERS } from '../../../lib/providers.js';
+import { getProviderForModel, PROVIDERS } from '../../../lib/providers.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
-import { getProviderEnvForModel } from '../../../lib/agents.js';
+import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
+import { canUseHarness } from '../../../lib/harness-policy.js';
 import {
   detectProviderEnvConflicts,
 } from '../../../lib/claude-settings-overlay.js';
@@ -50,18 +51,17 @@ const readJsonBody = Effect.gen(function* () {
 
 /** Model ID to API model ID mapping */
 const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
-  // OpenAI models — gpt-5.x family maps to real API model names
-  'gpt-5.5-pro': { apiModel: 'gpt-4o' },
-  'gpt-5.5': { apiModel: 'gpt-4o' },
-  'gpt-5.5-mini': { apiModel: 'gpt-4o-mini' },
-  'gpt-5.5-nano': { apiModel: 'gpt-4o-mini' },
-  'gpt-5.4-pro': { apiModel: 'gpt-4o' },
-  'gpt-5.4': { apiModel: 'gpt-4o' },
-  'gpt-5.4-mini': { apiModel: 'gpt-4o-mini' },
-  'gpt-5.4-nano': { apiModel: 'gpt-4o-mini' },
+  // OpenAI models — gpt-5.x are real OpenAI model IDs (identity map).
+  // Codex sign-in routes through CLIProxy; API key routes direct.
+  'gpt-5.5-pro': { apiModel: 'gpt-5.5-pro' },
+  'gpt-5.5': { apiModel: 'gpt-5.5' },
+  'gpt-5.4-pro': { apiModel: 'gpt-5.4-pro' },
+  'gpt-5.4': { apiModel: 'gpt-5.4' },
+  'gpt-5.4-mini': { apiModel: 'gpt-5.4-mini' },
+  'gpt-5.3-codex': { apiModel: 'gpt-5.3-codex' },
+  'gpt-5.2': { apiModel: 'gpt-5.2' },
   'o3': { apiModel: 'o3' },
   'o4-mini': { apiModel: 'o4-mini' },
-  'gpt-5.2-codex': { apiModel: 'gpt-4o' },
   'o3-deep-research': { apiModel: 'gpt-4o' },
   'gpt-4o': { apiModel: 'gpt-4o' },
   'gpt-4o-mini': { apiModel: 'gpt-4o-mini' },
@@ -440,7 +440,8 @@ const postValidateApiKeyRoute = HttpRouter.add(
 
         case 'google': {
           try {
-            const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
+            const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview' + ':generateContent';
+            const resp = await fetch(`${endpoint}?key=${apiKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ contents: [{ parts: [{ text: 'test' }] }] }),
@@ -670,9 +671,53 @@ const postOpenRouterTestKeyRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/settings/provider-env-conflicts ─────────────────────────
+// ─── Route: GET /api/settings/harness-policy ────────────────────────────────
 
 const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
+const MAX_HARNESS_POLICY_MODELS = 250;
+const MAX_HARNESS_POLICY_MODEL_LENGTH = 200;
+
+const getHarnessPolicyRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/harness-policy',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(async () => {
+      const url = new URL(request.url, 'http://localhost');
+      const models = (url.searchParams.get('models') ?? '')
+        .split(',')
+        .map((model) => model.trim())
+        .filter(Boolean);
+
+      if (
+        models.length === 0
+        || models.length > MAX_HARNESS_POLICY_MODELS
+        || models.some((model) => model.length > MAX_HARNESS_POLICY_MODEL_LENGTH || !SAFE_MODEL_PATTERN.test(model))
+      ) {
+        return jsonResponse({ error: 'Valid models parameter is required' }, { status: 400 });
+      }
+
+      const decisions: Record<string, Record<string, { allowed: boolean; reason?: string }>> = {};
+      const authModeByProvider = new Map<string, Awaited<ReturnType<typeof getProviderAuthMode>>>();
+      for (const model of Array.from(new Set(models))) {
+        const providerName = getProviderForModel(model).name;
+        let authMode = authModeByProvider.get(providerName);
+        if (!authModeByProvider.has(providerName)) {
+          authMode = await getProviderAuthMode(model);
+          authModeByProvider.set(providerName, authMode);
+        }
+        decisions[model] = {
+          'claude-code': canUseHarness('claude-code', model, authMode),
+          pi: canUseHarness('pi', model, authMode),
+        };
+      }
+      return jsonResponse({ decisions });
+    });
+  })),
+);
+
+// ─── Route: GET /api/settings/provider-env-conflicts ─────────────────────────
+
 
 const getProviderEnvConflictsRoute = HttpRouter.add(
   'GET',
@@ -715,6 +760,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   putOpenRouterFavoritesRoute,
   putOpenRouterApiKeyRoute,
   postOpenRouterTestKeyRoute,
+  getHarnessPolicyRoute,
   getProviderEnvConflictsRoute,
 );
 

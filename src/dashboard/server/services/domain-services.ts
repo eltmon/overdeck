@@ -91,17 +91,15 @@ function mapDomainEventToDetailed(event: StoredEvent): {
     case 'pipeline.verification-failed':
       return { source: 'verification', level: 'error', message: `Verification failed for ${issueId}${p['failedCheck'] ? `: ${p['failedCheck']}` : ''}`, issueId, triggeringEvent: event.type };
     case 'pipeline.review-started':
-      return { source: 'review-specialist', level: 'info', message: `Review specialist started for ${issueId}`, issueId, triggeringEvent: event.type };
+      return { source: 'review', level: 'info', message: `Review specialist started for ${issueId}`, issueId, triggeringEvent: event.type };
     case 'pipeline.review-completed':
-      return { source: 'review-specialist', level: p['passed'] ? 'success' : 'error', message: `Review ${p['passed'] ? 'passed' : 'failed'} for ${issueId}`, issueId, triggeringEvent: event.type };
+      return { source: 'review', level: p['passed'] ? 'success' : 'error', message: `Review ${p['passed'] ? 'passed' : 'failed'} for ${issueId}`, issueId, triggeringEvent: event.type };
     case 'pipeline.test-started':
-      return { source: 'test-specialist', level: 'info', message: `Test specialist started for ${issueId}`, issueId, triggeringEvent: event.type };
+      return { source: 'test', level: 'info', message: `Test specialist started for ${issueId}`, issueId, triggeringEvent: event.type };
     case 'pipeline.test-completed':
-      return { source: 'test-specialist', level: p['passed'] ? 'success' : 'error', message: `Tests ${p['passed'] ? 'passed' : 'failed'} for ${issueId}`, issueId, triggeringEvent: event.type };
-    case 'specialist.started': {
-      const spec = p['specialist'] as Record<string, unknown> | undefined;
-      return { source: 'cloister', level: 'info', message: `Specialist ${spec?.['name'] ?? '?'} started${spec?.['currentIssue'] ? ` for ${spec['currentIssue']}` : ''}`, issueId, triggeringEvent: event.type };
-    }
+      return { source: 'test', level: p['passed'] ? 'success' : 'error', message: `Tests ${p['passed'] ? 'passed' : 'failed'} for ${issueId}`, issueId, triggeringEvent: event.type };
+    case 'specialist.started':
+      return { source: 'cloister', level: 'info', message: `Specialist ${p['name'] ?? '?'} started${p['currentIssue'] ? ` for ${p['currentIssue']}` : ''}`, issueId, triggeringEvent: event.type };
     case 'specialist.completed':
       return { source: 'cloister', level: 'success', message: `Specialist ${p['name']} completed`, issueId, triggeringEvent: event.type };
     case 'specialist.failed':
@@ -125,7 +123,7 @@ function mapDomainEventToDetailed(event: StoredEvent): {
     case 'dashboard.lifecycle_failed':
       return { source: 'dashboard', level: 'error', message: `Dashboard lifecycle failed: ${p['reason']} — ${p['error']}`, issueId, triggeringEvent: event.type };
     case 'merge.ready':
-      return { source: 'merge-agent', level: 'success', message: `Issue ${issueId} ready for merge`, issueId, triggeringEvent: event.type };
+      return { source: 'ship', level: 'success', message: `Issue ${issueId} ready for merge`, issueId, triggeringEvent: event.type };
     case 'system.health_severity_changed':
       return {
         source: 'system-health',

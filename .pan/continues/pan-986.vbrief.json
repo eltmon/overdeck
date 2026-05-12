@@ -1,0 +1,24 @@
+{
+  "version": "1",
+  "issueId": "PAN-986",
+  "created": "2026-05-07T19:02:09.905Z",
+  "updated": "2026-05-10T04:54:26.543Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T19:02Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-07T19:02:09.906Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T19:44Z] review-agent → APPROVED — seq 1",
+      "timestamp": "2026-05-07T19:44:55.473Z"
+    }
+  ]
+}

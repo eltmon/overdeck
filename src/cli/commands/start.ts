@@ -4,16 +4,19 @@ import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { promisify } from 'util';
-import { exec } from 'child_process';
+import { exec, execFile, execFileSync } from 'child_process';
 
 const execAsync = promisify(exec);
-import { spawnAgent, type SpawnOptions } from '../../lib/agents.js';
+const execFileAsync = promisify(execFile);
+import { spawnAgent } from '../../lib/agents.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
 import { isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
+import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
+import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -83,7 +86,7 @@ interface IssueOptions {
   shadow?: boolean;
   remote?: boolean;
   local?: boolean;
-  phase?: string;
+  auto?: boolean;
 }
 
 /**
@@ -206,6 +209,39 @@ function findLocalWorkspace(issueId: string, labels: string[] = []): string | nu
  */
 function findWorkspace(issueId: string, labels: string[] = []): string | null {
   return findLocalWorkspace(issueId, labels);
+}
+
+async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIssueInput> {
+  const github = resolveGitHubIssue(issueId);
+  if (github.isGitHub) {
+    try {
+      const { stdout } = await execFileAsync('gh', ['issue', 'view', String(github.number), '--repo', `${github.owner}/${github.repo}`, '--json', 'title,body,url'], {
+        encoding: 'utf-8',
+        timeout: 15000,
+      });
+      const parsed = JSON.parse(stdout) as { title?: string; body?: string; url?: string };
+      return { issueId, title: parsed.title || issueId, body: parsed.body || '', url: parsed.url };
+    } catch {
+      return { issueId, title: issueId, body: '' };
+    }
+  }
+
+  if (isLinearIssue(issueId)) {
+    const apiKey = getLinearApiKey();
+    if (apiKey) {
+      try {
+        const { LinearClient } = await import('@linear/sdk');
+        const client = new LinearClient({ apiKey });
+        const results = await client.searchIssues(issueId, { first: 1 });
+        const issue = results.nodes[0];
+        if (issue) {
+          return { issueId, title: issue.title, body: issue.description ?? '', url: issue.url };
+        }
+      } catch { /* fall through */ }
+    }
+  }
+
+  return { issueId, title: issueId, body: '' };
 }
 
 /**
@@ -462,10 +498,13 @@ import {
  * Uses `bd list` to query the beads database directly (storage-backend agnostic).
  * Exported for testing.
  */
-export function hasBeadsTasks(workspacePath: string): boolean {
+export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean {
+  const label = issueId?.toLowerCase();
   try {
-    const { execSync } = require('child_process');
-    const output = execSync('bd list --json --limit 1', {
+    const args = label
+      ? ['list', '--json', '-l', label, '--status', 'all', '--limit', '1']
+      : ['list', '--json', '--limit', '1'];
+    const output = execFileSync('bd', args, {
       cwd: workspacePath,
       encoding: 'utf-8',
       timeout: 10000,
@@ -474,8 +513,21 @@ export function hasBeadsTasks(workspacePath: string): boolean {
     const tasks = JSON.parse(output.trim() || '[]');
     return tasks.length > 0;
   } catch {
-    // Fallback: check for .beads directory existence (bd not installed or server down)
-    return existsSync(join(workspacePath, '.beads'));
+    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+    if (!existsSync(jsonlPath)) return false;
+    if (!label) return readFileSync(jsonlPath, 'utf-8').trim().length > 0;
+
+    for (const line of readFileSync(jsonlPath, 'utf-8').split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        const labels: string[] = Array.isArray(entry.labels) ? entry.labels : [];
+        if (labels.some((candidate) => candidate.toLowerCase() === label || candidate.toLowerCase() === `workspace:${label}`)) {
+          return true;
+        }
+      } catch { /* skip malformed lines */ }
+    }
+    return false;
   }
 }
 
@@ -540,6 +592,37 @@ function validateAndCleanStateFile(workspacePath: string, issueId: string): { va
   }
 }
 
+interface PostCreateValidationFailureOptions {
+  spinner: Ora;
+  issueId: string;
+  projectRoot: string;
+  workspaceCreatedThisRun: boolean;
+  message: string;
+  printDetails: () => void;
+}
+
+async function failPostCreateValidation(options: PostCreateValidationFailureOptions): Promise<never> {
+  options.spinner.fail(options.message);
+  options.printDetails();
+
+  if (options.workspaceCreatedThisRun) {
+    const nodeDir = dirname(process.execPath);
+    try {
+      await execFileAsync('pan', ['workspace', 'destroy', options.issueId, '--force', '--project', options.projectRoot], {
+        cwd: options.projectRoot,
+        encoding: 'utf-8',
+        timeout: 120000,
+        env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` },
+      });
+      console.log(chalk.dim(`Rolled back workspace created for ${options.issueId}.`));
+    } catch (rollbackErr: any) {
+      console.warn(chalk.yellow(`Warning: failed to roll back workspace for ${options.issueId}: ${rollbackErr.message}`));
+    }
+  }
+
+  process.exit(1);
+}
+
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   // PAN-636 — validate --harness up front. canUseHarness gates the
   // {harness, model, authMode} combination; invalid combos exit non-zero
@@ -599,6 +682,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     const projectRoot = findProjectRoot(id);
     let workspace = workspacePath;
     const workspaceExisted = !!workspace;
+    let workspaceCreatedThisRun = false;
 
     if (!workspace) {
       spinner.text = `Creating workspace for ${id}...`;
@@ -610,6 +694,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           { cwd: projectRoot, encoding: 'utf-8', timeout: 60000, env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` } }
         );
         workspace = expectedWorkspacePath;
+        workspaceCreatedThisRun = true;
       } catch (wsErr) {
         spinner.fail(`Failed to create workspace for ${id}: ${(wsErr as Error).message}`);
         process.exit(1);
@@ -668,15 +753,22 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         } catch { /* ignore sub-repo check errors */ }
 
         if (!hasFeatureBranch) {
-          spinner.fail(`Workspace is on ${branch} branch`);
-          console.log('');
-          console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
-          console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
-          console.log('');
-          console.log(chalk.bold('To fix:'));
-          console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
-          console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
-          process.exit(1);
+          await failPostCreateValidation({
+            spinner,
+            issueId: id,
+            projectRoot,
+            workspaceCreatedThisRun,
+            message: `Workspace is on ${branch} branch`,
+            printDetails: () => {
+              console.log('');
+              console.log(chalk.red('CRITICAL: Work agents must NOT run on main/master branch.'));
+              console.log(chalk.red('This bypasses the entire review/test/merge workflow.'));
+              console.log('');
+              console.log(chalk.bold('To fix:'));
+              console.log(`  1. Create a proper workspace: ${chalk.cyan(`pan workspace ${id}`)}`);
+              console.log(`  2. Or checkout a feature branch: ${chalk.cyan(`git checkout -b feature/${normalizedId}`)}`);
+            },
+          });
         }
       } else {
         spinner.text = `Found workspace on branch: ${branch}`;
@@ -720,19 +812,54 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Validate spec.vbrief.json belongs to this issue (prevent stale workspace plan state from the wrong issue)
     const planValidation = validatePlanMatchesIssue(workspace, id);
     if (!planValidation.valid) {
-      spinner.fail(`Workspace planning artifacts are for ${planValidation.wrongIssue}, not ${id}`);
-      console.log('');
-      console.log(chalk.red(`The workspace contains a stale plan from a different issue.`));
-      console.log(chalk.dim(`This can happen when a workspace is reused or a branch is repurposed.`));
-      console.log('');
-      console.log(chalk.bold('To fix this:'));
-      console.log(`  ${chalk.cyan(`1. Clean the workspace planning artifacts`)}`);
-      console.log(`  ${chalk.cyan(`2. Run planning again: pan plan ${id}`)}`);
-      process.exit(1);
+      await failPostCreateValidation({
+        spinner,
+        issueId: id,
+        projectRoot,
+        workspaceCreatedThisRun,
+        message: `Workspace planning artifacts are for ${planValidation.wrongIssue}, not ${id}`,
+        printDetails: () => {
+          console.log('');
+          console.log(chalk.red(`The workspace contains a stale plan from a different issue.`));
+          if (workspaceExisted) {
+            console.log(chalk.dim(`This can happen when a workspace is reused or a branch is repurposed.`));
+            console.log('');
+            console.log(chalk.bold('To fix this:'));
+            console.log(`  ${chalk.cyan(`1. Clean the workspace planning artifacts`)}`);
+            console.log(`  ${chalk.cyan(`2. Run planning again: pan plan ${id}`)}`);
+          } else {
+            console.log(chalk.dim(`A freshly-created workspace inherited the wrong .pan/spec.vbrief.json from the project tree.`));
+            console.log('');
+            console.log(chalk.bold('To fix this:'));
+            console.log(`  ${chalk.cyan(`1. Remove workspace-only .pan/spec.vbrief.json from the main worktree`)}`);
+            console.log(`  ${chalk.cyan(`2. Ensure .pan/spec.vbrief.json is ignored`)}`);
+            console.log(`  ${chalk.cyan(`3. Run planning again: pan plan ${id}`)}`);
+          }
+        },
+      });
+    }
+
+    if (options.auto && !existsSync(getWorkspacePanPaths(workspace).specPath)) {
+      spinner.text = `Synthesizing minimal vBRIEF for ${id}...`;
+      const issue = await fetchIssueForAutoStart(id);
+      await writeAutoStartVBrief(projectRoot, workspace, issue);
+      const recovery = await createBeadsFromVBrief(workspace);
+      if (recovery.created.length === 0) {
+        await failPostCreateValidation({
+          spinner,
+          issueId: id,
+          projectRoot,
+          workspaceCreatedThisRun,
+          message: `Auto-start synthesized a vBRIEF but no beads were created for ${id}`,
+          printDetails: () => {
+            if (recovery.errors.length > 0) console.log(chalk.dim(`  Errors: ${recovery.errors.join(', ')}`));
+          },
+        });
+      }
     }
 
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
-    if (!hasBeadsTasks(workspace)) {
+    if (!hasBeadsTasks(workspace, id)) {
       // If no planning was done, this is a simple issue — auto-create a bead so the agent can start
       const hasPlanningState = existsSync(getWorkspacePanPaths(workspace).specPath);
       if (!hasPlanningState) {
@@ -746,8 +873,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
             stdio: ['pipe', 'pipe', 'pipe'],
           });
         } catch (bdErr) {
-          spinner.fail(`No beads tasks found for ${id} and auto-create failed`);
-          process.exit(1);
+          await failPostCreateValidation({
+            spinner,
+            issueId: id,
+            projectRoot,
+            workspaceCreatedThisRun,
+            message: `No beads tasks found for ${id} and auto-create failed`,
+            printDetails: () => {},
+          });
         }
       } else {
         // Planning was done but no beads — attempt auto-recovery from vBRIEF (matches dashboard agents.ts path)
@@ -758,25 +891,39 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           if (recovery.created.length > 0) {
             spinner.succeed(`Recovered ${recovery.created.length} beads from vBRIEF plan`);
           } else {
-            spinner.fail(`No beads tasks found for ${id} and recovery from vBRIEF failed`);
-            if (recovery.errors.length > 0) {
-              console.log(chalk.dim(`  Errors: ${recovery.errors.join(', ')}`));
-            }
-            console.log('');
-            console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
-            console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
-            console.log('');
-            console.log(chalk.bold('To re-run planning:'));
-            console.log(`  ${chalk.cyan(`Open the dashboard and click 'Plan' for ${id}`)}`);
-            process.exit(1);
+            await failPostCreateValidation({
+              spinner,
+              issueId: id,
+              projectRoot,
+              workspaceCreatedThisRun,
+              message: `No beads tasks found for ${id} and recovery from vBRIEF failed`,
+              printDetails: () => {
+                if (recovery.errors.length > 0) {
+                  console.log(chalk.dim(`  Errors: ${recovery.errors.join(', ')}`));
+                }
+                console.log('');
+                console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
+                console.log(chalk.dim(`Run planning again and ensure it creates beads with "bd create".`));
+                console.log('');
+                console.log(chalk.bold('To re-run planning:'));
+                console.log(`  ${chalk.cyan(`Open the dashboard and click 'Plan' for ${id}`)}`);
+              },
+            });
           }
         } catch (recoveryErr: any) {
-          spinner.fail(`No beads tasks found for ${id}`);
-          console.log(chalk.dim(`  Recovery error: ${recoveryErr.message}`));
-          console.log('');
-          console.log(chalk.bold('To re-run planning:'));
-          console.log(`  ${chalk.cyan(`pan plan ${id}`)}`);
-          process.exit(1);
+          await failPostCreateValidation({
+            spinner,
+            issueId: id,
+            projectRoot,
+            workspaceCreatedThisRun,
+            message: `No beads tasks found for ${id}`,
+            printDetails: () => {
+              console.log(chalk.dim(`  Recovery error: ${recoveryErr.message}`));
+              console.log('');
+              console.log(chalk.bold('To re-run planning:'));
+              console.log(`  ${chalk.cyan(`pan plan ${id}`)}`);
+            },
+          });
         }
       }
     }
@@ -792,7 +939,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       workspace,
       harness: requestedHarness,
       model: options.model,
-      phase: (options.phase || 'implementation') as SpawnOptions['phase'],
+      role: 'work',
       prompt,
     });
 
@@ -814,7 +961,9 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     console.log(chalk.bold('Agent Details:'));
     console.log(`  Session:    ${chalk.cyan(agent.id)}`);
     console.log(`  Workspace:  ${workspace}`);
-    console.log(`  Runtime:    ${agent.runtime} (${agent.model})`);
+    console.log(`  Harness:    ${agent.harness ?? 'claude-code'}`);
+    console.log(`  Model:      ${agent.model}`);
+    console.log(`  Role:       ${agent.role}`);
 
     // Show context info
     const planningContext = readPlanningContext(workspace);
@@ -837,3 +986,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exit(1);
   }
 }
+
+export const __testInternals = {
+  failPostCreateValidation,
+};

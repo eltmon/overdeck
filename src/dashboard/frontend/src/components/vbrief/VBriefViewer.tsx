@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { List, GitBranch, Code2 } from 'lucide-react';
-import type { VBriefDocument } from './types';
+import type { VBriefDocument, VBriefInspectionPolicy } from './types';
 import { VBriefHeader } from './VBriefHeader';
 import { VBriefNarratives } from './VBriefNarratives';
 import { VBriefReferences } from './VBriefReferences';
@@ -20,9 +20,11 @@ interface VBriefViewerProps {
   doc: VBriefDocument | null;
   /** Optional override for active tab */
   initialTab?: VBriefViewTab;
+  onInspectionPolicyChange?: (policy: VBriefInspectionPolicy) => void;
+  isUpdatingInspectionPolicy?: boolean;
 }
 
-export function VBriefViewer({ doc, initialTab }: VBriefViewerProps) {
+export function VBriefViewer({ doc, initialTab, onInspectionPolicyChange, isUpdatingInspectionPolicy = false }: VBriefViewerProps) {
   const [tab, setTab] = useState<VBriefViewTab>(() => {
     if (initialTab) return initialTab;
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -67,7 +69,11 @@ export function VBriefViewer({ doc, initialTab }: VBriefViewerProps) {
       <div className={`flex-1 ${tab === 'dag' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {tab === 'list' && (
           <>
-            <VBriefHeader doc={doc} />
+            <VBriefHeader
+              doc={doc}
+              onInspectionPolicyChange={onInspectionPolicyChange}
+              isUpdatingInspectionPolicy={isUpdatingInspectionPolicy}
+            />
             {doc.plan.narratives && <VBriefNarratives narratives={doc.plan.narratives} />}
             {doc.plan.references && doc.plan.references.length > 0 && (
               <VBriefReferences references={doc.plan.references} />

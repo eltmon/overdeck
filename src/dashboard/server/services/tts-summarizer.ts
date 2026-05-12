@@ -2,7 +2,7 @@
  * TTS Summarizer Service
  *
  * Batches recent activity.entry events and sends them to a cheap model
- * (default: gpt-5.4-nano) to produce concise, natural-language TTS utterances.
+ * (default: gpt-5.4-mini) to produce concise, natural-language TTS utterances.
  *
  * - Off by default — enabled via tts.summarizer.enabled in ~/.panopticon/config.yaml
  * - Configurable model and batch window

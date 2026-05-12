@@ -29,6 +29,7 @@ import { homedir } from 'node:os'
 import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import type {
   AgentRuntime,
   Heartbeat,
@@ -222,7 +223,7 @@ export class PiRuntime implements AgentRuntime {
     if (!existsSync(readyPathFor(agentId))) {
       throw new PiNotReady(`Pi agent ${agentId}: ready.json not present yet`)
     }
-    writePiCommand(agentId, { cmd: 'prompt', text: message })
+    writePiCommand(agentId, { id: randomUUID(), type: 'prompt', message })
   }
 
   /**
@@ -241,7 +242,7 @@ export class PiRuntime implements AgentRuntime {
   async killAgent(agentId: string): Promise<void> {
     // Step 1: graceful RPC abort.
     try {
-      writePiCommand(agentId, { cmd: 'abort' })
+      writePiCommand(agentId, { id: randomUUID(), type: 'abort' })
     } catch {
       // No reader / not ready — fall through to signal escalation.
     }
@@ -316,7 +317,7 @@ export class PiRuntime implements AgentRuntime {
     }
 
     const launcherScript = generateLauncherScript({
-      agentType: 'work',
+      role: 'work',
       workingDir: config.workspace,
       harness: 'pi',
       piExtensionPath,

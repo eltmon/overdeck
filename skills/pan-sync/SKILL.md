@@ -261,7 +261,7 @@ backup_before_sync = false
 
 These names are reserved by Panopticon. Don't use them for custom skills:
 
-**Pan operations:** `pan-down`, `pan-help`, `pan-install`, `pan-issue`, `pan-plan`, `pan-quickstart`, `pan-setup`, `pan-status`, `pan-up`, `pan-config`, `pan-tracker`, `pan-projects`, `pan-sync`, `pan-docker`, `pan-network`, `pan-approve`, `pan-tell`, `pan-kill`, `pan-health`, `pan-diagnose`, `pan-logs`, `pan-rescue`
+**Pan operations:** `pan-down`, `pan-help`, `pan-install`, `pan-issue`, `pan-plan`, `pan-quickstart`, `pan-setup`, `pan-status`, `pan-up`, `pan-config`, `pan-tracker`, `pan-projects`, `pan-sync`, `pan-docker`, `pan-network`, `pan-approve`, `pan-tell`, `pan-kill`, `pan-doctor`, `pan-diagnose`, `pan-logs`, `pan-rescue`
 
 **Workflow skills:** `beads`, `bug-fix`, `code-review`, `code-review-performance`, `code-review-security`, `dependency-update`, `feature-work`, `incident-response`, `onboard-codebase`, `refactor`, `release`, `session-health`, `skill-creator`, `web-design-guidelines`, `work-complete`
 

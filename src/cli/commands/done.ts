@@ -16,6 +16,7 @@ import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
+import type { MergeSet } from '../../lib/merge-set.js';
 
 interface DoneOptions {
   comment?: string;
@@ -135,6 +136,39 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
     console.error('GitHub API error:', error);
     return false;
   }
+}
+
+async function isMergeSetMergedIntoTargets(
+  workspacePath: string,
+  mergeSet: MergeSet | null | undefined,
+): Promise<boolean> {
+  if (!mergeSet || mergeSet.repos.length === 0) return false;
+
+  for (const repo of mergeSet.repos) {
+    const repoPath = mergeSet.workspaceType === 'polyrepo'
+      ? join(workspacePath, repo.repoKey)
+      : workspacePath;
+
+    if (!existsSync(join(repoPath, '.git'))) return false;
+
+    await execAsync(`git fetch origin ${repo.targetBranch}`, {
+      cwd: repoPath,
+      encoding: 'utf-8',
+      timeout: 60000,
+    });
+
+    try {
+      await execAsync(`git merge-base --is-ancestor HEAD origin/${repo.targetBranch}`, {
+        cwd: repoPath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      });
+    } catch {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
@@ -365,12 +399,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.log(chalk.yellow('  ⚠ No changed repos detected for review artifact creation'));
     }
 
-    // Step 3: Update agent state to stopped (so it appears in dashboard agents list)
-    // Mark phase as 'review-response' so the dashboard shows the agent as on
-    // standby for UAT tweaks rather than fully stopped.
+    // Step 3: Update agent state to stopped (so it appears in dashboard agents list).
+    // The completed marker and review artifact state represent standby/review handoff;
+    // state.json now keeps only stable role identity, not transient phases.
     if (existingState) {
       existingState.status = 'stopped';
-      existingState.phase = 'review-response';
       existingState.stoppedByUser = true;
       existingState.lastActivity = new Date().toISOString();
       saveAgentState(existingState);
@@ -418,16 +451,21 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.warn(`[pan done] Failed to append end entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
 
-    // Step 4b: Guard against already-merged issues (e.g. merge completed in
-    // background while agent was finishing up). If already merged, skip the
-    // review pipeline entirely — no review status init, no HTTP trigger.
+    // Step 4b: Guard against actually-merged issues (e.g. merge completed in
+    // background while agent was finishing up). Review status is cached state and
+    // can be stale after re-submission, so verify git ancestry before skipping.
     const { getReviewStatus } = await import('../../lib/review-status.js');
     const currentStatus = getReviewStatus(issueId);
     if (currentStatus?.mergeStatus === 'merged') {
-      spinner.succeed(`Work complete: ${issueId} (already merged — skipping review pipeline)`);
-      console.log(chalk.green(`  ✓ Issue was already merged — no review pipeline triggered`));
-      console.log('');
-      return;
+      const actuallyMerged = await isMergeSetMergedIntoTargets(workspacePath, artifactResult.mergeSet);
+      if (actuallyMerged) {
+        spinner.succeed(`Work complete: ${issueId} (already merged — skipping review pipeline)`);
+        console.log(chalk.green(`  ✓ Issue was already merged — no review pipeline triggered`));
+        console.log('');
+        return;
+      }
+
+      console.log(chalk.yellow(`  ⚠ Stored merge status for ${issueId} was stale; re-running review pipeline.`));
     }
 
     // Step 4c: Guard against no-op re-submission. If review already passed and

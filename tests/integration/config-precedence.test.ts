@@ -1,292 +1,88 @@
 /**
- * Integration tests for configuration precedence
+ * Integration tests for role-based configuration precedence.
  *
- * Tests the priority order of configuration within the WorkTypeRouter:
- * 1. Per-work-type overrides have highest priority
- * 2. Smart selection is used when no overrides exist
- * 3. Fallback is applied when providers are disabled
- * 4. Router correctly uses normalized config
+ * PAN-1048 removed the legacy work-type routing layer. Model selection now resolves from:
+ * 1. role sub-config (`roles.<role>.sub.<subRole>.model`)
+ * 2. role config (`roles.<role>.model`)
+ * 3. built-in role defaults
+ * 4. workhorse indirection (`workhorse:<slot>`)
  */
 
 import { describe, it, expect } from 'vitest';
-import { WorkTypeRouter } from '../../src/lib/work-type-router.js';
-import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
-import type { WorkTypeId } from '../../src/lib/work-types.js';
+import { mergeConfigs, resolveModel } from '../../src/lib/config-yaml.js';
 
-/**
- * Helper to create a test config
- */
-function createTestConfig(overrides: Partial<NormalizedConfig> = {}): NormalizedConfig {
-  return {
-    enabledProviders: new Set(['anthropic']),
-    apiKeys: {},
-    overrides: {},
-    geminiThinkingLevel: 3,
-    shadow: {
-      enabled: false,
-      trackers: {
-        linear: false,
-        github: false,
-        gitlab: false,
-        rally: false,
+describe('configuration precedence for role model routing', () => {
+  it('uses project role config over lower-precedence global config', () => {
+    const { config } = mergeConfigs(
+      {
+        roles: {
+          work: { model: 'claude-opus-4-7' },
+        },
       },
-    },
-    ...overrides,
-  };
-}
-
-describe('configuration precedence in router', () => {
-  describe('override vs smart selection precedence', () => {
-    it('should use override instead of smart selection', () => {
-      const config = createTestConfig({
-        overrides: {
-          'issue-agent:documentation': 'claude-opus-4-6', // Override documentation to use Opus
+      {
+        roles: {
+          work: { model: 'claude-haiku-4-5' },
         },
-      });
+      },
+    );
 
-      const router = new WorkTypeRouter(config);
-      const result = router.getModel('issue-agent:documentation' as WorkTypeId);
-
-      expect(result.model).toBe('claude-opus-4-6');
-      expect(result.source).toBe('override');
-    });
-
-    it('should use smart selection when no override', () => {
-      const config = createTestConfig({
-        overrides: {}, // No overrides
-      });
-
-      const router = new WorkTypeRouter(config);
-      const result = router.getModel('issue-agent:documentation' as WorkTypeId);
-
-      expect(result.source).toBe('smart');
-      // Should return a valid model
-      expect(result.model).toBeDefined();
-      expect(result.model.length).toBeGreaterThan(0);
-    });
+    expect(resolveModel('work', undefined, config)).toBe('claude-opus-4-7');
   });
 
-  describe('smart selection differences', () => {
-    it('should use different models based on available providers', () => {
-      const workType = 'issue-agent:documentation' as WorkTypeId;
-
-      // Only Anthropic: should use Claude
-      const anthropicRouter = new WorkTypeRouter(createTestConfig({
-        enabledProviders: new Set(['anthropic']),
-      }));
-      const anthropicModel = anthropicRouter.getModelId(workType);
-
-      // Only OpenAI: should use GPT
-      const openaiRouter = new WorkTypeRouter(createTestConfig({
-        enabledProviders: new Set(['openai', 'anthropic']), // Include anthropic as fallback
-      }));
-      const openaiModel = openaiRouter.getModelId(workType);
-
-      // Both should return valid models
-      expect(anthropicModel).toBeDefined();
-      expect(openaiModel).toBeDefined();
-      expect(anthropicModel.length).toBeGreaterThan(0);
-      expect(openaiModel.length).toBeGreaterThan(0);
-    });
-
-    it('should return enabled providers', () => {
-      const providers = ['anthropic', 'openai', 'google'] as const;
-
-      for (const provider of providers) {
-        const router = new WorkTypeRouter(createTestConfig({
-          enabledProviders: new Set([provider]),
-        }));
-        expect(router.getEnabledProviders().has(provider)).toBe(true);
-      }
-    });
-  });
-
-  describe('provider filtering', () => {
-    it('should apply fallback when provider is disabled', () => {
-      const config = createTestConfig({
-        enabledProviders: new Set(['anthropic']), // Only Anthropic enabled
-        overrides: {
-          'issue-agent:implementation': 'gpt-5.2-codex', // OpenAI model
+  it('uses sub-role model config over parent role config', () => {
+    const { config } = mergeConfigs({
+      roles: {
+        review: {
+          model: 'claude-opus-4-7',
+          sub: {
+            security: { model: 'claude-sonnet-4-6' },
+          },
         },
-      });
-
-      const router = new WorkTypeRouter(config);
-      const result = router.getModel('issue-agent:implementation' as WorkTypeId);
-
-      // Should fall back to an Anthropic model
-      expect(result.usedFallback).toBe(true);
-      expect(result.model).toMatch(/claude/i);
-      expect(result.originalModel).toBe('gpt-5.2-codex');
+      },
     });
 
-    it('should not apply fallback when provider is enabled', () => {
-      const config = createTestConfig({
-        enabledProviders: new Set(['anthropic', 'openai']),
-        overrides: {
-          'issue-agent:implementation': 'gpt-5.2-codex',
+    expect(resolveModel('review', 'security', config)).toBe('claude-sonnet-4-6');
+    expect(resolveModel('review', 'unconfigured-sub-role', config)).toBe('claude-opus-4-7');
+  });
+
+  it('resolves role defaults through default workhorse slots', () => {
+    const { config } = mergeConfigs(null);
+
+    expect(resolveModel('plan', undefined, config)).toBe('claude-opus-4-7');
+    // PAN-1048 R4: default workhorse:mid is claude-sonnet-4-7.
+    expect(resolveModel('work', undefined, config)).toBe('claude-sonnet-4-7');
+    expect(resolveModel('work', 'inspect', config)).toBe('claude-haiku-4-5');
+    expect(resolveModel('review', 'requirements', config)).toBe('claude-sonnet-4-7');
+  });
+
+  it('uses configured workhorse slots for roles and sub-roles', () => {
+    const { config } = mergeConfigs({
+      workhorses: {
+        expensive: 'gpt-5.5',
+        mid: 'glm-5.1',
+        cheap: 'minimax-m2.7-highspeed',
+      },
+      roles: {
+        plan: { model: 'workhorse:expensive' },
+        work: {
+          model: 'workhorse:mid',
+          sub: {
+            inspect: { model: 'workhorse:cheap' },
+          },
         },
-      });
-
-      const router = new WorkTypeRouter(config);
-      const result = router.getModel('issue-agent:implementation' as WorkTypeId);
-
-      // Should use the requested model
-      expect(result.usedFallback).toBe(false);
-      expect(result.model).toBe('gpt-5.2-codex');
+      },
     });
+
+    expect(resolveModel('plan', undefined, config)).toBe('gpt-5.5');
+    expect(resolveModel('work', undefined, config)).toBe('glm-5.1');
+    expect(resolveModel('work', 'inspect', config)).toBe('minimax-m2.7-highspeed');
   });
 
-  describe('multiple overrides', () => {
-    it('should handle multiple overrides independently', () => {
-      const config = createTestConfig({
-        enabledProviders: new Set(['anthropic', 'openai']), // Enable providers so no fallback
-        overrides: {
-          'issue-agent:exploration': 'claude-haiku-4-5',
-          'issue-agent:documentation': 'claude-opus-4-6',
-          'issue-agent:implementation': 'gpt-5.2-codex',
-        },
-      });
-
-      const router = new WorkTypeRouter(config);
-
-      expect(router.getModelId('issue-agent:exploration' as WorkTypeId)).toBe('claude-haiku-4-5');
-      expect(router.getModelId('issue-agent:documentation' as WorkTypeId)).toBe('claude-opus-4-6');
-      expect(router.getModelId('issue-agent:implementation' as WorkTypeId)).toBe('gpt-5.2-codex');
-    });
-
-    it('should use smart selection for non-overridden work types', () => {
-      const config = createTestConfig({
-        enabledProviders: new Set(['anthropic', 'openai', 'google']), // Enable all providers
-        overrides: {
-          'issue-agent:documentation': 'claude-haiku-4-5', // Only documentation overridden
-        },
-      });
-
-      const router = new WorkTypeRouter(config);
-
-      const documentationResult = router.getModel('issue-agent:documentation' as WorkTypeId);
-      expect(documentationResult.source).toBe('override');
-      expect(documentationResult.model).toBe('claude-haiku-4-5');
-
-      const explorationResult = router.getModel('issue-agent:exploration' as WorkTypeId);
-      expect(explorationResult.source).toBe('smart');
-      expect(explorationResult.model).toBeDefined();
-    });
-  });
-
-  describe('override checking', () => {
-    it('should correctly report if work type has override', () => {
-      const config = createTestConfig({
-        overrides: {
-          'issue-agent:documentation': 'claude-opus-4-6',
-        },
-      });
-
-      const router = new WorkTypeRouter(config);
-
-      expect(router.hasOverride('issue-agent:documentation' as WorkTypeId)).toBe(true);
-      expect(router.hasOverride('issue-agent:exploration' as WorkTypeId)).toBe(false);
-    });
-  });
-
-  describe('API keys and provider config', () => {
-    it('should expose API keys configuration', () => {
-      const config = createTestConfig({
-        apiKeys: {
-          openai: 'test-openai-key',
-          google: 'test-google-key',
-          minimax: 'test-minimax-key',
-          zai: 'test-zai-key',
-        },
-      });
-
-      const router = new WorkTypeRouter(config);
-      const apiKeys = router.getApiKeys();
-
-      expect(apiKeys.openai).toBe('test-openai-key');
-      expect(apiKeys.google).toBe('test-google-key');
-      expect(apiKeys.minimax).toBe('test-minimax-key');
-      expect(apiKeys.zai).toBe('test-zai-key');
-    });
-
-    it('should expose enabled providers', () => {
-      const config = createTestConfig({
-        enabledProviders: new Set(['anthropic', 'openai', 'google']),
-      });
-
-      const router = new WorkTypeRouter(config);
-      const providers = router.getEnabledProviders();
-
-      expect(providers.has('anthropic')).toBe(true);
-      expect(providers.has('openai')).toBe(true);
-      expect(providers.has('google')).toBe(true);
-      expect(providers.has('minimax')).toBe(false);
-      expect(providers.has('zai')).toBe(false);
-    });
-  });
-
-  describe('Gemini thinking level', () => {
-    it('should expose Gemini thinking level configuration', () => {
-      const levels: Array<1 | 2 | 3 | 4> = [1, 2, 3, 4];
-
-      for (const level of levels) {
-        const config = createTestConfig({
-          geminiThinkingLevel: level,
-        });
-
-        const router = new WorkTypeRouter(config);
-        expect(router.getGeminiThinkingLevel()).toBe(level);
-      }
-    });
-  });
-
-  describe('router reload', () => {
-    it('should allow reloading configuration', () => {
-      const config1 = createTestConfig({ enabledProviders: new Set(['anthropic']) });
-      const router = new WorkTypeRouter(config1);
-
-      expect(router.getEnabledProviders().has('anthropic')).toBe(true);
-      expect(router.getEnabledProviders().has('openai')).toBe(false);
-
-      // Simulate config change by creating new config and reloading
-      // Note: In real usage, reload() would re-read from disk
-      const config2 = createTestConfig({ enabledProviders: new Set(['anthropic', 'openai']) });
-      const newRouter = new WorkTypeRouter(config2);
-
-      expect(newRouter.getEnabledProviders().has('anthropic')).toBe(true);
-      expect(newRouter.getEnabledProviders().has('openai')).toBe(true);
-    });
-  });
-
-  describe('all work types resolved', () => {
-    it('should resolve all issue agent phases', () => {
-      const router = new WorkTypeRouter(createTestConfig());
-
-      const phases = [
-        'exploration',
-        'implementation',
-        'testing',
-        'documentation',
-        'review-response',
-      ];
-
-      for (const phase of phases) {
-        const result = router.getModel(`issue-agent:${phase}` as WorkTypeId);
-        expect(result.model).toBeDefined();
-        expect(result.model.length).toBeGreaterThan(0);
-      }
-    });
-
-    it('should resolve all specialist agents', () => {
-      const router = new WorkTypeRouter(createTestConfig());
-
-      const specialists = ['review-agent', 'test-agent', 'merge-agent'];
-
-      for (const specialist of specialists) {
-        const result = router.getModel(`specialist-${specialist}` as WorkTypeId);
-        expect(result.model).toBeDefined();
-        expect(result.model.length).toBeGreaterThan(0);
-      }
-    });
+  it('rejects nested workhorse references', () => {
+    expect(() => mergeConfigs({
+      workhorses: {
+        expensive: 'workhorse:mid',
+      },
+    })).toThrow(/cannot reference another workhorse/);
   });
 });

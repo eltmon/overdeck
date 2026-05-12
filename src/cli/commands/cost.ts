@@ -21,6 +21,7 @@ import {
   summarizeCosts,
 } from '../../lib/cost.js';
 import { syncWalFromAllProjects } from '../../lib/costs/sync-wal.js';
+import { getCostForIssueFromDb, type IssueAggregate } from '../../lib/database/cost-events-db.js';
 
 /**
  * Run the cost sync action (shared by `pan cost sync` and `pan sync-costs`).
@@ -59,6 +60,43 @@ export async function runCostSync(): Promise<void> {
     console.error(chalk.red('Error:'), error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
+}
+
+export function formatIssueCostAggregate(issueId: string, aggregate: IssueAggregate): string[] {
+  const lines = [
+    chalk.bold(`Costs for ${issueId.toUpperCase()}`),
+    '',
+    `Total Cost: ${chalk.green(formatCost(aggregate.totalCost))}`,
+    `API Calls: ${Object.values(aggregate.stages).reduce((sum, stage) => sum + stage.calls, 0)}`,
+    `Tokens: ${(
+      aggregate.inputTokens
+      + aggregate.outputTokens
+      + aggregate.cacheReadTokens
+      + aggregate.cacheWriteTokens
+    ).toLocaleString()}`,
+    '',
+  ];
+
+  if (Object.keys(aggregate.models).length > 0) {
+    lines.push(chalk.bold('By Model'));
+    for (const [model, stats] of Object.entries(aggregate.models)) {
+      lines.push(`  ${model}: ${formatCost(stats.cost)}`);
+    }
+    lines.push('');
+  }
+
+  const reviewStages = Object.entries(aggregate.stages)
+    .filter(([stage]) => stage === 'review' || stage.startsWith('review.'));
+  if (reviewStages.length > 0) {
+    lines.push(chalk.bold('By Review Role'));
+    for (const [stage, stats] of reviewStages) {
+      const label = stage === 'review' ? 'synthesis' : stage.slice('review.'.length);
+      lines.push(`  ${label}: ${formatCost(stats.cost)} (${stats.calls} call${stats.calls === 1 ? '' : 's'})`);
+    }
+    lines.push('');
+  }
+
+  return lines;
 }
 
 export function createCostCommand(): Command {
@@ -234,6 +272,14 @@ export function createCostCommand(): Command {
     .option('-d, --days <n>', 'Number of days to look back', '30')
     .action((issueId: string, options) => {
       try {
+        const aggregate = getCostForIssueFromDb(issueId);
+        if (aggregate) {
+          for (const line of formatIssueCostAggregate(issueId, aggregate)) {
+            console.log(line);
+          }
+          return;
+        }
+
         const entries = readIssueCosts(issueId, parseInt(options.days, 10));
 
         if (entries.length === 0) {

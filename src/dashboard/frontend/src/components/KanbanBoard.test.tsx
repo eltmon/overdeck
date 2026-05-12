@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Issue, Agent } from '../types';
-import type { SpecialistAgent } from './SpecialistAgentCard';
+// PAN-1048 — SpecialistAgent retired; specialist-style indicators now come
+// from role-tagged AgentSnapshots passed through the `specialists` prop.
 import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard } from './KanbanBoard';
 import { useDashboardStore } from '../lib/store';
 import { DialogProvider } from './DialogProvider';
@@ -311,15 +312,18 @@ describe('ListIssueRow', () => {
     ...overrides,
   });
 
-  const createMockSpecialist = (overrides: Partial<SpecialistAgent> = {}): SpecialistAgent => ({
-    name: 'review-agent',
-    displayName: 'Review Agent',
-    description: 'Code review',
-    enabled: true,
-    autoWake: true,
-    state: 'active',
-    isRunning: true,
-    tmuxSession: 'specialist-review-agent',
+  // PAN-1048 — specialist-style agents are now role-tagged AgentSnapshots
+  // (review / test / ship) keyed off the `role` primitive.
+  const createMockRoleAgent = (overrides: Partial<Agent> = {}): Agent => ({
+    id: 'review-1',
+    issueId: 'TEST-123',
+    runtime: 'claude-code',
+    model: 'test-model',
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    consecutiveFailures: 0,
+    killCount: 0,
+    role: 'review',
     ...overrides,
   });
 
@@ -411,11 +415,11 @@ describe('ListIssueRow', () => {
     expect(screen.queryByTitle('Agent running')).toBeNull();
   });
 
-  it('should show specialist indicators', () => {
+  it('should show specialist indicators (PAN-1048 role primitive)', () => {
     const issue = createMockIssue();
     const specialists = [
-      createMockSpecialist({ name: 'review-agent', displayName: 'Review Agent', currentIssue: 'TEST-123' }),
-      createMockSpecialist({ name: 'test-agent', displayName: 'Test Agent', currentIssue: 'TEST-123' }),
+      createMockRoleAgent({ id: 'review-1', role: 'review', issueId: 'TEST-123' }),
+      createMockRoleAgent({ id: 'test-1', role: 'test', issueId: 'TEST-123' }),
     ];
     render(
       <ListIssueRow
@@ -429,8 +433,9 @@ describe('ListIssueRow', () => {
       />
     );
 
-    expect(screen.getByTitle('Review Agent specialist')).toBeDefined();
-    expect(screen.getByTitle('Test Agent specialist')).toBeDefined();
+    // Title is now `${role} agent` — derived from AgentSnapshot.role.
+    expect(screen.getByTitle('review agent')).toBeDefined();
+    expect(screen.getByTitle('test agent')).toBeDefined();
   });
 
   it('should call onSelectIssue when clicked', () => {
@@ -530,6 +535,10 @@ describe('IssueCard', () => {
     ...overrides,
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   function renderIssueCard(props: Partial<ComponentProps<typeof IssueCard>> = {}) {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -552,6 +561,39 @@ describe('IssueCard', () => {
 
     return defaultProps;
   }
+
+  it('passes auto mode when Auto-plan is clicked', () => {
+    const onPlan = vi.fn();
+    renderIssueCard({
+      issue: createMockIssue({ status: 'Todo' }),
+      onPlan,
+    });
+
+    fireEvent.click(screen.getByTestId('action-auto-plan-TEST-123'));
+
+    expect(onPlan).toHaveBeenCalledWith(true);
+  });
+
+  it('sends auto=true when Auto-start is clicked', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve(JSON.stringify({ success: true })),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderIssueCard({
+      issue: createMockIssue({ status: 'Todo', hasPlan: true, hasBeads: true }),
+      planningState: { hasPlan: true, hasBeads: true, planningComplete: true },
+    });
+
+    fireEvent.click(screen.getByTestId('card-auto-start-agent-TEST-123'));
+
+    await waitFor(() => {
+      const startCall = fetchMock.mock.calls.find(([url]) => url === '/api/agents');
+      expect(startCall).toBeTruthy();
+      expect(JSON.parse((startCall?.[1] as RequestInit).body as string)).toMatchObject({ auto: true });
+    });
+  });
 
   it('opens the inspector rather than the planning dialog for planning-only input', () => {
     const onSelect = vi.fn();

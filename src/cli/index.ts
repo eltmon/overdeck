@@ -57,9 +57,14 @@ import { pendingCommand } from './commands/pending.js';
 import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
 import { abortReviewCommand } from './commands/abort-review.js';
-import { reviewRunCommand } from './commands/review-run.js';
+// PAN-1048 R5: `pan review run` removed. Review now runs as the role primitive
+// via spawnRun(issueId, 'review', …) → roles/review.md, with convoy reviewers
+// spawned by the review role through `pan review spawn-reviewer`.
+// The blocking-orchestrator CLI was the only caller of runParallelReview /
+// parseReviewSynthesis (now also retired).
 import { reviewRestartCommand } from './commands/review-restart.js';
-import { registerWorkspaceCommands } from './commands/workspace.js';
+import { reviewSpawnReviewerCommand } from './commands/review-spawn-reviewer.js';
+import { destroyCommand as destroyWorkspaceCommand, registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
@@ -70,6 +75,7 @@ import { updateCommand } from './commands/update.js';
 import { restartCommand } from './commands/restart.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
+import { planCommand } from './commands/plan.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
@@ -272,19 +278,30 @@ review
   .action(reviewRestartCommand);
 
 review
-  .command('run <id>')
-  .description('Run the full review pipeline (blocking): spawn reviewers → synthesize → post to GitHub. Exit codes: 0=approved, 1=changes, 2=failed.')
-  .option('--cwd <path>', 'Workspace directory (default: cwd)')
-  .option('--pr-url <url>', 'Override PR URL detection')
-  .option('--branch <name>', 'Override branch detection')
-  .option('--files-changed <list>', 'Comma-separated file list (overrides git diff)')
-  .option('--model <model>', 'Override model for all reviewers')
-  .action(reviewRunCommand);
+  .command('spawn-reviewer <id>', { hidden: true })
+  .description('Internal: spawn one review convoy sub-role')
+  .requiredOption('--sub-role <role>', 'Reviewer sub-role (security/correctness/performance/requirements)')
+  .requiredOption('--run-id <id>', 'Review run ID')
+  .option('--workspace <path>', 'Workspace path')
+  .option('--output <path>', 'Reviewer output path')
+  .option('--context <path>', 'Context manifest path')
+  .option('--model <model>', 'Override reviewer model')
+  .action(reviewSpawnReviewerCommand);
+
+// PAN-1048 R5: `pan review run` removed (see import note above).
 
 // pan plan finalize <id>
 const planCmd = program
   .command('plan')
-  .description('Planning lifecycle commands');
+  .description('Planning lifecycle commands')
+  .argument('[id]', 'Issue ID to plan')
+  .option('--auto', 'Run non-interactive planning; inferred choices are recorded in plan.autoDecisions[]')
+  .option('--model <model>', 'Model to use for the planning role')
+  .option('--harness <harness>', 'Planning-agent harness: claude-code (default) | pi')
+  .option('--effort <level>', 'Planning effort: low | medium | high')
+  .option('--remote', 'Use remote planning workspace (Fly.io)')
+  .option('--local', 'Use local planning workspace')
+  .action(planCommand);
 
 planCmd
   .command('finalize')
@@ -363,9 +380,17 @@ program
 
 program
   .command('wipe <id>')
-  .description('Destructive: reset all state for an issue. Confirms.')
+  .description('Destructive: removes workspace files, kills processes, deletes branches, clears review state, and resets tracker status')
   .option('--force', 'Skip confirmation')
+  .option('-y, --yes', 'Skip confirmation')
   .action(wipeCommand);
+
+program
+  .command('destroy <id>')
+  .description('Alias for workspace destroy: remove the issue workspace worktree and branch')
+  .option('--force', 'Force removal even with uncommitted changes')
+  .option('--project <path>', 'Explicit project path (overrides registry)')
+  .action(destroyWorkspaceCommand);
 
 program
   .command('close <id>')
@@ -384,7 +409,7 @@ program
   .option('--no-shadow', 'Disable shadow mode')
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
-  .option('--phase <phase>', 'Work phase for model routing')
+  .option('--auto', 'Skip planning agent by synthesizing a minimal vBRIEF and beads from the issue title/body')
   .action(startCommand);
 
 program

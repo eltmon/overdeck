@@ -1,7 +1,7 @@
 import { X, ScrollText } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { VBriefViewer } from './VBriefViewer';
-import type { VBriefDocument } from './types';
+import type { VBriefDocument, VBriefInspectionPolicy } from './types';
 
 interface VBriefDialogProps {
   issueId: string;
@@ -9,14 +9,30 @@ interface VBriefDialogProps {
 }
 
 export function VBriefDialog({ issueId, onClose }: VBriefDialogProps) {
+  const queryClient = useQueryClient();
+  const queryKey = ['vbrief-plan', issueId];
   const { data: doc, isLoading, isError } = useQuery<VBriefDocument | null>({
-    queryKey: ['vbrief-plan', issueId],
+    queryKey,
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/plan`);
       if (!res.ok) return null;
       return res.json() as Promise<VBriefDocument>;
     },
     retry: false,
+  });
+  const updateInspectionPolicy = useMutation({
+    mutationFn: async (inspectionPolicy: VBriefInspectionPolicy) => {
+      const res = await fetch(`/api/workspaces/${issueId}/plan/inspection-policy`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inspectionPolicy }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      return res.json() as Promise<VBriefDocument>;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKey, updated);
+    },
   });
 
   return (
@@ -50,7 +66,11 @@ export function VBriefDialog({ issueId, onClose }: VBriefDialogProps) {
             </div>
           )}
           {!isLoading && !isError && (
-            <VBriefViewer doc={doc ?? null} />
+            <VBriefViewer
+              doc={doc ?? null}
+              onInspectionPolicyChange={(policy) => updateInspectionPolicy.mutate(policy)}
+              isUpdatingInspectionPolicy={updateInspectionPolicy.isPending}
+            />
           )}
         </div>
       </div>

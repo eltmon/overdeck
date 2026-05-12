@@ -26,6 +26,7 @@ const mockEnsureMergeSetForIssue = vi.fn().mockReturnValue(null);
 const mockRebaseAndPushRepos = vi.fn();
 const mockCreateReviewArtifactsForIssue = vi.fn().mockResolvedValue({ artifacts: [], mergeSet: null });
 const mockSetReviewStatus = vi.fn();
+const mockGetReviewStatus = vi.fn().mockReturnValue(null);
 const mockGetDashboardApiUrl = vi.fn().mockReturnValue('http://localhost:3000');
 const mockGetVBriefACStatus = vi.fn().mockReturnValue(null);
 
@@ -77,7 +78,7 @@ vi.mock('../../../../src/lib/review-artifacts.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   setReviewStatus: mockSetReviewStatus,
-  getReviewStatus: vi.fn().mockReturnValue(null),
+  getReviewStatus: mockGetReviewStatus,
 }));
 
 vi.mock('../../../../src/lib/config.js', () => ({
@@ -101,6 +102,12 @@ vi.mock('ora', () => ({
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+beforeEach(() => {
+  mockGetReviewStatus.mockReset();
+  mockGetReviewStatus.mockReturnValue(null);
+  mockSetReviewStatus.mockClear();
+});
 
 function makeAgentState(workspace: string) {
   return {
@@ -278,6 +285,37 @@ describe('doneCommand dashboard-unreachable graceful path', () => {
 
     // Should not throw — dashboard unreachable is handled gracefully
     await expect(doneCommand('PAN-714', { force: true })).resolves.not.toThrow();
+  });
+
+  it('does not skip review when stored merged status is stale', async () => {
+    mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
+    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
+      if (cmd.includes('git merge-base --is-ancestor')) {
+        cb(new Error('not merged'), '', '');
+      } else {
+        cb(null, { stdout: '', stderr: '' });
+      }
+    });
+    mockShouldSkipTrackerUpdate.mockResolvedValue(true);
+    mockUpdateShadowState.mockResolvedValue(undefined);
+    mockGetReviewStatus.mockReturnValue({ mergeStatus: 'merged' });
+    mockCreateReviewArtifactsForIssue.mockResolvedValue({
+      artifacts: [{ skipped: false, url: 'https://example.test/pr/714' }],
+      mergeSet: {
+        workspaceType: 'monorepo',
+        repos: [{ repoKey: 'panopticon-cli', targetBranch: 'main' }],
+      },
+    });
+    mockGetDashboardApiUrl.mockReturnValue('http://localhost:19999');
+
+    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
+    await doneCommand('PAN-714', { force: true });
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-714', expect.objectContaining({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+    }));
   });
 });
 

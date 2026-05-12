@@ -37,20 +37,18 @@ describe('GET /api/settings/minimax-defaults — route handler payload', () => {
     expect(providers.openrouter).toBe(false);
   });
 
-  it('includes minimax model overrides for all issue-agent work types', () => {
-    const { models } = getMiniMaxDefaultsApi();
-    const overrides = models.overrides ?? {};
+  it('uses minimax workhorses for role-based model selection', () => {
+    const defaults = getMiniMaxDefaultsApi();
 
-    const issueAgentTypes = [
-      'issue-agent:exploration',
-      'issue-agent:implementation',
-    ] as const;
-
-    issueAgentTypes.forEach((wt) => {
-      expect(overrides[wt]).toBeDefined();
-      expect(typeof overrides[wt]).toBe('string');
-      expect(overrides[wt]).toMatch(/minimax/i);
+    expect(defaults.models.overrides).toBeUndefined();
+    expect(defaults.workhorses).toEqual({
+      expensive: 'minimax-m2.7-highspeed',
+      mid: 'minimax-m2.7-highspeed',
+      cheap: 'minimax-m2.7-highspeed',
     });
+    for (const role of ['plan', 'work', 'review', 'test', 'ship'] as const) {
+      expect(defaults.roles?.[role]?.model).toBeDefined();
+    }
   });
 
   it('returns empty api_keys and tracker_keys (no secrets in preset)', () => {

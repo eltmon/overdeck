@@ -28,7 +28,7 @@ import { detectAwaitingInputForAgent, type AwaitingInputDetection } from '../../
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatus } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
-import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
+import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../../lib/pan-dir/index.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
@@ -185,7 +185,7 @@ async function collectSessionTreeNodes(
     if (!stateText) continue;
 
     try {
-      const state = JSON.parse(stateText) as { model?: string; runtime?: string; startedAt?: string; createdAt?: string; status?: string };
+      const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string };
       const isPlanning = checkId.startsWith('planning-');
       const sectionType = isPlanning ? 'planning' : 'work';
       if (isPlanning) hasPlanningSection = true;
@@ -203,7 +203,7 @@ async function collectSessionTreeNodes(
         type: sectionType,
         sessionId: checkId,
         tmuxSession: sectionType === 'work' || sectionType === 'planning' ? checkId : undefined,
-        model: state.model || state.runtime || 'unknown',
+        model: state.model || 'unknown',
         startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
         endedAt: undefined,
         duration: state.startedAt
@@ -262,6 +262,7 @@ async function collectSessionTreeNodes(
     if (latestReview) {
       const resolvedProject = resolveProjectFromIssue(issueId);
       const reviewerProjectKey = resolvedProject?.projectKey ?? issuePrefix.toLowerCase();
+      const synthesisRoundMetadata = await readSynthesisRounds(issueId, reviewerProjectKey);
       const orchestratorSessionName = getTmuxSessionName('review-agent', reviewerProjectKey);
       const orchestratorPresence: SessionNodePresence = context.tmuxSessionNames.has(orchestratorSessionName)
         ? (latestReview.status === 'reviewing' ? 'active' : 'idle')
@@ -275,6 +276,7 @@ async function collectSessionTreeNodes(
         duration: 0,
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
         presence: orchestratorPresence,
+        roundMetadata: synthesisRoundMetadata,
       });
       const reviewerNodes = await buildReviewerNodes({
         issueId,

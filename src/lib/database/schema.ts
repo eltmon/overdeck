@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 /**
  * Initialize the complete database schema.
@@ -226,7 +226,8 @@ export function initSchema(db: Database.Database): void {
       model            TEXT,                               -- model used to spawn conversation (e.g. 'minimax-m2.7-highspeed')
       effort           TEXT,                               -- effort level (e.g. 'low', 'medium', 'high')
       fork_status      TEXT,                               -- async fork provisioning: summarizing, spawning, injecting, failed (null = not a fork or done)
-      fork_error       TEXT                                -- error message when fork_status='failed'
+      fork_error       TEXT,                               -- error message when fork_status='failed'
+      harness          TEXT                                -- coding harness used for conversation runtime
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -770,6 +771,11 @@ export function runMigrations(db: Database.Database): void {
   if (currentVersion < 32) {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN last_verified_commit TEXT`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE review_status ADD COLUMN merge_step TEXT`); } catch { /* already exists */ }
+  }
+
+  // v32 → v33: persist harness used by conversations and forks (PAN-1055)
+  if (currentVersion < 33) {
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN harness TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

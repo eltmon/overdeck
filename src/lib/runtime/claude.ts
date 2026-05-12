@@ -100,7 +100,7 @@ export function createClaudeAdapter(): RuntimeAdapter {
         writeFileSync(
           launcherScript,
           generateLauncherScript({
-            agentType: 'runtime',
+            role: 'work',
             workingDir: options.workingDir,
             setTerminalEnv: true,
             promptFile,

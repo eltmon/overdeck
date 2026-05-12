@@ -22,7 +22,7 @@ import {
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
 } from '@panctl/contracts';
-import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEvent } from '../../lib/persistent-logger.js';
 
@@ -49,10 +49,13 @@ let _cachedEventStore: any = null;
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
-const VALID_AGENT_PHASES = new Set<AgentPhase>(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push", "review", "review-response", "merge"]);
-const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear"]);
-const VALID_SPECIALIST_TYPES = new Set<SpecialistType>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
-const VALID_SPECIALIST_STATES = new Set<SpecialistState>(["active", "sleeping", "uninitialized"]);
+const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship"]);
+const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"]);
+type SpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent' | 'inspect-agent' | 'uat-agent';
+type SpecialistLifecycleState = 'active' | 'sleeping' | 'uninitialized';
+
+const VALID_SPECIALIST_NAMES = new Set<SpecialistAgentName>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
+const VALID_SPECIALIST_LIFECYCLE_STATES = new Set<SpecialistLifecycleState>(["active", "sleeping", "uninitialized"]);
 const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing", "passed", "failed", "blocked"]);
 const VALID_TEST_STATUSES = new Set<TestStatusValue>(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"]);
 const VALID_MERGE_STATUSES = new Set<MergeStatusValue>(["pending", "queued", "merging", "verifying", "merged", "failed"]);
@@ -61,17 +64,18 @@ const VALID_VERIFICATION_STATUSES = new Set<VerificationStatusValue>(["pending",
 export function toAgentStatus(v: unknown): AgentStatus {
   return VALID_AGENT_STATUSES.has(v as AgentStatus) ? v as AgentStatus : "unknown";
 }
-export function toAgentPhase(v: unknown): AgentPhase | undefined {
-  return v && VALID_AGENT_PHASES.has(v as AgentPhase) ? v as AgentPhase : undefined;
+export function toRole(v: unknown): Role | undefined {
+  return v && VALID_ROLES.has(v as Role) ? v as Role : undefined;
 }
+
 export function toAgentResolution(v: unknown): AgentResolution | undefined {
   return v && VALID_RESOLUTIONS.has(v as AgentResolution) ? v as AgentResolution : undefined;
 }
-export function toSpecialistType(v: unknown): SpecialistType | undefined {
-  return VALID_SPECIALIST_TYPES.has(v as SpecialistType) ? v as SpecialistType : undefined;
+export function toSpecialistAgentName(v: unknown): SpecialistAgentName | undefined {
+  return VALID_SPECIALIST_NAMES.has(v as SpecialistAgentName) ? v as SpecialistAgentName : undefined;
 }
-export function toSpecialistState(v: unknown): SpecialistState {
-  return VALID_SPECIALIST_STATES.has(v as SpecialistState) ? v as SpecialistState : "uninitialized";
+export function toSpecialistLifecycleState(v: unknown): SpecialistLifecycleState {
+  return VALID_SPECIALIST_LIFECYCLE_STATES.has(v as SpecialistLifecycleState) ? v as SpecialistLifecycleState : "uninitialized";
 }
 export function toReviewStatus(v: unknown): ReviewStatusValue | undefined {
   return v && VALID_REVIEW_STATUSES.has(v as ReviewStatusValue) ? v as ReviewStatusValue : undefined;
@@ -181,7 +185,11 @@ export const ReadModelServiceLive = Layer.effect(
       return {
         sequence: state.sequence,
         agents: Object.values(state.agentsById),
-        specialists: Object.values(state.specialistsByName),
+        // PAN-1048 — specialistsByName projection retired. The DashboardSnapshot
+        // schema still has a `specialists` field for backward compat with the
+        // wire format; we always send an empty array and clients derive the
+        // same data from agentsById filtered by role.
+        specialists: [],
         reviewStatuses: Object.values(state.reviewStatusByIssueId),
         agentRuntimeById: state.agentRuntimeById,
         channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
@@ -315,7 +323,14 @@ export const ReadModelServiceLive = Layer.effect(
               id: a.id,
               issueId: a.issueId,
               workspace: a.workspace || undefined,
-              runtime: a.runtime || undefined,
+              // PAN-1048 review feedback 004 (C3): AgentState carries `harness`,
+              // not `runtime`. The snapshot field consumed by getHarness() is
+              // `runtime` (packages/contracts/src/types.ts:54-60). Without this
+              // mapping, every Pi agent rendered as Claude Code in the
+              // dashboard because runtime defaulted to undefined → claude-code.
+              // The legacy `runtime` field is read first for backward compat
+              // with state.json files written before the rename.
+              runtime: (a as { runtime?: string }).runtime || a.harness || undefined,
               model: a.model || undefined,
               status: toAgentStatus(reconciled),
               startedAt: a.startedAt || undefined,
@@ -323,9 +338,8 @@ export const ReadModelServiceLive = Layer.effect(
               branch: a.branch || undefined,
               costSoFar: a.costSoFar,
               sessionId: a.sessionId || undefined,
-              phase: toAgentPhase(a.phase),
+              role: toRole((a as { role?: unknown }).role),
               runtimeState: cachedAgent?.runtimeState,
-              agentPhase: cachedAgent?.agentPhase,
               hasPendingQuestion: cachedAgent?.hasPendingQuestion,
               pendingQuestionCount: cachedAgent?.pendingQuestionCount,
               pendingQuestionPrompt: cachedAgent?.pendingQuestionPrompt,
@@ -340,7 +354,8 @@ export const ReadModelServiceLive = Layer.effect(
             ...INITIAL_READ_MODEL_STATE,
             sequence: cached.sequence,
             agentsById,
-            specialistsByName: Object.fromEntries((cached.specialists ?? []).map((s) => [s.name, s])),
+            // PAN-1048 — specialistsByName projection retired; consumers derive
+            // from agentsById filtered by role.
             reviewStatusByIssueId: Object.fromEntries(
               Object.values(statusMap).map((status) => [status.issueId, toReviewStatusSnapshot(status)]),
             ),
@@ -360,16 +375,17 @@ export const ReadModelServiceLive = Layer.effect(
       // ── Slow path: bootstrap from lib modules ────────────────────────────────
       if (!usedProjectionCache) {
         // Lazy imports to avoid circular dependency issues
-        const [{ listRunningAgentsAsync, warnOnBareNumericIssueIds }, { getAllSpecialists, getSpecialistState }, { getReviewStatus }, { computeAgentEnrichment }] =
+        const [{ listRunningAgentsAsync, warnOnBareNumericIssueIds }, { getReviewStatus }, { computeAgentEnrichment }] =
           yield* Effect.all([
             Effect.promise(() => import('../../lib/agents.js')),
-            Effect.promise(() => import('../../lib/cloister/specialists.js')),
             Effect.promise(() => import('../../lib/review-status.js')),
             Effect.promise(() => import('../../lib/agent-enrichment.js')),
           ]);
 
-        // Warn on legacy state files with bare numeric issueIds (PAN-489)
-        warnOnBareNumericIssueIds();
+        // Warn on legacy state files with bare numeric issueIds (PAN-489).
+        // PAN-1048 P2: async to avoid blocking the dashboard event loop on
+        // startup while it scans agent state files and kills stale tmux.
+        yield* Effect.promise(() => warnOnBareNumericIssueIds());
 
         // ── Agents ────────────────────────────────────────────────────────────
         const running = yield* Effect.promise(() => listRunningAgentsAsync());
@@ -407,7 +423,11 @@ export const ReadModelServiceLive = Layer.effect(
             id: a.id,
             issueId: a.issueId,
             workspace: a.workspace || undefined,
-            runtime: a.runtime || undefined,
+            // PAN-1048 review feedback 004 (C3): same mapping as the cached
+            // path above — surface AgentState.harness as snapshot.runtime so
+            // getHarness() returns the actual harness instead of defaulting
+            // every agent to claude-code.
+            runtime: (a as { runtime?: string }).runtime || a.harness || undefined,
             model: a.model || undefined,
             // Reconcile on-disk status with live tmux state:
             // - tmux active but state.json says 'stopped' → actually running (resumed outside API)
@@ -428,31 +448,15 @@ export const ReadModelServiceLive = Layer.effect(
             branch: a.branch || undefined,
             costSoFar: a.costSoFar,
             sessionId: a.sessionId || undefined,
-            phase: toAgentPhase(a.phase),
+            role: toRole((a as { role?: unknown }).role),
             runtimeState: completedNormally ? 'completed' : undefined,
             // Enrichment fields (PAN-440)
-            agentPhase: enrichment ? toAgentPhase(enrichment.agentPhase) : undefined,
             hasPendingQuestion: enrichment?.hasPendingQuestion,
             pendingQuestionCount: enrichment?.pendingQuestionCount,
             pendingQuestionPrompt: enrichment?.pendingQuestionPrompt,
             pendingQuestionReason: enrichment?.pendingQuestionReason,
             resolution: enrichment ? toAgentResolution(enrichment.resolution) : undefined,
             resolutionCount: enrichment?.resolutionCount,
-          };
-        }
-
-        // ── Specialists ────────────────────────────────────────────────────────
-        const allSpecs = getAllSpecialists();
-        const specialistsByName: Record<string, SpecialistSnapshot> = {};
-        for (const s of allSpecs) {
-          const specType = toSpecialistType(s.name);
-          if (!specType) continue; // Skip unknown specialist types
-          const specState = getSpecialistState(s.name);
-          specialistsByName[s.name] = {
-            name: specType,
-            state: toSpecialistState(specState),
-            isRunning: specState === 'active',
-            lastWake: s.lastWake || undefined,
           };
         }
 
@@ -480,14 +484,14 @@ export const ReadModelServiceLive = Layer.effect(
           ...INITIAL_READ_MODEL_STATE,
           sequence,
           agentsById,
-          specialistsByName,
+          // PAN-1048 — specialistsByName projection retired; consumers derive
+          // from agentsById filtered by role.
           reviewStatusByIssueId,
           issuesRaw: [],
         };
 
         console.log(
           `[ReadModel] Bootstrapped: ${Object.keys(agentsById).length} agents, ` +
-          `${Object.keys(specialistsByName).length} specialists, ` +
           `${Object.keys(reviewStatusByIssueId).length} review statuses, seq=${sequence}`,
         );
       }

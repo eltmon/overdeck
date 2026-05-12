@@ -10,7 +10,6 @@
  */
 
 import { ModelId } from './settings.js';
-import { WorkTypeId } from './work-types.js';
 import {
   MODEL_CAPABILITIES,
   SkillDimension,
@@ -42,36 +41,36 @@ export interface SkillRequirement {
  * Work type to skill mapping
  * Defines what skills each work type needs
  */
-export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
+export const WORK_TYPE_REQUIREMENTS: Record<string, SkillRequirement[]> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // ISSUE AGENT PHASES
   // ═══════════════════════════════════════════════════════════════════════════
 
-  'issue-agent:exploration': [
+  'role-plan': [
     { skill: 'speed', weight: 0.4 }, // Need fast exploration
     { skill: 'context-length', weight: 0.3 }, // Large codebases
     { skill: 'synthesis', weight: 0.3 }, // Understanding structure
   ],
 
-  'issue-agent:implementation': [
+  'role-work': [
     { skill: 'code-generation', weight: 0.6 }, // Primary skill
     { skill: 'debugging', weight: 0.2 }, // Avoiding bugs
     { skill: 'testing', weight: 0.2 }, // Writing testable code
   ],
 
-  'issue-agent:testing': [
+  'role-test': [
     { skill: 'testing', weight: 0.5 }, // Primary skill
     { skill: 'code-generation', weight: 0.3 }, // Writing test code
     { skill: 'debugging', weight: 0.2 }, // Finding edge cases
   ],
 
-  'issue-agent:documentation': [
+  'role-work-docs': [
     { skill: 'documentation', weight: 0.6 }, // Primary skill
     { skill: 'synthesis', weight: 0.3 }, // Summarizing
     { skill: 'speed', weight: 0.1 }, // Fast iteration
   ],
 
-  'issue-agent:review-response': [
+  'role-work-review-response': [
     { skill: 'code-review', weight: 0.4 }, // Understanding feedback
     { skill: 'code-generation', weight: 0.3 }, // Making fixes
     { skill: 'debugging', weight: 0.3 }, // Finding issues
@@ -81,31 +80,31 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
   // SPECIALIST AGENTS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  'specialist-review-agent': [
+  'role-review': [
     { skill: 'code-review', weight: 0.5 }, // Primary skill
     { skill: 'security', weight: 0.25 }, // Security awareness
     { skill: 'performance', weight: 0.25 }, // Performance awareness
   ],
 
-  'specialist-test-agent': [
+  'role-test-runner': [
     { skill: 'testing', weight: 0.5 }, // Primary skill
     { skill: 'code-generation', weight: 0.3 }, // Writing tests
     { skill: 'debugging', weight: 0.2 }, // Finding issues
   ],
 
-  'specialist-merge-agent': [
+  'role-ship': [
     { skill: 'code-review', weight: 0.4 }, // Understanding conflicts
     { skill: 'synthesis', weight: 0.3 }, // Merging changes
     { skill: 'debugging', weight: 0.3 }, // Resolving issues
   ],
 
-  'specialist-inspect-agent': [
+  'role-work-inspect': [
     { skill: 'code-review', weight: 0.4 }, // Compare implementation to bead/spec
     { skill: 'debugging', weight: 0.3 }, // Catch regressions and bad diffs
     { skill: 'testing', weight: 0.3 }, // Compile/smoke verification
   ],
 
-  'specialist-uat-agent': [
+  'role-test-uat': [
     { skill: 'testing', weight: 0.4 }, // Browser verification is primary
     { skill: 'debugging', weight: 0.3 }, // Investigating console/network failures
     { skill: 'documentation', weight: 0.3 }, // Requirement coverage and evidence capture
@@ -115,25 +114,25 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
   // SUBAGENTS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  'subagent:explore': [
+  'helper-explore': [
     { skill: 'speed', weight: 0.5 }, // Need speed
     { skill: 'context-length', weight: 0.3 }, // Large scope
     { skill: 'synthesis', weight: 0.2 }, // Quick understanding
   ],
 
-  'subagent:plan': [
+  'helper-plan': [
     { skill: 'planning', weight: 0.5 }, // Primary skill
     { skill: 'synthesis', weight: 0.3 }, // Combining info
     { skill: 'speed', weight: 0.2 }, // Quick iteration
   ],
 
-  'subagent:bash': [
+  'helper-bash': [
     { skill: 'speed', weight: 0.6 }, // Fast execution
     { skill: 'code-generation', weight: 0.3 }, // Command generation
     { skill: 'debugging', weight: 0.1 }, // Error handling
   ],
 
-  'subagent:general-purpose': [
+  'helper-general-purpose': [
     { skill: 'speed', weight: 0.3 }, // Balanced
     { skill: 'synthesis', weight: 0.3 }, // General understanding
     { skill: 'code-generation', weight: 0.4 }, // General tasks
@@ -143,37 +142,37 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
   // REVIEW AGENTS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  'review:security': [
+  'review-security': [
     { skill: 'security', weight: 0.7 }, // PRIMARY - never compromise
     { skill: 'code-review', weight: 0.2 }, // Code understanding
     { skill: 'debugging', weight: 0.1 }, // Finding vulnerabilities
   ],
 
-  'review:performance': [
+  'review-performance': [
     { skill: 'performance', weight: 0.6 }, // Primary skill
     { skill: 'code-review', weight: 0.3 }, // Code understanding
     { skill: 'debugging', weight: 0.1 }, // Finding bottlenecks
   ],
 
-  'review:correctness': [
+  'review-correctness': [
     { skill: 'code-review', weight: 0.4 }, // Primary skill
     { skill: 'debugging', weight: 0.4 }, // Finding bugs
     { skill: 'testing', weight: 0.2 }, // Test coverage
   ],
 
-  'review:requirements': [
+  'review-requirements': [
     { skill: 'planning', weight: 0.4 },    // Mapping requirements to code
     { skill: 'code-review', weight: 0.4 }, // Understanding what code does
     { skill: 'documentation', weight: 0.2 }, // Reading vBRIEF structure
   ],
 
-  'review:synthesis': [
+  'review-synthesis': [
     { skill: 'synthesis', weight: 0.6 }, // Primary skill
     { skill: 'documentation', weight: 0.2 }, // Clear writing
     { skill: 'planning', weight: 0.2 }, // Organizing findings
   ],
 
-  'review:lightweight': [
+  'review-lightweight': [
     { skill: 'speed', weight: 0.5 }, // Speed-first: resolves to haiku-tier
     { skill: 'code-review', weight: 0.3 }, // Basic code understanding
     { skill: 'debugging', weight: 0.2 }, // Lightweight issue spotting
@@ -203,13 +202,13 @@ export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
   // CLI CONTEXTS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  'cli:interactive': [
+  'cli-interactive': [
     { skill: 'speed', weight: 0.4 }, // Responsive
     { skill: 'synthesis', weight: 0.3 }, // Understanding context
     { skill: 'code-generation', weight: 0.3 }, // Quick code
   ],
 
-  'cli:quick-command': [
+  'cli-quick-command': [
     { skill: 'speed', weight: 0.7 }, // Must be fast
     { skill: 'code-generation', weight: 0.2 }, // Simple generation
     { skill: 'synthesis', weight: 0.1 }, // Quick understanding
@@ -322,7 +321,7 @@ function isAccessibleAtTier(
  * Select the best model for a work type from available models
  */
 export function selectModel(
-  workType: WorkTypeId,
+  workType: string,
   availableModels: ModelId[],
   options: SelectionOptions = {}
 ): ModelSelectionResult {
@@ -431,12 +430,9 @@ export function selectModel(
 export function selectAllModels(
   availableModels: ModelId[],
   options: SelectionOptions = {}
-): Record<WorkTypeId, ModelSelectionResult> {
-  const workTypes = Object.keys(WORK_TYPE_REQUIREMENTS) as WorkTypeId[];
-  const results: Record<WorkTypeId, ModelSelectionResult> = {} as Record<
-    WorkTypeId,
-    ModelSelectionResult
-  >;
+): Record<string, ModelSelectionResult> {
+  const workTypes = Object.keys(WORK_TYPE_REQUIREMENTS);
+  const results: Record<string, ModelSelectionResult> = {};
 
   for (const workType of workTypes) {
     results[workType] = selectModel(workType, availableModels, options);
@@ -451,12 +447,12 @@ export function selectAllModels(
 export function getSimpleModelMapping(
   availableModels: ModelId[],
   options: SelectionOptions = {}
-): Record<WorkTypeId, ModelId> {
+): Record<string, ModelId> {
   const results = selectAllModels(availableModels, options);
-  const mapping: Record<WorkTypeId, ModelId> = {} as Record<WorkTypeId, ModelId>;
+  const mapping: Record<string, ModelId> = {} as Record<string, ModelId>;
 
   for (const [workType, result] of Object.entries(results)) {
-    mapping[workType as WorkTypeId] = result.model;
+    mapping[workType] = result.model;
   }
 
   return mapping;
@@ -466,7 +462,7 @@ export function getSimpleModelMapping(
  * Pretty print selection results for debugging
  */
 export function formatSelectionResults(
-  results: Record<WorkTypeId, ModelSelectionResult>
+  results: Record<string, ModelSelectionResult>
 ): string {
   const lines: string[] = ['Model Selection Results', '='.repeat(60)];
 

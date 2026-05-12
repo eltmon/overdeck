@@ -43,7 +43,6 @@ vi.mock('../specialists.js', () => ({
   checkSpecialistQueue: vi.fn(() => ({ hasWork: false, items: [] })),
   completeSpecialistTask: vi.fn(),
   getAllProjectSpecialistStatuses: vi.fn(() => []),
-  SpecialistType: {},
 }));
 
 vi.mock('../config.js', () => ({

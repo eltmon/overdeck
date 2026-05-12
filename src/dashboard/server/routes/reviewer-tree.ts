@@ -1,15 +1,15 @@
 /**
  * Reviewer-tree builder for the Command Deck (PAN-830).
  *
- * Given an issue, this module returns exactly five canonical reviewer nodes
- * (one per role: correctness, security, performance, requirements, synthesis)
- * regardless of how many review rounds have run. Each node carries the
+ * Given an issue, this module returns exactly four canonical convoy reviewer
+ * nodes (correctness, security, performance, requirements) regardless of how
+ * many review rounds have run. Each node carries the
  * aggregated round metadata read from
  * `~/.panopticon/agents/<canonical-session>/round-N.json` artifacts written
  * by `archiveReviewerRound` in review-agent.ts.
  *
  * The orchestrator (parent `review` node) is emitted by the caller; this
- * module is only responsible for the five role children.
+ * module is only responsible for the four convoy children.
  *
  * Async-only (fs/promises); safe to call from the dashboard server.
  */
@@ -21,13 +21,19 @@ import { join } from 'node:path';
 import type { AgentStatus, SessionNodePresence } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import {
-  REVIEWER_ROLES,
   getReviewerSessionName,
   parseReviewerSessionName,
   type ReviewerRole,
 } from '../../../lib/cloister/specialists.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { capturePaneAsync } from '../../../lib/tmux.js';
+
+const CONVOY_REVIEWER_ROLES: readonly ReviewerRole[] = [
+  'correctness',
+  'security',
+  'performance',
+  'requirements',
+];
 
 const API_ERROR_PATTERNS = [
   /attempt\s+\d+\/\d+/i,
@@ -263,9 +269,17 @@ async function findLatestReviewRunDir(
   }
 }
 
+export async function readSynthesisRounds(
+  issueId: string,
+  projectKey: string,
+  agentsRoot: string = join(homedir(), '.panopticon', 'agents'),
+): Promise<ReviewerRoundMetadata | undefined> {
+  return readReviewerRounds(getReviewerSessionName('synthesis', projectKey, issueId), agentsRoot);
+}
+
 /**
- * Build exactly five canonical reviewer nodes for an issue. Order matches
- * REVIEWER_ROLES so synthesis is always last.
+ * Build exactly four canonical convoy reviewer nodes for an issue. Synthesis
+ * metadata is attached to the parent review node by callers via readSynthesisRounds.
  */
 export async function buildReviewerNodes(
   opts: BuildReviewerNodesOptions,
@@ -282,7 +296,7 @@ export async function buildReviewerNodes(
   const latestReviewRunDir = await findLatestReviewRunDir(opts.workspacePath, opts.issueId);
 
   const nodes = await Promise.all(
-    REVIEWER_ROLES.map(async (role) => {
+    CONVOY_REVIEWER_ROLES.map(async (role) => {
       const sessionId = getReviewerSessionName(role, opts.projectKey, opts.issueId);
       const isLive = opts.tmuxSessionNames.has(sessionId);
       const roundMetadata = await readReviewerRounds(sessionId, agentsRoot);

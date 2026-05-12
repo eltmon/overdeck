@@ -77,9 +77,45 @@ These block the Node.js event loop, freezing all HTTP requests, WebSocket connec
 
 ## Harnesses
 
-Panopticon supports two coding-agent harnesses: `claude-code` (default) and `pi` (alternative, multi-provider). The harness is picked per spawn at plan kickoff, work agent start, and the conversation panel; specialists read per-role defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
+Panopticon supports two coding-agent harnesses: `claude-code` (default) and `pi` (alternative, multi-provider). The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
 
 See [docs/HARNESSES.md](docs/HARNESSES.md) for installation, picker locations, ToS rules, and troubleshooting.
+
+## Panopticon Agent Taxonomy
+
+Panopticon's pipeline is expressed as five issue-scoped **roles**:
+
+| Role | Purpose | Instruction source |
+| --- | --- | --- |
+| `plan` | Discover requirements and produce vBRIEF/beads artifacts | `roles/plan.md` |
+| `work` | Implement one bead at a time in the workspace | `roles/work.md` |
+| `review` | Synthesize code review and transition approved/blocked work | `roles/review.md` |
+| `test` | Run automated verification and required browser UAT | `roles/test.md` |
+| `ship` | Rebase/verify/push approved branches for human merge | `roles/ship.md` |
+
+Sub-roles are configuration slots under a role, not standalone pipeline stages. All sub-roles today are delivered as **harness-agnostic prompt templates** that the orchestrator inlines into spawn messages:
+
+- **`review.security` / `review.correctness` / `review.performance` / `review.requirements`** — Panopticon reads `roles/review-<subRole>.md` and inlines the body into each convoy spawn message. Never loaded via Claude's `--agent` flag, never synced into project workspaces.
+- **`work.inspect` / `work.inspect-deep`** — same shape: the inspection prompt is workflow-injected, not auto-discovered.
+
+`.claude/agents/` is **deliberately empty** in this repo. The directory exists in worktrees only as a sync target for the Claude Code harness, but Panopticon ships no ambient subagents there. Two reasons: (1) ambient subagents leak into every Claude Code session and can fire at moments the workflow doesn't intend; (2) ambient subagent definitions can hardcode model assumptions (e.g. `model: haiku`) that break on non-Anthropic-routed agents (CLIProxy → gpt-5.5), since the harness doesn't always thread provider routing through to the subagent call. When a role needs codebase exploration or general-purpose subagent work, it uses Claude Code's built-in subagent types (`Explore`, `general-purpose`), which inherit the parent's model and routing context properly.
+
+`.claude/skills/` is also a workspace sync target, not a source of truth — same gitignore policy (PAN-1090).
+
+The full mental model — Role vs Claude subagent vs Panopticon pipeline agent — lives in [docs/ROLES.md](docs/ROLES.md). For review specifically, see [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md).
+
+Legacy specialist wake/session/queue machinery has been removed. Use `spawnRun(issueId, role, opts)` and lifecycle state transitions instead of waking named specialists.
+
+## Skills ↔ CLI Convention
+
+The `pan` binary's subcommands and Claude Code's `pan-*` skills follow a strict convention:
+
+- **`pan <verb>`** (CLI subcommand) is wrapped by **`/pan-<verb>`** (a skill at `skills/pan-<verb>/SKILL.md`).
+- The `pan-` prefix is also a namespace for workflow / reference / topical skills (`/pan-workflow`, `/pan-code-review`, `/pan-network`) that don't map 1:1 to a single verb.
+- Not every CLI verb gets a wrapper skill — only verbs where the skill adds non-trivial guidance beyond `--help`. The current exclusion list and the criteria are documented in [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md).
+- **When the CLI changes, the wrapper skill changes in the same commit.** `scripts/lint-skills.sh` (wired into `npm run lint`) enforces this by cross-checking every flag and subcommand a wrapper SKILL.md mentions against the actual `pan <verb> --help` output. Drift fails CI.
+
+See [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) for the full rules, shapes (CLI-wrapper / CLI-sub-wrapper / Workflow / Reference / Topical), and creating-a-new-skill checklist.
 
 ## Project Structure
 
@@ -183,9 +219,9 @@ unconditionally.
   channels`) is dismissed automatically at agent startup via one
   `sendRawKeystrokeAsync(C-m)` call, gated on `state.channelsEnabled`.
 
-**Scope:** only the work-agent prompt-delivery sites in `src/lib/agents.ts`
+**Scope:** only the work-role prompt-delivery sites in `src/lib/agents.ts`
 migrate. The following intentionally stay on `sendKeysAsync`:
-`src/lib/cloister/` (specialists, deacon, review, merge), `src/lib/runtimes/`
+Cloister orchestration helpers outside work-message delivery, `src/lib/runtimes/`
 (non-Claude-Code runtimes), `src/dashboard/server/routes/conversations.ts`,
 and `src/dashboard/server/routes/misc.ts`. Bidirectional reply tools and
 dashboard-routed permission relay are out of scope and tracked as separate
@@ -235,7 +271,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 ## Verification Gate (PAN-174)
 
 After a work agent signals completion, Cloister runs quality gates from `projects.yaml`
-before waking the review-agent. If typecheck/lint/test fail, feedback is sent to the
+before advancing to the review role. If typecheck/lint/test fail, feedback is sent to the
 agent's tmux session and the completion marker is NOT processed (allowing retry).
 After 3 consecutive failures, verification is bypassed to prevent permanent blocking.
 
@@ -309,7 +345,7 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
 5. **Linear/GitHub status** — issue status reset to Todo/Open
 
-**The scope vBRIEF** in `.pan/specs/` on main survives deep-wipe — it's committed to the project repo independently of the workspace. The docs-level PRD (e.g., `myn/docs/prds/planned/MIN-XXX-*.md`) also survives. The workspace `.pan/` directory (spec, continue state) and `.beads/` are destroyed.
+**The scope vBRIEF** in `.pan/specs/` on main survives deep-wipe — it's committed to the project repo independently of the workspace. Project-level PRD archives (e.g., a team's own `docs/prds/` if they keep one for narrative archival) also survive; the Panopticon-managed PRD draft at `<projectRoot>/.pan/drafts/<issue>.md` survives too. The workspace `.pan/` directory (spec, continue state) and `.beads/` are destroyed.
 
 **Rules:**
 - **NEVER call deep-wipe programmatically** without the user explicitly requesting it
@@ -352,43 +388,71 @@ When TLDR is available, you'll have these MCP tools:
 
 ## vBRIEF Plans & Lifecycle
 
-Panopticon uses **vBRIEF v0.5** for machine-readable work plans with a filesystem-as-state lifecycle model. Key references:
+Panopticon uses **vBRIEF v0.5** for machine-readable work plans. Key references:
 
 - **Canonical spec:** [github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)
 - **Our fork:** [github.com/eltmon/vBRIEF](https://github.com/eltmon/vBRIEF)
 - **Extension proposal:** [deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)
-- **Panopticon docs:** [docs/VBRIEF.md](docs/VBRIEF.md)
+- **Panopticon docs:** [docs/VBRIEF.md](docs/VBRIEF.md) — full schema, lifecycle, and migration notes
 
-### Lifecycle Directories
+### The five-artifact model (PAN-967 + PAN-946)
 
-Scope vBRIEFs live in `vbrief/` at the project root and move between directories as work progresses:
+There are five artifacts. They are distinct — do not conflate them.
 
-- `vbrief/proposed/` — planning complete, awaiting approval
-- `vbrief/active/` — agent is working on it
-- `vbrief/completed/` — merged/closed
-- `vbrief/cancelled/` — abandoned
+| Artifact | Location | Writer | Mutability |
+| --- | --- | --- | --- |
+| **PRD draft** (`.md`) | `<projectRoot>/.pan/drafts/<issue>.md` | Human or planning agent | Free-form narrative, human-mutable |
+| **vBRIEF spec** (`.json`) on main | `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` | Pipeline only (single writer) | Status changes are atomic field flips on the same file — files do NOT move between directories |
+| **Project-side continue state** (`.json`) | `<projectRoot>/.pan/continues/<issue-lowercase>.vbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback — one canonical file per issue, never moves |
+| **Workspace working copy** (`.json`) | `<workspace>/.pan/spec.vbrief.json` | Work agent (one per issue) | Copied from main at branch creation; mutated during work; never reaches back into main's spec |
+| **Workspace-side continue state** (`.json`) | `<workspace>/.pan/continue.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback |
 
-Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
+**The PAN-946 invariant — workspace mutations never reach lifecycle directories.** `findPlan`, `readWorkspacePlan`, `updateItemStatus`, and `updateSubItemStatus` resolve ONLY the workspace-local `.pan/spec.vbrief.json`. Lifecycle/archive lookups go through `findVBriefByIssue` in `lifecycle-io.ts` (read-only) or `findVBriefByIssueAsync` in `vbrief-index.ts` (read-only, indexed). Conflating these two surfaces caused a high-severity correctness bug; the comment at `src/lib/vbrief/io.ts:5-17` is the canonical reminder.
 
-### Continue State
+**Gitignore policy.** The two workspace-only files (`.pan/spec.vbrief.json` and `.pan/continue.json`) are listed in `.gitignore` and must NEVER be tracked in main. If they leak into main's tree, every new git worktree inherits the most-recently-committed workspace's spec and `pan start` refuses with a misleading "workspace planning artifacts are for PAN-XXXX" error (see PAN-1073 for the cleanup). The lifecycle artifacts (`.pan/specs/`, `.pan/continues/`, `.pan/drafts/`) remain tracked — they're the canonical record of plans, continue states, and PRD drafts at rest.
 
-`continue-<issueId>.vbrief.json` replaces STATE.md as the structured session history. Lives alongside the scope vBRIEF in the same lifecycle directory. Contains git state, decisions, hazards, resume point, beads mapping, agent model, and session history.
+### Status is a JSON field, not a directory
+
+`plan.status` advances through one canonical file via atomic single-commit updates on main. Files do not move between directories.
+
+```
+draft (in .pan/drafts/*.md) ──► proposed ──► approved ──► active/running ──► completed
+                                       │                                          │
+                                       └──────────► cancelled ◄───────────────────┘
+```
+
+| Transition | Trigger | What changes |
+| --- | --- | --- |
+| (new) → draft | `pan plan` starts | Markdown PRD written to `<projectRoot>/.pan/drafts/<issue>.md` |
+| draft → proposed | Planning completes | vBRIEF created in `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"` |
+| proposed → approved/running | `pan start` | Status field flipped on main; spec copied to workspace `.pan/spec.vbrief.json` |
+| running → completed | PR merges | Status field flipped to `"completed"` on main |
+| any → cancelled | Issue closed | Status field flipped to `"cancelled"` on main |
+
+### Legacy paths
+
+PAN-967 unified everything under `.pan/`. The following are gone or read-only legacy:
+
+- `.planning/plan.vbrief.json` — **DELETED.** Replaced by `.pan/spec.vbrief.json`.
+- `docs/prds/planned/`, `docs/prds/active/` — no longer a Panopticon convention. PRD drafts live in `.pan/drafts/`. Projects may keep their own `docs/prds/` for human archival, but Panopticon does not read or write it.
+- `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyVBriefByIssue` for backward compatibility during migration; pipeline writes target `.pan/specs/` only. Legacy spec files (non-continue) remain at these paths as read-only fallback.
+
+If you see an agent referencing `.planning/`, `docs/prds/planned/*.vbrief.json`, or planning a "copy PRD vBRIEF into workspace .planning" step, the agent is reading a pre-PAN-967 problem statement and needs to be redirected at `docs/VBRIEF.md`.
 
 ### Auto-Behaviors
 
-- `io.ts` (`updateItemStatus`/`updateSubItemStatus`) auto-increments `plan.sequence` and sets `updated` timestamps on every write
-- `complete-planning` promotes vBRIEF to `vbrief/proposed/` on main with an issue-keyed filename
-- `start-agent` transitions vBRIEF from `proposed/` to `active/` and sets `plan.status` to `approved`/`running`
-- `postMergeLifecycle` transitions vBRIEF from `active/` to `completed/` on main
-- `start-planning` discovers PRDs from `docs/prds/planned/` and `docs/prds/active/` matching the issue ID and copies to `.pan/prd.md`
-- `findPlan()` resolves vBRIEFs from `.pan/specs/` on main first, falling back to workspace `.pan/spec.vbrief.json`
+- `io.ts` (`updateItemStatus`/`updateSubItemStatus`) auto-increments `plan.sequence` and sets `updated` timestamps on every write.
+- `complete-planning` writes the vBRIEF to `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"`.
+- `start-agent` materializes the workspace working copy at `<workspace>/.pan/spec.vbrief.json` (copying from the canonical spec on main, importing from `.pan/drafts/` PRDs when needed — PAN-945) and flips the main-side status field.
+- `postMergeLifecycle` flips the main-side `plan.status` to `"completed"` after merge.
+- `findPlan(workspacePath)` returns the workspace-local spec only. Read-only lifecycle lookups go through `findVBriefByIssue(projectRoot, issueId)` in `lifecycle-io.ts`.
 
 ### Dashboard Viewer
 
 VBriefViewer components at `src/dashboard/frontend/src/components/vbrief/`:
 - Accessible via **vBRIEF button** on kanban issue cards and InspectorPanel
 - List / DAG / Raw JSON tabs
-- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from lifecycle dirs first, then workspace)
+- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from `.pan/specs/` first via the read-only lifecycle helpers, then workspace `.pan/spec.vbrief.json`)
 
 ## Issue Creation from PRDs
 

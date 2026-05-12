@@ -35,7 +35,7 @@ import type { TrackerConfig } from '../tracker/factory.js';
 // Review status file location (same as dashboard server)
 
 import {
-  SpecialistType,
+  SpecialistAgentName,
   getTmuxSessionName,
   isRunning,
   getAllProjectSpecialistStatuses,
@@ -90,7 +90,7 @@ export interface DeaconConfig {
  * Health check state for a single specialist
  */
 export interface SpecialistHealthState {
-  specialistName: SpecialistType;
+  specialistName: SpecialistAgentName;
   lastPingTime?: string;         // ISO 8601
   lastResponseTime?: string;     // ISO 8601
   consecutiveFailures: number;
@@ -112,7 +112,7 @@ export interface ContainerRestartRecord {
  * Complete health check state for all specialists
  */
 export interface DeaconState {
-  specialists: Record<SpecialistType, SpecialistHealthState>;
+  specialists: Record<SpecialistAgentName, SpecialistHealthState>;
   lastPatrol?: string;           // ISO 8601
   patrolCycle: number;
   recentDeaths: string[];        // ISO timestamps of recent deaths
@@ -125,7 +125,7 @@ export interface DeaconState {
  * Result of a health check
  */
 export interface HealthCheckResult {
-  specialistName: SpecialistType;
+  specialistName: SpecialistAgentName;
   isResponsive: boolean;
   responseTimeMs?: number;
   consecutiveFailures: number;
@@ -207,7 +207,7 @@ export function loadState(): DeaconState {
 
   // Return empty state
   return {
-    specialists: {} as Record<SpecialistType, SpecialistHealthState>,
+    specialists: {} as Record<SpecialistAgentName, SpecialistHealthState>,
     patrolCycle: 0,
     recentDeaths: [],
   };
@@ -231,7 +231,7 @@ export function saveState(state: DeaconState): void {
  */
 function getSpecialistState(
   state: DeaconState,
-  name: SpecialistType
+  name: SpecialistAgentName
 ): SpecialistHealthState {
   if (!state.specialists[name]) {
     state.specialists[name] = {
@@ -277,7 +277,7 @@ function getCooldownRemaining(healthState: SpecialistHealthState): number {
 /**
  * Check if a specialist is responsive by reading their heartbeat
  */
-function checkHeartbeat(name: SpecialistType): {
+function checkHeartbeat(name: SpecialistAgentName): {
   isResponsive: boolean;
   lastActivity?: number;
   responseTimeMs?: number;
@@ -318,7 +318,7 @@ function checkHeartbeat(name: SpecialistType): {
  * When called standalone (no sharedState), loads and saves state itself.
  */
 export async function checkSpecialistHealth(
-  name: SpecialistType,
+  name: SpecialistAgentName,
   sharedState?: DeaconState,
 ): Promise<HealthCheckResult> {
   const state = sharedState ?? loadState();
@@ -409,7 +409,7 @@ export async function checkSpecialistHealth(
  * When called standalone, loads and saves state itself.
  */
 export async function forceKillSpecialist(
-  name: SpecialistType,
+  name: SpecialistAgentName,
   sharedState?: DeaconState,
 ): Promise<{
   success: boolean;
@@ -706,7 +706,7 @@ function parseThinkingDuration(tmuxOutput: string): number | null {
 export async function checkStuckWorkAgents(): Promise<string[]> {
   const actions: string[] = [];
   const agents = listRunningAgents();
-  // Specialist sessions (global or per-project) all start with "specialist-"
+  // Specialist sessions (global or per-project) use the specialist tmux prefix.
   const isSpecialistSession = (id: string) => id.startsWith('specialist-');
   const now = Date.now();
 
@@ -1140,8 +1140,9 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
  * still alive or a review is in flight, and kills sessions that have been
  * alive for more than one hour with no owner.
  *
- * This is a safety net for crashes where runParallelReview's finally block
- * or /api/specialists/done cleanup did not run.
+ * Safety net for orphaned convoy reviewer sessions (agent-<id>-review-<subRole>)
+ * whose synthesis session already ended but whose sub-role session outlived the
+ * stop-hook reaper (e.g. reaper race, tmux busy, dashboard restart).
  */
 export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
   const actions: string[] = [];
@@ -1179,10 +1180,9 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
   const { parseReviewerSessionName } = await import('./specialists.js');
 
   for (const sessionName of sessions) {
-    // Only consider reviewer/specialist sessions
-    const isReviewer = sessionName.includes('-review-');
-    const isCoordinator = sessionName.startsWith('review-coordinator-');
-    if (!isReviewer && !isCoordinator) continue;
+    // PAN-1059: convoy sub-role sessions are agent-<id>-review-<subRole>.
+    // Legacy specialist sessions matched specialist-*-review-*. Both contain -review-.
+    if (!sessionName.includes('-review-')) continue;
 
     // Check age
     const createdMs = creationTimes.get(sessionName);
@@ -1191,14 +1191,20 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
     // Extract issueId from session name
     let issueId: string | null = null;
 
-    // Try canonical reviewer pattern first
-    const parsedReviewer = parseReviewerSessionName(sessionName);
-    if (parsedReviewer) {
-      issueId = parsedReviewer.issueId.toUpperCase();
+    // PAN-1059 convoy pattern: agent-<issueId>-review-<subRole>
+    const convoyMatch = sessionName.match(/^agent-([a-z0-9]+-\d+)-review-(?:security|correctness|performance|requirements)$/);
+    if (convoyMatch) {
+      issueId = convoyMatch[1].toUpperCase();
     } else {
-      // Fall back to generic issue-id regex extraction
-      const match = sessionName.match(/([A-Z0-9]+-\d+)/);
-      if (match) issueId = match[1].toUpperCase();
+      // Legacy specialist pattern: specialist-<project>-<issueId>-review-<role>
+      const parsedReviewer = parseReviewerSessionName(sessionName);
+      if (parsedReviewer) {
+        issueId = parsedReviewer.issueId.toUpperCase();
+      } else {
+        // Generic fallback
+        const match = sessionName.match(/([A-Z0-9]+-\d+)/i);
+        if (match) issueId = match[1].toUpperCase();
+      }
     }
 
     if (!issueId) continue;
@@ -1219,7 +1225,7 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
     try {
       await killSessionAsync(sessionName);
       const ageMin = Math.round((now - createdMs) / 60000);
-      const msg = `Killed orphan ${isReviewer ? 'reviewer' : 'coordinator'} session ${sessionName} (${ageMin}m old)`;
+      const msg = `Killed orphan reviewer session ${sessionName} (${ageMin}m old)`;
       actions.push(msg);
       console.log(`[deacon] ${msg}`);
     } catch (err) {
@@ -1298,14 +1304,24 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
       }
     }
 
-    // Also detect ad-hoc parallel review sessions spawned by dispatchParallelReview.
-    // These never register runtime state, so they're invisible to the specialist checks above.
+    // PAN-1048 R5: detect role-primitive review/test runs (agent-<id>-review,
+    // agent-<id>-test) so the deacon doesn't spuriously flag an in-flight role
+    // run as an orphan. Replaces the legacy getActiveParallelReviewIssues
+    // helper that scanned for review-coordinator-* / review-<id>-<role>
+    // sessions spawned by dispatchParallelReview (now retired).
     try {
-      const { listSessionNamesAsync } = await import('../tmux.js');
-      const { getActiveParallelReviewIssues } = await import('./review-agent.js');
-      const allSessions = await listSessionNamesAsync();
-      for (const issueId of getActiveParallelReviewIssues(allSessions)) {
-        activeReviewSessions.add(issueId);
+      const { listRunningAgentsAsync } = await import('../agents.js');
+      const agents = await listRunningAgentsAsync();
+      for (const agent of agents) {
+        if (agent.status === 'stopped' || agent.status === 'error') continue;
+        const issueId = (agent.issueId ?? '').trim().toUpperCase();
+        if (!issueId) continue;
+        const role = agent.role
+          ?? (agent.id.endsWith('-review') ? 'review'
+            : agent.id.endsWith('-test') ? 'test'
+            : null);
+        if (role === 'review') activeReviewSessions.add(issueId);
+        else if (role === 'test') activeTestSessions.add(issueId);
       }
     } catch {
       // Non-fatal: fall back to specialist-only detection
@@ -1460,18 +1476,8 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         const completedProcessedFile = join(AGENTS_DIR, agentIdForCheck, 'completed.processed');
         if (existsSync(completedProcessedFile)) {
           const agentState = getAgentState(agentIdForCheck);
-          // stoppedByUser is also set by `pan done` (work agent signaling completion),
-          // not just `pan kill`. For pan-done agents, phase==='review-response'.
-          // Re-dispatching the review fan-out doesn't require the work agent to be
-          // running — only a true user-kill (different phase) should block recovery.
-          if (
-            agentState?.status === 'stopped' &&
-            agentState.stoppedByUser &&
-            agentState.phase !== 'review-response'
-          ) {
-            actions.push(`Skipped pending review for ${issueId}: work agent was explicitly stopped`);
-            continue;
-          }
+          // A completed.processed marker means the work agent intentionally handed off;
+          // review recovery does not require that work session to still be running.
           const { resolveProjectFromIssue } = await import('../projects.js');
           const resolved = resolveProjectFromIssue(issueId);
           const issueLower = issueId.toLowerCase();
@@ -1479,10 +1485,11 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
 
           if (workspace && resolved) {
             const branch = `feature/${issueLower}`;
-            const { dispatchParallelReview } = await import('./review-agent.js');
+            // PAN-1048 R4: deacon recovery routes through the role primitive.
+            const { spawnReviewRoleForIssue } = await import('./review-agent.js');
             try {
-              await dispatchParallelReview({ issueId, workspace, branch });
-              // dispatchParallelReview sets reviewStatus='reviewing' internally;
+              await spawnReviewRoleForIssue({ issueId, workspace, branch });
+              // spawnReviewRoleForIssue sets reviewStatus='reviewing' internally;
               // keep local status in sync so this patrol doesn't re-process the issue.
               status.reviewStatus = 'reviewing';
               actions.push(
@@ -1518,7 +1525,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           `[deacon] Orphaned test detected: ${issueId} shows '${status.testStatus}' but test-agent is not active`,
         );
 
-        // Re-dispatch using per-project ephemeral specialist (no queue fallback)
+        // Re-dispatch through the unified test role runner (no specialist queue fallback)
         const agentId = `agent-${issueId.toLowerCase()}`;
         const agentState = getAgentState(agentId);
         const { resolveProjectFromIssue } = await import('../projects.js');
@@ -1528,40 +1535,34 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
 
         if (workspace && resolved) {
           const branch = `feature/${issueLower}`;
-          const { spawnEphemeralSpecialist } = await import('./specialists.js');
-          const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
-            issueId,
-            workspace,
-            branch,
-          });
-          if (result.success) {
+          const { spawnRun } = await import('../agents.js');
+          const { buildTestRolePrompt } = await import('./test-agent-queue.js');
+          try {
+            const run = await spawnRun(issueId, 'test', {
+              workspace,
+              prompt: buildTestRolePrompt({ issueId, workspace, branch }),
+            });
             setReviewStatus(issueId, { testStatus: 'testing' });
             status.testStatus = 'testing';
             actions.push(
-              `Re-dispatched orphaned test for ${issueId} via ${resolved.projectKey}/test-agent (deacon-orphan-recovery)`,
+              `Re-dispatched orphaned test for ${issueId} via test role ${run.id} (deacon-orphan-recovery)`,
             );
             console.log(
-              `[deacon] Re-dispatched test for ${issueId} after orphan detection (project: ${resolved.projectKey}, workspace: ${workspace})`,
+              `[deacon] Re-dispatched test role for ${issueId} after orphan detection (project: ${resolved.projectKey}, workspace: ${workspace})`,
             );
-          } else if (result.error === 'specialist_busy') {
-            // Specialist busy — set dispatch_failed so deacon retries next patrol
-            setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
-            status.testStatus = 'dispatch_failed';
-            actions.push(
-              `Orphaned test for ${issueId}: specialist busy — set dispatch_failed for next patrol retry`,
-            );
-            console.log(
-              `[deacon] Specialist busy for ${issueId} — set dispatch_failed for next patrol retry`,
-            );
-          } else {
-            setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
-            status.testStatus = 'dispatch_failed';
-            actions.push(
-              `Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-            );
-            console.log(
-              `[deacon] Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-            );
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg.includes('already running')) {
+              setReviewStatus(issueId, { testStatus: 'testing' });
+              status.testStatus = 'testing';
+              actions.push(`Orphaned test for ${issueId}: test role already running`);
+              console.log(`[deacon] Test role already running for ${issueId}`);
+            } else {
+              setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
+              status.testStatus = 'dispatch_failed';
+              actions.push(`Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+              console.log(`[deacon] Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+            }
           }
         } else {
           // Cannot derive workspace/project — reset to pending so the pipeline can re-trigger cleanly
@@ -1635,9 +1636,10 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
         continue;
       }
 
-      const { dispatchParallelReview } = await import('./review-agent.js');
+      // PAN-1048 R4: deacon auto-trigger routes through the role primitive.
+      const { spawnReviewRoleForIssue } = await import('./review-agent.js');
       try {
-        await dispatchParallelReview({
+        await spawnReviewRoleForIssue({
           issueId,
           workspace,
           branch: `feature/${issueLower}`,
@@ -1710,41 +1712,30 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
         continue;
       }
 
-      const { spawnEphemeralSpecialist } = await import('./specialists.js');
+      const { spawnRun } = await import('../agents.js');
+      const { buildTestRolePrompt } = await import('./test-agent-queue.js');
       try {
-        const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
-          issueId,
+        const run = await spawnRun(issueId, 'test', {
           workspace,
-          branch,
+          prompt: buildTestRolePrompt({ issueId, workspace, branch }),
         });
-        if (result.success) {
+        setReviewStatus(issueId, { testStatus: 'testing', testRetryCount: retryCount + 1 });
+        actions.push(`Dispatched test role ${run.id} for ${issueId} (retry ${retryCount + 1})`);
+        console.log(`[deacon] Dispatched test role for ${issueId} (retry ${retryCount + 1})`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('already running')) {
           setReviewStatus(issueId, { testStatus: 'testing', testRetryCount: retryCount + 1 });
-          actions.push(`Dispatched test-agent for ${issueId} (retry ${retryCount + 1})`);
-          console.log(`[deacon] Dispatched test-agent for ${issueId} (retry ${retryCount + 1})`);
-        } else if (result.error === 'specialist_busy') {
-          setReviewStatus(issueId, {
-            testStatus: 'dispatch_failed',
-            testNotes: 'Specialist busy',
-            testRetryCount: retryCount + 1,
-          });
-          actions.push(`Test-agent busy for ${issueId} — queued for next patrol retry`);
+          actions.push(`Test role already running for ${issueId} (retry ${retryCount + 1})`);
         } else {
           setReviewStatus(issueId, {
             testStatus: 'dispatch_failed',
-            testNotes: result.message || String(result.error),
+            testNotes: msg,
             testRetryCount: retryCount + 1,
           });
-          actions.push(`Test-agent dispatch failed for ${issueId}: ${result.message || result.error}`);
+          actions.push(`Test role dispatch error for ${issueId}: ${msg}`);
+          console.error(`[deacon] Test role dispatch error for ${issueId}:`, msg);
         }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setReviewStatus(issueId, {
-          testStatus: 'dispatch_failed',
-          testNotes: msg,
-          testRetryCount: retryCount + 1,
-        });
-        actions.push(`Test-agent dispatch error for ${issueId}: ${msg}`);
-        console.error(`[deacon] Test-agent dispatch error for ${issueId}:`, msg);
       }
     }
   } catch (error: unknown) {
@@ -1762,7 +1753,7 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
 /**
  * Detect issues stuck in `reviewing` status with no active review session.
  *
- * When `dispatchParallelReview` sets `reviewing` + `reviewSpawnedAt` but the
+ * When `spawnReviewRoleForIssue` sets `reviewing` + `reviewSpawnedAt` but the
  * spawn crashes or the review agent exits without updating status, the issue
  * can remain in `reviewing` forever. This check uses `reviewSpawnedAt` as a
  * heartbeat: if it's >30 minutes old and no review session is active, reset
@@ -1800,18 +1791,17 @@ export async function checkStuckReviewing(): Promise<string[]> {
         activeReviewIssues.add(rState.currentIssue.toUpperCase());
       }
     }
-    // PAN-796: Also check parallel review sessions (review-<issueId>-<ts>-<role>)
-    // and coordinator sessions (review-coordinator-<issueId>-<ts>)
+    // Detect active review runs: agent-<id>-review (synthesis) and
+    // agent-<id>-review-<subRole> (PAN-1059 convoy).
     try {
-      const { listSessionNamesAsync } = await import('../tmux.js');
-      const { getActiveParallelReviewIssues } = await import('./review-agent.js');
-      const allSessions = await listSessionNamesAsync();
-      for (const issueId of getActiveParallelReviewIssues(allSessions)) {
-        activeReviewIssues.add(issueId.toUpperCase());
-      }
-      for (const s of allSessions) {
-        const coordMatch = s.match(/^review-coordinator-([A-Za-z]+-\d+)-/);
-        if (coordMatch) activeReviewIssues.add(coordMatch[1].toUpperCase());
+      const { listRunningAgentsAsync } = await import('../agents.js');
+      const agents = await listRunningAgentsAsync();
+      for (const agent of agents) {
+        if (agent.status === 'stopped' || agent.status === 'error') continue;
+        const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : null);
+        if (role !== 'review') continue;
+        const issueId = (agent.issueId ?? '').trim().toUpperCase();
+        if (issueId) activeReviewIssues.add(issueId);
       }
     } catch {
       // Non-fatal: fall back to specialist-only detection
@@ -3088,7 +3078,7 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 
   try {
     const agents = listRunningAgents();
-    // Specialist sessions (global or per-project) all start with "specialist-"
+    // Specialist sessions (global or per-project) use the specialist tmux prefix.
     const isSpecialistSession = (id: string) => id.startsWith('specialist-');
 
     for (const agent of agents) {
@@ -3715,8 +3705,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   }
 
   // Periodic orphan reviewer/specialist session sweep (PAN-846).
-  // Safety net for crashes where runParallelReview finally or
-  // /api/specialists/done cleanup did not run.
+  // Safety net for convoy sessions the stop-hook reaper missed.
   if (Math.random() < 0.01) {
     const orphanActions = await cleanupOrphanReviewerSessions();
     actions.push(...orphanActions);
@@ -3786,7 +3775,7 @@ export async function runPatrol(): Promise<PatrolResult> {
 
       const runtimeState = getAgentRuntimeState(projSpec.tmuxSession);
       // A running ephemeral specialist with no runtime state, or active for more than
-      // the max specialist timeout (wakeSpecialistWithTask uses 15 min), is considered stuck.
+      // the max specialist timeout (ephemeral specialist spawn uses 15 min), is considered stuck.
       const isStuck = runtimeState?.state === 'active' && runtimeState.lastActivity
         ? (Date.now() - new Date(runtimeState.lastActivity).getTime()) > 15 * 60 * 1000
         : false;
@@ -3796,9 +3785,7 @@ export async function runPatrol(): Promise<PatrolResult> {
         console.log(`[deacon] Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing ${projSpec.tmuxSession}`);
         try {
           await killSessionAsync(projSpec.tmuxSession);
-          // Do NOT clearSessionId — the Claude session still exists in storage
-          // and should be resumed on next dispatch. Clearing causes --session-id
-          // "already in use" errors.
+          // Preserve Claude JSONL/session artifacts; only reset Panopticon runtime state.
           saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
           actions.push(`Force-killed stuck per-project ${projSpec.specialistType} (${projSpec.projectKey})`);
         } catch {
@@ -4114,27 +4101,25 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
 }
 
 /**
- * Kill orphaned parallel-review sessions whose work agent is no longer running.
+ * Kill orphaned review sessions whose work agent is no longer running.
  *
- * Review sessions are named `review-<issueId>-<timestamp>-<role>` (e.g.
- * `review-PAN-540-1713456789000-correctness`). They are created by
- * `runParallelReview()` but can leak when:
- *   - `waitForReviewer()` fails to kill (race, tmux busy, swallowed exception)
- *   - The work agent is stopped/killed but review sessions survive
- *   - A retry generates a new reviewId, leaving old sessions behind
+ * Covers three naming patterns:
+ *   - PAN-1059 convoy: `agent-<issueId>-review-<subRole>` (current)
+ *   - Legacy specialist: `specialist-*-review-*` (retired)
+ *   - Legacy batch: `review-<issueId>-<timestamp>-<role>` (retired)
  *
- * A review session is "orphaned" when the corresponding work agent session
- * `agent-<issueLower>` does not exist. We only check existence (not state)
- * because a stopped agent may still have its tmux session alive transiently.
+ * A session is "orphaned" when the corresponding work-agent session
+ * `agent-<issueLower>` does not exist.
  */
 export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
   const actions: string[] = [];
   let reviewSessions: string[];
   try {
     const allSessions = await listSessionNamesAsync();
+    const convoyReviewSessions = allSessions.filter(s => /^agent-.*-review-(?:security|correctness|performance|requirements)$/.test(s));
     const legacyReviewSessions = allSessions.filter(s => /^review-/.test(s));
-    const canonicalReviewSessions = allSessions.filter(s => /^specialist-.*-review-/.test(s) && !s.includes('coordinator'));
-    reviewSessions = [...new Set([...legacyReviewSessions, ...canonicalReviewSessions])];
+    const canonicalReviewSessions = allSessions.filter(s => /^specialist-.*-review-/.test(s));
+    reviewSessions = [...new Set([...convoyReviewSessions, ...legacyReviewSessions, ...canonicalReviewSessions])];
   } catch {
     return actions;
   }
@@ -4144,13 +4129,21 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
   for (const reviewSession of reviewSessions) {
     let issueId: string | null = null;
 
-    const legacyMatch = reviewSession.match(/^review-([A-Za-z0-9]+-\d+)-\d+/);
-    if (legacyMatch) {
-      issueId = legacyMatch[1].toUpperCase();
+    // PAN-1059 convoy pattern
+    const convoyMatch = reviewSession.match(/^agent-([a-z0-9]+-\d+)-review-(?:security|correctness|performance|requirements)$/);
+    if (convoyMatch) {
+      issueId = convoyMatch[1].toUpperCase();
     } else {
-      const canonicalMatch = reviewSession.match(/^specialist-(.+)-([A-Za-z0-9]+-\d+)-review-[a-z-]+$/);
-      if (canonicalMatch) {
-        issueId = canonicalMatch[2].toUpperCase();
+      // Legacy batch pattern: review-<issueId>-<timestamp>
+      const legacyMatch = reviewSession.match(/^review-([A-Za-z0-9]+-\d+)-\d+/);
+      if (legacyMatch) {
+        issueId = legacyMatch[1].toUpperCase();
+      } else {
+        // Legacy specialist pattern: specialist-<project>-<issueId>-review-<role>
+        const canonicalMatch = reviewSession.match(/^specialist-(.+)-([A-Za-z0-9]+-\d+)-review-[a-z-]+$/);
+        if (canonicalMatch) {
+          issueId = canonicalMatch[2].toUpperCase();
+        }
       }
     }
 
@@ -4223,7 +4216,7 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
     const state = getAgentState(agentId);
     if (!state) continue;
     if (state.status !== 'running') continue;
-    if (state.phase !== 'implementation' && state.phase !== 'review-response') continue;
+    if (state.role !== 'work') continue;
 
     // Tmux must be alive; orphans are handled by recoverOrphanedAgents.
     if (!await sessionExistsAsync(agentId)) continue;
@@ -4292,7 +4285,7 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
 /**
  * Auto-resume work agents that were stopped by a system crash/reboot
  * but still have incomplete work. Scans all agent state directories for
- * stopped implementation-phase agents and resumes them.
+ * stopped work-role agents and resumes them.
  *
  * Resumption rules:
  * - Agents with pending review feedback (blocked/failed/verification-failed)
@@ -4324,8 +4317,8 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — status=${state.status} (not stopped)`);
       continue;
     }
-    if (state.phase !== 'implementation' && state.phase !== 'review-response') {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — phase=${state.phase} (not implementation or review-response)`);
+    if (state.role !== 'work') {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — role=${state.role} (not work)`);
       continue;
     }
 
@@ -4407,14 +4400,6 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} resuming — review feedback pending (review=${review?.reviewStatus}, test=${review?.testStatus}, verification=${review?.verificationStatus})`);
     } else {
 
-      // Skip agents that are on standby for UAT tweaks after pan done.
-      // review-response phase means the agent is waiting for human input via pan tell,
-      // not crashed or orphaned.
-      if (state.phase === 'review-response') {
-        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — standby for UAT tweaks (phase=review-response)`);
-        continue;
-      }
-
       // Fallback: runtime.state === 'idle' means the agent is genuinely idle,
       // not crashed. Skip auto-resume unless review feedback arrives later.
       const runtimeState = getAgentRuntimeState(agentId);
@@ -4435,18 +4420,17 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${msg}`);
         logAgentLifecycle(agentId, `resumed by deacon auto-recovery (session restored after system event)`);
         const issueId = state.issueId;
-        const phaseLabel = state.phase === 'review-response' ? 'review-response' : 'work';
         emitActivityEntry({
           source: 'cloister',
           level: 'info',
           message: issueId
-            ? `Deacon auto-resumed ${issueId} ${phaseLabel} agent`
+            ? `Deacon auto-resumed ${issueId} work agent`
             : `Deacon auto-resumed agent ${agentId}`,
           issueId,
         });
         emitActivityTts({
           utterance: issueId
-            ? `Deacon auto resumed ${issueId} ${phaseLabel} agent`
+            ? `Deacon auto resumed ${issueId} work agent`
             : `Deacon auto resumed agent ${agentId}`,
           priority: 1,
           issueId,

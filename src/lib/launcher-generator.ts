@@ -1,18 +1,12 @@
-export type LauncherAgentType =
-  | 'work'
-  | 'planning'
-  | 'specialist-dispatch'
-  | 'specialist-init'
-  | 'review'
-  | 'conversation'
-  | 'remote'
-  | 'runtime'
-  | 'resume';
+import type { Role } from './agents.js';
+
+export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
 export type LauncherHarness = 'claude-code' | 'pi';
 
 export interface LauncherConfig {
-  agentType: LauncherAgentType;
+  role: Role;
+  spawnMode?: LauncherSpawnMode;
   workingDir: string;
 
   /**
@@ -23,9 +17,24 @@ export interface LauncherConfig {
    * to the tmux pane.
    */
   harness?: LauncherHarness;
+  /**
+   * Pi output mode (mapped to `pi --mode <mode>`).
+   *
+   *   - 'rpc' (default for harness='pi'): JSONL command stream over stdin/
+   *     stdout. Used for work-agents where Cloister needs structured delivery.
+   *     Requires piFifoPath. Pane is non-interactive (no TUI).
+   *   - 'tui': interactive Pi terminal UI (Pi's default mode). Used for
+   *     conversation panels so users can type in the tmux pane directly.
+   *     Dashboard messages are delivered via tmux paste-buffer instead of
+   *     the FIFO. piFifoPath is not used in this mode.
+   *
+   * Pi writes JSONL session files via --session-dir regardless of mode, so
+   * cost parsing keeps working in both modes.
+   */
+  piMode?: 'rpc' | 'tui';
   /** Absolute path to packages/pi-extension/dist/index.js. Required for harness='pi'. */
   piExtensionPath?: string;
-  /** Absolute path to ~/.panopticon/agents/<id>/rpc.in. Required for harness='pi'. */
+  /** Absolute path to ~/.panopticon/agents/<id>/rpc.in. Required for harness='pi' + piMode='rpc'. */
   piFifoPath?: string;
   /** Absolute path to per-agent Pi session-dir (Pi --session-dir). Required for harness='pi'. */
   piSessionDir?: string;
@@ -256,7 +265,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   }
 
   // Post-exit echo messages
-  if (config.agentType === 'planning') {
+  if (config.role === 'plan') {
     lines.push('echo ""');
     lines.push('echo "Planning agent has exited. Session kept alive for review."');
     lines.push('echo "Click \'Done\' in the dashboard when ready to hand off to implementation."');
@@ -265,15 +274,9 @@ export function generateLauncherScript(config: LauncherConfig): string {
     }
   }
 
-  if (config.agentType === 'conversation') {
+  if (config.spawnMode === 'conversation') {
     lines.push('echo ""');
     lines.push('echo "Conversation session ended. Close this panel or click Resume to start a new session."');
-  }
-
-  // Specialist completion signal
-  if (config.agentType === 'specialist-dispatch') {
-    lines.push('echo ""');
-    lines.push('echo "## Specialist completed task"');
   }
 
   // Keep-alive loop
@@ -291,7 +294,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
 }
 
 /**
- * Generate the outer `script -qfaec` wrapper for specialist dispatch.
+ * Generate the outer `script -qfaec` wrapper for launchers that need tty logging.
  * Returns null if useScriptWrapper is false.
  */
 export function generateLauncherWrapper(config: LauncherConfig): string | null {
@@ -317,7 +320,12 @@ const PROVIDER_ENV_UNSETS = [
 function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
 
-  if (config.agentType === 'conversation') {
+  if (config.spawnMode === 'conversation') {
+    if (config.harness === 'pi') {
+      return buildPiCommand(config, false);
+    }
+
+
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
       const args: string[] = [];
@@ -334,40 +342,11 @@ function buildCommand(config: LauncherConfig): string[] {
     return parts;
   }
 
-  if (config.agentType === 'specialist-dispatch') {
-    // Inner script: no exec, runs claude directly then echoes completion
-    if (config.baseCommand) {
-      let cmd = config.baseCommand;
-
-      cmd += buildChannelsArgs(config);
-      if (config.sessionId) {
-        cmd += ` --session-id ${shellQuote(config.sessionId)}`;
-      }
-      if (config.model) {
-        cmd += ` --model ${config.model}`;
-      }
-      if (config.permissionFlags && config.permissionFlags.length > 0) {
-        const cmdTokens = cmd.split(/\s+/);
-        for (const flag of config.permissionFlags) {
-          if (!cmdTokens.includes(flag)) {
-            cmd += ` ${flag}`;
-          }
-        }
-      }
-      if (config.promptFile) {
-        cmd += ' "$prompt"';
-      }
-
-      parts.push(cmd.trim().replace(/\s+/g, ' '));
-    }
-    return parts;
-  }
-
-  if (config.agentType === 'planning') {
+  if (config.role === 'plan') {
     return buildNonConversationCommand(config, false);
   }
 
-  // All other types use exec
+  // All other launchers use exec
   return buildNonConversationCommand(config, true);
 }
 
@@ -378,8 +357,6 @@ function buildCommand(config: LauncherConfig): string[] {
  * PAN-982: When `baseCommand` contains `--agent` (i.e. an agent definition
  * is selecting permissions, model, and tools via `.claude/agents/pan-*.md`
  * frontmatter), permission flags are skipped — the frontmatter handles them.
- * Specialists not yet migrated to --agent (e.g. specialist-init for review
- * canonical sessions) still pass permissionFlags and get them emitted.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (config.harness === 'pi') {
@@ -434,6 +411,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
 /**
  * Build a Pi command line.
  *
+ * RPC mode (work-agents):
  *   pi --mode rpc \
  *      --model <model> \
  *      --session-dir <piSessionDir> \
@@ -441,29 +419,45 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
  *      --no-context-files \
  *      [--session <resumeSessionId>] \
  *      [--append-system-prompt "$prompt"] \
- *      < <piFifoPath>
+ *      <> <piFifoPath>
+ *
+ * TUI mode (conversations):
+ *   pi --model <model> \
+ *      --session-dir <piSessionDir> \
+ *      [--extension <piExtensionPath>] \
+ *      --no-context-files \
+ *      [--session <resumeSessionId>] \
+ *      [--append-system-prompt "$prompt"]
  *
  * Pi has no permission system, so permissionFlags are intentionally
  * dropped (AC4). baseCommand is ignored — Pi launchers always start with
  * the literal `pi` so callers cannot accidentally smuggle in claude flags.
  */
 function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
-  if (!config.piExtensionPath) {
-    throw new Error('Pi launcher requires piExtensionPath');
-  }
-  if (!config.piFifoPath) {
-    throw new Error('Pi launcher requires piFifoPath');
-  }
+  const piMode = config.piMode ?? 'rpc';
   if (!config.piSessionDir) {
     throw new Error('Pi launcher requires piSessionDir');
   }
+  if (piMode === 'rpc') {
+    if (!config.piExtensionPath) {
+      throw new Error('Pi launcher (rpc mode) requires piExtensionPath');
+    }
+    if (!config.piFifoPath) {
+      throw new Error('Pi launcher (rpc mode) requires piFifoPath');
+    }
+  }
 
-  const tokens: string[] = ['pi', '--mode', 'rpc'];
+  const tokens: string[] = ['pi'];
+  if (piMode === 'rpc') {
+    tokens.push('--mode', 'rpc');
+  }
   if (config.model) {
     tokens.push('--model', config.model);
   }
   tokens.push('--session-dir', shellQuote(config.piSessionDir));
-  tokens.push('--extension', shellQuote(config.piExtensionPath));
+  if (config.piExtensionPath) {
+    tokens.push('--extension', shellQuote(config.piExtensionPath));
+  }
   tokens.push('--no-context-files');
 
   if (config.resumeSessionId) {
@@ -478,10 +472,20 @@ function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
     tokens.push('--append-system-prompt', shellQuote(config.promptInline));
   }
 
-  // stdin redirection from the per-agent fifo. Pi reads JSONL RPC commands
-  // from stdin in --mode rpc.
-  const stdinRedirect = `< ${shellQuote(config.piFifoPath)}`;
-  const cmd = `${tokens.join(' ')} ${stdinRedirect}`.replace(/\s+/g, ' ').trim();
+  let cmd = tokens.join(' ').replace(/\s+/g, ' ').trim();
+
+  if (piMode === 'rpc') {
+    // stdin redirection from the per-agent fifo. Pi reads JSONL RPC commands
+    // from stdin in --mode rpc. Use bash read-write redirection (`<>`) instead
+    // of read-only (`<`): opening a FIFO read-only blocks until a writer is
+    // present, which means Pi could never exec and never write `ready.json`
+    // before any external writer attached, deadlocking work-agent launches.
+    // `<>` opens the FIFO without blocking, lets Pi start, emit its ready
+    // marker, and then read JSONL commands as the dashboard writer pushes them.
+    cmd = `${cmd} <> ${shellQuote(config.piFifoPath!)}`;
+  }
+  // TUI mode: leave stdin attached to the tmux pane so the user (or paste-buffer
+  // delivery from the dashboard) can type into Pi directly.
 
   return [useExec ? `exec ${cmd}` : cmd];
 }

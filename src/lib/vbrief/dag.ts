@@ -38,7 +38,8 @@ export function groupItemsByWave(doc: VBriefDocument): Wave[] {
     doc.plan.items.filter(i => skipStatuses.has(i.status)).map(i => i.id),
   );
 
-  const blockEdges = doc.plan.edges.filter(
+  const edges = doc.plan.edges ?? [];
+  const blockEdges = edges.filter(
     e => e.type === 'blocks' && allItemIds.has(e.from) && allItemIds.has(e.to),
   );
 
@@ -112,7 +113,8 @@ export function groupItemsByWave(doc: VBriefDocument): Wave[] {
  */
 export function criticalPath(doc: VBriefDocument): string[] {
   const items = doc.plan.items;
-  const blockEdges = doc.plan.edges.filter(e => e.type === 'blocks');
+  const edges = doc.plan.edges ?? [];
+  const blockEdges = edges.filter(e => e.type === 'blocks');
 
   if (items.length === 0 || blockEdges.length === 0) return [];
 

@@ -16,6 +16,8 @@ let TEST_DIR: string;
 function makePlanWithAC(items: Array<{
   id: string;
   title: string;
+  status?: string;
+  metadata?: Record<string, unknown>;
   subItems?: Array<{ id: string; title: string; status?: string; kind?: string }>;
 }>): VBriefDocument {
   return {
@@ -27,7 +29,8 @@ function makePlanWithAC(items: Array<{
       items: items.map(i => ({
         id: i.id,
         title: i.title,
-        status: 'pending' as const,
+        status: (i.status ?? 'pending') as any,
+        metadata: i.metadata,
         subItems: i.subItems?.map(s => ({
           id: s.id,
           title: s.title,
@@ -102,6 +105,28 @@ describe('extractAcceptanceCriteria', () => {
     const result = extractAcceptanceCriteria(TEST_DIR);
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe('AC item');
+  });
+
+  it('skips acceptance criteria from deferred items', () => {
+    const doc = makePlanWithAC([
+      {
+        id: 'active-item',
+        title: 'Active task',
+        subItems: [{ id: 'active-item.ac1', title: 'Active AC' }],
+      },
+      {
+        id: 'deferred-item',
+        title: 'Deferred task',
+        status: 'deferred',
+        metadata: { deferred: true },
+        subItems: [{ id: 'deferred-item.ac1', title: 'Deferred AC' }],
+      },
+    ]);
+    writePlan(TEST_DIR, doc);
+
+    const result = extractAcceptanceCriteria(TEST_DIR);
+    expect(result).toHaveLength(1);
+    expect(result[0].itemId).toBe('active-item');
   });
 
   it('extracts AC from multiple items', () => {
@@ -226,6 +251,23 @@ describe('checkAllCriteriaCompleted', () => {
 
     const result = checkAllCriteriaCompleted(TEST_DIR);
     expect(result.allCompleted).toBe(true);
+  });
+
+  it('does not block completion on deferred item acceptance criteria', () => {
+    const doc = makePlanWithAC([{
+      id: 'deferred-item',
+      title: 'Deferred task',
+      status: 'deferred',
+      metadata: { deferred: true },
+      subItems: [
+        { id: 'deferred-item.ac1', title: 'Deferred and not done', status: 'pending' },
+      ],
+    }]);
+    writePlan(TEST_DIR, doc);
+
+    const result = checkAllCriteriaCompleted(TEST_DIR);
+    expect(result.allCompleted).toBe(true);
+    expect(result.incomplete).toEqual([]);
   });
 
   it('returns allCompleted=true when items have no AC subItems', () => {

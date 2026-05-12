@@ -17,7 +17,8 @@ import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
-import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredModel } from './ModelPicker';
+import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredHarness, saveStoredModel } from './ModelPicker';
+import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -29,6 +30,7 @@ async function switchModel(
   conversationName: string,
   model: string,
   agentId?: string,
+  harness?: Harness,
 ): Promise<void> {
   const endpoint = agentId
     ? `/api/agents/${encodeURIComponent(agentId)}/switch-model`
@@ -36,7 +38,7 @@ async function switchModel(
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model }),
+    body: JSON.stringify({ model, harness }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -149,6 +151,14 @@ interface ComposerFooterProps {
 
 export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: ComposerFooterProps) {
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
+  // Existing conversations are bound to the harness they were spawned with.
+  // Falling back to a global localStorage default here caused the picker to
+  // display the *last globally-picked* harness for any conversation whose
+  // harness column was null, then send that harness on the next /switch-model
+  // call — silently rewriting the conversation's runtime. Default to
+  // 'claude-code' (the safe runtime) when the conversation has no stored
+  // harness; do NOT consult localStorage.
+  const [harness, setHarness] = useState<Harness>(conversation.harness ?? 'claude-code');
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
@@ -271,14 +281,37 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
     processUploadQueue();
   }, [processUploadQueue]);
 
-  // Switch model via API — kills session and respawns with correct provider env.
-  // Unlike /model (same-provider only), this works for cross-provider switches.
+  // Changing harness is a runtime switch — the new harness wraps a different
+  // binary (claude vs pi). Just updating local state would diverge the UI from
+  // the running tmux session. Reuse switch-model (which already accepts harness
+  // and handles kill+respawn) so the conversation is truly rebound. Persist to
+  // the global localStorage default *only* — the per-conversation harness is
+  // now owned by the backend.
+  const handleHarnessChange = useCallback((newHarness: Harness) => {
+    if (newHarness === harness) return;
+    setHarness(newHarness);
+    saveStoredHarness(newHarness);
+    if (conversation.sessionAlive) {
+      setSending(true);
+      void switchModel(conversation.name, model, agentId, newHarness)
+        .catch((err: unknown) => {
+          console.error('[ComposerFooter] Failed to switch harness:', err);
+          toast.error(err instanceof Error ? err.message : 'Failed to switch harness');
+          // Roll back the optimistic state change so the UI matches the server.
+          setHarness(harness);
+        })
+        .finally(() => {
+          setSending(false);
+        });
+    }
+  }, [agentId, conversation.name, conversation.sessionAlive, harness, model]);
+
   const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {
     setModel(newModel);
     saveStoredModel(newModel);
     if (conversation.sessionAlive) {
       setSending(true);
-      void switchModel(conversation.name, newModel)
+      void switchModel(conversation.name, newModel, agentId, harness)
         .catch((err: unknown) => {
           console.error('[ComposerFooter] Failed to switch model:', err);
           toast.error(err instanceof Error ? err.message : 'Failed to switch model');
@@ -287,7 +320,33 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
           setSending(false);
         });
     }
-  }, [conversation.name, conversation.sessionAlive]);
+  }, [agentId, conversation.name, conversation.sessionAlive, harness]);
+
+  /**
+   * Atomic model+harness swap. Used by the picker's auto-resolve flow when
+   * a single click would otherwise fire two switch-model API calls that race
+   * on the tmux session lifecycle (PAN-1067).
+   */
+  const handleComboChange = useCallback((newModel: string, _effortLevels: readonly string[], newHarness: Harness) => {
+    setModel(newModel);
+    saveStoredModel(newModel);
+    setHarness(newHarness);
+    saveStoredHarness(newHarness);
+    if (conversation.sessionAlive) {
+      setSending(true);
+      void switchModel(conversation.name, newModel, agentId, newHarness)
+        .catch((err: unknown) => {
+          console.error('[ComposerFooter] Failed to switch model+harness:', err);
+          toast.error(err instanceof Error ? err.message : 'Failed to switch model+harness');
+          // Roll back to keep UI in sync with backend on failure.
+          setModel(model);
+          setHarness(harness);
+        })
+        .finally(() => {
+          setSending(false);
+        });
+    }
+  }, [agentId, conversation.name, conversation.sessionAlive, harness, model]);
 
   const handlePaste = useCallback((event: ClipboardEvent<HTMLDivElement>) => {
     if (sending) {
@@ -367,7 +426,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
       // kill the session and restart with the new model before sending.
       // switchModel already waits for the new session to be ready before returning.
       if (model !== conversation.model && conversation.sessionAlive) {
-        await switchModel(submitConversationName, model, agentId);
+        await switchModel(submitConversationName, model, agentId, harness);
       }
 
       // Abort if conversation switched during the async model switch — the
@@ -433,6 +492,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
     setText('');
     setSending(false);
     setModel(conversation.model ?? getDefaultConversationModel());
+    setHarness(conversation.harness ?? 'claude-code');
     editorRef.current?.update(() => {
       $getRoot().clear();
     });
@@ -511,7 +571,14 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
 
         {/* Toolbar inside the box */}
         <div className={styles.composerToolbar}>
-          <ModelPicker value={model} onChange={handleModelChange} disabled={isDisabled} />
+          <ModelPicker
+            value={model}
+            onChange={handleModelChange}
+            onComboChange={handleComboChange}
+            disabled={isDisabled}
+            harness={harness}
+            onHarnessChange={handleHarnessChange}
+          />
           <div className={styles.composerToolbarDivider} />
           <EffortPicker value={effort} onChange={setEffort} disabled={isDisabled} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 

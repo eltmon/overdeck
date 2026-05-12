@@ -120,7 +120,8 @@ export function WorkspaceStatusOverview({
     || hasVerificationState
   );
 
-  const isStandby = agent?.status === 'stopped' && agent?.agentPhase === 'review-response' && !!lifecycle?.hasLiveTmuxSession;
+  // PAN-1048: standby = stopped work agent with a live tmux session.
+  const isStandby = agent?.status === 'stopped' && (agent?.role ?? 'work') === 'work' && !!lifecycle?.hasLiveTmuxSession;
   const isRunning = agent && agent.status !== 'dead' && (agent.status !== 'stopped' || isStandby);
   const isLaunching = agentLaunchState === 'starting' || agentLaunchState === 'resuming';
   const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';

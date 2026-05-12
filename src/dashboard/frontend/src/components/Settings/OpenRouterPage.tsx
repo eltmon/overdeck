@@ -4,6 +4,7 @@ import { Eye, EyeOff, Loader2, CheckCircle, XCircle, Globe } from 'lucide-react'
 import { toast } from 'sonner';
 import { OpenRouterModelBrowser, OpenRouterModel } from './OpenRouterModelBrowser';
 import { cn } from '../../lib/utils';
+import { invalidateAvailableModelsCache } from '../shared/ModelPicker';
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
@@ -89,6 +90,7 @@ export function OpenRouterPage({
   const favoritesMutation = useMutation({
     mutationFn: saveFavorites,
     onSuccess: () => {
+      invalidateAvailableModelsCache();
       queryClient.invalidateQueries({ queryKey: ['openrouter-models'] });
     },
     onError: () => {
@@ -102,6 +104,7 @@ export function OpenRouterPage({
       const savedKey = result.apiKey ?? keyInput.trim();
       onApiKeySaved(savedKey);
       setKeyInput(savedKey);
+      invalidateAvailableModelsCache();
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       toast.success(result.message);
     },

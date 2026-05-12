@@ -41,10 +41,17 @@ export function extractIssueIdFromSession(sessionName: string): string | null {
   const agentMatch = sessionName.match(new RegExp(`^(agent|planning)-${issuePattern}(?:-\\d+)?$`, 'i'));
   if (agentMatch) return agentMatch[2]!.toUpperCase();
 
+  const reviewRoleMatch = sessionName.match(new RegExp(`^agent-${issuePattern}-review(?:-[a-z]+)?$`, 'i'));
+  if (reviewRoleMatch) return reviewRoleMatch[1]!.toUpperCase();
+
   const reviewMatch = sessionName.match(new RegExp(`^review-(?:coordinator-)?${issuePattern}-\\d+(?:-[a-z]+)?$`, 'i'));
   if (reviewMatch) return reviewMatch[1]!.toUpperCase();
 
   return null;
+}
+
+function reviewRoleSessionName(issueId: string): string {
+  return `agent-${issueId.toLowerCase()}-review`;
 }
 
 /** Compute issue ID prefixes that belong to a project. */
@@ -112,9 +119,8 @@ function mapEventToDelta(event: StoredEvent): SessionTreeDelta | null {
       };
     }
     case 'specialist.started': {
-      const specialist = p['specialist'] as Record<string, unknown> | undefined;
-      const name = specialist?.['name'] as string | undefined;
-      const currentIssue = specialist?.['currentIssue'] as string | undefined;
+      const name = p['name'] as string | undefined;
+      const currentIssue = p['currentIssue'] as string | undefined;
       if (!name) return null;
       return {
         kind: 'session_added',
@@ -133,7 +139,7 @@ function mapEventToDelta(event: StoredEvent): SessionTreeDelta | null {
       return {
         kind: 'session_added',
         issueId,
-        sessionId: `review-coordinator-${issueId}`,
+        sessionId: reviewRoleSessionName(issueId),
         timestamp: event.timestamp,
       };
     }
@@ -141,7 +147,7 @@ function mapEventToDelta(event: StoredEvent): SessionTreeDelta | null {
       return {
         kind: 'session_removed',
         issueId,
-        sessionId: `review-coordinator-${issueId}`,
+        sessionId: reviewRoleSessionName(issueId),
         timestamp: event.timestamp,
       };
     }

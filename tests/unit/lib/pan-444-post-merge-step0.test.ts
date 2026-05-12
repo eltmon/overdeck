@@ -10,34 +10,43 @@ import { join } from 'path';
 const mockUnref = vi.hoisted(() => vi.fn());
 const mockSpawnChild = vi.hoisted(() => ({ pid: 12345, unref: mockUnref }));
 const mockSpawn = vi.hoisted(() => vi.fn(() => mockSpawnChild));
-const mockExecResult = vi.hoisted(() => vi.fn((cmd: string) => {
+const mockExecAsync = vi.hoisted(() => vi.fn(async (cmd: string) => {
   if (cmd.includes('git rev-parse --verify')) return { stdout: 'deadbeef\n', stderr: '' };
   if (cmd.includes('git merge-base --is-ancestor')) return { stdout: '', stderr: '' };
   if (cmd.includes('git diff origin/main...')) return { stdout: '', stderr: '' };
   if (cmd.includes('gh pr list')) return { stdout: '[]', stderr: '' };
   return { stdout: '', stderr: '' };
 }));
-const mockExec = vi.hoisted(() => vi.fn((cmd: string, _opts: any, cb: any) => {
-  const result = mockExecResult(cmd);
-  if (typeof _opts === 'function') _opts(null, result);
-  else if (cb) cb(null, result);
+const mockExec = vi.hoisted(() => vi.fn((cmd: string, optionsOrCb?: any, maybeCb?: any) => {
+  const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCb;
+  if (typeof callback === 'function') {
+    mockExecAsync(cmd).then(
+      ({ stdout, stderr }) => callback(null, stdout, stderr),
+      (error) => callback(error, '', error instanceof Error ? error.message : String(error)),
+    );
+  }
 }));
 
-const kCustom = Symbol.for('nodejs.util.promisify.custom');
-(mockExec as any)[kCustom] = vi.fn((cmd: string) => Promise.resolve(mockExecResult(cmd)));
-
-vi.mock('child_process', () => ({
-  spawn: mockSpawn,
-  exec: mockExec,
-  execFile: mockExec,
-}));
+vi.mock('child_process', () => {
+  (mockExec as any)[Symbol.for('nodejs.util.promisify.custom')] = mockExecAsync;
+  return {
+    spawn: mockSpawn,
+    exec: mockExec,
+    execFile: mockExec,
+  };
+});
 
 // ── fs/promises mock ──────────────────────────────────────────────────────────
 const mockWriteFile = vi.hoisted(() => vi.fn<() => Promise<void>>().mockResolvedValue(undefined));
 
-vi.mock('fs/promises', () => ({
-  writeFile: mockWriteFile,
-}));
+vi.mock('fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs/promises')>();
+  return {
+    ...actual,
+    writeFile: mockWriteFile,
+    rm: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 // ── fs mock ───────────────────────────────────────────────────────────────────
 vi.mock('fs', async (importOriginal) => {
@@ -62,6 +71,8 @@ vi.mock('../../../src/lib/tmux.js', () => ({
 
 vi.mock('../../../src/lib/paths.js', () => ({
   PANOPTICON_HOME: '/tmp/panopticon-test',
+  AGENTS_DIR: '/tmp/panopticon-test/agents',
+  getPanopticonHome: vi.fn(() => '/tmp/panopticon-test'),
   PROJECT_DOCS_SUBDIR: 'docs',
   PROJECT_PRDS_SUBDIR: 'prds',
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
@@ -74,10 +85,7 @@ vi.mock('../../../src/lib/tracker-utils.js', () => ({
 }));
 
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
-  getSessionId: vi.fn().mockReturnValue(null),
-  recordWake: vi.fn(),
   getTmuxSessionName: vi.fn().mockReturnValue('test-session'),
-  wakeSpecialist: vi.fn().mockResolvedValue({ success: false }),
   spawnEphemeralSpecialist: vi.fn().mockResolvedValue({ success: false }),
   isRunning: vi.fn().mockResolvedValue(false),
 }));
@@ -95,6 +103,10 @@ vi.mock('../../../src/lib/cloister/validation.js', () => ({
 
 vi.mock('../../../src/lib/activity-log.js', () => ({
   logActivity: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/review-status.js', () => ({
+  setReviewStatus: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/git-utils.js', () => ({

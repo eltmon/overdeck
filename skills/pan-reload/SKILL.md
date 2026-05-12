@@ -1,3 +1,8 @@
+---
+name: pan-reload
+description: Rebuild Panopticon and restart the dashboard after code changes.
+---
+
 # Pan Reload
 
 Rebuild and restart the Panopticon dashboard after code changes.

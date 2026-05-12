@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef, createContext, useContext } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
+import { useDashboardStore, selectAgentList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
 /* Drag-and-drop disabled pending rework (PAN-TODO)
 import {
   DndContext,
@@ -27,7 +27,8 @@ import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, 
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
-import { SpecialistAgent } from './SpecialistAgentCard';
+// PAN-1048 — SpecialistAgent type retired; specialist-style indicators now
+// derive directly from role-tagged AgentSnapshots (review / test / ship).
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
@@ -47,6 +48,7 @@ import { BulkActionBar } from './BulkActionBar';
 import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';
 import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgress';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
+import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
 
 
 // Parity registry anchor — keeps the card action surface tied to the
@@ -879,12 +881,13 @@ export function ListIssueRow({
   issue: Issue;
   issueWorkAgentsById?: Map<string, Agent[]>;
   agents: Agent[];
-  specialists: SpecialistAgent[];
+  /** PAN-1048 — role-tagged agents (review / test / ship) for the visible cycle. */
+  specialists: Agent[];
   issueCosts: Record<string, IssueCost>;
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
   onSelectIssue: (id: string | null) => void;
-  onPlan: (issue: Issue) => void;
+  onPlan: (issue: Issue, autoStart?: boolean) => void;
   isBulkSelected?: boolean;
   onBulkToggle?: () => void;
 }) {
@@ -917,15 +920,21 @@ export function ListIssueRow({
     }
     return getIssueWorkAgentMap(agents).get(issueIdLower) ?? [];
   }, [agents, issueWorkAgentsById, issueIdLower]);
+  // PAN-1048: standby = work agent that finished its run but kept its tmux session
+  // alive for review/UAT response. Replaces the legacy agentPhase === 'review-response'
+  // signal — agentPhase no longer exists after the role primitive hard cut.
   const standbyAgent = workAgents.find(
-    (workAgent) => workAgent.status === 'stopped' && workAgent.agentPhase === 'review-response',
+    (workAgent) =>
+      workAgent.status === 'stopped' &&
+      (workAgent.role ?? 'work') === 'work' &&
+      !!workAgent.lifecycle?.hasLiveTmuxSession,
   );
   const isRunning = workAgents.some(isAgentSessionAttachable) || !!standbyAgent;
   const hasMultipleWorkAgents = workAgents.length > 1;
 
-  // Check for specialists
+  // Check for specialists — PAN-1048 — role-tagged agents whose issueId matches.
   const issueSpecialists = specialists.filter(
-    s => s.currentIssue?.toLowerCase() === issueIdLower
+    (s) => s.issueId?.toLowerCase() === issueIdLower && s.status !== 'stopped'
   );
 
   // Parse difficulty from labels
@@ -1006,10 +1015,10 @@ export function ListIssueRow({
         </span>
       )}
 
-      {/* Specialist indicators */}
-      {issueSpecialists.map(s => (
-        <span key={s.name} className="text-xs text-primary shrink-0" title={`${s.displayName} specialist`}>
-          {s.name === 'review-agent' ? '👁️' : s.name === 'test-agent' ? '🧪' : s.name === 'merge-agent' ? '🔀' : '🤖'}
+      {/* Specialist indicators — PAN-1048 keyed on role primitive */}
+      {issueSpecialists.map((s) => (
+        <span key={s.id} className="text-xs text-primary shrink-0" title={`${s.role} agent`}>
+          {s.role === 'review' ? '👁️' : s.role === 'test' ? '🧪' : s.role === 'ship' ? '🔀' : '🤖'}
         </span>
       ))}
 
@@ -1018,16 +1027,32 @@ export function ListIssueRow({
         {/* Plan/Start button for backlog/todo, plus in_progress issues with no running
             agent (e.g. PAN-977 hit the empty-spawn bug and needs re-planning). */}
         {!isRunning && (canonical === 'backlog' || canonical === 'todo' || canonical === 'in_progress') && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPlan(issue);
-            }}
-            className="p-1 text-muted-foreground hover:text-primary transition-colors"
-            title={canonical === 'in_progress' ? 'Re-plan issue' : 'Plan issue'}
-          >
-            <Play className="w-3.5 h-3.5" />
-          </button>
+          <div className="inline-flex items-center rounded border border-border/70 overflow-hidden">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPlan(issue);
+              }}
+              className="p-1 text-muted-foreground hover:text-primary transition-colors"
+              title={canonical === 'in_progress' ? 'Re-plan issue' : 'Plan issue'}
+              data-testid={`list-plan-${issue.identifier}`}
+            >
+              <Play className="w-3.5 h-3.5" />
+            </button>
+            {canonical !== 'in_progress' && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPlan(issue, true);
+                }}
+                className="p-1 text-primary hover:text-primary/80 border-l border-border/70 transition-colors"
+                title="Auto-plan issue"
+                data-testid={`list-auto-plan-${issue.identifier}`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         )}
 
         {/* View button */}
@@ -1099,6 +1124,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const [internalSelectedIssue, setInternalSelectedIssue] = useState<string | null>(null);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set()); // Empty = all projects
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null); // Lifted dialog state
+  const [planDialogAutoStart, setPlanDialogAutoStart] = useState(false);
+  const openPlanDialog = useCallback((issue: Issue, autoStart = false) => {
+    setPlanDialogAutoStart(autoStart);
+    setPlanDialogIssue(issue);
+  }, []);
 
   // Notify parent when plan dialog opens/closes so it can suppress the detail panel terminal
   useEffect(() => {
@@ -1159,7 +1189,14 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   // Event-sourced state from Zustand store (PAN-433 read model)
   const issues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
-  const specialists = useDashboardStore(selectSpecialistList) as unknown as SpecialistAgent[];
+  // PAN-1048 — derive specialist-role agents (review / test / ship) from the
+  // unified agent list. Replaces the retired specialistsByName projection.
+  const specialists = useMemo(
+    () => agents.filter(
+      (a) => a.role === 'review' || a.role === 'test' || a.role === 'ship',
+    ),
+    [agents],
+  );
   const reviewStatusByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
 
   // Bulk selection state — key based on filters so selection survives data refreshes
@@ -1748,7 +1785,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
-                    onPlan={setPlanDialogIssue}
+                    onPlan={openPlanDialog}
                     isBulkSelected={bulkSelection.isSelected(issue.identifier)}
                     onBulkToggle={() => bulkSelection.toggle(issue.identifier)}
                   />
@@ -1784,7 +1821,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
-                    onPlan={setPlanDialogIssue}
+                    onPlan={openPlanDialog}
                     isBulkSelected={bulkSelection.isSelected(issue.identifier)}
                     onBulkToggle={() => bulkSelection.toggle(issue.identifier)}
                   />
@@ -1822,7 +1859,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
-                    onPlan={setPlanDialogIssue}
+                    onPlan={openPlanDialog}
                     isBulkSelected={bulkSelection.isSelected(issue.identifier)}
                     onBulkToggle={() => bulkSelection.toggle(issue.identifier)}
                   />
@@ -1885,7 +1922,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
-                    onPlan={setPlanDialogIssue}
+                    onPlan={openPlanDialog}
                     onViewBeads={setBeadsDialogIssue}
                     onViewVBrief={setVbriefDialogIssue}
                     collapsedFeatures={collapsedFeatures}
@@ -1929,12 +1966,17 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         <PlanDialog
           issue={planDialogIssue}
           isOpen={true}
-          onClose={() => setPlanDialogIssue(null)}
+          onClose={() => {
+            setPlanDialogIssue(null);
+            setPlanDialogAutoStart(false);
+          }}
           onComplete={async () => {
             setPlanDialogIssue(null);
+            setPlanDialogAutoStart(false);
             await refreshDashboardState(queryClient);
           }}
           onTerminalReleased={() => onPlanDialogChange?.(null)}
+          autoStart={planDialogAutoStart}
         />
       )}
 
@@ -2003,12 +2045,13 @@ function ColumnContent({
   issues: Issue[];
   issueWorkAgentsById: Map<string, Agent[]>;
   agents: Agent[];
-  specialists: SpecialistAgent[];
+  /** PAN-1048 — role-tagged agents (review / test / ship). */
+  specialists: Agent[];
   issueCosts: Record<string, IssueCost>;
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
   onSelectIssue: (id: string | null) => void;
-  onPlan: (issue: Issue) => void;
+  onPlan: (issue: Issue, autoStart?: boolean) => void;
   onViewBeads: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
   collapsedFeatures: Set<string>;
@@ -2029,7 +2072,7 @@ function ColumnContent({
       (a) => a.issueId?.toLowerCase() === issueIdLower && a.id?.startsWith('planning-')
     );
     const issueSpecialists = specialists.filter(
-      (s) => s.currentIssue?.toLowerCase() === issueIdLower
+      (s) => s.issueId?.toLowerCase() === issueIdLower && s.status !== 'stopped'
     );
 
     return (
@@ -2046,7 +2089,7 @@ function ColumnContent({
         onSelect={() => onSelectIssue(
           selectedIssue === issue.identifier ? null : issue.identifier
         )}
-        onPlan={() => onPlan(issue)}
+        onPlan={(autoStart) => onPlan(issue, autoStart)}
         onViewBeads={(i) => onViewBeads(i)}
         onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}
         isBulkSelected={bulkSelectedIds?.has(issue.identifier)}
@@ -2652,12 +2695,13 @@ interface IssueCardProps {
   workAgent?: Agent;
   workAgents?: Agent[];
   planningAgent?: Agent;
-  specialists?: SpecialistAgent[];
+  /** PAN-1048 — role-tagged agents (review / test / ship) for this issue. */
+  specialists?: Agent[];
   cost?: IssueCost;
   costsLoading?: boolean;
   isSelected: boolean;
   onSelect: () => void;
-  onPlan: () => void; // Lifted to parent to survive re-renders
+  onPlan: (autoStart?: boolean) => void; // Lifted to parent to survive re-renders
   onViewBeads?: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
   isBulkSelected?: boolean;
@@ -2671,6 +2715,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const { prefs: _prefs } = useUIPreferences();
+  const { groups: modelGroups, defaultModel, harnessPolicy } = useAvailableModels();
+  const [launchModel, setLaunchModel] = useState(defaultModel);
+  const [launchHarness, setLaunchHarness] = useState<Harness>('claude-code');
 
   // Auto-scroll into view when selected via search
   useEffect(() => {
@@ -2710,8 +2757,12 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   // Determine which agent is relevant based on issue status
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
   const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0];
+  // PAN-1048: see comment on the earlier standbyAgent — derive from role + live tmux.
   const standbyAgent = issueWorkAgents.find(
-    (candidate) => candidate.status === 'stopped' && candidate.agentPhase === 'review-response' && !!candidate.lifecycle?.hasLiveTmuxSession,
+    (candidate) =>
+      candidate.status === 'stopped' &&
+      (candidate.role ?? 'work') === 'work' &&
+      !!candidate.lifecycle?.hasLiveTmuxSession,
   );
   const isStandby = !!standbyAgent;
   const isRunning = issueWorkAgents.some(isAgentSessionAttachable) || isStandby;
@@ -2785,19 +2836,32 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   // an in-progress planning session, not starting over).
   const planLabelExists = hasPlan || issue.labels?.some(l => l.toLowerCase() === 'planned');
   const planChip = (
-    <button
-      data-testid={`action-plan-${issue.identifier}`}
-      onClick={(e) => { e.stopPropagation(); handlePlan(e); }}
-      className={`flex items-center gap-1 text-xs transition-colors ${
-        planLabelExists
-          ? 'text-success hover:text-success/80'
-          : 'text-muted-foreground hover:text-foreground'
-      }`}
-      title={planLabelExists ? 'See plan / continue planning' : 'Plan'}
-    >
-      <FileText className="w-3.5 h-3.5" />
-      {planLabelExists ? 'See Plan' : 'Plan'}
-    </button>
+    <div className="inline-flex items-center rounded border border-border/70 overflow-hidden">
+      <button
+        data-testid={`action-plan-${issue.identifier}`}
+        onClick={(e) => handlePlan(e)}
+        className={`flex items-center gap-1 text-xs transition-colors px-2 py-1 ${
+          planLabelExists
+            ? 'text-success hover:text-success/80'
+            : 'text-muted-foreground hover:text-foreground'
+        }`}
+        title={planLabelExists ? 'See plan / continue planning' : 'Plan'}
+      >
+        <FileText className="w-3.5 h-3.5" />
+        {planLabelExists ? 'See Plan' : 'Plan…'}
+      </button>
+      {!planLabelExists && (
+        <button
+          data-testid={`action-auto-plan-${issue.identifier}`}
+          onClick={(e) => handlePlan(e, true)}
+          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 border-l border-border/70 px-2 py-1 transition-colors"
+          title="Run non-interactive planning"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          Auto-plan
+        </button>
+      )}
+    </div>
   );
 
   // Send message mutation
@@ -2849,9 +2913,17 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     });
   }, [confirm]);
 
-  const startAgentMutation = useMutation({
-    mutationFn: async () => {
-      const requestBody = { issueId: issue.identifier };
+  const startAgentMutation = useMutation<StartAgentResponse, Error, boolean>({
+    mutationFn: async (autoStart = false) => {
+      // PAN-1048 + PAN-1055: role-aware spawn body that also threads the
+      // user-selected model + harness from the launch panel.
+      const requestBody = {
+        issueId: issue.identifier,
+        role: 'work',
+        model: launchModel,
+        harness: launchHarness,
+        auto: autoStart,
+      };
       let lastRequestBody: Record<string, unknown> = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
@@ -2978,14 +3050,14 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
 
   const startButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const handleStartAgent = (e: React.MouseEvent) => {
+  const handleStartAgent = (e: React.MouseEvent, autoStart = false) => {
     e.stopPropagation();
-    startAgentMutation.mutate();
+    startAgentMutation.mutate(autoStart);
   };
 
-  const handlePlan = (e: React.MouseEvent) => {
+  const handlePlan = (e: React.MouseEvent, autoStart = false) => {
     e.stopPropagation();
-    onPlan();
+    onPlan(autoStart);
   };
 
   // Deep wipe is now handled by the DeepWipeDialog component (PAN-461)
@@ -3164,7 +3236,11 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                 });
               }
               for (const spec of specialists) {
-                const specType = spec.name.replace('-agent', '') as 'review' | 'test' | 'merge';
+                // PAN-1048 — role primitive directly maps to the AgentBadge type.
+                // Map ship → merge for the legacy badge palette so reviewers
+                // still see the familiar "merge" indicator.
+                const specType = (spec.role === 'ship' ? 'merge' : spec.role) as 'review' | 'test' | 'merge';
+                if (specType !== 'review' && specType !== 'test' && specType !== 'merge') continue;
                 badges.push({ type: specType, name: specType });
               }
 
@@ -3542,17 +3618,40 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
           {planLabelExists && (
             <>
               {artifactLinks}
-              <button
-                ref={startButtonRef}
-                onClick={handleStartAgent}
-                disabled={startAgentMutation.isPending || isStarting}
-                className="flex items-center gap-1 text-xs font-semibold bg-success hover:bg-success/90 text-foreground transition-colors rounded px-2 py-1 disabled:opacity-50"
-                title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
-                data-testid={`card-start-agent-${issue.identifier}`}
-              >
-                {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}</span>
-              </button>
+              <div className="min-w-[220px]" onClick={(e) => e.stopPropagation()}>
+                <ModelHarnessPicker
+                  model={launchModel}
+                  harness={launchHarness}
+                  onModelChange={setLaunchModel}
+                  onHarnessChange={setLaunchHarness}
+                  groups={modelGroups}
+                  harnessPolicy={harnessPolicy}
+                  modelLabel="Agent model"
+                />
+              </div>
+              <div className="inline-flex items-center rounded overflow-hidden">
+                <button
+                  ref={startButtonRef}
+                  onClick={(e) => handleStartAgent(e)}
+                  disabled={startAgentMutation.isPending || isStarting}
+                  className="flex items-center gap-1 text-xs font-semibold bg-success hover:bg-success/90 text-foreground transition-colors px-2 py-1 disabled:opacity-50"
+                  title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
+                  data-testid={`card-start-agent-${issue.identifier}`}
+                >
+                  {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start'}</span>
+                </button>
+                <button
+                  onClick={(e) => handleStartAgent(e, true)}
+                  disabled={startAgentMutation.isPending || isStarting}
+                  className="flex items-center gap-1 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground transition-colors border-l border-background/20 px-2 py-1 disabled:opacity-50"
+                  title="Synthesize a minimal vBRIEF from the issue and start the agent"
+                  data-testid={`card-auto-start-agent-${issue.identifier}`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Auto-start
+                </button>
+              </div>
             </>
           )}
           {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
@@ -3591,17 +3690,42 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
               <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
             </button>
           ) : hasBeads ? (
-            <button
-              ref={startButtonRef}
-              onClick={handleStartAgent}
-              disabled={startAgentMutation.isPending || isStarting}
-              className="flex items-center gap-1 text-xs font-semibold bg-success text-success-foreground hover:bg-emerald-500 transition-colors rounded px-2 py-1 disabled:opacity-50"
-              title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
-              data-testid={`card-start-agent-${issue.identifier}`}
-            >
-              {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}</span>
-            </button>
+            <>
+              <div className="min-w-[220px]" onClick={(e) => e.stopPropagation()}>
+                <ModelHarnessPicker
+                  model={launchModel}
+                  harness={launchHarness}
+                  onModelChange={setLaunchModel}
+                  onHarnessChange={setLaunchHarness}
+                  groups={modelGroups}
+                  harnessPolicy={harnessPolicy}
+                  modelLabel="Agent model"
+                />
+              </div>
+              <div className="inline-flex items-center rounded overflow-hidden">
+                <button
+                  ref={startButtonRef}
+                  onClick={(e) => handleStartAgent(e)}
+                  disabled={startAgentMutation.isPending || isStarting}
+                  className="flex items-center gap-1 text-xs font-semibold bg-success text-success-foreground hover:bg-emerald-500 transition-colors px-2 py-1 disabled:opacity-50"
+                  title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
+                  data-testid={`card-start-agent-${issue.identifier}`}
+                >
+                  {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start'}</span>
+                </button>
+                <button
+                  onClick={(e) => handleStartAgent(e, true)}
+                  disabled={startAgentMutation.isPending || isStarting}
+                  className="flex items-center gap-1 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground transition-colors border-l border-background/20 px-2 py-1 disabled:opacity-50"
+                  title="Synthesize a minimal vBRIEF from the issue and start the agent"
+                  data-testid={`card-auto-start-agent-${issue.identifier}`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Auto-start
+                </button>
+              </div>
+            </>
           ) : null}
           <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
         </div>

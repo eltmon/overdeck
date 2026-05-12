@@ -8,6 +8,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import type { IssueTracker } from '../tracker/interface.js';
 
 export interface StepResult {
   step: string;
@@ -44,6 +45,8 @@ export interface LifecycleContext {
     workspace?: string;
     project?: string;
   };
+  /** Issue tracker abstraction used by lifecycle operations when available */
+  tracker?: IssueTracker;
 }
 
 /** Options for teardown-workspace */
@@ -92,6 +95,8 @@ export interface DeepWipeProgress {
 }
 
 export interface DeepWipeOptions {
+  /** IssueTracker instance for tracker-aware reset/cancel messages */
+  tracker?: IssueTracker;
   /** Delete workspace directory. Default: true */
   deleteWorkspace?: boolean;
   /** Delete git branches (local + remote). Default: true */

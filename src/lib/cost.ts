@@ -94,17 +94,16 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'anthropic', model: 'claude-sonnet-4', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, cacheWrite5mPer1k: 0.00375, cacheWrite1hPer1k: 0.006, currency: 'USD' },
   // Anthropic - Legacy
   { provider: 'anthropic', model: 'claude-haiku-3', inputPer1k: 0.00025, outputPer1k: 0.00125, cacheReadPer1k: 0.00003, cacheWrite5mPer1k: 0.0003, cacheWrite1hPer1k: 0.0005, currency: 'USD' },
-  // OpenAI
-  { provider: 'openai', model: 'gpt-5.5', inputPer1k: 0.003, outputPer1k: 0.018, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.5-mini', inputPer1k: 0.0005, outputPer1k: 0.002, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.5-nano', inputPer1k: 0.00025, outputPer1k: 0.0015, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.5-pro', inputPer1k: 0.018, outputPer1k: 0.22, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.4', inputPer1k: 0.0025, outputPer1k: 0.015, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.4-mini', inputPer1k: 0.0004, outputPer1k: 0.0016, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.4-nano', inputPer1k: 0.0002, outputPer1k: 0.00125, currency: 'USD' },
-  { provider: 'openai', model: 'gpt-5.4-pro', inputPer1k: 0.015, outputPer1k: 0.195, currency: 'USD' },
+  // OpenAI — prices per developers.openai.com/api/docs/pricing (May 2026)
+  { provider: 'openai', model: 'gpt-5.5', inputPer1k: 0.005, outputPer1k: 0.030, cacheReadPer1k: 0.0005, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.5-pro', inputPer1k: 0.030, outputPer1k: 0.180, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.4', inputPer1k: 0.0025, outputPer1k: 0.015, cacheReadPer1k: 0.00025, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.4-mini', inputPer1k: 0.00075, outputPer1k: 0.0045, cacheReadPer1k: 0.000075, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.4-pro', inputPer1k: 0.030, outputPer1k: 0.180, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.3-codex', inputPer1k: 0.00175, outputPer1k: 0.014, cacheReadPer1k: 0.000175, currency: 'USD' },
+  { provider: 'openai', model: 'gpt-5.2', inputPer1k: 0.00125, outputPer1k: 0.010, currency: 'USD' },
   { provider: 'openai', model: 'o3', inputPer1k: 0.002, outputPer1k: 0.008, currency: 'USD' },
-  { provider: 'openai', model: 'o4-mini', inputPer1k: 0.0011, outputPer1k: 0.0044, currency: 'USD' },
+  { provider: 'openai', model: 'o4-mini', inputPer1k: 0.004, outputPer1k: 0.016, cacheReadPer1k: 0.001, currency: 'USD' },
   // Google
   { provider: 'google', model: 'gemini-3.1-pro-preview', inputPer1k: 0.002, outputPer1k: 0.012, currency: 'USD' },
   { provider: 'google', model: 'gemini-3-flash-preview', inputPer1k: 0.00015, outputPer1k: 0.0006, currency: 'USD' },

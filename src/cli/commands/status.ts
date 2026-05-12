@@ -86,8 +86,9 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
       console.log(`  Context:  ${ctxStr}`);
     }
 
-    console.log(`  Runtime:  ${agent.runtime} (${agent.model})`);
     console.log(`  Harness:  ${agent.harness ?? 'claude-code'}`);
+    console.log(`  Model:    ${agent.model}`);
+    console.log(`  Role:     ${agent.role}`);
     console.log(`  Duration: ${duration} min`);
     console.log(`  Workspace: ${chalk.dim(agent.workspace)}`);
 

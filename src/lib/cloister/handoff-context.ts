@@ -100,7 +100,7 @@ export async function captureHandoffContext(
     previousSessionId: agentState.sessionId,
     targetModel,
     reason,
-    handoffCount: agentState.handoffCount || 0,
+    handoffCount: 0,
     costSoFar: agentState.costSoFar || 0,
   };
 

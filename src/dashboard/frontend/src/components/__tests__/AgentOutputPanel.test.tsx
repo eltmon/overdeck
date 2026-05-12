@@ -83,6 +83,10 @@ describe('deriveAgentIssueId', () => {
     expect(deriveAgentIssueId('planning-pan-503', 'PAN-503')).toBe('PAN-503');
   });
 
+  it('derives issueId from role-suffixed test run id', () => {
+    expect(deriveAgentIssueId('agent-pan-503-test')).toBe('PAN-503');
+  });
+
   // Non-matching ids
   it('returns null for specialist session names', () => {
     expect(deriveAgentIssueId('specialist-pan-review-agent')).toBeNull();
@@ -130,6 +134,20 @@ describe('AgentOutputPanel — planning agent rendering (AC4)', () => {
     expect(screen.queryByText(/No issue associated/)).not.toBeInTheDocument();
     expect(screen.getByTestId('xterm')).toBeInTheDocument();
     expect(screen.getByTestId('xterm')).toHaveAttribute('data-session', 'planning-orphan');
+  });
+
+  it('renders ActivityView for persisted test role runs using state.role and issueId', () => {
+    (useDashboardStore as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: 'agent-custom-test',
+      role: 'test',
+      issueId: 'PAN-503',
+    });
+
+    renderPanel('agent-custom-test');
+
+    expect(screen.getByTestId('activity-view')).toBeInTheDocument();
+    expect(screen.getByTestId('activity-view')).toHaveAttribute('data-issue', 'PAN-503');
+    expect(screen.queryByText(/No issue associated/)).not.toBeInTheDocument();
   });
 
   it('shows No issue associated placeholder for non-planning agent with non-derivable id', () => {

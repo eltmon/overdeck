@@ -62,6 +62,10 @@ export interface ParseState {
   permissionMode?: string;
   /** Map assistant message ID → file paths touched by file-modifying tool_use calls in that turn. */
   fileEditsByAssistantId: Map<string, Array<{ tool: string; filePath: string }>>;
+  /** ID of the current pendingAssistant message (carried across incremental parses for file-edit tracking). */
+  pendingAssistantId?: string;
+  /** Orphaned tool_use entry UUIDs awaiting re-keying (carried across incremental parses). */
+  orphanToolUseIds?: Set<string>;
 }
 
 export interface ConversationActivitySummary {
@@ -307,6 +311,15 @@ export async function parseConversationMessages(
   // Track file-modifying tool_use calls per assistant message for diff computation
   const fileEditsByAssistantId = new Map<string, Array<{ tool: string; filePath: string }>>();
   const FILE_EDIT_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
+  // Tool_use entries arrive with their own UUID, separate from the text entry that follows.
+  // We track these UUIDs so we can re-key edits when the text entry merges them into one message.
+  const orphanToolUseIds = priorState?.orphanToolUseIds
+    ? new Set(priorState.orphanToolUseIds)
+    : new Set<string>();
+  // Restore pendingAssistant ID from prior incremental parse for correct file-edit tracking
+  if (priorState?.pendingAssistantId && !pendingAssistant) {
+    pendingAssistant = { id: priorState.pendingAssistantId } as ChatMessage;
+  }
 
   for (const line of lines) {
     let entry: JsonlEntry;
@@ -472,6 +485,11 @@ export async function parseConversationMessages(
               const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
               if (filePath) {
                 const asstId = pendingAssistant?.id ?? entry.uuid ?? msg.id ?? `asst-${messages.length}`;
+                // If no pendingAssistant, this tool_use UUID is orphaned — the text entry
+                // will merge it into the final message with a different UUID.
+                if (!pendingAssistant) {
+                  orphanToolUseIds.add(asstId);
+                }
                 let edits = fileEditsByAssistantId.get(asstId);
                 if (!edits) {
                   edits = [];
@@ -512,10 +530,38 @@ export async function parseConversationMessages(
       }
 
       if (assistantText) {
+        const newId = entry.uuid ?? msg.id ?? `asst-${messages.length}`;
         // Flush previous pending assistant
         if (pendingAssistant) {
           messages.push(pendingAssistant);
+          // Re-key file edits from old pendingAssistant UUID
+          const oldId = pendingAssistant.id;
+          if (oldId !== newId) {
+            const edits = fileEditsByAssistantId.get(oldId);
+            if (edits) {
+              fileEditsByAssistantId.delete(oldId);
+              fileEditsByAssistantId.set(newId, edits);
+            }
+          }
         }
+        // Re-key orphaned tool_use UUIDs into the merged message's UUID
+        for (const orphanId of orphanToolUseIds) {
+          if (orphanId !== newId) {
+            const edits = fileEditsByAssistantId.get(orphanId);
+            if (edits) {
+              fileEditsByAssistantId.delete(orphanId);
+              const existing = fileEditsByAssistantId.get(newId);
+              if (existing) {
+                for (const e of edits) {
+                  if (!existing.some(x => x.filePath === e.filePath)) existing.push(e);
+                }
+              } else {
+                fileEditsByAssistantId.set(newId, edits);
+              }
+            }
+          }
+        }
+        orphanToolUseIds.clear();
         pendingAssistant = {
           id: entry.uuid ?? msg.id ?? `asst-${messages.length}`,
           role: 'assistant',
@@ -713,6 +759,8 @@ export async function parseConversationMessages(
     compactBoundaries,
     permissionMode,
     fileEditsByAssistantId,
+    pendingAssistantId: pendingAssistant?.id,
+    orphanToolUseIds: orphanToolUseIds.size > 0 ? orphanToolUseIds : undefined,
   };
 }
 

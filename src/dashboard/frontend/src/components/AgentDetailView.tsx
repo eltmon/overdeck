@@ -27,7 +27,7 @@ interface HealthEvent {
   metadata?: Record<string, any>;
 }
 
-interface SpecialistStatus {
+interface SpecialistApiStatus {
   name: string;
   displayName: string;
   state: 'sleeping' | 'active' | 'uninitialized';
@@ -42,7 +42,7 @@ async function fetchHealthHistory(agentId: string, hours: number = 24): Promise<
   return res.json();
 }
 
-async function fetchSpecialists(): Promise<SpecialistStatus[]> {
+async function fetchSpecialists(): Promise<SpecialistApiStatus[]> {
   const res = await fetch('/api/specialists');
   if (!res.ok) throw new Error('Failed to fetch specialists');
   const data = await res.json();
@@ -88,8 +88,8 @@ function isSpecialistAgent(agentId: string): boolean {
 
 /**
  * Parse an issue-scoped ephemeral session name.
- * "specialist-pan-PAN-509-merge-agent" → { projectKey: "pan", issueId: "PAN-509", specialistType: "merge-agent" }
- * Returns null for global specialist sessions like "specialist-merge-agent".
+ * Parses issue-scoped specialist session names into project, issue, and specialist identifiers.
+ * Returns null for global specialist sessions.
  */
 function parseEphemeralSession(agentId: string): { projectKey: string; issueId: string; specialistType: string } | null {
   const match = agentId.match(/^specialist-(.+)-([A-Z]+-\d+)-(merge-agent|review-agent|test-agent|inspect-agent|uat-agent)$/);

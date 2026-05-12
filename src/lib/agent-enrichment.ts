@@ -1,11 +1,14 @@
 /**
- * Agent enrichment utilities (PAN-440)
+ * Agent enrichment utilities (PAN-440 / PAN-1048)
  *
  * Shared functions for computing enrichment fields:
- *   agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
+ *   role, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
  *
  * Used by both the legacy REST /api/agents endpoint and the new
  * AgentEnrichmentService background poller.
+ *
+ * PAN-1048: replaced the legacy `agentPhase` string with the role primitive —
+ * the dashboard derives label/status from `role` + lifecycle state.
  */
 
 import { existsSync } from 'fs'
@@ -34,7 +37,7 @@ export interface Question { question: string; header: string; options: QuestionO
 export interface PendingQuestion { toolId: string; timestamp: string; questions: Question[] }
 
 export interface AgentEnrichment {
-  agentPhase: 'planning' | 'exploration' | 'implementation' | 'testing' | 'documentation' | 'pre_push' | 'post_push'
+  role: 'plan' | 'work' | 'review' | 'test' | 'ship' | undefined
   hasPendingQuestion: boolean
   pendingQuestionCount: number
   pendingQuestionPrompt?: string
@@ -237,17 +240,21 @@ export async function computeAgentEnrichment(
 ): Promise<AgentEnrichment> {
   const isPlanning = agentId.startsWith('planning-')
 
-  // Read state.json for current phase
+  // Read state.json role for enrichment projection.
   const stateFile = join(getAgentDir(agentId), 'state.json')
-  let statePhase: string | undefined
+  let stateRole: string | undefined
   if (existsSync(stateFile)) {
     try {
       const state = JSON.parse(await readFile(stateFile, 'utf-8'))
-      statePhase = state.phase
+      stateRole = state.role
     } catch {}
   }
 
-  const agentPhase = (isPlanning ? 'planning' : (statePhase || 'implementation')) as AgentEnrichment['agentPhase']
+  const role: AgentEnrichment['role'] =
+    (stateRole === 'plan' || stateRole === 'work' || stateRole === 'review' ||
+     stateRole === 'test' || stateRole === 'ship')
+      ? stateRole
+      : (isPlanning ? 'plan' : undefined)
 
   // Get runtime state for resolution + explicit waiting signals.
   const runtimeState = await getAgentRuntimeStateAsync(agentId)
@@ -302,7 +309,7 @@ export async function computeAgentEnrichment(
   const hasPendingQuestion = !hasActiveSpecialist && detection !== null
 
   return {
-    agentPhase,
+    role,
     hasPendingQuestion,
     pendingQuestionCount: pendingQuestions.length,
     pendingQuestionPrompt: detection?.prompt,

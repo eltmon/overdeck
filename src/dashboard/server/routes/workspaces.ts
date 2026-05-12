@@ -10,6 +10,7 @@ import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
  *   GET    /api/workspaces/:issueId
  *   POST   /api/workspaces
  *   GET    /api/workspaces/:issueId/plan
+ *   PATCH  /api/workspaces/:issueId/plan/inspection-policy
  *   GET    /api/workspaces/:issueId/clean/preview
  *   POST   /api/workspaces/:issueId/clean
  *   POST   /api/workspaces/:issueId/containerize
@@ -84,13 +85,15 @@ import {
   getAgentState,
   getAgentStateAsync,
   spawnAgent,
+  spawnRun,
 } from '../../../lib/agents.js';
 import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getCostsForIssue } from '../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPlan, readPlan, readWorkspacePlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
-import type { VBriefDocument } from '../../../lib/vbrief/types.js';
+import { findPlan, readPlan, readPlanAsync, readWorkspacePlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { VBRIEF_INSPECTION_POLICIES } from '../../../lib/vbrief/types.js';
+import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief/types.js';
 import { findVBriefByIssueAsync, readVBriefDocumentAsync } from '../../../lib/vbrief/vbrief-index.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
@@ -263,8 +266,7 @@ async function ensureWorkAgentReadyForMerge(
   const state = await spawnAgent({
     issueId,
     workspace: workspacePath,
-    phase: 'implementation',
-    agentType: 'work-agent',
+    role: 'work',
     prompt: rebaseMsg,
   });
 
@@ -1614,6 +1616,28 @@ const getWorkspaceInferenceMdRoute = HttpRouter.add(
   }))
 );
 
+function resolvePlanLocation(projectPath: string, issueId: string): Promise<{ path: string; lifecycleDir: string; doc: VBriefDocument } | null> {
+  return findVBriefByIssueAsync(projectPath, issueId).then(async found => {
+    if (found) {
+      return {
+        path: found.path,
+        lifecycleDir: found.lifecycleDir,
+        doc: await readVBriefDocumentAsync(found.path),
+      };
+    }
+
+    const issueLower = issueId.toLowerCase();
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    const planPath = findPlan(workspacePath);
+    if (!planPath) return null;
+    return {
+      path: planPath,
+      lifecycleDir: 'workspace',
+      doc: await readPlanAsync(planPath),
+    };
+  });
+}
+
 const getWorkspacePlanRoute = HttpRouter.add(
   'GET',
   '/api/workspaces/:issueId/plan',
@@ -1625,42 +1649,67 @@ const getWorkspacePlanRoute = HttpRouter.add(
     }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
-    const issueLower = issueId.toLowerCase();
-    const workspaceName = `feature-${issueLower}`;
-    const workspacePath = join(projectPath, 'workspaces', workspaceName);
 
-    // Resolve from lifecycle specs first (cached/async), then fall back to the
-    // workspace-local `.pan/spec.vbrief.json` when planning is still in progress.
-    let planPath: string | null = null;
-    let lifecycleDir: string | null = null;
-    let doc: VBriefDocument | null = null;
-
-    const found = yield* Effect.promise(() => findVBriefByIssueAsync(projectPath, issueId));
-    if (found) {
-      planPath = found.path;
-      lifecycleDir = found.lifecycleDir;
-      doc = yield* Effect.promise(() => readVBriefDocumentAsync(found.path));
-    } else {
-      planPath = findPlan(workspacePath);
-      if (planPath) {
-        lifecycleDir = 'workspace';
-        const planPathConst = planPath;
-        doc = yield* Effect.promise(async () => {
-          const raw = await readFile(planPathConst, 'utf-8');
-          return JSON.parse(raw) as VBriefDocument;
-        });
-      }
-    }
-
-    if (!doc) {
+    const location = yield* Effect.promise(() => resolvePlanLocation(projectPath, issueId));
+    if (!location) {
       return jsonResponse(
         { error: 'No vBRIEF plan found for this workspace' },
         { status: 404 }
       );
     }
 
-    const cp = criticalPath(doc);
-    return jsonResponse({ ...doc, criticalPath: cp, lifecycleDir });
+    const cp = criticalPath(location.doc);
+    return jsonResponse({ ...location.doc, criticalPath: cp, lifecycleDir: location.lifecycleDir });
+  }))
+);
+
+const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
+  'PATCH',
+  '/api/workspaces/:issueId/plan/inspection-policy',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedMutationOrigin(request);
+    if (originError) return originError;
+
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+
+    const body = yield* readJsonBody;
+    const policy = (body as { inspectionPolicy?: unknown }).inspectionPolicy;
+    if (!VBRIEF_INSPECTION_POLICIES.includes(policy as VBriefInspectionPolicy)) {
+      return jsonResponse({ error: 'Invalid inspection policy' }, { status: 400 });
+    }
+
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const location = yield* Effect.promise(() => resolvePlanLocation(projectPath, issueId));
+    if (!location) {
+      return jsonResponse(
+        { error: 'No vBRIEF plan found for this workspace' },
+        { status: 404 }
+      );
+    }
+
+    const now = new Date().toISOString();
+    const updated: VBriefDocument = {
+      ...location.doc,
+      vBRIEFInfo: {
+        ...location.doc.vBRIEFInfo,
+        inspectionPolicy: policy as VBriefInspectionPolicy,
+        updated: now,
+      },
+      plan: {
+        ...location.doc.plan,
+        updated: now,
+      },
+    };
+
+    yield* Effect.promise(() => writeFile(location.path, JSON.stringify(updated, null, 2) + '\n', 'utf-8'));
+    const cp = criticalPath(updated);
+    return jsonResponse({ ...updated, criticalPath: cp, lifecycleDir: location.lifecycleDir });
   }))
 );
 
@@ -2948,6 +2997,24 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
       });
       console.log(`[review-status] Set review-agent (${tmuxSession}) to idle`);
 
+      // PAN-1048 review feedback 003: drop the review-temp stash on terminal
+      // review status. spawnReviewRoleForIssue() persists the stash ref before
+      // dispatching the review role; without this symmetric cleanup, every
+      // successful review leaves a stale review-temp:* stash and dangling
+      // reviewTempStashRef metadata. cleanupReviewTempStash is a no-op when
+      // no stash ref is set, so it's safe across all terminal verdicts.
+      try {
+        const wsInfo = getWorkspaceInfoForIssue(issueId);
+        if (wsInfo.exists && !wsInfo.isRemote && wsInfo.localPath) {
+          const { cleanupReviewTempStash } = yield* Effect.promise(() =>
+            import('../../../lib/cloister/review-agent.js')
+          );
+          yield* Effect.promise(() => cleanupReviewTempStash(issueId, wsInfo.localPath!));
+        }
+      } catch (err) {
+        console.error(`[review-status] Failed to drop review-temp stash for ${issueId}:`, err);
+      }
+
       if (['blocked', 'failed'].includes(reviewStatus) && reviewNotes) {
         const agentId = `agent-${issueId.toLowerCase()}`;
         const feedbackBody = `CODE REVIEW ${reviewStatus.toUpperCase()} for ${issueId}:\n\n${reviewNotes}\n\n## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests locally to verify your fixes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.`;
@@ -2987,29 +3054,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           timestamp: new Date().toISOString(),
           payload: { issueId, passed: true },
         })));
-        const issueLower = issueId.toLowerCase();
-        const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
-        const projectPath = getProjectPath(undefined, issuePrefix);
-        const testWorkspace =
-          body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
-        const testBranch = body.branch || `feature/${issueLower}`;
-
-        const { dispatchTestAgentAndNotify } = yield* Effect.promise(() => import(
-          '../../../lib/cloister/test-agent-queue.js'
-        ));
-        try {
-          yield* Effect.promise(() => dispatchTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent));
-          yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-            type: 'pipeline.test-started',
-            timestamp: new Date().toISOString(),
-            payload: { issueId },
-          })));
-        } catch (err) {
-          console.error(
-            `[review-status] Unhandled error in dispatchTestAgentAndNotify for ${issueId}:`,
-            err
-          );
-        }
+        console.log(`[review-status] ${issueId} review approved; reactive Cloister will dispatch the test role`);
       } else if (['blocked', 'failed'].includes(reviewStatus)) {
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-completed',
@@ -3140,7 +3185,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
         'Operation timed out',
         'specialist.*not running',
         'specialist.*busy',
-        'wakeSpecialistOrQueue',
+        'legacy specialist wake',
       ];
       const isInfraFailure = infraFailurePatterns.some(pattern =>
         new RegExp(pattern, 'i').test(existingStatus.reviewNotes || '')
@@ -3307,9 +3352,15 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               return;
             }
 
-            const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
+            // PAN-1048 C1/R3: review now runs as the role primitive via spawnRun
+            // (loads roles/review.md → Agent tool fans out to code-review-* sub-agents).
+            // The wrapper preserves dispatchParallelReview's orchestration concerns
+            // (idempotency, feedback archive, review-temp stash, status flip,
+            // pipeline event) but the review itself is no longer a detached
+            // `pan review run` coordinator process.
+            const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
             const prUrl = getReviewStatus(issueId)?.prUrl;
-            const reviewResult = await dispatchParallelReview({
+            const reviewResult = await spawnReviewRoleForIssue({
               issueId,
               branch: branchName,
               workspace: workspacePath,
@@ -3436,8 +3487,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
             }
 
             const prUrl = getReviewStatus(issueId)?.prUrl;
-            const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
-            const result = await dispatchParallelReview({
+            const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
+            const result = await spawnReviewRoleForIssue({
               issueId,
               workspace: workspacePathRerun,
               branch: branchNameRerun,
@@ -3446,8 +3497,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
             if (result.success) {
               // reviewStatus transitions ('reviewing' → passed/blocked/failed) are
-              // managed entirely inside dispatchParallelReview — do not write here.
-              console.log(`[request-review] Parallel review dispatched for ${issueId}`);
+              // managed by the review role itself via /api/review/:id/status.
+              console.log(`[request-review] Review role spawned for ${issueId}`);
             } else {
               const errorMsg = result.error || result.message || 'Failed to dispatch review';
               console.error(`[request-review] Dispatch failed for ${issueId}: ${errorMsg}`);
@@ -3471,7 +3522,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
       if (existingStatus.testStatus === 'failed' || existingStatus.testStatus === 'pending' || existingStatus.testStatus === 'dispatch_failed') {
         console.log(
-          `[request-review] ${issueId}: review passed but tests ${existingStatus.testStatus} — dispatching test specialist`
+          `[request-review] ${issueId}: review passed but tests ${existingStatus.testStatus} — dispatching test role`
         );
         setReviewStatus(issueId, { testStatus: 'pending' });
 
@@ -3479,7 +3530,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           const resolved = resolveProjectFromIssue(issueId);
           if (!resolved) {
             console.error(
-              `[request-review] No project configured for ${issueId} — cannot spawn test specialist`
+              `[request-review] No project configured for ${issueId} — cannot spawn test role`
             );
             setReviewStatus(issueId, {
               testStatus: 'dispatch_failed',
@@ -3491,29 +3542,33 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               'workspaces',
               `feature-${issueId.toLowerCase()}`
             );
-            const branchName = `feature/${issueId.toLowerCase()}`;
             setReviewStatus(issueId, { testStatus: 'testing' });
-            const { spawnEphemeralSpecialist } = yield* Effect.promise(() => import(
-              '../../../lib/cloister/specialists.js'
-            ));
-            const testResult = yield* Effect.promise(() => spawnEphemeralSpecialist(
-              resolved.projectKey,
-              'test-agent',
-              { issueId, workspace: workspacePath, branch: branchName }
-            ));
-            console.log(
-              `[request-review] Test specialist ${testResult.success ? 'spawned' : 'failed'} for ${issueId}`
-            );
-            if (!testResult.success) {
+            // PAN-1048 R1: spawn the test role via the role primitive instead
+            // of the legacy spawnEphemeralSpecialist machinery. Reactive
+            // Cloister normally drives this on lifecycle transitions; this
+            // path is a manual re-dispatch for already-approved reviews.
+            const { spawnRun } = yield* Effect.promise(() => import('../../../lib/agents.js'));
+            try {
+              const testRun = yield* Effect.promise(() => spawnRun(issueId, 'test', {
+                workspace: workspacePath,
+              }));
+              console.log(
+                `[request-review] Test role spawned for ${issueId} as ${testRun.id}`
+              );
+            } catch (testErr) {
+              const msg = testErr instanceof Error ? testErr.message : String(testErr);
+              console.error(
+                `[request-review] Test role spawn failed for ${issueId}: ${msg}`
+              );
               setReviewStatus(issueId, {
                 testStatus: 'dispatch_failed',
-                testNotes: `Test dispatch failed: ${testResult.error || testResult.message}`,
+                testNotes: `Test dispatch failed: ${msg}`,
               });
             }
           }
         } catch (err: any) {
           console.warn(
-            `[request-review] Failed to queue test specialist for ${issueId}: ${err.message}`
+            `[request-review] Failed to queue test role for ${issueId}: ${err.message}`
           );
         }
         return jsonResponse({
@@ -3642,8 +3697,8 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       }
 
       const result = yield* Effect.promise(async () => {
-        const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
-        return dispatchParallelReview({
+        const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
+        return spawnReviewRoleForIssue({
           issueId,
           workspace: workspacePath,
           branch: branchName,
@@ -3651,8 +3706,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       });
 
       if (result.success) {
-        console.log(`[request-review] Parallel review dispatched for ${issueId}`);
-        // PAN-511: set 'reviewing' only after dispatch succeeds
+        console.log(`[request-review] Review role spawned for ${issueId}`);
+        // PAN-511: set 'reviewing' only after spawn succeeds. spawnReviewRoleForIssue
+        // already flips reviewStatus internally, but we keep this redundant write
+        // to preserve the original ordering invariant for downstream readers.
         setReviewStatus(issueId, { reviewStatus: 'reviewing' });
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-started',
@@ -3817,7 +3874,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
     if (rerun) {
       try {
         yield* Effect.promise(async () => {
-          const { dispatchParallelReview } = await import('../../../lib/cloister/review-agent.js');
+          const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
           const resolved = resolveProjectFromIssue(issueId);
           if (resolved) {
             const wsInfo = getWorkspaceInfoForIssue(issueId);
@@ -3829,7 +3886,7 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
               wsInfo.localPath ||
               join(resolved.projectPath, 'workspaces', `feature-${numericSuffix}`);
 
-            const result = await dispatchParallelReview({
+            const result = await spawnReviewRoleForIssue({
               issueId,
               workspace: wsPath,
               branch: branchName,
@@ -3891,42 +3948,16 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
       return jsonResponse({ success: false, error: 'Workspace does not exist' }, { status: 400 });
     }
 
-    // Kill all reviewer AND coordinator tmux sessions for this issue.
-    // Session name patterns:
-    //   specialist-<projectKey>-<issueId>-review-<role>  (PAN-830 canonical reviewer / synthesis)
-    //   review-<issueId>-<ts>-<role>                     (legacy timestamped reviewer)
-    //   review-<issueId>-<ts>-synthesis                  (legacy timestamped synthesis)
-    //   review-coordinator-<issueId>-<ts>                (detached `pan review run` orchestrator)
-    const legacyReviewerPrefix = `review-${issueId}-`;
-    const coordinatorPrefix = `review-coordinator-${issueId}-`;
     const { resolveProjectFromIssue } = yield* Effect.promise(() =>
       import('../../../lib/projects.js'),
     );
+    const { killAllReviewerSessions } = yield* Effect.promise(() =>
+      import('../../../lib/cloister/review-agent.js'),
+    );
     const resolved = resolveProjectFromIssue(issueId);
-    const projectKey = resolved?.projectKey;
-    // Canonical PAN-830 reviewer/synthesis sessions (PAN-915). Match
-    // case-insensitively on the issueId portion since session names are
-    // composed with the caller-supplied case.
-    const canonicalPrefix = projectKey
-      ? `specialist-${projectKey.toLowerCase()}-${issueId.toLowerCase()}-review-`
-      : null;
-    const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
-    const reviewSessions = allSessions.filter(s => {
-      if (s.startsWith(legacyReviewerPrefix) || s.startsWith(coordinatorPrefix)) return true;
-      if (canonicalPrefix && s.toLowerCase().startsWith(canonicalPrefix)) return true;
-      return false;
-    });
-
-    const killed: string[] = [];
-    const failed: string[] = [];
-    for (const session of reviewSessions) {
-      try {
-        yield* Effect.promise(() => killSessionAsync(session));
-        killed.push(session);
-      } catch {
-        failed.push(session);
-      }
-    }
+    const { killed, failed } = yield* Effect.promise(() =>
+      killAllReviewerSessions(resolved?.projectKey, issueId),
+    );
 
     // Reset only reviewStatus — leave test/merge/verification untouched
     setReviewStatus(issueId, {
@@ -5342,91 +5373,45 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           }
         } catch {}
 
-        const { wakeSpecialist, spawnEphemeralSpecialist: spawnApproveEphemeral } =
-          await import('../../../lib/cloister/specialists.js');
-        const approveProjectKey = resolveProjectFromIssue(issueId)?.projectKey ?? null;
+        console.log(`[approve] Starting role pipeline for ${issueId}...`);
 
-        console.log(`[approve] Starting specialist pipeline for ${issueId}...`);
-
-        const pipelinePrompt = `STRICT REVIEW WORKFLOW for ${issueId}
-
-You are a DEMANDING code reviewer. Your job is to find EVERY issue before code can proceed.
-DO NOT BE NICE. BE THOROUGH. The code must be PERFECT before it can proceed to testing.
-
-=== CONTEXT ===
-ISSUE: ${issueId}
-WORKSPACE: ${workspacePath}
-BRANCH: ${branchName}
-PROJECT: ${projectPath}
-
-=== MANDATORY REQUIREMENTS (Block if ANY violated) ===
-1. **Tests Required** - Every new function MUST have test files. No exceptions.
-2. **No In-Memory Only Storage** - Important data MUST persist to files/DB.
-3. **No Dead Code** - Remove unused imports, functions, variables.
-4. **Error Handling** - All async operations must handle errors.
-5. **Type Safety** - No \`any\` without justification.
-
-=== YOUR TASK (EXHAUSTIVE REVIEW) ===
-1. cd ${workspacePath}
-2. Review ALL changes: git diff main...${branchName}
-3. Check EVERY file for:
-   - Missing test FILES (AUTOMATIC REJECTION)
-   - In-memory storage for persistent data (AUTOMATIC REJECTION)
-   - Security vulnerabilities
-   - Performance issues
-   - Code quality problems
-4. List EVERY issue found with file:line references
-
-**IMPORTANT: DO NOT run tests (npm test). You are the REVIEW agent - you only review code.**
-**The TEST agent will run tests in the next step. Just verify test FILES exist.**
-
-=== DECISION ===
-**IF ANY ISSUES FOUND:**
-- Update status: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -H "Content-Type: application/json" -d '{"reviewStatus":"blocked","reviewNotes":"[detailed list of all issues found]"}'
-- Use /send-feedback-to-agent to send detailed feedback to agent-${issueId.toLowerCase()}
-- DO NOT hand off to test-agent
-
-**ONLY IF CODE IS PERFECT (rare):**
-- Update status: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -H "Content-Type: application/json" -d '{"reviewStatus":"passed"}'
-- Queue test-agent (DO NOT use pan specialists wake directly):
-
-curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Content-Type: application/json" -d '{"issueId":"${issueId}","workspace":"${workspacePath}","branch":"${branchName}","customPrompt":"TEST TASK for ${issueId}:\\nWORKSPACE: ${workspacePath}\\nBRANCH: ${branchName}\\n\\n1. cd ${workspacePath}\\n2. Run tests: npm test\\n3. Update status via API:\\n   - PASS: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -H Content-Type:application/json -d {testStatus:passed}\\n   - FAIL: curl -X POST http://localhost:${PORT}/api/review/${issueId}/status -d {testStatus:failed,testNotes:[details]}\\n\\nIMPORTANT: Do NOT hand off to merge-agent. Human clicks Merge button when ready."}'
-
-=== REVIEW PHILOSOPHY ===
-- Your default answer is BLOCK, not PASS
-- Missing tests alone is enough to reject
-- In-memory storage for important data is enough to reject
-- "It works" is NOT enough - code must be EXCELLENT
-- Find EVERYTHING. The agent should learn from your feedback.`;
-
+        // PAN-1048 R3: route through the same wrapper every other approve path
+        // uses (idempotency + feedback archive + review-temp stash + status flip
+        // + pipeline event). The role agent loads roles/review.md, fans out the
+        // four code-review-* convoy reviewers via Agent tool, synthesizes, and
+        // posts the verdict via /api/review/:id/status. Test dispatch is NOT
+        // part of the review prompt — reactive Cloister picks up the
+        // review.approved lifecycle event and spawns the test role.
         let reviewResult: { success: boolean; message: string; error?: string };
-        if (approveProjectKey) {
-          reviewResult = await spawnApproveEphemeral(approveProjectKey, 'review-agent', {
+        try {
+          const { spawnReviewRoleForIssue } = await import('../../../lib/cloister/review-agent.js');
+          reviewResult = await spawnReviewRoleForIssue({
             issueId,
-            branch: branchName,
             workspace: workspacePath,
-            promptOverride: pipelinePrompt,
+            branch: branchName,
+            prUrl: getReviewStatus(issueId)?.prUrl,
           });
-        } else {
-          reviewResult = await wakeSpecialist('review-agent', pipelinePrompt, {
-            waitForReady: true,
-            startIfNotRunning: true,
-          });
+        } catch (err: any) {
+          reviewResult = {
+            success: false,
+            message: err?.message ?? 'Failed to start review role',
+            error: err?.message,
+          };
         }
 
         if (!reviewResult.success) {
-          console.warn(`[approve] review-agent failed to wake: ${reviewResult.message}`);
+          console.warn(`[approve] review role failed to start: ${reviewResult.message}`);
           console.log(`[approve] Falling back to direct merge...`);
         } else {
           console.log(
-            `[approve] Pipeline started - review-agent will queue test-agent when done`
+            `[approve] Pipeline started - review role will synthesize convoy findings`
           );
           completePendingOperation(issueId, null);
           return jsonResponse({
             success: true,
-            message: `Approval pipeline started for ${issueId}. Specialists: review → test`,
+            message: `Approval pipeline started for ${issueId}. Role: review`,
             pipeline: 'running',
-            note: 'Watch the specialists panel for progress. Click Merge when review+test pass.',
+            note: 'Watch the role run for progress. Click Merge when review+test pass.',
             ...(recentPushWarning && { recentPushWarning }),
             ...(mainAdvancedBy > 0 && { mainAdvancedBy }),
           });
@@ -5776,6 +5761,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceStateMdRoute,
   getWorkspaceInferenceMdRoute,
   getWorkspacePlanRoute,
+  patchWorkspacePlanInspectionPolicyRoute,
   getWorkspaceStashesRoute,
   postWorkspaceRecoverStashRoute,
   deleteWorkspaceStashRoute,

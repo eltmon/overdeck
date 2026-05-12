@@ -48,10 +48,13 @@ vi.mock('../../../src/lib/projects.js', () => ({
   }),
 }));
 
-// Mock work-type-router module
-vi.mock('../../../src/lib/work-type-router.js', () => ({
-  getModelId: vi.fn(() => 'claude-sonnet-4-5'),
-}));
+vi.mock('../../../src/lib/config-yaml.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/lib/config-yaml.js')>('../../../src/lib/config-yaml.js');
+  return {
+    ...actual,
+    loadConfig: vi.fn(() => ({ config: { roles: actual.DEFAULT_ROLES, workhorses: actual.DEFAULT_WORKHORSES } })),
+  };
+});
 
 describe('specialist-context', () => {
   let testDir: string;

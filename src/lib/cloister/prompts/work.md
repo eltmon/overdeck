@@ -62,12 +62,12 @@ Before starting any work, you MUST read these files to understand the full conte
 These files contain critical context that may have been updated since the last session.
 {{/LOCAL}}
 {{#REMOTE}}
-Your workspace is at /workspace. Check for planning artifacts:
-- /workspace/.pan/continue.json - Structured planning context (decisions, hazards)
-- /workspace/.pan/spec.vbrief.json - Contains the workspace vBRIEF plan
-- /workspace/docs/prds/ - May contain PRD documents
+Your workspace is at /workspace. Check for planning artifacts under `/workspace/.pan/`:
+- `/workspace/.pan/continue.json` — structured planning context (decisions, hazards, resumePoint)
+- `/workspace/.pan/spec.vbrief.json` — workspace working copy of the vBRIEF plan
+- `/workspace/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
 
-Start by reading the continue file to understand the plan, then begin implementation.
+Start by reading `.pan/continue.json` to understand the plan, then begin implementation.
 If no continue file exists, check the issue tracker for requirements.
 {{/REMOTE}}
 
@@ -77,6 +77,13 @@ If no continue file exists, check the issue tracker for requirements.
 - Never rely on another agent's browser session, cookies, tabs, zoom level, or shared profile state.
 - If you need authenticated/browser state, recreate it inside your own isolated session.
 - If Playwright reports browser/profile contention, treat it as a tooling/config bug to fix — do not skip UI verification.
+
+## CRITICAL: Never Approve Permission Prompts
+
+- NEVER answer, approve, deny, dismiss, or drive a permission prompt by sending keystrokes to any Claude Code session.
+- NEVER run `tmux send-keys`, `tmux paste-buffer`, `sendKeys`, `sendKeysAsync`, or any equivalent session-input mechanism to interact with a permission dialog.
+- If a permission prompt appears in your own session, wait for the harness/user to handle it; if it appears in another agent, treat that as a system bug and fix the permissions path, not the prompt.
+- Do not ask an inspector, reviewer, test agent, or any subagent to approve a prompt. Permission decisions belong to the harness/user path only.
 
 {{#TLDR_AVAILABLE}}
 ## TLDR: Token-Efficient Code Analysis
@@ -156,13 +163,16 @@ will be rejected.
 4. `git add` and `git commit` — one bead = one commit
 5. **Update `.pan/continue.json`** — append a decision or hazard if you learned something new, update `resumePoint` with what the next agent should do (see continue format below)
 6. `bd close <bead-id> --reason="what you did"`
-7. **Check `metadata.requiresInspection` on this bead's plan item** in `.pan/spec.vbrief.json`:
-   - If `true` (or missing — treat as `true` only on legacy plans without the field): run `pan inspect {{ISSUE_ID}} --bead <bead-id>` and **WAIT** for the verdict (delivered via `pan tell`).
+7. **Re-read this bead's plan item metadata** in `.pan/spec.vbrief.json` after the commit and before deciding inspection:
+   - If `metadata.requiresInspection === false`: skip inspection entirely and proceed straight to step 1.
+   - If `metadata.requiresInspection === true`: read `metadata.inspectionDepth` (`fast` by default when omitted), then run the matching command and **WAIT** for the verdict (delivered via `pan tell`):
+     - `inspectionDepth: "fast"` or omitted → `pan inspect {{ISSUE_ID}} --bead <bead-id>`
+     - `inspectionDepth: "deep"` → `pan inspect {{ISSUE_ID}} --bead <bead-id> --deep`
      - `INSPECTION PASSED` → proceed to step 1
-     - `INSPECTION BLOCKED` → fix, commit, `bd close` again, then `pan inspect` again
-   - If `false`: skip inspection entirely. Proceed straight to step 1.
+     - `INSPECTION BLOCKED` → fix, commit, `bd close` again, then run the same inspection command again
+   - If `requiresInspection` is missing on a legacy plan item, treat it as `true` with `inspectionDepth: "fast"`.
 
-The planning agent decides per-bead whether inspection is required. Most mechanical beads (flag flips, file renames, isolated bug fixes) carry `requiresInspection: false`; foundational beads that downstream beads build on top of carry `true`. Trust the plan — do not request inspection on beads marked `false`, do not skip inspection on beads marked `true`.
+The planning agent decides per-bead whether inspection is required and how deep it should be. Most mechanical beads carry `requiresInspection: false`; foundational beads that downstream beads build on top of carry `true`, usually with fast depth unless the plan explicitly says `inspectionDepth: "deep"`. Trust the plan — do not request inspection on beads marked `false`, do not skip inspection on beads marked `true`, and do not reuse stale metadata from before you closed the bead.
 
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
@@ -274,10 +284,10 @@ and your work will be rejected.
 4. `git add` and `git commit` — one bead = one commit
 5. **Update `.pan/continue.json`** — this is MANDATORY before closing the bead (see continue format below)
 6. `bd close <bead-id> --reason="what you did"`
-7. `pan inspect {{ISSUE_ID}} --bead <bead-id>` — YOU must run this yourself. There is no auto-trigger; closing a bead does NOT spawn the inspector.
-8. **WAIT** for the inspection result (delivered to your session via `pan tell`)
-9. `INSPECTION PASSED` → proceed to step 1
-10. `INSPECTION BLOCKED` → fix, commit, `bd close` again, then `pan inspect …` again
+7. Re-read `metadata.requiresInspection` and `metadata.inspectionDepth` for this bead in `.pan/spec.vbrief.json`.
+8. If inspection is required, run `pan inspect {{ISSUE_ID}} --bead <bead-id>` for fast depth or add `--deep` for deep depth; closing a bead does NOT spawn the inspector.
+9. **WAIT** for the inspection result (delivered to your session via `pan tell`).
+10. `INSPECTION PASSED` → proceed to step 1; `INSPECTION BLOCKED` → fix, commit, `bd close` again, then run the same inspection command again.
 
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the

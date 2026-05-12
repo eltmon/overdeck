@@ -40,10 +40,8 @@ vi.mock('../../../../src/lib/tracker-utils.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
-  getSessionId: vi.fn().mockReturnValue(null),
   recordWake: vi.fn(),
   getTmuxSessionName: vi.fn().mockReturnValue('specialist-merge-agent'),
-  wakeSpecialist: vi.fn().mockResolvedValue({ success: false }),
   spawnEphemeralSpecialist: vi.fn().mockResolvedValue({ success: false }),
   isRunning: vi.fn().mockResolvedValue(false),
 }));
@@ -207,7 +205,7 @@ describe('scanGitPatterns', () => {
   it('also emits an activity entry for each matched line', () => {
     scanGitPatterns('git push origin feature/pan-1', new Set(), 'PAN-1');
     expect(mockEmitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
-      source: 'merge-agent',
+      source: 'ship',
       issueId: 'PAN-1',
     }));
   });

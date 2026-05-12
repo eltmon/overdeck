@@ -26,7 +26,9 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel, roleAgentDefinitionPath } from '../agents.js';
+import { loadConfig, resolveModel } from '../config-yaml.js';
+import { canUseHarness } from '../harness-policy.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
@@ -108,12 +110,14 @@ export interface SpawnPlanningOptions {
   workspaceLocation: 'local' | 'remote';
   startDocker?: boolean;
   shadowMode?: boolean;
-  /** Optional model override — if omitted, the planning-agent setting is used. */
+  /** Optional model override — if omitted, roles.plan.model is used. */
   model?: string;
   /** Optional harness override (PAN-636). Defaults to 'claude-code'. */
   harness?: 'claude-code' | 'pi';
   /** Optional effort level — controls how thorough the planning agent is. */
   effort?: 'low' | 'medium' | 'high';
+  /** Non-interactive planning: choose defensible defaults and record inferred choices. */
+  auto?: boolean;
   /** Optional callback for streaming progress events to the client. */
   onProgress?: (event: PlanningProgress) => void;
 }
@@ -155,7 +159,7 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high'): Promise<string> {
+export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false): Promise<string> {
   const issueLower = issue.identifier.toLowerCase();
   const version = await getPackageVersion();
   const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
@@ -262,6 +266,17 @@ ${effort === 'high'
     ? `,\n      ${prdFiles.map(p => `{ "uri": "${p.path}", "label": "${p.label}", "type": "prd" }`).join(',\n      ')}`
     : '';
 
+  const autoSection = auto ? `
+## Auto Planning Mode
+
+The user invoked \`pan plan --auto\`. Complete planning end-to-end without asking the user questions or waiting for interactive confirmation.
+
+- Do not use AskUserQuestion.
+- When normal planning would ask a question, choose the most defensible default and record it in \`plan.autoDecisions[]\` as \`{ "summary": "...", "rationale": "..." }\`.
+- Halt only for a genuine contradiction between authoritative inputs, such as the issue body requiring one behavior while a linked PRD requires the opposite. If that happens, write the contradiction into continue.json hazards and stop with a clear escalation message so the dashboard surfaces it.
+- Still produce the same complete vBRIEF and beads via \`pan plan-finalize\` when no contradiction exists.
+` : '';
+
   return renderPrompt({
     name: 'planning',
     vars: {
@@ -277,6 +292,7 @@ ${effort === 'high'
       CHILD_STORIES_SECTION: childStoriesSection,
       PROJECT_STRUCTURE_SECTION: projectStructureSection,
       EFFORT_SECTION: effortSection,
+      AUTO_SECTION: autoSection,
       PRD_REFERENCES: prdReferences,
     },
   });
@@ -318,7 +334,7 @@ export async function writeFeatureContext(workspacePath: string, issue: Planning
  * is sent. It updates agent state to 'running' on success or 'failed' on error.
  */
 export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<SpawnPlanningResult> {
-  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, onProgress } = opts;
+  const { issue, workspacePath, projectPath, sessionName, workspaceLocation, startDocker, shadowMode, model: modelOverride, effort, auto, onProgress } = opts;
   const issueLower = issue.identifier.toLowerCase();
   const agentStateDir = join(homedir(), '.panopticon', 'agents', sessionName);
 
@@ -385,8 +401,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         progress(1, 'Creating workspace', errorMsg, 'error');
         await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
           id: sessionName, issueId: issue.identifier, workspace: workspacePath,
-          status: 'failed', error: errorMsg,
-          startedAt: new Date().toISOString(), type: 'planning', agentPhase: 'planning', location: workspaceLocation,
+          status: 'error', error: errorMsg,
+          startedAt: new Date().toISOString(), role: 'plan', location: workspaceLocation,
         }, null, 2));
         return { success: false, error: errorMsg };
       }
@@ -429,20 +445,28 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 3: Load specs & PRDs ────────────────────────────────────────
     progress(3, 'Loading specs & PRDs', `Searching for ${issue.identifier} specs`);
 
-    // Determine planning model — explicit override takes precedence over work-type router
-    let settingsModel = 'claude-opus-4-6';
-    let modelSource = 'fallback';
-    try {
-      const { getModel } = await import('../work-type-router.js');
-      const resolution = getModel('planning-agent');
-      settingsModel = resolution.model;
-      modelSource = resolution.source;
-      console.log(`[start-planning] Model resolution for planning-agent: model=${resolution.model} source=${resolution.source} usedFallback=${resolution.usedFallback} originalModel=${resolution.originalModel || '(none)'}`);
-    } catch (err: any) {
-      console.warn(`[start-planning] Work-type router failed for planning-agent, falling back to ${settingsModel}: ${err.message}`);
+    // Determine planning model — explicit override takes precedence over role routing.
+    // PAN-1048 R1: resolveModel must NOT be wrapped in try/catch with a silent
+    // fallback. If the user's roles.plan.model points at a missing workhorse
+    // slot, an unknown model id, or a chained reference we can't dereference,
+    // we want spawn to fail loudly with the precise error so the operator can
+    // fix their config. The previous fallback to claude-opus-4-7 hid those
+    // bugs and silently overrode their explicit configuration.
+    let settingsModel: string;
+    let modelSource: string;
+    if (modelOverride) {
+      settingsModel = 'claude-opus-4-7'; // unused — modelOverride wins
+      modelSource = 'modelOverride';
+    } else {
+      settingsModel = resolveModel('plan', undefined, loadConfig().config);
+      modelSource = 'roles.plan.model';
+      console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
     }
     const planningModel = modelOverride || settingsModel;
-    console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource})`);
+    const requestedHarness = opts.harness ?? 'claude-code';
+    const harnessDecision = canUseHarness(requestedHarness, planningModel, await getProviderAuthMode(planningModel));
+    const effectiveHarness = harnessDecision.allowed ? requestedHarness : 'claude-code';
+    console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
     // Discover and copy PRD files to workspace
     const prdFiles = await discoverPrdFiles(workspacePath, issue.identifier);
@@ -464,7 +488,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 4: Configure agent ─────────────────────────────────────────
     progress(4, 'Configuring agent', planningModel);
 
-    const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort);
+    const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true);
 
     // Capture planning prompt in workspace .pan/continue.json.
     writeWorkspaceContinue(workspacePath, {
@@ -490,11 +514,11 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     await writeFeatureContext(workspacePath, issue);
 
-    // PAN-982: emit 'claude --agent pan-planning-agent --name <sessionName>'.
+    // PAN-1048: emit 'claude --agent roles/plan.md --name <sessionName>'.
     // PAN-636: thread harness through so a planning kickoff with --harness pi
     // produces a `pi --mode rpc --model <id>` line and skips the --agent flag
     // (Pi has no agent-definition system).
-    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, 'planning', opts.harness ?? 'claude-code');
+    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, roleAgentDefinitionPath('plan'), effectiveHarness);
 
     const providerExports = await getProviderExportsForModel(planningModel);
 
@@ -507,11 +531,11 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     await writeFile(
       launcherScript,
       generateLauncherScript({
-        agentType: 'planning',
+        role: 'plan',
         workingDir: workspacePath,
         setCi: true,
         setTerminalEnv: true,
-        panopticonEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'planning' },
+        panopticonEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
         providerExports,
         promptFile,
         baseCommand: cmdWithArgs,
@@ -549,16 +573,15 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // See PAN-417 for the full forensic timeline.
 
     // ── Update agent state to running ──────────────────────────────────────
+    // PAN-1048 R2: legacy `runtime` field removed; AgentState carries `harness`.
     await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
       id: sessionName,
       issueId: issue.identifier,
       workspace: workspacePath,
-      runtime: 'claude',
       model: planningModel,
       status: 'running',
       startedAt: new Date().toISOString(),
-      type: 'planning',
-      agentPhase: 'planning',
+      role: 'plan',
       location: workspaceLocation,
     }, null, 2));
 
@@ -575,11 +598,10 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         id: sessionName,
         issueId: issue.identifier,
         workspace: workspacePath,
-        status: 'failed',
+        status: 'error',
         error: err.message,
         startedAt: new Date().toISOString(),
-        type: 'planning',
-        agentPhase: 'planning',
+        role: 'plan',
         location: workspaceLocation,
       }, null, 2));
     } catch { /* ignore state write errors */ }

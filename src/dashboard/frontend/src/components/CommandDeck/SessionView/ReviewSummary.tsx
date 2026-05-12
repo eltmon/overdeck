@@ -5,7 +5,6 @@ import {
   Lock,
   Gauge,
   ClipboardList,
-  Layers,
 } from 'lucide-react';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
@@ -18,7 +17,6 @@ const ROLE_META: Record<string, { icon: typeof ShieldCheck; label: string; color
   security: { icon: Lock, label: 'Security', color: 'var(--destructive)' },
   performance: { icon: Gauge, label: 'Performance', color: 'var(--warning)' },
   requirements: { icon: ClipboardList, label: 'Requirements', color: 'var(--success)' },
-  synthesis: { icon: Layers, label: 'Synthesis', color: 'var(--muted-foreground)' },
 };
 
 function presenceToStatus(presence: SessionNodeType['presence']): StatusDotStatus {
@@ -72,15 +70,22 @@ interface ReviewSummaryProps {
 export function ReviewSummary({ session, reviewers, roundData }: ReviewSummaryProps) {
   const totalFindings = useMemo(() => {
     let sum = 0;
+    const latestSynthesis = session.roundMetadata?.history[session.roundMetadata.history.length - 1];
+    if (latestSynthesis?.findings) sum += latestSynthesis.findings;
     for (const r of reviewers) {
       const latest = r.roundMetadata?.history[r.roundMetadata.history.length - 1];
       if (latest?.findings) sum += latest.findings;
     }
     return sum;
-  }, [reviewers]);
+  }, [reviewers, session.roundMetadata]);
 
   const totalCost = useMemo(() => {
     let sum = 0;
+    if (session.roundMetadata) {
+      for (const h of session.roundMetadata.history) {
+        if (h.cost) sum += h.cost;
+      }
+    }
     for (const r of reviewers) {
       if (!r.roundMetadata) continue;
       for (const h of r.roundMetadata.history) {
@@ -88,14 +93,13 @@ export function ReviewSummary({ session, reviewers, roundData }: ReviewSummaryPr
       }
     }
     return sum;
-  }, [reviewers]);
+  }, [reviewers, session.roundMetadata]);
 
   const synthSummary = useMemo(() => {
-    const synth = reviewers.find(r => r.role === 'synthesis');
-    if (!synth?.roundMetadata) return null;
-    const latest = synth.roundMetadata.history[synth.roundMetadata.history.length - 1];
+    if (!session.roundMetadata) return null;
+    const latest = session.roundMetadata.history[session.roundMetadata.history.length - 1];
     return latest?.summary ?? null;
-  }, [reviewers]);
+  }, [session.roundMetadata]);
 
   const allDone = reviewers.length > 0 && reviewers.every(r => r.status === 'stopped');
   const anyRunning = reviewers.some(r => r.status === 'running');

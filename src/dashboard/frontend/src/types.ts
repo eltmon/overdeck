@@ -82,6 +82,7 @@ export interface Agent {
   id: string;
   issueId?: string;
   runtime: string;
+  harness?: 'claude-code' | 'pi' | null;
   model: string;
   status: 'healthy' | 'warning' | 'stuck' | 'dead' | 'stopped' | 'starting' | 'running' | 'failed';
   error?: string;
@@ -94,6 +95,17 @@ export interface Agent {
   workspaceLocation?: 'local' | 'remote';
   git?: GitStatus;
   type?: 'agent';
+  /**
+   * PAN-1048 role primitive. Replaces the legacy agentPhase string.
+   * 'plan' | 'work' | 'review' | 'test' | 'ship'.
+   */
+  role?: 'plan' | 'work' | 'review' | 'test' | 'ship';
+  /**
+   * @deprecated PAN-1048 — server stopped emitting this; kept on the type
+   * temporarily so older test fixtures still compile while their references
+   * are removed. New code MUST consume `role` plus `lifecycle.hasLiveTmuxSession`
+   * instead of branching on this field.
+   */
   agentPhase?: 'planning' | 'implementation' | 'exploration' | string;
   hasPendingQuestion?: boolean;
   pendingQuestionCount?: number;

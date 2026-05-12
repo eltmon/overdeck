@@ -73,10 +73,7 @@ vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   getTmuxSessionName: vi.fn().mockReturnValue('mock-session'),
   isRunning: vi.fn().mockResolvedValue(false),
   initializeSpecialist: vi.fn(),
-  wakeSpecialist: vi.fn(),
-  clearSessionId: vi.fn(),
   spawnEphemeralSpecialist: vi.fn(),
-  wakeSpecialistWithTask: vi.fn(),
   getAllProjectSpecialistStatuses: vi.fn().mockResolvedValue([]),
 }));
 

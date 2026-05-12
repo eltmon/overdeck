@@ -86,6 +86,28 @@ export async function checkCodexAuthStatus(): Promise<CodexAuthStatus> {
   return await applyBurnedTokenOverride(jwtStatus, email, expiresAt);
 }
 
+/**
+ * Override status to 'burned' only when there is recent, unambiguous
+ * evidence that the OAuth refresh path is dead.
+ *
+ * Signals (all from the cliproxy log):
+ *   1. The last burn line in the tail window.
+ *   2. The last 200 on /v1/messages or /v1/chat/completions — this proves
+ *      cliproxy auto-retried with a fresh token and the auth path works.
+ *
+ * Decision:
+ *   - No burn line in window           → trust base status.
+ *   - Burn + later success             → trust base status (auto-retry won).
+ *   - Burn + no later success + stale  → trust base status (no recent traffic;
+ *                                        the burn line is from a quiet period
+ *                                        where nothing tried, so we have no
+ *                                        evidence the path is broken right now).
+ *   - Burn + no later success + recent → flag as burned.
+ *
+ * We intentionally don't probe cliproxy with HTTP — `GET /v1/models` always
+ * 401s (it needs real OAuth, not the local key) and would generate
+ * spurious log lines on every dashboard load.
+ */
 async function applyBurnedTokenOverride(
   baseStatus: CodexAuthStatus,
   email: string,
@@ -100,23 +122,44 @@ async function applyBurnedTokenOverride(
     return baseStatus;
   }
 
-  const lines = logRaw.split('\n').slice(-50);
-  const burned = lines.some((line) => line.includes('refresh token has already been used'));
-  if (!burned) {
-    return baseStatus;
+  // Scan a wider window than the original 50 lines so a quiet recovery
+  // period can still suppress an older burn line.
+  const lines = logRaw.split('\n').slice(-500);
+  let lastBurnIdx = -1;
+  let lastSuccessIdx = -1;
+  let lastBurnTimestamp: number | null = null;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i] ?? '';
+    if (lastBurnIdx < 0 && line.includes('refresh token has already been used')) {
+      lastBurnIdx = i;
+      // Look backwards a few lines for the gin_logger or openai_auth.go line
+      // with the surrounding bracketed timestamp.
+      for (let j = i; j >= Math.max(0, i - 10) && lastBurnTimestamp === null; j--) {
+        const m = lines[j]?.match(/^\[(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\]/);
+        if (m) {
+          const t = Date.parse(`${m[1]}T${m[2]}Z`);
+          if (Number.isFinite(t)) lastBurnTimestamp = t;
+        }
+      }
+    }
+    if (lastSuccessIdx < 0 && /\b200 \|/.test(line) && /POST\s+"\/v1\/(messages|chat\/completions)/.test(line)) {
+      lastSuccessIdx = i;
+    }
+    if (lastBurnIdx >= 0 && lastSuccessIdx >= 0) break;
   }
 
-  const { stat } = await import('fs/promises');
-  let mtime: Date;
-  try {
-    const s = await stat(logPath);
-    mtime = s.mtime;
-  } catch {
-    return baseStatus;
-  }
+  // No burn evidence at all → trust the JWT-based status.
+  if (lastBurnIdx < 0) return baseStatus;
 
-  const oneHourAgo = Date.now() - 60 * 60 * 1000;
-  if (mtime.getTime() < oneHourAgo) {
+  // A successful LLM call came AFTER the burn line → auto-retry worked.
+  if (lastSuccessIdx > lastBurnIdx) return baseStatus;
+
+  // Burn is the most recent signal. But if it's older than 5 minutes with
+  // no traffic since, treat it as stale (the user hasn't actually tried
+  // anything yet; banner would be a false alarm). The JWT exp check has
+  // already covered actually-expired tokens.
+  const BURN_STALENESS_MS = 5 * 60 * 1000;
+  if (lastBurnTimestamp !== null && Date.now() - lastBurnTimestamp > BURN_STALENESS_MS) {
     return baseStatus;
   }
 

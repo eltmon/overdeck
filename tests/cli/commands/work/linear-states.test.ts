@@ -7,6 +7,24 @@ import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
+vi.mock('@linear/sdk', () => ({
+  LinearClient: vi.fn().mockImplementation(() => ({
+    teams: vi.fn().mockResolvedValue({
+      nodes: [
+        {
+          states: vi.fn().mockResolvedValue({
+            nodes: [
+              { id: 'state-todo', name: 'Todo', type: 'unstarted', position: 0 },
+              { id: 'state-review', name: 'CustomState', type: 'custom', position: 1 },
+            ],
+          }),
+        },
+      ],
+    }),
+    issues: vi.fn().mockResolvedValue({ nodes: [] }),
+  })),
+}));
+
 describe('linear-states', () => {
   let tempDir: string;
   let originalHome: string | undefined;

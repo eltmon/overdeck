@@ -30,6 +30,11 @@ import { extractNumber, extractPrefix } from '../issue-id.js';
 
 const execAsync = promisify(exec);
 
+function trackerName(ctx: LifecycleContext, fallback: string): string {
+  const name = ctx.tracker?.name ?? fallback;
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 /**
  * Build a WorkflowResult from collected steps.
  */
@@ -215,6 +220,7 @@ async function destructiveResetWorkflow(
   const start = Date.now();
   const allSteps: StepResult[] = [];
   const { deleteWorkspace = true, deleteBranches = true, resetIssue = true, onProgress } = opts;
+  const resetContext = opts.tracker ? { ...ctx, tracker: opts.tracker } : ctx;
 
   const TOTAL_STEPS = 3 + (resetIssue ? 1 : 0);
   let stepNum = 0;
@@ -259,7 +265,7 @@ async function destructiveResetWorkflow(
   if (resetIssue) {
     stepNum = 3;
     progress(progressLabel, `${ctx.issueId}`);
-    const resetResult = await resetStep(ctx);
+    const resetResult = await resetStep(resetContext);
     allSteps.push(resetResult);
     progress(progressLabel, resetResult.success ? progressSuccessDetail : (resetResult.error || 'Failed'), resetResult.success ? 'complete' : 'error');
   }
@@ -508,7 +514,7 @@ async function resetIssueToTodo(ctx: LifecycleContext): Promise<StepResult> {
           }
         }
       }
-      return stepOk(step, [`Reset Linear issue ${ctx.issueId} to Todo`]);
+      return stepOk(step, [`Reset ${trackerName(ctx, 'linear')} issue ${ctx.issueId} to Todo`]);
     }
 
     return stepSkipped(step, ['No tracker available to reset issue']);
@@ -590,7 +596,7 @@ async function resetIssueToCanceled(ctx: LifecycleContext): Promise<StepResult> 
           }
         }
       }
-      return stepOk(step, [`Reset Linear issue ${ctx.issueId} to Canceled`]);
+      return stepOk(step, [`Reset ${trackerName(ctx, 'linear')} issue ${ctx.issueId} to Canceled`]);
     }
 
     return stepSkipped(step, ['No tracker available to cancel issue']);

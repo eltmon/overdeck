@@ -34,8 +34,8 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
       {
         id: 'agent-pi-1',
         issueId: 'PAN-636',
-        runtime: 'pi',
         harness: 'pi',
+        role: 'work',
         model: 'claude-sonnet-4-6',
         workspace: '/tmp/ws',
         startedAt: new Date().toISOString(),
@@ -54,8 +54,8 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
       {
         id: 'agent-legacy-1',
         issueId: 'PAN-100',
-        runtime: 'claude-code',
         // harness intentionally absent — emulates a legacy state.json from before PAN-636.
+        role: 'work',
         model: 'claude-sonnet-4-6',
         workspace: '/tmp/ws',
         startedAt: new Date().toISOString(),
@@ -74,8 +74,8 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
       {
         id: 'agent-pi-2',
         issueId: 'PAN-636',
-        runtime: 'pi',
         harness: 'pi',
+        role: 'work',
         model: 'claude-sonnet-4-6',
         workspace: '/tmp/ws',
         startedAt: new Date().toISOString(),

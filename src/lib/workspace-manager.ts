@@ -233,13 +233,13 @@ export function copyPanopticonSettingsToWorkspace(workspacePath: string): { copi
 }
 
 /**
- * Ensure .pan/events/, .pan/review/, and .pan/prompts/ are excluded from git tracking
+ * Ensure runtime-only Panopticon and Claude Code sync paths are excluded from git tracking
  * in the given project root's .gitignore. .pan/skills/ is intentionally NOT excluded
  * since project-specific skills should be committed.
  */
 export function ensurePanGitignore(projectPath: string): void {
   const gitignorePath = join(projectPath, '.gitignore');
-  const requiredEntries = ['.pan/events/', '.pan/review/', '.pan/prompts/'];
+  const requiredEntries = ['.pan/events/', '.pan/review/', '.pan/prompts/', '.claude/skills/'];
 
   let content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : '';
   const lines = content.split('\n');
@@ -701,10 +701,10 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     result.steps.push('Cleared stale workspace-local .pan runtime state');
   }
 
-  // Ensure .pan/events/, .pan/review/, .pan/prompts/ are in the project's .gitignore
+  // Ensure runtime-only Panopticon and Claude Code sync paths are in the project's .gitignore
   try {
     ensurePanGitignore(projectConfig.path);
-    result.steps.push('Verified .pan/ runtime paths are in .gitignore');
+    result.steps.push('Verified runtime-only Panopticon and Claude Code sync paths are in .gitignore');
   } catch (gitignoreErr: any) {
     // Non-fatal — log but don't block workspace creation
     result.steps.push(`Warning: could not update .gitignore: ${gitignoreErr.message}`);

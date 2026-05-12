@@ -53,10 +53,10 @@ When you run `pan up`, the following services start:
 pan up
 
 # Start in foreground (see logs)
-pan up --foreground
+pan up
 
 # Start without Traefik
-pan up --no-traefik
+pan up --skip-traefik
 
 # Start on custom ports
 DASHBOARD_PORT=4001 API_PORT=4002 pan up
@@ -154,7 +154,7 @@ cat ~/.panopticon/logs/api.log
 cat ~/.panopticon/logs/traefik.log
 
 # Or run in foreground to see real-time logs
-pan up --foreground
+pan up
 ```
 
 ## Configuration Options
@@ -315,7 +315,7 @@ pan up
 **Solutions:**
 ```bash
 # Run in foreground to see errors
-pan up --foreground
+pan up
 
 # Check logs
 cat ~/.panopticon/logs/dashboard.log
@@ -349,15 +349,13 @@ lsof -i :3002
 ### Background vs Foreground
 
 ```bash
-# Background (default) - services run as daemons
+# Foreground (default) - see logs in real time
 pan up
 
-# Foreground - see logs in real-time
-pan up --foreground
+# Detached background mode
+pan up --detach
 
-# Detach from foreground: Ctrl+C stops services
-# To run truly in background, use:
-nohup pan up &
+# Ctrl+C stops foreground services
 ```
 
 ## Auto-Start on Boot
@@ -374,7 +372,7 @@ After=network.target docker.service
 [Service]
 Type=simple
 User=youruser
-ExecStart=/usr/local/bin/pan up --foreground
+ExecStart=/usr/local/bin/pan up
 ExecStop=/usr/local/bin/pan down
 Restart=on-failure
 

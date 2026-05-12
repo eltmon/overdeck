@@ -57,7 +57,6 @@ const REVIEWER_ROLES: readonly string[] = [
   'security',
   'performance',
   'requirements',
-  'synthesis',
 ];
 
 function ReviewerRoleLabel({ role }: { role: string }) {
@@ -995,7 +994,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             data-testid="overview-reviewer-grid"
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+              gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
               gap: 8,
             }}
           >
@@ -1260,13 +1259,14 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       {showSwitchModel && agent && (
         <SwitchModelModal
           currentModel={agent.model}
+          currentHarness={agent.harness ?? (agent.runtime === 'pi' ? 'pi' : 'claude-code')}
           agentId={agent.id}
           issueId={issueId}
           agentStatus={agent.status}
           hasResumableSession={agent.hasSession ?? false}
           onClose={() => setShowSwitchModel(false)}
-          onSwitch={(model, message) => {
-            switchMutation.mutate({ model, message }, {
+          onSwitch={(model, message, harness) => {
+            switchMutation.mutate({ model, message, harness }, {
               onSuccess: () => setShowSwitchModel(false),
             });
           }}

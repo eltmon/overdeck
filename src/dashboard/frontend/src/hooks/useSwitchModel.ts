@@ -10,15 +10,15 @@ interface SwitchModelResult {
 export function useSwitchModel(agentId: string | undefined, issueId: string) {
   const queryClient = useQueryClient();
 
-  const switchMutation = useMutation<SwitchModelResult, Error, { model: string; message?: string }>({
-    mutationFn: async ({ model, message }) => {
+  const switchMutation = useMutation<SwitchModelResult, Error, { model: string; message?: string; harness?: 'claude-code' | 'pi' }>({
+    mutationFn: async ({ model, message, harness }) => {
       if (!agentId) throw new Error('No agent to switch');
 
       // Step 1: Prepare — stop agent, clear session, update model in state.json
       const prepRes = await fetch(`/api/agents/${agentId}/switch-model`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model }),
+        body: JSON.stringify({ model, harness }),
       });
       if (!prepRes.ok) {
         const data = await prepRes.json().catch(() => ({})) as { error?: string };
@@ -30,7 +30,7 @@ export function useSwitchModel(agentId: string | undefined, issueId: string) {
       const startRes = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId, model, message: message || undefined }),
+        body: JSON.stringify({ issueId, model, harness, message: message || undefined }),
       });
       if (!startRes.ok) {
         const data = await startRes.json().catch(() => ({})) as { error?: string };

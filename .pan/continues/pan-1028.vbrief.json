@@ -1,0 +1,29 @@
+{
+  "version": "1",
+  "issueId": "PAN-1028",
+  "created": "2026-05-08T03:34:01.932Z",
+  "updated": "2026-05-10T04:53:51.709Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-08T03:34Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-08T03:34:01.932Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-08T03:34:01.976Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.4",
+      "timestamp": "2026-05-08T11:49:04.303Z"
+    }
+  ]
+}

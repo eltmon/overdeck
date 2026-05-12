@@ -10,6 +10,7 @@ const { mockExecAsync } = vi.hoisted(() => ({
 
 vi.mock('child_process', () => ({
   exec: vi.fn(),
+  execFile: vi.fn(),
 }));
 vi.mock('util', async (importOriginal) => {
   const actual = await importOriginal<typeof import('util')>();
@@ -44,7 +45,13 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   clearReviewStatus: vi.fn(),
 }));
 
-import { approve, closeOut, deepWipe, close, __testInternals } from '../../../../src/lib/lifecycle/workflows.js';
+vi.mock('@linear/sdk', () => ({
+  LinearClient: vi.fn().mockImplementation(() => ({
+    issues: vi.fn().mockResolvedValue({ nodes: [] }),
+  })),
+}));
+
+import { approve, closeOut, deepWipe, close, resetToTodo, __testInternals } from '../../../../src/lib/lifecycle/workflows.js';
 import { AGENTS_DIR, PANOPTICON_HOME } from '../../../../src/lib/paths.js';
 
 describe('workflows', () => {
@@ -57,6 +64,8 @@ describe('workflows', () => {
     mkdirSync(PANOPTICON_HOME, { recursive: true });
 
     vi.clearAllMocks();
+    process.env.HOME = testDir;
+    delete process.env.LINEAR_API_KEY;
     mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
   });
 
@@ -204,6 +213,24 @@ describe('workflows', () => {
 
       const resetStep = result.steps.find(s => s.step === 'reset:reset-issue');
       expect(resetStep).toBeUndefined();
+    });
+
+    it('should use tracker name in reset issue details when provided', async () => {
+      process.env.LINEAR_API_KEY = 'test-key';
+      const { LinearClient } = await import('@linear/sdk');
+      vi.mocked(LinearClient).mockImplementation(() => ({
+        issues: vi.fn().mockResolvedValue({ nodes: [] }),
+      }) as any);
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await resetToTodo(ctx, {
+        deleteWorkspace: false,
+        deleteBranches: false,
+        tracker: { name: 'rally' } as any,
+      });
+
+      expect(result.steps.map(s => s.step)).toContain('reset:reset-issue');
+      const resetStep = result.steps.find(s => s.step === 'reset:reset-issue');
+      expect(resetStep?.details).toContain('Reset Rally issue PAN-100 to Todo');
     });
 
     it('should pass workspaceConfig through to teardown', async () => {

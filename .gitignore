@@ -50,6 +50,15 @@ src/dashboard/restart.sh
 # Workspace-specific generated files
 CLAUDE.md
 
+# Workspace-only vBRIEF + continue state (per the five-artifact model in CLAUDE.md).
+# These files are mutated by the work agent and must never reach main — otherwise
+# every new worktree inherits the last-committed workspace's spec and pan start
+# refuses with "Workspace planning artifacts are for PAN-XXXX". See PAN-1073.
+# The canonical lifecycle artifacts (.pan/specs/, .pan/continues/, .pan/drafts/)
+# remain tracked — only the workspace working copies are excluded.
+.pan/spec.vbrief.json
+.pan/continue.json
+
 # Planning artifacts — tracked on feature branches, excluded from merges to main.
 # postMergeLifecycle removes them from main programmatically (PAN-337).
 # DO NOT gitignore .planning/ — agents and dashboard need these files throughout
@@ -67,8 +76,9 @@ docker-compose.devcontainer.yml
 
 # Pan sync manifest (tracks what pan sync installed — workspace-specific)
 .claude/.panopticon-manifest.json
-# Workspace-specific agent definitions (triage-agent etc. are local tooling)
+# Workspace-specific Claude Code sync targets (local tooling, not source of truth)
 .claude/agents/
+.claude/skills/
 # Review prompt templates — source of truth is src/lib/cloister/prompts/review/,
 # synced to ~/.panopticon/review-prompts/ by pan sync. Must not appear in worktrees
 # where work agents could read them and attempt self-review.
@@ -97,10 +107,10 @@ temp/
 .playwright-mcp/
 .playwright-mcp/
 
-# Graphify output — track reports/viz, exclude large raw data and machine-specific state
-graphify-out/graph.json
-graphify-out/cache/
-graphify-out/.graphify_*
+# Graphify output — derived from source on every run. Tracking causes thousands
+# of lines of diff churn on every PR (5500+ lines in PAN-1059's #1089). The
+# graph is regenerable via `graphify update .` so there's no value in commits.
+graphify-out/
 
 # Panopticon runtime artifacts (ephemeral, not tracked)
 .pan/events/
@@ -110,6 +120,7 @@ graphify-out/.graphify_*
 .pan/feedback/
 .pan/followup-issues.txt
 .pan/spec.vbrief.json
+.pan/agent-mcp.json
 .panopticon/
 
 # Beads / Dolt files (added by bd init)
@@ -134,4 +145,3 @@ multica/
 .tldr/
 .claude/mcp.json
 graphify-out/cost.json
-vbrief/active/*.vbrief.json

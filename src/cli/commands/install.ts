@@ -22,6 +22,7 @@ import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
 import { generatePanopticonTraefikConfig, cleanupTemplateFiles, ensureProjectCerts, generateTlsConfig } from '../../lib/traefik.js';
 import { refreshCache } from '../../lib/sync.js';
+import { setupHooksCommand } from './setup/hooks.js';
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -238,6 +239,8 @@ async function installCommand(options: InstallOptions): Promise<void> {
   } catch (error) {
     spinner.warn(`Failed to refresh cache: ${error}`);
   }
+
+  await setupHooksCommand();
 
   // Step 3: Docker network
   if (!options.skipDocker) {

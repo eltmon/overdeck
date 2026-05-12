@@ -40,17 +40,18 @@ bd close <beadId> --reason="Implemented X"
 
 # Branch on the bead's flag:
 #   requiresInspection: false → continue straight to the next bead (default for most beads)
-#   requiresInspection: true  → run pan inspect and wait
+#   requiresInspection: true  → re-read inspectionDepth and run pan inspect
 
 # When required:
-pan inspect <issueId> --bead <beadId>
+pan inspect <issueId> --bead <beadId>          # inspectionDepth: fast or omitted
+pan inspect <issueId> --bead <beadId> --deep   # inspectionDepth: deep
 
 # Wait for result — delivered via pan tell
 # INSPECTION PASSED → proceed to next bead
 # INSPECTION BLOCKED → fix issues, then re-request
 ```
 
-`pan inspect` is an explicit command the agent runs only for flagged beads. There is no auto-trigger from `bd close`.
+`pan inspect` is an explicit command the agent runs only for flagged beads. There is no auto-trigger from `bd close`. The work agent re-reads bead metadata after closing so late plan updates can switch between the fast inspector and `--deep`.
 
 ### What Inspect Checks
 
@@ -72,7 +73,8 @@ Checkpoints stored at: `~/.panopticon/specialists/<project>/inspect-agent/checkp
 ### CLI Reference
 
 ```bash
-pan inspect <issueId> --bead <beadId>           # Request inspection
+pan inspect <issueId> --bead <beadId>           # Fast inspection
+pan inspect <issueId> --bead <beadId> --deep    # Deep inspection
 pan inspect <issueId> --bead <beadId> --workspace /path  # With explicit workspace
 pan specialists done inspect <issueId> --status passed   # Signal completion (specialist only)
 ```

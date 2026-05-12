@@ -12,6 +12,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { parse } from 'yaml';
 import { getIsolatedPlaywrightMcpConfig } from '../claude-mcp.js';
+import { buildClaudeUserSettings } from '../claude-permissions.js';
 import { FlyApiClient, createFlyApiClient, FlyApiError } from './fly-api.js';
 import type { RemoteProvider, VmInfo, VmStatus, ExecResult } from './interface.js';
 
@@ -410,11 +411,11 @@ with open(path, "w") as f:
     const scriptB64 = Buffer.from(onboardingScript).toString('base64');
     await this.ssh(vmName, `echo '${scriptB64}' | base64 -d | python3`);
 
-    // Write settings.json with bypass permissions
-    const settings = JSON.stringify({
-      theme: 'dark',
-      permissions: { defaultMode: 'bypassPermissions' },
-    });
+    // Write ~/.claude/settings.json honoring the user's Panopticon permission mode.
+    // The defaultMode here is the fallback applied to any `claude` invocation on the
+    // VM that doesn't pass --permission-mode; hardcoding bypass would silently
+    // escalate any unflagged invocation even when the user has chosen Auto.
+    const settings = JSON.stringify(buildClaudeUserSettings());
     const settingsB64 = Buffer.from(settings).toString('base64');
     await this.ssh(vmName, `echo '${settingsB64}' | base64 -d > ~/.claude/settings.json`);
 

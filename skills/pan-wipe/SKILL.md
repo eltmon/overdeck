@@ -1,6 +1,6 @@
 ---
 name: pan-wipe
-description: "pan wipe <id> — destructive reset to Todo: remove workspace, branches, and agent state"
+description: "pan wipe <id> — destructive reset to Todo: remove workspace, processes, branches, review state, beads, and tracker status"
 triggers:
   - pan wipe
   - wipe issue
@@ -16,15 +16,18 @@ allowed-tools:
 
 ```bash
 pan wipe <issue-id>
+pan wipe <issue-id> --yes   # skip confirmation
+pan wipe <issue-id> --force # skip confirmation
 ```
 
 ## What It Does
 
 Performs the canonical destructive reset-to-Todo for an issue:
-- Kills all tmux sessions for the issue
+- Kills all tmux sessions and running processes for the issue
 - Removes the workspace directory (`workspaces/feature-<id>/`)
 - Removes agent state (`~/.panopticon/agents/<id>/`)
 - Deletes local and remote feature branches
+- Clears review status and issue beads
 - Resets issue status in the tracker to Todo
 
 ## When to Use

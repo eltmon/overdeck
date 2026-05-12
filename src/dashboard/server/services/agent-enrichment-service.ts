@@ -18,7 +18,7 @@ import { getReviewStatus } from '../../../lib/review-status.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getEventStore } from '../event-store.js'
 import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent } from '@panctl/contracts'
-import { toAgentStatus, toAgentPhase, toAgentResolution } from '../read-model.js'
+import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ interface EnrichmentServiceState {
 function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichment): boolean {
   if (!prev) return true
   return (
-    prev.agentPhase !== next.agentPhase ||
+    prev.role !== next.role ||
     prev.hasPendingQuestion !== next.hasPendingQuestion ||
     prev.pendingQuestionCount !== next.pendingQuestionCount ||
     prev.pendingQuestionPrompt !== next.pendingQuestionPrompt ||
@@ -83,7 +83,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 id: agentId,
                 issueId: issueId ?? agentId,
                 workspace: agent.workspace || undefined,
-                runtime: agent.runtime || undefined,
+                runtime: undefined,
                 model: agent.model || undefined,
                 status: toAgentStatus(agent.tmuxActive && agent.status === 'stopped' ? 'running' : agent.status),
                 startedAt: agent.startedAt || undefined,
@@ -91,8 +91,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 branch: agent.branch || undefined,
                 costSoFar: agent.costSoFar,
                 sessionId: agent.sessionId || undefined,
-                phase: toAgentPhase(agent.phase),
-                agentPhase: undefined,
+                role: toRole(agent.role) ?? 'work',
                 hasPendingQuestion: undefined,
                 pendingQuestionCount: undefined,
                 pendingQuestionPrompt: undefined,
@@ -147,7 +146,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
       let enrichment: AgentEnrichment
       try {
-        // If JSONL hasn't changed, only re-check runtime state (resolution/phase)
+        // If JSONL hasn't changed, only re-check runtime state (resolution)
         // by passing a flag that skips the expensive JSONL scan.
         enrichment = await computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, jsonlUnchanged)
       } catch {
@@ -166,7 +165,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         timestamp: new Date().toISOString(),
         payload: {
           agentId,
-          agentPhase: enrichment.agentPhase,
+          role: toRole(agent.role) ?? 'work',
           hasPendingQuestion: enrichment.hasPendingQuestion,
           pendingQuestionCount: enrichment.pendingQuestionCount,
           pendingQuestionPrompt: enrichment.pendingQuestionPrompt,

@@ -14,7 +14,7 @@ import { basename, join, resolve } from 'path';
 import { readWorkspacePlan, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
 import type { AcceptanceCriterion } from './acceptance-criteria.js';
-import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
+import type { VBriefDocument, VBriefInspectionPolicy, VBriefItem, VBriefItemStatus } from './types.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -38,6 +38,18 @@ export interface CreateBeadsResult {
   errors: string[];
   /** Map from vBRIEF item ID → created bead ID */
   beadIds: Map<string, string>;
+}
+
+function resolveInspectionMetadata(policy: VBriefInspectionPolicy, item: VBriefItem): { requiresInspection: boolean; inspectionDepth: 'fast' | 'deep' } {
+  if (policy === 'never') return { requiresInspection: false, inspectionDepth: 'fast' };
+  if (policy === 'fast') return { requiresInspection: true, inspectionDepth: 'fast' };
+  if (policy === 'deep') return { requiresInspection: true, inspectionDepth: 'deep' };
+
+  const requiresInspection = typeof item.metadata?.requiresInspection === 'boolean'
+    ? item.metadata.requiresInspection
+    : false;
+  const inspectionDepth = item.metadata?.inspectionDepth === 'deep' ? 'deep' : 'fast';
+  return { requiresInspection, inspectionDepth };
 }
 
 /**
@@ -97,6 +109,8 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
   }
 
   const { plan } = doc;
+  const planEdges = plan.edges ?? [];
+  const inspectionPolicy = doc.vBRIEFInfo.inspectionPolicy ?? 'auto';
 
   // Verify db connectivity — the Dolt database for this project may not exist yet
   // on fresh installs (bd was installed but bd init was never run at the project root).
@@ -180,7 +194,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
   for (const item of plan.items) {
     blockers.set(item.id, new Set());
   }
-  for (const edge of plan.edges) {
+  for (const edge of planEdges) {
     if (edge.type === 'blocks') {
       const blockersOfTo = blockers.get(edge.to);
       if (blockersOfTo) {
@@ -196,7 +210,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     inDegree.set(item.id, 0);
     adjacency.set(item.id, []);
   }
-  for (const edge of plan.edges) {
+  for (const edge of planEdges) {
     if (edge.type === 'blocks') {
       inDegree.set(edge.to, (inDegree.get(edge.to) ?? 0) + 1);
       adjacency.get(edge.from)?.push(edge.to);
@@ -247,6 +261,10 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
     const difficulty = item.metadata?.difficulty ?? 'medium';
     const issueLabel = item.metadata?.issueLabel ?? plan.id.toLowerCase();
     const phase = item.metadata?.phase;
+    const beadMetadata = {
+      ...(item.metadata ?? {}),
+      ...resolveInspectionMetadata(inspectionPolicy, item),
+    };
 
     const labels = [issueLabel, `difficulty:${difficulty}`];
     if (phase !== undefined) labels.push(`phase-${phase}`);
@@ -264,7 +282,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
       return beadId ? `blocks:${beadId}` : null;
     }).filter((d): d is string => d !== null);
 
-    const args = ['create', fullTitle, '--type', 'task', '--silent', '-l', labelStr];
+    const args = ['create', fullTitle, '--type', 'task', '--silent', '-l', labelStr, '--metadata', JSON.stringify(beadMetadata)];
     if (description) args.push('-d', description);
     if (blockingDeps.length > 0) args.push('--deps', blockingDeps.join(','));
 

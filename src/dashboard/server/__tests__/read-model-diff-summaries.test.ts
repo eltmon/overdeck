@@ -252,6 +252,7 @@ describe('ReadModel checkpoint reconciliation', () => {
       const turnNumber = Number.parseInt(turnId.replace('turn-', ''), 10)
       return new Date(Date.parse('2026-05-08T05:00:00.000Z') + turnNumber * 1000).toISOString()
     })
+    const deleteLegacyCheckpointRefs = vi.fn().mockResolvedValue(0)
 
     const summaries = await withIsolatedReadModel(
       async (readModel) => {
@@ -268,7 +269,7 @@ describe('ReadModel checkpoint reconciliation', () => {
             listCheckpoints,
             diffCheckpointFiles,
             getCheckpointTimestamp,
-            deleteLegacyCheckpointRefs: vi.fn().mockResolvedValue(0),
+            deleteLegacyCheckpointRefs,
           }))
           vi.doMock('../../../lib/agent-enrichment.js', () => ({
             computeAgentEnrichment: vi.fn().mockResolvedValue(undefined),
@@ -288,10 +289,12 @@ describe('ReadModel checkpoint reconciliation', () => {
                 branch: 'feature/pan-1024',
                 costSoFar: 0,
                 sessionId: 'session-1',
-                phase: 'implementation',
+                harness: 'claude-code',
+                role: 'work',
               },
             ]),
-            warnOnBareNumericIssueIds: vi.fn(),
+            // PAN-1048 P2: now async.
+            warnOnBareNumericIssueIds: vi.fn(async () => {}),
           }))
         },
       },

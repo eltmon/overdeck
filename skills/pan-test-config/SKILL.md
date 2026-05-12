@@ -1,3 +1,8 @@
+---
+name: pan-test-config
+description: Configure test suites for Panopticon projects in projects.yaml.
+---
+
 # Pan Test Config
 
 Configure test suites for your project in Panopticon.

@@ -5,7 +5,8 @@ vi.mock('fs', () => ({
   readFileSync: vi.fn(() => JSON.stringify({
     issueId: 'PAN-871',
     workspace: '/tmp/workspace',
-    runtime: 'claude',
+    harness: 'claude-code',
+    role: 'work',
     model: 'claude-sonnet-4-6',
     status: 'running',
     startedAt: '2026-04-27T00:00:00.000Z',
@@ -53,9 +54,8 @@ vi.mock('../cv.js', () => ({
 }));
 
 vi.mock('../cloister/config.js', () => ({ loadCloisterConfig: vi.fn(() => ({})) }));
-vi.mock('../work-type-router.js', () => ({ getModelId: vi.fn(), WorkTypeId: {} }));
 vi.mock('../providers.js', () => ({ getProviderForModel: vi.fn(() => ({ name: 'anthropic', compatibility: 'direct' })), getProviderEnv: vi.fn(() => ({})), setupCredentialFileAuth: vi.fn(), clearCredentialFileAuth: vi.fn() }));
-vi.mock('../config-yaml.js', () => ({ loadConfig: vi.fn(() => ({ config: {} })), NormalizedCavemanConfig: {} }));
+vi.mock('../config-yaml.js', () => ({ loadConfig: vi.fn(() => ({ config: {} })), isClaudeCodeChannelsEnabled: vi.fn(() => false), resolveModel: vi.fn(), NormalizedCavemanConfig: {} }));
 vi.mock('../caveman/workspace.js', () => ({ readCavemanVariant: vi.fn() }));
 vi.mock('../config.js', () => ({ loadConfig: vi.fn(() => ({})) }));
 vi.mock('../openai-auth.js', () => ({ getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: false })) }));

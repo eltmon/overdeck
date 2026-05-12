@@ -1,0 +1,282 @@
+{
+  "version": "1",
+  "issueId": "PAN-1055",
+  "created": "2026-05-09T23:36:29.392Z",
+  "updated": "2026-05-10T15:31:41.191Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "approved",
+      "timestamp": "2026-05-10T15:31:41Z",
+      "markdownBody": "# Verdict: APPROVED\n\n## Summary\nThe PR implements the requested dashboard harness picker and persistence across model-selection flows, and all four reviewers report no blocking issues. Requirements coverage is complete across the shared picker, ToS policy enforcement, settings persistence, launch-path propagation, awaiting-input indicators, and tests; correctness, security, and performance all approve the current state, including fixes for prior Pi FIFO, message-cache, and synchronous-write blockers. No changes are required before merge.\n\n## Blockers (MUST fix before merge)\n\n_none_\n\n## High Priority (SHOULD fix; synthesis may still approve if justified)\n\n_none_\n\n## Nits (advisory — safe to defer)\n\n_none_\n\n## Cross-cutting groups\n\n_none_\n\n## What's good\n- Requirements coverage is complete: all 12 identified acceptance criteria are implemented, including shared harness/model picker usage, canonical ToS policy wiring, settings persistence, launch-path propagation, awaiting-input indicators, and launcher harness test coverage.\n- Correctness reports no blocking issues and confirms harness selection is consistently threaded through UI, settings, work/planning spawn commands, conversation/fork paths, model-switch, and resume flows.\n- Performance reports the prior route-reachable synchronous launcher write fixed with async `writeFile`, and the earlier conversation-message cache blocker remains fixed.\n- Security found no blocking vulnerabilities in harness validation, model validation, FIFO JSONL serialization, shell quoting, subprocess spawning, or SQLite persistence.\n\n## Review stats\n- Blockers: 0   High: 0   Medium: 0   Nits: 0\n- By reviewer: correctness=0, security=0, performance=0, requirements=0\n- Files touched: 57   Files with findings: 0\n\n## Appendix: individual reviews\n\nSee individual reviewer output files listed in `## Reviewer Output Files` in the Synthesis Context above. Those files contain full per-reviewer detail; this synthesis is the policy layer.\n\n## ✅ CODE APPROVED — YOUR WORK IS COMPLETE\n\n**Do NOT make any more changes.**\n**Do NOT run `pan done` again.**\n**Do NOT run `pan review request`.**\n\nThe specialist pipeline will now run tests. If tests pass, the issue enters the merge queue for human approval.\n"
+    }
+  ],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:36Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-09T23:36:29.394Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-09T23:36:29.462Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:37Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-09T23:37:13.229Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-09T23:48Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-09T23:48:00.824Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-09T23:48:00.854Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T00:52Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T00:52:17.238Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T00:52:17.271Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T01:25Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-10T01:25:59.115Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T01:25:59.180Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T01:28Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-10T01:28:45.266Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T01:28:45.325Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T01:36Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T01:36:29.994Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T01:36:30.021Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T05:32:51.980Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T05:56Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-10T05:56:35.130Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T06:26Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T06:26:57.237Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T07:19Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-10T07:19:18.927Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T07:19:18.954Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T07:33Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-10T07:33:49.815Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T07:33:49.882Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T08:25Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T08:25:22.954Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T08:25:22.981Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T09:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T09:51:58.766Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T09:51:58.788Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T10:27Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T10:27:45.569Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T10:27:45.591Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T11:39Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-10T11:39:19.156Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T11:39:19.182Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T11:39Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-10T11:39:25.401Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T11:39:25.423Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T12:19Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T12:19:49.248Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T12:19:49.273Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T12:31Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T12:31:13.498Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T12:31:13.522Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T12:40Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T12:40:48.775Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T12:40:48.794Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T12:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T12:51:43.773Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-10T12:51:43.793Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-10T13:19:37.505Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T13:40Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T13:40:21.681Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-10T13:40:21.698Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T14:18Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T14:18:01.280Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-10T14:18:01.302Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T14:38Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T14:38:57.880Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-10T14:38:57.903Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T14:47Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T14:47:21.791Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-10T14:47:21.815Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T15:24Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-10T15:24:23.998Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-10T15:24:24.019Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T15:29Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-10T15:29:17.767Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-10T15:29:17.805Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-10T15:31Z] review-agent → APPROVED — seq 1",
+      "timestamp": "2026-05-10T15:31:41.191Z"
+    }
+  ]
+}

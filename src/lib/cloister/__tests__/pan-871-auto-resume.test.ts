@@ -48,7 +48,6 @@ vi.mock('../../../lib/activity-logger.js', () => ({
 }));
 
 vi.mock('../specialists.js', () => ({
-  SpecialistType: {},
   getTmuxSessionName: vi.fn(),
   isRunning: vi.fn(async () => false),
   getAllProjectSpecialistStatuses: vi.fn(() => []),
@@ -107,10 +106,10 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       id: 'agent-pan-871',
       issueId: 'PAN-871',
       workspace: '/tmp/workspace',
-      runtime: 'claude',
+      harness: 'claude-code',
+      role: 'work',
       model: 'claude-sonnet-4-6',
       status: 'stopped',
-      phase: 'implementation',
       startedAt: new Date().toISOString(),
     });
     mockGetReviewStatus.mockReturnValue({
@@ -146,10 +145,10 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       id: 'agent-pan-871',
       issueId: 'PAN-871',
       workspace: '/tmp/workspace',
-      runtime: 'claude',
+      harness: 'claude-code',
+      role: 'work',
       model: 'claude-sonnet-4-6',
       status: 'stopped',
-      phase: 'implementation',
       startedAt: new Date().toISOString(),
       stoppedByUser: true,
     });
