@@ -20,6 +20,10 @@ export function upsertReviewStatus(status: ReviewStatus): void {
   const db = getDatabase();
 
   const upsert = db.transaction((s: ReviewStatus) => {
+    // Normalize issueId to uppercase so SQLite's case-sensitive PRIMARY KEY
+    // doesn't create duplicate rows (e.g. pan-457 vs PAN-457).
+    s.issueId = s.issueId.toUpperCase();
+
     // Upsert main record
     db.prepare(`
       INSERT INTO review_status (
@@ -292,7 +296,7 @@ interface DbReviewStatusRow {
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
   return normalizeReviewStatus({
-    issueId: row.issue_id,
+    issueId: row.issue_id.toUpperCase(),
     reviewStatus: row.review_status as ReviewStatus['reviewStatus'],
     testStatus: row.test_status as ReviewStatus['testStatus'],
     mergeStatus: row.merge_status as ReviewStatus['mergeStatus'] ?? undefined,
