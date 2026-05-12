@@ -91,9 +91,15 @@ jobs:
           bun-version: latest
 
       # npm >= 11.5.1 is required for OIDC trusted publishing. Node 22 LTS
-      # currently ships npm 10.x, so upgrade before any publish step runs.
-      - name: Upgrade npm for OIDC trusted publishing
-        run: npm install -g npm@latest
+      # ships npm 10.x. We can't `npm install -g npm@latest` in place — the
+      # in-place upgrade corrupts npm's own dependency tree partway through
+      # ("Cannot find module 'promise-retry'"). Install to a separate prefix
+      # and prepend to PATH instead.
+      - name: Install npm 11 for OIDC trusted publishing
+        run: |
+          npm install --location=global --prefix="$RUNNER_TEMP/npm-bin" npm@11
+          echo "$RUNNER_TEMP/npm-bin/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/npm-bin/bin/npm" --version
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
