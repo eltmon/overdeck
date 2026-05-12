@@ -73,6 +73,18 @@ describe('conversations-db', () => {
     expect(list[1].name).toBe('a');
   });
 
+  it('listConversations excludes agent orchestrator conversations', async () => {
+    const { createConversation, listConversations } = await import('../conversations-db.js');
+    createConversation({ name: 'user-chat', tmuxSession: 'conv-user', cwd: '/cwd' });
+    createConversation({ name: 'agent-pan-123-ship', tmuxSession: 'agent-pan-123-ship', cwd: '/cwd' });
+    createConversation({ name: 'agent-pan-123-review-correctness', tmuxSession: 'agent-pan-123-review-correctness', cwd: '/cwd' });
+    createConversation({ name: 'planning-pan-456', tmuxSession: 'planning-pan-456', cwd: '/cwd' });
+    createConversation({ name: 'specialist-pan-789-review-security', tmuxSession: 'specialist-pan-789-review-security', cwd: '/cwd' });
+    const list = listConversations();
+    expect(list).toHaveLength(1);
+    expect(list[0].name).toBe('user-chat');
+  });
+
   it('getConversationByName returns the matching row', async () => {
     const { createConversation, getConversationByName } = await import('../conversations-db.js');
     createConversation({ name: 'lookup-me', tmuxSession: 'conv-lookup-me', cwd: '/cwd' });
