@@ -408,9 +408,9 @@ async function installCommand(options: InstallOptions): Promise<void> {
       if (match) {
         const [, major, minor, patch] = match.map(Number);
         const currentVersion = major * 10000 + minor * 100 + patch;
-        const recommendedVersion = 1 * 10000 + 0 * 100 + 2; // v1.0.2 required for batch, gate, rules
+        const recommendedVersion = 1 * 10000 + 0 * 100 + 4; // v1.0.4 required for bd ping, auto-repair, perms-fix
         if (currentVersion < recommendedVersion) {
-          spinner.info(`beads v${major}.${minor}.${patch} installed (v1.0.2+ recommended for new features)`);
+          spinner.info(`beads v${major}.${minor}.${patch} installed (v1.0.4+ recommended for new features)`);
         } else {
           spinner.info(`beads v${major}.${minor}.${patch} installed`);
         }

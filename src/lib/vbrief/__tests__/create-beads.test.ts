@@ -104,7 +104,7 @@ describe('createBeadsFromVBrief', () => {
 
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd list --json --limit 0
+      .mockResolvedValueOnce({ stdout: '{"ok":true}', stderr: '' })   // bd ping --json
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ...
       .mockResolvedValueOnce({ stdout: 'bead-001\n', stderr: '' });    // bd create
 
@@ -134,7 +134,8 @@ describe('createBeadsFromVBrief', () => {
     const dbError = new Error('Error 1146 (HY000): table not found: issues');
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
-      .mockRejectedValueOnce(dbError);                                 // bd list --json --limit 0 (probe)
+      .mockRejectedValueOnce(dbError)                                  // bd ping --json (fails)
+      .mockRejectedValueOnce(dbError);                                 // bd doctor --fix (also fails — returns error)
 
     const result = await createBeadsFromVBrief(workspacePath);
 
@@ -147,7 +148,7 @@ describe('createBeadsFromVBrief', () => {
 
     expect(result.success).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors[0]).toMatch(/redirect|main beads/i);
+    expect(result.errors[0]).toMatch(/ping|doctor/i);
   });
 
   it('runs bd init only when there is no redirect AND no main beads (true fresh install)', async () => {
@@ -169,7 +170,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd init --prefix <expectedPrefix> (early setup)
       .mockResolvedValueOnce({ stdout: '', stderr: '' })               // git config beads.role contributor
       .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd config set export.git-add false
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd list --json --limit 0 (probe — succeeds after init)
+      .mockResolvedValueOnce({ stdout: '{"ok":true}', stderr: '' })   // bd ping --json (probe — succeeds after init)
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ... (idempotency)
       .mockResolvedValueOnce({ stdout: 'bead-002\n', stderr: '' });    // bd create
 
@@ -195,7 +196,7 @@ describe('createBeadsFromVBrief', () => {
 
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd list --json --limit 0
+      .mockResolvedValueOnce({ stdout: '{"ok":true}', stderr: '' })   // bd ping --json
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ... (idempotency)
       .mockResolvedValueOnce({ stdout: 'bead-alpha\n', stderr: '' })  // bd create item-a
       .mockResolvedValueOnce({ stdout: 'bead-beta\n', stderr: '' });  // bd create item-b
@@ -216,7 +217,7 @@ describe('createBeadsFromVBrief', () => {
     const existingBeads = JSON.stringify([{ id: 'stale-bead-42' }, { id: 'stale-bead-43' }]);
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })    // which bd
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })                // bd list --json --limit 0
+      .mockResolvedValueOnce({ stdout: '{"ok":true}', stderr: '' })    // bd ping --json
       .mockResolvedValueOnce({ stdout: existingBeads, stderr: '' })    // bd list --json -l ... (idempotency)
       .mockResolvedValueOnce({ stdout: '', stderr: '' })                // bd delete stale-bead-42
       .mockResolvedValueOnce({ stdout: '', stderr: '' })                // bd delete stale-bead-43
@@ -251,7 +252,7 @@ describe('createBeadsFromVBrief', () => {
 
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '{"ok":true}', stderr: '' })
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce({ stdout: 'bead-auto\n', stderr: '' });
 
@@ -279,7 +280,7 @@ describe('createBeadsFromVBrief', () => {
 
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '{"ok":true}', stderr: '' })
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce({ stdout: 'bead-deep\n', stderr: '' });
 
