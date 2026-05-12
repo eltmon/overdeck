@@ -193,6 +193,13 @@ const TRACKERS: { id: TrackerType; name: string; icon: any; envVar: string; plac
   { id: 'rally', name: 'Rally', icon: Flag, envVar: 'RALLY_API_KEY', placeholder: '_abc123...' },
 ];
 
+function formatCodexExpiry(expiresAt?: string): string | null {
+  if (!expiresAt) return null;
+  const date = new Date(expiresAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return `Expires ${date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`;
+}
+
 const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'model-routing', label: 'Model Routing', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
@@ -560,8 +567,8 @@ export function SettingsPage() {
                 return { text: 'Not authenticated', variant: 'warning' as const };
               }
               if (provider.id === 'openai') {
-                if (codexAuth?.status === 'valid') return { text: 'OAuth', variant: 'success' as const };
-                if (codexAuth?.status === 'expired' || codexAuth?.status === 'burned') return { text: codexAuth.status, variant: 'warning' as const };
+                if (codexAuth?.status === 'valid') return { text: 'Subscription OAuth', variant: 'success' as const };
+                if (codexAuth?.status === 'expired' || codexAuth?.status === 'burned') return { text: `Subscription OAuth ${codexAuth.status}`, variant: 'warning' as const };
               }
               if (apiKey && !apiKey.startsWith('$')) return { text: 'Key configured', variant: 'success' as const };
               if (apiKey?.startsWith('$')) return { text: `via ${apiKey}`, variant: 'neutral' as const };
@@ -569,6 +576,7 @@ export function SettingsPage() {
             };
 
             const authSummary = getAuthSummary();
+            const codexExpiry = provider.id === 'openai' ? formatCodexExpiry(codexAuth?.expiresAt) : null;
 
             return (
               <div key={provider.id} className="border border-transparent rounded-lg hover:border-border transition-colors">
@@ -643,16 +651,21 @@ export function SettingsPage() {
                     ) : provider.id === 'openai' ? (
                       <div className="space-y-2">
                         {codexAuth?.status === 'valid' ? (
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                            <span>OAuth active</span>
+                            <span>Subscription OAuth valid</span>
                             {codexAuth.email && (
                               <SensitiveText value={codexAuth.email} className="text-[10px] text-muted-foreground" />
                             )}
+                            {codexExpiry && <span>{codexExpiry}</span>}
                           </div>
                         ) : (codexAuth?.status === 'expired' || codexAuth?.status === 'burned') ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-warning capitalize">{codexAuth.status}</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-warning capitalize">Subscription OAuth {codexAuth.status}</span>
+                            {codexAuth.email && (
+                              <SensitiveText value={codexAuth.email} className="text-[10px] text-muted-foreground" />
+                            )}
+                            {codexExpiry && <span className="text-[10px] text-muted-foreground">{codexExpiry}</span>}
                             <button
                               onClick={async () => {
                                 try {

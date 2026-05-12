@@ -904,7 +904,7 @@
     "hash": "f0c24b8cbfb7dc9817d5001c60cb1657"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/scripts/record-cost-event.d.ts": {
-    "mtime": 1778616691.9344366,
+    "mtime": 1778622014.9255087,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/scripts/notify-complete": {
@@ -3388,8 +3388,8 @@
     "hash": "b038f5de8db10c43f7606b45a694ecbc"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/src/dashboard/frontend/src/components/Settings/SettingsPage.tsx": {
-    "mtime": 1778557831.0329392,
-    "hash": "5c6a73cc4ce583891f41b8feab633af7"
+    "mtime": 1778621888.2765517,
+    "hash": "72567c600381c0da024f25cc6024331b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/src/dashboard/frontend/src/components/Settings/OpenRouterPage.tsx": {
     "mtime": 1778557710.977809,
