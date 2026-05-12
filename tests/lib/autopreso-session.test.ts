@@ -1,8 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createWhiteboardSession } from '../../src/autopreso/session.js';
 import * as agent from '../../src/autopreso/agent.js';
 
 describe('createWhiteboardSession', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
   it('exposes direct state and initializes agent history after warmup', async () => {
     vi.spyOn(agent, 'runWhiteboardWarmupOnce').mockResolvedValueOnce(undefined);
     const session = createWhiteboardSession();
@@ -46,7 +51,6 @@ describe('createWhiteboardSession', () => {
       expect(session.warmupStatus).toBe('failed');
     } finally {
       vi.useRealTimers();
-      warmup.mockRestore();
     }
   });
 
