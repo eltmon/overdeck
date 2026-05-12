@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T18:18:40.319276Z"
+    "updated": "2026-05-12T18:21:50.928640Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T18:18:40.319276Z",
+    "updated": "2026-05-12T18:21:50.928640Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -90,7 +90,7 @@
       {
         "id": "moonshine-sidecar-build",
         "title": "Write scripts/build-moonshine-sidecars.js and sidecar main.py",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -105,7 +105,7 @@
           {
             "id": "moonshine-sidecar-build.ac1",
             "title": "scripts/build-moonshine-sidecars.js creates venv, installs moonshine-voice, runs PyInstaller",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -113,7 +113,7 @@
           {
             "id": "moonshine-sidecar-build.ac2",
             "title": "Sidecar main.py implements the JSONL protocol: audio→pcm16le base64 in, ready/partial/committed out",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -121,7 +121,7 @@
           {
             "id": "moonshine-sidecar-build.ac3",
             "title": "npm run build:sidecar script defined in package.json",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

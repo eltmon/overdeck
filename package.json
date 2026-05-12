@@ -75,6 +75,7 @@
     "build:dashboard": "npm run build:dashboard:frontend && npm run build:dashboard:server",
     "build:dashboard:frontend": "npm --prefix ./src/dashboard/frontend run build",
     "build:dashboard:server": "npm run build:contracts && npm --prefix ./src/dashboard/server run build && node scripts/fs-helper.mjs copy-ext .md src/lib/cloister/prompts dist/dashboard/prompts",
+    "build:sidecar": "node scripts/build-moonshine-sidecars.js",
     "build:desktop": "cd apps/desktop && bun run build && bun run dist:linux && bun run dist:mac && bun run dist:win",
     "build:desktop:linux": "cd apps/desktop && bun run build && bun run dist:linux",
     "build:desktop:mac": "cd apps/desktop && bun run build && bun run dist:mac",
