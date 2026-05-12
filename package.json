@@ -27,6 +27,7 @@
   "workspaces": {
     "packages": [
       "packages/contracts",
+      "packages/moonshine-linux-x64",
       "packages/pi-extension",
       "src/dashboard/server",
       "src/dashboard/frontend",
@@ -93,6 +94,9 @@
     "prepublishOnly": "npm run build",
     "postinstall": "node scripts/postinstall.mjs || true",
     "prepare": "husky"
+  },
+  "optionalDependencies": {
+    "moonshine-linux-x64": "workspace:*"
   },
   "dependencies": {
     "@effect/platform-bun": "4.0.0-beta.45",

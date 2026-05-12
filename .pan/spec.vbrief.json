@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T18:15:47.581121Z"
+    "updated": "2026-05-12T18:18:40.319276Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T18:15:47.581121Z",
+    "updated": "2026-05-12T18:18:40.319276Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -49,7 +49,7 @@
       {
         "id": "moonshine-pkg",
         "title": "Create packages/moonshine-linux-x64 npm package structure",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -64,7 +64,7 @@
           {
             "id": "moonshine-pkg.ac1",
             "title": "packages/moonshine-linux-x64/package.json exists with os: [\"linux\"], cpu: [\"x64\"], version 0.1.0",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -72,7 +72,7 @@
           {
             "id": "moonshine-pkg.ac2",
             "title": "packages/moonshine-linux-x64/bin/ directory exists (placeholder for sidecar binary)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -80,7 +80,7 @@
           {
             "id": "moonshine-pkg.ac3",
             "title": "root package.json lists moonshine-linux-x64 as optionalDependencies",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
