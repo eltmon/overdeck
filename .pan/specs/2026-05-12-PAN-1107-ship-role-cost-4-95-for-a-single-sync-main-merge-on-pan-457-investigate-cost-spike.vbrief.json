@@ -1,0 +1,121 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-12T17:41:26.299Z",
+    "updated": "2026-05-12T17:41:26.299Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1107: Ship role cost $4.95 for a single sync-main merge on PAN-457 — investigate cost spike",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1107",
+    "title": "Ship role cost $4.95 for a single sync-main merge on PAN-457 — investigate cost spike",
+    "status": "proposed",
+    "uid": "ced5b9fa-0be3-4202-8a97-2f246dcf453c",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 1,
+    "created": "2026-05-12T17:41:26.299Z",
+    "updated": "2026-05-12T17:41:26.299Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1107",
+        "label": "PAN-1107",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-12-PAN-1107-ship-role-cost-4-95-for-a-single-sync-main-merge-on-pan-457-investigate-cost-spike.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Symptom\n\n\\`agent-pan-457-ship\\` ran for 23m and accumulated \\$4.95 in gpt-5.5 spend resolving 19 sync-main merge conflicts on PAN-457 (\\`feature/pan-457\\`).\n\nThat's an order of magnitude higher than the expected ship-role cost. Ship is meant to be mechanical conflict resolution + verification on a cheap workhorse model; previous ship runs typically cost a few cents.\n\nStatus line at completion:\n\\`\\`\\`\ngpt-5.5 (gpt-5.5)  ctx 63%  189/200.0k  out 260  cost \\$4.9465  +2/-1\n\\`\\`\\`\n\n## Contributing factors (suspected)\n\n- 19 conflicts is on the high end. A few of them involved \\`.beads/config.yaml\\` (with conflict markers inside YAML) and \\`.pan/spec.vbrief.json\\`, which the ship agent had to repeatedly re-scan.\n- One tool call referenced a stale path (\\`src/dashboard/frontend/src/components/MissionControl/styles/mission-control.module.css\\`) that no longer exists. That suggests the agent was using cached state from training or earlier turns rather than reading the actual tree.\n- Verification ran the full \\`npm test\\` (329 files) which is appropriate but pulls heavy context.\n- Ship apparently ran through several rounds of \\\"stage → verify → fix\\\" loops based on output budget (out=260).\n\n## Why it matters\n\nSync-main is invoked automatically on every \\`pan start\\` for an existing workspace. If sync-main routinely produces 19-conflict merges that cost \\$5 in ship time, the per-restart cost adds up fast.\n\n## Acceptance\n\n- Capture per-attempt cost in the ship role audit log so spikes are visible from the dashboard\n- Investigate whether the agent's repeated re-scans of conflict files can be short-circuited (e.g., feed it the conflict-marker locations directly instead of re-reading every file)\n- Decide whether ship should bail out and ask for human help past a certain cost/conflict-count threshold rather than burn through a workhorse budget",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T17:41:26.299Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1107",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Symptom\n\n\\`agent-pan-457-ship\\` ran for 23m and accumulated \\$4.95 in gpt-5.5 spend resolving 19 sync-main merge conflicts on PAN-457 (\\`feature/pan-457\\`).\n\nThat's an order of magnitude higher than the expected ship-role cost. Ship is meant to be mechanical conflict resolution + verification on a cheap workhorse model; previous ship runs typically cost a few cents.\n\nStatus line at completion:\n\\`\\`\\`\ngpt-5.5 (gpt-5.5)  ctx 63%  189/200.0k  out 260  cost \\$4.9465  +2/-1\n\\`\\`\\`\n\n## Contributing factors (suspected)\n\n- 19 conflicts is on the high end. A few of them involved \\`.beads/config.yaml\\` (with conflict markers inside YAML) and \\`.pan/spec.vbrief.json\\`, which the ship agent had to repeatedly re-scan.\n- One tool call referenced a stale path (\\`src/dashboard/frontend/src/components/MissionControl/styles/mission-control.module.css\\`) that no longer exists. That suggests the agent was using cached state from training or earlier turns rather than reading the actual tree.\n- Verification ran the full \\`npm test\\` (329 files) which is appropriate but pulls heavy context.\n- Ship apparently ran through several rounds of \\\"stage → verify → fix\\\" loops based on output budget (out=260).\n\n## Why it matters\n\nSync-main is invoked automatically on every \\`pan start\\` for an existing workspace. If sync-main routinely produces 19-conflict merges that cost \\$5 in ship time, the per-restart cost adds up fast.\n\n## Acceptance\n\n- Capture per-attempt cost in the ship role audit log so spikes are visible from the dashboard\n- Investigate whether the agent's repeated re-scans of conflict files can be short-circuited (e.g., feed it the conflict-marker locations directly instead of re-reading every file)\n- Decide whether ship should bail out and ask for human help past a certain cost/conflict-count threshold rather than burn through a workhorse budget"
+        },
+        "subItems": [
+          {
+            "id": "auto-start.ac1",
+            "title": "19 conflicts is on the high end. A few of them involved \\.beads/config.yaml\\ (with conflict markers inside YAML) and \\.pan/spec.vbrief.json\\, which the ship agent had to repeatedly re-scan.",
+            "status": "pending",
+            "created": "2026-05-12T17:41:26.299Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "One tool call referenced a stale path (\\src/dashboard/frontend/src/components/MissionControl/styles/mission-control.module.css\\) that no longer exists. That suggests the agent was using cached state from training or earlier turns rather than reading the actual tree.",
+            "status": "pending",
+            "created": "2026-05-12T17:41:26.299Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "Verification ran the full \\npm test\\ (329 files) which is appropriate but pulls heavy context.",
+            "status": "pending",
+            "created": "2026-05-12T17:41:26.299Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Ship apparently ran through several rounds of \\\"stage → verify → fix\\\" loops based on output budget (out=260).",
+            "status": "pending",
+            "created": "2026-05-12T17:41:26.299Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "Capture per-attempt cost in the ship role audit log so spikes are visible from the dashboard",
+            "status": "pending",
+            "created": "2026-05-12T17:41:26.299Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "Investigate whether the agent's repeated re-scans of conflict files can be short-circuited (e.g., feed it the conflict-marker locations directly instead of re-reading every file)",
+            "status": "pending",
+            "created": "2026-05-12T17:41:26.299Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac7",
+            "title": "Decide whether ship should bail out and ask for human help past a certain cost/conflict-count threshold rather than burn through a workhorse budget",
+            "status": "pending",
+            "created": "2026-05-12T17:41:26.299Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

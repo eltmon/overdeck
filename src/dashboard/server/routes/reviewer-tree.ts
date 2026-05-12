@@ -118,8 +118,9 @@ export interface BuildReviewerNodesOptions {
 
 /**
  * Extract the reviewer role from a tmux session name. Supports both:
- *   - Canonical (PAN-830): `specialist-<projectKey>-<issueId>-review-<role>`
- *   - Legacy (PAN-821):    `review-<issueId>-<timestamp>-<role>`
+ *   - Current (PAN-1048+): `agent-<issueId>-review-<role>`
+ *   - Legacy (PAN-830):   `specialist-<projectKey>-<issueId>-review-<role>`
+ *   - Legacy (PAN-821):   `review-<issueId>-<timestamp>-<role>`
  *
  * Returns the role string, or null if the name doesn't match either pattern.
  */

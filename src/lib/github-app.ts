@@ -13,6 +13,10 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { createSign } from 'crypto';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const APP_DIR = join(homedir(), '.panopticon', 'github-app');
 
@@ -389,6 +393,49 @@ export async function reportCommitStatus(
   if (!response.ok) {
     const text = await response.text();
     console.warn(`[github-app] Failed to report status: ${response.status} ${text}`);
+  }
+}
+
+/**
+ * Post the `panopticon/tests` commit status for the HEAD of a workspace.
+ *
+ * Used by verification-runner (pre-review gate) and the test specialist
+ * (post-review gate) to signal that Panopticon has run the test suite
+ * against this exact commit. The `test` job in .github/workflows/ci.yml
+ * reads this status and skips its own vitest run when it's `success`,
+ * eliminating duplicate test execution for pipeline-managed PRs.
+ *
+ * Non-pipeline pushes (no workspace, no `panopticon/tests` status) cause
+ * CI to fall through and run vitest as normal — defense in depth.
+ *
+ * Failures are non-fatal: status posting is informational and must never
+ * block the verification or test specialist's primary outcome.
+ */
+export async function postPanopticonTestsStatus(
+  workspacePath: string,
+  owner: string,
+  repo: string,
+  status: 'success' | 'failure',
+  description: string,
+): Promise<void> {
+  if (!isGitHubAppConfigured()) return;
+  try {
+    const { stdout } = await execAsync('git rev-parse HEAD', {
+      cwd: workspacePath,
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
+    const sha = stdout.trim();
+    if (!sha) return;
+    // Context name MUST match branch protection's required_status_checks.contexts
+    // for main, which is the singular "panopticon/test". Don't change to plural
+    // without coordinating the branch protection rule update.
+    await reportCommitStatus(owner, repo, sha, status, 'panopticon/test', description);
+    console.log(
+      `[github-app] Posted panopticon/test=${status} for ${sha.slice(0, 8)} in ${owner}/${repo}`,
+    );
+  } catch (err: any) {
+    console.warn(`[github-app] Failed to post panopticon/test status: ${err.message}`);
   }
 }
 

@@ -17,6 +17,11 @@ jobs:
       npm_tag: ${{ steps.channel.outputs.npm_tag }}
       prerelease: ${{ steps.channel.outputs.prerelease }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
       - name: Classify release channel
         id: channel
         shell: bash
@@ -31,9 +36,42 @@ jobs:
             echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Unsupported release tag: $tag"
+            echo "::error::Unsupported release tag: $tag"
             exit 1
           fi
+
+      - name: Verify tag matches pan release stable output
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          expected="${tag#v}"
+          root_v=$(node -p "require('./package.json').version")
+          desktop_v=$(node -p "require('./apps/desktop/package.json').version")
+          contracts_v=$(node -p "require('./packages/contracts/package.json').version")
+          notes_path=".release/${tag}.md"
+
+          fail=0
+          if [ "$root_v" != "$expected" ]; then
+            echo "::error::package.json version is $root_v, expected $expected. Did you run 'pan release stable --version $expected'?"
+            fail=1
+          fi
+          if [ "$desktop_v" != "$expected" ]; then
+            echo "::error::apps/desktop/package.json version is $desktop_v, expected $expected."
+            fail=1
+          fi
+          if [ "$contracts_v" != "$expected" ]; then
+            echo "::error::packages/contracts/package.json version is $contracts_v, expected $expected."
+            fail=1
+          fi
+          if [ ! -f "$notes_path" ]; then
+            echo "::error::Release notes $notes_path missing. Only 'pan release stable' produces this file."
+            fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Release guard failed. Tags must be produced by 'pan release stable' so version bumps and release notes are committed atomically."
+            exit 1
+          fi
+          echo "Release guard passed: $tag matches all three package.json files and $notes_path is committed."
 
   npm:
     needs: classify
@@ -52,6 +90,17 @@ jobs:
         with:
           bun-version: latest
 
+      # npm >= 11.5.1 is required for OIDC trusted publishing. Node 22 LTS
+      # ships npm 10.x. We can't `npm install -g npm@latest` in place — the
+      # in-place upgrade corrupts npm's own dependency tree partway through
+      # ("Cannot find module 'promise-retry'"). Install to a separate prefix
+      # and prepend to PATH instead.
+      - name: Install npm 11 for OIDC trusted publishing
+        run: |
+          npm install --location=global --prefix="$RUNNER_TEMP/npm-bin" npm@11
+          echo "$RUNNER_TEMP/npm-bin/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/npm-bin/bin/npm" --version
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -63,6 +112,10 @@ jobs:
           node dist/cli/index.js --version
           node dist/cli/index.js --help
 
+      # Trusted Publishing: no NODE_AUTH_TOKEN. npm authenticates to npmjs.org
+      # using the GitHub OIDC token granted by `id-token: write` above. The
+      # trusted-publisher config on each @panctl/* package on npmjs.com pins
+      # this repo + workflow filename as the only allowed publisher.
       - name: Publish CLI to npm
         run: |
           PKG_NAME=$(node -p "require('./package.json').name")
@@ -76,8 +129,6 @@ jobs:
           else
             npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Build contracts
         run: cd packages/contracts && npm run build
@@ -96,8 +147,6 @@ jobs:
           else
             npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish desktop to npm
         run: |
@@ -114,16 +163,12 @@ jobs:
           else
             npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Deprecate legacy npm packages
-        if: needs.classify.outputs.npm_tag == 'latest'
-        run: |
-          npm deprecate panopticon-cli "Renamed to @panctl/cli — use 'npx @panctl/cli' instead." || true
-          npm deprecate @eltmon/panctl "Use @panctl/cli — same package, official scope." || true
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # The deprecate step is dropped intentionally: it required a long-lived
+      # NPM_TOKEN and OIDC trusted publishing only covers publish, not metadata
+      # writes. panopticon-cli and @eltmon/panctl are already deprecated on
+      # npm (from prior releases) — deprecation is idempotent metadata, not
+      # something to re-assert every release.
 
   desktop:
     needs: classify
@@ -180,17 +225,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build
-        run: bun run build
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Download all desktop artifacts
         uses: actions/download-artifact@v4
@@ -199,10 +236,14 @@ jobs:
           pattern: desktop-*
           merge-multiple: true
 
-      - name: Generate structured release notes
+      - name: Resolve release notes
         run: |
-          mkdir -p .release
-          node dist/cli/index.js release notes "$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)" "${GITHUB_REF_NAME}" --write ".release/${GITHUB_REF_NAME}.md"
+          notes=".release/${GITHUB_REF_NAME}.md"
+          if [ ! -f "$notes" ]; then
+            echo "::error::Release notes $notes are missing. 'pan release stable' must commit them before tag push."
+            exit 1
+          fi
+          echo "Using committed release notes: $notes"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1

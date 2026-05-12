@@ -1,0 +1,121 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-12T17:40:09.465Z",
+    "updated": "2026-05-12T17:40:09.465Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1105: Convoy review specialists exit twice without writing reports (PAN-457)",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1105",
+    "title": "Convoy review specialists exit twice without writing reports (PAN-457)",
+    "status": "proposed",
+    "uid": "ac25a24e-a104-4919-aacf-1e9e2d27ca16",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 1,
+    "created": "2026-05-12T17:40:09.465Z",
+    "updated": "2026-05-12T17:40:09.465Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1105",
+        "label": "PAN-1105",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-12-PAN-1105-convoy-review-specialists-exit-twice-without-writing-reports-pan-457.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Repro\n\nPAN-457 review run \\`agent-pan-457-review-5c799040\\` (2026-05-12 ~17:10Z): all four convoy reviewers (security, correctness, performance, requirements) exited before producing a non-empty report. A retry was attempted for each — also exited without writing the required output file.\n\nSynthesis at \\`.pan/review/agent-pan-457-review-5c799040/synthesis.md\\`:\n\n> ### [security] Reviewer failed to write report — security.md\n> The security reviewer session exited before producing a non-empty report. A retry was attempted and also exited without producing the required output file.\n\n(Same line for correctness/performance/requirements.)\n\n## Why it matters\n\nWhen all four convoy reviewers fail this way, the parent review role marks PAN-XXX as \\`review: blocked\\` and the work agent cannot auto-respawn. The user has to \\`pan reopen\\` to unstick. Two PRs hit this back-to-back today (PAN-457, possibly PAN-1069 — the conversations sidebar lists \\`agent-pan-1069-review-*\\` sessions from earlier).\n\n## Likely cause\n\nConvoy reviewer specialists spawn via Claude Code agents but exit without producing output. Candidates:\n- Specialist agent prompt blows past context budget before writing the report\n- Specialist agent crashes on first tool call (broken MCP, missing skill, etc.)\n- The required-output-file path is wrong or unwriteable\n- Specialist is gated on something stale from the workspace state (e.g. \\`.beads/\\` corruption — but PAN-457 had this resolved by the time review ran)\n\n## Acceptance\n\n- Identify which of the above causes the silent exit\n- Surface the underlying error in the synthesis instead of \\\"exited before producing a non-empty report\\\"\n- Optionally: gate the retry on a different failure mode than \\\"file missing\\\" so a second silent exit doesn't look like a fresh failure",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T17:40:09.465Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1105",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Repro\n\nPAN-457 review run \\`agent-pan-457-review-5c799040\\` (2026-05-12 ~17:10Z): all four convoy reviewers (security, correctness, performance, requirements) exited before producing a non-empty report. A retry was attempted for each — also exited without writing the required output file.\n\nSynthesis at \\`.pan/review/agent-pan-457-review-5c799040/synthesis.md\\`:\n\n> ### [security] Reviewer failed to write report — security.md\n> The security reviewer session exited before producing a non-empty report. A retry was attempted and also exited without producing the required output file.\n\n(Same line for correctness/performance/requirements.)\n\n## Why it matters\n\nWhen all four convoy reviewers fail this way, the parent review role marks PAN-XXX as \\`review: blocked\\` and the work agent cannot auto-respawn. The user has to \\`pan reopen\\` to unstick. Two PRs hit this back-to-back today (PAN-457, possibly PAN-1069 — the conversations sidebar lists \\`agent-pan-1069-review-*\\` sessions from earlier).\n\n## Likely cause\n\nConvoy reviewer specialists spawn via Claude Code agents but exit without producing output. Candidates:\n- Specialist agent prompt blows past context budget before writing the report\n- Specialist agent crashes on first tool call (broken MCP, missing skill, etc.)\n- The required-output-file path is wrong or unwriteable\n- Specialist is gated on something stale from the workspace state (e.g. \\`.beads/\\` corruption — but PAN-457 had this resolved by the time review ran)\n\n## Acceptance\n\n- Identify which of the above causes the silent exit\n- Surface the underlying error in the synthesis instead of \\\"exited before producing a non-empty report\\\"\n- Optionally: gate the retry on a different failure mode than \\\"file missing\\\" so a second silent exit doesn't look like a fresh failure"
+        },
+        "subItems": [
+          {
+            "id": "auto-start.ac1",
+            "title": "Specialist agent prompt blows past context budget before writing the report",
+            "status": "pending",
+            "created": "2026-05-12T17:40:09.465Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "Specialist agent crashes on first tool call (broken MCP, missing skill, etc.)",
+            "status": "pending",
+            "created": "2026-05-12T17:40:09.465Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "The required-output-file path is wrong or unwriteable",
+            "status": "pending",
+            "created": "2026-05-12T17:40:09.465Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Specialist is gated on something stale from the workspace state (e.g. \\.beads/\\ corruption — but PAN-457 had this resolved by the time review ran)",
+            "status": "pending",
+            "created": "2026-05-12T17:40:09.465Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "Identify which of the above causes the silent exit",
+            "status": "pending",
+            "created": "2026-05-12T17:40:09.465Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "Surface the underlying error in the synthesis instead of \\\"exited before producing a non-empty report\\\"",
+            "status": "pending",
+            "created": "2026-05-12T17:40:09.465Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac7",
+            "title": "Optionally: gate the retry on a different failure mode than \\\"file missing\\\" so a second silent exit doesn't look like a fresh failure",
+            "status": "pending",
+            "created": "2026-05-12T17:40:09.465Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

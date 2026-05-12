@@ -8,7 +8,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 vi.mock('@linear/sdk', () => ({
-  LinearClient: vi.fn().mockImplementation(() => ({
+  LinearClient: vi.fn().mockImplementation(function () { return {
     teams: vi.fn().mockResolvedValue({
       nodes: [
         {
@@ -22,7 +22,7 @@ vi.mock('@linear/sdk', () => ({
       ],
     }),
     issues: vi.fn().mockResolvedValue({ nodes: [] }),
-  })),
+  }; }),
 }));
 
 describe('linear-states', () => {

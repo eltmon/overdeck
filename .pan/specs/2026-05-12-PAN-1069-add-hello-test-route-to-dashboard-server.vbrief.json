@@ -1,0 +1,121 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-12T10:00:14.730Z",
+    "updated": "2026-05-12T10:00:14.730Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1069: Add /hello test route to dashboard server",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1069",
+    "title": "Add /hello test route to dashboard server",
+    "status": "proposed",
+    "uid": "8755497a-bd55-4706-bd95-9dc4a7e0cc0b",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 1,
+    "created": "2026-05-12T10:00:14.730Z",
+    "updated": "2026-05-12T10:00:14.730Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1069",
+        "label": "PAN-1069",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-12-PAN-1069-add-hello-test-route-to-dashboard-server.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Summary\n\nAdd a minimal HTTP route to the Panopticon dashboard server that returns a simple HTML page when accessed at \\`/hello\\`.\n\n## Acceptance Criteria\n\n- \\`GET /hello\\` returns HTTP 200\n- Response body is exactly: \\`<html><body>Hello</body></html>\\`\n- \\`Content-Type\\` header is \\`text/html\\`\n- Route is registered in the main Effect HTTP router alongside existing routes\n\n## Why\n\nSmall smoke-test route used to verify the full Panopticon review/work pipeline end-to-end without domain complexity getting in the way.\n\n## Implementation Notes\n\n- Add a new route handler file \\`src/dashboard/server/routes/hello.ts\\`\n- Register it in \\`src/dashboard/server/server.ts\\` (or wherever routes are composed)\n- No auth, no DB, no side effects — pure request/response",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-12T10:00:14.730Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1069",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Summary\n\nAdd a minimal HTTP route to the Panopticon dashboard server that returns a simple HTML page when accessed at \\`/hello\\`.\n\n## Acceptance Criteria\n\n- \\`GET /hello\\` returns HTTP 200\n- Response body is exactly: \\`<html><body>Hello</body></html>\\`\n- \\`Content-Type\\` header is \\`text/html\\`\n- Route is registered in the main Effect HTTP router alongside existing routes\n\n## Why\n\nSmall smoke-test route used to verify the full Panopticon review/work pipeline end-to-end without domain complexity getting in the way.\n\n## Implementation Notes\n\n- Add a new route handler file \\`src/dashboard/server/routes/hello.ts\\`\n- Register it in \\`src/dashboard/server/server.ts\\` (or wherever routes are composed)\n- No auth, no DB, no side effects — pure request/response"
+        },
+        "subItems": [
+          {
+            "id": "auto-start.ac1",
+            "title": "\\GET /hello\\ returns HTTP 200",
+            "status": "pending",
+            "created": "2026-05-12T10:00:14.730Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "Response body is exactly: \\<html><body>Hello</body></html>\\",
+            "status": "pending",
+            "created": "2026-05-12T10:00:14.730Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "\\Content-Type\\ header is \\text/html\\",
+            "status": "pending",
+            "created": "2026-05-12T10:00:14.730Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Route is registered in the main Effect HTTP router alongside existing routes",
+            "status": "pending",
+            "created": "2026-05-12T10:00:14.730Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "Add a new route handler file \\src/dashboard/server/routes/hello.ts\\",
+            "status": "pending",
+            "created": "2026-05-12T10:00:14.730Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "Register it in \\src/dashboard/server/server.ts\\ (or wherever routes are composed)",
+            "status": "pending",
+            "created": "2026-05-12T10:00:14.730Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac7",
+            "title": "No auth, no DB, no side effects — pure request/response",
+            "status": "pending",
+            "created": "2026-05-12T10:00:14.730Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

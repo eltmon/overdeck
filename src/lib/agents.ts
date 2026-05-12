@@ -29,6 +29,7 @@ import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScript } from './launcher-generator.js';
+import { createConversation } from './database/conversations-db.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge-token.js';
@@ -585,7 +586,17 @@ function cleanAgentState(raw: AgentState): AgentState {
 function parseAgentState(content: string, normalizedId: string): AgentState | null {
   try {
     const state = JSON.parse(content) as Partial<AgentState>;
-    if (!isRole(state.role)) return null;
+    if (!isRole(state.role)) {
+      // Infer role from agent ID suffix for old states created before the role
+      // field was mandatory (e.g. PAN-913 and other pre-PAN-1048 agents).
+      let inferred: Role | undefined;
+      if (normalizedId.endsWith('-review')) inferred = 'review';
+      else if (normalizedId.endsWith('-test')) inferred = 'test';
+      else if (normalizedId.endsWith('-ship')) inferred = 'ship';
+      else if (normalizedId.endsWith('-plan')) inferred = 'plan';
+      else inferred = 'work';
+      state.role = inferred;
+    }
     if (!state.id) state.id = normalizedId;
     return cleanAgentState(state as AgentState);
   } catch {
@@ -1779,6 +1790,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   const providerExports = await getProviderExportsForModel(selectedModel);
   const providerEnv = await getProviderEnvForModel(selectedModel);
+
   // PAN-1048 review feedback 005 (S1): when the resolved harness is Pi, thread
   // the per-agent Pi launcher fields (--session-dir, --extension, FIFO
   // redirect) through generateLauncherScript so the role launcher emits the
@@ -1788,6 +1800,31 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   const piLauncherFields = resolvedHarness === 'pi'
     ? await getPiLauncherFields(agentId, selectedModel)
     : {};
+
+  // Create a conversation record for specialist roles so their JSONL sessions
+  // are persisted and viewable in the dashboard. The orchestrator (review
+  // without subRole) does not get a conversation — it manages sub-role
+  // reviewers and its output is visible through the work agent's panel.
+  const isSpecialistRole = (role === 'review' && options.subRole) || role === 'test' || role === 'ship';
+  let sessionId: string | undefined;
+  if (isSpecialistRole) {
+    sessionId = randomUUID();
+    try {
+      createConversation({
+        name: agentId,
+        tmuxSession: agentId,
+        cwd: workspace,
+        issueId,
+        claudeSessionId: sessionId,
+        model: selectedModel,
+        harness: resolvedHarness,
+      });
+    } catch (err) {
+      // Non-fatal: the specialist still runs, but without a conversation record
+      console.warn(`[spawnRun] Failed to create conversation for ${agentId}:`, err instanceof Error ? err.message : String(err));
+    }
+  }
+
   const launcherContent = generateLauncherScript({
     role,
     workingDir: workspace,
@@ -1798,6 +1835,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     promptFile,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
+    sessionId,
     ...piLauncherFields,
   });
 

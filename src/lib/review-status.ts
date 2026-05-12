@@ -158,6 +158,24 @@ export function setReviewStatus(
   update: Partial<ReviewStatus>,
   existing?: ReviewStatus,
 ): ReviewStatus {
+  // Guard: bare numeric IDs (no alphabetic prefix) must never reach the DB.
+  // They would create orphaned rows that pollute pending lists and metrics.
+  if (/^\d+$/.test(issueId)) {
+    console.warn(
+      `[review-status] Rejecting setReviewStatus for bare numeric ID "${issueId}" — ` +
+      `issue IDs must include a project prefix (e.g. PAN-${issueId}).`
+    );
+    return {
+      issueId,
+      reviewStatus: 'pending' as const,
+      testStatus: 'pending' as const,
+      updatedAt: new Date().toISOString(),
+      readyForMerge: false,
+    };
+  }
+
+  issueId = issueId.toUpperCase();
+
   // Read only the single row we're updating (avoids TOCTOU: bulk read-modify-write
   // races when two concurrent calls for different issue IDs run concurrently).
   // If `existing` is provided (e.g. from mutateBlockers), skip the DB read to
@@ -247,9 +265,12 @@ export function setReviewStatus(
         );
         const sha = stdout.trim();
         if (sha) {
+          // panopticon/review is honest here — review just transitioned to readyForMerge.
+          // The panopticon/tests status is posted separately at the actual test-completion
+          // site (verification-runner success, test-agent POST in workspaces routes) so it
+          // accurately reflects which commit was tested.
           await reportCommitStatus(owner, repo, sha, 'success', 'panopticon/review', 'Review passed');
-          await reportCommitStatus(owner, repo, sha, 'success', 'panopticon/test', 'Tests passed');
-          console.log(`[review-status] Reported commit statuses for ${issueId} (${sha.slice(0, 8)})`);
+          console.log(`[review-status] Reported panopticon/review for ${issueId} (${sha.slice(0, 8)})`);
         }
       } catch (err: any) {
         console.warn(`[review-status] Failed to report commit status: ${err.message}`);

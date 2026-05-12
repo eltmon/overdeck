@@ -3119,6 +3119,24 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         setReviewStatus(issueId, { readyForMerge: true });
         console.log(`[review-status] ${issueId} marked ready for merge after test=passed`);
 
+        // Post panopticon/tests=success so the CI test job self-skips on this
+        // commit. Mirrors what verification-runner does at the pre-review gate.
+        yield* Effect.promise(async () => {
+          try {
+            const { resolveProjectFromIssue } = await import('../../../lib/projects.js');
+            const project = resolveProjectFromIssue(issueId);
+            const repo = project?.github_repo;
+            if (!repo || !repo.includes('/')) return;
+            const [owner, name] = repo.split('/');
+            const wsInfo = getWorkspaceInfoForIssue(issueId);
+            if (!wsInfo?.localPath) return;
+            const { postPanopticonTestsStatus } = await import('../../../lib/github-app.js');
+            await postPanopticonTestsStatus(wsInfo.localPath, owner!, name!, 'success', 'Test specialist passed');
+          } catch (err: any) {
+            console.warn(`[review-status] Failed to post panopticon/tests for ${issueId}: ${err.message}`);
+          }
+        });
+
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.test-completed',
           timestamp: new Date().toISOString(),

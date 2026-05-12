@@ -2,17 +2,22 @@
   "version": "1",
   "issueId": "PAN-913",
   "created": "2026-05-09T23:35:53.171Z",
-  "updated": "2026-05-10T07:01:11.323Z",
+  "updated": "2026-05-12T03:48:17.898323+00:00",
   "gitState": {},
   "decisions": [],
   "hazards": [],
-  "resumePoint": null,
+  "resumePoint": "rebase-on-main-and-resubmit",
   "beadsMapping": {},
-  "feedback": [],
+  "feedback": [
+    {
+      "timestamp": "2026-05-12T03:48:17.898323+00:00",
+      "note": "RESUME DIRECTIVE (2026-05-12, session 933): The work was paused with PR #916 OPEN, all CI green, but mergeable=CONFLICTING \u2014 there are merge conflicts against current main. Your job: (1) cd to workspaces/feature-pan-913 (you're already there if you've been resumed), (2) git fetch origin main, (3) git rebase origin/main, (4) resolve conflicts \u2014 prefer main's evolved code where it touches permission/inspect spawn paths (PAN-1059, PAN-1082 merged since), preserve THIS PR's Codex auth detection logic, (5) run npm run lint && npm run typecheck && npm test until all clean, (6) git push --force-with-lease origin feature/pan-913, (7) run 'pan done PAN-913' to re-trigger review pipeline. Do NOT run 'pan inspect' on any bead \u2014 set requiresInspection=false on every bead. No Anthropic models \u2014 you're spawned on gpt-5.5. If conflicts are too gnarly OR you can't get tests green, halt and 'pan tell PAN-913' a summary of the blocker rather than guessing."
+    }
+  ],
   "sessionHistory": [
     {
       "reason": "feedback",
-      "note": "[2026-05-09T23:35Z] verification-gate → FAILED — seq 1",
+      "note": "[2026-05-09T23:35Z] verification-gate \u2192 FAILED \u2014 seq 1",
       "timestamp": "2026-05-09T23:35:53.172Z"
     },
     {
@@ -22,7 +27,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-09T23:44Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "note": "[2026-05-09T23:44Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
       "timestamp": "2026-05-09T23:44:21.815Z"
     },
     {
@@ -32,7 +37,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T00:06Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "note": "[2026-05-10T00:06Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
       "timestamp": "2026-05-10T00:06:41.657Z"
     },
     {
@@ -42,7 +47,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T00:23Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "note": "[2026-05-10T00:23Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
       "timestamp": "2026-05-10T00:23:01.982Z"
     },
     {
@@ -52,7 +57,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T01:10Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "note": "[2026-05-10T01:10Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
       "timestamp": "2026-05-10T01:10:42.226Z"
     },
     {
@@ -62,7 +67,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T04:02Z] verification-gate → FAILED — seq 2",
+      "note": "[2026-05-10T04:02Z] verification-gate \u2192 FAILED \u2014 seq 2",
       "timestamp": "2026-05-10T04:02:46.058Z"
     },
     {
@@ -72,7 +77,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T04:16Z] verification-gate → FAILED — seq 3",
+      "note": "[2026-05-10T04:16Z] verification-gate \u2192 FAILED \u2014 seq 3",
       "timestamp": "2026-05-10T04:16:09.932Z"
     },
     {
@@ -82,7 +87,7 @@
     },
     {
       "reason": "feedback",
-      "note": "[2026-05-10T04:40Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "note": "[2026-05-10T04:40Z] review-agent \u2192 CHANGES-REQUESTED \u2014 seq 1",
       "timestamp": "2026-05-10T04:40:29.027Z"
     },
     {

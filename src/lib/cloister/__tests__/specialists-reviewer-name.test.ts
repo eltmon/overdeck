@@ -6,63 +6,65 @@ import {
   type ReviewerRole,
 } from '../specialists.js';
 
-describe('getReviewerSessionName (PAN-830)', () => {
-  it('produces canonical name for correctness reviewer', () => {
-    expect(getReviewerSessionName('correctness', 'panopticon', '540')).toBe(
-      'specialist-panopticon-540-review-correctness',
+describe('getReviewerSessionName (PAN-1048+)', () => {
+  it('produces agent-* format for correctness reviewer', () => {
+    expect(getReviewerSessionName('correctness', 'panopticon', 'PAN-540')).toBe(
+      'agent-pan-540-review-correctness',
     );
   });
 
-  it('produces canonical names for all five reviewer roles', () => {
+  it('produces agent-* format for all five reviewer roles', () => {
     for (const role of REVIEWER_ROLES) {
-      expect(getReviewerSessionName(role, 'panopticon', '830')).toBe(
-        `specialist-panopticon-830-review-${role}`,
+      expect(getReviewerSessionName(role, 'panopticon', 'PAN-830')).toBe(
+        `agent-pan-830-review-${role}`,
       );
     }
   });
 
-  it('handles project keys and issue ids with hyphens', () => {
+  it('handles issue ids with hyphens', () => {
     expect(getReviewerSessionName('security', 'my-proj', 'pan-830')).toBe(
-      'specialist-my-proj-pan-830-review-security',
+      'agent-pan-830-review-security',
     );
   });
 });
 
-describe('parseReviewerSessionName (PAN-830)', () => {
-  it('round-trips a canonical name back to its components', () => {
-    const name = getReviewerSessionName('synthesis', 'panopticon', '540');
-    expect(parseReviewerSessionName(name)).toEqual({
-      role: 'synthesis',
-      projectKey: 'panopticon',
-      issueId: '540',
+describe('parseReviewerSessionName (PAN-1048+)', () => {
+  it('parses current agent-* format', () => {
+    expect(parseReviewerSessionName('agent-PAN-540-review-correctness')).toEqual({
+      role: 'correctness',
+      issueId: 'PAN-540',
     });
   });
 
-  it('round-trips for every reviewer role', () => {
-    const project = 'panopticon';
-    const issue = 'pan-830';
+  it('round-trips agent-* format for every reviewer role', () => {
     for (const role of REVIEWER_ROLES) {
-      const name = getReviewerSessionName(role as ReviewerRole, project, issue);
+      const name = getReviewerSessionName(role as ReviewerRole, 'panopticon', 'PAN-830');
       const parsed = parseReviewerSessionName(name);
       expect(parsed?.role).toBe(role);
-      expect(parsed?.projectKey).toBe(project);
-      expect(parsed?.issueId).toBe(issue);
+      expect(parsed?.issueId).toBe('PAN-830');
     }
   });
 
+  it('parses legacy specialist-* format for backward compatibility', () => {
+    expect(parseReviewerSessionName('specialist-panopticon-PAN-540-review-correctness')).toEqual({
+      role: 'correctness',
+      issueId: 'PAN-540',
+    });
+  });
+
   it('returns null for non-reviewer specialist names (e.g. work-agent)', () => {
-    expect(parseReviewerSessionName('specialist-panopticon-540-work-agent')).toBeNull();
+    expect(parseReviewerSessionName('specialist-panopticon-PAN-540-work-agent')).toBeNull();
   });
 
   it('returns null for legacy timestamp-based reviewer names', () => {
     expect(
-      parseReviewerSessionName('review-540-1714000000-correctness'),
+      parseReviewerSessionName('review-PAN-540-1714000000-correctness'),
     ).toBeNull();
   });
 
   it('returns null for unknown reviewer roles', () => {
     expect(
-      parseReviewerSessionName('specialist-panopticon-540-review-bogus'),
+      parseReviewerSessionName('specialist-panopticon-PAN-540-review-bogus'),
     ).toBeNull();
   });
 

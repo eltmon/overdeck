@@ -8,12 +8,12 @@ const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 
 vi.mock('../../../src/lib/tracker/rally-api.js', () => ({
-  RallyRestApi: vi.fn().mockImplementation(() => ({
+  RallyRestApi: vi.fn().mockImplementation(function () { return {
     query: mockQuery,
     create: mockCreate,
     update: mockUpdate,
     server: 'https://rally1.rallydev.com',
-  })),
+  }; }),
 }));
 
 /** Helper: build a WSAPI response wrapping the given results. */

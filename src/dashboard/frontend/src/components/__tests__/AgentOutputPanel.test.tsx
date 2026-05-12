@@ -158,14 +158,7 @@ describe('AgentOutputPanel — planning agent rendering (AC4)', () => {
     expect(screen.getByText(/No issue associated/)).toBeInTheDocument();
   });
 
-  it('fetches specialist status with project and issue scoped route', async () => {
-    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ isRunning: true }) }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderPanel('specialist-panopticon-PAN-509-review-agent');
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/specialists/panopticon/PAN-509/review-agent/status');
-    });
-  });
+  // The /api/specialists/:project/:issue/:type/status endpoint was retired
+  // in PAN-1048 — specialist running state is now derived from the agent
+  // snapshot's status field. No fetch is expected.
 });

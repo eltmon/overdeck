@@ -1,0 +1,32 @@
+{
+  "version": "1",
+  "issueId": "PAN-1106",
+  "created": "2026-05-12T17:55:41.460Z",
+  "updated": "2026-05-12T17:55:41.490Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-12T17:55:41Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1106\n\n# Review Synthesis — PAN-1106 — 2026-05-12T17:56:00Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1106/.pan/review/agent-pan-1106-review-bf1eb8ac/context.json\n- Branch: feature/1106\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1106\n\n## Convoy Status\n| Sub-role | Status | Blocking findings |\n| --- | --- | --- |\n| security | done | 0 |\n| correctness | done | 0 |\n| performance | done | 0 |\n| requirements | done | 1 |\n\n## Blocking Findings\n\n### [requirements] Ship/test rows do not expose an attachable tmux session for idle live sessions — `src/dashboard/server/routes/projects.ts:219`\nThe requirements reviewer found that the new ship/test nodes are visible, but they do not populate `tmuxSession` because that field is only set for `work` and `planning` session types. The frontend computes the terminal target as `session.tmuxSession || (session.presence === 'active' ? session.sessionId : undefined)` in `src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx:118`, while live tmux sessions can be reported as `idle` or `suspended` by `deriveSessionPresence()`. As a result, a live idle ship/test row can render “No terminal session available” instead of attaching to the session, leaving the acceptance criteria “Where to click to attach to the right session” and “Clicking a role row opens the right tmux session / conversation” partially unmet.\n\nSuggested fix from the reviewer: populate `tmuxSession: checkId` for ship/test nodes when the tmux session exists, or make the session panel fallback to `sessionId` for any non-ended session type whose `sessionId` is the canonical tmux name.\n\n## Non-blocking Findings\n\n### [requirements] Per-role cost display remains ambiguous\nThe requirements reviewer noted that `SessionNode` includes model, status, duration, presence, and round metadata, but no per-node cost field (`packages/contracts/src/types.ts:445`). If “where applicable” means every role row should show cost inline, the contract needs a new field; if issue-level/review-level cost UI already satisfies it, no change is required.\n\n## Clean Sub-roles\n- security\n- correctness\n- performance\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1106/.pan/review/agent-pan-1106-review-bf1eb8ac/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1106 -m \"Fixed review issues\"`"
+    }
+  ],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-12T17:55Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-12T17:55:41.460Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "minimax-m2.7-highspeed",
+      "timestamp": "2026-05-12T17:55:41.490Z"
+    }
+  ]
+}

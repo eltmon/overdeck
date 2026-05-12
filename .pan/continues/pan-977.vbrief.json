@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-977",
   "created": "2026-05-08T09:40:09.134Z",
-  "updated": "2026-05-10T17:32:59.566Z",
+  "updated": "2026-05-12T17:58:28.562Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
-  "resumePoint": null,
+  "resumePoint": "rebase-on-main-and-resubmit",
   "beadsMapping": {},
   "agentModel": "claude-sonnet-4-6",
   "sessionHistory": [

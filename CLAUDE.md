@@ -62,6 +62,35 @@ The goal is autonomous correctness. Every manual intervention is a system bug.
 
 When working directly on `main` (not in a Panopticon workspace), commit completed changes and push to `origin` before ending the session. Agent PRs merge to `origin/main` through the pipeline — unpushed local commits cause divergence that requires manual merge resolution. Don't commit half-done work; finish the change, verify it builds, then commit and push.
 
+## CRITICAL: Releases Go Through `pan release stable` — Never Manual
+
+**To cut a new release of `@panctl/*`, ALWAYS use `pan release stable --version X.Y.Z`. NEVER run `git tag v...` manually, never edit `"version"` in any `package.json` directly, never `npm version` or `npm publish`.**
+
+The release tooling does five things atomically that humans (and agents) get wrong piecemeal:
+
+1. Bumps `package.json`, `apps/desktop/package.json`, `packages/contracts/package.json` together (mismatches silently break the npm publish).
+2. Generates rich release notes from `git log <prev-tag>..HEAD` into `.release/<tag>.md`.
+3. Commits everything with the canonical subject `chore: release X.Y.Z`.
+4. Creates an annotated tag.
+5. Lets the CI release pipeline publish to npm via OIDC and create the GitHub Release with attached desktop binaries.
+
+**How to release:**
+
+```bash
+# From a clean main, after the change you want to ship is committed
+pan release stable --version 0.9.4
+git push origin main
+git push origin v0.9.4
+```
+
+**Guards already in place** (if you bypass them, you're working against the system):
+
+- `.husky/pre-push` rejects any `v*` tag whose commit doesn't have matching `package.json` versions and a committed `.release/<tag>.md`.
+- `.github/workflows/release.yml` re-runs the same check on the runner side; tags missing the artifacts cause the release pipeline to fail loudly before any publish.
+- `.husky/commit-msg` rejects commits that change a `package.json` version field unless the subject is `chore: release X.Y.Z`. This catches the failure one step earlier than the push hook.
+
+**If asked to "release", "tag", "bump version", "publish", or anything similar:** the answer is `pan release stable --version X.Y.Z`. Never a workaround, never a manual tag, never `--no-verify`.
+
 ## CRITICAL: No Blocking Calls in Dashboard Server Code
 
 **NEVER use `execSync`, `readFileSync`, `writeFileSync`, `readdirSync`, or `statSync` in any code reachable from the dashboard server** (Effect route handlers in `src/dashboard/server/routes/`, services in `src/dashboard/server/services/`, or any module imported by them).
@@ -116,6 +145,30 @@ The `pan` binary's subcommands and Claude Code's `pan-*` skills follow a strict 
 - **When the CLI changes, the wrapper skill changes in the same commit.** `scripts/lint-skills.sh` (wired into `npm run lint`) enforces this by cross-checking every flag and subcommand a wrapper SKILL.md mentions against the actual `pan <verb> --help` output. Drift fails CI.
 
 See [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) for the full rules, shapes (CLI-wrapper / CLI-sub-wrapper / Workflow / Reference / Topical), and creating-a-new-skill checklist.
+
+## Planning Modes
+
+Panopticon supports two planning modes:
+
+### Interactive (default)
+```bash
+pan plan <id>
+```
+Launches an interactive planning session where the agent asks Q&A questions before producing a vBRIEF.
+
+### Auto (non-interactive)
+```bash
+pan plan <id> --auto
+```
+Runs the planning agent end-to-end without prompting. If it encounters a contradiction it can't resolve, it escalates to interactive mode. All inferred choices are recorded in `plan.autoDecisions[]` for audit.
+
+### Auto-Start (skip planning)
+```bash
+pan start <id> --auto
+```
+Skips the planning agent entirely. Synthesizes a minimal vBRIEF from the issue title/body, creates beads, and spawns the work agent directly. For trivial issues (typos, version bumps) where full planning is overkill.
+
+**Always verify available flags with `pan <verb> --help`** — the CLI is self-documenting and flags may change between versions.
 
 ## Project Structure
 

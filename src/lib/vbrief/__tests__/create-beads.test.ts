@@ -118,31 +118,63 @@ describe('createBeadsFromVBrief', () => {
     expect(result.created).toContain('PAN-TEST: First task');
   });
 
-  it('auto-inits database when bd list fails with "database not found"', async () => {
-    // Use a nested workspace path so deriveProjectPrefix is deterministic:
-    // workspace = projectRoot/workspaces/feature-init  →  prefix = basename(projectRoot)
+  it('refuses to bd init when redirect exists and probe fails (would clobber redirect)', async () => {
+    // Regression: createBeadsFromVBrief used to run `bd init --prefix` in a worktree
+    // whenever the connectivity probe failed AND a redirect existed. `bd init` creates
+    // a self-contained local Dolt DB, clobbering the redirect — and if init then failed
+    // partway, the worktree was left with metadata.json pointing at a schema-less local
+    // DB that broke every subsequent bd call ("table not found: issues").
     const projectRoot = WORKSPACE_DIR;
-    const workspacePath = join(projectRoot, 'workspaces', 'feature-init');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-redirect-probe-fail');
     mkdirSync(workspacePath, { recursive: true });
 
     setupRedirect(workspacePath);
+    writePlan(workspacePath, makeDoc('PAN-NOINIT', [{ id: 'item-1', title: 'Should not init' }]));
+
+    const dbError = new Error('Error 1146 (HY000): table not found: issues');
+    mockExecAsync
+      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
+      .mockRejectedValueOnce(dbError);                                 // bd list --json --limit 0 (probe)
+
+    const result = await createBeadsFromVBrief(workspacePath);
+
+    // bd init must NOT have been called.
+    const initCall = mockExecAsync.mock.calls.find(
+      ([file, args]: [string, string[]]) =>
+        file === 'bd' && Array.isArray(args) && args[0] === 'init',
+    );
+    expect(initCall).toBeUndefined();
+
+    expect(result.success).toBe(false);
+    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.errors[0]).toMatch(/redirect|main beads/i);
+  });
+
+  it('runs bd init only when there is no redirect AND no main beads (true fresh install)', async () => {
+    // Standalone path: a single-repo project (not a worktree) with no .beads/ anywhere.
+    // The early setup block in createBeadsFromVBrief runs `bd init` here (line ~92),
+    // because mainBeadsDir doesn't exist and beadsDir doesn't exist. The probe that
+    // follows then succeeds against the freshly-initialized DB.
+    const projectRoot = WORKSPACE_DIR;
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-init');
+    mkdirSync(workspacePath, { recursive: true });
+    // No setupRedirect, no main .beads/ — true fresh-install scenario.
+
     writePlan(workspacePath, makeDoc('PAN-INIT', [{ id: 'item-1', title: 'Setup task' }]));
 
     const expectedPrefix = basename(projectRoot).toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
-    const dbError = new Error('Error: database not found, defaulting to local');
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
-      .mockRejectedValueOnce(dbError)                                  // bd list --json --limit 0
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd init --prefix <expectedPrefix>
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd init --prefix <expectedPrefix> (early setup)
       .mockResolvedValueOnce({ stdout: '', stderr: '' })               // git config beads.role contributor
       .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd config set export.git-add false
-      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ...
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd list --json --limit 0 (probe — succeeds after init)
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ... (idempotency)
       .mockResolvedValueOnce({ stdout: 'bead-002\n', stderr: '' });    // bd create
 
     const result = await createBeadsFromVBrief(workspacePath);
 
-    // bd init must have been called with the repo-derived prefix.
     const initCall = mockExecAsync.mock.calls.find(
       ([file, args]: [string, string[]]) =>
         file === 'bd' && Array.isArray(args) && args[0] === 'init' && args.includes('--prefix'),

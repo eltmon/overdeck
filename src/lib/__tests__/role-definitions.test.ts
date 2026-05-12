@@ -69,13 +69,15 @@ describe('role definitions', () => {
     }
   });
 
-  it('defines inspect and inspect-deep as work sub-roles without ambient Claude subagents', () => {
+  it('defines inspect and inspect-deep as workflow-injected work sub-roles', () => {
     expect(existsSync(join(process.cwd(), '.claude/agents/inspect.md'))).toBe(false);
     expect(existsSync(join(process.cwd(), '.claude/agents/inspect-deep.md'))).toBe(false);
 
     const body = readRepoFile('src/lib/cloister/prompts/inspect-agent.md');
     expect(body).toContain('INSPECTION PASSED');
     expect(body).toContain('INSPECTION BLOCKED');
+    expect(body).toContain('{{issueId}}');
+    expect(body).toContain('{{beadId}}');
 
     const inspectAgentSource = readRepoFile('src/lib/cloister/inspect-agent.ts');
     expect(inspectAgentSource).toContain("resolveModel('work', subRole, config)");

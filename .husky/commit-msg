@@ -1,1 +1,69 @@
-npx --no -- commitlint --edit "$1"
+#!/bin/sh
+# 1. Conventional-commits lint (project convention).
+npx --no -- commitlint --edit "$1" || exit 1
+
+# 2. Guard: block commits that change a `package.json` "version" field unless
+# the commit subject is the canonical `chore: release X.Y.Z` produced by
+# `pan release stable`. Catches the failure mode where someone manually
+# bumps a version (which silently breaks the npm publish — see v0.9.0).
+#
+# Merge commits may legitimately carry version bumps that already landed on
+# main; this hook should not make feature branches unable to sync with main.
+#
+# Bypass with `git commit --no-verify` if you really know what you're doing;
+# the pre-push hook and CI release guard will still reject the resulting tag
+# unless all 3 package.json files and .release/<tag>.md are aligned.
+
+if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+  exit 0
+fi
+
+staged_pkg_changes=$(git diff --cached --name-only | grep -E '(^|/)package\.json$' || true)
+if [ -z "$staged_pkg_changes" ]; then
+  exit 0
+fi
+
+version_changed=0
+for pkg in $staged_pkg_changes; do
+  if git diff --cached -U0 "$pkg" | grep -E '^[-+]\s*"version"\s*:' >/dev/null; then
+    version_changed=1
+    break
+  fi
+done
+
+if [ "$version_changed" -eq 0 ]; then
+  exit 0
+fi
+
+first_line=$(head -n 1 "$1")
+if echo "$first_line" | grep -Eq '^chore: release [0-9]+\.[0-9]+\.[0-9]+(-canary\.[0-9]+)?$'; then
+  exit 0
+fi
+
+cat >&2 <<EOF
+
+Refusing to commit a package.json version change outside of \`pan release stable\`.
+
+Detected version field changes staged in:
+$(echo "$staged_pkg_changes" | sed 's/^/  /')
+
+Commit subject: $first_line
+
+If this is a release, abort and run:
+
+  pan release stable --version X.Y.Z
+
+If you're editing dependencies or scripts and the version diff is unintended,
+unstage the version line:
+
+  git restore --staged package.json   # then edit out the version change
+
+If you're sure this is correct and you want to override, re-run with:
+
+  git commit --no-verify
+
+(but be aware the pre-push hook and CI release guard will still reject the
+resulting tag if package.json versions and .release/<tag>.md aren't aligned.)
+
+EOF
+exit 1

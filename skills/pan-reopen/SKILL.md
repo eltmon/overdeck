@@ -1,34 +1,49 @@
 ---
 name: pan-reopen
-description: "pan reopen <id> — reopen a completed issue, resetting specialist state for a new implementation cycle"
+description: "pan reopen <id> — re-enter the pipeline for a CLOSED/COMPLETED/CANCELLED issue. NOT for issues already in progress — use `pan review restart` for that."
 triggers:
-  - reopen issue
+  - reopen closed issue
+  - reopen completed issue
   - reopen PAN-
-  - issue needs re-work
-  - re-open this issue
-  - reset specialist status
-  - reopen for rework
   - issue was closed but needs work
+  - issue needs re-work after merge
 ---
 
-# Reopen Issue for Re-Work
+# Reopen a Closed/Completed Issue for Re-Work
 
-Use this skill when an issue needs to be re-worked after being marked done, when review feedback requires significant new work, or when a merged fix turns out to be incomplete.
+Use this skill only when an issue has **already been closed, completed, or cancelled** and needs to re-enter the pipeline.
+
+If the issue is still in progress and you want to re-trigger reviewers or reset specialist state, **do not use `pan reopen`** — see [\"When NOT to Use Reopen\"](#when-not-to-use-reopen) below.
 
 ## What Reopen Does
 
 1. **Moves tracker status** to "In Progress" (not Backlog — agent resumes with existing plan)
 2. **Resets specialist states** — review/test/merge status → pending
 3. **Removes queue items** — clears any stale entries from specialist queues
-4. **Updates STATE.md** — appends a "Reopened" section with context
-5. **Fetches tracker comments** — injects latest feedback into STATE.md
+4. **Updates the continue file** — appends a "Reopened" breadcrumb with context
+5. **Fetches tracker comments** — injects latest feedback for the agent
 
-## When to Use
+## Preflight Guard
 
-- Issue was marked Done but follow-up work is needed
-- Review passed but post-merge testing found regressions
-- User requested changes after review
-- Agent fast-pathed to done on restart (STATE.md said "complete")
+As of PAN-1115, `pan reopen <id>` refuses to run when the issue's current tracker state is in-progress-like (In Progress, In Review, Todo, Backlog, Open, etc.) and prints a pointer to the right command for that situation. Re-run with `--force` to override the guard if you truly want reopen semantics on an already-open issue.
+
+## When to Use Reopen
+
+- Issue was marked **Done / Closed** but follow-up work is needed
+- Issue was **Cancelled** and now needs to be picked back up
+- Review passed and merged, but post-merge testing found a regression that warrants a fresh implementation cycle on the same issue
+- Agent fast-pathed to done on restart and the issue's tracker state is closed but the work was incomplete
+
+## When NOT to Use Reopen
+
+If the issue is **already In Progress** and one of these is true, use the listed command instead. None of these touch code, git, branches, or PRs — they only reset pipeline state.
+
+| Situation | Command |
+| --- | --- |
+| Reviewers are stuck / errored / silently exited and you want fresh ones | `pan review restart <id>` |
+| You want to force review/test/merge cycles back to pending (human override) | `pan review reset <id>` |
+| You want to kill running reviewers and leave the worker idle | `pan review abort <id>` |
+| Work agent should pick up where it left off, no state reset needed | just `pan start <id>` |
 
 ## How to Reopen
 

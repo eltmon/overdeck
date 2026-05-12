@@ -9,12 +9,12 @@ const mockTransitionIssue = vi.fn();
 const mockAddComment = vi.fn();
 
 vi.mock('../../../../lib/tracker/rally.js', () => ({
-  RallyTracker: vi.fn().mockImplementation(() => ({
+  RallyTracker: vi.fn().mockImplementation(function () { return {
     getIssue: mockGetIssue,
     getChildIssues: mockGetChildIssues,
     transitionIssue: mockTransitionIssue,
     addComment: mockAddComment,
-  })),
+  }; }),
 }));
 
 // ─── Mock tracker-config ──────────────────────────────────────────────────────
