@@ -349,16 +349,19 @@ describe('Dashboard Issue Filtering (PAN-76)', () => {
 });
 
 describe('getOneDayAgo helper', () => {
-  it('should return a date exactly 24 hours ago', () => {
-    const now = new Date('2024-01-15T12:00:00Z');
+  beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(now);
+    vi.setSystemTime(new Date('2024-01-15T12:00:00Z'));
+  });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should return a date exactly 24 hours ago', () => {
     const oneDayAgo = getOneDayAgo();
 
     expect(oneDayAgo.getTime()).toBe(new Date('2024-01-14T12:00:00Z').getTime());
-
-    vi.useRealTimers();
   });
 
   it('should return a new Date object each time', () => {

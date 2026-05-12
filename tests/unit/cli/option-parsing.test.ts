@@ -30,6 +30,8 @@ function runCli(args: string[]): { stdout: string; stderr: string; status: numbe
     const stdout = execSync(`node ${CLI_PATH} ${args.join(' ')}`, {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 2000,
+      env: { ...process.env, DASHBOARD_URL: 'http://127.0.0.1:9' },
     });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
