@@ -68,6 +68,16 @@ export async function queryBeadsForIssue(
   }
 }
 
+export async function assertIssueHasBeads(workspacePath: string, issueId: string): Promise<void> {
+  const beads = await queryBeadsForIssue(workspacePath, issueId);
+  if (beads.length === 0) {
+    const label = issueId.toLowerCase();
+    throw new Error(
+      `No beads tasks found for ${issueId}. Planning must create beads labeled "${label}" before a work agent can start.`
+    );
+  }
+}
+
 /**
  * Look up a single bead by ID from the live Dolt database via `bd show`.
  * Returns null on any failure.

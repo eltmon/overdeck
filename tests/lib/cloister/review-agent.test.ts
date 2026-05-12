@@ -19,6 +19,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import {
   buildConvoyPrompt,
+  isReviewSessionForIssue,
+  killAllReviewerSessions,
   killAllReviewSessions,
   spawnReviewSubRoleForIssue,
 } from '../../../src/lib/cloister/review-agent.js';
@@ -159,6 +161,62 @@ describe('killAllReviewSessions', () => {
 
     expect(result.killed).toHaveLength(0);
     expect(result.failed).toContain('review-coordinator-PAN-999-1234567890000');
+  });
+});
+
+// ── issue-scoped review abort/restart cleanup ─────────────────────────────────
+
+describe('killAllReviewerSessions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockKillSessionAsync.mockResolvedValue(undefined);
+  });
+
+  it('kills the parent review orchestrator before convoy sessions exist', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'agent-pan-1080-review',
+      'agent-pan-1080',
+      'agent-pan-999-review',
+    ]);
+
+    const result = await killAllReviewerSessions('panopticon-cli', 'PAN-1080');
+
+    expect(result.killed).toEqual(['agent-pan-1080-review']);
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('agent-pan-1080-review');
+  });
+
+  it('kills the parent review orchestrator and full convoy sessions', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'agent-pan-1080-review',
+      'agent-pan-1080-review-security',
+      'agent-pan-1080-review-correctness',
+      'specialist-panopticon-cli-pan-1080-review-performance',
+      'specialist-panopticon-cli-pan-1080-review-requirements',
+      'review-coordinator-pan-1080-1234567890',
+      'agent-pan-1080',
+    ]);
+
+    const result = await killAllReviewerSessions('panopticon-cli', 'PAN-1080');
+
+    expect(result.killed).toEqual(expect.arrayContaining([
+      'agent-pan-1080-review',
+      'agent-pan-1080-review-security',
+      'agent-pan-1080-review-correctness',
+      'specialist-panopticon-cli-pan-1080-review-performance',
+      'specialist-panopticon-cli-pan-1080-review-requirements',
+      'review-coordinator-pan-1080-1234567890',
+    ]));
+    expect(result.killed).toHaveLength(6);
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(6);
+  });
+
+  it('matches only review sessions for the requested issue', () => {
+    expect(isReviewSessionForIssue('agent-pan-1080-review', 'panopticon-cli', 'PAN-1080')).toBe(true);
+    expect(isReviewSessionForIssue('agent-pan-1080-review-security', 'panopticon-cli', 'PAN-1080')).toBe(true);
+    expect(isReviewSessionForIssue('agent-pan-1080', 'panopticon-cli', 'PAN-1080')).toBe(false);
+    expect(isReviewSessionForIssue('agent-pan-1081-review', 'panopticon-cli', 'PAN-1080')).toBe(false);
   });
 });
 

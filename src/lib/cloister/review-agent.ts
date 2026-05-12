@@ -45,7 +45,6 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { killSessionAsync, listSessionNamesAsync, isPaneDeadAsync } from '../tmux.js';
 import { emitActivityEntry } from '../activity-logger.js';
-import { getReviewerSessionName, REVIEWER_ROLES } from './specialists.js';
 import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
 import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
@@ -430,24 +429,44 @@ export async function spawnReviewRoleForIssue(
  * terminal lifecycle events: merge complete, reset, cancel, deep-wipe, and
  * explicit `pan review abort`.
  *
- * Iterates the canonical REVIEWER_ROLES set so callers don't need a
- * `ReviewAgentConfig[]` — every issue has the same five role slots.
+ * Matches the parent review role, convoy children, and legacy coordinator
+ * sessions so callers do not need to know which review phase has started.
  */
+export function isReviewSessionForIssue(sessionName: string, projectKey: string | undefined, issueId: string): boolean {
+  const session = sessionName.toLowerCase();
+  const issue = issueId.toLowerCase();
+  const project = projectKey?.toLowerCase();
+
+  if (session === `agent-${issue}-review` || session.startsWith(`agent-${issue}-review-`)) return true;
+  if (session.startsWith(`review-${issue}-`) || session.startsWith(`review-coordinator-${issue}-`)) return true;
+  if (!project) return false;
+  if (session === `specialist-${project}-${issue}-review-agent`) return true;
+  return session.startsWith(`specialist-${project}-${issue}-review-`);
+}
+
 export async function killAllReviewerSessions(
-  projectKey: string,
+  projectKey: string | undefined,
   issueId: string,
 ): Promise<{ killed: string[]; failed: string[] }> {
   const killed: string[] = [];
   const failed: string[] = [];
+  let allSessions: string[];
+
+  try {
+    allSessions = await listSessionNamesAsync();
+  } catch (err) {
+    console.warn('[review-agent] Failed to list tmux sessions during reviewer cleanup:', err instanceof Error ? err.message : String(err));
+    return { killed, failed };
+  }
+
+  const sessionsToKill = allSessions.filter(s => isReviewSessionForIssue(s, projectKey, issueId));
   await Promise.all(
-    REVIEWER_ROLES.map(async (role) => {
-      const sessionName = getReviewerSessionName(role, projectKey, issueId);
+    sessionsToKill.map(async (sessionName) => {
       try {
         await killSessionAsync(sessionName);
         console.log(`[review-agent] Killed reviewer session ${sessionName}`);
         killed.push(sessionName);
       } catch (err) {
-        // Session may not exist (e.g., never spawned, or already killed)
         console.log(`[review-agent] Session ${sessionName} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
         failed.push(sessionName);
       }

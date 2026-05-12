@@ -109,6 +109,14 @@ vi.mock('../../src/lib/harness-policy.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../src/lib/beads-query.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/beads-query.js')>();
+  return {
+    ...actual,
+    assertIssueHasBeads: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 describe('PAN-1048 role primitive — agent spawning', () => {
   let testPanopticonHome: string;
   let testAgentsDir: string;
@@ -124,6 +132,8 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     vi.mocked(sessionExistsAsync).mockResolvedValue(false);
     const cliproxy = await import('../../src/lib/cliproxy.js');
     vi.mocked(cliproxy.isCliproxyRunning).mockReturnValue(true);
+    const beadsQuery = await import('../../src/lib/beads-query.js');
+    vi.mocked(beadsQuery.assertIssueHasBeads).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -187,6 +197,21 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       expect(state.model).toBe('claude-haiku-4-5');
       expect(state.role).toBe('work');
+    });
+
+    it('refuses to spawn before creating state when the issue has no beads', async () => {
+      const beadsQuery = await import('../../src/lib/beads-query.js');
+      vi.mocked(beadsQuery.assertIssueHasBeads).mockRejectedValueOnce(
+        new Error('No beads tasks found for PAN-NOBEADS-1')
+      );
+
+      await expect(spawnAgent({
+        issueId: 'PAN-NOBEADS-1',
+        workspace: '/tmp/test-workspace',
+        role: 'work',
+      })).rejects.toThrow(/No beads tasks found/);
+
+      expect(getAgentState('agent-pan-nobeads-1')).toBeNull();
     });
   });
 

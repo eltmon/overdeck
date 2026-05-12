@@ -808,7 +808,7 @@ interface DestroyOptions {
   project?: string;
 }
 
-async function destroyCommand(issueId: string, options: DestroyOptions): Promise<void> {
+export async function destroyCommand(issueId: string, options: DestroyOptions): Promise<void> {
   const spinner = ora('Destroying workspace...').start();
 
   try {
