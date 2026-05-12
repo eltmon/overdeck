@@ -228,7 +228,7 @@ export function createConversation(opts: {
       now,
       opts.claudeSessionId ?? null,
       opts.title ?? null,
-      opts.titleSource,
+      opts.titleSource ?? 'default',
       opts.titleSeed ?? null,
       opts.model ?? null,
       opts.effort ?? null,

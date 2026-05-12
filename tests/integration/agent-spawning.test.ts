@@ -136,7 +136,9 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     vi.mocked(beadsQuery.assertIssueHasBeads).mockResolvedValue(undefined);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    const { resetDatabase } = await import('../../src/lib/database/index.js');
+    resetDatabase();
     if (originalPanopticonHome) {
       process.env.PANOPTICON_HOME = originalPanopticonHome;
     } else {
@@ -233,6 +235,21 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       // DEFAULT_ROLES carries no per-role harness override → must default to
       // claude-code, not be left undefined.
       expect(state.harness).toBe(DEFAULT_ROLES[role].harness ?? 'claude-code');
+    });
+
+    it('creates conversation records for specialist role runs', async () => {
+      const { getConversationByName } = await import('../../src/lib/database/conversations-db.js');
+
+      await spawnRun('PAN-SPECIALIST-1', 'review', {
+        workspace: '/tmp/test-workspace',
+        subRole: 'requirements',
+      });
+
+      const conv = getConversationByName('agent-pan-specialist-1-review-requirements');
+      expect(conv).not.toBeNull();
+      expect(conv?.issueId).toBe('PAN-SPECIALIST-1');
+      expect(conv?.titleSource).toBe('default');
+      expect(conv?.claudeSessionId).toBeTruthy();
     });
 
     it('refuses to spawn when a role session is already in tmux', async () => {

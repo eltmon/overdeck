@@ -37,7 +37,7 @@ describe('conversations-db', () => {
     expect(conv.createdAt).toBeTruthy();
     expect(conv.endedAt).toBeNull();
     expect(conv.lastAttachedAt).toBeNull();
-    expect(conv.titleSource).toBeNull();
+    expect(conv.titleSource).toBe('default');
     expect(conv.titleSeed).toBeNull();
   });
 

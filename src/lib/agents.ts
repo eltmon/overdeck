@@ -36,6 +36,7 @@ import { canUseHarness } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtimes/pi-fifo.js';
 import { assertIssueHasBeads } from './beads-query.js';
+import { createConversation } from './database/conversations-db.js';
 
 const execAsync = promisify(exec);
 
@@ -1787,10 +1788,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     ? await getPiLauncherFields(agentId, selectedModel)
     : {};
 
-  // Create a conversation record for specialist roles so their JSONL sessions
-  // are persisted and viewable in the dashboard. The orchestrator (review
-  // without subRole) does not get a conversation — it manages sub-role
-  // reviewers and its output is visible through the work agent's panel.
   const isSpecialistRole = (role === 'review' && options.subRole) || role === 'test' || role === 'ship';
   let sessionId: string | undefined;
   if (isSpecialistRole) {
@@ -1806,7 +1803,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
         harness: resolvedHarness,
       });
     } catch (err) {
-      // Non-fatal: the specialist still runs, but without a conversation record
       console.warn(`[spawnRun] Failed to create conversation for ${agentId}:`, err instanceof Error ? err.message : String(err));
     }
   }
