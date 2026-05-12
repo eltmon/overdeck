@@ -756,8 +756,8 @@
     "hash": "2d020d17346590a54bf7c6c046007b70"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/tests/dashboard/issue-filtering.test.ts": {
-    "mtime": 1778364880.4304764,
-    "hash": "3034cd9e175d4f7dda5b9651f5cb138a"
+    "mtime": 1778625764.3609195,
+    "hash": "081b82a93283e16f05cd2ad30274c87a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/tests/dashboard/read-model-validators.test.ts": {
     "mtime": 1778557710.9969394,
@@ -904,7 +904,7 @@
     "hash": "f0c24b8cbfb7dc9817d5001c60cb1657"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/scripts/record-cost-event.d.ts": {
-    "mtime": 1778625224.635442,
+    "mtime": 1778625695.0805736,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/scripts/notify-complete": {
@@ -4316,8 +4316,8 @@
     "hash": "2a515ae7f5f94f28fb35b46a81577694"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/src/cli/commands/done.ts": {
-    "mtime": 1778625362.7822165,
-    "hash": "b3470b3541898b353957f38a5a0e801c"
+    "mtime": 1778625677.23097,
+    "hash": "b76d7de060588a3e99e82f78404cb1a1"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/src/cli/commands/plan-finalize.ts": {
     "mtime": 1778557710.9698086,

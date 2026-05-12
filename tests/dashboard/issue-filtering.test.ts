@@ -362,12 +362,16 @@ describe('getOneDayAgo helper', () => {
   });
 
   it('should return a new Date object each time', () => {
+    const now = new Date('2024-01-15T12:00:00Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
     const date1 = getOneDayAgo();
     const date2 = getOneDayAgo();
 
-    // Should be different objects
     expect(date1).not.toBe(date2);
-    // With frozen clocks they have the same value
     expect(date1.getTime()).toBe(date2.getTime());
+
+    vi.useRealTimers();
   });
 });

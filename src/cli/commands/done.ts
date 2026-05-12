@@ -606,6 +606,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     }
 
     await restoreTrackedBeadsExport(workspacePath);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await restoreTrackedBeadsExport(workspacePath);
 
   } catch (error: any) {
     spinner.fail(error.message);
