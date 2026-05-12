@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T19:12:00.724431Z"
+    "updated": "2026-05-12T20:21:31.712402Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a4f2c8d1-7b3e-4a90-b5f6-2e1d9c0a8374",
     "author": "agent:claude-opus-4-7",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T19:12:00.724431Z",
+    "updated": "2026-05-12T20:21:31.712402Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -548,7 +548,7 @@
       {
         "id": "voice-settings-ui",
         "title": "Add Voice Settings section to the Settings page",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -563,7 +563,7 @@
           {
             "id": "voice-settings-ui.ac1",
             "title": "STT provider picker (Moonshine / Google Cloud STT) in Settings > Voice",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -571,7 +571,7 @@
           {
             "id": "voice-settings-ui.ac2",
             "title": "Moonshine model picker (tiny/base) shown when Moonshine selected",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -579,7 +579,7 @@
           {
             "id": "voice-settings-ui.ac3",
             "title": "Google Cloud API key field shown when Google Cloud STT selected",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -587,7 +587,7 @@
           {
             "id": "voice-settings-ui.ac4",
             "title": "Changes persisted via PUT /api/voice/settings",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

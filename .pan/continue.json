@@ -83,11 +83,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed transcription manager implementation for workspace-rlxe; inspection required before dependent Google Cloud STT work should proceed.",
-    "beadId": "workspace-rlxe",
+    "description": "Completed Voice Settings UI for workspace-nu0i; continue with the next ready PAN-1053 bead after committing and closing the bead.",
+    "beadId": "workspace-nu0i",
     "filesToRead": [
-      "src/voice/transcription-manager.ts",
-      "src/voice/transcription.ts"
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      ".pan/spec.vbrief.json"
     ]
   },
   "beadsMapping": {},
@@ -170,7 +170,14 @@
       "reason": "bead-complete",
       "note": "Implemented createTranscriptionManager with VoiceSettings type, applyCurrent/getActive/close lifecycle, Moonshine provider creation, and explicit Google Cloud placeholder for the follow-up provider bead. ESLint passed for the new file.",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-12T20:21:31.712402Z",
+      "reason": "bead-complete",
+      "note": "Implemented Settings > Voice UI with STT provider picker, conditional Moonshine and Google Cloud controls, backend persistence through /api/voice/settings, and localStorage-backed input/output device plus volume controls. Verified with ESLint, npm run typecheck, npm run build, and browser testing against the workspace Node 22 dashboard server.",
+      "agentModel": "gpt-5.5"
     }
   ],
-  "feedback": []
+  "feedback": [],
+  "updatedAt": "2026-05-12T20:21:31.712402Z"
 }
