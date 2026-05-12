@@ -463,6 +463,10 @@
     "mtime": 1778342940.3747826,
     "hash": "5f307ce8a7b6aaffde4f010fa3ec7516"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/google-cloud-transcription.test.ts": {
+    "mtime": 1778617527.844569,
+    "hash": "f2812bf3cc7c8593d3425e124e98c293"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/model-deprecation.test.ts": {
     "mtime": 1778342940.3747826,
     "hash": "6e5ea6469c23f0877244d77a24409c04"
@@ -900,7 +904,7 @@
     "hash": "7931ab290cdb194afbbf233d4b636993"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/record-cost-event.d.ts": {
-    "mtime": 1778617156.5252142,
+    "mtime": 1778617579.682495,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/notify-complete": {
@@ -2295,13 +2299,17 @@
     "mtime": 1778342940.359632,
     "hash": "db86cf73631401d7800fe64df31bc89a"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/voice/google-cloud-transcription.ts": {
+    "mtime": 1778617473.2485251,
+    "hash": "1877f5edb71868eb230c7f1e629923b5"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/voice/transcription.ts": {
-    "mtime": 1778610208.4139163,
+    "mtime": 1778617505.136721,
     "hash": "d4096354309f8cb71503dea0769beed1"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/voice/transcription-manager.ts": {
-    "mtime": 1778613091.968238,
-    "hash": "4c965edf6b11f90ca9f1163214b5ff45"
+    "mtime": 1778617511.5639613,
+    "hash": "6071df580e62be18e85a2786cad696a8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/supervisor/server.ts": {
     "mtime": 1778342940.3724341,
@@ -4628,8 +4636,8 @@
     "hash": "4a87e31fba1163a020fc4fb0b5fe51e7"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docker-compose.devcontainer.yml": {
-    "mtime": 1778342948.2918797,
-    "hash": "64847538dd5ad3bc2a2279c537489937"
+    "mtime": 1778617589.2697008,
+    "hash": "6bcb5ed74352843f55421f80eed5edf4"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/E2E_TEST_PLAN.md": {
     "mtime": 1778342940.3730102,

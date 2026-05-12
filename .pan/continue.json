@@ -83,10 +83,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed Voice Settings UI for workspace-nu0i; continue with the next ready PAN-1053 bead after committing and closing the bead.",
-    "beadId": "workspace-nu0i",
+    "description": "Completed Google Cloud STT implementation and transcription-manager wiring for workspace-9dni/workspace-prvi; continue with the next ready PAN-1053 bead after committing and closing both beads.",
+    "beadId": "workspace-prvi",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      "src/voice/google-cloud-transcription.ts",
+      "src/voice/transcription-manager.ts",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -176,8 +177,14 @@
       "reason": "bead-complete",
       "note": "Implemented Settings > Voice UI with STT provider picker, conditional Moonshine and Google Cloud controls, backend persistence through /api/voice/settings, and localStorage-backed input/output device plus volume controls. Verified with ESLint, npm run typecheck, npm run build, and browser testing against the workspace Node 22 dashboard server.",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-12T20:26:51.412052Z",
+      "reason": "bead-complete",
+      "note": "Implemented Google Cloud Speech streaming transcription with @google-cloud/speech, added a skipped credential-gated integration test, and wired transcription-manager to instantiate Google Cloud provider while preserving emitter teardown/recreation semantics. ESLint, typecheck, focused vitest, and build passed.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": [],
-  "updatedAt": "2026-05-12T20:21:31.712402Z"
+  "updatedAt": "2026-05-12T20:26:51.412052Z"
 }

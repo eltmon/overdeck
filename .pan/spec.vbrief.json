@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T20:21:31.712402Z"
+    "updated": "2026-05-12T20:26:51.412052Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a4f2c8d1-7b3e-4a90-b5f6-2e1d9c0a8374",
     "author": "agent:claude-opus-4-7",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T20:21:31.712402Z",
+    "updated": "2026-05-12T20:26:51.412052Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -1179,7 +1179,7 @@
       {
         "id": "google-cloud-stt-ts",
         "title": "Implement src/voice/google-cloud-transcription.ts — Cloud STT streaming",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -1194,7 +1194,7 @@
           {
             "id": "google-cloud-stt-ts.ac1",
             "title": "createGoogleCloudTranscription() returns ITurnEmitter (same interface as Moonshine)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1202,7 +1202,7 @@
           {
             "id": "google-cloud-stt-ts.ac2",
             "title": "Audio streamed to Google Cloud Speech StreamingRecognize API",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1210,7 +1210,7 @@
           {
             "id": "google-cloud-stt-ts.ac3",
             "title": "Partial results → onPartial callback, final results → onCommitted callback",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1218,7 +1218,7 @@
           {
             "id": "google-cloud-stt-ts.ac4",
             "title": "Integration test skipped if GOOGLE_CLOUD_SPEECH_API_KEY not set",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1228,7 +1228,7 @@
       {
         "id": "transcription-manager-gcp",
         "title": "Wire Google Cloud STT into transcription-manager hot-swap",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -1243,7 +1243,7 @@
           {
             "id": "transcription-manager-gcp.ac1",
             "title": "applyCurrent() instantiates createGoogleCloudTranscription() for provider 'google-cloud'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1251,7 +1251,7 @@
           {
             "id": "transcription-manager-gcp.ac2",
             "title": "Hot-swap: Moonshine→Google Cloud tears down old ITurnEmitter, creates new one",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1259,7 +1259,7 @@
           {
             "id": "transcription-manager-gcp.ac3",
             "title": "WebSocket connection remains open across provider swap",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

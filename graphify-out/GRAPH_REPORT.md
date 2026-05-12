@@ -1,16 +1,16 @@
 # Graph Report - feature-pan-1053  (2026-05-12)
 
 ## Corpus Check
-- 1557 files · ~2,055,766 words
+- 1559 files · ~2,056,131 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 21544 nodes · 31914 edges · 1124 communities (1087 shown, 37 thin omitted)
+- 21560 nodes · 31936 edges · 1127 communities (1091 shown, 36 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 415 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `6498022f`
+- Built from commit: `47fd82a8`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -1081,19 +1081,22 @@
 - [[_COMMUNITY_Community 1063|Community 1063]]
 - [[_COMMUNITY_Community 1064|Community 1064]]
 - [[_COMMUNITY_Community 1065|Community 1065]]
+- [[_COMMUNITY_Community 1066|Community 1066]]
+- [[_COMMUNITY_Community 1067|Community 1067]]
 - [[_COMMUNITY_Community 1068|Community 1068]]
-- [[_COMMUNITY_Community 1070|Community 1070]]
 - [[_COMMUNITY_Community 1071|Community 1071]]
-- [[_COMMUNITY_Community 1072|Community 1072]]
 - [[_COMMUNITY_Community 1073|Community 1073]]
 - [[_COMMUNITY_Community 1074|Community 1074]]
+- [[_COMMUNITY_Community 1075|Community 1075]]
 - [[_COMMUNITY_Community 1076|Community 1076]]
-- [[_COMMUNITY_Community 1078|Community 1078]]
+- [[_COMMUNITY_Community 1077|Community 1077]]
 - [[_COMMUNITY_Community 1079|Community 1079]]
-- [[_COMMUNITY_Community 1080|Community 1080]]
 - [[_COMMUNITY_Community 1081|Community 1081]]
 - [[_COMMUNITY_Community 1082|Community 1082]]
 - [[_COMMUNITY_Community 1083|Community 1083]]
+- [[_COMMUNITY_Community 1084|Community 1084]]
+- [[_COMMUNITY_Community 1085|Community 1085]]
+- [[_COMMUNITY_Community 1086|Community 1086]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `fetch` - 159 edges
@@ -1112,398 +1115,398 @@
   src/dashboard/server/routes/command-deck.ts → docs/god-view.md
 - `pathExists()` --calls--> `Access`  [INFERRED]
   src/dashboard/server/routes/projects.ts → docs/god-view.md
+- `pathExists()` --calls--> `Access`  [INFERRED]
+  src/dashboard/server/routes/jsonl-resolver.ts → docs/god-view.md
 - `readGlobalResourceConfig()` --calls--> `Access`  [INFERRED]
   src/dashboard/server/services/system-health-service.ts → docs/god-view.md
 - `statusCommand()` --calls--> `Color`  [INFERRED]
   src/cli/commands/cloister/status.ts → design/style-guide/STYLE-GUIDE.md
-- `upsertReviewStatus()` --calls--> `upsert()`  [INFERRED]
-  src/lib/database/review-status-db.ts → tests/unit/lib/database.test.ts
 
-## Communities (1124 total, 37 thin omitted)
+## Communities (1127 total, 36 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.03
-Nodes (131): checkStuckWorkAgents(), nudgeIdleWorkAgentsWithOpenBeads(), performKillAndSpawn(), killCommand(), KillOptions, pendingCommand(), recoverCommand(), RecoverOptions (+123 more)
+Cohesion: 0.02
+Nodes (136): AgentOutputPanel(), AgentOutputPanelProps, deriveAgentIssueId(), parseSpecialistSession(), AwaitingMergePage(), AwaitingMergeRow(), BlockedMergeRow(), BlockedRowProps (+128 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.03
-Nodes (132): checkOrphanedReviewStatuses(), checkStuckReviewing(), buildHandoffPrompt(), detectHandoffMethod(), extractSpecialistName(), HandoffMethod, HandoffOptions, HandoffResult (+124 more)
+Cohesion: 0.02
+Nodes (129): ConversationList(), DeaconLogEntry, DeaconStatus(), DeaconStatusData, fetchDeaconLogs(), fetchDeaconStatus(), LOG_LEVEL_COLORS, LOG_LEVEL_LABELS (+121 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.03
-Nodes (127): ACTIVE_STATUS_PATTERNS, addLog(), API_ERROR_PATTERNS, apiErrorRecoveryState, checkAndSuspendIdleAgents(), checkApiErrorAgents(), checkDeadEndAgents(), checkFailedMergeRetry() (+119 more)
+Cohesion: 0.02
+Nodes (139): checkFailedMergeRetry(), checkMissingReviewStatuses(), getNextSequenceNumber(), resolveWorkspacePath(), writeFeedbackFile(), WriteFeedbackOptions, WriteFeedbackResult, archiveReviewerRound() (+131 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.02
-Nodes (123): checkMissingReviewStatuses(), archiveReviewerRound(), buildReviewFeedbackBody(), CLAUDE_ALIAS_WORK_TYPE, cleanupReviewTempStash(), DEFAULT_REVIEW_AGENTS, dispatchParallelReview(), execAsync (+115 more)
+Cohesion: 0.03
+Nodes (140): readCavemanVariant(), checkStuckWorkAgents(), spawnRebaseAgentForBranch(), renderPrompt(), spawnReviewCoordinatorSession(), spawnSingleReviewer(), resolveSpecialistBaseCommand(), rotateSpecialistSession() (+132 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.02
-Nodes (100): AutoPresoListener, AutoPresoMode, AutoPresoSession, AutoPresoSnapshot, ExcalidrawElementLike, WarmupStatus, adminRouteLayer, getAdminTldrRoute (+92 more)
+Cohesion: 0.03
+Nodes (135): ACTIVE_STATUS_PATTERNS, addLog(), API_ERROR_PATTERNS, apiErrorRecoveryState, autoResumeStoppedWorkAgents(), checkAndSuspendIdleAgents(), checkApiErrorAgents(), checkDeadEndAgents() (+127 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.03
-Nodes (106): getActivity(), agentsCache, decodeDomainEvent, deleteAgentRoute, EMPTY_CONVERSATION, evaluateSpawnGuardrails(), execAsync, formatLeakedSpecialistSummary() (+98 more)
+Nodes (107): PlanningState, ZoneAActionsState, DetailPanelLayoutProps, loadPanelState(), PanelMode, PanelState, savePanelState(), formatCost() (+99 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.03
-Nodes (90): AgentCard(), AgentCardProps, AgentPhase, getModelStyle(), MODEL_COLORS, ModelBadge(), AGENT_DEFINITIONS, AgentCardsPanelProps (+82 more)
+Cohesion: 0.02
+Nodes (104): useZoneAActions(), ZoneActionStrip(), ZoneActionStripProps, ZoneBActionStrip(), ZoneBActionStripProps, AlertOptions, ConfirmOptions, DialogContext (+96 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.04
-Nodes (93): cleanupSpawnAndOrphanedStashes(), captureTmuxOutput(), _closeIssueFailures, closeIssueWithCircuitBreaker(), _completedPostMerge, __dirname, dropLingeringPreMergeStashes(), execAsync (+85 more)
+Cohesion: 0.03
+Nodes (114): nudgeIdleWorkAgentsWithOpenBeads(), buildHandoffPrompt(), captureHandoffContext(), serializeHandoffContext(), detectHandoffMethod(), extractSpecialistName(), HandoffMethod, HandoffOptions (+106 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.03
-Nodes (79): fetchConversations(), GeneralConversation, GeneralSectionProps, archiveConversation(), ConversationMutations, favoriteConversation(), stopConversation(), summaryForkConversation() (+71 more)
+Nodes (117): captureTmuxOutput(), _closeIssueFailures, closeIssueWithCircuitBreaker(), _completedPostMerge, __dirname, dropLingeringPreMergeStashes(), execAsync, __filename (+109 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.03
-Nodes (86): backup, bundledFrontendIndex, bundledServer, child, composeFile, config, configContent, configFile (+78 more)
+Cohesion: 0.02
+Nodes (103): reconcileAndCheckIfMerged(), buildSyncFailureFeedback(), execAsync, getSyncTargetBranch(), resolveGitDirs(), runVerificationForIssue(), SyncResult, syncSingleRepo() (+95 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.03
-Nodes (67): WorkLogEntry, ConversationPanel(), ConversationPanelProps, ConversationViewProps, fetchMessages(), FORK_STEPS, MessagesResponse, PHASE_ICONS (+59 more)
+Cohesion: 0.02
+Nodes (88): ArtifactLinks(), ArtifactLinksProps, BulkActionBar(), BulkActionBarProps, BulkCloseOutProgress(), BulkCloseOutProgressProps, BulkCloseResult, BulkCloseStatus (+80 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.03
-Nodes (70): issues, result, importTrackerConfig(), result, clearCacheRoute, ConfirmationRequest, deletePlanningSessionRoute, execAsync (+62 more)
+Cohesion: 0.04
+Nodes (92): forkCommand(), ForkOptions, normalize(), unarchiveConversationCommand(), copySessionFromCompactBoundary(), createSummaryFork(), findLastCompactBoundaryOffset(), generateSummaryForFork() (+84 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.04
-Nodes (67): useZoneAActions(), ZoneActionStrip(), ZoneActionStripProps, ArtifactLinks(), ArtifactLinksProps, AlertOptions, ConfirmOptions, DialogContext (+59 more)
+Cohesion: 0.03
+Nodes (85): AutoPresoListener, AutoPresoMode, AutoPresoSession, AutoPresoSnapshot, ExcalidrawElementLike, WarmupStatus, adminRouteLayer, getAdminTldrRoute (+77 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.03
-Nodes (89): agentDir, dir1, dir2, marker, missing, nested, invalidateAgentsCache(), cb (+81 more)
+Nodes (81): AgentSpawner, AgentSpawnerLive, AgentSpawnerShape, DeepWipeOptions, SpawnedAgent, StartPlanningOptions, StartWorkOptions, getGitHubClient() (+73 more)
 
 ### Community 14 - "Community 14"
 Cohesion: 0.03
-Nodes (72): BulkActionBar(), BulkActionBarProps, BulkCloseOutProgress(), BulkCloseOutProgressProps, BulkCloseResult, BulkCloseStatus, AGENT_ICONS, AgentWarningDialogProps (+64 more)
+Nodes (77): ActivitySection, ActivityView(), ActivityViewProps, CostByStage, fetchActivity(), BulkAgentWarningDialog(), BulkAgentWarningDialogProps, DeepWipeDialogProps (+69 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.03
-Nodes (70): DetailPanelLayout(), DetailPanelLayoutProps, loadPanelState(), PanelMode, PanelState, savePanelState(), fetchOutput(), TerminalPanel() (+62 more)
+Nodes (75): db, makeTestLayer(), makeTestService(), received, runWithService(), store, svc, unsubscribe (+67 more)
 
 ### Community 16 - "Community 16"
 Cohesion: 0.04
-Nodes (63): formatCost(), formatTokens(), InspectorPanel(), InspectorPanelProps, state, EDITOR_LABELS, PanOpenInPicker(), PanOpenInPickerProps (+55 more)
+Nodes (81): getAllSpecialistStatus(), SpecialistStatus, after, row, status, clearWorkspaceStuck(), DbReviewStatusRow, deleteReviewStatus() (+73 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.04
-Nodes (75): Access, computeAgentEnrichment(), execAsync, getActiveSessionPath(), getAgentJsonlMtime(), getAgentJsonlPath(), getAgentPendingQuestions(), getAgentWorkspace() (+67 more)
+Cohesion: 0.03
+Nodes (67): ComposerFooter(), ComposerFooterProps, deleteConversationImage(), PendingImage, sendConversationMessage(), switchModel(), uploadConversationImage(), ensureDefaultConversationModel() (+59 more)
 
 ### Community 18 - "Community 18"
-Cohesion: 0.04
-Nodes (74): forkCommand(), ForkOptions, copySessionFromCompactBoundary(), createSummaryFork(), findLastCompactBoundaryOffset(), generateFallbackSummary(), generateSummaryForFork(), reserveSummaryForkSession() (+66 more)
+Cohesion: 0.03
+Nodes (70): ActivityFeed(), ActivityFeedProps, EVENT_COLORS, EVENT_ICONS, selectIssueActivityFeed(), AgentCard(), AgentCardProps, LastHeardCounter() (+62 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.03
-Nodes (76): dequeueMerge(), execFile(), kCustom, mockExecFile, ActivityEntry, activityLog, ApprovePushResult, buildRichPRBody() (+68 more)
+Cohesion: 0.05
+Nodes (78): BeadsTask, captureBeadsTasks(), captureFiles(), captureGitState(), execAsync, findSpecByIssue(), updateSpecStatus(), writeSpecForIssue() (+70 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.03
-Nodes (67): ChannelPermissionDialog(), ChannelPermissionDialogProps, { container }, onAllow, onDeny, request, ConfirmationDialog(), ConfirmationDialogProps (+59 more)
+Cohesion: 0.04
+Nodes (75): AgentCard(), AgentCardProps, AgentPhase, getModelStyle(), MODEL_COLORS, ModelBadge(), AGENT_DEFINITIONS, AgentCardsPanelProps (+67 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.03
-Nodes (73): ActivityEntry, AgentList(), AgentListProps, CloisterStatus, fetchActivity(), fetchCloisterStatus(), fetchProjectSpecialists(), formatTimeAgo() (+65 more)
+Cohesion: 0.04
+Nodes (62): ChangedFilesTree, EMPTY_DIRECTORY_OVERRIDES, ChatMessage, CompactBoundary, ConversationEvent, ProposedPlan, TurnDiffFileChange, TurnDiffSummary (+54 more)
 
 ### Community 22 - "Community 22"
-Cohesion: 0.04
-Nodes (66): ConversationView(), AgentOutputPanel(), AgentOutputPanelProps, deriveAgentIssueId(), parseSpecialistSession(), AwaitingMergePage(), AwaitingMergeRow(), BlockedMergeRow() (+58 more)
+Cohesion: 0.05
+Nodes (74): AgentStatusOptions, analyzeSession(), detectStatus(), extractCost(), extractModel(), MODEL_PATTERNS, SessionInfo, STATUS_COLORS (+66 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.04
-Nodes (68): AgentSpawner, AgentSpawnerLive, AgentSpawnerShape, DeepWipeOptions, SpawnedAgent, StartPlanningOptions, StartWorkOptions, getGitHubClient() (+60 more)
+Cohesion: 0.03
+Nodes (69): ALL_TABS, OverviewTabSpec, ZoneCOverview(), ZoneCOverviewProps, CostEvent, CostStreamResponse, fetchCostStream(), useCostStream() (+61 more)
 
 ### Community 24 - "Community 24"
 Cohesion: 0.03
-Nodes (71): ALL_TABS, OverviewTabSpec, ZoneCOverview(), ZoneCOverviewProps, BeadsTasksPanel(), CostEvent, CostStreamResponse, fetchCostStream() (+63 more)
+Nodes (68): agentStatusCommand(), AgentEnrichment, computeAgentEnrichment(), execAsync, getActiveSessionPath(), getAgentJsonlMtime(), getAgentJsonlPath(), getAgentPendingQuestions() (+60 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.04
-Nodes (67): cn(), SettingsCardSection(), SettingsCardSectionProps, SettingsHeader(), SettingsHeaderProps, SettingsLayout(), SettingsLayoutProps, SettingsRow() (+59 more)
+Cohesion: 0.03
+Nodes (72): agentDir, dir1, dir2, marker, missing, nested, invalidateAgentsCache(), cb (+64 more)
 
 ### Community 26 - "Community 26"
 Cohesion: 0.05
-Nodes (72): resolveProjectConfig(), workspaceRenderDevcontainerCommand(), WorkspaceRenderDevcontainerOptions, createHumeConfig(), deleteHumeConfig(), humeFetch(), HumeResult, addTunnelIngress() (+64 more)
+Nodes (55): criteria, doc, result, after, doc, filename, path, ACCompletionResult (+47 more)
 
 ### Community 27 - "Community 27"
-Cohesion: 0.03
-Nodes (68): AutoActions, AutoRestartConfig, CLOISTER_CONFIG_FILE, CloisterConfig, CostTrackingConfig, deepMerge(), DEFAULT_CLOISTER_CONFIG, HandoffConfig (+60 more)
+Cohesion: 0.05
+Nodes (63): defaults, first, issueAgentTypes, { models }, second, clearConfigCache(), getGlobalConfigPath(), MODEL_DEPRECATIONS (+55 more)
 
 ### Community 28 - "Community 28"
 Cohesion: 0.05
-Nodes (73): agentStatusCommand(), AgentStatusOptions, analyzeSession(), detectStatus(), extractCost(), extractModel(), MODEL_PATTERNS, SessionInfo (+65 more)
+Nodes (53): getReviewerSessionName(), parseReviewerSessionName(), REVIEWER_ROLES, ReviewerRole, isAgentStateServiceInProcess(), getAgentRuntimeStateAsync(), snapshotToRuntimeState(), withConcurrencyLimit() (+45 more)
 
 ### Community 29 - "Community 29"
-Cohesion: 0.03
-Nodes (61): ViewMode, Conversation, ConversationList(), ConversationListProps, fetchConversations(), getSortKey(), ListTab, SORT_LABELS (+53 more)
+Cohesion: 0.04
+Nodes (53): loadPinState(), PHASE_CHIP_COLORS, PHASE_LABELS, PipelinePhase, savePinState(), TAB_ID_TO_SESSION_TYPE, TerminalTab, TerminalTabs() (+45 more)
 
 ### Community 30 - "Community 30"
-Cohesion: 0.03
-Nodes (62): db, makeTestLayer(), makeTestService(), received, runWithService(), store, svc, unsubscribe (+54 more)
+Cohesion: 0.05
+Nodes (54): abortReviewCommand(), DASHBOARD_URL, configShadowCommand(), ShadowOptions, displayIssues(), getConfiguredTrackers(), getTrackerConfig(), listCommand() (+46 more)
 
 ### Community 31 - "Community 31"
 Cohesion: 0.06
-Nodes (69): closeOutCommand(), CloseOutOptions, getGitHubConfig(), addRepoCommand(), AddRepoOptions, convertToSshUrl(), createCommand(), CreateOptions (+61 more)
+Nodes (58): FileStatus, AGENTS_DIR, ARCHIVES_DIR, BACKUPS_DIR, BIN_DIR, CACHE_AGENTS_DIR, CACHE_MANIFEST, CACHE_REVIEW_PROMPTS_DIR (+50 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.03
-Nodes (65): BulkAgentWarningDialog(), BulkAgentWarningDialogProps, DeepWipeDialogProps, DeepWipeProgress, STEP_ICONS, STEP_LABELS, WipeState, ghCliIssue (+57 more)
+Cohesion: 0.05
+Nodes (55): setAgentStoppedNotifier(), announceMerge(), ActivityLevel, ActivitySource, emitActivityDetailed(), emitActivityEntry(), EmitActivityOptions, emitActivityTts() (+47 more)
 
 ### Community 33 - "Community 33"
-Cohesion: 0.04
-Nodes (58): githubTracker, linearTracker, longBody, mockCreateTrackerFromConfig, mockExistsSync, mockLoadConfig, mockStatSync, STATE_MTIME (+50 more)
+Cohesion: 0.05
+Nodes (47): AggregateActivityState, AggregateBadge, buildActivitySummary(), computeDominantStatus(), FeatureContextMenu(), FeatureContextMenuProps, FeatureItem(), FeatureItemProps (+39 more)
 
 ### Community 34 - "Community 34"
-Cohesion: 0.03
-Nodes (62): mockLoadProjectsConfig, mockRunQualityGates, PASSING_GATE_RESULT, runProjectQualityGates(), dispatchTestAgentAndNotify(), mockResolveProjectFromIssue, mockSetReviewStatus, mockSpawnEphemeralSpecialist (+54 more)
+Cohesion: 0.04
+Nodes (52): backup, bundledFrontendIndex, bundledServer, child, composeFile, config, configContent, configFile (+44 more)
 
 ### Community 35 - "Community 35"
-Cohesion: 0.05
-Nodes (63): backupCleanCommand(), backupListCommand(), BUNDLED_AGENTS_DIR, BUNDLED_SKILLS_DIR, copyBundledAgents(), copyBundledSkills(), __dirname, __filename (+55 more)
+Cohesion: 0.06
+Nodes (54): checkPendingTestDispatch(), AddOptions, BUNDLED_HOOKS_DIR, __dirname, __filename, installGitHooks(), ListOptions, projectAddCommand() (+46 more)
 
 ### Community 36 - "Community 36"
-Cohesion: 0.04
-Nodes (52): ChangedFilesTree, EMPTY_DIRECTORY_OVERRIDES, ChatMessage, CompactBoundary, ConversationEvent, ProposedPlan, TurnDiffFileChange, TurnDiffSummary (+44 more)
+Cohesion: 0.05
+Nodes (48): ConversationPanel(), ConversationPanelProps, ConversationView(), ConversationViewProps, FailedMessage, fetchMessages(), FORK_STEPS, MessagesResponse (+40 more)
 
 ### Community 37 - "Community 37"
-Cohesion: 0.05
-Nodes (59): BUNDLED_GIT_HOOKS_DIR, checkCommand(), __dirname, __filename, syncCommand(), SyncOptions, getCurrentVersion(), getLatestVersion() (+51 more)
-
-### Community 38 - "Community 38"
-Cohesion: 0.05
-Nodes (51): doc, path, ACCompletionResult, criticalPath(), WaveItem, isRFC3339DateTime(), toRFC3339(), VBriefDifficulty (+43 more)
-
-### Community 39 - "Community 39"
-Cohesion: 0.04
-Nodes (52): ComposerFooter(), ComposerFooterProps, deleteConversationImage(), PendingImage, sendConversationMessage(), switchModel(), uploadConversationImage(), ensureDefaultConversationModel() (+44 more)
-
-### Community 40 - "Community 40"
-Cohesion: 0.06
-Nodes (58): after, row, status, clearWorkspaceStuck(), DbReviewStatusRow, deleteReviewStatus(), getAllReviewStatusesFromDb(), getHistoryFromDb() (+50 more)
-
-### Community 41 - "Community 41"
-Cohesion: 0.05
-Nodes (63): defaults, first, issueAgentTypes, { models }, second, clearConfigCache(), getGlobalConfigPath(), YamlConfig (+55 more)
-
-### Community 42 - "Community 42"
-Cohesion: 0.05
-Nodes (60): normalize(), unarchiveConversationCommand(), archiveConversation(), backfillConversationModel(), clearStuckForks(), createConversation(), FavoriteType, getConversationByClaudeSessionId() (+52 more)
-
-### Community 43 - "Community 43"
-Cohesion: 0.09
-Nodes (56): buildPanSpecFilename(), buildPanSpecPath(), ensurePanDirs(), entryFromFile(), findSpecByIssue(), getProjectPanPaths(), listSpecs(), parsePanSpecDocument() (+48 more)
-
-### Community 44 - "Community 44"
-Cohesion: 0.04
-Nodes (46): ActivitySection, AgentSection(), AgentSectionProps, formatCost(), formatDuration(), formatModel(), formatTime(), getPreviewLine() (+38 more)
-
-### Community 45 - "Community 45"
-Cohesion: 0.06
-Nodes (41): createFlyApiClient(), FlyApiClient, FlyApiError, FlyExecResult, FlyMachine, FlyMachineConfig, client, fetchMock (+33 more)
-
-### Community 46 - "Community 46"
-Cohesion: 0.05
-Nodes (45): AggregateActivityState, AggregateBadge, buildActivitySummary(), computeDominantStatus(), FeatureContextMenuProps, FeatureItem(), FeatureItemProps, formatCost() (+37 more)
-
-### Community 47 - "Community 47"
 Cohesion: 0.03
 Nodes (60): ActivityDetailedEvent, ActivityEntryEvent, ActivityTtsEvent, ActivityUpdatedEvent, AgentActivityChangedEvent, AgentChannelReplyEvent, AgentCreatedEvent, AgentCurrentIssueSetEvent (+52 more)
 
-### Community 48 - "Community 48"
+### Community 38 - "Community 38"
+Cohesion: 0.07
+Nodes (41): parsePiSession(), CLAUDE_PROJECTS_DIR, SessionIndexEntry, agentDirFor(), agentsDir(), cleanupPiTransientFiles(), execAsync, createPiFifo() (+33 more)
+
+### Community 39 - "Community 39"
+Cohesion: 0.06
+Nodes (52): buildChannelsArgs(), buildCommand(), buildNonConversationCommand(), buildPiCommand(), generateLauncherWrapper(), LauncherAgentType, LauncherConfig, LauncherHarness (+44 more)
+
+### Community 40 - "Community 40"
 Cohesion: 0.05
-Nodes (50): ContainerDetailPanel(), ContainerDetailPanelProps, ContainerDetails, DetailTab, fetchContainerDetails(), formatBytes(), getBarColor(), ResourceBar() (+42 more)
+Nodes (49): ContainerDetailPanel(), ContainerDetailPanelProps, ContainerDetails, DetailTab, fetchContainerDetails(), formatBytes(), getBarColor(), ResourceBar() (+41 more)
+
+### Community 41 - "Community 41"
+Cohesion: 0.04
+Nodes (52): result, clearCacheRoute, ConfirmationRequest, deletePlanningSessionRoute, execAsync, getCacheStatusRoute, getConfirmationsRoute, getDeaconLogsRoute (+44 more)
+
+### Community 42 - "Community 42"
+Cohesion: 0.05
+Nodes (33): DiffPanel(), DiffPanelProps, DiffThemeType, getRenderablePatch(), readDiffParamsFromUrl(), RenderablePatch, ToggleButton(), DiffPanelLoadingState() (+25 more)
+
+### Community 43 - "Community 43"
+Cohesion: 0.06
+Nodes (40): getUnblockedItems(), isTaskReady(), TERMINAL_STATUSES, findWorkspaceRoot(), planFinalizeCommand(), PlanFinalizeOptions, stampPlanForFinalization(), beadsDir (+32 more)
+
+### Community 44 - "Community 44"
+Cohesion: 0.06
+Nodes (50): generateFallbackSummary(), Access, buildConversationResponse(), getCachedMessages(), validateCwdContainment(), getIndexStats(), getIndexStats(), analyze_session() (+42 more)
+
+### Community 45 - "Community 45"
+Cohesion: 0.06
+Nodes (43): SETTINGS_FILE, buildAnthropicMessagesUrl(), cache, CacheEntry, cacheKey(), classifyError(), doProbe(), formatProbeError() (+35 more)
+
+### Community 46 - "Community 46"
+Cohesion: 0.06
+Nodes (39): cn(), SettingsCardSection(), SettingsCardSectionProps, SettingsHeader(), SettingsHeaderProps, SettingsLayout(), SettingsLayoutProps, SettingsRow() (+31 more)
+
+### Community 47 - "Community 47"
+Cohesion: 0.06
+Nodes (41): InlineSparkline(), InlineSparklineProps, listeners, useSharedTick(), ContainerNode(), containerStatusColor(), containerStatusToDot(), formatMemory() (+33 more)
+
+### Community 48 - "Community 48"
+Cohesion: 0.06
+Nodes (48): getIssueDataService(), ActivityContext, closedIssuesCache, commandDeckRouteLayer, costCache, execAsync, execFileAsync, fetchActivityData() (+40 more)
 
 ### Community 49 - "Community 49"
 Cohesion: 0.05
-Nodes (49): shouldAutoStart(), autoResumeStoppedWorkAgents(), setAgentStoppedNotifier(), setMergeReadyNotifier(), announceMerge(), DEACON_DIR, DEACON_STATE_PATH, _deaconState (+41 more)
+Nodes (46): AgentRollup, CavemanExperimentRow, DailyTrend, DbCostRow, DbIssueSummaryRow, getAgentRollup(), getCavemanExperimentData(), getCostForIssueFromDb() (+38 more)
 
 ### Community 50 - "Community 50"
-Cohesion: 0.08
-Nodes (39): parsePiSession(), agentDirFor(), agentsDir(), cleanupPiTransientFiles(), execAsync, createPiFifo(), destroyPiFifo(), execAsync (+31 more)
+Cohesion: 0.07
+Nodes (46): addRepoCommand(), AddRepoOptions, convertToSshUrl(), createCommand(), CreateOptions, createRemoteWorkspace(), destroyCommand(), DestroyOptions (+38 more)
 
 ### Community 51 - "Community 51"
-Cohesion: 0.06
-Nodes (40): getUnblockedItems(), isTaskReady(), TERMINAL_STATUSES, findWorkspaceRoot(), planFinalizeCommand(), PlanFinalizeOptions, stampPlanForFinalization(), DASHBOARD_URL (+32 more)
+Cohesion: 0.05
+Nodes (37): ALLOWED, HarnessPolicyDecision, PI_ANTHROPIC_SUBSCRIPTION_BLOCK, getModelCapability(), MODEL_CAPABILITIES, ModelCapability, SkillDimension, calculateSkillScore() (+29 more)
 
 ### Community 52 - "Community 52"
 Cohesion: 0.05
-Nodes (41): ActivityFeed(), ActivityFeedProps, EVENT_COLORS, EVENT_ICONS, selectIssueActivityFeed(), CostDonut(), CostDonutProps, GodViewPage() (+33 more)
+Nodes (44): resetDb(), resetDb(), getSetting(), isDeaconGloballyPaused(), setDeaconGloballyPaused(), setSetting(), closeDatabase(), getDatabasePath() (+36 more)
 
 ### Community 53 - "Community 53"
-Cohesion: 0.05
-Nodes (47): DEFAULT_GATES, execAsync, parseValidationOutput(), QualityGateResult, QualityGateRunOptions, runHttpHealthGate(), runQualityGates(), afterCommit (+39 more)
-
-### Community 54 - "Community 54"
-Cohesion: 0.07
-Nodes (48): buildACLookupByTitle(), buildPolyrepoContext(), buildWorkAgentPrompt(), extractStitchDesigns(), getTrackerContext(), inferIssueIdFromWorkspace(), matchBeadToAC(), readBeadsTasks() (+40 more)
-
-### Community 55 - "Community 55"
-Cohesion: 0.07
-Nodes (49): buildManifestFromDirectory(), collectSourceFiles(), compareFileToManifest(), createEmptyManifest(), hashFile(), Manifest, ManifestEntry, readManifest() (+41 more)
-
-### Community 56 - "Community 56"
-Cohesion: 0.04
-Nodes (45): initSchema(), base, cols, colsAfter, colsBefore, correctedPath, index, names (+37 more)
-
-### Community 57 - "Community 57"
-Cohesion: 0.06
-Nodes (42): withConcurrencyLimit(), result, ActivityContext, buildIssueTitleMap(), collectSessionTreeNodes(), compareSessionTreeSessionIds(), escapeRegExp(), fetchProjectSessionTree() (+34 more)
-
-### Community 58 - "Community 58"
-Cohesion: 0.08
-Nodes (48): devCommand(), __dirname, ensureDashboardBundle(), killPort(), readConfig(), resolveNode22(), sleep(), waitForHealth() (+40 more)
-
-### Community 59 - "Community 59"
-Cohesion: 0.05
-Nodes (46): AgentRollup, CavemanExperimentRow, DailyTrend, DbCostRow, DbIssueSummaryRow, getAgentRollup(), getCavemanExperimentData(), getCostForIssueFromDb() (+38 more)
-
-### Community 60 - "Community 60"
-Cohesion: 0.06
-Nodes (44): parseContainerServiceName(), parseIssueIdFromText(), fetchProjectTree(), isBenchmarkMode, startedAt, computeResourceAllocatedIssues(), discoverResourceAllocatedIssues(), discoverResourceAllocatedIssuesFresh() (+36 more)
-
-### Community 61 - "Community 61"
-Cohesion: 0.06
-Nodes (43): ApproveReviewArtifactInput, buildRepositoryFlag(), CommentOnArtifactInput, CreateReviewArtifactInput, CreateReviewArtifactResult, DiscoverArtifactInput, execAsync, ForgeAdapter (+35 more)
-
-### Community 62 - "Community 62"
-Cohesion: 0.06
-Nodes (46): getIssueDataService(), ActivityContext, closedIssuesCache, commandDeckRouteLayer, costCache, execAsync, execFileAsync, fetchActivityData() (+38 more)
-
-### Community 63 - "Community 63"
 Cohesion: 0.1
 Nodes (45): BlockerReason, getReviewStatusAsync(), setReviewStatusAsync(), addFailingSource(), getFailingChecksBlocker(), getRepoFromPrUrl(), getTrackedRepos(), handleCheckRun() (+37 more)
 
-### Community 64 - "Community 64"
+### Community 54 - "Community 54"
 Cohesion: 0.06
-Nodes (41): SETTINGS_FILE, buildAnthropicMessagesUrl(), cache, CacheEntry, cacheKey(), classifyError(), doProbe(), formatProbeError() (+33 more)
+Nodes (43): parseContainerServiceName(), parseIssueIdFromText(), fetchProjectTree(), isBenchmarkMode, startedAt, computeResourceAllocatedIssues(), discoverResourceAllocatedIssues(), discoverResourceAllocatedIssuesFresh() (+35 more)
 
-### Community 65 - "Community 65"
+### Community 55 - "Community 55"
 Cohesion: 0.09
 Nodes (44): startPostLaunchSidecars(), startSidecars(), resolveBundledServerPath(), resolveNode22(), resolveScope(), restartCommand(), RestartOptions, runFullRestart() (+36 more)
 
-### Community 66 - "Community 66"
+### Community 56 - "Community 56"
+Cohesion: 0.09
+Nodes (44): devCommand(), __dirname, ensureDashboardBundle(), killPort(), readConfig(), resolveNode22(), sleep(), waitForHealth() (+36 more)
+
+### Community 57 - "Community 57"
+Cohesion: 0.07
+Nodes (44): DASHBOARD_URL, difficultyColor(), dryRun(), printWavePlan(), swarmCommand(), autoAdvanceInFlight, buildSlotPrompt(), buildStructuredSlotTaskInput() (+36 more)
+
+### Community 58 - "Community 58"
+Cohesion: 0.05
+Nodes (40): initSchema(), base, cols, colsAfter, colsBefore, correctedPath, index, names (+32 more)
+
+### Community 59 - "Community 59"
+Cohesion: 0.08
+Nodes (43): isEligibleForCleanup(), buildACLookupByTitle(), buildPolyrepoContext(), buildWorkAgentPrompt(), extractStitchDesigns(), getTrackerContext(), inferIssueIdFromWorkspace(), matchBeadToAC() (+35 more)
+
+### Community 60 - "Community 60"
 Cohesion: 0.04
 Nodes (48): 10. UX Requirements, 11. Implementation Notes, 12. Acceptance Criteria, 13. Success Criteria, 1. New Dashboard Surface, 2.1 By Issue, 2.2 By Workspace, 2.3 By Agent Type (+40 more)
 
-### Community 67 - "Community 67"
+### Community 61 - "Community 61"
 Cohesion: 0.04
 Nodes (48): 1.1 What We Have Today, 1.2 Tool-by-Tool Analysis, 1.3 Comparative Matrix, 2.1 Design Principles, 2.2 Proposed Enhancements (Prioritized), 2.3 Implementation Roadmap, 2.4 What We're NOT Adopting (and Why), 2.5 Success Metrics (+40 more)
 
-### Community 68 - "Community 68"
+### Community 62 - "Community 62"
 Cohesion: 0.04
 Nodes (48): 10. God View: Keep But Integrate, 1. Rename: Mission Control → Command Deck, 2. Navigation: Horizontal Bar → Grouped Sidebar, 3. Color System: Semantic Token Architecture, 4. Typography Update, 5. Fractal Noise Texture Overlay, 6. Component Unification, 7. Scrollbar Styling (+40 more)
 
-### Community 69 - "Community 69"
-Cohesion: 0.08
-Nodes (39): DbMergeSetRepoRow, DbMergeSetRow, deleteMergeSet(), getAllMergeSetsFromDb(), getMergeSetFromDb(), getReposFromDb(), rowToMergeSet(), repos (+31 more)
+### Community 63 - "Community 63"
+Cohesion: 0.05
+Nodes (34): ActivitySection, AgentSection(), AgentSectionProps, formatCost(), formatDuration(), formatModel(), formatTime(), getPreviewLine() (+26 more)
 
-### Community 70 - "Community 70"
+### Community 64 - "Community 64"
 Cohesion: 0.04
 Nodes (47): 1. **work-agent**, 2. **planning-agent**, 3. **review-agent**, 4. **test-agent**, 5. **merge-agent**, 6. **inspect-agent** ⚠️ PARTIAL CONFIGURATION, 7. **uat-agent** ⚠️ CRITICAL GAPS, Action Items (Prioritized) (+39 more)
 
-### Community 71 - "Community 71"
+### Community 65 - "Community 65"
 Cohesion: 0.04
 Nodes (46): 1. Dashboard UI Integration (from PAN-225), 2. FTS5 as Phase 1 Search (from PAN-225, PAN-179), 3. Session-Oriented Learning Types (from PAN-225, PAN-184), 4. Specific Thinking-Block Perception Signals (from PAN-184), 5. Explicit Deduplication Threshold (from PAN-225), Acceptance Criteria, Architecture, code:block1 (Source of truth (git-tracked):) (+38 more)
 
-### Community 72 - "Community 72"
+### Community 66 - "Community 66"
 Cohesion: 0.04
 Nodes (47): 1. Agent Discovery, 1. Monitor Regularly, 2. Activity Detection, 2. Establish Baselines, 3. Automate Alerts, 3. Log Analysis, 4. Log Everything, 4. Resource Usage (+39 more)
 
-### Community 73 - "Community 73"
+### Community 67 - "Community 67"
 Cohesion: 0.04
 Nodes (47): 1. Start Traefik, 2. Add DNS Entry, 3. Verify, "502 Bad Gateway", Add a New Route, Architecture, "Certificate Error", Certificate Management (+39 more)
 
-### Community 74 - "Community 74"
-Cohesion: 0.08
-Nodes (36): refreshCommand(), refreshFromLinear(), RefreshOptions, shadowCommand(), CanonicalState, createShadowState(), ensureShadowStateDir(), getDisplayStatus() (+28 more)
+### Community 68 - "Community 68"
+Cohesion: 0.06
+Nodes (38): agentDir, envArg, options, state, stateFile, workspace, SpawnOptions, NormalizedConfig (+30 more)
 
-### Community 75 - "Community 75"
+### Community 69 - "Community 69"
+Cohesion: 0.09
+Nodes (43): updateCommand(), buildManifestFromDirectory(), collectSourceFiles(), compareFileToManifest(), createEmptyManifest(), hashFile(), Manifest, ManifestEntry (+35 more)
+
+### Community 70 - "Community 70"
 Cohesion: 0.13
 Nodes (44): bridgeCodexAuthToCliproxy(), bridgeCodexAuthToCliproxyAsync(), bridgeGeminiAuthToCliproxyAsync(), buildCliproxyConfig(), checkCliproxyPortAsync(), CliproxyCodexCredentials, CliproxyGeminiCredentials, CodexAuthFile (+36 more)
 
-### Community 76 - "Community 76"
-Cohesion: 0.09
-Nodes (43): addEventToCache(), CostCache, createEmptyCache(), getCacheFile(), getCacheStatus(), getCostsByIssue(), getCostsDir(), getCostsForIssue() (+35 more)
-
-### Community 77 - "Community 77"
-Cohesion: 0.07
-Nodes (37): BadgeBarProps, fetchPlanning(), PlanningData, MarkdownModal(), MarkdownModalProps, TranscriptUpload(), TranscriptUploadProps, ActionKey (+29 more)
-
-### Community 78 - "Community 78"
+### Community 71 - "Community 71"
 Cohesion: 0.05
 Nodes (40): entry, { issueId }, { limit }, old, op, ops, recent, result (+32 more)
 
-### Community 79 - "Community 79"
+### Community 72 - "Community 72"
+Cohesion: 0.08
+Nodes (36): refreshCommand(), refreshFromLinear(), RefreshOptions, shadowCommand(), CanonicalState, createShadowState(), ensureShadowStateDir(), getDisplayStatus() (+28 more)
+
+### Community 73 - "Community 73"
 Cohesion: 0.04
 Nodes (46): 1. Issue lifecycle, 2. Observation, 3. Things you manage, 4. System / daemon, 5. Releases, 6. First-run & maintenance, 7. `pan admin` — plumbing, code:bash (pan issues                       # what can I work on?) (+38 more)
 
-### Community 80 - "Community 80"
+### Community 74 - "Community 74"
 Cohesion: 0.04
 Nodes (46): 1.1 Kanban Card Cost Badge, 1.2 Issue Detail Panel Cost Section, 1. Per-Issue Cost Display, 2.1 Session File Location, 2.2 JSONL Message Format, 2.3 Parser Implementation, 2. Claude Code JSONL Parsing, 3.1 Linking Mechanism (+38 more)
 
-### Community 81 - "Community 81"
+### Community 75 - "Community 75"
 Cohesion: 0.04
 Nodes (46): 10. Compose right pane for project-selected mode, 11. CSS for session tree, issue header, session panel, 1. Add `SessionNode`, `FeatureNode`, `ProjectSessionTree` types to contracts, 2. Extend `fetchActivityData` to include reviewer sub-agents, presence, and JSONL paths, 3. New endpoint `GET /api/projects/:projectKey/session-tree`, 4. RPC subscription `subscribeProjectSessionTree`, 5. `SessionNode.tsx` component, 6. Extend `FeatureItem.tsx` to be expandable (+38 more)
 
-### Community 82 - "Community 82"
+### Community 76 - "Community 76"
+Cohesion: 0.08
+Nodes (17): issues, result, importTrackerConfig(), getCanonicalStatus(), IssueDataService, issuesChanged(), mapRallyStateToCanonical(), planningStateCache (+9 more)
+
+### Community 77 - "Community 77"
 Cohesion: 0.04
 Nodes (45): 1. Overview, 2.1 What It Is, 2.2 Implementation, 2. Ralph Wiggum Self-Assessment Loop, 3.1 What It Is, 3.2 Current State, 3.3 Proposed State, 3.4 Implementation (+37 more)
 
-### Community 83 - "Community 83"
+### Community 78 - "Community 78"
 Cohesion: 0.04
 Nodes (45): Automated Installation, code:bash (pan doctor), code:bash (# Option 1: Install globally), code:bash (# Add user to docker group), code:bash (# Using nvm (recommended)), code:bash (# Ubuntu/Debian), code:bash (# Ubuntu/Debian (Docker Compose v2)), code:bash (# Clear npm cache) (+37 more)
 
-### Community 84 - "Community 84"
+### Community 79 - "Community 79"
 Cohesion: 0.04
 Nodes (45): 1. Creation, 2. Usage, 3. Cleanup, Architecture, Best Practices, code:block1 (project/), code:bash (pan workspace create MIN-123), code:bash (pan workspace create MIN-123 --docker) (+37 more)
 
-### Community 85 - "Community 85"
+### Community 80 - "Community 80"
 Cohesion: 0.07
 Nodes (43): applyMigrations(), backupGlobalConfig(), CavemanConfig, CavemanMode, ConfigCache, ConfigLoadResult, ConversationsConfig, CONVOY_KEY_MIGRATION (+35 more)
 
-### Community 86 - "Community 86"
-Cohesion: 0.07
-Nodes (41): systemHealthCommand(), computeRestartDelay(), getSmeeBinaryPath(), getSmeeUrl(), getWebhookTarget(), isProcessAlive(), isSmeeProcessRunning(), isSmeeRunning() (+33 more)
+### Community 81 - "Community 81"
+Cohesion: 0.08
+Nodes (39): appendCostEvent(), CostEvent, deduplicateEvents(), ensureEventsFile(), EventMetadata, eventsFileExists(), getCostsDir(), getEventsFile() (+31 more)
 
-### Community 87 - "Community 87"
-Cohesion: 0.06
-Nodes (28): PlanningState, ZoneAActionsState, ZoneBActionStrip(), ZoneBActionStripProps, PlanDialog(), PlanDialogProps, PlanningStatus, StartPlanningResult (+20 more)
-
-### Community 88 - "Community 88"
+### Community 82 - "Community 82"
 Cohesion: 0.04
 Nodes (44): After Frontend Code Changes, After Server Code Changes, Architecture, code:block1 (Browser → https://pan.localhost (Traefik)), code:bash (cd /home/eltmon/Projects/panopticon-cli && npm run build:das), code:bash (cd /home/eltmon/Projects/panopticon-cli && \), code:bash (for i in $(seq 1 15); do), code:bash (cd /home/eltmon/Projects/panopticon-cli/src/dashboard/fronte) (+36 more)
 
-### Community 89 - "Community 89"
+### Community 83 - "Community 83"
 Cohesion: 0.05
 Nodes (43): 1. Concise is Key, 1. Source Locations, 2. Degrees of Freedom, 2. Installation Flow, 3. Progressive Disclosure, Bundled Resources, code:block1 (pan install (first time)), code:bash (# For public skills) (+35 more)
 
-### Community 90 - "Community 90"
-Cohesion: 0.06
-Nodes (33): agentDir, envArg, options, state, stateFile, workspace, SpawnOptions, NormalizedConfig (+25 more)
+### Community 84 - "Community 84"
+Cohesion: 0.07
+Nodes (26): CLAUDE_PROJECTS_DIR, ClaudeMessage, getActiveSessionModel(), getProjectDirs(), getRecentSessions(), getSessionFiles(), importSessionToCostLog(), normalizeModelName() (+18 more)
 
-### Community 91 - "Community 91"
+### Community 85 - "Community 85"
+Cohesion: 0.07
+Nodes (40): computeRestartDelay(), getSmeeBinaryPath(), getSmeeUrl(), getWebhookTarget(), isProcessAlive(), isSmeeProcessRunning(), isSmeeRunning(), errorSpy (+32 more)
+
+### Community 86 - "Community 86"
+Cohesion: 0.07
+Nodes (31): fmtCost(), fmtDuration(), RoundCard(), RoundCardProps, RoundData, RoundVerdict, VERDICT_COLOR, VERDICT_LABEL (+23 more)
+
+### Community 87 - "Community 87"
 Cohesion: 0.05
 Nodes (43): After Adding Custom Skills, After Updating Panopticon, Auto-Sync, Available Targets, Backup Location, Backup Only, Backups, code:block1 (~/.panopticon/skills/          (Panopticon skills - source)) (+35 more)
 
-### Community 92 - "Community 92"
+### Community 88 - "Community 88"
 Cohesion: 0.05
 Nodes (43): Anatomy of a Resumable Issue, Anti-Patterns, code:markdown (Description: What needs to be built and why), code:block10, code:block11, code:block12, code:markdown (Title: Fix typo in README), code:markdown (Acceptance:) (+35 more)
 
-### Community 93 - "Community 93"
+### Community 89 - "Community 89"
 Cohesion: 0.05
 Nodes (43): Boundaries: When to Use bd vs TodoWrite, code:block1 (bd issue: "Implement user authentication" (epic)), code:block2 (Session start:), code:block3 (1. Create bd issue with current TodoWrite content), code:block4 (1. Keep bd issue for historical record), code:block5 (db-epic: "Migrate production database to PostgreSQL"), code:block6 (- [ ] Import logging library), code:block7 (- [ ] Reproduce bug) (+35 more)
 
-### Community 94 - "Community 94"
+### Community 90 - "Community 90"
 Cohesion: 0.05
 Nodes (43): Architectural Smells (High Confidence), Available Categories, code:bash (# If project has override skill, this skill is permanently d), code:bash (# AI will add this section if it doesn't exist, or append to), code:bash (# Edit directly), code:bash (# Remove the AI Suggestion Preferences section), code:bash (rm -rf .claude/skills/refactor-radar/), code:markdown (## Refactoring Proposal: Standardize User Entity Naming) (+35 more)
 
-### Community 95 - "Community 95"
+### Community 91 - "Community 91"
 Cohesion: 0.05
 Nodes (41): execAsync, execFileAsync, firePostMergeLifecycle(), getModelsResolveRoute, getProjectPathForIssue(), getProjectSpecialistContextRoute, getProjectSpecialistGraceRoute, getProjectSpecialistLatestLogRoute (+33 more)
+
+### Community 92 - "Community 92"
+Cohesion: 0.08
+Nodes (35): getHealthThresholdsMs(), evaluateHealthState(), formatDuration(), generateHealthSummary(), getAgentHealth(), getAgentsNeedingAttention(), getAgentsToKill(), getAgentsToPoke() (+27 more)
+
+### Community 93 - "Community 93"
+Cohesion: 0.08
+Nodes (37): Platform, evaluateSpawnGuardrails(), formatLeakedSpecialistSummary(), resolveAgentCountEnv(), buildLeakedSpecialists(), buildTopConsumers(), bytesToGb(), collectAgentProcesses() (+29 more)
+
+### Community 94 - "Community 94"
+Cohesion: 0.06
+Nodes (34): REVIEWER_STYLE, ReviewerRole, RoleBadge(), RoleBadgeProps, RoleBadgeSize, RoleStyle, SESSION_STYLE, SIZE_PX (+26 more)
+
+### Community 95 - "Community 95"
+Cohesion: 0.05
+Nodes (29): StandaloneTerminal(), StandaloneTerminalProps, ContextMenuState, isMac, TerminalSizeMessage, TerminalSnapshotMessage, checkbox, consoleErrorSpy (+21 more)
 
 ### Community 96 - "Community 96"
 Cohesion: 0.05
@@ -1526,32 +1529,32 @@ Cohesion: 0.05
 Nodes (42): 0.1 The breaking change, 0.2 Files affected in Panopticon, 0.3 Execution, 0.4 Risk, 0. Prerequisite: Effect beta.43 → beta.48 bump, 1.1 What t3code does, 1.2 What Panopticon does today, 1.3 Recommendation: migrate to single `/ws` with structured `TerminalEvent` (+34 more)
 
 ### Community 101 - "Community 101"
+Cohesion: 0.11
+Nodes (36): cvCommand(), CVOptions, healthCommand(), HealthOptions, relativeTime(), showCommand(), ShowOptions, calls (+28 more)
+
+### Community 102 - "Community 102"
+Cohesion: 0.07
+Nodes (12): emitter, setupVoiceWebSocket(), createGoogleCloudTranscription(), GoogleCloudTranscription, GoogleStreamingRecognizeResponse, createMoonshineTranscription(), ITurnEmitter, TranscriptionManager (+4 more)
+
+### Community 103 - "Community 103"
 Cohesion: 0.07
 Nodes (30): firstSessionPanel, firstWorkbench, workbench, ComposerMode, IssueComposer(), IssueComposerProps, IssueWorkbench(), IssueWorkbenchProps (+22 more)
 
-### Community 102 - "Community 102"
+### Community 104 - "Community 104"
 Cohesion: 0.05
 Nodes (41): Abort semantics, Acceptance criteria taxonomy, CLI reference, code:block1 (Work agent (Claude, in its own tmux session)), code:yaml (work_types:), code:block2 (.pan/review/<reviewId>/), code:block3 (src/lib/cloister/prompts/review/), code:markdown (# Review Context) (+33 more)
 
-### Community 103 - "Community 103"
+### Community 105 - "Community 105"
 Cohesion: 0.05
 Nodes (41): Agentic, All subagents (`explore`, `plan`, `bash`, `general-purpose`), `cli:interactive` and `cli:quick-command`, Coding, `convoy:correctness-reviewer`, `convoy:performance-reviewer`, `convoy:requirements-reviewer`, `convoy:security-reviewer` (+33 more)
 
-### Community 104 - "Community 104"
+### Community 106 - "Community 106"
 Cohesion: 0.05
 Nodes (41): 1. Run Diagnostics, 2. Check Configuration, 3. Check Running Services, 4. Check Skills, 5. Check Dependencies, Agents, Clean Up Old Workspaces, code:bash (pan doctor) (+33 more)
 
-### Community 105 - "Community 105"
-Cohesion: 0.08
-Nodes (34): getHealthThresholdsMs(), AgentHealth, evaluateHealthState(), formatDuration(), generateHealthSummary(), getAgentHealth(), getAgentsNeedingAttention(), getAgentsToKill() (+26 more)
-
-### Community 106 - "Community 106"
-Cohesion: 0.11
-Nodes (35): cvCommand(), CVOptions, healthCommand(), HealthOptions, relativeTime(), showCommand(), ShowOptions, calls (+27 more)
-
 ### Community 107 - "Community 107"
 Cohesion: 0.09
-Nodes (35): clearFeedbackFiles(), getNextSequenceNumber(), resolveWorkspacePath(), writeFeedbackFile(), WriteFeedbackOptions, WriteFeedbackResult, formatFeedbackForAgent(), sendFeedbackToAgent() (+27 more)
+Nodes (36): createHumeConfig(), deleteHumeConfig(), humeFetch(), HumeResult, content, d, existingDir, lines (+28 more)
 
 ### Community 108 - "Community 108"
 Cohesion: 0.05
@@ -1566,36 +1569,36 @@ Cohesion: 0.05
 Nodes (40): 1. Algorithmic Complexity, 2. Database & Query Performance, 3. Memory Management, 4. Network & I/O, 5. Frontend Performance, 6. Caching, 7. Concurrency & Parallelism, 8. Resource Usage (+32 more)
 
 ### Community 111 - "Community 111"
-Cohesion: 0.12
-Nodes (29): getAllTrackers(), getPrimaryTracker(), getSecondaryTracker(), getTrackerKeyFromConfig(), config, originalEnv, tracker, TrackerConfig (+21 more)
-
-### Community 112 - "Community 112"
-Cohesion: 0.08
-Nodes (36): CLAUDE_DIR, createClaudeAdapter(), createRuntimeRegistry(), getInstalledRuntimes(), getRuntimeAdapter(), getSupportedRuntimes(), isRuntimeInstalled(), AgentMessage (+28 more)
-
-### Community 113 - "Community 113"
 Cohesion: 0.05
 Nodes (39): AC-Driven Specialist Pipeline, Artifact Lifecycle, Automatic Beads Conversion, Can agents produce valid vBRIEF JSON reliably?, code:block1 (PRD (human, markdown)              ← requirements & intent), code:block2 (docs/prds/), code:json ({), code:json ({) (+31 more)
 
-### Community 114 - "Community 114"
+### Community 112 - "Community 112"
 Cohesion: 0.05
 Nodes (37): 1. record-cost-event.js esbuild bundle broken, 2. Deacon patrolWorkAgentResolutions — getEnabledSpecialists not defined, 3. Issue ID regex missing prefixes, Bugs Found and Fixed (2026-03-20), Build Requirements, code:block1 (~/.claude/projects/<encoded-cwd>/<session-uuid>.jsonl), code:block2 (cwd: /home/eltmon/Projects/krux/workspaces/feature-krux-4), code:block5 (Claude Code Agent (tmux session)) (+29 more)
 
-### Community 115 - "Community 115"
+### Community 113 - "Community 113"
 Cohesion: 0.05
 Nodes (39): Acceptance Criteria, API Changes, API Server, Architecture, Beads Tasks, CLI, code:block1 (~/.panopticon/specialists/), code:block2 (~/.panopticon/specialists/) (+31 more)
 
-### Community 116 - "Community 116"
+### Community 114 - "Community 114"
 Cohesion: 0.05
 Nodes (39): Action Items, Agentic, All subagents (`explore`, `plan`, `bash`, `general-purpose`), `cli:interactive` and `cli:quick-command`, Coding, Community Reception `[K2.6]`, Confirmed Improvements `[K2.6]`, `convoy:correctness-reviewer` (+31 more)
 
-### Community 117 - "Community 117"
+### Community 115 - "Community 115"
 Cohesion: 0.05
 Nodes (39): 1. Create a `dev` Script, 1. Register the Project, 2. Create CLAUDE.md (Recommended), 2. Create docker-compose.yml, 3. Panopticon Integration, 3. Set Up Tracker Mapping, 4. Verify Setup, Add a Project (+31 more)
 
-### Community 118 - "Community 118"
+### Community 116 - "Community 116"
 Cohesion: 0.05
 Nodes (39): 1. Isolate High-Volume Operations, 2. Parallel Research, 3. Cost Optimization, 4. Security Boundaries, Built-in Subagents, CLI-Defined Subagents, code:markdown (---), code:markdown (---) (+31 more)
+
+### Community 117 - "Community 117"
+Cohesion: 0.08
+Nodes (35): execAsync, formatDuration(), generateReport(), parseTestOutput(), runTests(), RunTestsOptions, runTestSuite(), sendNotification() (+27 more)
+
+### Community 118 - "Community 118"
+Cohesion: 0.08
+Nodes (31): findVendoredDir(), getCavemanHooksDir(), getCavemanSkillsDir(), setupCavemanCompressScripts(), setupCavemanHooks(), CavemanVariant, determineCavemanVariant(), injectCavemanSettings() (+23 more)
 
 ### Community 119 - "Community 119"
 Cohesion: 0.07
@@ -1606,20 +1609,20 @@ Cohesion: 0.07
 Nodes (27): createClaudeCodeRuntime(), getGlobalRegistry(), getRuntime(), getRuntimeForAgent(), RuntimeRegistry, setGlobalRegistry(), createPiRuntime(), PiSpawnTimeout (+19 more)
 
 ### Community 121 - "Community 121"
-Cohesion: 0.08
-Nodes (31): findVendoredDir(), getCavemanHooksDir(), getCavemanSkillsDir(), setupCavemanCompressScripts(), setupCavemanHooks(), CavemanVariant, determineCavemanVariant(), injectCavemanSettings() (+23 more)
+Cohesion: 0.06
+Nodes (32): AutoActions, AutoRestartConfig, CLOISTER_CONFIG_FILE, CloisterConfig, CostTrackingConfig, deepMerge(), DEFAULT_CLOISTER_CONFIG, HandoffConfig (+24 more)
 
 ### Community 122 - "Community 122"
-Cohesion: 0.09
-Nodes (31): activityToStatus(), capitalize(), deriveDotStatus(), deriveSessionLabel(), deriveSessionModel(), describePresence(), describeSessionPurpose(), describeWaitingReason() (+23 more)
-
-### Community 123 - "Community 123"
 Cohesion: 0.05
 Nodes (38): DomainEvent, AgentOutput, ChatMessage, CompactBoundary, ConversationEvent, ConversationResponse, DeepWipeRpc, GetAvailableEditorsRpc (+30 more)
 
-### Community 124 - "Community 124"
+### Community 123 - "Community 123"
 Cohesion: 0.05
 Nodes (38): 1. Read Enforcer (`PreToolUse` on `Read`), 2. Post-Edit Notify (`PostToolUse` on `Edit|Write`), 3. MCP Server, Architecture, Build Triggers, CLI Commands, code:block1 (PROJECT ROOT (main branch)), code:block2 (┌─────────────────────────┐) (+30 more)
+
+### Community 124 - "Community 124"
+Cohesion: 0.05
+Nodes (39): CLI Distribution Strategy, code:yaml (# Your original docker-compose.yml), code:bash (pan workspace create my-feature --template node-fullstack), code:block102 (~/.panopticon/templates/), code:toml ([template]), code:block109 (~/.panopticon/), code:yaml (# ~/.panopticon/traefik/dynamic/feature-min-648.yml), code:toml ([panopticon]) (+31 more)
 
 ### Community 125 - "Community 125"
 Cohesion: 0.05
@@ -1642,428 +1645,432 @@ Cohesion: 0.05
 Nodes (38): 10. Insufficient Logging & Monitoring, 1. Injection Attacks, 2. Authentication & Authorization, 3. Sensitive Data Exposure, 4. XML External Entities (XXE), 5. Broken Access Control, 6. Security Misconfiguration, 7. Cross-Site Scripting (XSS) (+30 more)
 
 ### Community 130 - "Community 130"
-Cohesion: 0.1
-Nodes (36): appendToRunLog(), checkLogSizeLimit(), cleanupAllLogs(), cleanupOldLogs(), createRunLog(), ensureRunsDirectory(), finalizeRunLog(), generateRunId() (+28 more)
-
-### Community 131 - "Community 131"
 Cohesion: 0.09
 Nodes (26): BeadsTask, COMPLEXITY_KEYWORDS, COMPLEXITY_LABELS, ComplexityDetectionResult, ComplexityLevel, complexityToModel(), detectComplexity(), detectComplexityFromEstimate() (+18 more)
 
+### Community 131 - "Community 131"
+Cohesion: 0.1
+Nodes (36): appendToRunLog(), checkLogSizeLimit(), cleanupAllLogs(), cleanupOldLogs(), createRunLog(), ensureRunsDirectory(), finalizeRunLog(), generateRunId() (+28 more)
+
 ### Community 132 - "Community 132"
-Cohesion: 0.06
-Nodes (29): AC_STATUS_ICONS, BeadsResponse, BeadsTasksPanelProps, BeadTask, PlanItemDetailProps, AC_STATUS_COLORS, AC_STATUS_SYMBOL, applyDagreLayout() (+21 more)
+Cohesion: 0.11
+Nodes (35): CHUNK_BUDGET_CHARS_BY_MODEL, chunkEntriesByBudget(), CompactionOptions, CompactionResult, computeFileLists(), createFileOps(), CutPointResult, estimateContextTokens() (+27 more)
 
 ### Community 133 - "Community 133"
 Cohesion: 0.07
 Nodes (32): ActivityEntry, ActivityItem(), ActivityPanel(), ActivityPanelProps, ActivityStream, applyPinWarnings(), CategoryFilter, fetchActivityREST() (+24 more)
 
 ### Community 134 - "Community 134"
-Cohesion: 0.05
-Nodes (37): 1. ChatMarkdown, 2. MessagesTimeline, 3. JSONL Parser (server-side), 4. ComposerPromptEditor, 5. ModelPicker, 6. EffortPicker, 7. SendButton + Message Submission, 8. ConversationPanel (wrapper) (+29 more)
+Cohesion: 0.06
+Nodes (24): AC_STATUS_ICONS, BeadsResponse, BeadsTasksPanel(), BeadsTasksPanelProps, BeadTask, PlanItemDetailProps, PlanDAGViewer(), VBriefDocument (+16 more)
 
 ### Community 135 - "Community 135"
 Cohesion: 0.05
-Nodes (36): 1. CommentMediator Service, 2. Author Filtering, 3. Content Classifier, 4. Summarizer, 5. Retrofit `getTrackerContext()`, 6. Quarantine Storage & Dashboard, 7. Gated Full-Text Tool, 8. Configuration (+28 more)
+Nodes (37): 1. ChatMarkdown, 2. MessagesTimeline, 3. JSONL Parser (server-side), 4. ComposerPromptEditor, 5. ModelPicker, 6. EffortPicker, 7. SendButton + Message Submission, 8. ConversationPanel (wrapper) (+29 more)
 
 ### Community 136 - "Community 136"
 Cohesion: 0.05
-Nodes (37): Audit Completeness, Category: Agent Lifecycle, Category: Delivery Confirmation, Category: Git Pattern Scanning (Merge Agent), Category: Health Checks (No Pattern Scanning), Category: Health & Stuck Detection (Deacon), Category: Model & Metadata Extraction, Category: Readiness Detection (+29 more)
+Nodes (36): 1. CommentMediator Service, 2. Author Filtering, 3. Content Classifier, 4. Summarizer, 5. Retrofit `getTrackerContext()`, 6. Quarantine Storage & Dashboard, 7. Gated Full-Text Tool, 8. Configuration (+28 more)
 
 ### Community 137 - "Community 137"
 Cohesion: 0.05
-Nodes (37): 1. Triggered After Test Pass, 2. UAT Specialist Receives Context, 3. UAT Specialist Runs Verification, 4. UAT Specialist Reports, Auth Flow, code:block1 (Agent → Inspect (per-bead) → Review (full MR) → Test (suite)), code:typescript (// After test passes, queue UAT), code:block11 (Agent finishes bead → Inspect (bead diff)    → PASS → next b) (+29 more)
+Nodes (37): Audit Completeness, Category: Agent Lifecycle, Category: Delivery Confirmation, Category: Git Pattern Scanning (Merge Agent), Category: Health Checks (No Pattern Scanning), Category: Health & Stuck Detection (Deacon), Category: Model & Metadata Extraction, Category: Readiness Detection (+29 more)
 
 ### Community 138 - "Community 138"
+Cohesion: 0.05
+Nodes (37): 1. Triggered After Test Pass, 2. UAT Specialist Receives Context, 3. UAT Specialist Runs Verification, 4. UAT Specialist Reports, Auth Flow, code:block1 (Agent → Inspect (per-bead) → Review (full MR) → Test (suite)), code:typescript (// After test passes, queue UAT), code:block11 (Agent finishes bead → Inspect (bead diff)    → PASS → next b) (+29 more)
+
+### Community 139 - "Community 139"
 Cohesion: 0.05
 Nodes (37): Arguments, Auto-Detection (when no wrapper config), code:block1 (1. Check: Does ~/.panopticon/skills/spec-readiness-*/config.), code:block10 (## Bug Analysis), code:block11 (Read spec-readiness-{identifier}.json), code:block12 (spec readiness MIN-704), code:yaml (# ~/.panopticon/skills/spec-readiness-mycompany/config.yaml), code:block3 (get_issue         → mcp__linear__get_issue(id, includeRelati) (+29 more)
 
 ### Community 140 - "Community 140"
 Cohesion: 0.08
-Nodes (31): err, exec(), execFile(), execMock, kCustom, realExecAsync, spawnMock, tmuxCapturePaneAsyncMock (+23 more)
+Nodes (27): showHelp(), startCommand(), statusCommand(), stopCommand(), tldrCommand(), TldrOptions, warmCommand(), captureTldrMetrics() (+19 more)
 
 ### Community 141 - "Community 141"
-Cohesion: 0.09
-Nodes (33): buildChannelsArgs(), buildCommand(), buildNonConversationCommand(), buildPiCommand(), generateLauncherScript(), generateLauncherWrapper(), LauncherAgentType, LauncherConfig (+25 more)
+Cohesion: 0.12
+Nodes (31): createFlyProvider(), FlyProviderConfig, { execAsyncMock, spawnMock, mockApi }, fly, p, getRemoteProvider(), ProviderType, ExecResult (+23 more)
 
 ### Community 142 - "Community 142"
-Cohesion: 0.07
-Nodes (25): getModelCapability(), MODEL_CAPABILITIES, ModelCapability, SkillDimension, calculateSkillScore(), formatSelectionResults(), getSimpleModelMapping(), ModelSelectionResult (+17 more)
-
-### Community 143 - "Community 143"
 Cohesion: 0.05
 Nodes (36): 1. All-Up Skill, 2. Awaiting Merge Page, 3. Workflow Orchestration Visibility, Acceptance Criteria, Architecture, Awaiting Merge Page Spec, Behavior, Benefits (+28 more)
 
-### Community 144 - "Community 144"
+### Community 143 - "Community 143"
 Cohesion: 0.05
 Nodes (35): 1. Identity key and registry shape, 1. Per-project singleton baked in at three places, 2. Inverted model priority — hidden Sonnet default, 2. Model resolution — authoritative chain + resolution trace, 3. PAN-540 convoy reviewers in the registry, 3. PAN-540 convoy reviewers invisible, 4. Duplicate-tab risk on shared worktree, 4. Single-writer-per-worktree enforcement (+27 more)
 
-### Community 145 - "Community 145"
+### Community 144 - "Community 144"
 Cohesion: 0.05
 Nodes (36): Closure Checklist, Closure Pattern, code:bash ($ bd ready), code:bash (bd list --status in_progress), code:bash (bd show issue-id), code:block12 ("From bd notes: [summary of COMPLETED]. Currently [IN PROGRE), code:block13 (Issue: bd-42 "OAuth refresh token implementation"), code:block14 (- [ ] Implement rate limiting on refresh endpoint) (+28 more)
 
-### Community 146 - "Community 146"
+### Community 145 - "Community 145"
 Cohesion: 0.05
 Nodes (35): API Commands, code:bash (gh issue list --state open --limit 50), code:bash (gh pr merge 456 --squash --delete-branch), code:bash (gh pr close 456), code:bash (gh pr checkout 456), code:bash (# Get PR comments), code:bash (gh issue list -R eltmon/panopticon-cli), code:bash (gh issue view 123) (+27 more)
 
-### Community 147 - "Community 147"
+### Community 146 - "Community 146"
 Cohesion: 0.1
 Nodes (26): build_voice_clone_prompt(), _close_player(), _ensure_player(), _extract_audio(), _get_default_sink_state(), Handler, load_base_model(), load_design_model() (+18 more)
 
-### Community 148 - "Community 148"
-Cohesion: 0.08
-Nodes (31): agentDir, missing, result, snapshot, status, AgentEnrichment, discoverNewAgentIds(), ReadModelServiceShape (+23 more)
-
-### Community 149 - "Community 149"
-Cohesion: 0.08
-Nodes (29): generateRouterConfigFromWorkTypes(), Provider, ROUTER_CONFIG_DIR, ROUTER_CONFIG_FILE, RouterConfig, RouterRule, ModelId, getAllWorkTypes() (+21 more)
-
-### Community 150 - "Community 150"
-Cohesion: 0.09
-Nodes (20): captureTldrMetrics(), daemonRegistry, ensureTldrStateDir(), execAsync, getStateFilePath(), getTldrMetrics(), hashWorkspacePath(), listTldrDaemonServices() (+12 more)
-
-### Community 151 - "Community 151"
+### Community 147 - "Community 147"
 Cohesion: 0.11
 Nodes (32): buildInspectPrompt(), detectCompileCommand(), __dirname, execAsync, __filename, getBeadDescription(), InspectContext, InspectResult (+24 more)
 
-### Community 152 - "Community 152"
+### Community 148 - "Community 148"
 Cohesion: 0.12
 Nodes (35): buildReleaseNotesMarkdown(), contractsPackageJsonPath, desktopPackageJsonPath, __dirname, ensureCleanTree(), ensureMainBranch(), ensureTagDoesNotExist(), __filename (+27 more)
 
-### Community 153 - "Community 153"
+### Community 149 - "Community 149"
 Cohesion: 0.06
 Nodes (35): Auto-Behaviors, Available MCP Tools, Beads Enforcement, Claude Code Channels (experimental), code:bash (# List all agent sessions), code:typescript (// Correct (in sendKeysAsync):), code:block3 (**PRD:** [`path/to/prd.md`](https link to the file in the re), Commit and Push When Working on Main (+27 more)
 
-### Community 154 - "Community 154"
+### Community 150 - "Community 150"
 Cohesion: 0.06
 Nodes (35): Adding Repos Mid-Work, Agent Skill: `/workspace-add-repo`, Architecture, code:typescript (export interface WorkspaceConfig {), code:block10, code:block11 (## Readonly Repos), code:typescript (// CURRENT: create worktree for every repo), code:typescript (// NEW: respect progressive mode) (+27 more)
 
-### Community 155 - "Community 155"
+### Community 151 - "Community 151"
 Cohesion: 0.06
 Nodes (35): Advanced Features, bd vs TodoWrite, Beads - Persistent Task Memory for AI Agents, CLI Reference, Close & Reopen, code:bash (# Link beads issue to GitHub issue PAN-84), code:bash (bd show <id> --json              # Full issue details), code:bash (bd close <id> --reason "Completed" --json) (+27 more)
 
-### Community 156 - "Community 156"
+### Community 152 - "Community 152"
 Cohesion: 0.06
 Nodes (35): Bug Tracking During Oversight, code:block1 (/pan-oversee PAN-129), code:bash (# Manually trigger review), code:bash (# Check specialist status), code:bash (# Wake it manually), code:bash (# Check if work agent received feedback), code:bash (# Check test status), code:bash (# Final status check) (+27 more)
 
-### Community 157 - "Community 157"
+### Community 153 - "Community 153"
+Cohesion: 0.1
+Nodes (32): archivePlanning(), CloseIssueOptions, ApproveOptions, ArchiveOptions, DeepWipeOptions, DeepWipeProgress, getLinearApiKey(), TeardownOptions (+24 more)
+
+### Community 154 - "Community 154"
+Cohesion: 0.1
+Nodes (3): stopDeacon(), CloisterService, writeStateFile()
+
+### Community 155 - "Community 155"
 Cohesion: 0.13
 Nodes (29): hookCommand(), HookOptions, generateRecoveryPrompt(), checkHook(), clearHook(), collectMail(), generateFixedPointPrompt(), getHook() (+21 more)
 
-### Community 158 - "Community 158"
-Cohesion: 0.06
-Nodes (22): criteria, doc, result, dbError, deleteCalls, existingBeads, expectedPrefix, initCall (+14 more)
-
-### Community 159 - "Community 159"
+### Community 156 - "Community 156"
 Cohesion: 0.07
 Nodes (29): AgentDetailView(), AgentDetailViewProps, AgentHealthHistory, fetchHealthHistory(), fetchSpecialists(), formatDuration(), formatTokens(), HEALTH_STATE_EMOJI (+21 more)
 
-### Community 160 - "Community 160"
-Cohesion: 0.07
-Nodes (22): ActivitySection, formatModel(), IsolationMode(), IsolationModeProps, TYPE_STYLES, ALLOWED_CSS_PROPERTIES, ALLOWED_SHIKI_ATTRS, ALLOWED_SHIKI_TAGS (+14 more)
-
-### Community 161 - "Community 161"
-Cohesion: 0.08
-Nodes (28): fmtCost(), fmtDuration(), RoundCard(), RoundCardProps, RoundData, RoundVerdict, VERDICT_COLOR, VERDICT_LABEL (+20 more)
-
-### Community 162 - "Community 162"
+### Community 157 - "Community 157"
 Cohesion: 0.06
 Nodes (34): Activity, AgentChannelReply, AgentId, AgentPhase, AgentResolution, AgentRuntimeSnapshot, AgentSnapshot, CHANNEL_REPLY_KIND_VALUES (+26 more)
 
-### Community 163 - "Community 163"
+### Community 158 - "Community 158"
 Cohesion: 0.06
 Nodes (34): Authentication failure, Build and push, Building the pan-workspace Image, code:bash (curl -L https://fly.io/install.sh | sh), code:bash (pan workspace delete PAN-42), code:bash (# Tunnel remote port 4173 to local port 4173), code:bash (pan workspace sync-auth PAN-42), code:bash (# Via the dashboard UI (Costs tab)) (+26 more)
 
-### Community 164 - "Community 164"
+### Community 159 - "Community 159"
 Cohesion: 0.06
 Nodes (34): 1. Filesystem: `.claude/agents/<name>.md`, 2. CLI JSON: `--agents '{"name":{...}}'`, 3. Hybrid: Filesystem base + CLI `--model` override, Agent Definition Format (Full Spec), Agent Teams: Out of Scope, Architecture: Three Injection Paths, `claude agents` Has No JSON Output, code:yaml (---) (+26 more)
 
-### Community 165 - "Community 165"
+### Community 160 - "Community 160"
 Cohesion: 0.06
 Nodes (34): 1. Agent Triggers Inspection (Only When Flagged), 2. Inspect Specialist Runs, 3. Inspect Specialist Reports, 4. Checkpoint System, Agent Workflow Integration, Check 1: Spec Fidelity, Check 2: Constraint Compliance, Check 3: Compile + Smoke (+26 more)
 
-### Community 166 - "Community 166"
+### Community 161 - "Community 161"
 Cohesion: 0.06
 Nodes (34): 1. Configuration Ownership, 2. Implementation Scope, 3. API Key Storage, 4. Complexity Routing, Acceptance Criteria Checklist, Agent Spawning Changes, Architecture, code:block1 (~/.panopticon/) (+26 more)
 
-### Community 167 - "Community 167"
+### Community 162 - "Community 162"
 Cohesion: 0.06
 Nodes (34): `cli:interactive` and `cli:quick-command`, `convoy:correctness-reviewer`, `convoy:performance-reviewer`, `convoy:requirements-reviewer`, `convoy:security-reviewer`, `convoy:synthesis-agent`, Excellent Fit, Gemini 3 Flash Preview Work Type Fit Analysis (+26 more)
 
-### Community 168 - "Community 168"
+### Community 163 - "Community 163"
 Cohesion: 0.06
 Nodes (34): `cli:interactive`, `cli:quick-command`, `convoy:correctness-reviewer`, `convoy:performance-reviewer`, `convoy:requirements-reviewer`, `convoy:security-reviewer`, `convoy:synthesis-agent`, Excellent Fit (+26 more)
 
-### Community 169 - "Community 169"
+### Community 164 - "Community 164"
 Cohesion: 0.06
 Nodes (34): Agent States, code:bash (# List recent boots — the previous boot (-1) is the crashed ), code:bash (# Check .pan/continue.json for each workspace), code:bash (# Current memory usage), code:markdown (## Crash Summary), code:typescript (pool: 'forks',), code:bash (# All OOM events from the crashed boot), code:bash (# Find the process table dump from the first OOM event) (+26 more)
 
-### Community 170 - "Community 170"
+### Community 165 - "Community 165"
 Cohesion: 0.07
-Nodes (26): ActivitySparkline(), ActivitySparklineProps, CATEGORY_COLORS, SparklineCategory, SparklineEvent, formatCost(), IssueHeader(), IssueHeaderProps (+18 more)
+Nodes (22): getDebugInfo(), getGlobalRouter(), getModel(), hasOverride(), resetGlobalRouter(), apiKeys, config, debug (+14 more)
 
-### Community 171 - "Community 171"
-Cohesion: 0.12
-Nodes (28): WipeOptions, extractNumber(), extractPrefix(), extractStandardNumber(), extractStandardPrefix(), normalizeIssueId(), ParsedIssueId, parseIssueId() (+20 more)
+### Community 166 - "Community 166"
+Cohesion: 0.08
+Nodes (31): migrateConfigCommand(), MigrateConfigOptions, BACKUP_SETTINGS_PATH, convertToYamlConfig(), detectEnabledProviders(), getMigrationStatus(), hasLegacySettings(), LEGACY_SETTINGS_PATH (+23 more)
 
-### Community 172 - "Community 172"
+### Community 167 - "Community 167"
+Cohesion: 0.06
+Nodes (27): loadCloisterConfig(), cleanupStaleAgentState(), { activeSessions }, agentDir, fortyMinutesAgo, twentyMinutesAgo, determineModel(), checkAgentHealthAsync() (+19 more)
+
+### Community 168 - "Community 168"
+Cohesion: 0.08
+Nodes (32): cleanupOldHealthEvents(), deleteAgentHealthHistory(), getAgentsWithHistory(), getAllHealthHistory(), getHealthHistory(), getLatestHealthEvent(), getRecentHealthHistory(), HealthEvent (+24 more)
+
+### Community 169 - "Community 169"
 Cohesion: 0.06
 Nodes (33): 1. Upgrade CanonicalState to 9-State vBRIEF Lifecycle, 2. vBRIEF Lifecycle Folders, 3. `pan install` Bootstraps Deft, 4. Layered Rule Hierarchy for Agent Prompts, 5. Deterministic Gates in Cloister Pipeline, 6. Structured Planning Strategies, 7. Swarm Integration, 8. Issue Ingestion and Reconciliation (+25 more)
 
-### Community 173 - "Community 173"
+### Community 170 - "Community 170"
 Cohesion: 0.06
 Nodes (31): `AgentStateService` — the single interface, Architectural principle, Backpressure, code:block1 (writers                          canonical state            ), code:typescript (// in AgentSnapshot Schema.Struct, add:), code:typescript (export const AgentActivityChanged = Schema.Struct({), code:typescript (export const AgentStateRestored = Schema.Struct({), code:typescript (// inside applyEvent switch, representative case:) (+23 more)
 
-### Community 174 - "Community 174"
+### Community 171 - "Community 171"
 Cohesion: 0.06
 Nodes (33): 10. Preserve power-user trust, 1. Replace the current page shell with a coherent settings shell, 2. Introduce reusable settings primitives, 3. Reorganize the settings information architecture, 4. Add explicit local settings navigation, 5. Redesign Providers into summary-first expandable management panels, 6. Redesign Model Routing around presets + overrides, not a wall of tiles, 7. Normalize Conversations, Terminal, Tracker Keys, Appearance, Maintenance, and Desktop sections into the shared system (+25 more)
 
-### Community 175 - "Community 175"
+### Community 172 - "Community 172"
 Cohesion: 0.06
 Nodes (32): 1. mem0 Overview, 2. Architecture, 3. Key Technical Details, 4. Managed Platform vs Open Source, 5. Performance Claims, 6. Panopticon Adoption Analysis, 7. References, AI Memory Layer Research: mem0 and Adoption Strategy for Panopticon (+24 more)
 
-### Community 176 - "Community 176"
+### Community 173 - "Community 173"
 Cohesion: 0.06
 Nodes (33): 1. Public bootstrap/health/config endpoints, 2. Inspect the deployed frontend bundle, 3. SSH and inspect runtime directly, code:bash (pan remote setup), code:bash (fly auth whoami), code:bash (pan remote status), code:bash (fly proxy 4173:4173 -a <app>), code:bash (fly status -a <app>) (+25 more)
 
-### Community 177 - "Community 177"
+### Community 174 - "Community 174"
 Cohesion: 0.06
 Nodes (33): 1. Find the Agent Session, 2. Check Current Agent Status, 3. Send Your Message, 4. Verify Message Was Received, Change Priorities, code:bash (# ALWAYS use pan tell - it handles Enter correctly), code:bash (pan tell ISSUE-123 "Looks good! Please commit your changes a), code:bash (# List all sessions to find the correct name) (+25 more)
 
-### Community 178 - "Community 178"
+### Community 175 - "Community 175"
 Cohesion: 0.06
 Nodes (33): code:block1 (myproject/), code:block10 (your-project/), code:yaml (# ~/.panopticon/projects.yaml), code:yaml (# WRONG - causes Maven startup failure), code:yaml (projects:), code:yaml (projects:), code:yaml (services:), code:block4 (your-project/) (+25 more)
 
-### Community 179 - "Community 179"
+### Community 176 - "Community 176"
 Cohesion: 0.06
 Nodes (33): Agent Self-Requeue (Circuit Breaker), Automatic Handoffs, Cloister: AI Lifecycle Manager, code:block1 (┌───────────────────────────────────────────────────────────), code:json ({), code:javascript ({), code:json ({), code:bash (# Via dashboard - click "Start" in the Cloister status bar) (+25 more)
 
-### Community 180 - "Community 180"
+### Community 177 - "Community 177"
 Cohesion: 0.06
 Nodes (18): callServerApi(), currentStatus, DEFAULTS, electron, electron_updater, fetchActiveWorkspaces(), iconPath, IPC (+10 more)
 
-### Community 181 - "Community 181"
+### Community 178 - "Community 178"
 Cohesion: 0.09
-Nodes (30): migrateConfigCommand(), MigrateConfigOptions, BACKUP_SETTINGS_PATH, convertToYamlConfig(), detectEnabledProviders(), getMigrationStatus(), hasLegacySettings(), LEGACY_SETTINGS_PATH (+22 more)
+Nodes (30): DoneOptions, execAsync, getGitHubConfig(), updateGitHubToInReview(), updateLinearToInReview(), AutoCreateStateConfig, CANONICAL_STATES, CanonicalState (+22 more)
 
-### Community 182 - "Community 182"
-Cohesion: 0.1
-Nodes (29): applyFallback(), applyTierAwareFallback(), detectEnabledProviders(), FALLBACK_MAP, filterAvailableModels(), getAvailableModels(), getBestAnthropicAtTier(), getFallbackModel() (+21 more)
+### Community 179 - "Community 179"
+Cohesion: 0.07
+Nodes (25): ActivitySparkline(), ActivitySparklineProps, CATEGORY_COLORS, SparklineCategory, SparklineEvent, formatCost(), IssueHeader(), IssueHeaderProps (+17 more)
 
-### Community 183 - "Community 183"
+### Community 180 - "Community 180"
 Cohesion: 0.06
 Nodes (32): 1. Installation Test, 2. DNS Setup Test, 3. Startup Test (pan up), 4. Port-based Fallback Test, 5. Traefik Routing Test, 6. Shutdown Test (pan down), 7. Minimal Mode Test, Automated Test Script (+24 more)
 
-### Community 184 - "Community 184"
+### Community 181 - "Community 181"
 Cohesion: 0.06
 Nodes (32): 1.1 vBRIEF (Adopted), 1.2 Deft, 1.3 Superpowers, 1.4 Spec Kit (GitHub), 1.5 Taskmaster (eyaltoledano/claude-task-master), 1.6 OpenAI Agents SDK ("Agent OS" candidate), 1.7 Not Found / Need Clarification, 1. The Frameworks (+24 more)
 
-### Community 185 - "Community 185"
+### Community 182 - "Community 182"
 Cohesion: 0.06
 Nodes (31): 1. FizzyApiClient (`src/lib/tracker/fizzy-client.ts`), 2. FizzyCardMapping (SQLite), 3. FizzySyncService (`src/lib/fizzy/sync-service.ts`), 4. FizzyWebhookReceiver (`src/dashboard/server/routes/fizzy-webhooks.ts`), 5. FizzyColumnResolver (`src/lib/fizzy/column-resolver.ts`), Architecture, code:block1 (GitHub Issues (source of truth)), code:yaml (fizzy:) (+23 more)
 
-### Community 186 - "Community 186"
+### Community 183 - "Community 183"
 Cohesion: 0.06
 Nodes (32): Automated Synthesis, Best Practices, Code Conflicts, code:bash (# Get convoy status and results), code:typescript (// Agent 1 added field:), code:bash (# Generate synthesis prompt), code:bash (# Convoy management), code:bash (# Check each workspace for changes) (+24 more)
 
-### Community 187 - "Community 187"
+### Community 184 - "Community 184"
 Cohesion: 0.06
 Nodes (32): code:bash (pan setup), code:yaml (# template.yaml), code:block11 (team-meta/), code:bash (# Setup Agent prompt includes:), code:block2 ($ pan setup), code:block3 (Step 2: Project Type Detection), code:block4 (Step 3: Template Selection), code:block5 (Step 4: Repository Configuration) (+24 more)
 
+### Community 185 - "Community 185"
+Cohesion: 0.07
+Nodes (30): defect, defectQuery, feature, featureQuery, featureWithEmptyState, featureWithObjectState, featureWithPartialState, mockCreate (+22 more)
+
+### Community 186 - "Community 186"
+Cohesion: 0.09
+Nodes (28): execAsync, gatherArtifacts(), generateBasicInference(), generateMonitoringPrompt(), InferenceDocument, MonitoringAgentConfig, readInferenceDocument(), updateInferenceDocument() (+20 more)
+
+### Community 187 - "Community 187"
+Cohesion: 0.1
+Nodes (28): activeViolations, checkAgentForViolations(), clearOldViolations(), DEFAULT_FPP_CONFIG, FPPViolation, FPPViolationConfig, FPPViolationType, getActiveViolations() (+20 more)
+
 ### Community 188 - "Community 188"
-Cohesion: 0.08
-Nodes (27): resetDb(), resetDb(), closeDatabase(), getDatabasePath(), isBunRuntime(), _require, resetDatabase(), conv (+19 more)
+Cohesion: 0.1
+Nodes (27): execFileAsync, gitFetch(), gitForcePush(), gitMerge(), gitPush(), gitRevParse(), MainDivergedError, appendGitOperation() (+19 more)
 
 ### Community 189 - "Community 189"
 Cohesion: 0.13
 Nodes (29): captureCheckpoint(), checkpointRef(), deleteAllCheckpoints(), deleteCheckpoint(), diffAgainstMain(), diffAgainstMainFiles(), diffCheckpointFiles(), diffCheckpoints() (+21 more)
 
 ### Community 190 - "Community 190"
-Cohesion: 0.07
-Nodes (30): defect, defectQuery, feature, featureQuery, featureWithEmptyState, featureWithObjectState, featureWithPartialState, mockCreate (+22 more)
-
-### Community 191 - "Community 191"
-Cohesion: 0.09
-Nodes (28): execAsync, gatherArtifacts(), generateBasicInference(), generateMonitoringPrompt(), InferenceDocument, MonitoringAgentConfig, readInferenceDocument(), updateInferenceDocument() (+20 more)
-
-### Community 192 - "Community 192"
-Cohesion: 0.1
-Nodes (27): execFileAsync, gitFetch(), gitForcePush(), gitMerge(), gitPush(), gitRevParse(), MainDivergedError, appendGitOperation() (+19 more)
-
-### Community 193 - "Community 193"
 Cohesion: 0.06
 Nodes (30): 1. JWT Expiry (Primary), 2. CLIProxy Log Tailing (Secondary), Automatic Retry, Bridging to CLIProxy, code:block1 (~/.panopticon/cliproxy/auth/codex-primary.json), code:bash (curl http://localhost:3000/api/settings/codex-auth), code:bash (pan config get issue-agent:implementation), code:block2 (~/.codex/) (+22 more)
 
-### Community 194 - "Community 194"
+### Community 191 - "Community 191"
 Cohesion: 0.06
 Nodes (31): All subagents (`explore`, `plan`, `bash`, `general-purpose`), `cli:interactive` and `cli:quick-command`, `convoy:correctness-reviewer`, `convoy:performance-reviewer`, `convoy:requirements-reviewer`, `convoy:security-reviewer`, `convoy:synthesis-agent`, Critical Issue: Tool Behavior Bug (+23 more)
 
-### Community 195 - "Community 195"
+### Community 192 - "Community 192"
 Cohesion: 0.06
 Nodes (31): All subagents (except general-purpose), Claude Sonnet 4.6 Work Type Fit Analysis, `cli:quick-command`, `convoy:correctness-reviewer`, `convoy:performance-reviewer`, `convoy:requirements-reviewer`, `convoy:security-reviewer`, `convoy:synthesis-agent` (+23 more)
 
-### Community 196 - "Community 196"
+### Community 193 - "Community 193"
 Cohesion: 0.06
 Nodes (31): 1. Be Specific, 2. Explain Why, 3. Order Steps Logically, 4. Consider Edge Cases, 5. Be Realistic, code:typescript (// Find authentication code), code:typescript (AskUserQuestion({), code:markdown (# [ISSUE-ID]: [Issue Title]) (+23 more)
 
-### Community 197 - "Community 197"
+### Community 194 - "Community 194"
 Cohesion: 0.06
 Nodes (31): Backend Frameworks, code:yaml (projects:), code:bash (# Create workspace (uses configuration from projects.yaml)), code:yaml (services:), code:yaml (projects:), code:yaml (projects:), code:yaml (projects:), code:bash (cat ~/.panopticon/projects.yaml) (+23 more)
 
-### Community 198 - "Community 198"
+### Community 195 - "Community 195"
 Cohesion: 0.06
 Nodes (31): Best Practices, Built-in Convoy Templates, code-review Template, code:bash (# Run a parallel code review), code:block10 (1. Start command received), code:bash (# Watch convoy progress), code:bash (# Check individual agent status), code:block2 (pan convoy start code-review --files "src/**/*.ts") (+23 more)
 
-### Community 199 - "Community 199"
+### Community 196 - "Community 196"
+Cohesion: 0.11
+Nodes (29): applyFallback(), applyTierAwareFallback(), detectEnabledProviders(), FALLBACK_MAP, filterAvailableModels(), getAvailableModels(), getBestAnthropicAtTier(), getFallbackModel() (+21 more)
+
+### Community 197 - "Community 197"
 Cohesion: 0.08
 Nodes (26): activeSpec, agent2, baseAgent, baseSpecialist, bigOutput, events, existing, issues (+18 more)
 
-### Community 200 - "Community 200"
+### Community 198 - "Community 198"
 Cohesion: 0.1
-Nodes (28): activeViolations, checkAgentForViolations(), clearOldViolations(), DEFAULT_FPP_CONFIG, FPPViolation, FPPViolationConfig, FPPViolationType, getActiveViolations() (+20 more)
+Nodes (26): ActionKey, ActionLayout, derivePipelineState(), flattenActions(), getZoneAActions(), getZoneBActions(), PipelineState, ZoneAInput (+18 more)
 
-### Community 201 - "Community 201"
+### Community 199 - "Community 199"
 Cohesion: 0.14
 Nodes (3): execAsync, FlyProvider, mapFlyStateToVmStatus()
 
-### Community 202 - "Community 202"
-Cohesion: 0.11
-Nodes (27): BeadsTask, captureBeadsTasks(), captureFiles(), captureGitState(), captureHandoffContext(), execAsync, serializeHandoffContext(), next (+19 more)
-
-### Community 203 - "Community 203"
-Cohesion: 0.11
-Nodes (27): CloseOutContext, CloseOutResult, CloseOutStep, execAsync, executeCloseOut(), findWorkspacePath(), isBranchMerged(), canonicalPrdSubdir() (+19 more)
-
-### Community 204 - "Community 204"
-Cohesion: 0.06
-Nodes (31): code:yaml (# Your original docker-compose.yml), code:bash (pan workspace create my-feature --template node-fullstack), code:block102 (~/.panopticon/templates/), code:toml ([template]), code:block109 (~/.panopticon/), code:yaml (# ~/.panopticon/traefik/dynamic/feature-min-648.yml), code:toml ([panopticon]), code:toml ([project]) (+23 more)
-
-### Community 205 - "Community 205"
+### Community 200 - "Community 200"
 Cohesion: 0.06
 Nodes (30): 1. Template File Resolution, 2. Config File Integration, 3. Docker Compose Integration, 4. Certificate Integration, code:bash (pan install), code:bash (node -e "import('./dist/chunk-*.js').then(m => console.log(m), code:bash (ls -la templates/traefik/), code:bash (ls -la ~/.panopticon/traefik/) (+22 more)
 
-### Community 206 - "Community 206"
+### Community 201 - "Community 201"
 Cohesion: 0.06
 Nodes (30): 1. Review Artifact Creation at `pan done`, 1. The work agent owns all code-changing git operations, 2. Merge-Set Data Model, 2. Review artifacts are created at work completion, 3. Merge agent is the coordinator for merge sets, 3. Work-Agent-Owned Rebase Flow, 4. Non-Mutating Post-Rebase Verification, 4. Verification runs twice (+22 more)
 
-### Community 207 - "Community 207"
+### Community 202 - "Community 202"
 Cohesion: 0.06
 Nodes (30): 1. Extend XTerminal Component, 3. Smart Ctrl+C Logic, 4. Context Menu (Embedded in XTerminal), 5. Auto-Copy on Selection, 6. Configuration UI, Breakdown into Sub-Tasks, code:typescript (interface XTerminalProps {), code:typescript (// Pseudo-code) (+22 more)
 
-### Community 208 - "Community 208"
+### Community 203 - "Community 203"
 Cohesion: 0.06
 Nodes (30): All subagents, `cli:interactive` and `cli:quick-command`, `convoy:correctness-reviewer`, `convoy:performance-reviewer`, `convoy:requirements-reviewer`, `convoy:security-reviewer`, `convoy:synthesis-agent`, Excellent Fit (+22 more)
 
-### Community 209 - "Community 209"
+### Community 204 - "Community 204"
 Cohesion: 0.06
 Nodes (30): Agent State Management, Architecture, code:block1 (┌───────────────────────────────────────────────────────────), code:bash (# Check what will be synced (including dev-skills)), code:block2 (~/.panopticon/), code:json ({), code:bash (pan remote init        # Initialize Fly.io provider), code:bash (pan work wipe MIN-123           # Basic cleanup) (+22 more)
 
-### Community 210 - "Community 210"
+### Community 205 - "Community 205"
 Cohesion: 0.06
 Nodes (30): Available Commands, Available Skills, Code Review, code:bash (# 1. Initialize Panopticon), code:bash (# 1. Optionally create a plan first), code:bash (# List all workspaces), Configuration, Configuration Files (+22 more)
 
-### Community 211 - "Community 211"
+### Community 206 - "Community 206"
 Cohesion: 0.06
 Nodes (30): 1. Planning Phase, 2. Implementation Phase, 3. Iteration, "API not enabled" errors, Available MCP Tools, Best Practices, Bidirectional Sync, Code Quality (+22 more)
 
-### Community 212 - "Community 212"
+### Community 207 - "Community 207"
 Cohesion: 0.06
 Nodes (30): Available TLDR Tools, Beads Tasks, code:block1 (1. Agent needs to understand auth.ts), code:bash (node -e "const fs=require('fs'); const p='.pan/spec.vbrief.j), code:bash (git fetch origin main && git rebase origin/main), code:bash (pan done {{ISSUE_ID}} -c "Work already complete from previou), code:json ({), code:bash (npm test                                         # Run tests) (+22 more)
 
-### Community 213 - "Community 213"
+### Community 208 - "Community 208"
 Cohesion: 0.06
 Nodes (30): Agent Commands, code:bash (# Spawn an agent for a Linear issue), code:bash (pan work request-review min-123 -m "Fixed: added tests and r), code:bash (# Clean up agents, state, Linear status), code:bash (# Recover a specific agent), code:bash (# Check status of all specialists), code:bash (# Initialize Fly.io provider), code:bash (pan work status) (+22 more)
 
-### Community 214 - "Community 214"
-Cohesion: 0.14
-Nodes (29): CHUNK_BUDGET_CHARS_BY_MODEL, chunkEntriesByBudget(), CompactionOptions, CompactionResult, computeFileLists(), createFileOps(), CutPointResult, estimateContextTokens() (+21 more)
+### Community 209 - "Community 209"
+Cohesion: 0.1
+Nodes (22): buildMenuTemplate(), configureApplicationMenu(), fetchActiveWorkspaces(), rebuildMenu(), WorkspaceSummary, checkForUpdates(), currentStatus, downloadUpdate() (+14 more)
 
-### Community 215 - "Community 215"
+### Community 210 - "Community 210"
+Cohesion: 0.12
+Nodes (24): registerAdminCommands(), registerCloisterCommands(), compactCommand(), CompactOptions, detectPlatform(), doctorCommand(), execAsync, getOldClosedCount() (+16 more)
+
+### Community 211 - "Community 211"
+Cohesion: 0.11
+Nodes (26): BUNDLED_GIT_HOOKS_DIR, checkCommand(), __dirname, __filename, syncCommand(), SyncOptions, getCurrentVersion(), getLatestVersion() (+18 more)
+
+### Community 212 - "Community 212"
+Cohesion: 0.17
+Nodes (21): Comment, Issue, IssueFilters, IssueNotFoundError, IssueState, IssueTracker, IssueUpdate, NewIssue (+13 more)
+
+### Community 213 - "Community 213"
 Cohesion: 0.11
 Nodes (25): main(), print_usage(), build_compress_prompt(), build_fix_prompt(), call_claude(), compress_file(), Strip outer ```markdown ... ``` fence when it wraps the entire output., strip_llm_wrapper() (+17 more)
 
-### Community 216 - "Community 216"
-Cohesion: 0.09
-Nodes (22): InlineSparkline(), InlineSparklineProps, STATUS_ANIM_CLASS, STATUS_COLOR, STATUS_GLOW, StatusDot(), StatusDotProps, StatusDotSize (+14 more)
+### Community 214 - "Community 214"
+Cohesion: 0.11
+Nodes (24): clearFeedbackFiles(), writeStoryFeatureContext(), validatePlanMatchesIssue(), readWorkspaceContext(), writeWorkspaceContext(), ensureWorkspacePanDir(), getWorkspacePanPaths(), readWorkspaceContinue() (+16 more)
 
-### Community 217 - "Community 217"
+### Community 215 - "Community 215"
 Cohesion: 0.07
 Nodes (29): 2026-04-12 — Run 1, 2026-04-12 — Run 2, 2026-04-12 — Run 3, 2026-04-13 — Run 4, 2026-04-13 — Run 8, 2026-04-14 — Run 9, Bug Log Template, code:block1 (### BUG: [Short description]) (+21 more)
 
-### Community 218 - "Community 218"
+### Community 216 - "Community 216"
 Cohesion: 0.07
 Nodes (29): code:typescript (interface VBriefReference {), code:typescript (export interface VBriefInfo {), code:json ({), code:block4 (## vBRIEF Plan Format), code:markdown (| **vBRIEF Plan Format** | Machine-readable work plans using), code:typescript (// Scan for PRDs matching this issue), code:block7 (VBriefViewer), code:block8 (tests/vbrief/full-spec.test.ts) (+21 more)
 
-### Community 219 - "Community 219"
+### Community 217 - "Community 217"
 Cohesion: 0.07
 Nodes (29): 1. Be Realistic, 2. Verify with Code, 3. Consider Context, 4. Communicate Uncertainty, 5. Update Estimates, Best Practices, Bug Triage, code:bash (# Find related code) (+21 more)
 
-### Community 220 - "Community 220"
+### Community 218 - "Community 218"
 Cohesion: 0.07
 Nodes (29): Access Points, Alternative Backend Frameworks, API Communication, Backend CORS, Backend Development, code:block1 (project/), code:javascript (const cors = require('cors')), code:bash (docker compose exec backend npx prisma migrate dev) (+21 more)
 
-### Community 221 - "Community 221"
+### Community 219 - "Community 219"
+Cohesion: 0.11
+Nodes (25): CloseOutContext, CloseOutResult, CloseOutStep, execAsync, executeCloseOut(), findWorkspacePath(), isBranchMerged(), canonicalPrdSubdir() (+17 more)
+
+### Community 220 - "Community 220"
 Cohesion: 0.1
 Nodes (26): AlsoSyncTool, collectSkillDirs(), extractSkillName(), MultiToolSyncResult, readSkillContent(), stripFrontmatter(), syncSkillsToTools(), syncToAider() (+18 more)
 
+### Community 221 - "Community 221"
+Cohesion: 0.15
+Nodes (27): addEventToCache(), CostCache, createEmptyCache(), getCacheFile(), getCacheStatus(), getCostsByIssue(), getCostsDir(), getCostsForIssue() (+19 more)
+
 ### Community 222 - "Community 222"
 Cohesion: 0.1
-Nodes (22): getReauthSessionToken(), activePtyHubs, addClientToHub(), broadcastToHub(), hubFlushTimer, hubOutputBuffer, PtyHub, removeClientFromHub() (+14 more)
+Nodes (26): HandoffContext, createHandoffEvent(), ensureLogDir(), getHandoffStats(), getPendingVerificationHandoffs(), HANDOFF_LOG_FILE, HandoffEvent, logHandoffEvent() (+18 more)
 
 ### Community 223 - "Community 223"
-Cohesion: 0.1
-Nodes (22): EventRouter(), createRecoveryCoordinator(), EventClassification, RecoveryCoordinator, RecoveryPhase, RecoveryPhaseKind, RecoveryReason, RecoveryState (+14 more)
+Cohesion: 0.11
+Nodes (26): agentDir, missing, result, snapshot, status, discoverNewAgentIds(), ReadModelServiceShape, toAgentPhase() (+18 more)
 
 ### Community 224 - "Community 224"
-Cohesion: 0.12
-Nodes (26): wipeCommand(), archivePlanning(), CloseIssueOptions, approve(), buildResult(), cancelIssueWorkflow(), clearReviewStatusStep(), close() (+18 more)
-
-### Community 225 - "Community 225"
 Cohesion: 0.07
 Nodes (28): API Endpoints, Architecture Overview, Backoff Strategy, CacheService (`src/dashboard/server/services/cache-service.ts`), code:block1 (Frontend (TanStack Query)), code:typescript (await issueDataService.invalidateTracker('github'); // or 'l), code:json ({), Dashboard API Caching & Real-Time Push Architecture (+20 more)
 
-### Community 226 - "Community 226"
+### Community 225 - "Community 225"
 Cohesion: 0.07
 Nodes (28): 1. Interactive CLI Wizard (`pan setup`), 2. Project Templates, 3. Setup Agent, Architecture, code:block1 ($ pan setup), code:typescript (interface SetupState {), code:typescript (async function detectRepos(projectPath: string): Promise<Det), code:block4 (templates/project-types/) (+20 more)
 
-### Community 227 - "Community 227"
+### Community 226 - "Community 226"
 Cohesion: 0.07
 Nodes (28): 1. `ensureManagedTmuxConfig*` thrash on every tmux invocation, 2. 5000-line escape-coded snapshot on every attach, 3. `sendKeysAsync` per-line buffer + 50 ms sleep, Acceptance Criteria, Add, Code Changes Summary, code:typescript (// Lines 84-88 (sync) and 90-94 (async):), code:typescript (async function captureSnapshot(sessionName: string, cols: nu) (+20 more)
 
-### Community 228 - "Community 228"
+### Community 227 - "Community 227"
 Cohesion: 0.07
 Nodes (28): 1. Keep or Remove Runtime Parameter?, 1. Remove Sync Targets and Runtime Adapters, 2. Config Migration Strategy, 2. Consolidate Cloister Runtime System, 3. Remove CLI Runtime Selection, 3. Symlink Cleanup Approach, 4. Cloister Runtime Consolidation, 4. Config Migration (+20 more)
 
-### Community 229 - "Community 229"
+### Community 228 - "Community 228"
 Cohesion: 0.07
 Nodes (28): 1. Cleanup Strategy: **Delete Permanently**, 2. Age Threshold: **7 Days (Configurable)**, 3. Directory Types to Clean, 4. Cleanup Triggers: **Both Auto + Manual**, 5. Status Marking: **Add 'completed' Status**, 6. Cost Endpoint Migration: **Yes, Include It**, Acceptance Criteria, Blocker Status: RESOLVED ✓ (+20 more)
 
-### Community 230 - "Community 230"
+### Community 229 - "Community 229"
 Cohesion: 0.07
 Nodes (28): All subagents, inspect agent, merge agent, CLI modes, API Migration from Opus 4.6, Breaking Changes, Claude Opus 4.7 Work Type Fit Analysis, `convoy:correctness-reviewer`, `convoy:performance-reviewer`, `convoy:requirements-reviewer`, `convoy:security-reviewer` (+20 more)
 
-### Community 231 - "Community 231"
+### Community 230 - "Community 230"
 Cohesion: 0.07
 Nodes (28): All subagents (`explore`, `plan`, `bash`, `general-purpose`), `cli:interactive` and `cli:quick-command`, `convoy:performance-reviewer` and `convoy:correctness-reviewer`, `convoy:requirements-reviewer`, `convoy:security-reviewer`, `convoy:synthesis-agent`, Excellent Fit, GLM-5.1 Work Type Fit Analysis (+20 more)
 
-### Community 232 - "Community 232"
+### Community 231 - "Community 231"
 Cohesion: 0.07
 Nodes (28): code:bash (# PAN-XXX -> /home/eltmon/projects/panopticon (GitHub)), code:block10 (Items:), code:block11 (Items:), code:json ({), code:json ({), code:bash (# Materialize beads and mark the workspace spec proposed), code:bash (# Load Stitch tools), code:bash (gh label create "planned" --color "0E8A16" 2>/dev/null || tr) (+20 more)
 
-### Community 233 - "Community 233"
+### Community 232 - "Community 232"
 Cohesion: 0.07
 Nodes (28): code:bash (# Check dashboard is running), code:bash (# Check for uncommitted changes), code:bash (# Create GitHub issue), code:bash (# Create test fixture), code:bash (# Trigger the approval - this kicks off review-agent), code:bash (# Watch review-agent (should complete review and hand off)), code:bash (# Check if branch was merged to main), code:bash (# Close the GitHub issue) (+20 more)
 
-### Community 234 - "Community 234"
+### Community 233 - "Community 233"
 Cohesion: 0.07
 Nodes (28): 1. Logic Errors, 2. Null/Undefined Handling, 3. Edge Cases, 4. Type Safety, 5. Data Flow, 6. Consistency and Completeness, Acceptance criteria classification, Code Review: Correctness (+20 more)
 
+### Community 234 - "Community 234"
+Cohesion: 0.22
+Nodes (26): archiveWorkspaceArtifacts(), findWorkspacePath(), cleanupLabelsGitHub(), cleanupLabelsLinear(), cleanupMergedLabels(), execAsync, LABELS_TO_REMOVE, buildPlaceholders() (+18 more)
+
 ### Community 235 - "Community 235"
-Cohesion: 0.15
-Nodes (26): listActiveConversations(), markConversationEnded(), assertSafeName(), cleanupConversationAttachments(), cleanupOrphanedConversationAttachments(), cleanupUnreferencedConversationAttachments(), ensureConversationAttachmentDir(), extractConversationAttachmentPaths() (+18 more)
+Cohesion: 0.11
+Nodes (22): resolveProjectConfig(), workspaceRenderDevcontainerCommand(), WorkspaceRenderDevcontainerOptions, ProjectConfig, StepResult, after, before, cfg (+14 more)
 
 ### Community 236 - "Community 236"
-Cohesion: 0.08
-Nodes (26): calculateCost(), CostEntry, DEFAULT_PRICING, getPricing(), logUsage(), ModelPricing, anthropicModels, cost (+18 more)
+Cohesion: 0.12
+Nodes (23): buildPanSpecFilename(), buildPanSpecPath(), entryFromFile(), parsePanSpecDocument(), readSpec(), writeSpec(), asPanSpecDocument(), isPanSpecStatus() (+15 more)
 
 ### Community 237 - "Community 237"
 Cohesion: 0.09
@@ -2102,976 +2109,976 @@ Cohesion: 0.07
 Nodes (27): `.agent-template/`, code:block1 (team-meta/), code:bash (#!/bin/bash), code:yaml (groups:), code:block3 (Step 6: Meta Repo), code:bash (mkdir -p team-meta/{.agent-template/.claude,panopticon,docs/), code:bash (git clone git@github.com:yourorg/team-meta.git), code:bash (cd team-meta/docs/onboarding) (+19 more)
 
 ### Community 246 - "Community 246"
-Cohesion: 0.14
-Nodes (25): buildDigestPrompt(), deleteContextDigest(), ensureContextDirectory(), execAsync(), generateContextDigest(), getContextDigestPath(), getContextDirectory(), getContextRunsCount() (+17 more)
+Cohesion: 0.15
+Nodes (22): wipeCommand(), cleanupAgentDirectories(), CleanupResult, findOrphanedAgentDirs(), getPlanningIssueId(), isLegacyConversationDirectory(), isValidAgentDirectoryName(), OrphanedAgentDir (+14 more)
 
 ### Community 247 - "Community 247"
-Cohesion: 0.16
-Nodes (3): IssueDataService, issuesChanged(), mapRallyStateToCanonical()
+Cohesion: 0.09
+Nodes (25): calculateCost(), DEFAULT_PRICING, getPricing(), logUsage(), ModelPricing, anthropicModels, cost, entries (+17 more)
 
 ### Community 248 - "Community 248"
-Cohesion: 0.13
-Nodes (23): appendCostEvent(), CostEvent, deduplicateEvents(), ensureEventsFile(), EventMetadata, eventsFileExists(), getCostsDir(), getEventsFile() (+15 more)
+Cohesion: 0.11
+Nodes (22): err, exec(), execFile(), execMock, kCustom, realExecAsync, spawnMock, tmuxCapturePaneAsyncMock (+14 more)
 
 ### Community 249 - "Community 249"
-Cohesion: 0.15
-Nodes (12): CLAUDE_PROJECTS_DIR, ClaudeMessage, getActiveSessionModel(), getAllSessionFiles(), getProjectDirs(), getRecentSessions(), getSessionFiles(), importSessionToCostLog() (+4 more)
+Cohesion: 0.14
+Nodes (9): defectQuery, hrQuery, mockCreate, mockQuery, mockUpdate, tracker, escapeQueryValue(), RallyTracker (+1 more)
 
 ### Community 250 - "Community 250"
-Cohesion: 0.1
-Nodes (18): RoundMarker, ZoneCConversation(), ZoneCConversationProps, deriveRoundMarkers(), TimestampedItem, resolveWorkTypeKey(), useResolvedModels(), getViewKey() (+10 more)
+Cohesion: 0.14
+Nodes (25): buildDigestPrompt(), deleteContextDigest(), ensureContextDirectory(), execAsync(), generateContextDigest(), getContextDigestPath(), getContextDirectory(), getContextRunsCount() (+17 more)
 
 ### Community 251 - "Community 251"
 Cohesion: 0.08
 Nodes (23): body, bytes, claudeProjectDir, conv, created, delivery, encodedCwd, getTrustedOrigins() (+15 more)
 
 ### Community 252 - "Community 252"
-Cohesion: 0.07
-Nodes (26): A. Provider Billing & Observability → #730, Already Fixed / Shipped (14), B. Metrics Page v2 → #750, Biggest backlog themes, C. Documentation Overhaul → #634, Critical (5 issues) — 1.0 blockers or active pipeline corruption, D. Cost Display Polish → new umbrella or #77, Duplicates (10) (+18 more)
+Cohesion: 0.08
+Nodes (21): AC_STATUS_COLORS, AC_STATUS_SYMBOL, applyDagreLayout(), DIFFICULTY_LABELS, EMPTY_ARRAY, GATE_LABELS, GATE_STATUS_COLORS, gateStatusFromReview() (+13 more)
 
 ### Community 253 - "Community 253"
 Cohesion: 0.07
-Nodes (26): 1. Check release readiness, 2. Create the release commit and tag, 3. Push intentionally, Branch and channel policy, Build or tests fail during preflight, Canary, Canary tags, code:bash (pan release check) (+18 more)
+Nodes (26): A. Provider Billing & Observability → #730, Already Fixed / Shipped (14), B. Metrics Page v2 → #750, Biggest backlog themes, C. Documentation Overhaul → #634, Critical (5 issues) — 1.0 blockers or active pipeline corruption, D. Cost Display Polish → new umbrella or #77, Duplicates (10) (+18 more)
 
 ### Community 254 - "Community 254"
 Cohesion: 0.07
-Nodes (26): Advanced: Work Type Table, Available Providers, Bulk Reset, Canonical Sources, Changing a Model Assignment, code:yaml (models:), code:yaml (openrouter:), Configuration File (+18 more)
+Nodes (26): 1. Check release readiness, 2. Create the release commit and tag, 3. Push intentionally, Branch and channel policy, Build or tests fail during preflight, Canary, Canary tags, code:bash (pan release check) (+18 more)
 
 ### Community 255 - "Community 255"
 Cohesion: 0.07
-Nodes (26): Anthropic-heavy reviews, cheaper helpers, Choosing What to Override, CLI Modes, code:yaml (models:), code:yaml (models:), code:yaml (models:), code:yaml (models:), code:yaml (models:) (+18 more)
+Nodes (26): Advanced: Work Type Table, Available Providers, Bulk Reset, Canonical Sources, Changing a Model Assignment, code:yaml (models:), code:yaml (openrouter:), Configuration File (+18 more)
 
 ### Community 256 - "Community 256"
 Cohesion: 0.07
-Nodes (25): 1. The breaker logic and the reset logic do not match, 2. `manual_retry` does not fit the current history type, 3. The `markWorkspaceStuck()` sample call is type-wrong, 4. The new retry endpoint overlaps heavily with the existing unstick flow, 5. `checkStuckReviewing()` may become too aggressive if tmux output pauses, 6. The PRD should call out interaction with stale-session cleanup in `runParallelReview()`, 7. The frontend copy and state model are good, but the PRD under-specifies how `stuckReason` should drive copy, 8. Minor path/documentation mismatch (+17 more)
+Nodes (26): Anthropic-heavy reviews, cheaper helpers, Choosing What to Override, CLI Modes, code:yaml (models:), code:yaml (models:), code:yaml (models:), code:yaml (models:), code:yaml (models:) (+18 more)
 
 ### Community 257 - "Community 257"
 Cohesion: 0.07
-Nodes (26): A/B Infrastructure, code:markdown (## Simplicity First), code:markdown ({{#KARPATHY_GUIDELINES}}), code:markdown ({{#KARPATHY_GUIDELINES}}), code:markdown ({{#KARPATHY_GUIDELINES}}), code:yaml (# ~/.panopticon/config.yaml), Config Schema, Design (+18 more)
+Nodes (25): 1. The breaker logic and the reset logic do not match, 2. `manual_retry` does not fit the current history type, 3. The `markWorkspaceStuck()` sample call is type-wrong, 4. The new retry endpoint overlaps heavily with the existing unstick flow, 5. `checkStuckReviewing()` may become too aggressive if tmux output pauses, 6. The PRD should call out interaction with stale-session cleanup in `runParallelReview()`, 7. The frontend copy and state model are good, but the PRD under-specifies how `stuckReason` should drive copy, 8. Minor path/documentation mismatch (+17 more)
 
 ### Community 258 - "Community 258"
 Cohesion: 0.07
-Nodes (26): 1. Infrastructure Model: Self-Contained Machines, 2. Command Execution: Hybrid Approach, 3. Exe Provider: Delete and Reimplement, 4. Docker Image: Full Pipeline, 5. Workspace Flow: Full Parity (minus shared infra), 6. Cost Tracking: Existing JSONL System, 7. Agent Management: Fly Machine Exec API, Architecture (+18 more)
+Nodes (26): A/B Infrastructure, code:markdown (## Simplicity First), code:markdown ({{#KARPATHY_GUIDELINES}}), code:markdown ({{#KARPATHY_GUIDELINES}}), code:markdown ({{#KARPATHY_GUIDELINES}}), code:yaml (# ~/.panopticon/config.yaml), Config Schema, Design (+18 more)
 
 ### Community 259 - "Community 259"
 Cohesion: 0.07
-Nodes (26): All implementation work types, All specialist agents (except review), All subagents, Claude Opus 4.6 Work Type Fit Analysis, CLI modes, `convoy:correctness-reviewer`, `convoy:performance-reviewer`, `convoy:requirements-reviewer` (+18 more)
+Nodes (26): 1. Infrastructure Model: Self-Contained Machines, 2. Command Execution: Hybrid Approach, 3. Exe Provider: Delete and Reimplement, 4. Docker Image: Full Pipeline, 5. Workspace Flow: Full Parity (minus shared infra), 6. Cost Tracking: Existing JSONL System, 7. Agent Management: Fly Machine Exec API, Architecture (+18 more)
 
 ### Community 260 - "Community 260"
 Cohesion: 0.07
-Nodes (26): All convoy reviewers, All implementation work types, All specialist agents (except inspect), `cli:interactive`, `cli:quick-command`, Excellent Fit, Good Fit — Worth Benchmarking, GPT-5.4 Nano Work Type Fit Analysis (+18 more)
+Nodes (26): All implementation work types, All specialist agents (except review), All subagents, Claude Opus 4.6 Work Type Fit Analysis, CLI modes, `convoy:correctness-reviewer`, `convoy:performance-reviewer`, `convoy:requirements-reviewer` (+18 more)
 
 ### Community 261 - "Community 261"
 Cohesion: 0.07
-Nodes (26): 1. Check Agent Status First, 2. Graceful Shutdown (Recommended), 3. Immediate Stop (If Needed), 4. Verify Stopped, 5. Clean Up (Optional), After Killing, code:bash (# Using pan CLI), code:bash (# List all matching sessions) (+18 more)
+Nodes (26): All convoy reviewers, All implementation work types, All specialist agents (except inspect), `cli:interactive`, `cli:quick-command`, Excellent Fit, Good Fit — Worth Benchmarking, GPT-5.4 Nano Work Type Fit Analysis (+18 more)
 
 ### Community 262 - "Community 262"
 Cohesion: 0.07
-Nodes (26): code:bash (python3 scripts/conv-find.py <id>), code:text (Conversation #108), code:bash (python3 scripts/conv-find.py --jsonl 108), code:bash (python3 scripts/conv-find.py --summary 108), code:bash (python3 scripts/conv-find.py --json 108), code:bash (python3 scripts/conv-find.py --recent 20   # default 20), code:bash (python3 scripts/conv-find.py --search lexerra), code:python (import json, pathlib) (+18 more)
+Nodes (26): 1. Check Agent Status First, 2. Graceful Shutdown (Recommended), 3. Immediate Stop (If Needed), 4. Verify Stopped, 5. Clean Up (Optional), After Killing, code:bash (# Using pan CLI), code:bash (# List all matching sessions) (+18 more)
 
 ### Community 263 - "Community 263"
 Cohesion: 0.07
-Nodes (26): 1. Visual Theme & Atmosphere, 2. Color Palette & Roles, 3. Typography Rules, 4. Component Stylings, 5. Layout Principles, 6. Design System Notes for Stitch Generation, Accent & Interactive, Alignment & Visual Balance (+18 more)
+Nodes (26): code:bash (python3 scripts/conv-find.py <id>), code:text (Conversation #108), code:bash (python3 scripts/conv-find.py --jsonl 108), code:bash (python3 scripts/conv-find.py --summary 108), code:bash (python3 scripts/conv-find.py --json 108), code:bash (python3 scripts/conv-find.py --recent 20   # default 20), code:bash (python3 scripts/conv-find.py --search lexerra), code:python (import json, pathlib) (+18 more)
 
 ### Community 264 - "Community 264"
 Cohesion: 0.07
-Nodes (26): Adding Repos Mid-Work, CLI Command, code:yaml (# ~/.panopticon/projects.yaml), code:yaml (# Old config — still works, all repos checked out), code:yaml (# team-meta/panopticon/repo-groups.yaml), code:bash (# Add specific repos), code:bash (# Add specific repos), code:block5 (/workspace-add-repo) (+18 more)
+Nodes (26): 1. Visual Theme & Atmosphere, 2. Color Palette & Roles, 3. Typography Rules, 4. Component Stylings, 5. Layout Principles, 6. Design System Notes for Stitch Generation, Accent & Interactive, Alignment & Visual Balance (+18 more)
 
 ### Community 265 - "Community 265"
 Cohesion: 0.07
-Nodes (26): Agent Self-Requeue (Circuit Breaker), code:block1 (Human clicks "Review"), code:bash (# All specialists with their current state), code:bash (# Via dashboard: click "Review" on an issue card), code:yaml (projects:), code:yaml (projects:), code:yaml (projects:), code:bash (# Via dashboard: click "Approve & Merge" on an issue card) (+18 more)
+Nodes (26): Adding Repos Mid-Work, CLI Command, code:yaml (# ~/.panopticon/projects.yaml), code:yaml (# Old config — still works, all repos checked out), code:yaml (# team-meta/panopticon/repo-groups.yaml), code:bash (# Add specific repos), code:bash (# Add specific repos), code:block5 (/workspace-add-repo) (+18 more)
 
 ### Community 266 - "Community 266"
 Cohesion: 0.07
-Nodes (26): 1. Test Coverage, 2. No Blocking Operations, 3. No Dead Code, 4. Error Handling, 5. Type Safety, 6. Temporal Dead Zone (TDZ), Acceptance Criteria (from vBRIEF plan) — MANDATORY GATE, APPROVED (rare — only for PERFECT code) (+18 more)
+Nodes (26): Agent Self-Requeue (Circuit Breaker), code:block1 (Human clicks "Review"), code:bash (# All specialists with their current state), code:bash (# Via dashboard: click "Review" on an issue card), code:yaml (projects:), code:yaml (projects:), code:yaml (projects:), code:bash (# Via dashboard: click "Approve & Merge" on an issue card) (+18 more)
 
 ### Community 267 - "Community 267"
-Cohesion: 0.11
-Nodes (19): childEnv, expectedExits, killChildTree(), port, requiredFiles, restartQueue, shutdown(), startApp() (+11 more)
+Cohesion: 0.07
+Nodes (26): 1. Test Coverage, 2. No Blocking Operations, 3. No Dead Code, 4. Error Handling, 5. Type Safety, 6. Temporal Dead Zone (TDZ), Acceptance Criteria (from vBRIEF plan) — MANDATORY GATE, APPROVED (rare — only for PERFECT code) (+18 more)
 
 ### Community 268 - "Community 268"
+Cohesion: 0.12
+Nodes (19): createTerminalWindow(), createWindow(), dispatchMenuAction(), iconPath, IPC, isDevelopment, resolveResourcePath(), resolveServerEntry() (+11 more)
+
+### Community 269 - "Community 269"
 Cohesion: 0.19
 Nodes (24): createCostCommand(), BUDGETS_FILE, checkBudget(), CostBudget, CostSummary, createBudget(), deleteBudget(), formatCost() (+16 more)
 
-### Community 269 - "Community 269"
-Cohesion: 0.11
-Nodes (8): setupVoiceWebSocket(), createMoonshineTranscription(), ITurnEmitter, TranscriptionManager, VoiceSettings, MoonshineTranscription, resolveSidecarBinary(), SidecarMessage
-
 ### Community 270 - "Community 270"
-Cohesion: 0.1
-Nodes (24): AutoCreateStateConfig, CANONICAL_STATES, CanonicalState, CanonicalStateDefinition, canonicalToTrackerState(), cleanupWorkflowLabels(), DEFAULT_STATE_MAPPINGS, getLinearStateName() (+16 more)
+Cohesion: 0.08
+Nodes (16): dbError, deleteCalls, existingBeads, expectedPrefix, initCall, { mockExecAsync }, redirectContent, workspacePath (+8 more)
 
 ### Community 271 - "Community 271"
+Cohesion: 0.16
+Nodes (24): assertSafeName(), cleanupConversationAttachments(), cleanupOrphanedConversationAttachments(), cleanupUnreferencedConversationAttachments(), ensureConversationAttachmentDir(), extractConversationAttachmentPaths(), getAttachmentCache(), getAttachmentCacheKey() (+16 more)
+
+### Community 272 - "Community 272"
+Cohesion: 0.1
+Nodes (10): createFlyApiClient(), FlyApiClient, FlyApiError, FlyExecResult, FlyMachine, FlyMachineConfig, client, fetchMock (+2 more)
+
+### Community 273 - "Community 273"
+Cohesion: 0.11
+Nodes (19): childEnv, expectedExits, killChildTree(), port, requiredFiles, restartQueue, shutdown(), startApp() (+11 more)
+
+### Community 274 - "Community 274"
 Cohesion: 0.13
 Nodes (21): envFor(), handlePanDone(), handleSessionStart(), handleToolExecutionEnd(), handleTurnEnd(), HookEnv, PanopticonPaths, panopticonPathsFor() (+13 more)
 
-### Community 272 - "Community 272"
+### Community 275 - "Community 275"
 Cohesion: 0.08
 Nodes (25): BRANCH_NOT_FOUND, Check Merged, code:bash (# Standard naming convention), code:bash (# Get repo list from project config), code:bash (# Check local branches), code:bash (# Check for unmerged commits), code:bash (git -C "$PROJECT_PATH" fetch origin "$BRANCH" 2>/dev/null), code:bash (# Check if any commit in main references the issue ID) (+17 more)
 
-### Community 273 - "Community 273"
+### Community 276 - "Community 276"
 Cohesion: 0.08
 Nodes (25): 10. Footer, 1. Brand Stripe (4px), 2. Header Block (primary_color background), 3. Issue Info Row (Light Gray background, #F5F5F5), 4. Score Dashboard — 5 metric cards in a row/grid, 5. Overall Score Bar, 6. Top Blockers (Amber/warning callout box), 7. Dimension Details — One section per dimension (+17 more)
 
-### Community 274 - "Community 274"
+### Community 277 - "Community 277"
 Cohesion: 0.08
 Nodes (20): assistantIssues, assistantText, CLAUDE_PROJECTS, contextIssues, cost, db, DB_PATH, entries (+12 more)
 
-### Community 275 - "Community 275"
-Cohesion: 0.17
-Nodes (18): workspaceDeepCleanCommand(), WorkspaceDeepCleanOptions, dangerBanner(), DangerousOp, DangerousOpBlockedError, dryRunGitClean(), execAsync, pathLeaf() (+10 more)
+### Community 278 - "Community 278"
+Cohesion: 0.08
+Nodes (22): CloisterEvent, setCloisterService(), capturedEvents, consoleSpy, customService, emergencyEvent, health, healths (+14 more)
 
-### Community 276 - "Community 276"
+### Community 279 - "Community 279"
 Cohesion: 0.12
 Nodes (23): appendBridgeLog(), BunGlobal, ChannelPermissionRequest, ChannelPermissionRequestNotification, ChannelPushPayload, ChannelPushResult, constantTimeHeaderMatch(), forwardPermissionRequestToDashboard() (+15 more)
 
-### Community 277 - "Community 277"
-Cohesion: 0.08
-Nodes (24): Architecture, Auto-Start, Auto-Updater Channels, Available Actions, Building the Desktop App, Cmd+K Command Palette, code:bash (chmod +x Panopticon-*.AppImage), code:bash (npx panopticon serve) (+16 more)
-
-### Community 278 - "Community 278"
-Cohesion: 0.08
-Nodes (24): Backlog (hidden), Canonical States (Internal), Classification Labels (all trackers), Close-Out Ceremony, code:block1 (┌─────────────────────────────────────────┐), code:block2 (docs/prds/), code:block3 (backlog      -- Hidden from board, separate view), Columns (+16 more)
-
-### Community 279 - "Community 279"
-Cohesion: 0.08
-Nodes (24): code:block1 (project-repo/), code:block2 (project-repo/), code:yaml (models:), code:yaml (# ~/.panopticon/config.yaml), code:yaml (# .pan.yaml (per-project, merges with global — never replace), code:block6 (project-repo/  (main branch)), code:block7 (project-repo/  (feature branch workspace)), code:block8 (.pan/events/) (+16 more)
-
 ### Community 280 - "Community 280"
-Cohesion: 0.08
-Nodes (24): Authentication & Network Exposure, Backpressure, Bash / curl, code:block1 (GET /events/stream), code:block2 (event: activity.entry), code:bash (curl -N -H "Accept: text/event-stream" \), code:python (import sseclient, requests, json), code:ts (import { EventSource } from 'eventsource';) (+16 more)
+Cohesion: 0.13
+Nodes (8): CACHE_DB_PATH, CacheEntry, CacheService, DEFAULT_TTLS, L1Entry, openSqliteDb(), RateLimitInfo, _require
 
 ### Community 281 - "Community 281"
-Cohesion: 0.08
-Nodes (25): Automatic Complexity Detection, Beads Integration, code:block10 (┌───────────────────────────────────────────────────────────), code:typescript (// Example: Task completion triggers handoff), code:yaml (# ~/.panopticon/cloister.yaml), code:typescript (interface HandoffContext {), code:block18 (┌───────────────────────────────────────────────────────────), code:typescript (interface HandoffEvent {) (+17 more)
+Cohesion: 0.17
+Nodes (18): workspaceDeepCleanCommand(), WorkspaceDeepCleanOptions, dangerBanner(), DangerousOp, DangerousOpBlockedError, dryRunGitClean(), execAsync, pathLeaf() (+10 more)
 
 ### Community 282 - "Community 282"
 Cohesion: 0.08
-Nodes (24): Adding New Assets, Build Commands, Build Commands, Build Pipeline, Build Tools, code:javascript (// Injected by tsdown shims), code:typescript (import { renderPrompt } from './prompts.js';), code:block3 (src/lib/cloister/prompts/*.md → dist/dashboard/prompts/) (+16 more)
+Nodes (24): Architecture, Auto-Start, Auto-Updater Channels, Available Actions, Building the Desktop App, Cmd+K Command Palette, code:bash (chmod +x Panopticon-*.AppImage), code:bash (npx panopticon serve) (+16 more)
 
 ### Community 283 - "Community 283"
 Cohesion: 0.08
-Nodes (24): Acceptance Criteria, Architecture, code:block1 (┌─────────────────────────────────────────────────────┐), code:typescript (// packages/contracts/src/editor.ts), code:typescript (// In WS_METHODS:), code:typescript ([WS_METHODS.shellOpenInEditor]: (input) => panOpen.openInEdi), code:block5 (┌─ Inspector: MIN-846 ─────────────────────────────────┐), Design Goals (+16 more)
+Nodes (24): Backlog (hidden), Canonical States (Internal), Classification Labels (all trackers), Close-Out Ceremony, code:block1 (┌─────────────────────────────────────────┐), code:block2 (docs/prds/), code:block3 (backlog      -- Hidden from board, separate view), Columns (+16 more)
 
 ### Community 284 - "Community 284"
 Cohesion: 0.08
-Nodes (24): Architecture, code:block1 (MissionControl (index.tsx)), code:block2 (JSONL file (append-only)), code:block3 (@pierre/diffs, react-markdown, remark-gfm, lexical, @lexical), Data Flow, Decisions, Frontend Changes, Full Lexical Editor (+16 more)
+Nodes (24): code:block1 (project-repo/), code:block2 (project-repo/), code:yaml (models:), code:yaml (# ~/.panopticon/config.yaml), code:yaml (# .pan.yaml (per-project, merges with global — never replace), code:block6 (project-repo/  (main branch)), code:block7 (project-repo/  (feature branch workspace)), code:block8 (.pan/events/) (+16 more)
 
 ### Community 285 - "Community 285"
 Cohesion: 0.08
-Nodes (24): code:yaml (projects:), code:bash (# Run all tests for a workspace), code:yaml (tests:), code:yaml (tests:), code:yaml (tests:), code:yaml (tests:), code:block7 (reports/), code:markdown (# Test Run Report - feature-min-123) (+16 more)
+Nodes (24): Authentication & Network Exposure, Backpressure, Bash / curl, code:block1 (GET /events/stream), code:block2 (event: activity.entry), code:bash (curl -N -H "Accept: text/event-stream" \), code:python (import sseclient, requests, json), code:ts (import { EventSource } from 'eventsource';) (+16 more)
 
 ### Community 286 - "Community 286"
 Cohesion: 0.08
-Nodes (24): 0.1 Main hygiene check (BEFORE anything else), 0. Read FLYWHEEL-STATE.md (BEFORE main hygiene), 1. Inventory (priority-sorted), 2. Diagnose & fix substrate, 3. Drive each issue to readyForMerge, 4. Hand off to the user via Awaiting Merge, 5. Merge — but only after the user signs off, 6. Repeat until empty (+16 more)
+Nodes (25): Automatic Complexity Detection, Beads Integration, code:block10 (┌───────────────────────────────────────────────────────────), code:typescript (// Example: Task completion triggers handoff), code:yaml (# ~/.panopticon/cloister.yaml), code:typescript (interface HandoffContext {), code:block18 (┌───────────────────────────────────────────────────────────), code:typescript (interface HandoffEvent {) (+17 more)
 
 ### Community 287 - "Community 287"
 Cohesion: 0.08
-Nodes (24): Adding DNS Entries, Automatic (Recommended), Checking Status, code:bash (pan doctor --fix), code:powershell (powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.), code:powershell (cd \\wsl$\Ubuntu-20.04\home\eltmon\projects\panopticon\infra), code:powershell (# Copy sync script), code:bash (echo "myapp.localhost" >> ~/.wsl2hosts) (+16 more)
+Nodes (24): Adding New Assets, Build Commands, Build Commands, Build Pipeline, Build Tools, code:javascript (// Injected by tsdown shims), code:typescript (import { renderPrompt } from './prompts.js';), code:block3 (src/lib/cloister/prompts/*.md → dist/dashboard/prompts/) (+16 more)
 
 ### Community 288 - "Community 288"
 Cohesion: 0.08
-Nodes (24): 1. Provider Configuration, 2. Cost Tracking, 3. Model Routing, 4. Dashboard Visibility, 5. CLI Visibility, API Contract, Chat Completions, code:block1 (POST /v1/chat/completions) (+16 more)
+Nodes (24): Acceptance Criteria, Architecture, code:block1 (┌─────────────────────────────────────────────────────┐), code:typescript (// packages/contracts/src/editor.ts), code:typescript (// In WS_METHODS:), code:typescript ([WS_METHODS.shellOpenInEditor]: (input) => panOpen.openInEdi), code:block5 (┌─ Inspector: MIN-846 ─────────────────────────────────┐), Design Goals (+16 more)
 
 ### Community 289 - "Community 289"
 Cohesion: 0.08
-Nodes (23): Activity View, Adding Projects, Badge Bar, code:block1 (feature-pan-XXX/.planning/), Concept, Configuration, Conversation List, Conversations (+15 more)
+Nodes (24): Architecture, code:block1 (MissionControl (index.tsx)), code:block2 (JSONL file (append-only)), code:block3 (@pierre/diffs, react-markdown, remark-gfm, lexical, @lexical), Data Flow, Decisions, Frontend Changes, Full Lexical Editor (+16 more)
 
 ### Community 290 - "Community 290"
 Cohesion: 0.08
-Nodes (23): Agent Guidance, Agent System, Architecture & Design, Build & Development, Configuration, Configuration & Models, Development, Documentation Maintenance (+15 more)
+Nodes (24): code:yaml (projects:), code:bash (# Run all tests for a workspace), code:yaml (tests:), code:yaml (tests:), code:yaml (tests:), code:yaml (tests:), code:block7 (reports/), code:markdown (# Test Run Report - feature-min-123) (+16 more)
 
 ### Community 291 - "Community 291"
 Cohesion: 0.08
-Nodes (23): code:block1 (Session 1: AI queries users.created_at → Error (column is "c), code:block2 (myproject/), code:markdown (# In ~/.claude/CLAUDE.md (developer's personal config)), code:bash (pan start MIN-123 --shadow), code:yaml (# In <project>/.panopticon.yaml), code:yaml (# In ~/.panopticon/config.yaml), code:bash (SHADOW_MODE=true pan start MIN-123), code:yaml (# In .panopticon.yaml — only shadow Linear, not GitHub) (+15 more)
+Nodes (24): 0.1 Main hygiene check (BEFORE anything else), 0. Read FLYWHEEL-STATE.md (BEFORE main hygiene), 1. Inventory (priority-sorted), 2. Diagnose & fix substrate, 3. Drive each issue to readyForMerge, 4. Hand off to the user via Awaiting Merge, 5. Merge — but only after the user signs off, 6. Repeat until empty (+16 more)
 
 ### Community 292 - "Community 292"
 Cohesion: 0.08
-Nodes (23): Architecture, code:block1 (Main repo (host)), code:yaml (projects:), code:yaml (volumes:), code:yaml (# ✗ WRONG — causes two hard failures:), code:sh (bun install &&), code:json ("overrides": {), Container Image (+15 more)
+Nodes (24): Adding DNS Entries, Automatic (Recommended), Checking Status, code:bash (pan doctor --fix), code:powershell (powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\.), code:powershell (cd \\wsl$\Ubuntu-20.04\home\eltmon\projects\panopticon\infra), code:powershell (# Copy sync script), code:bash (echo "myapp.localhost" >> ~/.wsl2hosts) (+16 more)
 
 ### Community 293 - "Community 293"
 Cohesion: 0.08
-Nodes (23): Architecture Decisions, Build Verification, code:bash (pan install), code:bash (pan up), code:bash (pan down), code:bash (pan install --minimal), Documentation, Files Created/Modified (+15 more)
+Nodes (24): 1. Provider Configuration, 2. Cost Tracking, 3. Model Routing, 4. Dashboard Visibility, 5. CLI Visibility, API Contract, Chat Completions, code:block1 (POST /v1/chat/completions) (+16 more)
 
 ### Community 294 - "Community 294"
-Cohesion: 0.08
-Nodes (23): Agent Slots, AgentSnapshot extensions, Architecture (3 sentences), CLI Command, Cloister as Monitor, code:block1 (Wave 1: [items with no unmet blocks dependencies]  → spawn N), code:block2 (PAN-970), code:bash (pan swarm <issueId>          # Analyze DAG, show wave plan, ) (+15 more)
+Cohesion: 0.09
+Nodes (20): existingSkillDir, existsInTarget, mockClaudeSkills, mockPanopticonSkills, nonSkillDir, skillDir, skills, skillsToSync (+12 more)
 
 ### Community 295 - "Community 295"
-Cohesion: 0.08
-Nodes (23): Acceptance Criteria, code:block1 (click + → DraftConversationPanel mounts → user types first m), code:block2 (click + → POST /api/conversations { model, effort }), Compact-boundary offset, Design, Duplicate-id audit (#696), Goals, Implementation Notes (+15 more)
+Cohesion: 0.14
+Nodes (19): DbMergeSetRepoRow, DbMergeSetRow, deleteMergeSet(), getAllMergeSetsFromDb(), getMergeSetFromDb(), getReposFromDb(), rowToMergeSet(), repos (+11 more)
 
 ### Community 296 - "Community 296"
 Cohesion: 0.08
-Nodes (23): A/B Testing, caveman-compress (manual only), caveman-review for Review Agent, code:json ({), code:yaml (# ~/.panopticon/config.yaml), code:block3 (## Panopticon Overrides (non-negotiable)), code:block4 (Format: L<line>: <problem>. <fix>.), Config Schema (+15 more)
+Nodes (23): Activity View, Adding Projects, Badge Bar, code:block1 (feature-pan-XXX/.planning/), Concept, Configuration, Conversation List, Conversations (+15 more)
 
 ### Community 297 - "Community 297"
 Cohesion: 0.08
-Nodes (23): Animations, Architecture, Charts (visx), code:block1 (GodViewPage (new tab component)), code:block2 (Server:), Data Flow, Decisions Made, Design System (God View scope) (+15 more)
+Nodes (23): Agent Guidance, Agent System, Architecture & Design, Build & Development, Configuration, Configuration & Models, Development, Documentation Maintenance (+15 more)
 
 ### Community 298 - "Community 298"
 Cohesion: 0.08
-Nodes (23): 1a. Verification Gate Enhancement, 1b. Review Convoy Enhancement, Architecture, Attribution, code:typescript (async function checkForStubs(workspacePath: string): Promise), code:block2 (## Stub Detection), code:markdown (## Locked Decisions), code:block4 (## Decision Protocol) (+15 more)
+Nodes (23): code:block1 (Session 1: AI queries users.created_at → Error (column is "c), code:block2 (myproject/), code:markdown (# In ~/.claude/CLAUDE.md (developer's personal config)), code:bash (pan start MIN-123 --shadow), code:yaml (# In <project>/.panopticon.yaml), code:yaml (# In ~/.panopticon/config.yaml), code:bash (SHADOW_MODE=true pan start MIN-123), code:yaml (# In .panopticon.yaml — only shadow Linear, not GitHub) (+15 more)
 
 ### Community 299 - "Community 299"
 Cohesion: 0.08
-Nodes (23): Architecture Decisions, D1: Extend existing command, not create new, D2: Transition to "In Progress", not Backlog, D3: Keep .planning-complete marker, D4: Reset specialist states to pending (preserve history), D5: Append-only STATE.md updates, D6: Core reopen logic in a shared function, D7: Remove issue from specialist queues on reopen (+15 more)
+Nodes (23): Appendix: exe.dev CLI Reference, CLI Reference, code:bash (# Authentication), Comparison, Cost Analysis, Documentation Updates, exe.dev Pricing, Future Enhancements (+15 more)
 
 ### Community 300 - "Community 300"
 Cohesion: 0.08
-Nodes (22): Architecture, code:block1 (main.ts: await startSharedIssueService()     ← BLOCKS until ), code:block2 (main.ts: startSharedIssueService()           ← NO await, fir), Current Flow (Slow), Decisions, Edge Cases, EventRouter Changes, Files Changed (Summary) (+14 more)
+Nodes (23): Architecture, code:block1 (Main repo (host)), code:yaml (projects:), code:yaml (volumes:), code:yaml (# ✗ WRONG — causes two hard failures:), code:sh (bun install &&), code:json ("overrides": {), Container Image (+15 more)
 
 ### Community 301 - "Community 301"
 Cohesion: 0.08
-Nodes (23): 1. God View: Token foundation only, 2. API rename: Full rename, 3. Chat components: Included in rebrand, 4. Sidebar: Custom component, Architecture Overview, Decisions Made, Design References, In Scope (+15 more)
+Nodes (23): Architecture Decisions, Build Verification, code:bash (pan install), code:bash (pan up), code:bash (pan down), code:bash (pan install --minimal), Documentation, Files Created/Modified (+15 more)
 
 ### Community 302 - "Community 302"
 Cohesion: 0.08
-Nodes (23): By Gemini 3 Flash (for subagent:explore), By GPT-5.4 Nano (for subagent/CLI work), Claude Haiku 4.5 Work Type Fit Analysis, `cli:interactive`, `cli:quick-command`, Good Fit (Current Defaults), Integration Notes, Keep Haiku for: (+15 more)
+Nodes (23): Agent Slots, AgentSnapshot extensions, Architecture (3 sentences), CLI Command, Cloister as Monitor, code:block1 (Wave 1: [items with no unmet blocks dependencies]  → spawn N), code:block2 (PAN-970), code:bash (pan swarm <issueId>          # Analyze DAG, show wave plan, ) (+15 more)
 
 ### Community 303 - "Community 303"
 Cohesion: 0.08
-Nodes (23): Anti-Patterns, Chemistry Patterns, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (Will this work be referenced later?), code:bash (# Start grooming), code:bash (# Start review), code:bash (# Start spike (2 hour timebox)), code:bash (# Persistent mol (solid → liquid)) (+15 more)
+Nodes (23): Acceptance Criteria, code:block1 (click + → DraftConversationPanel mounts → user types first m), code:block2 (click + → POST /api/conversations { model, effort }), Compact-boundary offset, Design, Duplicate-id audit (#696), Goals, Implementation Notes (+15 more)
 
 ### Community 304 - "Community 304"
 Cohesion: 0.08
-Nodes (23): code:block1 (~/.panopticon/skills/spec-readiness-{name}/), code:bash (mkdir -p ~/.panopticon/skills/spec-readiness-{name}), code:block11 (Created spec-readiness wrapper: spec-readiness-{name}), code:block12 (User: setup spec readiness), code:yaml (tracker:), code:yaml (tracker:), code:yaml (tracker:), code:yaml (tracker:) (+15 more)
+Nodes (23): A/B Testing, caveman-compress (manual only), caveman-review for Review Agent, code:json ({), code:yaml (# ~/.panopticon/config.yaml), code:block3 (## Panopticon Overrides (non-negotiable)), code:block4 (Format: L<line>: <problem>. <fix>.), Config Schema (+15 more)
 
 ### Community 305 - "Community 305"
 Cohesion: 0.08
-Nodes (23): Bead Description (What Was Asked), BLOCKED — Any check fails, Check 1: Spec Fidelity, Check 2: Constraint Compliance, Check 3: Compile + Smoke, code:bash (cd {{workspacePath}}), code:bash (# Check workspace CLAUDE.md), code:bash (# Example: check for prohibited imports) (+15 more)
+Nodes (23): Animations, Architecture, Charts (visx), code:block1 (GodViewPage (new tab component)), code:block2 (Server:), Data Flow, Decisions Made, Design System (God View scope) (+15 more)
 
 ### Community 306 - "Community 306"
-Cohesion: 0.12
-Nodes (16): createTerminalWindow(), createWindow(), iconPath, IPC, isDevelopment, resolveResourcePath(), resolveServerStaticDir(), resolveWindowUrl() (+8 more)
+Cohesion: 0.08
+Nodes (23): 1a. Verification Gate Enhancement, 1b. Review Convoy Enhancement, Architecture, Attribution, code:typescript (async function checkForStubs(workspacePath: string): Promise), code:block2 (## Stub Detection), code:markdown (## Locked Decisions), code:block4 (## Decision Protocol) (+15 more)
 
 ### Community 307 - "Community 307"
+Cohesion: 0.08
+Nodes (23): Architecture Decisions, D1: Extend existing command, not create new, D2: Transition to "In Progress", not Backlog, D3: Keep .planning-complete marker, D4: Reset specialist states to pending (preserve history), D5: Append-only STATE.md updates, D6: Core reopen logic in a shared function, D7: Remove issue from specialist queues on reopen (+15 more)
+
+### Community 308 - "Community 308"
+Cohesion: 0.08
+Nodes (22): Architecture, code:block1 (main.ts: await startSharedIssueService()     ← BLOCKS until ), code:block2 (main.ts: startSharedIssueService()           ← NO await, fir), Current Flow (Slow), Decisions, Edge Cases, EventRouter Changes, Files Changed (Summary) (+14 more)
+
+### Community 309 - "Community 309"
+Cohesion: 0.08
+Nodes (23): 1. God View: Token foundation only, 2. API rename: Full rename, 3. Chat components: Included in rebrand, 4. Sidebar: Custom component, Architecture Overview, Decisions Made, Design References, In Scope (+15 more)
+
+### Community 310 - "Community 310"
+Cohesion: 0.08
+Nodes (23): By Gemini 3 Flash (for subagent:explore), By GPT-5.4 Nano (for subagent/CLI work), Claude Haiku 4.5 Work Type Fit Analysis, `cli:interactive`, `cli:quick-command`, Good Fit (Current Defaults), Integration Notes, Keep Haiku for: (+15 more)
+
+### Community 311 - "Community 311"
+Cohesion: 0.08
+Nodes (23): Anti-Patterns, Chemistry Patterns, code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (Will this work be referenced later?), code:bash (# Start grooming), code:bash (# Start review), code:bash (# Start spike (2 hour timebox)), code:bash (# Persistent mol (solid → liquid)) (+15 more)
+
+### Community 312 - "Community 312"
+Cohesion: 0.08
+Nodes (23): code:block1 (~/.panopticon/skills/spec-readiness-{name}/), code:bash (mkdir -p ~/.panopticon/skills/spec-readiness-{name}), code:block11 (Created spec-readiness wrapper: spec-readiness-{name}), code:block12 (User: setup spec readiness), code:yaml (tracker:), code:yaml (tracker:), code:yaml (tracker:), code:yaml (tracker:) (+15 more)
+
+### Community 313 - "Community 313"
+Cohesion: 0.08
+Nodes (23): Bead Description (What Was Asked), BLOCKED — Any check fails, Check 1: Spec Fidelity, Check 2: Constraint Compliance, Check 3: Compile + Smoke, code:bash (cd {{workspacePath}}), code:bash (# Check workspace CLAUDE.md), code:bash (# Example: check for prohibited imports) (+15 more)
+
+### Community 314 - "Community 314"
+Cohesion: 0.13
+Nodes (17): handleAutoStartNag(), showFirstLaunchDialog(), deepClone(), DEFAULTS, DesktopSettings, getDesktopSettings(), loadDesktopSettings(), NotificationEventType (+9 more)
+
+### Community 315 - "Community 315"
 Cohesion: 0.15
 Nodes (21): runCostSync(), buildSessionIndex(), decodeClaudeDirName(), extractCostEvents(), extractSessionId(), getAgentsDir(), getClaudeProjectsDir(), getSessionOffset() (+13 more)
 
-### Community 308 - "Community 308"
+### Community 316 - "Community 316"
 Cohesion: 0.11
 Nodes (19): __dirname, __filename, isStringArray(), loadPromptFrontmatter(), ParsedPrompt, parsePrompt(), PromptError, PromptFrontmatter (+11 more)
 
-### Community 309 - "Community 309"
-Cohesion: 0.09
-Nodes (18): after, continueContent, continueState, copied, doc, filename, found, log (+10 more)
-
-### Community 310 - "Community 310"
-Cohesion: 0.09
-Nodes (23): code:block126 (┌─────────────────┐    ┌─────────────────┐    ┌─────────────), code:block127 (┌──────────────────────────────────────────────────────────┐), code:yaml (permissions:), code:json ({), code:bash (# 1. Login to npm (one-time)), code:bash (# Bump version (follows semver)), code:bash (# One-shot (no global install needed)), code:bash (# Tag beta releases) (+15 more)
-
-### Community 311 - "Community 311"
-Cohesion: 0.09
-Nodes (23): code:typescript (interface IssueTracker {), code:block78 (┌───────────────────────────────────────────────────────────), code:toml (# ~/.panopticon/projects.toml), code:block80 (┌──────────┐    ┌──────────┐    ┌──────────┐    ┌───────────), code:yaml (# ~/.panopticon/state-mappings.yaml), code:typescript (// ~/.panopticon/issue-states.json), code:typescript (interface StateManager {), code:block84 ($ pan project add ~/projects/myn --tracker linear --team MIN) (+15 more)
-
-### Community 312 - "Community 312"
-Cohesion: 0.09
-Nodes (23): 10. `onboard-codebase` - Understanding New Code, All Questions Resolved ✅, Appendix A: Key Concepts Reference, Appendix C: References, Appendix D: Open Questions, code:block141 (workspaces/feature-min-648/), code:bash (# 1. Mayor spawns convoy), code:block37 (+15 more)
-
-### Community 313 - "Community 313"
-Cohesion: 0.09
-Nodes (22): 1. Root policy: what stays at root, 2. Root artifacts to relocate, 3. Destination policy, 4. Reference update pass, 5. Professionalism rule for future additions, Audits / investigations / findings, Constraints, Design (+14 more)
-
-### Community 314 - "Community 314"
-Cohesion: 0.09
-Nodes (22): 1. Viewer in scope, 2. Model injection for plan.author, 3. vBRIEFInfo.author from package.json, 4. Artifact copy: skip if exists, 5. Testing approach, Architecture, Artifact auto-copy (issues.ts — complete-planning), Beads sync (beads.ts) (+14 more)
-
-### Community 315 - "Community 315"
-Cohesion: 0.09
-Nodes (21): 1. KanbanBoard.tsx — `CycleFilter` type (line 678), 2. KanbanBoard.tsx — `groupByStatus()` (lines 191-193), 3. KanbanBoard.tsx — Filter bar UI (around line 1042), 4. KanbanBoard.tsx — Canceled list view, 5. issue-data-service.ts — `getIssues()` (around line 223), Acceptance Criteria, Architecture, code:typescript (// Before:) (+13 more)
-
-### Community 316 - "Community 316"
-Cohesion: 0.09
-Nodes (22): Acceptance criteria, Command Taxonomy Reorganization, Decision, Design principles, Implementation plan, Out of scope, Phase 1 — Scaffolding (non-breaking), Phase 2 — Collapse commands (+14 more)
-
 ### Community 317 - "Community 317"
-Cohesion: 0.09
-Nodes (22): 1. Auth Configuration, 2. CCR Command, 3. claudish Installation, 4. Model Prefixes, 5. Dashboard Model Display, 6. OpenAI Model Registry, 7. Token Usage Tracking, Architecture (+14 more)
+Cohesion: 0.19
+Nodes (21): deletePRDDraft(), getPRDDraftInfo(), getPRDDraftPath(), hasPRDDraft(), listPRDDrafts(), readPRDDraft(), resolveDraftProjectRoot(), writePRDDraft() (+13 more)
 
 ### Community 318 - "Community 318"
-Cohesion: 0.09
-Nodes (22): 10. Not yet decided, 1.1 PAN-722 (queue removal) left a per-project singleton, 1.2 Inverted model priority — Sonnet lurking under every config, 1.3 PAN-540 parallel review — invisible sibling tmux sessions, 1.4 Cross-cutting: duplicate-tab failure mode, 1. Problem inventory, 2. Root cause, 3. The DAG reframe (+14 more)
+Cohesion: 0.13
+Nodes (19): cleanupOldEntries(), dequeueMerge(), enqueueMerge(), getAllActiveQueues(), getCurrentMerge(), getQueueForProject(), markMergeProcessing(), MergeQueueEntry (+11 more)
 
 ### Community 319 - "Community 319"
-Cohesion: 0.09
-Nodes (22): ACCEPTANCE CRITERIA (WHAT SUCCESS LOOKS LIKE):, Ask the user before creating when:, code:markdown (bd update issue-9 --notes "IMPLEMENTATION GUIDE:), code:block2 (Two-phase Docs API approach:), code:block3 (- [ ] Markdown formatting renders in Doc (bold, italic, head), code:block4 (- [ ] Use two-phase batchUpdate approach), Contents, Create directly when: (+14 more)
+Cohesion: 0.1
+Nodes (13): getProjectIssuePrefixes(), PanRpcLayer, sharedPresencePoller, websocketRpcRouteLayer, watchConversation(), EditorLaunch, execAsync, getFileManagerCommand() (+5 more)
 
 ### Community 320 - "Community 320"
 Cohesion: 0.09
-Nodes (22): 1. Confirm scope before destroying anything, 2. Kill work agents via the CLI (preferred), 3. Kill review coordinators and test specialists, 4. Verify only conversations and the server remain, 5. (Optional) Stop the dashboard, 6. Verify, code:bash (# List live tmux sessions, classified), code:bash (# Loop over agent sessions and kill each via pan) (+14 more)
+Nodes (23): 10. `onboard-codebase` - Understanding New Code, All Questions Resolved ✅, Appendix A: Key Concepts Reference, Appendix C: References, Appendix D: Open Questions, code:block141 (workspaces/feature-min-648/), code:bash (# 1. Mayor spawns convoy), code:block37 (+15 more)
 
 ### Community 321 - "Community 321"
 Cohesion: 0.09
-Nodes (23): 7. Components, Alerts, Badges, Buttons, Cards, code:block11 (Container:), code:block12 (Base:), code:block13 (Base:) (+15 more)
+Nodes (23): code:block126 (┌─────────────────┐    ┌─────────────────┐    ┌─────────────), code:block127 (┌──────────────────────────────────────────────────────────┐), code:yaml (permissions:), code:json ({), code:bash (# 1. Login to npm (one-time)), code:bash (# Bump version (follows semver)), code:bash (# One-shot (no global install needed)), code:bash (# Tag beta releases) (+15 more)
 
 ### Community 322 - "Community 322"
 Cohesion: 0.09
-Nodes (22): AI Self-Monitoring, Best Practices, Built-In Skills, Code Review Subagents, code:block1 (# In Claude Code, Cursor, Windsurf, etc:), code:bash (# Use the guided skill creator), code:markdown (# Skill Title), code:bash (# Sync all skills to AI tools (Claude Code, Cursor, etc.)) (+14 more)
+Nodes (23): code:typescript (interface IssueTracker {), code:block78 (┌───────────────────────────────────────────────────────────), code:toml (# ~/.panopticon/projects.toml), code:block80 (┌──────────┐    ┌──────────┐    ┌──────────┐    ┌───────────), code:yaml (# ~/.panopticon/state-mappings.yaml), code:typescript (// ~/.panopticon/issue-states.json), code:typescript (interface StateManager {), code:block84 ($ pan project add ~/projects/myn --tracker linear --team MIN) (+15 more)
 
 ### Community 323 - "Community 323"
 Cohesion: 0.09
-Nodes (22): Anthropic, Benchmark Leaderboards, code:json ({), Coding Benchmarks, Community Sources, Deliverables, Google, Important Notes (+14 more)
+Nodes (22): 1. Root policy: what stays at root, 2. Root artifacts to relocate, 3. Destination policy, 4. Reference update pass, 5. Professionalism rule for future additions, Audits / investigations / findings, Constraints, Design (+14 more)
 
 ### Community 324 - "Community 324"
-Cohesion: 0.13
-Nodes (19): parseLogMetadata(), execAsync, listLogsCommand(), logsCommand(), LogsOptions, tailLogCommand(), actual, allLogs (+11 more)
+Cohesion: 0.09
+Nodes (22): 1. Viewer in scope, 2. Model injection for plan.author, 3. vBRIEFInfo.author from package.json, 4. Artifact copy: skip if exists, 5. Testing approach, Architecture, Artifact auto-copy (issues.ts — complete-planning), Beads sync (beads.ts) (+14 more)
 
 ### Community 325 - "Community 325"
 Cohesion: 0.09
-Nodes (21): consoleSpy, mirrorLog, mockCleanupLegacyRuntimeSymlinks, mockCreateBackup, mockEnsurePlaywrightIsolation, mockExecuteSync, mockGetDevrootPath, mockListProjects (+13 more)
+Nodes (21): 1. KanbanBoard.tsx — `CycleFilter` type (line 678), 2. KanbanBoard.tsx — `groupByStatus()` (lines 191-193), 3. KanbanBoard.tsx — Filter bar UI (around line 1042), 4. KanbanBoard.tsx — Canceled list view, 5. issue-data-service.ts — `getIssues()` (around line 223), Acceptance Criteria, Architecture, code:typescript (// Before:) (+13 more)
 
 ### Community 326 - "Community 326"
 Cohesion: 0.09
-Nodes (16): CLAUDE_PROJECTS, cost, db, DB_PATH, entry, insert, issueStats, lines (+8 more)
+Nodes (22): Acceptance criteria, Command Taxonomy Reorganization, Decision, Design principles, Implementation plan, Out of scope, Phase 1 — Scaffolding (non-breaking), Phase 2 — Collapse commands (+14 more)
 
 ### Community 327 - "Community 327"
-Cohesion: 0.14
-Nodes (16): handleAutoStartNag(), showFirstLaunchDialog(), deepClone(), DEFAULTS, DesktopSettings, getDesktopSettings(), loadDesktopSettings(), saveDesktopSettings() (+8 more)
+Cohesion: 0.09
+Nodes (22): 1. Auth Configuration, 2. CCR Command, 3. claudish Installation, 4. Model Prefixes, 5. Dashboard Model Display, 6. OpenAI Model Registry, 7. Token Usage Tracking, Architecture (+14 more)
 
 ### Community 328 - "Community 328"
 Cohesion: 0.09
-Nodes (20): companionInTarget, contentAfterFirst, dstScript, gitCwd, gitManifestDir, manifest, manifestAfterFirst, result (+12 more)
+Nodes (22): 10. Not yet decided, 1.1 PAN-722 (queue removal) left a per-project singleton, 1.2 Inverted model priority — Sonnet lurking under every config, 1.3 PAN-540 parallel review — invisible sibling tmux sessions, 1.4 Cross-cutting: duplicate-tab failure mode, 1. Problem inventory, 2. Root cause, 3. The DAG reframe (+14 more)
 
 ### Community 329 - "Community 329"
-Cohesion: 0.17
-Nodes (20): checkCommand(), execAsync, getMissingToolsForFeature(), INSTALLABLE_TOOLS, installBeads(), installMkcert(), installOx(), InstallResult (+12 more)
+Cohesion: 0.09
+Nodes (22): ACCEPTANCE CRITERIA (WHAT SUCCESS LOOKS LIKE):, Ask the user before creating when:, code:markdown (bd update issue-9 --notes "IMPLEMENTATION GUIDE:), code:block2 (Two-phase Docs API approach:), code:block3 (- [ ] Markdown formatting renders in Doc (bold, italic, head), code:block4 (- [ ] Use two-phase batchUpdate approach), Contents, Create directly when: (+14 more)
 
 ### Community 330 - "Community 330"
-Cohesion: 0.1
-Nodes (18): applyBurnedTokenOverride(), checkCodexAuthStatus(), CliproxyCodexCredentials, CodexAuthBurned, CodexAuthExpired, CodexAuthMissing, CodexAuthStatus, CodexAuthUnknown (+10 more)
+Cohesion: 0.09
+Nodes (22): 1. Confirm scope before destroying anything, 2. Kill work agents via the CLI (preferred), 3. Kill review coordinators and test specialists, 4. Verify only conversations and the server remain, 5. (Optional) Stop the dashboard, 6. Verify, code:bash (# List live tmux sessions, classified), code:bash (# Loop over agent sessions and kill each via pan) (+14 more)
 
 ### Community 331 - "Community 331"
-Cohesion: 0.12
-Nodes (10): formatIssueRef(), LinkDirection, LinkManager, LinkStore, parseIssueRef(), link, links, newManager (+2 more)
+Cohesion: 0.09
+Nodes (23): 7. Components, Alerts, Badges, Buttons, Cards, code:block11 (Container:), code:block12 (Base:), code:block13 (Base:) (+15 more)
 
 ### Community 332 - "Community 332"
-Cohesion: 0.19
-Nodes (20): applyClosedOutLabel(), applyLabelGitHub(), applyLabelLinear(), applyLabelViaTracker(), closeGitHubDirect(), closeGitHubPr(), closeIssue(), closeLinearDirect() (+12 more)
+Cohesion: 0.09
+Nodes (22): AI Self-Monitoring, Best Practices, Built-In Skills, Code Review Subagents, code:block1 (# In Claude Code, Cursor, Windsurf, etc:), code:bash (# Use the guided skill creator), code:markdown (# Skill Title), code:bash (# Sync all skills to AI tools (Claude Code, Cursor, etc.)) (+14 more)
 
 ### Community 333 - "Community 333"
 Cohesion: 0.09
-Nodes (19): assistantLine, content, existingFiles, firstLine, fixture, fixturePath, ids, lines (+11 more)
+Nodes (22): Anthropic, Benchmark Leaderboards, code:json ({), Coding Benchmarks, Community Sources, Deliverables, Google, Important Notes (+14 more)
 
 ### Community 334 - "Community 334"
 Cohesion: 0.09
-Nodes (21): 1. Batch Processing, 2. Cascade Approach, 3. Parallel Processing, Alternative Models, Claude Family (USD per million tokens), Cost Analysis, Detailed Recommendations, For Cost-Sensitive Deployments (+13 more)
+Nodes (21): consoleSpy, mirrorLog, mockCleanupLegacyRuntimeSymlinks, mockCreateBackup, mockEnsurePlaywrightIsolation, mockExecuteSync, mockGetDevrootPath, mockListProjects (+13 more)
 
 ### Community 335 - "Community 335"
 Cohesion: 0.09
-Nodes (21): 1. Supported harnesses, 2. Installing Pi, 3. Where you pick the harness, 4. ToS rules, 5. Troubleshooting, 6. Tradeoffs, Auth mode is exclusive, Claude Code (default) (+13 more)
+Nodes (16): CLAUDE_PROJECTS, cost, db, DB_PATH, entry, insert, issueStats, lines (+8 more)
 
 ### Community 336 - "Community 336"
-Cohesion: 0.09
-Nodes (20): Architecture, Backward Compatibility, code:typescript (/**), code:typescript (export interface ProjectConfig {), code:typescript (export function resolveTrackerType(issueId: string): Tracker), code:yaml (# Rally-tracked project with multiple artifact type prefixes), Configuration Example, Decision (+12 more)
+Cohesion: 0.19
+Nodes (20): applyClosedOutLabel(), applyLabelGitHub(), applyLabelLinear(), applyLabelViaTracker(), closeGitHubDirect(), closeGitHubPr(), closeIssue(), closeLinearDirect() (+12 more)
 
 ### Community 337 - "Community 337"
 Cohesion: 0.09
-Nodes (21): 1. Event Bus & Real-Time Broadcast, 2. Webhook System, 3. Claude Session Introspection, 4. Alert Rules Engine, 5. Standup / Daily Reports, 6. Workflow Templates & Pipelines, 7. Quality Review Gate Improvements, 8. RBAC & Authentication (+13 more)
+Nodes (20): companionInTarget, contentAfterFirst, dstScript, gitCwd, gitManifestDir, manifest, manifestAfterFirst, result (+12 more)
 
 ### Community 338 - "Community 338"
+Cohesion: 0.1
+Nodes (18): applyBurnedTokenOverride(), checkCodexAuthStatus(), CliproxyCodexCredentials, CodexAuthBurned, CodexAuthExpired, CodexAuthMissing, CodexAuthStatus, CodexAuthUnknown (+10 more)
+
+### Community 339 - "Community 339"
+Cohesion: 0.12
+Nodes (10): formatIssueRef(), LinkDirection, LinkManager, LinkStore, parseIssueRef(), link, links, newManager (+2 more)
+
+### Community 340 - "Community 340"
+Cohesion: 0.2
+Nodes (21): approveCommand(), cancelCommand(), collectInFlightRows(), collectLifecycleRows(), completeCommand(), dedupeRows(), formatTransition(), getProjectPath() (+13 more)
+
+### Community 341 - "Community 341"
+Cohesion: 0.17
+Nodes (20): checkCommand(), execAsync, getMissingToolsForFeature(), INSTALLABLE_TOOLS, installBeads(), installMkcert(), installOx(), InstallResult (+12 more)
+
+### Community 342 - "Community 342"
+Cohesion: 0.09
+Nodes (19): assistantLine, content, existingFiles, firstLine, fixture, fixturePath, ids, lines (+11 more)
+
+### Community 343 - "Community 343"
+Cohesion: 0.09
+Nodes (21): 1. Batch Processing, 2. Cascade Approach, 3. Parallel Processing, Alternative Models, Claude Family (USD per million tokens), Cost Analysis, Detailed Recommendations, For Cost-Sensitive Deployments (+13 more)
+
+### Community 344 - "Community 344"
+Cohesion: 0.09
+Nodes (21): 1. Supported harnesses, 2. Installing Pi, 3. Where you pick the harness, 4. ToS rules, 5. Troubleshooting, 6. Tradeoffs, Auth mode is exclusive, Claude Code (default) (+13 more)
+
+### Community 345 - "Community 345"
+Cohesion: 0.09
+Nodes (20): Architecture, Backward Compatibility, code:typescript (/**), code:typescript (export interface ProjectConfig {), code:typescript (export function resolveTrackerType(issueId: string): Tracker), code:yaml (# Rally-tracked project with multiple artifact type prefixes), Configuration Example, Decision (+12 more)
+
+### Community 346 - "Community 346"
+Cohesion: 0.09
+Nodes (21): 1. Event Bus & Real-Time Broadcast, 2. Webhook System, 3. Claude Session Introspection, 4. Alert Rules Engine, 5. Standup / Daily Reports, 6. Workflow Templates & Pipelines, 7. Quality Review Gate Improvements, 8. RBAC & Authentication (+13 more)
+
+### Community 347 - "Community 347"
 Cohesion: 0.09
 Nodes (21): Bead ID vs Issue ID, Beads Quick Reference for Panopticon Agents, code:bash (bd list --issue PAN-116), code:bash (# Option 1: Search in title (most common)), code:bash (# Find ALL beads for PAN-116 (including closed)), code:bash (# By status), code:bash (# Start work on a bead), code:bash (# ❌ WRONG) (+13 more)
 
-### Community 339 - "Community 339"
+### Community 348 - "Community 348"
 Cohesion: 0.09
 Nodes (21): 1. Extract Project Identity (JSON), 2. Define the Atmosphere (Image/HTML), 3. Map the Color Palette (Tailwind Config/JSON), 4. Translate Geometry & Shape (CSS/Tailwind), 5. Describe Depth & Elevation, Analysis & Synthesis Instructions, Best Practices, code:markdown (# Design System: [Project Title]) (+13 more)
 
-### Community 340 - "Community 340"
+### Community 349 - "Community 349"
 Cohesion: 0.09
 Nodes (21): Agents in the Panopticon pipeline, Claude Code subagents (NOT Panopticon specialists), code:block1 (pan plan-finalize), code:json ({), code:json ({), continue.vbrief.json Format, CRITICAL: PLANNING ONLY - NO IMPLEMENTATION, Description (+13 more)
 
-### Community 341 - "Community 341"
+### Community 350 - "Community 350"
 Cohesion: 0.09
 Nodes (21): code:bash (pan workspace create MIN-123), code:bash (pan workspace create MIN-123 --docker), code:javascript (// Disable Docker by default), code:bash (# From dashboard: click "Start Planning" (Docker enabled by ), code:bash (pan workspace list), code:bash (pan workspace destroy MIN-123), code:bash (export PANOPTICON_AUTO_REVERT_CHECKOUT=1  # Add to .bashrc/.), code:bash (./scripts/install-git-hooks.sh /path/to/your/project) (+13 more)
 
-### Community 342 - "Community 342"
-Cohesion: 0.14
-Nodes (17): cleanupOldEntries(), enqueueMerge(), getAllActiveQueues(), getCurrentMerge(), getQueueForProject(), markMergeProcessing(), MergeQueueEntry, removeMerge() (+9 more)
-
-### Community 343 - "Community 343"
+### Community 351 - "Community 351"
 Cohesion: 0.1
 Nodes (16): CLAUDE_PROJECTS, cost, db, DB_PATH, entry, insert, issueId, issueStats (+8 more)
 
-### Community 344 - "Community 344"
-Cohesion: 0.11
-Nodes (16): checkForUpdates(), currentStatus, downloadUpdate(), getUpdateStatus(), initializeAutoUpdater(), quitAndInstall(), startPeriodicChecks(), statusCallbacks (+8 more)
+### Community 352 - "Community 352"
+Cohesion: 0.13
+Nodes (19): parseLogMetadata(), execAsync, listLogsCommand(), logsCommand(), LogsOptions, tailLogCommand(), actual, allLogs (+11 more)
 
-### Community 345 - "Community 345"
+### Community 353 - "Community 353"
 Cohesion: 0.17
 Nodes (18): CostLimitsConfig, checkCostLimits(), checkDailyReset(), COST_DATA_FILE, CostAlert, CostAlertLevel, CostData, CostDataPersisted (+10 more)
 
-### Community 346 - "Community 346"
-Cohesion: 0.1
-Nodes (17): fail, failLayer, githubLayer, layer, mockGitHubAddLabel, mockGitHubCloseIssue, mockGitHubRemoveLabel, mockGitHubReopenIssue (+9 more)
-
-### Community 347 - "Community 347"
-Cohesion: 0.1
-Nodes (20): AIProvider, branch, branchMatch, buffer, cavemanVariant, cost, entry, input (+12 more)
-
-### Community 348 - "Community 348"
-Cohesion: 0.19
-Nodes (20): approveCommand(), cancelCommand(), collectInFlightRows(), collectLifecycleRows(), completeCommand(), dedupeRows(), formatTransition(), getProjectPath() (+12 more)
-
-### Community 349 - "Community 349"
-Cohesion: 0.11
-Nodes (14): ActionBar(), ActionBarProps, AgentTimeline(), AgentTimelineProps, TimelineEvent, TYPE_COLORS, BeadsKanban(), BeadsKanbanProps (+6 more)
-
-### Community 350 - "Community 350"
-Cohesion: 0.1
-Nodes (20): 13 Dashboard Views, Architecture at a Glance, code:bash (npx @panctl/cli), code:block2 (Issue         PRD           Agent         Review        Test), Command Deck, Contributing, Documentation, How It Works (+12 more)
-
-### Community 351 - "Community 351"
-Cohesion: 0.1
-Nodes (21): 6. Agreed End-State, Agent Startup Context, code:yaml (devroot: ~/Projects        # where you launch Claude Code fr), code:bash (pan workspace update MIN-678    # explicit command, only whe), code:block16 (pan workspace create MIN-678), code:block17 (Agent starts on MIN-678 workspace), code:block18 (~/.panopticon/                          PANOPTICON'S PRIVATE), code:block19 (~/.claude/skills/my-override/               ← WINS (personal) (+13 more)
-
-### Community 352 - "Community 352"
-Cohesion: 0.1
-Nodes (20): 10. B20 does not fully account for the current terminal surface area, 11. The resources event model is too narrow for the current resources UI, 12. The dependency DAG has one sequencing problem, 1. The current dashboard already has a real data layer; the problem is inconsistency, not total absence, 2. "Wrap existing libs in Effect" does not fix the blocking-call problem, 3. The storage plan should not introduce a third SQLite story without justification, 4. The toolchain/runtime section is not fully aligned with the repo as it exists today, 5. The dist/output migration has more blast radius than the PRD currently captures (+12 more)
-
-### Community 353 - "Community 353"
-Cohesion: 0.1
-Nodes (20): Code Changes Required in Panopticon, code:block1 (┌─────────────────────────────────────────────────────────┐), code:yaml (myn:), Critical Constraint: exe.dev Single Port, Current State, Goals, Implementation Checklist, Manual Fixes Still Required Per-Project (+12 more)
-
 ### Community 354 - "Community 354"
-Cohesion: 0.1
-Nodes (20): Agent Navigation, Architecture, Backend (Server), code:block1 (docker stats (5s poll)), Container Detail View, Data Flow, Decisions, Files to Create/Modify (+12 more)
+Cohesion: 0.12
+Nodes (17): activePtyHubs, addClientToHub(), broadcastToHub(), hubFlushTimer, hubOutputBuffer, PtyHub, removeClientFromHub(), setClientReady() (+9 more)
 
 ### Community 355 - "Community 355"
 Cohesion: 0.1
-Nodes (20): Architecture, btca CLI Skill, code:block1 (Browser (React + Vite)), code:json ({ "key": "mod+j", "command": "terminal.toggle" },), code:bash (btca ask -r codex -q "What is the return format for Codex Ap), Comparison to Panopticon, Feature Inventory, High priority (+12 more)
+Nodes (17): fail, failLayer, githubLayer, layer, mockGitHubAddLabel, mockGitHubCloseIssue, mockGitHubRemoveLabel, mockGitHubReopenIssue (+9 more)
 
 ### Community 356 - "Community 356"
 Cohesion: 0.1
-Nodes (21): 10. Configuration, 1. High-Level Structure, 2. Entry Points, 3. Architecture Patterns, 4. Code Organization, 5. Feature Location, 6. Dependencies Analysis, 7. Data Models (+13 more)
+Nodes (20): 13 Dashboard Views, Architecture at a Glance, code:bash (npx @panctl/cli), code:block2 (Issue         PRD           Agent         Review        Test), Command Deck, Contributing, Documentation, How It Works (+12 more)
 
 ### Community 357 - "Community 357"
 Cohesion: 0.1
-Nodes (20): code:block1 (skill-name/), code:yaml (---), code:bash (python scripts/init_skill.py <skill-name> --path <output-dir), code:bash (python scripts/package_skill.py <path/to/skill-folder> [outp), Concise is Key, Core Principles, Creation Process, Degrees of Freedom (+12 more)
+Nodes (20): 10. B20 does not fully account for the current terminal surface area, 11. The resources event model is too narrow for the current resources UI, 12. The dependency DAG has one sequencing problem, 1. The current dashboard already has a real data layer; the problem is inconsistency, not total absence, 2. "Wrap existing libs in Effect" does not fix the blocking-call problem, 3. The storage plan should not introduce a third SQLite story without justification, 4. The toolchain/runtime section is not fully aligned with the repo as it exists today, 5. The dist/output migration has more blast radius than the PRD currently captures (+12 more)
 
 ### Community 358 - "Community 358"
 Cohesion: 0.1
-Nodes (20): Activity View, Adding Projects, Badge Bar, code:block1 (feature-pan-XXX/.planning/), Concept, Configuration, How It Works, Layout (+12 more)
+Nodes (20): Code Changes Required in Panopticon, code:block1 (┌─────────────────────────────────────────────────────────┐), code:yaml (myn:), Critical Constraint: exe.dev Single Port, Current State, Goals, Implementation Checklist, Manual Fixes Still Required Per-Project (+12 more)
 
 ### Community 359 - "Community 359"
-Cohesion: 0.11
-Nodes (19): activeIssues, date1, date2, expectedOrder, filtered, filteredIds, filterRecentCompletedIssues(), getOneDayAgo() (+11 more)
+Cohesion: 0.1
+Nodes (20): Agent Navigation, Architecture, Backend (Server), code:block1 (docker stats (5s poll)), Container Detail View, Data Flow, Decisions, Files to Create/Modify (+12 more)
 
 ### Community 360 - "Community 360"
-Cohesion: 0.22
-Nodes (17): contextCommand(), ContextOptions, appendSummary(), checkContextBudget(), ContextBudget, estimateTokens(), generateSummaryEntry(), getHistoryDir() (+9 more)
+Cohesion: 0.1
+Nodes (20): Architecture, btca CLI Skill, code:block1 (Browser (React + Vite)), code:json ({ "key": "mod+j", "command": "terminal.toggle" },), code:bash (btca ask -r codex -q "What is the return format for Codex Ap), Comparison to Panopticon, Feature Inventory, High priority (+12 more)
 
 ### Community 361 - "Community 361"
-Cohesion: 0.15
-Nodes (16): formatTldrAge(), formatTldrRow(), readContextPercent(), readTldrIndexData(), statusCommand(), StatusOptions, TldrIndexEntry, tldrIndexStatusCommand() (+8 more)
+Cohesion: 0.1
+Nodes (21): 10. Configuration, 1. High-Level Structure, 2. Entry Points, 3. Architecture Patterns, 4. Code Organization, 5. Feature Location, 6. Dependencies Analysis, 7. Data Models (+13 more)
 
 ### Community 362 - "Community 362"
 Cohesion: 0.1
-Nodes (18): anthropicModel, anthropicRouter, apiKeys, config, config1, config2, documentationResult, explorationResult (+10 more)
+Nodes (20): code:block1 (skill-name/), code:yaml (---), code:bash (python scripts/init_skill.py <skill-name> --path <output-dir), code:bash (python scripts/package_skill.py <path/to/skill-folder> [outp), Concise is Key, Core Principles, Creation Process, Degrees of Freedom (+12 more)
 
 ### Community 363 - "Community 363"
-Cohesion: 0.22
-Nodes (3): escapeQueryValue(), RallyTracker, validateRallyId()
+Cohesion: 0.1
+Nodes (20): Activity View, Adding Projects, Badge Bar, code:block1 (feature-pan-XXX/.planning/), Concept, Configuration, How It Works, Layout (+12 more)
 
 ### Community 364 - "Community 364"
-Cohesion: 0.11
-Nodes (18): badPath, customPlanningDir, dir, doc, filename, item, item2, lifecyclePlan (+10 more)
+Cohesion: 0.1
+Nodes (18): anthropicModel, anthropicRouter, apiKeys, config, config1, config2, documentationResult, explorationResult (+10 more)
 
 ### Community 365 - "Community 365"
-Cohesion: 0.15
-Nodes (14): BYTE_UNITS, ContainerHistory, ContainerStats, DockerNetwork, DockerStatsCollector, DockerStatsRaw, DockerVolume, execAsync (+6 more)
+Cohesion: 0.11
+Nodes (19): activeIssues, date1, date2, expectedOrder, filtered, filteredIds, filterRecentCompletedIssues(), getOneDayAgo() (+11 more)
 
 ### Community 366 - "Community 366"
-Cohesion: 0.1
-Nodes (20): 10 High-Value Skills, 1. `feature-work` - Standard Feature Development, 2. `bug-fix` - Bug Investigation and Fix, 3. `code-review` - Code Review Focus Areas, 4. `code-review-security` - Security-Focused Review, 5. `code-review-performance` - Performance-Focused Review, 6. `refactor` - Safe Refactoring, 7. `release` - Release Process (+12 more)
+Cohesion: 0.22
+Nodes (17): contextCommand(), ContextOptions, appendSummary(), checkContextBudget(), ContextBudget, estimateTokens(), generateSummaryEntry(), getHistoryDir() (+9 more)
 
 ### Community 367 - "Community 367"
 Cohesion: 0.1
-Nodes (19): Appendix: exe.dev CLI Reference, CLI Reference, code:bash (# Authentication), Documentation Updates, Future Enhancements, Goals, Modified Commands, New Commands (+11 more)
+Nodes (19): branch, branchMatch, buffer, cavemanVariant, cost, entry, input, lines (+11 more)
 
 ### Community 368 - "Community 368"
-Cohesion: 0.1
-Nodes (19): Canonical reviewer naming, code:block2 (┌───────────────────────────────────────────────────────────), code:typescript (// src/lib/cloister/specialists.ts), code:block3 (╔═══════════════════════════════════════════════════════════), code:typescript (// pseudocode for review-agent.ts after PAN-830), code:block31 (┌───────────────────────────────────────────────────────────), code:typescript (async function resolveJsonlPath(session: SessionDescriptor):), Goal (+11 more)
+Cohesion: 0.14
+Nodes (16): buildMergeAgentMemory(), checkAndRotateIfNeeded(), DEFAULT_MEMORY_TIERS, execAsync, MemoryTiers, MergeRecord, needsSessionRotation(), SessionRotationResult (+8 more)
 
 ### Community 369 - "Community 369"
-Cohesion: 0.1
-Nodes (19): Architecture (3 sentences), code:block1 ([work items DAG] ──→ VERIFY ──→ REVIEW ──→ TEST ──→ MERGE ──), Data Sources, Depends On, Design, Escape State Overlays, Inline Diff Toggle, Motivation (+11 more)
+Cohesion: 0.16
+Nodes (16): ForgeType, buildMergeSetForIssue(), getRepoForge(), inferProjectForge(), normalizeForge(), resolveConfiguredRepos(), ResolvedProjectRepo, resolveProjectReposForIssue() (+8 more)
 
 ### Community 370 - "Community 370"
-Cohesion: 0.1
-Nodes (19): 10. Cleanup, 1. `.panopticon/` → `.pan/` (project-level only), 2. `.panopticon.yaml` → `.pan.yaml`, 3. Archive structure: flat → per-issue subdirectory, 4. `findWorkspacePath` numeric suffix fix, 5. `.pan/skills/` as sync source, 6. Multi-tool sync (all 6 tools), 7. `.gitignore` injection (+11 more)
+Cohesion: 0.12
+Nodes (14): ApproveReviewArtifactInput, buildRepositoryFlag(), CommentOnArtifactInput, CreateReviewArtifactInput, CreateReviewArtifactResult, DiscoverArtifactInput, execAsync, ForgeAdapter (+6 more)
 
 ### Community 371 - "Community 371"
-Cohesion: 0.1
-Nodes (19): 9 items flagged for Epic D recovery review, Bug locations (as of HEAD), code:block1 (feature/pan-698@{2026-04-22 15:30:09}: reset: moving to e0ce), code:block2 (Epic D  →  Epic A  →  Epic B  →  Epic C), Context, Decisions (resolved 2026-04-23), Epic A — Labels as display, internal state as source of truth, Epic B — Work agent doesn't touch git (+11 more)
+Cohesion: 0.11
+Nodes (18): badPath, customPlanningDir, dir, doc, filename, item, item2, lifecyclePlan (+10 more)
 
 ### Community 372 - "Community 372"
-Cohesion: 0.1
-Nodes (19): 10. Cleanup, 1. `.panopticon/` → `.pan/` (project-level only), 2. `.panopticon.yaml` → `.pan.yaml`, 3. Archive structure: flat → per-issue subdirectory, 4. `findWorkspacePath` numeric suffix fix, 5. `.pan/skills/` as sync source, 6. Multi-tool sync (all 6 tools), 7. `.gitignore` injection (+11 more)
+Cohesion: 0.15
+Nodes (14): BYTE_UNITS, ContainerHistory, ContainerStats, DockerNetwork, DockerStatsCollector, DockerStatsRaw, DockerVolume, execAsync (+6 more)
 
 ### Community 373 - "Community 373"
-Cohesion: 0.1
-Nodes (19): Ad-Hoc Speak (For Agents), Architecture, code:block1 (pan dashboard            pan-tts subscriber          qwen-tt), code:bash (cd skills/pan-tts/scripts), code:yaml (endpoint: http://127.0.0.1:3000/events/stream), code:bash (# one-shot foreground run (smoke test)), code:bash (./scripts/say.sh "Build is green, ready for review."), Configuration (+11 more)
+Cohesion: 0.11
+Nodes (16): fetchHealth(), fetchProjectSpecialists(), HealthDashboard(), PROJECT_RUN_STATUS_CONFIG, ProjectSpecialistStatus, STATUS_CONFIG, CostMetrics, fetchCostMetrics() (+8 more)
 
 ### Community 374 - "Community 374"
 Cohesion: 0.1
-Nodes (19): API Endpoints, Auth Token Refresh, Check Recent Logs, CLIProxy — Check and Restart, code:bash (# Is it running?), code:bash (# Kill any existing instance), code:bash (# Last 30 lines of cliproxy log), code:yaml (host: "127.0.0.1") (+11 more)
+Nodes (20): 10 High-Value Skills, 1. `feature-work` - Standard Feature Development, 2. `bug-fix` - Bug Investigation and Fix, 3. `code-review` - Code Review Focus Areas, 4. `code-review-security` - Security-Focused Review, 5. `code-review-performance` - Performance-Focused Review, 6. `refactor` - Safe Refactoring, 7. `release` - Release Process (+12 more)
 
 ### Community 375 - "Community 375"
 Cohesion: 0.1
-Nodes (19): Acceptance Criteria taxonomy (directive), Code Review: Requirements Coverage, code:bash (gh issue view <ISSUE_ID> --json title,body,labels), code:bash (gh pr view <PR_URL> --json body,title), code:bash (gh pr diff <PR_URL> --name-only 2>/dev/null || git diff --na), code:markdown (# Requirements Coverage Review - <timestamp>), Consolidate, Important Guidelines (+11 more)
+Nodes (19): Canonical reviewer naming, code:block2 (┌───────────────────────────────────────────────────────────), code:typescript (// src/lib/cloister/specialists.ts), code:block3 (╔═══════════════════════════════════════════════════════════), code:typescript (// pseudocode for review-agent.ts after PAN-830), code:block31 (┌───────────────────────────────────────────────────────────), code:typescript (async function resolveJsonlPath(session: SessionDescriptor):), Goal (+11 more)
 
 ### Community 376 - "Community 376"
 Cohesion: 0.1
-Nodes (19): CLI Overview, code:bash (# Install Panopticon globally), code:bash (pan work issue MIN-123      # Spawn agent), code:bash (pan workspace create MIN-123         # Create workspace), code:bash (pan up    # Start dashboard at localhost:3011), code:bash (# General help), Command Structure, Common Options (+11 more)
+Nodes (19): Architecture (3 sentences), code:block1 ([work items DAG] ──→ VERIFY ──→ REVIEW ──→ TEST ──→ MERGE ──), Data Sources, Depends On, Design, Escape State Overlays, Inline Diff Toggle, Motivation (+11 more)
 
 ### Community 377 - "Community 377"
+Cohesion: 0.1
+Nodes (19): 10. Cleanup, 1. `.panopticon/` → `.pan/` (project-level only), 2. `.panopticon.yaml` → `.pan.yaml`, 3. Archive structure: flat → per-issue subdirectory, 4. `findWorkspacePath` numeric suffix fix, 5. `.pan/skills/` as sync source, 6. Multi-tool sync (all 6 tools), 7. `.gitignore` injection (+11 more)
+
+### Community 378 - "Community 378"
+Cohesion: 0.1
+Nodes (19): 9 items flagged for Epic D recovery review, Bug locations (as of HEAD), code:block1 (feature/pan-698@{2026-04-22 15:30:09}: reset: moving to e0ce), code:block2 (Epic D  →  Epic A  →  Epic B  →  Epic C), Context, Decisions (resolved 2026-04-23), Epic A — Labels as display, internal state as source of truth, Epic B — Work agent doesn't touch git (+11 more)
+
+### Community 379 - "Community 379"
+Cohesion: 0.1
+Nodes (19): 10. Cleanup, 1. `.panopticon/` → `.pan/` (project-level only), 2. `.panopticon.yaml` → `.pan.yaml`, 3. Archive structure: flat → per-issue subdirectory, 4. `findWorkspacePath` numeric suffix fix, 5. `.pan/skills/` as sync source, 6. Multi-tool sync (all 6 tools), 7. `.gitignore` injection (+11 more)
+
+### Community 380 - "Community 380"
+Cohesion: 0.1
+Nodes (19): Ad-Hoc Speak (For Agents), Architecture, code:block1 (pan dashboard            pan-tts subscriber          qwen-tt), code:bash (cd skills/pan-tts/scripts), code:yaml (endpoint: http://127.0.0.1:3000/events/stream), code:bash (# one-shot foreground run (smoke test)), code:bash (./scripts/say.sh "Build is green, ready for review."), Configuration (+11 more)
+
+### Community 381 - "Community 381"
+Cohesion: 0.1
+Nodes (19): API Endpoints, Auth Token Refresh, Check Recent Logs, CLIProxy — Check and Restart, code:bash (# Is it running?), code:bash (# Kill any existing instance), code:bash (# Last 30 lines of cliproxy log), code:yaml (host: "127.0.0.1") (+11 more)
+
+### Community 382 - "Community 382"
+Cohesion: 0.1
+Nodes (19): Acceptance Criteria taxonomy (directive), Code Review: Requirements Coverage, code:bash (gh issue view <ISSUE_ID> --json title,body,labels), code:bash (gh pr view <PR_URL> --json body,title), code:bash (gh pr diff <PR_URL> --name-only 2>/dev/null || git diff --na), code:markdown (# Requirements Coverage Review - <timestamp>), Consolidate, Important Guidelines (+11 more)
+
+### Community 383 - "Community 383"
+Cohesion: 0.1
+Nodes (19): CLI Overview, code:bash (# Install Panopticon globally), code:bash (pan work issue MIN-123      # Spawn agent), code:bash (pan workspace create MIN-123         # Create workspace), code:bash (pan up    # Start dashboard at localhost:3011), code:bash (# General help), Command Structure, Common Options (+11 more)
+
+### Community 384 - "Community 384"
+Cohesion: 0.13
+Nodes (9): ENV_KEYS, EnvSnapshot, ENV_FILE_PATH, loadPanopticonEnv(), parseEnvFile(), ServerConfig, ServerConfigError, ServerConfigLayer (+1 more)
+
+### Community 385 - "Community 385"
+Cohesion: 0.16
+Nodes (15): formatTldrAge(), formatTldrRow(), readContextPercent(), readTldrIndexData(), statusCommand(), StatusOptions, TldrIndexEntry, tldrIndexStatusCommand() (+7 more)
+
+### Community 386 - "Community 386"
+Cohesion: 0.16
+Nodes (16): mockCreateTracker, mockCreateTrackerFromConfig, mockFindProjectByPath, mockGetIssuePrefix, mockTracker, warnSpy, createTracker(), createTrackerFromConfig() (+8 more)
+
+### Community 387 - "Community 387"
 Cohesion: 0.18
 Nodes (17): cleanupOldEvents(), CLOISTER_DB_PATH, deleteAgentHistory(), getAgentsWithHistory(), getAllHealthHistory(), getDatabaseStats(), getHealthDatabase(), getHealthHistory() (+9 more)
 
-### Community 378 - "Community 378"
-Cohesion: 0.16
-Nodes (16): buildMergeAgentMemory(), checkAndRotateIfNeeded(), DEFAULT_MEMORY_TIERS, execAsync, MemoryTiers, MergeRecord, needsSessionRotation(), rotateSpecialistSession() (+8 more)
-
-### Community 379 - "Community 379"
-Cohesion: 0.23
-Nodes (17): deletePRDDraft(), getPRDDraftInfo(), getPRDDraftPath(), hasPRDDraft(), listPRDDrafts(), readPRDDraft(), resolveDraftProjectRoot(), writePRDDraft() (+9 more)
-
-### Community 380 - "Community 380"
-Cohesion: 0.14
-Nodes (15): calls, { mockExecAsync }, opts, compactBeads(), CompactBeadsOptions, execAsync, { mockExecAsync }, ApproveOptions (+7 more)
-
-### Community 381 - "Community 381"
-Cohesion: 0.35
-Nodes (18): buildPlaceholders(), clearLegacyPlanningDir(), clearProjectBeads(), clearShadowState(), deleteBranches(), execAsync, isDockerContainerProcess(), killOrphanedProcesses() (+10 more)
-
-### Community 382 - "Community 382"
-Cohesion: 0.18
-Nodes (16): deliverQueuedFeedback(), enqueuePendingFeedbackDelivery(), FeedbackKind, isDeliveryStillRelevant(), markPendingFeedbackDelivered(), PENDING_FEEDBACK_FILE, PendingFeedbackDelivery, PendingFeedbackStore (+8 more)
-
-### Community 383 - "Community 383"
-Cohesion: 0.17
-Nodes (15): ForgeType, getRepoForge(), inferProjectForge(), normalizeForge(), resolveConfiguredRepos(), ResolvedProjectRepo, resolveProjectReposForIssue(), resolveProjectReposFromResolvedIssue() (+7 more)
-
-### Community 384 - "Community 384"
-Cohesion: 0.11
-Nodes (18): Agents, Beads, Cloister, Command Deck, Convoys, Core Concepts, Cost Tracking, Docker Integration (+10 more)
-
-### Community 385 - "Community 385"
-Cohesion: 0.11
-Nodes (18): Architecture, Best Practices, CLI Commands, code:bash (# 1. Implement feature), code:bash (# List all specialists with status), code:toml ([specialists.review_agent]), code:typescript (type Priority = 'urgent' | 'high' | 'normal' | 'low';), Configuration (+10 more)
-
-### Community 386 - "Community 386"
-Cohesion: 0.11
-Nodes (19): code:yaml (---), code:block20 (┌───────────────────────────────────────────────────────────), code:bash (# Skills tell the agent HOW to work), code:block22 (┌───────────────────────────────────────────────────────────), code:bash (# Update all agent workspaces with latest skills), code:bash (# Edit a skill in the canonical location), code:block25 (┌───────────────────────────────────────────────────────────), code:bash (# Parallel code review - spawn 4 agents with different focus) (+11 more)
-
-### Community 387 - "Community 387"
-Cohesion: 0.11
-Nodes (18): Architecture, Backend Changes (`src/dashboard/server/index.ts`), code:block1 (socketIo.emit('planning:started', { issueId: issue.identifie), code:block2 (socketIo.emit('planning:failed', { issueId: issue.identifier), code:block3 (Background async task fails), Data Flow, Decision: Full Recovery Controls, Decision: Kanban Card Failure Indicator (+10 more)
-
 ### Community 388 - "Community 388"
-Cohesion: 0.11
-Nodes (18): Acceptance Criteria, Architecture, code:block1 (Cannot find module 'close-issue-BVnGI6Mw.js'), code:block2 (OLD SERVER PROCESS), Decision: Detached deploy script + pending lifecycle file, Difficulty, Edge Cases, Files to Modify (+10 more)
+Cohesion: 0.13
+Nodes (17): buildPermissionActivityDetails(), buildPermissionWaitingMessage(), normalizePermissionRequestBody(), parsePermissionResponseBehavior(), permissionResolutionVerb(), processPermissionResponse(), ProcessPermissionResponseDeps, ProcessPermissionResponseResult (+9 more)
 
 ### Community 389 - "Community 389"
-Cohesion: 0.11
-Nodes (18): `cli:quick-command`, Flash-Lite's Niche in Panopticon, Gemini 3.1 Flash-Lite Preview Work Type Fit Analysis, Good Fit, Integration Notes, Key Benchmarks, Known Weaknesses, Model Profile (+10 more)
+Cohesion: 0.2
+Nodes (18): cloneReposOnVm(), collectPanWorkspaceFiles(), convertToSshUrl(), copyPlanningStateFromRemote(), copyPlanningStateToRemote(), copyWorkspacePanStateFromRemote(), copyWorkspacePanStateToRemote(), detectWorkspaceLocation() (+10 more)
 
 ### Community 390 - "Community 390"
 Cohesion: 0.11
-Nodes (16): code:bash (grep -E "FAIL|✗|Error|failed|BUILD FAILURE" /tmp/test-featur), code:bash (curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \), code:bash (curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \), code:bash (# Check if containers are running for this workspace), CRITICAL: Bash Timeout for Test Commands, CRITICAL: Context Management — Output Redirection, Never Close GitHub Issues, REQUIRED: Container Smoke Test (+8 more)
+Nodes (18): Agents, Beads, Cloister, Command Deck, Convoys, Core Concepts, Cost Tracking, Docker Integration (+10 more)
 
 ### Community 391 - "Community 391"
 Cohesion: 0.11
-Nodes (18): Built-in Convoy Templates, code-review Template, code:bash (# Run a parallel code review), code:bash (# Show most recent convoy status), code:bash (# List all convoys), code:bash (pan convoy stop <convoy-id>), code:json ({), code:bash (pan convoy start lightweight-review --files "src/**/*.ts") (+10 more)
+Nodes (18): Architecture, Best Practices, CLI Commands, code:bash (# 1. Implement feature), code:bash (# List all specialists with status), code:toml ([specialists.review_agent]), code:typescript (type Priority = 'urgent' | 'high' | 'normal' | 'low';), Configuration (+10 more)
 
 ### Community 392 - "Community 392"
-Cohesion: 0.18
-Nodes (16): buildReport(), categorizeProcesses(), ClaudeProcess, detectRole(), formatGb(), formatMb(), getClaudeProcesses(), getHeavyProcesses() (+8 more)
+Cohesion: 0.11
+Nodes (19): code:yaml (---), code:block20 (┌───────────────────────────────────────────────────────────), code:bash (# Skills tell the agent HOW to work), code:block22 (┌───────────────────────────────────────────────────────────), code:bash (# Update all agent workspaces with latest skills), code:bash (# Edit a skill in the canonical location), code:block25 (┌───────────────────────────────────────────────────────────), code:bash (# Parallel code review - spawn 4 agents with different focus) (+11 more)
 
 ### Community 393 - "Community 393"
-Cohesion: 0.14
-Nodes (16): SessionUsage, emptyUsage(), isAssistantMessage(), isMessage(), KNOWN_TYPES, parsePiSessionContent(), ParseResult, PiEntry (+8 more)
+Cohesion: 0.11
+Nodes (18): Architecture, Backend Changes (`src/dashboard/server/index.ts`), code:block1 (socketIo.emit('planning:started', { issueId: issue.identifie), code:block2 (socketIo.emit('planning:failed', { issueId: issue.identifier), code:block3 (Background async task fails), Data Flow, Decision: Full Recovery Controls, Decision: Kanban Card Failure Indicator (+10 more)
 
 ### Community 394 - "Community 394"
-Cohesion: 0.21
-Nodes (17): AgentContext, findSessionDirsByIssue(), getAgentsDir(), getClaudeProjectsDir(), getProjectPaths(), getProjectsYamlPath(), getSessionDir(), inferIssueId() (+9 more)
+Cohesion: 0.11
+Nodes (18): Acceptance Criteria, Architecture, code:block1 (Cannot find module 'close-issue-BVnGI6Mw.js'), code:block2 (OLD SERVER PROCESS), Decision: Detached deploy script + pending lifecycle file, Difficulty, Edge Cases, Files to Modify (+10 more)
 
 ### Community 395 - "Community 395"
 Cohesion: 0.11
-Nodes (17): firstSelect, openaiKeyInput, openaiProvider, PANOPTICON_HOME, reviewAgentLabel, reviewAgentSelect, ROUTER_CONFIG, routerConfig (+9 more)
+Nodes (18): `cli:quick-command`, Flash-Lite's Niche in Panopticon, Gemini 3.1 Flash-Lite Preview Work Type Fit Analysis, Good Fit, Integration Notes, Key Benchmarks, Known Weaknesses, Model Profile (+10 more)
 
 ### Community 396 - "Community 396"
-Cohesion: 0.16
-Nodes (12): formatBytes(), severityClasses(), SystemHealthPill(), critical, { mockConfirmAndKill, mockRefreshDashboardState }, { mockToastError, mockUseSystemHealth, hookState }, { rerender, queryClient }, toastCall (+4 more)
+Cohesion: 0.11
+Nodes (16): code:bash (grep -E "FAIL|✗|Error|failed|BUILD FAILURE" /tmp/test-featur), code:bash (curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \), code:bash (curl -s -X POST {{API_URL}}/api/review/{{ISSUE_ID}}/status \), code:bash (# Check if containers are running for this workspace), CRITICAL: Bash Timeout for Test Commands, CRITICAL: Context Management — Output Redirection, Never Close GitHub Issues, REQUIRED: Container Smoke Test (+8 more)
 
 ### Community 397 - "Community 397"
-Cohesion: 0.12
-Nodes (13): button, { container }, defaultProps, makeMutation(), makeSyncMutation(), onDismissPending, onKillSuccess, onPlan (+5 more)
+Cohesion: 0.11
+Nodes (18): Built-in Convoy Templates, code-review Template, code:bash (# Run a parallel code review), code:bash (# Show most recent convoy status), code:bash (# List all convoys), code:bash (pan convoy stop <convoy-id>), code:json ({), code:bash (pan convoy start lightweight-review --files "src/**/*.ts") (+10 more)
 
 ### Community 398 - "Community 398"
-Cohesion: 0.11
-Nodes (18): Approach 1: Passive Detection (MVP), Approach 2: Active Heartbeats (via Claude Code Hooks), Approach 3: Hybrid (Recommended), code:typescript (interface PassiveHeartbeat {), code:json ({), code:bash (#!/bin/bash), code:json ({), code:typescript (function getHeartbeat(agentId: string): Heartbeat {) (+10 more)
+Cohesion: 0.21
+Nodes (17): AgentContext, findSessionDirsByIssue(), getAgentsDir(), getClaudeProjectsDir(), getProjectPaths(), getProjectsYamlPath(), getSessionDir(), inferIssueId() (+9 more)
 
 ### Community 399 - "Community 399"
 Cohesion: 0.11
-Nodes (18): `<ActivitySparkline events={Event[]} windowMinutes={60} buckets={12} />`, Animation-timing reference, code:typescript (// Renders a 6×6 (small) or 8×8 (medium) circle with the rig), code:typescript (// Animates the number on change (vertical scroll fade, 250m), code:typescript (// Inline SVG, ~120×16px.), code:typescript (// 140-wide mini card with verdict, finding count, duration,), code:typescript (// Cross-fades the tool name on change (200ms each, with → b), code:typescript (// Wraps a lucide icon with the right ring color and avatar ) (+10 more)
+Nodes (15): agentState, callOrder, checkFn, killed, mockGetAgentState, mockGetRuntimeForAgent, mockKillAgent, mockKillSession (+7 more)
 
 ### Community 400 - "Community 400"
-Cohesion: 0.11
-Nodes (17): Architecture Decisions, code:block1 (wire-converter ──blocks──> remove-bd-prompts), Decisions, Dependency Graph (text), Key Files to Modify, Out of Scope, PAN-388: vBRIEF Integration — Structured Plans, Programmatic Beads, DAG Visualization, Phase 2 (+9 more)
+Cohesion: 0.2
+Nodes (17): APP_DIR, configureWorkspaceForBot(), generateInstallationToken(), generateJWT(), getBotIdentity(), getCommitCheckState(), getInstallationAccessToken(), githubApi() (+9 more)
 
 ### Community 401 - "Community 401"
-Cohesion: 0.11
-Nodes (17): Access Points, Add Dependencies, Add Services, Change Java Version, code:bash (# Copy template to your project), code:bash (# Application), code:bash (# Connect to PostgreSQL), code:bash (docker compose restart app) (+9 more)
+Cohesion: 0.18
+Nodes (16): buildReport(), categorizeProcesses(), ClaudeProcess, detectRole(), formatGb(), formatMb(), getClaudeProcesses(), getHeavyProcesses() (+8 more)
 
 ### Community 402 - "Community 402"
 Cohesion: 0.11
-Nodes (17): Access Points, Adding Dependencies, Alembic Migrations, code:bash (# Copy template to your project), code:bash (APP_PORT=8000), code:python (# database.py), code:bash (# Install alembic), code:bash (# Connect to PostgreSQL) (+9 more)
+Nodes (17): firstSelect, openaiKeyInput, openaiProvider, PANOPTICON_HOME, reviewAgentLabel, reviewAgentSelect, ROUTER_CONFIG, routerConfig (+9 more)
 
 ### Community 403 - "Community 403"
 Cohesion: 0.11
-Nodes (17): Adding Workspace Routes, code:block1 (~/.panopticon/traefik/), code:bash (mkcert "*.pan.localhost" "*.localhost" localhost 127.0.0.1 :), code:bash (cd ~/.panopticon/traefik), code:bash (cd ~/.panopticon/traefik), code:bash (docker logs -f panopticon-traefik), code:yaml (# dynamic/feature-pan-4.yml), Directory Structure (+9 more)
+Nodes (17): cb, cmdArgs, cmdStr, inline, issueCommentsJson, linearGetComments, linearGetIssueId, mockExec (+9 more)
 
 ### Community 404 - "Community 404"
 Cohesion: 0.11
-Nodes (17): bd vs TodoWrite, Beads Skill for Claude Code, code:bash (# Global installation), code:block2 (beads/), code:bash (# Want: "Setup must complete before Implementation"), code:bash (bd update issue-123 --notes "COMPLETED: JWT auth with RS256), Contributing, File Structure (+9 more)
+Nodes (18): Approach 1: Passive Detection (MVP), Approach 2: Active Heartbeats (via Claude Code Hooks), Approach 3: Hybrid (Recommended), code:typescript (interface PassiveHeartbeat {), code:json ({), code:bash (#!/bin/bash), code:json ({), code:typescript (function getHeartbeat(agentId: string): Heartbeat {) (+10 more)
 
 ### Community 405 - "Community 405"
 Cohesion: 0.11
-Nodes (17): Benchmark: QuantumLlama Provider Integration, code:block1 (/benchmark <scenario description>), code:bash (cat /home/eltmon/Projects/panopticon-cli/benchmarks/template), code:bash (cd /home/eltmon/Projects/panopticon-cli && gh label create b), code:bash (cd /home/eltmon/Projects/panopticon-cli && gh issue create \), code:block5 (Created PAN-XXX: Benchmark: QuantumLlama — <scenario>), Execution Steps, Important Notes (+9 more)
+Nodes (18): `<ActivitySparkline events={Event[]} windowMinutes={60} buckets={12} />`, Animation-timing reference, code:typescript (// Renders a 6×6 (small) or 8×8 (medium) circle with the rig), code:typescript (// Animates the number on change (vertical scroll fade, 250m), code:typescript (// Inline SVG, ~120×16px.), code:typescript (// 140-wide mini card with verdict, finding count, duration,), code:typescript (// Cross-fades the tool name on change (200ms each, with → b), code:typescript (// Wraps a lucide icon with the right ring color and avatar ) (+10 more)
 
 ### Community 406 - "Community 406"
 Cohesion: 0.11
-Nodes (17): API Documentation, Checklist Output, Code Generation, code:markdown (## Analysis Report), code:markdown (## Review Checklist), code:markdown (## Generated Code), code:markdown (## Changes Made), code:markdown (## Option Analysis) (+9 more)
+Nodes (17): Architecture Decisions, code:block1 (wire-converter ──blocks──> remove-bd-prompts), Decisions, Dependency Graph (text), Key Files to Modify, Out of Scope, PAN-388: vBRIEF Integration — Structured Plans, Programmatic Beads, DAG Visualization, Phase 2 (+9 more)
 
 ### Community 407 - "Community 407"
 Cohesion: 0.11
-Nodes (17): code:bash (# Register a project), code:yaml (projects:), code:json ([), code:yaml (projects:), code:bash (#!/bin/bash), code:yaml (projects:), Configuration Fields, Custom Workspace Commands (Legacy) (+9 more)
+Nodes (17): Access Points, Add Dependencies, Add Services, Change Java Version, code:bash (# Copy template to your project), code:bash (# Application), code:bash (# Connect to PostgreSQL), code:bash (docker compose restart app) (+9 more)
 
 ### Community 408 - "Community 408"
-Cohesion: 0.12
-Nodes (15): CI_FAILED_STATUS, ciBlockedStatus, feedbackDir, mockGetAgentRuntimeState, mockLoadReviewStatuses, mockResolveProjectFromIssue, mockSendKeysAsync, mockSessionExists (+7 more)
+Cohesion: 0.11
+Nodes (17): Access Points, Adding Dependencies, Alembic Migrations, code:bash (# Copy template to your project), code:bash (APP_PORT=8000), code:python (# database.py), code:bash (# Install alembic), code:bash (# Connect to PostgreSQL) (+9 more)
 
 ### Community 409 - "Community 409"
-Cohesion: 0.12
-Nodes (15): capturedCmds, mockCreateReviewArtifactsForIssue, mockEnsureMergeSetForIssue, mockExecFileFn, mockExecFn, mockGetAgentState, mockGetDashboardApiUrl, mockGetVBriefACStatus (+7 more)
+Cohesion: 0.11
+Nodes (17): Adding Workspace Routes, code:block1 (~/.panopticon/traefik/), code:bash (mkcert "*.pan.localhost" "*.localhost" localhost 127.0.0.1 :), code:bash (cd ~/.panopticon/traefik), code:bash (cd ~/.panopticon/traefik), code:bash (docker logs -f panopticon-traefik), code:yaml (# dynamic/feature-pan-4.yml), Directory Structure (+9 more)
 
 ### Community 410 - "Community 410"
-Cohesion: 0.29
-Nodes (16): display_title(), extract_text_fragments(), extract_tool_names(), find_by_id(), format_cost(), get_db(), get_session_summary(), iter_session_messages() (+8 more)
+Cohesion: 0.11
+Nodes (17): bd vs TodoWrite, Beads Skill for Claude Code, code:bash (# Global installation), code:block2 (beads/), code:bash (# Want: "Setup must complete before Implementation"), code:bash (bd update issue-123 --notes "COMPLETED: JWT auth with RS256), Contributing, File Structure (+9 more)
 
 ### Community 411 - "Community 411"
-Cohesion: 0.12
-Nodes (15): existingSkillDir, existsInTarget, mockClaudeSkills, mockPanopticonSkills, nonSkillDir, skillDir, skills, skillsToSync (+7 more)
+Cohesion: 0.11
+Nodes (17): code:block1 (Session Start (when bd is available):), code:block15 (Resume Workflow:), code:block23 (Unblocking Workflow:), code:block24 (Situation: bd ready shows nothing), code:block25 (Hybrid Workflow:), code:block5 (Discovery Workflow:), code:block6 (Issue Lifecycle:), Contents (+9 more)
+
+### Community 412 - "Community 412"
+Cohesion: 0.11
+Nodes (17): Benchmark: QuantumLlama Provider Integration, code:block1 (/benchmark <scenario description>), code:bash (cat /home/eltmon/Projects/panopticon-cli/benchmarks/template), code:bash (cd /home/eltmon/Projects/panopticon-cli && gh label create b), code:bash (cd /home/eltmon/Projects/panopticon-cli && gh issue create \), code:block5 (Created PAN-XXX: Benchmark: QuantumLlama — <scenario>), Execution Steps, Important Notes (+9 more)
 
 ### Community 413 - "Community 413"
-Cohesion: 0.19
-Nodes (12): AutoPresoControls(), AutoPresoView(), Excalidraw, ExcalidrawApiLike, TranscriptPanel(), AutoPresoMessage, AutoPresoMode, ExcalidrawElementLike (+4 more)
+Cohesion: 0.11
+Nodes (17): API Documentation, Checklist Output, Code Generation, code:markdown (## Analysis Report), code:markdown (## Review Checklist), code:markdown (## Generated Code), code:markdown (## Changes Made), code:markdown (## Option Analysis) (+9 more)
 
 ### Community 414 - "Community 414"
-Cohesion: 0.12
-Nodes (17): Agent Sessions Not Appearing, code:bash (# Check if ports are in use), code:bash (# Regenerate certificates), code:bash (# Check tmux sessions), code:bash (# List worktrees), code:bash (# Install build tools (macOS)), code:bash (# Verify API key), code:bash (# Check Traefik status) (+9 more)
+Cohesion: 0.11
+Nodes (17): code:bash (# Register a project), code:yaml (projects:), code:json ([), code:yaml (projects:), code:bash (#!/bin/bash), code:yaml (projects:), Configuration Fields, Custom Workspace Commands (Legacy) (+9 more)
 
 ### Community 415 - "Community 415"
 Cohesion: 0.12
-Nodes (17): API Compatibility Levels, code:bash (# Option 1: Kimi coding endpoint), code:bash (# GLM/Z.AI endpoint (Anthropic-compatible)), code:bash (export ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthr), code:bash (# Kimi API configuration for Claude Code), code:bash (source ~/.bashrc  # or source ~/.zshrc), code:bash (claude /status), code:bash (# Install router) (+9 more)
+Nodes (15): CI_FAILED_STATUS, ciBlockedStatus, feedbackDir, mockGetAgentRuntimeState, mockLoadReviewStatuses, mockResolveProjectFromIssue, mockSendKeysAsync, mockSessionExists (+7 more)
 
 ### Community 416 - "Community 416"
 Cohesion: 0.12
-Nodes (16): Acceptance Criteria, code:block1 (┌───────────────────────────────────────────┐), Docs are part of every fix, Exit Criteria for a Single Run, Goals, Main must always be clean, Non-goals, PRD: Fix-All Flywheel (+8 more)
+Nodes (15): capturedCmds, mockCreateReviewArtifactsForIssue, mockEnsureMergeSetForIssue, mockExecFileFn, mockExecFn, mockGetAgentState, mockGetDashboardApiUrl, mockGetVBriefACStatus (+7 more)
 
 ### Community 417 - "Community 417"
-Cohesion: 0.12
-Nodes (17): code:block21 (- discovers all sessions in target dir), code:block22 (- detects SSD vs HDD via lsblk rotational flag), code:block23 (- structured filters compose with AND), code:block24 (- L1 selects cheapest available model), code:block25 (- correct dimensions stored per provider/model), code:block26 (- nav entry routes to /conversations), code:block27 (- all fields render), code:block28 (- scan → enrich → embed → search across all three tiers) (+9 more)
+Cohesion: 0.29
+Nodes (16): display_title(), extract_text_fragments(), extract_tool_names(), find_by_id(), format_cost(), get_db(), get_session_summary(), iter_session_messages() (+8 more)
 
 ### Community 418 - "Community 418"
-Cohesion: 0.12
-Nodes (16): Architecture, CLI Interface (full surface), code:block1 (┌──────────────────────────────────────────┐), code:bash (pan conversations embed                      # all enriched,), code:yaml (# config.yaml), code:bash (# Discovery), code:block20 (GET  /api/archived-conversations), Dependencies (+8 more)
+Cohesion: 0.21
+Nodes (15): BUNDLED_AGENTS_DIR, BUNDLED_SKILLS_DIR, copyBundledAgents(), copyBundledSkills(), __dirname, __filename, initCommand(), PACKAGE_ROOT (+7 more)
 
 ### Community 419 - "Community 419"
-Cohesion: 0.12
-Nodes (17): Action cluster, code:block10 ($0.04/min currently · projecting $1.20 for this session at t), code:block11 (+47 lines), code:block12 (○ idle for 4m 12s — needs nudge?    [Send Message] [Stop]), code:block6 (phase: review-response · tool: Grep), code:block7 (🧠 thinking · since 14:32:42 · last tool was Grep 8s ago), code:block8 (⏸ waiting · {reason} — {message}                    [Resolve), code:block9 (┌──────────────┐  ┌──────────────┐  ┌──────────────┐) (+9 more)
+Cohesion: 0.15
+Nodes (15): emptyUsage(), isAssistantMessage(), isMessage(), KNOWN_TYPES, parsePiSessionContent(), ParseResult, PiEntry, PiGenericEntry (+7 more)
 
 ### Community 420 - "Community 420"
-Cohesion: 0.12
-Nodes (16): Additional Gaps, code:json ({), code:block2 (For each running work agent:), code:typescript ({), Files to Change, Non-Goals, PAN-309: Evidence-Based Completion Detection & Lifecycle Badges, Phase 1: Evidence-Based Completion Detection (stop-hook) (+8 more)
-
-### Community 421 - "Community 421"
-Cohesion: 0.12
-Nodes (15): Approach: Pre-fetch in callers, pass to prompt builder, Architecture, code:block1 ([issueCommand() / server endpoint]), Data Flow, Data to include, Decisions, Error handling: Warn in prompt, Files to Modify (+7 more)
+Cohesion: 0.21
+Nodes (14): doneCommand(), getForgeAdapter(), ensureMergeSetForIssue(), upsertMergeSet(), withRepoArtifactUrl(), withRepoState(), buildRichReviewArtifactBody(), createReviewArtifactsForIssue() (+6 more)
 
 ### Community 422 - "Community 422"
-Cohesion: 0.12
-Nodes (16): Constraints, Design, Draft-mode parity, Explicit reconciliation, Local outbox model, Must Have, Open Questions, Out of Scope (+8 more)
+Cohesion: 0.19
+Nodes (12): AutoPresoControls(), AutoPresoView(), Excalidraw, ExcalidrawApiLike, TranscriptPanel(), AutoPresoMessage, AutoPresoMode, ExcalidrawElementLike (+4 more)
 
 ### Community 423 - "Community 423"
-Cohesion: 0.12
-Nodes (16): Architecture, Bootstrap, code:block1 (AgentEnrichmentService (3s poll)), Contracts Package (`packages/contracts/src/`), Data Flow, Decisions, Files to Modify, Frontend (verify only) (+8 more)
+Cohesion: 0.13
+Nodes (12): checkNodeVersion(), checkServerBundle(), __dirname, launch(), packageDir, resolveElectron(), ACTIVE_STATUS_PATTERNS, agentDir (+4 more)
 
 ### Community 424 - "Community 424"
 Cohesion: 0.12
-Nodes (16): Access Points, code:bash (# Copy template to your project), code:bash (APP_PORT=5000), code:block3 (Server=sqlserver;Database=${DB_NAME};User Id=sa;Password=${D), code:json ({), code:bash (# Run migrations), code:bash (# Connect via sqlcmd), Connection String (+8 more)
+Nodes (17): Agent Sessions Not Appearing, code:bash (# Check if ports are in use), code:bash (# Regenerate certificates), code:bash (# Check tmux sessions), code:bash (# List worktrees), code:bash (# Install build tools (macOS)), code:bash (# Verify API key), code:bash (# Check Traefik status) (+9 more)
 
 ### Community 425 - "Community 425"
 Cohesion: 0.12
-Nodes (16): Authentication Issues, code:bash (npx @_davideast/stitch-mcp init), code:json ({), code:bash (npx @_davideast/stitch-mcp doctor), code:bash (export STITCH_USE_SYSTEM_GCLOUD=1), Environment Detection, Manual Configuration, Prerequisites (+8 more)
+Nodes (17): 6. Agreed End-State, Agent Startup Context, code:yaml (devroot: ~/Projects        # where you launch Claude Code fr), code:bash (pan workspace update MIN-678    # explicit command, only whe), code:block16 (pan workspace create MIN-678), code:block17 (Agent starts on MIN-678 workspace), code:block18 (~/.panopticon/                          PANOPTICON'S PRIVATE), code:block9 (DEVROOT (~/Projects/)                    Not a git repo) (+9 more)
 
 ### Community 426 - "Community 426"
 Cohesion: 0.12
-Nodes (16): 1. Generate the table, 2. Add an Awaiting Merge summary line, 3. (Optional) Defer to other status skills if user wants more detail, Cell semantics, code:block1 (ISSUE      TITLE                                            ), code:bash (python3 - <<'PY'), code:bash (curl -s http://localhost:3011/api/issues | python3 -c "), code:block4 (For deeper detail beyond the pipeline view:) (+8 more)
+Nodes (17): API Compatibility Levels, code:bash (# Option 1: Kimi coding endpoint), code:bash (# GLM/Z.AI endpoint (Anthropic-compatible)), code:bash (export ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthr), code:bash (# Kimi API configuration for Claude Code), code:bash (source ~/.bashrc  # or source ~/.zshrc), code:bash (claude /status), code:bash (# Install router) (+9 more)
 
 ### Community 427 - "Community 427"
 Cohesion: 0.12
-Nodes (16): Basic Usage, Cleanup After Shutdown, code:bash (# Stop all Panopticon services), code:bash (# Method 1: Separate commands), code:bash (# Clean up log files), code:bash (# Clean up stale resources), More Information, Next Steps (+8 more)
+Nodes (16): Acceptance Criteria, code:block1 (┌───────────────────────────────────────────┐), Docs are part of every fix, Exit Criteria for a Single Run, Goals, Main must always be clean, Non-goals, PRD: Fix-All Flywheel (+8 more)
 
 ### Community 428 - "Community 428"
 Cohesion: 0.12
-Nodes (16): 10. Scrollbars, 16. File Organization, 17. Quick Reference Card, 1. Design Philosophy, 5. Border Radius Scale, 6. Spacing & Sizing, 9. Fractal Noise Texture, code:css (--radius: 0.625rem;  /* 10px */) (+8 more)
+Nodes (17): code:block21 (- discovers all sessions in target dir), code:block22 (- detects SSD vs HDD via lsblk rotational flag), code:block23 (- structured filters compose with AND), code:block24 (- L1 selects cheapest available model), code:block25 (- correct dimensions stored per provider/model), code:block26 (- nav entry routes to /conversations), code:block27 (- all fields render), code:block28 (- scan → enrich → embed → search across all three tiers) (+9 more)
 
 ### Community 429 - "Community 429"
 Cohesion: 0.12
-Nodes (16): code:bash (curl {{API_URL}}/api/health), code:bash (# Get test token (server-side, before opening browser)), code:javascript (// Launch browser), code:block4 (## UAT Results), Context, Critical Notes, Examples of BLOCKED vs PASS, Handling Playwright (Browser Automation) (+8 more)
+Nodes (17): Action cluster, code:block10 ($0.04/min currently · projecting $1.20 for this session at t), code:block11 (+47 lines), code:block12 (○ idle for 4m 12s — needs nudge?    [Send Message] [Stop]), code:block6 (phase: review-response · tool: Grep), code:block7 (🧠 thinking · since 14:32:42 · last tool was Grep 8s ago), code:block8 (⏸ waiting · {reason} — {message}                    [Resolve), code:block9 (┌──────────────┐  ┌──────────────┐  ┌──────────────┐) (+9 more)
 
 ### Community 430 - "Community 430"
 Cohesion: 0.12
-Nodes (16): Best Value by Tier, Budget Tasks, Changes from Baseline, Code Review & Security, Conclusion, Cost-Effectiveness Analysis, Debugging, Executive Summary (+8 more)
+Nodes (16): Additional Gaps, code:json ({), code:block2 (For each running work agent:), code:typescript ({), Files to Change, Non-Goals, PAN-309: Evidence-Based Completion Detection & Lifecycle Badges, Phase 1: Evidence-Based Completion Detection (stop-hook) (+8 more)
 
 ### Community 431 - "Community 431"
 Cohesion: 0.12
-Nodes (16): code:bash (# Full install (includes Traefik + mkcert for HTTPS)), code:bash (pan sync), code:bash (pan doctor), code:bash (# Start with default settings), code:bash (pan down), code:bash (pan restart), code:bash (pan health), Core Commands (+8 more)
+Nodes (15): Approach: Pre-fetch in callers, pass to prompt builder, Architecture, code:block1 ([issueCommand() / server endpoint]), Data Flow, Data to include, Decisions, Error handling: Warn in prompt, Files to Modify (+7 more)
 
 ### Community 432 - "Community 432"
-Cohesion: 0.15
-Nodes (6): MockRallyArtifact, RallyApiMock, compoundQueries, mock, sampleArtifacts, typeQueries
+Cohesion: 0.12
+Nodes (16): Constraints, Design, Draft-mode parity, Explicit reconciliation, Local outbox model, Must Have, Open Questions, Out of Scope (+8 more)
 
 ### Community 433 - "Community 433"
-Cohesion: 0.2
-Nodes (14): checkCommand(), checkComposeLabelDrift(), checkDirectory(), checkPi(), CheckResult, compareSemver(), ComposeDriftEntry, countItems() (+6 more)
+Cohesion: 0.12
+Nodes (16): Architecture, Bootstrap, code:block1 (AgentEnrichmentService (3s poll)), Contracts Package (`packages/contracts/src/`), Data Flow, Decisions, Files to Modify, Frontend (verify only) (+8 more)
 
 ### Community 434 - "Community 434"
-Cohesion: 0.21
-Nodes (14): registerAdminCommands(), archiveCustomState(), CleanupOptions, cleanupStatesCommand(), LinearState, ListOptions, listStatesCommand(), listTeamStates() (+6 more)
+Cohesion: 0.12
+Nodes (16): Access Points, code:bash (# Copy template to your project), code:bash (APP_PORT=5000), code:block3 (Server=sqlserver;Database=${DB_NAME};User Id=sa;Password=${D), code:json ({), code:bash (# Run migrations), code:bash (# Connect via sqlcmd), Connection String (+8 more)
 
 ### Community 435 - "Community 435"
 Cohesion: 0.12
-Nodes (15): agentDir, cache1, cache2, events1, events2, eventsFile, sessionDir, stats (+7 more)
+Nodes (16): Authentication Issues, code:bash (npx @_davideast/stitch-mcp init), code:json ({), code:bash (npx @_davideast/stitch-mcp doctor), code:bash (export STITCH_USE_SYSTEM_GCLOUD=1), Environment Detection, Manual Configuration, Prerequisites (+8 more)
 
 ### Community 436 - "Community 436"
-Cohesion: 0.23
-Nodes (15): completeSession(), DEFAULT_DATA, findSessionById(), getAllIssuesWithCosts(), getIssueCostSummary(), getIssueSessions(), IssueSessionMap, linkSessionToIssue() (+7 more)
+Cohesion: 0.12
+Nodes (16): 1. Generate the table, 2. Add an Awaiting Merge summary line, 3. (Optional) Defer to other status skills if user wants more detail, Cell semantics, code:block1 (ISSUE      TITLE                                            ), code:bash (python3 - <<'PY'), code:bash (curl -s http://localhost:3011/api/issues | python3 -c "), code:block4 (For deeper detail beyond the pipeline view:) (+8 more)
+
+### Community 437 - "Community 437"
+Cohesion: 0.12
+Nodes (16): Basic Usage, Cleanup After Shutdown, code:bash (# Stop all Panopticon services), code:bash (# Clean up log files), code:bash (# Clean up stale resources), code:env (# Graceful shutdown timeout (seconds)), Configuration Options, More Information (+8 more)
 
 ### Community 438 - "Community 438"
 Cohesion: 0.12
-Nodes (13): after, afterItem, afterSub, before, completedTime, doc, item, planPath (+5 more)
+Nodes (16): 10. Scrollbars, 16. File Organization, 17. Quick Reference Card, 1. Design Philosophy, 5. Border Radius Scale, 6. Spacing & Sizing, 9. Fractal Noise Texture, code:css (--radius: 0.625rem;  /* 10px */) (+8 more)
 
 ### Community 439 - "Community 439"
 Cohesion: 0.12
-Nodes (15): agentDir, agentResult, beadsDir, branchResult, clearResult, content, legacyDir, legacyResult (+7 more)
+Nodes (16): code:bash (curl {{API_URL}}/api/health), code:bash (# Get test token (server-side, before opening browser)), code:javascript (// Launch browser), code:block4 (## UAT Results), Context, Critical Notes, Examples of BLOCKED vs PASS, Handling Playwright (Browser Automation) (+8 more)
 
 ### Community 440 - "Community 440"
 Cohesion: 0.12
-Nodes (16): Baseline-Aware Test Validation, code:block1 (┌───────────────────────────────────────────────────────────), code:bash (# In validate-merge.sh), code:typescript (// validation.ts — autoRevertMerge always uses ORIG_HEAD), code:typescript (const { stdout: statusOut } = await execAsync('git status --), code:typescript (if (stashCreated) {), code:block6 (┌──────────┐     ┌──────────┐     ┌──────────┐     ┌────────), code:typescript (POST /api/specialists/done) (+8 more)
+Nodes (16): Best Value by Tier, Budget Tasks, Changes from Baseline, Code Review & Security, Conclusion, Cost-Effectiveness Analysis, Debugging, Executive Summary (+8 more)
 
 ### Community 441 - "Community 441"
 Cohesion: 0.12
-Nodes (15): code:block1 (tests/), code:typescript (// Mock execAsync for git command tests), code:typescript (// Preferred: testid), Conventions, Dashboard UI Testing, `data-testid` Convention, Mocking, Playwright MCP (+7 more)
+Nodes (16): code:bash (# Full install (includes Traefik + mkcert for HTTPS)), code:bash (pan sync), code:bash (pan doctor), code:bash (# Start with default settings), code:bash (pan down), code:bash (pan restart), code:bash (pan health), Core Commands (+8 more)
 
 ### Community 442 - "Community 442"
-Cohesion: 0.12
-Nodes (15): API Integration, Component Structure, Core Layout, Design 1: Collapsed State, Design 2: Expanded State, Next Steps, Overrides (6 components), Overview (+7 more)
+Cohesion: 0.15
+Nodes (6): MockRallyArtifact, RallyApiMock, compoundQueries, mock, sampleArtifacts, typeQueries
 
 ### Community 443 - "Community 443"
 Cohesion: 0.12
-Nodes (16): 10. Autonomous flywheel daemon, 11. Public flywheel dashboard page, 12. Updated `all-up` skill, 13. Updated `CLAUDE.md` (repo-level), 1. `retro-agent` — New agent type, 2. Retro storage, 3. Synthesis step — new Step 8 in `all-up` skill, 4. `docs/FLYWHEEL-REPORT.md` — user-facing living doc (+8 more)
+Nodes (15): agentDir, agentResult, beadsDir, branchResult, clearResult, content, legacyDir, legacyResult (+7 more)
 
 ### Community 444 - "Community 444"
-Cohesion: 0.12
-Nodes (15): Acceptance Criteria, Code to Preserve (Merge Queue), code:block1 (if (specialist busy) → submitToSpecialistQueue()), code:block2 (if (workspace already has running specialist) → no-op (dupli), Current Architecture, Goal, Key Files to Remove/Modify, New Dispatch Pattern (+7 more)
+Cohesion: 0.2
+Nodes (14): checkCommand(), checkComposeLabelDrift(), checkDirectory(), checkPi(), CheckResult, compareSemver(), ComposeDriftEntry, countItems() (+6 more)
 
 ### Community 445 - "Community 445"
 Cohesion: 0.12
-Nodes (15): Approach, D1: Full scope — all 6 problem areas, D2: Typed error-to-HTTP mapping via `httpHandler` wrapper, D3: Convert ALL sync FS calls including `existsSync`, D4: Keep existing route composition pattern, Decisions, Out of Scope, PAN-470: Rewrite route handlers to idiomatic Effect (+7 more)
+Nodes (15): agentDir, cache1, cache2, events1, events2, eventsFile, sessionDir, stats (+7 more)
 
 ### Community 446 - "Community 446"
-Cohesion: 0.12
-Nodes (16): code:typescript (export function validateRallyConfig(config: RallyConfig): {), code:typescript (private async pollRally(): Promise<void> {), code:typescript (// POST /api/rally/validate - Test Rally connection and conf), code:typescript (describe('Rally Integration', () => {), code:typescript (const mock = new RallyApiMock();), code:typescript (// Before error throw:), code:typescript (// Add debug logging:), code:typescript (// Improve error logging:) (+8 more)
-
-### Community 447 - "Community 447"
-Cohesion: 0.12
-Nodes (15): 1. Eliminating Waterfalls (CRITICAL), 2. Bundle Size Optimization (CRITICAL), 3. Server-Side Performance (HIGH), 4. Client-Side Data Fetching (MEDIUM-HIGH), 5. Re-render Optimization (MEDIUM), 6. Rendering Performance (MEDIUM), 7. JavaScript Performance (LOW-MEDIUM), 8. Advanced Patterns (LOW) (+7 more)
+Cohesion: 0.23
+Nodes (15): completeSession(), DEFAULT_DATA, findSessionById(), getAllIssuesWithCosts(), getIssueCostSummary(), getIssueSessions(), IssueSessionMap, linkSessionToIssue() (+7 more)
 
 ### Community 448 - "Community 448"
-Cohesion: 0.12
-Nodes (15): Auto-Fix Critical Issues, Check Specific Workspace, code:bash (python ~/.claude/skills/session-health/scripts/check_session), code:bash (python ~/.claude/skills/session-health/scripts/check_session), code:bash (# Replace with your actual project path), code:bash (tmux kill-session -t agent-proj-123), code:python (import os, glob), code:bash (pan start PROJ-123) (+7 more)
+Cohesion: 0.16
+Nodes (14): CategoryFilter, formatContextLength(), formatCost(), ModelCard(), OpenRouterModel, OpenRouterModelBrowser(), OpenRouterModelBrowserProps, { container } (+6 more)
 
 ### Community 449 - "Community 449"
-Cohesion: 0.12
-Nodes (15): Beads Completion Check, BLOCKED - Open Beads Found, code:bash (# Check for open beads), code:block2 (BEADS CHECK: PASS), code:block3 (BEADS CHECK: BLOCKED), code:block4 (Task(subagent_type='beads-completion-check', prompt='Check i), code:json ({), Error Handling (+7 more)
+Cohesion: 0.21
+Nodes (12): getShadowModeStatus(), getShadowModeSummary(), hasProjectShadowConfig(), isShadowModeEnabled(), resolveShadowMode(), ShadowModeOptions, ShadowModeResult, shouldSkipTrackerUpdate() (+4 more)
 
 ### Community 450 - "Community 450"
 Cohesion: 0.12
-Nodes (15): Code Review Agent, code:markdown (---), code:markdown (---), code:markdown (---), code:markdown (---), code:markdown (---), code:markdown (---), code:markdown (---) (+7 more)
+Nodes (16): Baseline-Aware Test Validation, code:block1 (┌───────────────────────────────────────────────────────────), code:bash (# In validate-merge.sh), code:typescript (// validation.ts — autoRevertMerge always uses ORIG_HEAD), code:typescript (const { stdout: statusOut } = await execAsync('git status --), code:typescript (if (stashCreated) {), code:block6 (┌──────────┐     ┌──────────┐     ┌──────────┐     ┌────────), code:typescript (POST /api/specialists/done) (+8 more)
 
 ### Community 451 - "Community 451"
 Cohesion: 0.12
-Nodes (15): code:markdown (## Process), code:markdown (## Decision Tree), code:markdown (## Data Transformation), code:markdown (## Investigation Flow), code:markdown (## Setup Wizard), code:markdown (## Multi-Source Research), code:markdown (## Robust Execution), Conditional Branching (+7 more)
+Nodes (15): code:block1 (tests/), code:typescript (// Mock execAsync for git command tests), code:typescript (// Preferred: testid), Conventions, Dashboard UI Testing, `data-testid` Convention, Mocking, Playwright MCP (+7 more)
 
 ### Community 452 - "Community 452"
 Cohesion: 0.12
-Nodes (15): 1. Inspect commit context, 2. Choose the narrowest fitting scope, 3. Draft the commit message, 4. Commit safely, 5. If commitlint rejects the message, code:bash (git status --short --branch), code:text (feat(cli): add pan-commit skill), code:text (fix(dashboard): rehydrate snapshot after reconnect) (+7 more)
+Nodes (15): API Integration, Component Structure, Core Layout, Design 1: Collapsed State, Design 2: Expanded State, Next Steps, Overrides (6 components), Overview (+7 more)
 
 ### Community 453 - "Community 453"
 Cohesion: 0.12
-Nodes (15): code:bash (cd {{projectPath}}), code:bash (git diff --check), code:bash (git commit --no-edit), code:block4 (MERGE_RESULT: SUCCESS), code:block5 (MERGE_RESULT: FAILURE), code:bash (git merge --abort), Conflict Files, Critical Rules (+7 more)
+Nodes (16): 10. Autonomous flywheel daemon, 11. Public flywheel dashboard page, 12. Updated `all-up` skill, 13. Updated `CLAUDE.md` (repo-level), 1. `retro-agent` — New agent type, 2. Retro storage, 3. Synthesis step — new Step 8 in `all-up` skill, 4. `docs/FLYWHEEL-REPORT.md` — user-facing living doc (+8 more)
 
 ### Community 454 - "Community 454"
 Cohesion: 0.12
-Nodes (15): Code Review: Synthesis, code:block1 (# Verdict: APPROVED), code:markdown (# Verdict: CHANGES_REQUESTED), code:json ({), code:block4 (REVIEW_RESULT: APPROVED), Cross-referencing, Deduplication, Output: `synthesis.json` (+7 more)
+Nodes (15): Acceptance Criteria, Code to Preserve (Merge Queue), code:block1 (if (specialist busy) → submitToSpecialistQueue()), code:block2 (if (workspace already has running specialist) → no-op (dupli), Current Architecture, Goal, Key Files to Remove/Modify, New Dispatch Pattern (+7 more)
 
 ### Community 455 - "Community 455"
-Cohesion: 0.13
-Nodes (14): backup, backup1, backup2, backupDir, backups, dir1, dir2, removed (+6 more)
+Cohesion: 0.12
+Nodes (15): Approach, D1: Full scope — all 6 problem areas, D2: Typed error-to-HTTP mapping via `httpHandler` wrapper, D3: Convert ALL sync FS calls including `existsSync`, D4: Keep existing route composition pattern, Decisions, Out of Scope, PAN-470: Rewrite route handlers to idiomatic Effect (+7 more)
 
 ### Community 456 - "Community 456"
-Cohesion: 0.13
-Nodes (11): mockGitHubAddLabel, mockGitHubCloseIssue, mockGitHubRemoveLabel, mockGitHubReopenIssue, mockLinearGetIssue, mockLinearGetTeamStates, mockLinearUpdateState, mockRallyUpdateState (+3 more)
+Cohesion: 0.12
+Nodes (15): 1. Eliminating Waterfalls (CRITICAL), 2. Bundle Size Optimization (CRITICAL), 3. Server-Side Performance (HIGH), 4. Client-Side Data Fetching (MEDIUM-HIGH), 5. Re-render Optimization (MEDIUM), 6. Rendering Performance (MEDIUM), 7. JavaScript Performance (LOW-MEDIUM), 8. Advanced Patterns (LOW) (+7 more)
 
 ### Community 457 - "Community 457"
-Cohesion: 0.17
-Nodes (10): ApiKeyValidationResult, classifyModel(), detectThinkingSupport(), ModelCache, OpenRouterModel, OpenRouterService, OpenRouterServiceLive, OpenRouterServiceShape (+2 more)
+Cohesion: 0.12
+Nodes (15): Auto-Fix Critical Issues, Check Specific Workspace, code:bash (python ~/.claude/skills/session-health/scripts/check_session), code:bash (python ~/.claude/skills/session-health/scripts/check_session), code:bash (# Replace with your actual project path), code:bash (tmux kill-session -t agent-proj-123), code:python (import os, glob), code:bash (pan start PROJ-123) (+7 more)
 
 ### Community 458 - "Community 458"
-Cohesion: 0.17
-Nodes (12): ALLOWED, HarnessPolicyDecision, PI_ANTHROPIC_SUBSCRIPTION_BLOCK, AuthMode, SubscriptionPlan, RuntimeName, AUTH_MODES, cells (+4 more)
+Cohesion: 0.12
+Nodes (15): Beads Completion Check, BLOCKED - Open Beads Found, code:bash (# Check for open beads), code:block2 (BEADS CHECK: PASS), code:block3 (BEADS CHECK: BLOCKED), code:block4 (Task(subagent_type='beads-completion-check', prompt='Check i), code:json ({), Error Handling (+7 more)
 
 ### Community 459 - "Community 459"
-Cohesion: 0.22
-Nodes (11): showHelp(), startCommand(), statusCommand(), stopCommand(), tldrCommand(), TldrOptions, warmCommand(), getTldrDaemonService() (+3 more)
+Cohesion: 0.12
+Nodes (15): Code Review Agent, code:markdown (---), code:markdown (---), code:markdown (---), code:markdown (---), code:markdown (---), code:markdown (---), code:markdown (---) (+7 more)
 
 ### Community 460 - "Community 460"
-Cohesion: 0.13
-Nodes (12): claudeProjectDir, content, lines, newContent, newSessionFile, oldContent, oldSessionFile, projectDirName (+4 more)
+Cohesion: 0.12
+Nodes (15): code:markdown (## Process), code:markdown (## Decision Tree), code:markdown (## Data Transformation), code:markdown (## Investigation Flow), code:markdown (## Setup Wizard), code:markdown (## Multi-Source Research), code:markdown (## Robust Execution), Conditional Branching (+7 more)
 
 ### Community 461 - "Community 461"
-Cohesion: 0.13
-Nodes (12): mockDeepWipe, mockExistsSync, mockGetAgentState, mockGetAgentStateAsync, mockMessageAgent, mockMkdir, mockSpawnAgent, mockSpawnPlanningSession (+4 more)
+Cohesion: 0.12
+Nodes (15): 1. Inspect commit context, 2. Choose the narrowest fitting scope, 3. Draft the commit message, 4. Commit safely, 5. If commitlint rejects the message, code:bash (git status --short --branch), code:text (feat(cli): add pan-commit skill), code:text (fix(dashboard): rehydrate snapshot after reconnect) (+7 more)
 
 ### Community 462 - "Community 462"
-Cohesion: 0.13
-Nodes (15): Agent Commands, code:bash (# Start dashboard (prefers Electron desktop app if installed), code:bash (# Create workspace for an issue), code:bash (# Check agent status), code:bash (# Start work agent for an issue), code:bash (# Add project), code:bash (# Sync skills to Claude Code), code:bash (# Verify that main is releasable) (+7 more)
+Cohesion: 0.12
+Nodes (15): code:bash (cd {{projectPath}}), code:bash (git diff --check), code:bash (git commit --no-edit), code:block4 (MERGE_RESULT: SUCCESS), code:block5 (MERGE_RESULT: FAILURE), code:bash (git merge --abort), Conflict Files, Critical Rules (+7 more)
 
 ### Community 463 - "Community 463"
-Cohesion: 0.13
-Nodes (15): code:block111 (┌───────────────────────────────────────────────────────────), code:bash (# Key configuration (written to /etc/dnsmasq.d/panopticon.co), code:bash (# 1. Install dnsmasq), code:powershell (# Reads ~/.wsl2hosts from WSL2), code:powershell (# Run sync every 5 minutes (or on-demand when workspaces cha), code:bash (# Creates a helper command that can be run with sudo without), code:bash (# 1. Create workspace directories, containers, etc.), Component 1: dnsmasq Wildcard DNS (WSL2 Side) (+7 more)
+Cohesion: 0.12
+Nodes (15): Code Review: Synthesis, code:block1 (# Verdict: APPROVED), code:markdown (# Verdict: CHANGES_REQUESTED), code:json ({), code:block4 (REVIEW_RESULT: APPROVED), Cross-referencing, Deduplication, Output: `synthesis.json` (+7 more)
 
 ### Community 464 - "Community 464"
 Cohesion: 0.13
-Nodes (14): 10. Tracked Issues, 11. Implementation Scope, 3. Real-World Conflict: Mind Your Now, 4. Enterprise / Managed Policy, 5. Path Portability (Completed), 7. Rules: Planned Content, 9. Decisions Log, code:block7 (pan workspace create MIN-678) (+6 more)
+Nodes (14): backup, backup1, backup2, backupDir, backups, dir1, dir2, removed (+6 more)
 
 ### Community 465 - "Community 465"
-Cohesion: 0.13
-Nodes (15): Artifact Lifecycle, code:block46 (docs/prds/), code:block47 (.planning/), code:block48 (.beads/), code:bash (# Before moving (on source machine)), code:bash (bd sync                              # Export beads DB → JSO), code:bash (git checkout feature/min-667), code:bash (pan workspace migrate MIN-667 --to remote) (+7 more)
+Cohesion: 0.17
+Nodes (10): ApiKeyValidationResult, classifyModel(), detectThinkingSupport(), ModelCache, OpenRouterModel, OpenRouterService, OpenRouterServiceLive, OpenRouterServiceShape (+2 more)
 
 ### Community 466 - "Community 466"
-Cohesion: 0.13
-Nodes (15): code:yaml (models:), code:env (ANTHROPIC_API_KEY=sk-ant-api03-...), code:yaml (models:), code:env (ANTHROPIC_API_KEY=sk-ant-...), code:yaml (models:), code:env (ANTHROPIC_API_KEY=sk-ant-...), code:yaml (models:), code:yaml (models:) (+7 more)
+Cohesion: 0.2
+Nodes (12): createRecoveryCoordinator(), EventClassification, RecoveryCoordinator, RecoveryPhase, RecoveryPhaseKind, RecoveryReason, RecoveryState, bootstrapped() (+4 more)
 
 ### Community 467 - "Community 467"
 Cohesion: 0.13
-Nodes (14): A.1 Add `isInfrastructureFailure` helper, A.2 Enhance `checkStuckReviewing` to detect dead parallel sessions, A.3 Add infrastructure-failure circuit breaker, A.4 Honor `stuck` flag in re-dispatch path, A.5 ~~Detect verification/review contradiction~~ — REMOVED, A.6 Partial results from incomplete parallel reviews, A. `src/lib/cloister/deacon.ts`, code:typescript (function isInfrastructureFailure(notes?: string): boolean {) (+6 more)
+Nodes (12): mockDeepWipe, mockExistsSync, mockGetAgentState, mockGetAgentStateAsync, mockMessageAgent, mockMkdir, mockSpawnAgent, mockSpawnPlanningSession (+4 more)
 
 ### Community 468 - "Community 468"
 Cohesion: 0.13
-Nodes (14): Acceptance Criteria, Bead 1: HarnessPicker Component, Bead 2: API harness params, Bead 3: PlanDialog picker, Bead 4: Start-agent picker, Bead 5: ConversationPanel picker, Bead 6: SettingsPage defaults, Design Goals (+6 more)
+Nodes (15): Agent Commands, code:bash (# Start dashboard (prefers Electron desktop app if installed), code:bash (# Create workspace for an issue), code:bash (# Check agent status), code:bash (# Start work agent for an issue), code:bash (# Add project), code:bash (# Sync skills to Claude Code), code:bash (# Verify that main is releasable) (+7 more)
 
 ### Community 469 - "Community 469"
 Cohesion: 0.13
-Nodes (14): code:bash (# Migrate local → remote), Command Design, Current Architecture, Edge Cases, File: `src/cli/commands/workspace-migrate.ts`, Files to Create/Modify, Implementation, Local Workspaces (+6 more)
+Nodes (15): code:block111 (┌───────────────────────────────────────────────────────────), code:bash (# Key configuration (written to /etc/dnsmasq.d/panopticon.co), code:bash (# 1. Install dnsmasq), code:powershell (# Reads ~/.wsl2hosts from WSL2), code:powershell (# Run sync every 5 minutes (or on-demand when workspaces cha), code:bash (# Creates a helper command that can be run with sudo without), code:bash (# 1. Create workspace directories, containers, etc.), Component 1: dnsmasq Wildcard DNS (WSL2 Side) (+7 more)
 
 ### Community 470 - "Community 470"
 Cohesion: 0.13
-Nodes (14): Decision, Difficulty Estimates, Implementation Complete, In Scope, Key Architectural Choices, Out of Scope, PAN-428: Dashboard Data Layer — Consolidate Polling, Push-First Architecture, Parallelization Strategy (+6 more)
+Nodes (15): Artifact Lifecycle, code:block46 (docs/prds/), code:block47 (.planning/), code:block48 (.beads/), code:bash (# Before moving (on source machine)), code:bash (bd sync                              # Export beads DB → JSO), code:bash (git checkout feature/min-667), code:bash (pan workspace migrate MIN-667 --to remote) (+7 more)
 
 ### Community 471 - "Community 471"
 Cohesion: 0.13
-Nodes (14): Architecture Overview, Auto-Selection Logic, code:block1 (Command Deck (project selected)), Core Design: Conversation-First with Contextual Chrome, Data Flow, Decision Summary, Key Decisions Made, Key Patterns to Follow (+6 more)
+Nodes (15): code:yaml (models:), code:env (ANTHROPIC_API_KEY=sk-ant-api03-...), code:yaml (models:), code:env (ANTHROPIC_API_KEY=sk-ant-...), code:yaml (models:), code:env (ANTHROPIC_API_KEY=sk-ant-...), code:yaml (models:), code:yaml (models:) (+7 more)
 
 ### Community 472 - "Community 472"
 Cohesion: 0.13
-Nodes (14): Access Points, Adding Dependencies, App Router vs Pages Router, code:bash (# Copy template to your project), code:bash (APP_PORT=3000), code:javascript (/** @type {import('next').NextConfig} */), code:bash (# Install inside container), Development Workflow (+6 more)
+Nodes (14): A.1 Add `isInfrastructureFailure` helper, A.2 Enhance `checkStuckReviewing` to detect dead parallel sessions, A.3 Add infrastructure-failure circuit breaker, A.4 Honor `stuck` flag in re-dispatch path, A.5 ~~Detect verification/review contradiction~~ — REMOVED, A.6 Partial results from incomplete parallel reviews, A. `src/lib/cloister/deacon.ts`, code:typescript (function isInfrastructureFailure(notes?: string): boolean {) (+6 more)
 
 ### Community 473 - "Community 473"
 Cohesion: 0.13
-Nodes (14): Batch Operations, code:bash (# From a pipe), code:block2 (close <id> [reason...]), code:bash (# Close all open beads for PAN-116), code:bash (# Deprioritize multiple beads), Error Handling, Example: Bulk Close, Example: Bulk Update (+6 more)
+Nodes (14): Acceptance Criteria, Bead 1: HarnessPicker Component, Bead 2: API harness params, Bead 3: PlanDialog picker, Bead 4: Start-agent picker, Bead 5: ConversationPanel picker, Bead 6: SettingsPage defaults, Design Goals (+6 more)
 
 ### Community 474 - "Community 474"
 Cohesion: 0.13
-Nodes (15): code:block22 (feature-10: "Add user profiles"), code:block23 (research-5: "Investigate caching options"), code:block24 (refactor-20: "Extract validation logic"), code:bash (bd dep add original-work-id discovered-issue-id --type disco), code:block26 (spike-1: "Investigate API redesign"), code:block27 (bug-1: "Login fails intermittently"), code:block28 (feature-main: "Add shopping cart"), code:block29 (feature-10: "Add user profiles") (+7 more)
+Nodes (14): code:bash (# Migrate local → remote), Command Design, Current Architecture, Edge Cases, File: `src/cli/commands/workspace-migrate.ts`, Files to Create/Modify, Implementation, Local Workspaces (+6 more)
 
 ### Community 475 - "Community 475"
 Cohesion: 0.13
-Nodes (15): Automatic Unblocking, blocks - Hard Blocker, code:block1 (db-schema-1: "Create users table"), code:block2 (migrate-1: "Backup production database"), code:block3 (setup-1: "Install JWT library"), code:bash (bd dep add prerequisite-issue blocked-issue), code:block5 (foundation-1: "Set up authentication system"), code:block6 (step-1 blocks step-2 blocks step-3 blocks step-4) (+7 more)
+Nodes (14): Decision, Difficulty Estimates, Implementation Complete, In Scope, Key Architectural Choices, Out of Scope, PAN-428: Dashboard Data Layer — Consolidate Polling, Push-First Architecture, Parallelization Strategy (+6 more)
 
 ### Community 476 - "Community 476"
 Cohesion: 0.13
-Nodes (15): Basic Filters, code:bash (# Labels (AND: must have ALL)), code:bash (# Title search (substring)), code:bash (# Date range filters (YYYY-MM-DD or RFC3339)), code:bash (# Empty/null checks), code:bash (# Priority ranges), code:bash (# Combine multiple filters), code:bash (# Filter by status, priority, type) (+7 more)
+Nodes (14): Architecture Overview, Auto-Selection Logic, code:block1 (Command Deck (project selected)), Core Design: Conversation-First with Contextual Chrome, Data Flow, Decision Summary, Key Decisions Made, Key Patterns to Follow (+6 more)
 
 ### Community 477 - "Community 477"
 Cohesion: 0.13
-Nodes (14): code:block1 (Session Start (when bd is available):), code:block15 (Resume Workflow:), code:block25 (Hybrid Workflow:), code:block5 (Discovery Workflow:), code:block6 (Issue Lifecycle:), Contents, Decision Points, Discovery and Issue Creation {#discovery} (+6 more)
+Nodes (14): Access Points, Adding Dependencies, App Router vs Pages Router, code:bash (# Copy template to your project), code:bash (APP_PORT=3000), code:javascript (/** @type {import('next').NextConfig} */), code:bash (# Install inside container), Development Workflow (+6 more)
 
 ### Community 478 - "Community 478"
 Cohesion: 0.13
-Nodes (14): Architecture, code:bash (bd worktree create .worktrees/{name} --branch feature/{name}), code:block2 (main-repo/), code:bash (# Create worktree with beads support), code:bash (bd where              # Shows actual .beads location (follow), code:bash (bd init --branch beads-metadata    # Use separate branch for), Commands, Debugging (+6 more)
+Nodes (14): Batch Operations, code:bash (# From a pipe), code:block2 (close <id> [reason...]), code:bash (# Close all open beads for PAN-116), code:bash (# Deprioritize multiple beads), Error Handling, Example: Bulk Close, Example: Bulk Update (+6 more)
 
 ### Community 479 - "Community 479"
 Cohesion: 0.13
-Nodes (14): 1. Find the right document, 2. Decide the document type before editing, 3. Update the target document, 4. Update the index, 5. Verify the docs surface, Add or update documentation, Answer a docs question, Clean up confusing docs (+6 more)
+Nodes (15): Automatic Unblocking, blocks - Hard Blocker, code:block1 (db-schema-1: "Create users table"), code:block2 (migrate-1: "Backup production database"), code:block3 (setup-1: "Install JWT library"), code:bash (bd dep add prerequisite-issue blocked-issue), code:block5 (foundation-1: "Set up authentication system"), code:block6 (step-1 blocks step-2 blocks step-3 blocks step-4) (+7 more)
 
 ### Community 480 - "Community 480"
-Cohesion: 0.14
-Nodes (13): afterCompact, beforeCompact, db, events, oldTimestamp, payload, received, s1 (+5 more)
+Cohesion: 0.13
+Nodes (15): code:block22 (feature-10: "Add user profiles"), code:block23 (research-5: "Investigate caching options"), code:block24 (refactor-20: "Extract validation logic"), code:bash (bd dep add original-work-id discovered-issue-id --type disco), code:block26 (spike-1: "Investigate API redesign"), code:block27 (bug-1: "Login fails intermittently"), code:block28 (feature-main: "Add shopping cart"), code:block29 (feature-10: "Add user profiles") (+7 more)
 
 ### Community 481 - "Community 481"
+Cohesion: 0.13
+Nodes (15): Basic Filters, code:bash (# Labels (AND: must have ALL)), code:bash (# Title search (substring)), code:bash (# Date range filters (YYYY-MM-DD or RFC3339)), code:bash (# Empty/null checks), code:bash (# Priority ranges), code:bash (# Combine multiple filters), code:bash (# Filter by status, priority, type) (+7 more)
+
+### Community 482 - "Community 482"
+Cohesion: 0.13
+Nodes (14): Architecture, code:bash (bd worktree create .worktrees/{name} --branch feature/{name}), code:block2 (main-repo/), code:bash (# Create worktree with beads support), code:bash (bd where              # Shows actual .beads location (follow), code:bash (bd init --branch beads-metadata    # Use separate branch for), Commands, Debugging (+6 more)
+
+### Community 483 - "Community 483"
+Cohesion: 0.13
+Nodes (14): 1. Find the right document, 2. Decide the document type before editing, 3. Update the target document, 4. Update the index, 5. Verify the docs surface, Add or update documentation, Answer a docs question, Clean up confusing docs (+6 more)
+
+### Community 484 - "Community 484"
 Cohesion: 0.14
 Nodes (11): cache, capped, cpuList, events, lines, memFree, memTotal, result (+3 more)
 
-### Community 482 - "Community 482"
-Cohesion: 0.22
-Nodes (13): HandoffContext, createHandoffEvent(), ensureLogDir(), getHandoffStats(), getPendingVerificationHandoffs(), HANDOFF_LOG_FILE, HandoffEvent, logHandoffEvent() (+5 more)
-
-### Community 483 - "Community 483"
-Cohesion: 0.21
-Nodes (9): configShadowCommand(), ShadowOptions, PanopticonConfig, ENV_FILE_PATH, getShadowModeFromEnv(), loadPanopticonEnv(), parseEnvFile(), getPendingSyncCount() (+1 more)
-
-### Community 484 - "Community 484"
-Cohesion: 0.22
-Nodes (10): getShadowModeStatus(), getShadowModeSummary(), hasProjectShadowConfig(), isShadowModeEnabled(), resolveShadowMode(), ShadowModeOptions, ShadowModeResult, id (+2 more)
-
 ### Community 485 - "Community 485"
-Cohesion: 0.14
-Nodes (13): Agent Grid, code:block1 (┌────────────────────────────────────────────────────┐), code:css (--gv-bg: #0a0e1a          /* Dark navy background */), Components, Dependencies, Design System, Focus View, God View — Real-time Agent Activity Command Center (+5 more)
+Cohesion: 0.25
+Nodes (4): execAsync, readStateFile(), TldrDaemonService, writeStateFile()
 
 ### Community 487 - "Community 487"
 Cohesion: 0.14
 Nodes (11): BRIDGE_ENTRY, entry, exitPromise, lines, logPath, params, REPO_ROOT, { server } (+3 more)
 
 ### Community 488 - "Community 488"
-Cohesion: 0.2
-Nodes (12): getHeader(), getTrustedOrigins(), normalizeOrigin(), _resetTrustedOriginsForTests(), validateOrigin(), appendResolutionEvents, deliverDecision, details (+4 more)
+Cohesion: 0.14
+Nodes (13): Agent Grid, code:block1 (┌────────────────────────────────────────────────────┐), code:css (--gv-bg: #0a0e1a          /* Dark navy background */), Components, Dependencies, Design System, Focus View, God View — Real-time Agent Activity Command Center (+5 more)
 
 ### Community 489 - "Community 489"
 Cohesion: 0.14
 Nodes (12): closedWorkspaceIcon, issueId, pan777Row, pan862Row, ProjectData, projectHeader, RESOURCE_DETAIL_IDENTIFIERS, RESOURCE_ISSUES (+4 more)
 
 ### Community 490 - "Community 490"
-Cohesion: 0.21
-Nodes (10): BranchNode(), BranchNodeProps, ContainerNodeProps, PrNode(), PrNodeProps, getStorageKey(), readExpanded(), ResourcesGroup() (+2 more)
-
-### Community 491 - "Community 491"
 Cohesion: 0.15
 Nodes (11): fetchProjectSpecialists(), fetchRunLogs(), formatDate(), ProjectSpecialist, ProjectSpecialistCard(), ProjectSpecialistCardProps, ProjectSpecialistMetadata, RunLogEntry (+3 more)
+
+### Community 491 - "Community 491"
+Cohesion: 0.21
+Nodes (10): BranchNode(), BranchNodeProps, ContainerNodeProps, PrNode(), PrNodeProps, getStorageKey(), readExpanded(), ResourcesGroup() (+2 more)
 
 ### Community 493 - "Community 493"
 Cohesion: 0.14
@@ -3111,11 +3118,11 @@ Nodes (14): 1.1 Add exe.dev Provider, 1.2 New Commands, 2.2 Modified docker-comp
 
 ### Community 502 - "Community 502"
 Cohesion: 0.14
-Nodes (13): Available Work Types, code:yaml (models:), code:yaml (models:), code:yaml (models:), code:yaml (models:), code:yaml (models:), code:env (ANTHROPIC_API_KEY=sk-ant-...), Configuration Guide (+5 more)
+Nodes (13): 12. Responsive Behavior, 14. File Structure, 15. Acceptance Criteria, 16. Risks & Mitigations, 17. Open Questions, 1. Problem Statement, 2. Design Philosophy, 6. Cloister Banner (+5 more)
 
 ### Community 503 - "Community 503"
 Cohesion: 0.14
-Nodes (13): 12. Responsive Behavior, 14. File Structure, 15. Acceptance Criteria, 16. Risks & Mitigations, 17. Open Questions, 1. Problem Statement, 2. Design Philosophy, 6. Cloister Banner (+5 more)
+Nodes (13): Architecture, CLI Interface (full surface), code:block1 (┌──────────────────────────────────────────┐), code:bash (# Discovery), code:block20 (GET  /api/archived-conversations), Dependencies, Files Changed (planning estimate), Out of Scope (this issue) (+5 more)
 
 ### Community 504 - "Community 504"
 Cohesion: 0.14
@@ -3181,13 +3188,17 @@ Nodes (13): code:block1 (Session 1: AI queries users.created_at → Error (colum
 Cohesion: 0.14
 Nodes (14): 2. Typography, code:html (<!-- index.html -->), code:js (fontFamily: {), code:css (body {), Conversation Typography, CRITICAL: The Four Canonical Typography Rules (PAN-698), CSS Default, Deprecated Patterns (DO NOT USE) (+6 more)
 
-### Community 521 - "Community 521"
-Cohesion: 0.21
-Nodes (10): displayIssues(), getConfiguredTrackers(), getTrackerConfig(), listCommand(), ListOptions, PRIORITY_LABELS, { loadConfigMock, isShadowedMock, getPendingSyncCountMock, createTrackerMock, loadProjectsConfigMock }, mockIssues (+2 more)
-
-### Community 522 - "Community 522"
+### Community 520 - "Community 520"
 Cohesion: 0.15
 Nodes (12): config, config1, config2, configDir, configPath, content, googleProvider, openaiProvider (+4 more)
+
+### Community 521 - "Community 521"
+Cohesion: 0.15
+Nodes (11): dir, event, eventsDir1, eventsDir2, line, lines, parsed, repo1 (+3 more)
+
+### Community 522 - "Community 522"
+Cohesion: 0.28
+Nodes (11): after, before, blockers, result, statuses, clearReviewStatus(), DEFAULT_STATUS_FILE, getReviewStatus() (+3 more)
 
 ### Community 523 - "Community 523"
 Cohesion: 0.28
@@ -3195,23 +3206,19 @@ Nodes (12): buildStatus(), decodeBase64Url(), decodeJwtPayload(), getCodexAuthPa
 
 ### Community 524 - "Community 524"
 Cohesion: 0.15
-Nodes (11): dir, event, eventsDir1, eventsDir2, line, lines, parsed, repo1 (+3 more)
+Nodes (9): githubTracker, linearTracker, longBody, mockCreateTrackerFromConfig, mockExistsSync, mockLoadConfig, mockStatSync, STATE_MTIME (+1 more)
 
-### Community 525 - "Community 525"
+### Community 526 - "Community 526"
 Cohesion: 0.15
 Nodes (12): ACTIVITY_RESPONSE, AGENTS_RESPONSE, COSTS_RESPONSE, DISCUSSIONS_RESPONSE, ISSUES_RESPONSE, PLANNING_RESPONSE, PR_DIFF_RESPONSE, PR_RESPONSE (+4 more)
 
-### Community 526 - "Community 526"
+### Community 527 - "Community 527"
 Cohesion: 0.21
 Nodes (10): CapabilityStats, DailyStats, fetchRuntimeMetrics(), formatCost(), formatDuration(), formatPercent(), getSuccessColor(), MetricsResponse (+2 more)
 
-### Community 527 - "Community 527"
-Cohesion: 0.17
-Nodes (11): REVIEWER_STYLE, ReviewerRole, RoleBadge(), RoleBadgeProps, RoleBadgeSize, RoleStyle, SESSION_STYLE, SIZE_PX (+3 more)
-
 ### Community 528 - "Community 528"
-Cohesion: 0.28
-Nodes (11): after, before, blockers, result, statuses, clearReviewStatus(), DEFAULT_STATUS_FILE, getReviewStatus() (+3 more)
+Cohesion: 0.22
+Nodes (9): CodexAuthBanner(), SensitiveText(), SensitiveTextProps, CodexAuthStatus, fetchCodexAuthStatus(), useCodexAuthStatus(), retryPendingSpawn(), clearPendingCodexSpawn() (+1 more)
 
 ### Community 529 - "Community 529"
 Cohesion: 0.15
@@ -3231,7 +3238,7 @@ Nodes (12): code:typescript (export function isReviewPipelineStuck(status?: Pipe
 
 ### Community 533 - "Community 533"
 Cohesion: 0.15
-Nodes (12): C.1 Update `isReviewPipelineStuck` in `src/dashboard/frontend/src/lib/pipeline-state.ts`, C.2 Add recovery indicator helpers to `KanbanBoard.tsx`, C.3 Add pulsing border and recovery badge to the card, C.4 Add recovery badge in the card header, C.6 Style compliance, C. Frontend: Kanban Card Recovery Indicators, code:typescript (export function isReviewPipelineStuck(status?: PipelineState), code:typescript (export function isReviewPipelineStuck(status?: PipelineState) (+4 more)
+Nodes (13): code:typescript (// POST /api/rally/validate - Test Rally connection and conf), code:typescript (describe('Rally Integration', () => {), code:typescript (const mock = new RallyApiMock();), code:typescript (// Before error throw:), code:typescript (// Add debug logging:), code:typescript (// Improve error logging:), Task 1: Fix Query String Builder (CRITICAL), Task 2: Add Comprehensive Unit Tests (+5 more)
 
 ### Community 534 - "Community 534"
 Cohesion: 0.15
@@ -3255,11 +3262,11 @@ Nodes (13): code:bash (# If project has override skill, this skill is permanentl
 
 ### Community 539 - "Community 539"
 Cohesion: 0.15
-Nodes (12): `bd rules audit`, `bd rules compact`, Best Practices, code:bash (bd rules audit                    # Default scan), code:bash (bd rules compact --dry-run        # Preview merges without a), code:bash ($ bd rules audit), code:bash (# In pan sync workflow), Commands (+4 more)
+Nodes (13): code:bash (bd dep add issue-2 issue-1 --type blocks), code:bash (bd version), code:bash (# Via Homebrew (macOS/Linux)), code:bash (pkill -f "bd daemon"  # Kill old daemon), code:bash (bd create "Test A" -t task), code:bash (ps aux | grep "bd daemon"), code:bash (# Instead of: bd --no-daemon dep add ...), code:bash (cat .beads/issues.jsonl | jq '.dependencies') (+5 more)
 
 ### Community 540 - "Community 540"
 Cohesion: 0.15
-Nodes (13): code:block10 (Start: "What's the final deliverable?"), code:block11 (Ready Front 1:  gt-buffer (foundation)), code:bash (# Create epic (the goal)), code:block7 (Ready Front = Issues where all dependencies are closed), code:block8 (⚠️ COGNITIVE TRAP:), code:block9 (Epic Planning with Ready Fronts:), Epic Planning {#epic-planning}, Epic Planning Workflow (+5 more)
+Nodes (12): `bd rules audit`, `bd rules compact`, Best Practices, code:bash (bd rules audit                    # Default scan), code:bash (bd rules compact --dry-run        # Preview merges without a), code:bash ($ bd rules audit), code:bash (# In pan sync workflow), Commands (+4 more)
 
 ### Community 541 - "Community 541"
 Cohesion: 0.15
@@ -3267,19 +3274,19 @@ Nodes (13): At Session End (Claude prompts user), At Session Start (Claude's res
 
 ### Community 542 - "Community 542"
 Cohesion: 0.15
-Nodes (12): API Function, Categories, code:bash (pan tell ISSUE-123 "Your feedback message here"), code:block2 (Sending feedback to agent-pan-45:), code:block3 (Sending feedback to agent-pan-45:), Example: Merge Success, Example: Test Failure, Feedback Types (+4 more)
+Nodes (13): code:block10 (Start: "What's the final deliverable?"), code:block11 (Ready Front 1:  gt-buffer (foundation)), code:bash (# Create epic (the goal)), code:block7 (Ready Front = Issues where all dependencies are closed), code:block8 (⚠️ COGNITIVE TRAP:), code:block9 (Epic Planning with Ready Fronts:), Epic Planning {#epic-planning}, Epic Planning Workflow (+5 more)
 
 ### Community 543 - "Community 543"
 Cohesion: 0.15
-Nodes (12): code:bash (#!/bin/bash), code:bash (# Check system health), Complete Quick Start Script, Feedback and Support, Overview, Panopticon Quick Start, Related Skills, Success Checklist (+4 more)
+Nodes (12): API Function, Categories, code:bash (pan tell ISSUE-123 "Your feedback message here"), code:block2 (Sending feedback to agent-pan-45:), code:block3 (Sending feedback to agent-pan-45:), Example: Merge Success, Example: Test Failure, Feedback Types (+4 more)
 
 ### Community 544 - "Community 544"
 Cohesion: 0.15
-Nodes (13): "Certificate not trusted" warnings, code:bash (docker ps | grep traefik), code:bash (docker logs panopticon-traefik), code:bash (ls ~/.panopticon/traefik/certs/), code:bash (mkcert -install), code:bash (docker network inspect panopticon), code:bash (docker inspect <container> | grep -A 20 Labels), code:bash (# Find what's using the ports) (+5 more)
+Nodes (12): code:bash (#!/bin/bash), code:bash (# Check system health), Complete Quick Start Script, Feedback and Support, Overview, Panopticon Quick Start, Related Skills, Success Checklist (+4 more)
 
 ### Community 545 - "Community 545"
-Cohesion: 0.17
-Nodes (10): allOps, divergedOp, execAsync, execFileMock, execMock, ops, opTypes, status (+2 more)
+Cohesion: 0.15
+Nodes (13): "Certificate not trusted" warnings, code:bash (docker ps | grep traefik), code:bash (docker logs panopticon-traefik), code:bash (ls ~/.panopticon/traefik/certs/), code:bash (mkcert -install), code:bash (docker network inspect panopticon), code:bash (docker inspect <container> | grep -A 20 Labels), code:bash (# Find what's using the ports) (+5 more)
 
 ### Community 546 - "Community 546"
 Cohesion: 0.17
@@ -3290,88 +3297,88 @@ Cohesion: 0.17
 Nodes (10): bin, binPath, content, desktopDir, devDeps, engines, files, p (+2 more)
 
 ### Community 548 - "Community 548"
-Cohesion: 0.24
-Nodes (9): callServerApi(), dispatchMenuAction(), showOrCreateWindow(), buildMenuTemplate(), configureApplicationMenu(), fetchActiveWorkspaces(), rebuildMenu(), WorkspaceSummary (+1 more)
+Cohesion: 0.32
+Nodes (9): backupCleanCommand(), backupListCommand(), restoreCommand(), BackupInfo, cleanOldBackups(), createBackup(), createBackupTimestamp(), listBackups() (+1 more)
 
 ### Community 549 - "Community 549"
-Cohesion: 0.32
-Nodes (10): cleanFile(), configCommand(), execAsync, ExtendedProjectConfig, findFullProjectByTeam(), loadFullProjects(), seedCommand(), snapshotCommand() (+2 more)
-
-### Community 550 - "Community 550"
-Cohesion: 0.21
-Nodes (6): ENV_KEYS, EnvSnapshot, ServerConfig, ServerConfigError, ServerConfigLayer, ServerConfigShape
-
-### Community 551 - "Community 551"
-Cohesion: 0.24
-Nodes (11): DEFAULT_VOICE_SETTINGS, getVoiceSettingsRoute, isVoiceSettings(), loadVoiceSettings(), normalizeVoiceSettings(), putVoiceSettingsRoute, readJsonBody, saveVoiceSettings() (+3 more)
-
-### Community 552 - "Community 552"
 Cohesion: 0.24
 Nodes (10): analyzeIssue(), sortByPriority(), issues, options, result, results, sorted, triageMultiple() (+2 more)
 
-### Community 553 - "Community 553"
+### Community 550 - "Community 550"
 Cohesion: 0.33
 Nodes (11): getVBriefACStatus(), checkOpenBeads(), checkUncommittedChanges(), checkVBriefACStatus(), errorCode(), execAsync, execFileAsync, isMissingCommand() (+3 more)
 
-### Community 554 - "Community 554"
+### Community 551 - "Community 551"
 Cohesion: 0.17
 Nodes (11): failedState, initialState, jsonBlock, nextState, parsed, PLAN_DOC, prompt, sameWaveDoc (+3 more)
 
-### Community 555 - "Community 555"
+### Community 552 - "Community 552"
 Cohesion: 0.17
-Nodes (10): MessagesTimeline, divider, dividers, markers, messages, round1, round2, round3 (+2 more)
+Nodes (10): allOps, divergedOp, execAsync, execFileMock, execMock, ops, opTypes, status (+2 more)
 
-### Community 556 - "Community 556"
+### Community 553 - "Community 553"
+Cohesion: 0.3
+Nodes (10): encodeClaudeProjectDir(), pathExists(), pickFreshestSessionId(), readOptional(), resolveClaudeSessionId(), resolveJsonlPath(), ResolveJsonlPathOptions, arr (+2 more)
+
+### Community 554 - "Community 554"
 Cohesion: 0.3
 Nodes (11): abortSignal(), emitActivity(), emitAgentEvent(), emitChannelReply(), emitMessageReceived(), emitModelSet(), emitResolution(), emitWaitingClear() (+3 more)
 
-### Community 557 - "Community 557"
-Cohesion: 0.17
-Nodes (11): clearReviewStatus(), cb, cmdArgs, key, mockExec, mockGetPullRequestState, mockIsGitHubAppConfigured, next (+3 more)
+### Community 555 - "Community 555"
+Cohesion: 0.24
+Nodes (11): DEFAULT_VOICE_SETTINGS, getVoiceSettingsRoute, isVoiceSettings(), loadVoiceSettings(), normalizeVoiceSettings(), putVoiceSettingsRoute, readJsonBody, saveVoiceSettings() (+3 more)
 
-### Community 558 - "Community 558"
+### Community 556 - "Community 556"
+Cohesion: 0.35
+Nodes (10): cleanFile(), configCommand(), execAsync, ExtendedProjectConfig, findFullProjectByTeam(), loadFullProjects(), seedCommand(), snapshotCommand() (+2 more)
+
+### Community 557 - "Community 557"
 Cohesion: 0.17
 Nodes (12): Always pre-trust directories before spawning agents, Architecture Rules, code:typescript (// WRONG), code:bash (# CORRECT), code:typescript (// WRONG), code:typescript (let running = false;), code:typescript (import { preTrustDirectory } from '../workspace-manager.js';), Idempotency guards on background services (+4 more)
 
-### Community 559 - "Community 559"
+### Community 558 - "Community 558"
 Cohesion: 0.17
 Nodes (12): Before starting any work, Build before deploy, code:bash (# 1. Rebase onto latest main (always — even if STATE.md alre), code:bash (npm run build), code:bash (# WRONG — may stage .beads/, dist/, secrets), code:bash (bd ready -l pan-xxx          # Next unblocked bead for THIS ), code:bash (npm test                                         # Must pass), Completing work (+4 more)
 
-### Community 560 - "Community 560"
+### Community 559 - "Community 559"
 Cohesion: 0.17
 Nodes (11): Agent Instructions, Beads Issue Tracker, code:bash (bd ready              # Find available work), code:bash (git pull --rebase), code:bash (bd ready              # Find available work), code:bash (git pull --rebase), Landing the Plane (Session Completion), Quick Reference (+3 more)
 
-### Community 561 - "Community 561"
+### Community 560 - "Community 560"
 Cohesion: 0.17
 Nodes (11): Architecture at a Glance, code:bash (npx @panctl/cli), code:bash (npm install -g @panctl/cli), code:bash (npm install -g @panctl/cli), Direct Desktop Downloads, Headless / CI, One Command, Power-User Path: Install Everything Up Front (+3 more)
 
-### Community 562 - "Community 562"
+### Community 561 - "Community 561"
 Cohesion: 0.17
 Nodes (11): code:typescript (interface ContextBudget {), Context Budget Manager, ⚠️ DECOUPLING FROM MYN (CRITICAL), DO NOT rely on MYN infrastructure:, If tests pass, commit, Migration checklist (from MYN):, Panopticon: Multi-Agent Orchestration for Claude Code, Panopticon MUST be self-contained: (+3 more)
 
-### Community 563 - "Community 563"
+### Community 562 - "Community 562"
 Cohesion: 0.17
 Nodes (12): Agent Integration, Canonical PRD Sections, CLI Commands, code:block143 ({project}/), code:block144 (┌───────────────────────────────────────────────────────────), code:bash (# Initialize/regenerate canonical PRD), Feature PRDs Live in Workspaces, Naming Convention (+4 more)
 
-### Community 564 - "Community 564"
+### Community 563 - "Community 563"
 Cohesion: 0.17
 Nodes (12): code:bash (# 1. Install Panopticon), code:bash (# Start the day), code:bash (# Create detailed plan before spawning agent), code:bash (# Update Panopticon itself), code:toml (# In projects.toml), code:bash (pan sync), Daily Development, Initial Setup (+4 more)
 
-### Community 565 - "Community 565"
+### Community 564 - "Community 564"
 Cohesion: 0.17
 Nodes (11): Agent Types Index, Important distinction: runtime agents vs routed work types, Primary agents, Related docs, Runtime agent inventory, Specialist agents, Support and routing-only types, The big picture (+3 more)
 
-### Community 566 - "Community 566"
+### Community 565 - "Community 565"
 Cohesion: 0.17
 Nodes (12): code:bash (pan workspace create MIN-667 --remote    # Create on exe.dev), code:toml (# ~/.panopticon/config.toml), code:block38 ($ pan workspace create MIN-667), code:block39 (┌───────────────────────────────────────────────────────────), code:block40 (┌─────────────────────┐), code:block41 (┌─────────────────────────────┐), code:block42 (┌────────────────────────────────────────────────────────┐), code:block43 (┌────────────────────────────────────────────────────────┐) (+4 more)
 
-### Community 567 - "Community 567"
+### Community 566 - "Community 566"
 Cohesion: 0.17
 Nodes (12): code:yaml (# Deprecated → Current), code:yaml (models:), code:yaml (models:), code:block24 (✓ Backed up config.yaml → config.yaml.bak), code:bash (cp ~/.panopticon/config.yaml.bak ~/.panopticon/config.yaml), Current Deprecations, Dashboard Behavior, Example Migration (+4 more)
 
+### Community 567 - "Community 567"
+Cohesion: 0.17
+Nodes (11): code:yaml (models:), code:yaml (models:), code:env (ANTHROPIC_API_KEY=sk-ant-...), code:yaml (models:), Configuration Guide, Getting Help, Provider Configuration, Provider Management (+3 more)
+
 ### Community 568 - "Community 568"
 Cohesion: 0.17
-Nodes (11): code:typescript (// In src/dashboard/server/routes/resources.ts), code:typescript (HttpRouter.post('/api/resources/docker/container/:id/start',), code:typescript (// In src/dashboard/server/services/resource-discovery.ts (o), code:typescript (// New field on the response), Container name parsing utility (new), Extend `ResourceDetailIdentifiers` response, `GET /api/resources/docker/container/:id/logs`, New API endpoints (+3 more)
+Nodes (11): C.1 Update `isReviewPipelineStuck` in `src/dashboard/frontend/src/lib/pipeline-state.ts`, C.2 Add recovery indicator helpers to `KanbanBoard.tsx`, C.4 Add recovery badge in the card header, C.5 Update `phaseLabel` to show recovery state, C.6 Style compliance, C. Frontend: Kanban Card Recovery Indicators, code:typescript (export function isReviewPipelineStuck(status?: PipelineState), code:typescript (export function isReviewPipelineStuck(status?: PipelineState) (+3 more)
 
 ### Community 569 - "Community 569"
 Cohesion: 0.17
@@ -3379,55 +3386,55 @@ Nodes (12): Branch node layout, code:block2 (├── MIN-846  [$12.40]  In Rev
 
 ### Community 570 - "Community 570"
 Cohesion: 0.17
-Nodes (12): 1. Status billboard, 2. Reviewer summary (when in review), 3. Test summary (when test has run), 4. PR summary (when PR exists), 5. Cost breakdown sparkline, 6. Recent activity feed (combined across all sessions), 7. Quick links, code:block17 (┌───────────────────────────────────────────────────────────) (+4 more)
+Nodes (11): code:typescript (// In src/dashboard/server/routes/resources.ts), code:typescript (HttpRouter.post('/api/resources/docker/container/:id/start',), code:typescript (// In src/dashboard/server/services/resource-discovery.ts (o), code:typescript (// New field on the response), Container name parsing utility (new), Extend `ResourceDetailIdentifiers` response, `GET /api/resources/docker/container/:id/logs`, New API endpoints (+3 more)
 
 ### Community 571 - "Community 571"
 Cohesion: 0.17
-Nodes (11): Architecture Notes, code:typescript (const confirmed = await confirm({), code:typescript (catch (labelErr) {), Decisions, Implementation Plan, Out of Scope, PAN-445: Planning Abort button uses native JS confirm() instead of styled dialog, Problem (+3 more)
+Nodes (12): 1. Status billboard, 2. Reviewer summary (when in review), 3. Test summary (when test has run), 4. PR summary (when PR exists), 5. Cost breakdown sparkline, 6. Recent activity feed (combined across all sessions), 7. Quick links, code:block17 (┌───────────────────────────────────────────────────────────) (+4 more)
 
 ### Community 572 - "Community 572"
 Cohesion: 0.17
-Nodes (11): Architecture, Backend Changes, code:block1 (Backend /api/agents → includes planning-* agents with agentP), Data Flow, Decisions, Edge Cases, Files to Modify, Frontend Changes (+3 more)
+Nodes (11): Architecture Notes, code:typescript (const confirmed = await confirm({), code:typescript (catch (labelErr) {), Decisions, Implementation Plan, Out of Scope, PAN-445: Planning Abort button uses native JS confirm() instead of styled dialog, Problem (+3 more)
 
 ### Community 573 - "Community 573"
 Cohesion: 0.17
-Nodes (11): code:json ({ "HEAD": "abc1234", "branch": "feature/PAN-333" }), Decision: Implement the missing function, Difficulty: simple, Files to modify, Implementation approach, No changes needed, PAN-342: getWorkspaceCommitHashes is not a function, Problem (+3 more)
+Nodes (11): Architecture, Backend Changes, code:block1 (Backend /api/agents → includes planning-* agents with agentP), Data Flow, Decisions, Edge Cases, Files to Modify, Frontend Changes (+3 more)
 
 ### Community 574 - "Community 574"
 Cohesion: 0.17
-Nodes (11): Affected Files, code:typescript (const inInput = ['INPUT', 'TEXTAREA'].includes(target.tagNam), code:typescript (const inInput = target.tagName === 'INPUT' || target.tagName), Complexity, Out of Scope, Part 1: Fix global search hotkey (App.tsx), Part 2: Add slash command menu (ComposerPromptEditor.tsx), Problem (+3 more)
+Nodes (11): code:json ({ "HEAD": "abc1234", "branch": "feature/PAN-333" }), Decision: Implement the missing function, Difficulty: simple, Files to modify, Implementation approach, No changes needed, PAN-342: getWorkspaceCommitHashes is not a function, Problem (+3 more)
 
 ### Community 575 - "Community 575"
 Cohesion: 0.17
-Nodes (11): 1. Eliminate Extended Token Layer, 2. Replace `text-white` with Semantic Foreground Tokens, 3. Rename Mission Control → Command Deck, 4. Delete Isolated Codex Theme, 5. Upgrade DialogProvider, 6. Align `index.css` with T3Code Formulas, Acceptance Criteria, Objective (+3 more)
+Nodes (11): Affected Files, code:typescript (const inInput = ['INPUT', 'TEXTAREA'].includes(target.tagNam), code:typescript (const inInput = target.tagName === 'INPUT' || target.tagName), Complexity, Out of Scope, Part 1: Fix global search hotkey (App.tsx), Part 2: Add slash command menu (ComposerPromptEditor.tsx), Problem (+3 more)
 
 ### Community 576 - "Community 576"
 Cohesion: 0.17
-Nodes (11): Approach, Backend status: already done, Difficulty, Edit state, Empty/whitespace, Files touched, Out of scope, PAN-596: Allow editing a conversation title (+3 more)
+Nodes (11): 1. Eliminate Extended Token Layer, 2. Replace `text-white` with Semantic Foreground Tokens, 3. Rename Mission Control → Command Deck, 4. Delete Isolated Codex Theme, 5. Upgrade DialogProvider, 6. Align `index.css` with T3Code Formulas, Acceptance Criteria, Objective (+3 more)
 
 ### Community 577 - "Community 577"
 Cohesion: 0.17
-Nodes (11): Current architecture (observed), Decision summary, Difficulty, Files to change, Goal, Out of scope (explicit), PAN-509 — Inspector: Phase-Aware Terminal, Phase → session mapping (+3 more)
+Nodes (11): Approach, Backend status: already done, Difficulty, Edit state, Empty/whitespace, Files touched, Out of scope, PAN-596: Allow editing a conversation title (+3 more)
 
 ### Community 578 - "Community 578"
 Cohesion: 0.17
-Nodes (11): Approach, Decisions, Files to Modify, Layer 1: Frontend (toast + better messaging), Layer 2: Backend — complete-planning, Layer 3: Backend — POST /api/agents, Layer 4: beads.ts — robust initialization, Out of Scope (+3 more)
+Nodes (11): Current architecture (observed), Decision summary, Difficulty, Files to change, Goal, Out of scope (explicit), PAN-509 — Inspector: Phase-Aware Terminal, Phase → session mapping (+3 more)
 
 ### Community 579 - "Community 579"
 Cohesion: 0.17
-Nodes (11): After Reopening, code:bash (pan reopen PAN-123), code:bash (curl -X POST http://localhost:3011/api/issues/PAN-123/reopen), Do NOT Use `pan done` Until Re-Work Is Complete, How to Reopen, Reopen Issue for Re-Work, Via CLI (recommended for agents/supervisors), Via Dashboard API (+3 more)
+Nodes (11): Approach, Decisions, Files to Modify, Layer 1: Frontend (toast + better messaging), Layer 2: Backend — complete-planning, Layer 3: Backend — POST /api/agents, Layer 4: beads.ts — robust initialization, Out of Scope (+3 more)
 
 ### Community 580 - "Community 580"
 Cohesion: 0.17
-Nodes (12): code:block10 (feature-1: "Add OAuth login"), code:block11 (perf-1: "Investigate Redis caching"), code:bash (bd dep add issue-1 issue-2 --type related), code:block13 (api-redesign related to:), code:block14 (security-audit related to:), code:block9 (refactor-1: "Extract validation logic"), Common Patterns, Creating related Dependencies (+4 more)
+Nodes (11): After Reopening, code:bash (pan reopen PAN-123), code:bash (curl -X POST http://localhost:3011/api/issues/PAN-123/reopen), Do NOT Use `pan done` Until Re-Work Is Complete, How to Reopen, Reopen Issue for Re-Work, Via CLI (recommended for agents/supervisors), Via Dashboard API (+3 more)
 
 ### Community 581 - "Community 581"
 Cohesion: 0.17
-Nodes (11): Basic Usage, code:block1 (Invoke first: pipeline-status), code:bash (# Check all running agents (shorthand for work status)), Lead with the pipeline-status table, More Information, Next Steps, Overview, Panopticon Status Overview (+3 more)
+Nodes (12): code:block10 (feature-1: "Add OAuth login"), code:block11 (perf-1: "Investigate Redis caching"), code:bash (bd dep add issue-1 issue-2 --type related), code:block13 (api-redesign related to:), code:block14 (security-audit related to:), code:block9 (refactor-1: "Extract validation logic"), Common Patterns, Creating related Dependencies (+4 more)
 
 ### Community 582 - "Community 582"
 Cohesion: 0.17
-Nodes (12): Agent shows as crashed, code:bash (# Check tmux sessions directly), code:bash (# Check agent logs), code:bash (# Check Docker containers directly), code:bash (nvm install 18), code:bash (sudo systemctl start docker  # Linux), code:bash (pan up), code:bash (# Check API key in config) (+4 more)
+Nodes (11): Basic Usage, code:block1 (Invoke first: pipeline-status), code:bash (# Check all running agents (shorthand for work status)), Lead with the pipeline-status table, More Information, Next Steps, Overview, Panopticon Status Overview (+3 more)
 
 ### Community 583 - "Community 583"
 Cohesion: 0.17
@@ -3443,35 +3450,35 @@ Nodes (6): configFixture, __dirname, issueFixture, mockGitHubResponses, mockLine
 
 ### Community 586 - "Community 586"
 Cohesion: 0.18
-Nodes (10): columns, db, divergedRows, id, indexes, indexNames, names, pushRows (+2 more)
-
-### Community 587 - "Community 587"
-Cohesion: 0.18
 Nodes (10): agentDir, mockDispatchParallelReview, mockGetAgentRuntimeState, mockGetAgentState, mockGetTmuxSessionName, mockLoadReviewStatuses, mockResolveProjectFromIssue, mockSessionExists (+2 more)
 
-### Community 588 - "Community 588"
+### Community 587 - "Community 587"
 Cohesion: 0.25
 Nodes (9): create_skill(), init_skill(), main(), Validate skill name follows conventions., Convert skill-name to Skill Name., Create a new skill directory structure., Initialize a new skill directory structure., to_title() (+1 more)
 
-### Community 589 - "Community 589"
+### Community 588 - "Community 588"
 Cohesion: 0.18
 Nodes (10): desktopDir, __dirname, pkg, pkgPath, publicDest, publicSrc, repoRoot, serverDest (+2 more)
 
+### Community 589 - "Community 589"
+Cohesion: 0.29
+Nodes (10): callServerApi(), AgentStatus, buildContextMenu(), buildTooltip(), createTray(), createTrayIcon(), destroyTray(), HealthResponse (+2 more)
+
 ### Community 590 - "Community 590"
 Cohesion: 0.18
-Nodes (7): ACTIVE_STATUS_PATTERNS, agentDir, isEligibleForCleanup(), LAZY_PATTERNS, lazySamples, oldTime, stateFile
+Nodes (9): calls, ctx, mockClientCreateIssueLabel, mockClientIssueLabels, mockClientIssues, { mockExecAsync, mockGetLinearApiKey }, mockIssueLabels, mockIssueUpdate (+1 more)
 
-### Community 591 - "Community 591"
-Cohesion: 0.22
-Nodes (8): EditorLaunch, execAsync, getFileManagerCommand(), isCommandAvailable(), PanOpen, PanOpenLive, PanOpenShape, resolveEditorLaunch()
+### Community 592 - "Community 592"
+Cohesion: 0.18
+Nodes (10): columns, db, divergedRows, id, indexes, indexNames, names, pushRows (+2 more)
 
 ### Community 593 - "Community 593"
-Cohesion: 0.24
-Nodes (10): handlePermissionRequestNotification(), normalizePermissionRequest(), parsePermissionRequestNotification(), CHANNEL_PERMISSION_LIMITS, normalizeChannelPermissionRequestFields(), NormalizedChannelPermissionRequestFields, normalizePermissionInputPreview(), utf8ByteLength() (+2 more)
+Cohesion: 0.2
+Nodes (10): client, input, input1, input2, makeClient(), mockConversation, patchCalls, pendingResponses (+2 more)
 
 ### Community 594 - "Community 594"
-Cohesion: 0.18
-Nodes (9): calls, ctx, mockClientCreateIssueLabel, mockClientIssueLabels, mockClientIssues, { mockExecAsync, mockGetLinearApiKey }, mockIssueLabels, mockIssueUpdate (+1 more)
+Cohesion: 0.22
+Nodes (7): BadgeBarProps, fetchPlanning(), PlanningData, MarkdownModal(), MarkdownModalProps, TranscriptUpload(), TranscriptUploadProps
 
 ### Community 595 - "Community 595"
 Cohesion: 0.18
@@ -3495,15 +3502,15 @@ Nodes (11): 1. Tool Response Materialization, 2. Chat History as Queryable Files
 
 ### Community 600 - "Community 600"
 Cohesion: 0.18
-Nodes (11): code:typescript (interface Runtime {), code:toml (# ~/.panopticon/runtimes/claude.toml), code:toml (# ~/.panopticon/runtimes/codex.toml), code:bash (# Default: use project runtime), code:typescript (interface RuntimeMetrics {), Part 6: Multi-Runtime Architecture, Per-Agent Runtime Selection, Runtime Abstraction Layer (+3 more)
+Nodes (11): code:json ({), code:bash (# Cost for a specific issue), code:bash (bd show MIN-123), Cost Calculation, Data Sources, Implementation Notes, Part 15: Per-Feature Cost Tracking, Related Tools (+3 more)
 
 ### Community 601 - "Community 601"
 Cohesion: 0.18
-Nodes (11): Adopting GSD Patterns for Panopticon, code:markdown (# Workspace Context: MIN-648), code:markdown (# Agent State: MIN-648), code:markdown (# Work Summary: Research Phase), code:block43 (┌───────────────────────────────────────────────────────────), Context File Lifecycle, Part 5: Context Engineering from GSD-Plus, PROJECT.md → Workspace Context (+3 more)
+Nodes (11): code:typescript (interface Runtime {), code:toml (# ~/.panopticon/runtimes/claude.toml), code:toml (# ~/.panopticon/runtimes/codex.toml), code:bash (# Default: use project runtime), code:typescript (interface RuntimeMetrics {), Part 6: Multi-Runtime Architecture, Per-Agent Runtime Selection, Runtime Abstraction Layer (+3 more)
 
 ### Community 602 - "Community 602"
 Cohesion: 0.18
-Nodes (11): code:json ({), code:bash (# Cost for a specific issue), code:bash (bd show MIN-123), Cost Calculation, Data Sources, Implementation Notes, Part 15: Per-Feature Cost Tracking, Related Tools (+3 more)
+Nodes (11): Adopting GSD Patterns for Panopticon, code:markdown (# Workspace Context: MIN-648), code:markdown (# Agent State: MIN-648), code:markdown (# Work Summary: Research Phase), code:block43 (┌───────────────────────────────────────────────────────────), Context File Lifecycle, Part 5: Context Engineering from GSD-Plus, PROJECT.md → Workspace Context (+3 more)
 
 ### Community 603 - "Community 603"
 Cohesion: 0.18
@@ -3519,11 +3526,11 @@ Nodes (10): Acceptance criteria, Architecture Overview, code:block1 (┌──�
 
 ### Community 606 - "Community 606"
 Cohesion: 0.18
-Nodes (10): Acceptance criteria, code:css (.resourcesGroup {), CSS additions, Goal, Non-goals, PAN-965: Command Deck — Hierarchical Resource Tree Under Issues, Relationship to existing work, Status (+2 more)
+Nodes (10): 1. `InlineSparkline.tsx`, 2. `ContainerNode.tsx`, 3. `ResourcesGroup.tsx`, 4. `FeatureItem.tsx` modifications, 5. Container stats polling in `CommandDeck/index.tsx`, code:typescript (interface InlineSparklineProps {), code:typescript (interface ContainerNodeProps {), code:typescript (interface ResourcesGroupProps {) (+2 more)
 
 ### Community 607 - "Community 607"
 Cohesion: 0.18
-Nodes (10): 1. `InlineSparkline.tsx`, 2. `ContainerNode.tsx`, 3. `ResourcesGroup.tsx`, 4. `FeatureItem.tsx` modifications, 5. Container stats polling in `CommandDeck/index.tsx`, code:typescript (interface InlineSparklineProps {), code:typescript (interface ContainerNodeProps {), code:typescript (interface ResourcesGroupProps {) (+2 more)
+Nodes (10): Acceptance criteria, code:css (.resourcesGroup {), CSS additions, Goal, Non-goals, PAN-965: Command Deck — Hierarchical Resource Tree Under Issues, Relationship to existing work, Status (+2 more)
 
 ### Community 608 - "Community 608"
 Cohesion: 0.18
@@ -3583,11 +3590,11 @@ Nodes (10): CLI Quick Reference, code:bash (bd mol distill bd-o5xe --as "Release
 
 ### Community 622 - "Community 622"
 Cohesion: 0.18
-Nodes (10): code:block30 (Does Issue A prevent Issue B from starting?), code:block40 (Issue: feature-10), Contents, Decision Guide, Decision Tree, Dependency Types Guide, Overview, Quick Reference by Situation (+2 more)
+Nodes (11): code:block31 (docs-1: "Update documentation"), code:block32 (epic-1: "OAuth integration"), code:block33 (Everything blocks everything else in strict sequential order), code:bash (bd dep add api-endpoint database-schema), code:bash (bd dep add database-schema api-endpoint), Common Mistakes, Mistake 1: Using blocks for Preferences, Mistake 2: Using discovered-from for Planning (+3 more)
 
 ### Community 623 - "Community 623"
 Cohesion: 0.18
-Nodes (11): code:block31 (docs-1: "Update documentation"), code:block32 (epic-1: "OAuth integration"), code:block33 (Everything blocks everything else in strict sequential order), code:bash (bd dep add api-endpoint database-schema), code:bash (bd dep add database-schema api-endpoint), Common Mistakes, Mistake 1: Using blocks for Preferences, Mistake 2: Using discovered-from for Planning (+3 more)
+Nodes (10): code:block30 (Does Issue A prevent Issue B from starting?), code:block40 (Issue: feature-10), Contents, Decision Guide, Decision Tree, Dependency Types Guide, Overview, Quick Reference by Situation (+2 more)
 
 ### Community 624 - "Community 624"
 Cohesion: 0.18
@@ -3622,372 +3629,372 @@ Cohesion: 0.18
 Nodes (10): Claude Code Channels — Manual Smoke Test (PAN-985), code:block1 ([agent-pan-XXX] channels:eligible), code:block2 ({"ts":"2026-05-07T...","agentId":"agent-pan-XXX","contentLen), code:block3 ({"ts":"2026-...","agentId":"agent-pan-XXX","path":"channel",), code:block4 ({"ts":"2026-...","agentId":"agent-pan-XXX","path":"tmux","re), Expected log signatures, Failure modes & where to look, Prerequisites (+2 more)
 
 ### Community 632 - "Community 632"
-Cohesion: 0.2
-Nodes (8): build, copyPrompts, dashboardDir, distDir, preservedDashboardDir, preservedRoot, projectRoot, promptsDir
-
-### Community 633 - "Community 633"
-Cohesion: 0.33
-Nodes (9): AgentStatus, buildContextMenu(), buildTooltip(), createTray(), createTrayIcon(), destroyTray(), HealthResponse, refreshTrayStatus() (+1 more)
-
-### Community 634 - "Community 634"
-Cohesion: 0.44
-Nodes (9): compactCommand(), CompactOptions, detectPlatform(), doctorCommand(), execAsync, getOldClosedCount(), isBdAvailable(), statsCommand() (+1 more)
-
-### Community 635 - "Community 635"
-Cohesion: 0.24
-Nodes (8): readCavemanVariant(), buildSpecialistCavemanExports(), buildCavemanExports(), baseConfig, mockReadVariant, baseConfig, config, mockReadVariant
-
-### Community 636 - "Community 636"
 Cohesion: 0.31
 Nodes (9): atomicWrite(), backupIfNeeded(), detectProviderEnvConflicts(), findNewestBackup(), injectProviderEnvOverlay(), OverlayResult, PROVIDER_ENV_KEYS, ProviderEnvConflict (+1 more)
 
+### Community 633 - "Community 633"
+Cohesion: 0.2
+Nodes (8): build, copyPrompts, dashboardDir, distDir, preservedDashboardDir, preservedRoot, projectRoot, promptsDir
+
+### Community 634 - "Community 634"
+Cohesion: 0.29
+Nodes (7): calls, { mockExecAsync }, opts, compactBeads(), CompactBeadsOptions, execAsync, { mockExecAsync }
+
+### Community 635 - "Community 635"
+Cohesion: 0.22
+Nodes (7): changedFiles, errOutput, fetchMock, output, DASHBOARD_URL, syncMainCommand(), SyncMainResponse
+
+### Community 636 - "Community 636"
+Cohesion: 0.22
+Nodes (7): exec(), execMock, execResponses, kCustom, mockIsRunning, mockResolve, result
+
 ### Community 637 - "Community 637"
+Cohesion: 0.22
+Nodes (8): HealthCheck, systemHealthCommand(), mockExistsSync, mockFetch, mockGetDashboardApiUrl, mockIsCliproxyRunning, mockIsSmeeProcessRunning, output
+
+### Community 638 - "Community 638"
 Cohesion: 0.2
 Nodes (9): createdIssue, mockAssignee, mockClient, mockComment, mockIssue, mockLabels, mockState, stateTests (+1 more)
 
-### Community 638 - "Community 638"
-Cohesion: 0.22
-Nodes (9): buildPermissionActivityDetails(), buildPermissionWaitingMessage(), parsePermissionResponseBehavior(), permissionResolutionVerb(), processPermissionResponse(), ProcessPermissionResponseDeps, ProcessPermissionResponseResult, redactPermissionInputPreview() (+1 more)
-
 ### Community 639 - "Community 639"
-Cohesion: 0.24
-Nodes (8): CostBreakdownData, CostBreakdownModal(), CostBreakdownModalProps, formatCost(), formatTokens(), ModelBreakdown, STAGE_CONFIG, StageBreakdown
+Cohesion: 0.29
+Nodes (8): BeadEntry, execFileAsync, queryBeadById(), queryBeadsForIssue(), readBeadsFromJsonl(), bead, beads, plan
 
 ### Community 640 - "Community 640"
 Cohesion: 0.27
-Nodes (8): formatCost(), formatTimestamp(), MergedSummaryCard(), MergedSummaryCardProps, button, costText, link, onViewLastLog
+Nodes (9): handlePermissionRequestNotification(), normalizePermissionRequest(), parsePermissionRequestNotification(), CHANNEL_PERMISSION_LIMITS, normalizeChannelPermissionRequestFields(), NormalizedChannelPermissionRequestFields, normalizePermissionInputPreview(), utf8ByteLength() (+1 more)
 
 ### Community 641 - "Community 641"
 Cohesion: 0.2
 Nodes (8): merge, mergeAgent, pollSpecialistStatus(), review, reviewAgent, SpecialistStatus, test, testAgent
 
 ### Community 642 - "Community 642"
+Cohesion: 0.27
+Nodes (8): formatCost(), formatTimestamp(), MergedSummaryCard(), MergedSummaryCardProps, button, costText, link, onViewLastLog
+
+### Community 643 - "Community 643"
 Cohesion: 0.2
 Nodes (9): ArcProps, GroupProps, HTMLMotionProps, MotionComponent, PanopticonBridge, PanopticonBridgeDesktopSettings, Transition, Variants (+1 more)
 
-### Community 643 - "Community 643"
-Cohesion: 0.38
-Nodes (8): cleanupAgentDirectories(), CleanupResult, findOrphanedAgentDirs(), getPlanningIssueId(), isLegacyConversationDirectory(), isValidAgentDirectoryName(), OrphanedAgentDir, names
-
 ### Community 644 - "Community 644"
-Cohesion: 0.29
-Nodes (8): BeadEntry, execFileAsync, queryBeadById(), queryBeadsForIssue(), readBeadsFromJsonl(), bead, beads, plan
-
-### Community 645 - "Community 645"
 Cohesion: 0.2
 Nodes (10): 1. TypeScript typecheck, 2. Lint, 3. Tests, 4. No ephemeral files staged, code:bash (npm run typecheck    # npx tsc --noEmit), code:bash (npm run lint), code:bash (npm test), code:typescript (// vitest.config.ts) (+2 more)
 
-### Community 646 - "Community 646"
+### Community 645 - "Community 645"
 Cohesion: 0.2
 Nodes (10): code:bash (npx @panctl/cli), code:bash (npm install -g @panctl/cli && pan install && pan up), code:bash (npm install -g @panctl/cli), code:bash (pan install), code:bash (pan sync), code:bash (cd /path/to/your-project), code:bash (pan up), Installation (+2 more)
 
-### Community 647 - "Community 647"
+### Community 646 - "Community 646"
 Cohesion: 0.2
 Nodes (10): Caveats, code:json ({), code:yaml (claude:), code:bash (pan up                     # uses config (default: auto)), code:bash (pan --yolo=false up        # before subcommand), Permission Mode, Precedence, Prereq for `auto` mode (+2 more)
 
-### Community 648 - "Community 648"
+### Community 647 - "Community 647"
 Cohesion: 0.2
 Nodes (10): code:yaml (fpp_violation:), code:typescript (interface FPPViolation {), FPP (Fixed Point Principle) Violation Detection, Implementation Phases, Phase 1: Core Watchdog (MVP), Phase 2: Agent Management UI, Phase 3: Active Heartbeats & Hooks, Phase 4: Model Routing & Handoffs (+2 more)
 
-### Community 649 - "Community 649"
+### Community 648 - "Community 648"
 Cohesion: 0.2
 Nodes (10): Agent state — new `waiting-on-human` state, code:yaml (---), code:yaml (---), code:yaml (flywheel:), Dashboard schema — new kanban badge + Awaiting Merge sub-tab, Data model changes, `docs/FLYWHEEL-REPORT.md` (new), `docs/flywheel/retros/<issue-id>-<timestamp>.md` (new) (+2 more)
 
-### Community 650 - "Community 650"
+### Community 649 - "Community 649"
 Cohesion: 0.2
 Nodes (10): code:bash (pan conversations enrich), code:bash (pan conversations enrich --deep), code:bash (pan conversations enrich --with claude-opus-4-6 <session-id>), code:block15 (Session abc123 — 847 messages, ~125K tokens), L1 — Quick enrich (cheap, batch), L2 — Deep enrich (mid-tier model), L3 — Custom enrich (user-selected model), Re-enrichment rules (+2 more)
 
-### Community 651 - "Community 651"
+### Community 650 - "Community 650"
 Cohesion: 0.2
 Nodes (7): code:sql (CREATE VIEW archived_conversations_v AS), Data Model, Existing — `conversations` table, New — `discovered_sessions` table, New — FTS5 mirror, New — vector embeddings (optional), Unified view — `archived_conversations_v`
 
-### Community 652 - "Community 652"
+### Community 651 - "Community 651"
 Cohesion: 0.2
 Nodes (10): Architecture, Backend extraction, code:block1 (┌──────────────────────────┐         ┌──────────────────────), code:block2 (src/lib/setup/), code:typescript (// src/dashboard/frontend/src/stores/wizardStore.ts), Dashboard surfaces, High-level shape, Setup Agent as a first-class agent (+2 more)
 
-### Community 653 - "Community 653"
+### Community 652 - "Community 652"
 Cohesion: 0.2
 Nodes (9): Files to Create, Files to Modify, Goals, Non-goals, Open Questions, Problem, Project Setup Wizard — Dashboard UI, Risks (+1 more)
 
-### Community 654 - "Community 654"
+### Community 653 - "Community 653"
 Cohesion: 0.2
 Nodes (10): code:typescript (export interface ReviewStatusSnapshot {), code:typescript (describe('isInfrastructureFailure', () => {), D.1 Add new fields to `ReviewStatusSnapshot`, D. `packages/contracts/src/types.ts`, Detailed Changes, E.1 Unit test: `isInfrastructureFailure`, E.2 Unit test: circuit breaker in `checkOrphanedReviewStatuses`, E.3 Unit test: `checkStuckReviewing` with dead parallel sessions (+2 more)
 
-### Community 655 - "Community 655"
+### Community 654 - "Community 654"
 Cohesion: 0.2
 Nodes (9): 1. Do NOT rewrite `src/lib/*` modules, 2. Do NOT modify `server.ts` from route modules, 3. Preserve exact API contracts, 4. Socket.io → EventStore mapping, 5. Background processes become Effect fibers, 6. Effect service pattern for existing modules, code:typescript (// services/agent-manager.ts), code:typescript (// CORRECT — wrap existing async code in Effect) (+1 more)
 
-### Community 656 - "Community 656"
+### Community 655 - "Community 655"
 Cohesion: 0.2
 Nodes (9): Architecture, code:typescript ({), Data Flow, Decisions, Files to Modify, Key Implementation Details, PAN-426: Tasks Panel and DAG — AC Subtask Toggle, Scope (+1 more)
 
-### Community 657 - "Community 657"
+### Community 656 - "Community 656"
 Cohesion: 0.2
 Nodes (9): Approach, Architecture, code:block1 (DetailPanelLayout), Decision Record, Files Modified, Key Decisions, PAN-406: Workspace detail — replace polling logs with live interactive terminal, Problem (+1 more)
 
-### Community 658 - "Community 658"
+### Community 657 - "Community 657"
 Cohesion: 0.2
 Nodes (9): Architecture, Decisions, Edge Cases, Files to Modify, Flow After Fix, Out of Scope, PAN-208: Stale planning state causes premature 'Planning Complete' on restart, Problem (+1 more)
 
-### Community 659 - "Community 659"
+### Community 658 - "Community 658"
 Cohesion: 0.2
 Nodes (9): 1. Deep Link URL Format, 2. Deep Link Navigation Behavior, 3. Copy Button Feedback, Affected Files, Context, Decisions, Implementation Plan, Out of Scope (+1 more)
 
-### Community 660 - "Community 660"
+### Community 659 - "Community 659"
 Cohesion: 0.2
 Nodes (9): Context, Decision: Add unit tests for createBeadsFromVBrief, Difficulty, Files affected, PAN-507: beads db not initialized on fresh install, Status: Planning Complete, Test approach, What NOT to test (+1 more)
 
-### Community 661 - "Community 661"
+### Community 660 - "Community 660"
 Cohesion: 0.2
 Nodes (10): Boolean flags, code:mustache (Issue: {{ISSUE_ID}}), code:mustache ({{#USER_MESSAGE}}), code:mustache ({{^DO_PUSH}}), code:typescript (renderPrompt({), Inverted sections, Mustache syntax reference, No partials, no lambdas, no custom helpers (+2 more)
 
-### Community 662 - "Community 662"
+### Community 661 - "Community 661"
 Cohesion: 0.2
 Nodes (9): Codebase Explorer, Deliverables, Exploration Strategies, For Architecture Understanding, For New Codebases, For Specific Questions, Performance Tips, Remember (+1 more)
 
-### Community 663 - "Community 663"
+### Community 662 - "Community 662"
 Cohesion: 0.2
 Nodes (9): code:bash (tmux -L panopticon list-sessions), code:block2 ({{WORKSPACE_PATH}}), code:bash (# 1. Run tests), Completion Requirements (CRITICAL), CRITICAL: Workspace Isolation, Investigation First — NEVER Fix Inline, NEVER Defer Work (CRITICAL), tmux Socket — CRITICAL (+1 more)
 
-### Community 664 - "Community 664"
+### Community 663 - "Community 663"
 Cohesion: 0.2
 Nodes (9): AI Writing Patterns to Avoid, Bottom Line, Clear Writing, Composition Rules, Limited Context Strategy, Overview, Reference Files, Rules (+1 more)
 
-### Community 665 - "Community 665"
+### Community 664 - "Community 664"
 Cohesion: 0.2
 Nodes (10): code:bash (# In directory: /Users/name/Google Drive/...), code:bash (# Wrong location (cloud sync)), code:bash (mv ~/Google\ Drive/project ~/Repos/project), code:bash (bd init myproject), code:bash (bd import < issues-backup.jsonl), code:bash (# Don't initialize bd in cloud-synced directory), Database Errors on Cloud Storage, Resolution (+2 more)
 
-### Community 666 - "Community 666"
+### Community 665 - "Community 665"
 Cohesion: 0.2
 Nodes (10): code:bash (bd mol wisp mol-patrol                       # From proto), code:bash (bd mol wisp list                     # List all wisps), code:bash (bd mol squash wisp-abc123                              # Aut), code:bash (bd mol burn wisp-abc123                    # Delete wisp, no), code:bash (bd mol wisp gc                       # Clean up orphaned wis), Creating Wisps, Ending Wisps, Garbage Collection (+2 more)
 
-### Community 667 - "Community 667"
+### Community 666 - "Community 666"
 Cohesion: 0.2
 Nodes (9): 1. Verify Implementation, 2. Self-Review Your Changes, 3. Commit Your Work (BLOCKING - DO THIS FIRST), 4. Signal Completion, 5. Wait for User Response, code:bash (git diff origin/main...HEAD), code:bash (# Check for uncommitted changes), code:block3 (✅ WORK COMPLETE - Ready for Review) (+1 more)
 
-### Community 668 - "Community 668"
+### Community 667 - "Community 667"
 Cohesion: 0.2
 Nodes (10): Approve and Merge, Check Pending Work, code:bash (# Start dashboard and services), code:bash (# See completed work awaiting review), code:bash (# Approve work, merge MR, update tracker), Quick Start Workflow, Review in Dashboard, Step 1: Prerequisites Check (+2 more)
 
-### Community 669 - "Community 669"
+### Community 668 - "Community 668"
 Cohesion: 0.2
 Nodes (10): Agent Status, code:bash (pan status), code:block4 (Running Agents (3):), code:bash (pan workspace list), code:block6 (Workspaces (5):), code:bash (pan doctor), code:block8 (Panopticon System Health), System Health (+2 more)
 
-### Community 670 - "Community 670"
+### Community 669 - "Community 669"
 Cohesion: 0.2
 Nodes (9): Basic Usage, code:bash (# Start planning session for an issue), Dashboard Planning Interface, More Information, Overview, Panopticon Planning Workflow, Related Skills, What is AI Planning? (+1 more)
 
-### Community 671 - "Community 671"
+### Community 670 - "Community 670"
 Cohesion: 0.2
 Nodes (9): code:bash (cd /home/eltmon/Projects/panopticon-cli && npm run build), code:bash (pan up), code:bash (curl -s http://localhost:3011/api/health | head -1), code:bash (cd /home/eltmon/Projects/panopticon-cli && npm run build && ), Important Notes, Pan Reload, Quick One-Liner, Steps (+1 more)
 
-### Community 672 - "Community 672"
+### Community 671 - "Community 671"
 Cohesion: 0.2
 Nodes (10): code:bash (# Check Panopticon status), code:bash (# Check for agents), code:bash (pan down), code:block5 (✓ Stopping API server (PID 12345)), code:bash (# Check nothing is listening on ports), Step 1: Check What's Running, Step 2: Save Any Pending Work, Step 3: Stop Services (+2 more)
 
-### Community 673 - "Community 673"
-Cohesion: 0.36
-Nodes (8): getAllSpecialistStatus(), SpecialistStatus, displaySpecialist(), getRelativeTime(), getStatusColor(), getStatusIcon(), listCommand(), ListOptions
-
-### Community 674 - "Community 674"
-Cohesion: 0.31
-Nodes (6): resolveServerEntry(), randomHex(), resolvePort(), spawnServer(), startServer(), stopServer()
-
-### Community 675 - "Community 675"
+### Community 672 - "Community 672"
 Cohesion: 0.36
 Nodes (7): consolidateSpeakerCues(), decodeHtmlEntities(), formatTimestamp(), ParsedCue, parseTimestamp(), result, vttToMarkdown()
 
-### Community 676 - "Community 676"
-Cohesion: 0.28
-Nodes (7): formatDuration(), fiveMinAgo, now, recent, threeDaysAgo, twoHoursAgo, timeAgo()
-
-### Community 677 - "Community 677"
-Cohesion: 0.22
-Nodes (7): HealthCheck, mockExistsSync, mockFetch, mockGetDashboardApiUrl, mockIsCliproxyRunning, mockIsSmeeProcessRunning, output
-
-### Community 678 - "Community 678"
+### Community 673 - "Community 673"
 Cohesion: 0.22
 Nodes (7): colNames, cols, db, disabledRow, enabledRow, [row], rows
 
-### Community 679 - "Community 679"
+### Community 674 - "Community 674"
+Cohesion: 0.28
+Nodes (7): formatDuration(), fiveMinAgo, now, recent, threeDaysAgo, twoHoursAgo, timeAgo()
+
+### Community 675 - "Community 675"
 Cohesion: 0.22
 Nodes (8): error, mockComment, mockComments, mockIssue, mockIssues, mockOctokit, stateTests, tracker
 
-### Community 680 - "Community 680"
+### Community 676 - "Community 676"
 Cohesion: 0.28
 Nodes (6): BYTE_UNITS, hist, parseBytes(), parseMemUsage(), parseNetIO(), result
 
-### Community 681 - "Community 681"
+### Community 677 - "Community 677"
 Cohesion: 0.22
 Nodes (8): MOCK_HEALTH_RESPONSE, MOCK_PROJECT_SPECIALISTS_RESPONSE, MOCK_SPECIALISTS_RESPONSE, panBadge, perProjectHeader, sectionHeader, sessionCard, statusBar
 
-### Community 682 - "Community 682"
-Cohesion: 0.22
-Nodes (9): code:bash (# Activate Node 22 (always required)), code:bash (cp .env.example ~/.panopticon.env), code:bash (cd /path/to/panopticon-cli), code:bash (pan status          # Should show "Panopticon is running" or), Development Setup, Environment, Initialize beads (once per project), Prerequisites (+1 more)
-
-### Community 683 - "Community 683"
+### Community 678 - "Community 678"
 Cohesion: 0.22
 Nodes (9): After making changes, Building and Running, code:bash (npm run build           # Compiles TypeScript to dist/ via t), code:bash (npm run dev             # Dashboard with hot reload (Vite fr), code:bash (# ALWAYS use the explicit Node 22 path), code:bash (npm run build && npm link   # Rebuild + re-link `pan` global), Development mode, Full build (+1 more)
 
-### Community 684 - "Community 684"
+### Community 679 - "Community 679"
 Cohesion: 0.22
 Nodes (8): code:markdown (## Summary), code:block5 (panopticon-cli/), Contributing to Panopticon CLI, Filing Bugs, Issue Tracking, Key Invariants, Repository Layout, Table of Contents
 
-### Community 685 - "Community 685"
+### Community 680 - "Community 680"
+Cohesion: 0.22
+Nodes (9): code:bash (# Activate Node 22 (always required)), code:bash (cp .env.example ~/.panopticon.env), code:bash (cd /path/to/panopticon-cli), code:bash (pan status          # Should show "Panopticon is running" or), Development Setup, Environment, Initialize beads (once per project), Prerequisites (+1 more)
+
+### Community 681 - "Community 681"
 Cohesion: 0.22
 Nodes (8): [0.7.0] — Command Taxonomy Reorganization, Breaking Changes, Changed, Changelog, Changes, Deprecations Removed, New Commands, Unreleased
 
-### Community 686 - "Community 686"
+### Community 682 - "Community 682"
 Cohesion: 0.22
 Nodes (9): 1. Reviewer canonical sessions (PAN-830) — persistent across rounds, 2. Other specialist dispatches (test-agent, merge-agent, etc.) — fresh per dispatch, code:block14 (specialist-<projectKey>-<issueId>-review-<role>), code:block15 (IMPORTANT: This is a NEW task dispatch. You may have context), code:bash (# Reset via CLI — clears session state and context digest), Context Digest (cross-dispatch memory), Event-driven status (PAN-915), Resetting a Specialist (+1 more)
 
-### Community 687 - "Community 687"
+### Community 683 - "Community 683"
 Cohesion: 0.22
 Nodes (8): Current State (2026), Decision Log, Guiding Principle, Panopticon Product Vision, Phase 1 — Shared Instance, Phase 2 — Multi-Tenant SaaS, Vision Roadmap, Why local-first?
 
-### Community 688 - "Community 688"
+### Community 684 - "Community 684"
 Cohesion: 0.22
 Nodes (9): code:bash (# Register a project), code:json ([), code:bash (LINEAR_API_KEY=lin_api_xxxxx), Configuration, Environment File, Issue Trackers, Map Linear Projects to Local Directories, Rally Features and Derived Status (+1 more)
 
-### Community 689 - "Community 689"
+### Community 685 - "Community 685"
 Cohesion: 0.22
 Nodes (9): code:block3 (┌───────────────────────────────────────────────────────────), code:block4 (┌───────────────────────────────────────────────────────────), code:block5 (~/.panopticon/), code:bash (# CLI equivalent of /work-issue MIN-648), Panopticon Ships Batteries-Included, The Mayor Architecture: Dual-Interface Design, The Mayor Concept (from Gastown), What `pan sync` Syncs (+1 more)
 
-### Community 690 - "Community 690"
+### Community 686 - "Community 686"
 Cohesion: 0.22
 Nodes (8): Automatic Recovery, code:block50 (┌───────────────────────────────────────────────────────────), code:typescript (interface AgentHealth {), code:typescript (async function handleStuckAgent(agentId: string) {), Health Check Flow, Panopticon Health Dashboard, Part 7: Stuck Detection and Health Monitoring, The Deacon Pattern
 
-### Community 691 - "Community 691"
+### Community 687 - "Community 687"
+Cohesion: 0.22
+Nodes (8): 10. Tracked Issues, 11. Implementation Scope, 4. Enterprise / Managed Policy, 5. Path Portability (Completed), 7. Rules: Planned Content, 9. Decisions Log, References, Skill Distribution Architecture: Analysis & Findings
+
+### Community 688 - "Community 688"
 Cohesion: 0.22
 Nodes (9): 2.1 Workspace Creation Flow, code:bash (exe ssh min-667 "cd /workspace && docker compose up -d fe ap), code:bash (# exe.dev's HTTPS proxy handles this automatically), code:yaml (# ~/.panopticon/workspaces/min-667.yaml), code:bash (pan workspace create MIN-667 --remote), code:bash (exe vm create min-667), code:bash (exe ssh min-667 "git clone git@github.com:org/repo.git /work), code:bash (exe ssh min-667 "cat > /workspace/.env << 'EOF') (+1 more)
 
-### Community 692 - "Community 692"
+### Community 689 - "Community 689"
 Cohesion: 0.22
 Nodes (9): code:typescript (describe('isInfrastructureFailure', () => {), F.1 Unit test: `isInfrastructureFailure`, F.2 Unit test: circuit breaker in `checkOrphanedReviewStatuses`, F.3 Unit test: `checkStuckReviewing` with dead parallel sessions, F.4 Unit test: `isProcessActive` etime parsing, F.5 Frontend test: recovery and infra-stuck badges, F.6 Unit test: breaker honors recovery window boundary, F.7 Unit test: unstick route resets recovery window (+1 more)
 
-### Community 693 - "Community 693"
-Cohesion: 0.22
-Nodes (9): Problem 1: Dead/stuck parallel review sessions are invisible to deacon, Problem 2: No circuit breaker for infrastructure-failure cycling, Problem 3: Verification passed but review blocks the pipeline forever, Problem 4: Incomplete parallel reviews waste completed findings, Problem 5: `stuck` flag is never checked in re-dispatch path, Problem 6: No cycle boundary for the circuit breaker, Problem 7: No UI indication that recovery is happening, Problem 8: Multiple actors can manipulate the same review tmux sessions (+1 more)
-
-### Community 694 - "Community 694"
-Cohesion: 0.22
-Nodes (8): Acceptance Criteria, Backend: Deacon stuck detection, Background, Files Modified, Frontend: Recovery UI indicators, PRD: Stuck Parallel Review Detection, Recovery, and UI Indicators (PAN-794), Risks and Mitigations, Solution Overview
-
-### Community 695 - "Community 695"
+### Community 690 - "Community 690"
 Cohesion: 0.22
 Nodes (9): C.1 Add migration in `schema.ts`, C.2 Update `upsertReviewStatus` in `review-status-db.ts`, C.3 Update `rowToReviewStatus` in `review-status-db.ts`, C. Database schema changes (`src/lib/database/schema.ts` + `src/lib/database/review-status-db.ts`), code:typescript (// v24 → v25: add review_retry_count and recovery_started_at), code:typescript (export const ReviewStatusSnapshot = Schema.Struct({), D.1 Add new fields to `ReviewStatusSnapshot`, D. `packages/contracts/src/types.ts` (+1 more)
 
-### Community 696 - "Community 696"
-Cohesion: 0.22
-Nodes (9): code:block4 (┌───────────────────────────────────────────────────────────), code:block5 (┌──────────────────────────────────────────────────────────┐), First-run welcome, Project detail page (`/projects/:projectKey`), Project list page (`/projects`), Setup Agent in the agent list, Steps, UX Specification (+1 more)
-
-### Community 697 - "Community 697"
-Cohesion: 0.22
-Nodes (9): US-1 — First project (zero state), US-2 — Second project (existing user), US-3 — Watch the Setup Agent work, US-4 — Review generated docs, US-5 — Edit an existing project's config, US-6 — Re-run setup after adding repos, US-7 — Remove a project, US-8 — Dogfood through the dashboard (+1 more)
-
-### Community 698 - "Community 698"
+### Community 691 - "Community 691"
 Cohesion: 0.22
 Nodes (8): Acceptance Criteria, Backend: Deacon stuck detection, Background, Files Modified, Frontend: Recovery UI indicators, PRD: Stuck Parallel Review Detection, Recovery, and UI Indicators (PAN-794), Risks and Mitigations, Solution Overview
 
-### Community 699 - "Community 699"
+### Community 692 - "Community 692"
+Cohesion: 0.22
+Nodes (9): Problem 1: Dead/stuck parallel review sessions are invisible to deacon, Problem 2: No circuit breaker for infrastructure-failure cycling, Problem 3: Verification passed but review blocks the pipeline forever, Problem 4: Incomplete parallel reviews waste completed findings, Problem 5: `stuck` flag is never checked in re-dispatch path, Problem 6: No cycle boundary for the circuit breaker, Problem 7: No UI indication that recovery is happening, Problem 8: Multiple actors can manipulate the same review tmux sessions (+1 more)
+
+### Community 693 - "Community 693"
+Cohesion: 0.22
+Nodes (9): code:block4 (┌───────────────────────────────────────────────────────────), code:block5 (┌──────────────────────────────────────────────────────────┐), First-run welcome, Project detail page (`/projects/:projectKey`), Project list page (`/projects`), Setup Agent in the agent list, Steps, UX Specification (+1 more)
+
+### Community 694 - "Community 694"
+Cohesion: 0.22
+Nodes (9): US-1 — First project (zero state), US-2 — Second project (existing user), US-3 — Watch the Setup Agent work, US-4 — Review generated docs, US-5 — Edit an existing project's config, US-6 — Re-run setup after adding repos, US-7 — Remove a project, US-8 — Dogfood through the dashboard (+1 more)
+
+### Community 695 - "Community 695"
+Cohesion: 0.22
+Nodes (8): Acceptance Criteria, Backend: Deacon stuck detection, Background, Files Modified, Frontend: Recovery UI indicators, PRD: Stuck Parallel Review Detection, Recovery, and UI Indicators (PAN-794), Risks and Mitigations, Solution Overview
+
+### Community 696 - "Community 696"
 Cohesion: 0.22
 Nodes (9): Agent Events, Cost / Bead Events, Domain Events Catalog, Issue Events, Pipeline Events, Planning Events, Resource Events, Specialist Events (+1 more)
 
-### Community 700 - "Community 700"
+### Community 697 - "Community 697"
 Cohesion: 0.22
 Nodes (9): Build System: esbuild → tsdown + Vite, code:typescript (// Auto-detect runtime for HTTP server), code:typescript (// T3Code pattern: apps/server/src/terminal/Layers/BunPTY.ts), Effect Version: `4.0.0-beta.43` (pinned), Package Manager: npm → Bun, PTY: Dual-Runtime Terminal, Runtime: Dual-Mode (Bun + Node), SQLite: Dual-Runtime (+1 more)
 
-### Community 701 - "Community 701"
+### Community 698 - "Community 698"
 Cohesion: 0.22
 Nodes (9): Implementation plan, Phase 0 — Reading, Phase 1 — Reviewer canonical naming + resumption (server-side), Phase 2 — Three-zone Command Deck shell (frontend), Phase 3 — Liveness building blocks, Phase 4 — Issue-selected mode, Phase 5 — Action surface parity (additive only), Phase 6 — Tree node redesign + dividers (+1 more)
 
-### Community 702 - "Community 702"
+### Community 699 - "Community 699"
 Cohesion: 0.22
 Nodes (9): Acceptance criteria, Action parity, Density, Issue-selected mode, JSONL resolution, Liveness, Reviewer canonical naming + resumption, Three-zone Command Deck (+1 more)
 
-### Community 703 - "Community 703"
+### Community 700 - "Community 700"
 Cohesion: 0.22
 Nodes (8): Critical Discovery: PAN-759 Root Cause, Documents, Files to Modify, Guiding Principle, Open Questions / Research Needed, PAN-798: Eliminate All tmux capture-pane Usage, Problem Statement, Success Criteria
 
-### Community 704 - "Community 704"
+### Community 701 - "Community 701"
 Cohesion: 0.22
 Nodes (8): Current Status, Decisions, PAN-408: Wire vBRIEF Acceptance Criteria into Specialist Pipeline, Part 1: Wire AC into Specialist Pipeline, Part 2: Documentation Alignment, Remaining Work, Specialist Feedback, What Was Done
 
-### Community 705 - "Community 705"
+### Community 702 - "Community 702"
 Cohesion: 0.22
 Nodes (8): Not In Scope Here, PAN-632 Implementation Plan, Principles, Slice 1: Foundation, Slice 2: Review Artifact Creation, Slice 3: Readiness and Verification, Slice 4: Merge Orchestration, Slice 5: Recovery and Validation
 
-### Community 706 - "Community 706"
+### Community 703 - "Community 703"
 Cohesion: 0.22
 Nodes (8): Acceptance summary, Approach (chosen), Changes, Files touched, Out of scope, PAN-699 — Conversation view renders tool calls out of terminal order, Problem, Testing
 
-### Community 707 - "Community 707"
+### Community 704 - "Community 704"
 Cohesion: 0.22
 Nodes (8): Approach, code:block1 (vitest --run --no-file-parallelism && cd src/dashboard/front), code:block2 (vitest --run --no-file-parallelism), Convention, Decision, PAN-645: Tests: root Vitest config does not discover ActionsSection.test.tsx, Problem, Scope
 
-### Community 708 - "Community 708"
+### Community 705 - "Community 705"
 Cohesion: 0.22
 Nodes (8): Acceptance Criteria, Approach, Difficulty, Goal, Out of Scope, PAN-655: PRD Pipeline Test Marker, Risks, Scope
 
-### Community 709 - "Community 709"
+### Community 706 - "Community 706"
 Cohesion: 0.22
 Nodes (8): Approach, Decision, Difficulty, Files Modified, PAN-494: pan start fails if workspace doesn't exist, Problem, Root Cause, Scope
 
-### Community 710 - "Community 710"
+### Community 707 - "Community 707"
 Cohesion: 0.22
 Nodes (9): Cache invalidation, code:typescript (import { renderPrompt } from './prompts.js';), code:typescript (export function renderPrompt(options: RenderPromptOptions): ), code:block3 (Prompt "work" (.../prompts/work.md) requires variables that ), Error handling, Prompts directory resolution, Signature, The `renderPrompt` API (+1 more)
 
-### Community 711 - "Community 711"
+### Community 708 - "Community 708"
 Cohesion: 0.22
 Nodes (9): 1. Start Broad, Then Narrow, 2. Follow the Imports, 3. Read Tests to Understand Usage, 4. Look for README and Docs, 5. Use Multiple Techniques, Best Practices, code:typescript (Read file_path="src/index.ts"  // See what it imports), code:bash (Glob pattern="**/*.test.ts") (+1 more)
 
-### Community 712 - "Community 712"
+### Community 709 - "Community 709"
 Cohesion: 0.22
 Nodes (9): code:bash (Grep pattern="try.*catch|\.catch\(" output_mode="content" -A), code:bash (Grep pattern="process\.env\." output_mode="content" -A 0), code:bash (Grep pattern="@Entity|CREATE TABLE" output_mode="files_with_), code:bash (Glob pattern="**/*.test.ts"), Common Questions, "How are tests structured?", "How is error handling done?", "What database tables exist?" (+1 more)
 
-### Community 713 - "Community 713"
+### Community 710 - "Community 710"
 Cohesion: 0.22
 Nodes (8): Blocking Issues, code:bash (bd list               # See all tasks), code:bash (bd dep tree <id>        # See what's blocking this issue), code:bash (# Close multiple beads atomically), code:bash (bd create --title "Implement feature X" --parent <parent-id>), code:bash (# Make issue-A blocked by issue-B (A cannot start until B is), Creating Sub-Tasks, Task Tracking (Beads)
 
-### Community 714 - "Community 714"
+### Community 711 - "Community 711"
 Cohesion: 0.22
 Nodes (8): Algorithm Complexity, Blocking Operations (CRITICAL for Node.js), code:typescript (// Replace execSync with async version), Concurrency, Database/API Patterns, Memory & Resources, Output Format, Performance Review
 
-### Community 715 - "Community 715"
+### Community 712 - "Community 712"
 Cohesion: 0.22
 Nodes (9): Agent Logs, Capture Full Session, code:bash (# Watch agent in real-time (Ctrl+b d to detach)), code:bash (# Capture entire scrollback buffer), code:bash (# Search for errors), code:bash (# Capture all agents), Live Output, Multiple Agents (+1 more)
 
-### Community 716 - "Community 716"
-Cohesion: 0.22
-Nodes (9): code:markdown (## Database Conventions), code:markdown (## Build Commands), code:markdown (## Architecture: CQRS Pattern), code:markdown (## Testing Philosophy), Example 1: Database Schema, Example 2: Build System, Example 3: Architecture Pattern, Example 4: Testing Approach (+1 more)
-
-### Community 717 - "Community 717"
+### Community 713 - "Community 713"
 Cohesion: 0.22
 Nodes (8): code:bash (rm -rf .claude/skills/knowledge-capture/), code:yaml (---), File Locations, For New/Legacy Codebases, Integration with Other Skills, Knowledge Capture, Override Skill Format, User Commands (Escalating Silence)
 
-### Community 718 - "Community 718"
+### Community 714 - "Community 714"
+Cohesion: 0.22
+Nodes (9): code:markdown (## Database Conventions), code:markdown (## Build Commands), code:markdown (## Architecture: CQRS Pattern), code:markdown (## Testing Philosophy), Example 1: Database Schema, Example 2: Build System, Example 3: Architecture Pattern, Example 4: Testing Approach (+1 more)
+
+### Community 715 - "Community 715"
 Cohesion: 0.22
 Nodes (8): code:bash (pan unarchive-conversation <query>), code:bash (pan unarchive-conversation "Models, Models, Models"), Notes, See Also, unarchive-conversation, Usage, What It Does, When to Use
 
-### Community 719 - "Community 719"
+### Community 716 - "Community 716"
 Cohesion: 0.22
 Nodes (9): code:bash (# Don't use --no-daemon for CRUD operations), code:bash (bd --no-daemon update issue-1 --status in_progress), code:bash (bd --no-daemon update issue-1 --status in_progress), code:bash (bd --no-daemon update issue-1 --status in_progress), Resolution, Root Cause, Status Updates Not Visible, Symptom (+1 more)
 
-### Community 720 - "Community 720"
+### Community 717 - "Community 717"
 Cohesion: 0.22
 Nodes (9): code:bash (# Create proto), code:bash (# Patrol proto exists), code:bash (bd mol spawn mol-deploy --attach mol-rollback --attach-type ), code:bash (# After completing a good workflow organically), Common Patterns, Pattern: Capture Tribal Knowledge, Pattern: Ephemeral Patrol Cycle, Pattern: Feature with Rollback (+1 more)
 
-### Community 721 - "Community 721"
+### Community 718 - "Community 718"
 Cohesion: 0.22
 Nodes (9): Basic Spawn (Creates Wisp by Default), code:bash (bd mol spawn mol-patrol                    # Creates wisp (e), code:bash (bd mol pour mol-feature                    # Shortcut for sp), code:bash (bd mol run mol-release --var version=2.0), code:bash (bd mol spawn mol-feature --attach mol-testing --var name=aut), code:bash (bd mol spawn mol-deploy --attach mol-rollback --attach-type ), Spawn with Attachments, Spawn with Immediate Execution (+1 more)
 
-### Community 722 - "Community 722"
+### Community 719 - "Community 719"
 Cohesion: 0.22
 Nodes (9): Advanced Patterns, code:block36 (setup), code:block37 (core-feature (ready immediately)), code:block38 (research-main), code:block39 (auth-epic), Pattern: Diamond Dependencies, Pattern: Discovery Cascade, Pattern: Epic with Phases (+1 more)
 
-### Community 723 - "Community 723"
+### Community 720 - "Community 720"
 Cohesion: 0.22
 Nodes (8): Agent Beads, Bead Types, CLI Reference, code:block1 (idle → spawning → running/working → done → idle), Monitoring Integration, Slot Architecture, State Machine, When to Use Agent Beads
+
+### Community 721 - "Community 721"
+Cohesion: 0.22
+Nodes (9): Close/Reopen Issues, code:bash (# Basic creation), code:bash (# Update one or more issues), code:bash (# Complete work (supports multiple IDs)), code:bash (# Show dependency tree), Create Issues, Issue Management, Update Issues (+1 more)
+
+### Community 722 - "Community 722"
+Cohesion: 0.22
+Nodes (9): code:bash (# Import issues from JSONL), code:bash (# Migrate databases after version upgrade), code:bash (# List all running daemons), code:bash (# Manual sync (force immediate export/import/commit/push)), Daemon Management, Database Management, Import/Export, Migration (+1 more)
+
+### Community 723 - "Community 723"
+Cohesion: 0.22
+Nodes (9): code:bash (# Explicitly enable sandbox mode), code:bash (# Skip staleness check (emergency escape hatch)), code:bash (# Force metadata update even when DB appears synced), code:bash (# JSON output for programmatic use), Force Import, Global Flags, Other Global Flags, Sandbox Mode (+1 more)
 
 ### Community 724 - "Community 724"
 Cohesion: 0.22
@@ -3995,111 +4002,111 @@ Nodes (9): Batch Operations, Claim and Complete Work, code:bash (# 1. Find avail
 
 ### Community 725 - "Community 725"
 Cohesion: 0.22
-Nodes (9): code:bash (# Import issues from JSONL), code:bash (# Migrate databases after version upgrade), code:bash (# List all running daemons), code:bash (# Manual sync (force immediate export/import/commit/push)), Daemon Management, Database Management, Import/Export, Migration (+1 more)
+Nodes (9): Advanced Operations, Cleanup, code:bash (# Clean up closed issues (bulk deletion)), code:bash (# Find and merge duplicate issues), code:bash (# Agent-driven compaction), code:bash (# Rename issue prefix (e.g., from 'knowledge-work-' to 'kw-'), Compaction (Memory Decay), Duplicate Detection & Merging (+1 more)
 
 ### Community 726 - "Community 726"
 Cohesion: 0.22
-Nodes (9): Advanced Operations, Cleanup, code:bash (# Clean up closed issues (bulk deletion)), code:bash (# Find and merge duplicate issues), code:bash (# Agent-driven compaction), code:bash (# Rename issue prefix (e.g., from 'knowledge-work-' to 'kw-'), Compaction (Memory Decay), Duplicate Detection & Merging (+1 more)
+Nodes (9): code:block26 (1. Create research issue with question to answer), code:block27 (1. Create bug issue), code:block28 (1. Create issues for each refactoring step), code:block29 (1. Create spike issue: "Investigate caching options"), Common Workflow Patterns, Pattern: Bug Investigation, Pattern: Refactoring with Dependencies, Pattern: Spike Investigation (+1 more)
 
 ### Community 727 - "Community 727"
 Cohesion: 0.22
-Nodes (9): Close/Reopen Issues, code:bash (# Basic creation), code:bash (# Update one or more issues), code:bash (# Complete work (supports multiple IDs)), code:bash (# Show dependency tree), Create Issues, Issue Management, Update Issues (+1 more)
+Nodes (9): Checklist Templates, code:block30 (- [ ] Check for .beads/ directory), code:block31 (- [ ] Notice new work needed), code:block32 (- [ ] Implementation done), code:block33 (- [ ] Create epic for overall goal), Completing Work, Creating Issues During Work, Planning Complex Features (+1 more)
 
 ### Community 728 - "Community 728"
 Cohesion: 0.22
-Nodes (9): code:bash (# Explicitly enable sandbox mode), code:bash (# Skip staleness check (emergency escape hatch)), code:bash (# Force metadata update even when DB appears synced), code:bash (# JSON output for programmatic use), Force Import, Global Flags, Other Global Flags, Sandbox Mode (+1 more)
+Nodes (9): code:bash (# See issues from your tracker), code:bash (# Replace PAN-3 with your issue ID), code:bash (# Check agent status), code:bash (# Send message to agent), Create Workspace and Spawn Agent, Interact with Agent, List Available Issues, Monitor Agent Progress (+1 more)
 
 ### Community 729 - "Community 729"
 Cohesion: 0.22
-Nodes (9): Checklist Templates, code:block30 (- [ ] Check for .beads/ directory), code:block31 (- [ ] Notice new work needed), code:block32 (- [ ] Implementation done), code:block33 (- [ ] Create epic for overall goal), Completing Work, Creating Issues During Work, Planning Complex Features (+1 more)
+Nodes (9): Agent session not starting, code:bash (# Start Docker daemon), code:bash (# Find what's using the port), code:bash (# Verify API key is set), code:bash (# Check tmux is installed), Common First-Time Issues, Docker not running, Issue tracker not configured (+1 more)
 
 ### Community 730 - "Community 730"
 Cohesion: 0.22
-Nodes (9): code:block26 (1. Create research issue with question to answer), code:block27 (1. Create bug issue), code:block28 (1. Create issues for each refactoring step), code:block29 (1. Create spike issue: "Investigate caching options"), Common Workflow Patterns, Pattern: Bug Investigation, Pattern: Refactoring with Dependencies, Pattern: Spike Investigation (+1 more)
+Nodes (8): code:bash (npx add-skill google-labs-code/stitch-skills --skill react:c), code:text (Convert my Landing Page screen in my Podcast Stitch Project ), code:text (skills/react-components/), Example Prompt, How it Works, Install, Skill Structure, Stitch to React Components Skill
 
 ### Community 731 - "Community 731"
 Cohesion: 0.22
-Nodes (9): Agent session not starting, code:bash (# Start Docker daemon), code:bash (# Find what's using the port), code:bash (# Verify API key is set), code:bash (# Check tmux is installed), Common First-Time Issues, Docker not running, Issue tracker not configured (+1 more)
+Nodes (9): code:bash (# Check port availability), code:bash (# Check API is running), code:bash (# Restart the API server), code:bash (# Check server logs), "CORS error" in browser, Dashboard Issues, Dashboard shows stale data, Dashboard won't start (+1 more)
 
 ### Community 732 - "Community 732"
 Cohesion: 0.22
-Nodes (9): code:bash (# See issues from your tracker), code:bash (# Replace PAN-3 with your issue ID), code:bash (# Check agent status), code:bash (# Send message to agent), Create Workspace and Spawn Agent, Interact with Agent, List Available Issues, Monitor Agent Progress (+1 more)
+Nodes (9): code:bash (# Check config file exists), code:bash (# Test the key), code:bash (# Test the token), code:bash (# Fix permissions (should be readable only by owner)), Config file permissions, Configuration Issues, "GitHub token invalid", "Invalid Linear API key" (+1 more)
 
 ### Community 733 - "Community 733"
 Cohesion: 0.22
-Nodes (8): code:bash (npx add-skill google-labs-code/stitch-skills --skill react:c), code:text (Convert my Landing Page screen in my Podcast Stitch Project ), code:text (skills/react-components/), Example Prompt, How it Works, Install, Skill Structure, Stitch to React Components Skill
+Nodes (9): Agent crashed, Agent is stuck, Agent Issues, Agent won't start, code:bash (# Check if session exists), code:bash (# List all), code:bash (# Check tmux is available), code:bash (# Check what it's doing) (+1 more)
 
 ### Community 734 - "Community 734"
 Cohesion: 0.22
-Nodes (9): code:bash (# Check port availability), code:bash (# Check API is running), code:bash (# Restart the API server), code:bash (# Check server logs), "CORS error" in browser, Dashboard Issues, Dashboard shows stale data, Dashboard won't start (+1 more)
+Nodes (8): code:bash (npx add-skill google-labs-code/stitch-skills --skill design-), code:text (Analyze my Furniture Collection project's Home screen and ge), code:text (design-md/), Example Prompt, How it Works, Install, Skill Structure, Stitch Design System Documentation Skill
 
 ### Community 735 - "Community 735"
 Cohesion: 0.22
-Nodes (9): Agent crashed, Agent is stuck, Agent Issues, Agent won't start, code:bash (# Check if session exists), code:bash (# List all), code:bash (# Check tmux is available), code:bash (# Check what it's doing) (+1 more)
+Nodes (8): code:bash (cd /home/eltmon/projects/panopticon/src/dashboard/frontend &), code:bash (pkill -f "node.*dashboard" 2>/dev/null || true), code:bash (cd /home/eltmon/projects/panopticon/src/dashboard && npm run), code:bash (sleep 6), Notes, Pan Dashboard Restart, Steps, Triggers
 
 ### Community 736 - "Community 736"
 Cohesion: 0.22
-Nodes (9): code:bash (# Check config file exists), code:bash (# Test the key), code:bash (# Test the token), code:bash (# Fix permissions (should be readable only by owner)), Config file permissions, Configuration Issues, "GitHub token invalid", "Invalid Linear API key" (+1 more)
-
-### Community 737 - "Community 737"
-Cohesion: 0.22
-Nodes (8): code:bash (npx add-skill google-labs-code/stitch-skills --skill design-), code:text (Analyze my Furniture Collection project's Home screen and ge), code:text (design-md/), Example Prompt, How it Works, Install, Skill Structure, Stitch Design System Documentation Skill
-
-### Community 738 - "Community 738"
-Cohesion: 0.22
-Nodes (8): code:bash (cd /home/eltmon/projects/panopticon/src/dashboard/frontend &), code:bash (pkill -f "node.*dashboard" 2>/dev/null || true), code:bash (cd /home/eltmon/projects/panopticon/src/dashboard && npm run), code:bash (sleep 6), Notes, Pan Dashboard Restart, Steps, Triggers
-
-### Community 739 - "Community 739"
-Cohesion: 0.22
 Nodes (9): code:bash (RALLY_API_KEY=_xxxxx), code:yaml (# ~/.panopticon/projects.yaml), code:yaml (issue_prefixes: [F, US, DE, TA, TC]), code:yaml (projects:), Configuration, Rally ID Formats, Rally Integration, Setup (+1 more)
 
-### Community 740 - "Community 740"
-Cohesion: 0.25
-Nodes (5): devroot, mockGetDevrootPath, result, skillsDir, userSkillDir
-
-### Community 741 - "Community 741"
-Cohesion: 0.25
-Nodes (7): capturedArgs, capturedCmds, closedBeads, mockExecFileFn, mockExecFn, mockGetVBriefACStatus, mockSyncBeadStatusToVBrief
-
-### Community 742 - "Community 742"
-Cohesion: 0.32
-Nodes (7): bin(), main(), repoRoot, run(), source, target, venvDir
-
-### Community 743 - "Community 743"
-Cohesion: 0.36
-Nodes (8): buildContextMenu(), buildTooltip(), createTray(), createTrayIcon(), getDesktopSettings(), refreshTrayStatus(), resolveResourcePath(), sendNotification()
-
-### Community 744 - "Community 744"
-Cohesion: 0.25
-Nodes (8): deepClone(), enableAutoStart(), handleAutoStartNag(), loadDesktopSettings(), saveDesktopSettings(), settingsPath(), showFirstLaunchDialog(), updateDesktopSetting()
-
-### Community 745 - "Community 745"
+### Community 737 - "Community 737"
 Cohesion: 0.36
 Nodes (6): ClaudeAuthStatus, getClaudeAuthStatus(), parseOAuthPayload(), readKeychainCredentials(), raw, result
 
-### Community 746 - "Community 746"
+### Community 738 - "Community 738"
+Cohesion: 0.25
+Nodes (5): devroot, mockGetDevrootPath, result, skillsDir, userSkillDir
+
+### Community 739 - "Community 739"
+Cohesion: 0.25
+Nodes (7): capturedArgs, capturedCmds, closedBeads, mockExecFileFn, mockExecFn, mockGetVBriefACStatus, mockSyncBeadStatusToVBrief
+
+### Community 740 - "Community 740"
+Cohesion: 0.32
+Nodes (7): bin(), main(), repoRoot, run(), source, target, venvDir
+
+### Community 741 - "Community 741"
+Cohesion: 0.36
+Nodes (8): buildContextMenu(), buildTooltip(), createTray(), createTrayIcon(), getDesktopSettings(), refreshTrayStatus(), resolveResourcePath(), sendNotification()
+
+### Community 742 - "Community 742"
+Cohesion: 0.25
+Nodes (8): deepClone(), enableAutoStart(), handleAutoStartNag(), loadDesktopSettings(), saveDesktopSettings(), settingsPath(), showFirstLaunchDialog(), updateDesktopSetting()
+
+### Community 743 - "Community 743"
+Cohesion: 0.25
+Nodes (6): execSyncMock, first, parsed, result, second, settingsPath
+
+### Community 744 - "Community 744"
 Cohesion: 0.25
 Nodes (4): clientMock, octokitMock, result, states
 
-### Community 747 - "Community 747"
-Cohesion: 0.25
-Nodes (7): RallyApiConfig, RallyCreateConfig, RallyCreateResult, RallyQueryConfig, RallyQueryResult, RallyUpdateConfig, RallyUpdateResult
-
-### Community 748 - "Community 748"
+### Community 745 - "Community 745"
 Cohesion: 0.25
 Nodes (3): PendingCompletion, _pendingCompletions, SpecialistCompletionResult
 
-### Community 749 - "Community 749"
+### Community 746 - "Community 746"
 Cohesion: 0.29
 Nodes (5): log(), LOG_FILE, server, shutdown(), SUPERVISOR_PORT
 
-### Community 750 - "Community 750"
+### Community 747 - "Community 747"
 Cohesion: 0.25
 Nodes (7): baseSettings, exp, method, section, sections, settingsBtn, toggle
 
-### Community 751 - "Community 751"
+### Community 748 - "Community 748"
+Cohesion: 0.29
+Nodes (6): ChannelPermissionDialog(), ChannelPermissionDialogProps, { container }, onAllow, onDeny, request
+
+### Community 749 - "Community 749"
 Cohesion: 0.32
 Nodes (6): format(), LiveCounter(), LiveCounterProps, { getByTestId }, { queryByTestId }, { rerender, getByTestId }
+
+### Community 750 - "Community 750"
+Cohesion: 0.25
+Nodes (7): RallyApiConfig, RallyCreateConfig, RallyCreateResult, RallyQueryConfig, RallyQueryResult, RallyUpdateConfig, RallyUpdateResult
+
+### Community 751 - "Community 751"
+Cohesion: 0.32
+Nodes (7): archiveCustomState(), CleanupOptions, cleanupStatesCommand(), LinearState, ListOptions, listStatesCommand(), listTeamStates()
 
 ### Community 752 - "Community 752"
 Cohesion: 0.25
@@ -4111,35 +4118,35 @@ Nodes (7): code:block24 (Worker Agent completes work), Getting Help, Panopticon 
 
 ### Community 754 - "Community 754"
 Cohesion: 0.25
-Nodes (8): CLI Distribution Strategy, code:bash (# First time - zero install), code:bash (# pan init adds to ~/.bashrc or ~/.zshrc:), code:bash (npm install -g panopticon), code:bash (brew install panopticon      # macOS), Future: Homebrew/apt (v2), Primary: npx + Auto-Aliasing, Secondary: Global npm Install
+Nodes (8): Appendix B: Comparisons (FAQ), Can Panopticon and Gastown work together?, Can Panopticon and Vibe Kanban work together?, code:block140 (┌─────────────┐     ┌─────────────┐     ┌─────────────┐), How does Panopticon compare to Gastown?, How does Panopticon compare to Vibe Kanban?, Should I use Panopticon, Gastown, or Vibe Kanban?, Why build Panopticon when these tools exist?
 
 ### Community 755 - "Community 755"
 Cohesion: 0.25
-Nodes (8): Appendix B: Comparisons (FAQ), Can Panopticon and Gastown work together?, Can Panopticon and Vibe Kanban work together?, code:block140 (┌─────────────┐     ┌─────────────┐     ┌─────────────┐), How does Panopticon compare to Gastown?, How does Panopticon compare to Vibe Kanban?, Should I use Panopticon, Gastown, or Vibe Kanban?, Why build Panopticon when these tools exist?
+Nodes (8): 2. Panopticon's Current Distribution (Broken), code:block5 (TIER 1: REPO SOURCE), code:typescript (if (!existsSync(destPath)) {), Current Inventory, Problem 1: Stale Copies, Problem 2: Known Symlink Bug, Problem 3: Wrong Priority Level, The Three-Tier Flow
 
 ### Community 756 - "Community 756"
 Cohesion: 0.25
-Nodes (8): 2. Panopticon's Current Distribution (Broken), code:block5 (TIER 1: REPO SOURCE), code:typescript (if (!existsSync(destPath)) {), Current Inventory, Problem 1: Stale Copies, Problem 2: Known Symlink Bug, Problem 3: Wrong Priority Level, The Three-Tier Flow
+Nodes (8): 3.1 Agent Spawning, 3.2 Agent Monitoring, 3.3 Agent Lifecycle Events, code:bash (pan agent start MIN-667 --remote), code:bash (# SSH to workspace VM and start agent in tmux), code:bash (# Get agent output), code:typescript (// Agent events forwarded to dashboard via SSH polling or We), Phase 3: Remote Agent Execution
 
 ### Community 757 - "Community 757"
 Cohesion: 0.25
-Nodes (8): 3.1 Agent Spawning, 3.2 Agent Monitoring, 3.3 Agent Lifecycle Events, code:bash (pan agent start MIN-667 --remote), code:bash (# SSH to workspace VM and start agent in tmux), code:bash (# Get agent output), code:typescript (// Agent events forwarded to dashboard via SSH polling or We), Phase 3: Remote Agent Execution
+Nodes (7): Agent Directory Structure, Cleanup, code:bash (# Preview orphaned directories), Legacy Directories, Specialists Do Not Use Agent Directories, Standard Directory Contents, Valid Directory Naming Patterns
 
 ### Community 758 - "Community 758"
 Cohesion: 0.25
-Nodes (7): Agent Directory Structure, Cleanup, code:bash (# Preview orphaned directories), Legacy Directories, Specialists Do Not Use Agent Directories, Standard Directory Contents, Valid Directory Naming Patterns
+Nodes (8): Agent Detail View, Agents Page Layout, Cloister Control Bar, code:block35 (┌───────────────────────────────────────────────────────────), code:block36 (┌───────────────────────────────────────────────────────────), code:block37 (┌───────────────────────────────────────────────────────────), code:block38 (┌───────────────────────────────────────────────────────────), Dashboard UI
 
 ### Community 759 - "Community 759"
 Cohesion: 0.25
-Nodes (8): Agent Detail View, Agents Page Layout, Cloister Control Bar, code:block35 (┌───────────────────────────────────────────────────────────), code:block36 (┌───────────────────────────────────────────────────────────), code:block37 (┌───────────────────────────────────────────────────────────), code:block38 (┌───────────────────────────────────────────────────────────), Dashboard UI
+Nodes (8): Risk 1: Retros produce too much noise (every issue triggers a "proposal"), Risk 2: Retro-agent cost escalates, Risk 3: The skill-change pipeline introduces new failure modes, Risk 4: Autonomous daemon runs during user's active work and causes unwanted side effects, Risk 5: Q&A detection false positives (agent gets marked `waiting-on-human` when it's actually stuck), Risk 6: Proposed skill changes by the retro-agent are low-quality or hallucinated, Risk 7: Existing skills break when we add the audience field, Risks and mitigations
 
 ### Community 760 - "Community 760"
 Cohesion: 0.25
-Nodes (8): Risk 1: Retros produce too much noise (every issue triggers a "proposal"), Risk 2: Retro-agent cost escalates, Risk 3: The skill-change pipeline introduces new failure modes, Risk 4: Autonomous daemon runs during user's active work and causes unwanted side effects, Risk 5: Q&A detection false positives (agent gets marked `waiting-on-human` when it's actually stuck), Risk 6: Proposed skill changes by the retro-agent are low-quality or hallucinated, Risk 7: Existing skills break when we add the audience field, Risks and mitigations
+Nodes (8): 9.1 Header, 9.2 Tabs, 9.3 Terminal Tab, 9.4 Info Tab, 9.5 Actions Footer, 9. Agent Detail Panel (Slide-out), code:block8 (agent-pan-505                                [X]), code:block9 (+---------------+---------------+)
 
 ### Community 761 - "Community 761"
 Cohesion: 0.25
-Nodes (8): 9.1 Header, 9.2 Tabs, 9.3 Terminal Tab, 9.4 Info Tab, 9.5 Actions Footer, 9. Agent Detail Panel (Slide-out), code:block8 (agent-pan-505                                [X]), code:block9 (+---------------+---------------+)
+Nodes (8): code:bash (pan conversations scan <dir> [<dir>...]   # Targeted directo), code:typescript (interface SystemCapabilities {), code:block8 (Scanning ~/.claude/projects/...), Discovery Subsystem, MUST NOT delete or modify JSONL files, Performance-adaptive parallelism (system scan), Scripted extraction (zero LLM), Three discovery modes
 
 ### Community 762 - "Community 762"
 Cohesion: 0.25
@@ -4151,27 +4158,27 @@ Nodes (8): code:block18 (┌─────────────────�
 
 ### Community 764 - "Community 764"
 Cohesion: 0.25
-Nodes (8): code:bash (pan conversations scan <dir> [<dir>...]   # Targeted directo), code:typescript (interface SystemCapabilities {), code:block8 (Scanning ~/.claude/projects/...), Discovery Subsystem, MUST NOT delete or modify JSONL files, Performance-adaptive parallelism (system scan), Scripted extraction (zero LLM), Three discovery modes
+Nodes (8): B.1 Add new fields to `ReviewStatus` interface, B.2 Increment `reviewRetryCount` on each deacon re-dispatch, B.3 Reset recovery window on clean completion and on new commits, B. `src/lib/review-status.ts`, code:typescript (const { dispatchParallelReview } = await import('./review-ag), code:typescript (.then(result => {), code:typescript (setReviewStatus(issueId, {), code:typescript (export interface ReviewStatus {)
 
 ### Community 765 - "Community 765"
 Cohesion: 0.25
-Nodes (8): B.1 Add new fields to `ReviewStatus` interface, B.2 Increment `reviewRetryCount` on each deacon re-dispatch, B.3 Reset recovery window on clean completion and on new commits, B. `src/lib/review-status.ts`, code:typescript (const { dispatchParallelReview } = await import('./review-ag), code:typescript (.then(result => {), code:typescript (setReviewStatus(issueId, {), code:typescript (export interface ReviewStatus {)
+Nodes (8): code:block4 (panopticon-cli/), code:block5 (panopticon-cli/), code:json ({), code:json ({), Current Layout, Monorepo Structure, Target Layout, Workspace Configuration
 
 ### Community 766 - "Community 766"
 Cohesion: 0.25
-Nodes (8): code:block4 (panopticon-cli/), code:block5 (panopticon-cli/), code:json ({), code:json ({), Current Layout, Monorepo Structure, Target Layout, Workspace Configuration
+Nodes (8): code:block16 (8 sessions · 1 alive · 7 ended · last activity 2m ago · idle), code:block21 (Select a session in the tree to send a message …), Composer behavior in issue-selected mode, Issue-selected mode, Selection rules, Why have this mode, Zone B in issue-selected mode, Zone C tab strip (NEW)
 
 ### Community 767 - "Community 767"
 Cohesion: 0.25
-Nodes (8): code:block16 (8 sessions · 1 alive · 7 ended · last activity 2m ago · idle), code:block21 (Select a session in the tree to send a message …), Composer behavior in issue-selected mode, Issue-selected mode, Selection rules, Why have this mode, Zone B in issue-selected mode, Zone C tab strip (NEW)
+Nodes (7): code:block1 ([IssueDataService] Rally poll error: Rally API query failed:), Dependencies, Follow-up Work, PAN-166: Rally WSAPI Query Parse Error Fix, Problem Statement, Risk Assessment, Success Criteria
 
 ### Community 768 - "Community 768"
 Cohesion: 0.25
-Nodes (7): code:block1 ([IssueDataService] Rally poll error: Rally API query failed:), Dependencies, Follow-up Work, PAN-166: Rally WSAPI Query Parse Error Fix, Problem Statement, Risk Assessment, Success Criteria
+Nodes (7): Acceptance Criteria, Decision, Out of Scope, PAN-448: Start Agent confirmation timeout too short, Problem, Scope, Status: Planning Complete
 
 ### Community 769 - "Community 769"
 Cohesion: 0.25
-Nodes (7): Acceptance Criteria, Decision, Out of Scope, PAN-448: Start Agent confirmation timeout too short, Problem, Scope, Status: Planning Complete
+Nodes (8): Can't reach workspace URLs, code:bash (ls ~/.panopticon/traefik/certs/), code:bash (cd ~/.panopticon/traefik/certs), code:bash (mkcert -install), code:bash (docker ps | grep traefik), code:bash (ping feature-min-123.localhost), HTTPS not working, Network Issues
 
 ### Community 770 - "Community 770"
 Cohesion: 0.25
@@ -4179,135 +4186,135 @@ Nodes (8): Additional Windows 10 Workarounds, code:ini ([wsl2]), code:powershell
 
 ### Community 771 - "Community 771"
 Cohesion: 0.25
-Nodes (8): Can't reach workspace URLs, code:bash (ls ~/.panopticon/traefik/certs/), code:bash (cd ~/.panopticon/traefik/certs), code:bash (mkcert -install), code:bash (docker ps | grep traefik), code:bash (ping feature-min-123.localhost), HTTPS not working, Network Issues
+Nodes (8): Bootstrap templates, Deleted (replaced by the loader), Legacy (ad-hoc) templates, Legacy templates, Planning agent templates, Specialist agent templates, Template catalogue, Work agent templates
 
 ### Community 772 - "Community 772"
 Cohesion: 0.25
-Nodes (8): Bootstrap templates, Deleted (replaced by the loader), Legacy (ad-hoc) templates, Legacy templates, Planning agent templates, Specialist agent templates, Template catalogue, Work agent templates
+Nodes (8): Architecture Map, code:markdown (# Codebase Architecture), code:block12, code:markdown (# Feature: User Authentication), code:markdown (# Dependencies), Dependency Report, Feature Location Report, Output Formats
 
 ### Community 773 - "Community 773"
 Cohesion: 0.25
-Nodes (8): Architecture Map, code:markdown (# Codebase Architecture), code:block12, code:markdown (# Feature: User Authentication), code:markdown (# Dependencies), Dependency Report, Feature Location Report, Output Formats
+Nodes (7): code:bash (# View agent output), Log Levels, Overview, Quick Commands, Related Skills, View Logs, When to Use
 
 ### Community 774 - "Community 774"
 Cohesion: 0.25
-Nodes (7): code:bash (# View agent output), Log Levels, Overview, Quick Commands, Related Skills, View Logs, When to Use
+Nodes (8): Available Categories, code:bash (# AI will add this section if it doesn't exist), code:bash (# Edit directly), code:bash (# Remove the AI Suggestion Preferences section), code:markdown (## AI Suggestion Preferences), Updating Preferences, User Preferences in ~/.claude/CLAUDE.md, Why Skip Categories?
 
 ### Community 775 - "Community 775"
 Cohesion: 0.25
-Nodes (8): Available Categories, code:bash (# AI will add this section if it doesn't exist), code:bash (# Edit directly), code:bash (# Remove the AI Suggestion Preferences section), code:markdown (## AI Suggestion Preferences), Updating Preferences, User Preferences in ~/.claude/CLAUDE.md, Why Skip Categories?
+Nodes (8): Bond Types, Bonding Molecules, code:bash (# Found bug during wisp patrol? Persist it:), code:bash (bd mol bond mol-feature mol-deploy --as "Feature with Deploy), code:bash (bd mol bond A B                    # Sequential: B runs afte), Custom Compound Names, Operand Combinations, Phase Control in Bonds
 
 ### Community 776 - "Community 776"
 Cohesion: 0.25
-Nodes (8): code:bash (bd dep add issue-2 issue-1 --type blocks), code:bash (ps aux | grep "bd daemon"), code:bash (# Instead of: bd --no-daemon dep add ...), code:bash (cat .beads/issues.jsonl | jq '.dependencies'), Dependencies Not Persisting, Root Cause (Fixed in v0.15.0+), Still Not Working?, Symptom
+Nodes (7): 1. Audit Current State, 2. Update Strategy, 3. For Each Update, 4. Verify, code:bash (npm outdated          # See what's outdated), code:bash (npm install package@version), Dependency Update
 
 ### Community 777 - "Community 777"
 Cohesion: 0.25
-Nodes (8): Bond Types, Bonding Molecules, code:bash (# Found bug during wisp patrol? Persist it:), code:bash (bd mol bond mol-feature mol-deploy --as "Feature with Deploy), code:bash (bd mol bond A B                    # Sequential: B runs afte), Custom Compound Names, Operand Combinations, Phase Control in Bonds
+Nodes (7): Add Repos to Workspace, After adding repos, code:bash (pan workspace add-repo <workspace-id> <repo-name> [repo-name), code:bash (# Add specific repos), How to decide which repos you need, Notes, Usage
 
 ### Community 778 - "Community 778"
 Cohesion: 0.25
-Nodes (7): 1. Audit Current State, 2. Update Strategy, 3. For Each Update, 4. Verify, code:bash (npm outdated          # See what's outdated), code:bash (npm install package@version), Dependency Update
+Nodes (7): code:bash (pan admin cloister <subcommand>), code:block2 (pan admin cloister status          # Show watchdog state), pan admin cloister, See Also, Usage, What It Does, When to Use
 
 ### Community 779 - "Community 779"
 Cohesion: 0.25
-Nodes (7): Add Repos to Workspace, After adding repos, code:bash (pan workspace add-repo <workspace-id> <repo-name> [repo-name), code:bash (# Add specific repos), How to decide which repos you need, Notes, Usage
+Nodes (7): code:bash (pan VERB <args>), code:block2 (pan VERB <id>           # Primary usage), pan VERB, See Also, Usage, What It Does, When to Use
 
 ### Community 780 - "Community 780"
 Cohesion: 0.25
-Nodes (7): code:bash (pan admin cloister <subcommand>), code:block2 (pan admin cloister status          # Show watchdog state), pan admin cloister, See Also, Usage, What It Does, When to Use
+Nodes (7): code:bash (pan admin config <subcommand>), code:block2 (pan admin config shadow --status), pan admin config, See Also, Usage, What It Does, When to Use
 
 ### Community 781 - "Community 781"
 Cohesion: 0.25
-Nodes (7): code:bash (pan VERB <args>), code:block2 (pan VERB <id>           # Primary usage), pan VERB, See Also, Usage, What It Does, When to Use
+Nodes (7): code:bash (pan start <issue-id>), code:block2 (pan start PAN-123          # Spawn agent for issue PAN-123), pan start, See Also, Usage, What It Does, When to Use
 
 ### Community 782 - "Community 782"
 Cohesion: 0.25
-Nodes (7): code:bash (pan admin config <subcommand>), code:block2 (pan admin config shadow --status), pan admin config, See Also, Usage, What It Does, When to Use
+Nodes (7): code:bash (pan admin tracker <subcommand>), code:block2 (pan admin tracker linear-states    # List Linear workflow st), pan admin tracker, See Also, Usage, What It Does, When to Use
 
 ### Community 783 - "Community 783"
 Cohesion: 0.25
-Nodes (7): code:bash (pan start <issue-id>), code:block2 (pan start PAN-123          # Spawn agent for issue PAN-123), pan start, See Also, Usage, What It Does, When to Use
+Nodes (7): 1. Understand Requirements, 2. Design Approach, 3. Implement, 4. Test, 5. Self-Review, 6. Submit, Feature Work
 
 ### Community 784 - "Community 784"
 Cohesion: 0.25
-Nodes (7): code:bash (pan admin tracker <subcommand>), code:block2 (pan admin tracker linear-states    # List Linear workflow st), pan admin tracker, See Also, Usage, What It Does, When to Use
+Nodes (7): code:bash (pan review <subcommand>), code:block2 (pan review pending              # List completed work awaiti), pan review, See Also, Usage, What It Does, When to Use
 
 ### Community 785 - "Community 785"
 Cohesion: 0.25
-Nodes (7): 1. Understand Requirements, 2. Design Approach, 3. Implement, 4. Test, 5. Self-Review, 6. Submit, Feature Work
+Nodes (7): code:bash (pan show <issue-id>), code:block2 (pan show PAN-123           # Summary: shadow state + CV + he), pan show, See Also, Usage, What It Does, When to Use
 
 ### Community 786 - "Community 786"
 Cohesion: 0.25
-Nodes (7): code:bash (pan review <subcommand>), code:block2 (pan review pending              # List completed work awaiti), pan review, See Also, Usage, What It Does, When to Use
+Nodes (7): code:bash (pan admin tldr <subcommand>), code:block2 (pan admin tldr status              # Show TLDR daemon state), pan admin tldr, See Also, Usage, What It Does, When to Use
 
 ### Community 787 - "Community 787"
 Cohesion: 0.25
-Nodes (7): code:bash (pan show <issue-id>), code:block2 (pan show PAN-123           # Summary: shadow state + CV + he), pan show, See Also, Usage, What It Does, When to Use
+Nodes (8): code:bash (# Authenticate with GitHub CLI (recommended)), code:block4 (PAN-45       # GitHub issue #45 on the panopticon-cli projec), code:yaml (projects:), code:bash (# Via CLI), Creating Issues, GitHub Issues, Issue Prefix, Setup
 
 ### Community 788 - "Community 788"
 Cohesion: 0.25
-Nodes (7): code:bash (pan admin tldr <subcommand>), code:block2 (pan admin tldr status              # Show TLDR daemon state), pan admin tldr, See Also, Usage, What It Does, When to Use
-
-### Community 789 - "Community 789"
-Cohesion: 0.25
-Nodes (8): code:bash (# Authenticate with GitHub CLI (recommended)), code:block4 (PAN-45       # GitHub issue #45 on the panopticon-cli projec), code:yaml (projects:), code:bash (# Via CLI), Creating Issues, GitHub Issues, Issue Prefix, Setup
-
-### Community 790 - "Community 790"
-Cohesion: 0.25
 Nodes (8): 4. Surfaces & Depth, code:block7 (Level 0 (Page):     bg-background     — the deepest surface), code:css (shadow-xs/5    — buttons, inputs (barely visible)), code:css (/* Light mode: top edge highlight */), Inner Shadows (Cards), Shadow Scale, Tonal Layering (not shadows), When to Use Shadows
 
-### Community 791 - "Community 791"
+### Community 789 - "Community 789"
 Cohesion: 0.33
 Nodes (5): createTerminalWindow(), MockWindow, openTerminalWindow(), terminalWindows, win
 
-### Community 792 - "Community 792"
+### Community 790 - "Community 790"
 Cohesion: 0.33
 Nodes (5): execFileAsync, hooksLog, runHook(), runtimeRequests, SCRIPT_PATH
 
-### Community 793 - "Community 793"
+### Community 791 - "Community 791"
 Cohesion: 0.29
 Nodes (5): actual, CLI_PATH, __dirname, expected, FIXTURE_PATH
 
-### Community 794 - "Community 794"
+### Community 792 - "Community 792"
 Cohesion: 0.29
 Nodes (5): actual, __dirname, expected, FIXTURE_PATH, SKILLS_SOURCE_DIR
 
-### Community 795 - "Community 795"
+### Community 793 - "Community 793"
 Cohesion: 0.29
 Nodes (6): activeBeadsIgnore, activePlanningBeadsIgnore, content, gitignorePath, lines, ROOT
 
-### Community 796 - "Community 796"
+### Community 794 - "Community 794"
 Cohesion: 0.29
 Nodes (5): CLI_PATH, __dirname, { stdout }, { stdout, status }, { stdout, stderr }
 
-### Community 797 - "Community 797"
+### Community 795 - "Community 795"
 Cohesion: 0.29
 Nodes (5): next, restored, s, start, withAgent
 
-### Community 798 - "Community 798"
+### Community 796 - "Community 796"
 Cohesion: 0.29
 Nodes (6): alicePos, bobPos, longBody, result, subDir, wsPath
 
-### Community 799 - "Community 799"
+### Community 797 - "Community 797"
 Cohesion: 0.29
 Nodes (4): BIN_DIR, __dirname, NATIVE_MODULES, PACKAGE_ROOT
 
-### Community 800 - "Community 800"
+### Community 798 - "Community 798"
+Cohesion: 0.33
+Nodes (4): resolveServerStaticDir(), registerDesktopProtocol(), resolveStaticPath(), result
+
+### Community 799 - "Community 799"
 Cohesion: 0.29
 Nodes (6): bridge, DesktopSettings, IPC, NotificationEventType, PanopticonBridge, Window
 
+### Community 800 - "Community 800"
+Cohesion: 0.48
+Nodes (6): execAsync, RebaseAllResult, rebaseAndPushRepos(), rebaseOneRepo(), RebaseResult, tryResolvePlanningConflicts()
+
 ### Community 801 - "Community 801"
-Cohesion: 0.43
-Nodes (6): checkNodeVersion(), checkServerBundle(), __dirname, launch(), packageDir, resolveElectron()
+Cohesion: 0.33
+Nodes (5): DesktopSettings, DesktopSettingsSection(), isDesktopApp(), NOTIFICATION_LABELS, NotificationEventType
 
 ### Community 802 - "Community 802"
 Cohesion: 0.29
-Nodes (6): defectQuery, hrQuery, mockCreate, mockQuery, mockUpdate, tracker
+Nodes (3): mockFetch, mockGetGitHubConfig, program
 
 ### Community 803 - "Community 803"
-Cohesion: 0.29
-Nodes (3): mockFetch, mockGetGitHubConfig, program
+Cohesion: 0.43
+Nodes (5): ensurePlaywrightIsolation(), getIsolatedPlaywrightMcpConfig(), changed, config, result
 
 ### Community 804 - "Community 804"
 Cohesion: 0.33
@@ -4327,43 +4334,43 @@ Nodes (7): Branch and PR Workflow, Branch naming, code:block10 (feature/pan-<num
 
 ### Community 808 - "Community 808"
 Cohesion: 0.29
-Nodes (7): code:typescript (interface MergeResult {), code:typescript (interface ReviewResult {), code:typescript (interface TestResult {), Merge Agent Results, Result Monitoring, Review Agent Results, Test Agent Results
+Nodes (7): API, CLI, code:block21 (POST /api/issues/:issueId/sync-main), code:bash (pan sync-main PAN-143), Design Decisions, How It Works, Sync with Main (PAN-242)
 
 ### Community 809 - "Community 809"
 Cohesion: 0.29
-Nodes (7): code:bash (# Check if specialist is running), code:toml ([specialists.test_agent]), code:bash (cat ~/.panopticon/specialists/merge-agent/history.jsonl | ta), Merge agent conflict resolution failed, Review agent not dispatching, Test agent not detecting test runner, Troubleshooting
+Nodes (7): code:typescript (// Worker agent creates PR using gh CLI), code:bash (# Worker signals done — triggers verification gate → review-), Step 1: Complete Implementation, Step 2: Create Pull Request, Step 3: Signal Completion, Step 4: Specialist Pipeline Takes Over, Worker Agent Integration
 
 ### Community 810 - "Community 810"
 Cohesion: 0.29
-Nodes (7): Agent Workflow, Checkpoint System, CLI Reference, code:bash (# After closing a bead), code:bash (pan inspect <issueId> --bead <beadId>           # Request in), Inspect Specialist (PAN-382), What Inspect Checks
+Nodes (7): Adding a New Template, Available Templates, code:yaml (---), Frontmatter Contract, Prompt Templates, Template Location, Template Syntax
 
 ### Community 811 - "Community 811"
 Cohesion: 0.29
-Nodes (7): Adding a New Template, Available Templates, code:yaml (---), Frontmatter Contract, Prompt Templates, Template Location, Template Syntax
+Nodes (7): Agent Workflow, Checkpoint System, CLI Reference, code:bash (# After closing a bead), code:bash (pan inspect <issueId> --bead <beadId>           # Request in), Inspect Specialist (PAN-382), What Inspect Checks
 
 ### Community 812 - "Community 812"
 Cohesion: 0.29
-Nodes (7): API, CLI, code:block21 (POST /api/issues/:issueId/sync-main), code:bash (pan sync-main PAN-143), Design Decisions, How It Works, Sync with Main (PAN-242)
+Nodes (7): code:bash (# Check if specialist is running), code:toml ([specialists.test_agent]), code:bash (cat ~/.panopticon/specialists/merge-agent/history.jsonl | ta), Merge agent conflict resolution failed, Review agent not dispatching, Test agent not detecting test runner, Troubleshooting
 
 ### Community 813 - "Community 813"
 Cohesion: 0.29
-Nodes (7): code:typescript (// Worker agent creates PR using gh CLI), code:bash (# Worker signals done — triggers verification gate → review-), Step 1: Complete Implementation, Step 2: Create Pull Request, Step 3: Signal Completion, Step 4: Specialist Pipeline Takes Over, Worker Agent Integration
+Nodes (7): code:typescript (interface MergeResult {), code:typescript (interface ReviewResult {), code:typescript (interface TestResult {), Merge Agent Results, Result Monitoring, Review Agent Results, Test Agent Results
 
 ### Community 814 - "Community 814"
 Cohesion: 0.29
-Nodes (7): code:bash (# From Linear issue), code:block22 (~/.panopticon/workspaces/), code:block23 (https://feature-pan-123.localhost:3000     # Frontend), Creating Workspaces, Workspace Structure, Workspace URLs, Workspaces
+Nodes (7): Advanced Topics, code:bash (# Create remote workspace), code:yaml (# ~/.panopticon/work-types.yaml), code:json (// ~/.claude/hooks.json), Custom Work Types, Heartbeat Monitoring, Remote Workspaces
 
 ### Community 815 - "Community 815"
 Cohesion: 0.29
-Nodes (7): Advanced Topics, code:bash (# Create remote workspace), code:yaml (# ~/.panopticon/work-types.yaml), code:json (// ~/.claude/hooks.json), Custom Work Types, Heartbeat Monitoring, Remote Workspaces
+Nodes (7): code:markdown (---), code:bash (# Create skill directory), code:block27 (/my-skill), Creating Skills, Skill Structure, Skills, Using Skills
 
 ### Community 816 - "Community 816"
 Cohesion: 0.29
-Nodes (7): code:markdown (---), code:bash (# Create skill directory), code:block27 (/my-skill), Creating Skills, Skill Structure, Skills, Using Skills
+Nodes (7): code:bash (# ~/.panopticon.env), code:yaml (models:), code:bash (chmod 600 ~/.panopticon/config.yaml ~/.panopticon.env), Configuration via Dashboard, Multi-Model Support, Router Configuration, Supported Providers and Models
 
 ### Community 817 - "Community 817"
 Cohesion: 0.29
-Nodes (7): code:bash (# ~/.panopticon.env), code:yaml (models:), code:bash (chmod 600 ~/.panopticon/config.yaml ~/.panopticon.env), Configuration via Dashboard, Multi-Model Support, Router Configuration, Supported Providers and Models
+Nodes (7): code:bash (# From Linear issue), code:block22 (~/.panopticon/workspaces/), code:block23 (https://feature-pan-123.localhost:3000     # Frontend), Creating Workspaces, Workspace Structure, Workspace URLs, Workspaces
 
 ### Community 818 - "Community 818"
 Cohesion: 0.29
@@ -4387,19 +4394,19 @@ Nodes (7): code:toml (# Each entry controls one parallel reviewer.), code:yaml (
 
 ### Community 823 - "Community 823"
 Cohesion: 0.29
-Nodes (7): Balanced Preset (Recommended), Budget Preset, code:yaml (models:), code:yaml (models:), code:yaml (models:), Premium Preset, Presets
+Nodes (7): Available Work Types, code:yaml (models:), code:yaml (models:), code:yaml (models:), code:yaml (models:), Override Examples, Per-Work-Type Overrides
 
 ### Community 824 - "Community 824"
 Cohesion: 0.29
-Nodes (7): Adding New Integrations, Cloudflare Tunnels, code:yaml (workspace:), code:yaml (workspace:), code:yaml (env_file:), External Service Integrations, Hume EVI (Voice AI)
+Nodes (7): API Keys: `~/.panopticon.env`, code:yaml (models:), code:yaml (models:), code:env (# Anthropic (required)), Configuration Files, Global Configuration: `~/.panopticon/config.yaml`, Per-Project Configuration: `.panopticon.yaml`
 
 ### Community 825 - "Community 825"
 Cohesion: 0.29
-Nodes (7): API Keys: `~/.panopticon.env`, code:yaml (models:), code:yaml (models:), code:env (# Anthropic (required)), Configuration Files, Global Configuration: `~/.panopticon/config.yaml`, Per-Project Configuration: `.panopticon.yaml`
+Nodes (7): Balanced Preset (Recommended), Budget Preset, code:yaml (models:), code:yaml (models:), code:yaml (models:), Premium Preset, Presets
 
 ### Community 826 - "Community 826"
 Cohesion: 0.29
-Nodes (7): Agent Management, API Endpoints, Cloister Control, code:typescript (// Get Cloister status), code:typescript (// List all agents (specialists + issue agents)), code:typescript (// Initialize a specialist agent), Specialist Management
+Nodes (7): Adding New Integrations, Cloudflare Tunnels, code:yaml (workspace:), code:yaml (workspace:), code:yaml (env_file:), External Service Integrations, Hume EVI (Voice AI)
 
 ### Community 827 - "Community 827"
 Cohesion: 0.29
@@ -4407,19 +4414,19 @@ Nodes (5): code:block12 (┌─────────────┐     ┌�
 
 ### Community 828 - "Community 828"
 Cohesion: 0.29
-Nodes (6): Active Pipeline, Cycling Alerts, Flywheel State — Run 2026-05-09, Infrastructure Gaps, Pattern Ledger, Skill Gaps
+Nodes (7): Agent Management, API Endpoints, Cloister Control, code:typescript (// Get Cloister status), code:typescript (// List all agents (specialists + issue agents)), code:typescript (// Initialize a specialist agent), Specialist Management
 
 ### Community 829 - "Community 829"
 Cohesion: 0.29
-Nodes (6): 1. Context Budget Manager (PRD Phase 12.8), 2. Runtime Metrics (PRD Phase 13.6), 3. Multi-Runtime Dashboard (PRD Phase 13), Critical Gaps (Missing Functionality), Panopticon Implementation Gaps, Summary
+Nodes (6): Active Pipeline, Cycling Alerts, Flywheel State — Run 2026-05-09, Infrastructure Gaps, Pattern Ledger, Skill Gaps
 
 ### Community 830 - "Community 830"
 Cohesion: 0.29
-Nodes (7): 1. Operator skills are already renamed, 2. Skill naming — operator vs. agent split, 3. `pan sync` — two changes, one codebase, 4. Dashboard API routes follow PAN-705 conventions, 5. Audience backfill and skill renaming, 6. Operator-skill description format for any new operator skills PAN-709 adds, Dependencies — aligned with PAN-705 (Command Taxonomy Reorg)
+Nodes (6): 1. Context Budget Manager (PRD Phase 12.8), 2. Runtime Metrics (PRD Phase 13.6), 3. Multi-Runtime Dashboard (PRD Phase 13), Critical Gaps (Missing Functionality), Panopticon Implementation Gaps, Summary
 
 ### Community 831 - "Community 831"
 Cohesion: 0.29
-Nodes (7): 3.1 Page Layout, 3.2 Detail Panel (Slide-out), 3.3 Component Tree, 3. Architecture Overview, code:block1 (+-----------------------------------------------------------), code:block2 (+-----------------------------------+ +---------------------), code:block3 (AgentsPage (new, replaces AgentList + GodView agent display))
+Nodes (7): 1. Operator skills are already renamed, 2. Skill naming — operator vs. agent split, 3. `pan sync` — two changes, one codebase, 4. Dashboard API routes follow PAN-705 conventions, 5. Audience backfill and skill renaming, 6. Operator-skill description format for any new operator skills PAN-709 adds, Dependencies — aligned with PAN-705 (Command Taxonomy Reorg)
 
 ### Community 832 - "Community 832"
 Cohesion: 0.29
@@ -4431,43 +4438,43 @@ Nodes (7): 5.1 Live Grid (Default), 5.2 Command Table, 5.3 Timeline, 5.4 Topolog
 
 ### Community 834 - "Community 834"
 Cohesion: 0.29
-Nodes (7): 4.1 Color Palette (Obsidian Dark), 4.2 Signal Colors, 4.3 Typography, 4.4 Spacing & Radius, 4.5 Shadows & Elevation, 4.6 Animations, 4. Visual Design System
+Nodes (7): 3.1 Page Layout, 3.2 Detail Panel (Slide-out), 3.3 Component Tree, 3. Architecture Overview, code:block1 (+-----------------------------------------------------------), code:block2 (+-----------------------------------+ +---------------------), code:block3 (AgentsPage (new, replaces AgentList + GodView agent display))
 
 ### Community 835 - "Community 835"
 Cohesion: 0.29
-Nodes (7): code:bash (pan conversations search "redis cache invalidation"), code:bash (pan conversations search --semantic "debugging a race condit), code:bash (pan conversations search --workspace ~/Projects/myn), Search, Tier 1: Structured filters (instant, no LLM), Tier 2: Full-text search (FTS5, no LLM), Tier 3: Semantic search (optional, requires embeddings)
+Nodes (7): 4.1 Color Palette (Obsidian Dark), 4.2 Signal Colors, 4.3 Typography, 4.4 Spacing & Radius, 4.5 Shadows & Elevation, 4.6 Animations, 4. Visual Design System
 
 ### Community 836 - "Community 836"
 Cohesion: 0.29
-Nodes (7): Implementation Plan, Phase 1 — Backend extraction, Phase 2 — Project list & detail pages (no wizard yet), Phase 3 — Wizard UI (without Setup Agent), Phase 4 — Setup Agent integration, Phase 5 — First-run welcome, Phase 6 — Polish
+Nodes (7): code:bash (pan conversations search "redis cache invalidation"), code:bash (pan conversations search --semantic "debugging a race condit), code:bash (pan conversations search --workspace ~/Projects/myn), Search, Tier 1: Structured filters (instant, no LLM), Tier 2: Full-text search (FTS5, no LLM), Tier 3: Semantic search (optional, requires embeddings)
 
 ### Community 837 - "Community 837"
 Cohesion: 0.29
-Nodes (7): Problem 1: Dead/stuck parallel review sessions are invisible to deacon, Problem 2: No circuit breaker for infrastructure-failure cycling, Problem 3: Verification passed but review blocks the pipeline forever, Problem 4: Incomplete parallel reviews waste completed findings, Problem 5: `stuck` flag is never set, so re-dispatch never stops, Problem 6: No UI indication that recovery is happening, Problems Enumerated
+Nodes (7): Implementation Plan, Phase 1 — Backend extraction, Phase 2 — Project list & detail pages (no wizard yet), Phase 3 — Wizard UI (without Setup Agent), Phase 4 — Setup Agent integration, Phase 5 — First-run welcome, Phase 6 — Polish
 
 ### Community 838 - "Community 838"
 Cohesion: 0.29
-Nodes (7): B.1 Add `reviewRetryCount` to `ReviewStatus` interface, B.2 Increment `reviewRetryCount` on each deacon re-dispatch, B.3 Reset `reviewRetryCount` on successful review completion, B. `src/lib/review-status.ts`, code:typescript (setReviewStatus(opts.issueId, {), code:typescript (export interface ReviewStatus {), code:typescript (setReviewStatus(issueId, {)
+Nodes (7): Problem 1: Dead/stuck parallel review sessions are invisible to deacon, Problem 2: No circuit breaker for infrastructure-failure cycling, Problem 3: Verification passed but review blocks the pipeline forever, Problem 4: Incomplete parallel reviews waste completed findings, Problem 5: `stuck` flag is never set, so re-dispatch never stops, Problem 6: No UI indication that recovery is happening, Problems Enumerated
 
 ### Community 839 - "Community 839"
 Cohesion: 0.29
-Nodes (7): code:block7 (DockerStatsCollector (5s poll)), code:block8 (DockerStatsCollector.getHistory(containerId) (60 samples)), code:block9 (resource-discovery.ts (30s cache)), Container history path (new, lazy), Container stats path (new), Data flow, Resource detail identifiers path (existing)
+Nodes (7): B.1 Add `reviewRetryCount` to `ReviewStatus` interface, B.2 Increment `reviewRetryCount` on each deacon re-dispatch, B.3 Reset `reviewRetryCount` on successful review completion, B. `src/lib/review-status.ts`, code:typescript (setReviewStatus(opts.issueId, {), code:typescript (export interface ReviewStatus {), code:typescript (setReviewStatus(issueId, {)
 
 ### Community 840 - "Community 840"
 Cohesion: 0.29
-Nodes (7): code:typescript ({), code:typescript ({), Commands (mutations), Key Type Definitions, RPC Methods, Streaming (server → client), Unary (request → response)
+Nodes (7): code:block7 (DockerStatsCollector (5s poll)), code:block8 (DockerStatsCollector.getHistory(containerId) (60 samples)), code:block9 (resource-discovery.ts (30s cache)), Container history path (new, lazy), Container stats path (new), Data flow, Resource detail identifiers path (existing)
 
 ### Community 841 - "Community 841"
 Cohesion: 0.29
-Nodes (7): From `BadgeBar` modals, From `InspectorPanel` sections, From `IssueCard` (kanban card), From `StatusFlowControl`, From `WorkspacePane`, Parity smoke test, Reunified action layer (parity, additive)
+Nodes (7): code:typescript ({), code:typescript ({), Commands (mutations), Key Type Definitions, RPC Methods, Streaming (server → client), Unary (request → response)
 
 ### Community 842 - "Community 842"
 Cohesion: 0.29
-Nodes (7): code:typescript (interface RoundMarker {), code:block14 (── Round 1 · 14:02 → 14:06 · passed · 8 findings ─────), code:block15 (addressing: specialist-panopticon-540-review-correctness    ), Composer addressing, Session-tab strip (NEW), What changes, Zone C — Conversation + composer (agent-selected)
+Nodes (7): From `BadgeBar` modals, From `InspectorPanel` sections, From `IssueCard` (kanban card), From `StatusFlowControl`, From `WorkspacePane`, Parity smoke test, Reunified action layer (parity, additive)
 
 ### Community 843 - "Community 843"
 Cohesion: 0.29
-Nodes (7): P1 — Deacon health/stuck detection (structured state), `src/dashboard/lib/health-filtering.ts:13` — `checkAgentHealthAsync()`, `src/lib/cloister/deacon.ts:651` — `checkLazyAgent()`, `src/lib/cloister/deacon.ts:849` — `isAgentActiveInTmux()`, `src/lib/cloister/deacon.ts:935` — `parseThinkingDuration()`, `src/lib/cloister/deacon.ts:955` — `checkStuckWorkAgents()`, `src/lib/health.ts:91` — `getAgentOutput()`
+Nodes (7): code:typescript (interface RoundMarker {), code:block14 (── Round 1 · 14:02 → 14:06 · passed · 8 findings ─────), code:block15 (addressing: specialist-panopticon-540-review-correctness    ), Composer addressing, Session-tab strip (NEW), What changes, Zone C — Conversation + composer (agent-selected)
 
 ### Community 844 - "Community 844"
 Cohesion: 0.29
@@ -4475,51 +4482,51 @@ Nodes (7): P2 — Readiness and delivery (trust hooks, remove fallbacks), `src/d
 
 ### Community 845 - "Community 845"
 Cohesion: 0.29
-Nodes (6): Approach, Decision, Difficulty: trivial, PAN-415: Test: trace what calls complete-planning after agent finishes, Scope, Status: Planning Complete
+Nodes (7): P1 — Deacon health/stuck detection (structured state), `src/dashboard/lib/health-filtering.ts:13` — `checkAgentHealthAsync()`, `src/lib/cloister/deacon.ts:651` — `checkLazyAgent()`, `src/lib/cloister/deacon.ts:849` — `isAgentActiveInTmux()`, `src/lib/cloister/deacon.ts:935` — `parseThinkingDuration()`, `src/lib/cloister/deacon.ts:955` — `checkStuckWorkAgents()`, `src/lib/health.ts:91` — `getAgentOutput()`
 
 ### Community 846 - "Community 846"
 Cohesion: 0.29
-Nodes (7): 1. Core Fix (CRITICAL), 2. Comprehensive Testing, 3. Error Handling Improvements, 4. Configuration Validation, 5. Documentation, code:typescript (// Before:), Solution Design
+Nodes (6): Approach, Decision, Difficulty: trivial, PAN-415: Test: trace what calls complete-planning after agent finishes, Scope, Status: Planning Complete
 
 ### Community 847 - "Community 847"
 Cohesion: 0.29
-Nodes (6): Agent State: PAN-647, Blockers/Concerns, Current Position, Decisions Made During Planning, Notes, Planned Tasks
+Nodes (7): 1. Core Fix (CRITICAL), 2. Comprehensive Testing, 3. Error Handling Improvements, 4. Configuration Validation, 5. Documentation, code:typescript (// Before:), Solution Design
 
 ### Community 848 - "Community 848"
 Cohesion: 0.29
-Nodes (6): Agent State: MIN-794, Blockers/Concerns, Current Position, Decisions Made During Planning, Notes, Planned Tasks
+Nodes (6): Agent State: PAN-647, Blockers/Concerns, Current Position, Decisions Made During Planning, Notes, Planned Tasks
 
 ### Community 849 - "Community 849"
 Cohesion: 0.29
-Nodes (6): Decision (per PRD), Out of scope (confirmed from PRD), PAN-705: Command Taxonomy Reorganization, Pipeline handoff notes for specialists, Problem, Scope anchors
+Nodes (6): Agent State: MIN-794, Blockers/Concerns, Current Position, Decisions Made During Planning, Notes, Planned Tasks
 
 ### Community 850 - "Community 850"
 Cohesion: 0.29
-Nodes (7): Agent Issues, Agent keeps failing, Agent stuck / not responding, code:bash (# Check tmux session), code:bash (cat ~/.panopticon/agents/agent-min-123/state.json | jq .hand), code:bash (# Correct), Messages not reaching agent
+Nodes (6): Decision (per PRD), Out of scope (confirmed from PRD), PAN-705: Command Taxonomy Reorganization, Pipeline handoff notes for specialists, Problem, Scope anchors
 
 ### Community 851 - "Community 851"
 Cohesion: 0.29
-Nodes (7): code:bash (# Check container logs), code:bash (# Create the network), code:bash (# Use sudo to remove), Container won't start, Docker Issues, "No such network: panopticon", Permission denied on mounted volumes
+Nodes (7): Agent Issues, Agent keeps failing, Agent stuck / not responding, code:bash (# Check tmux session), code:bash (cat ~/.panopticon/agents/agent-min-123/state.json | jq .hand), code:bash (# Correct), Messages not reaching agent
 
 ### Community 852 - "Community 852"
 Cohesion: 0.29
-Nodes (7): Analyze Structure, code:bash (# By name), code:bash (# Function definitions), code:bash (# Directory tree (shallow)), Find Files, Quick Reference Commands, Search Code
+Nodes (7): code:bash (# Check container logs), code:bash (# Create the network), code:bash (# Use sudo to remove), Container won't start, Docker Issues, "No such network: panopticon", Permission denied on mounted volumes
 
 ### Community 853 - "Community 853"
 Cohesion: 0.29
-Nodes (7): code:bash (# Count errors per agent), code:bash (# If logs have timestamps, extract timeline), code:bash (# Count tool calls by type), Count Errors, Log Analysis, Timeline of Actions, Tool Usage Analysis
+Nodes (7): Analyze Structure, code:bash (# By name), code:bash (# Function definitions), code:bash (# Directory tree (shallow)), Find Files, Quick Reference Commands, Search Code
 
 ### Community 854 - "Community 854"
 Cohesion: 0.29
-Nodes (7): code:bash (# Check if session exists), code:bash (# Truncate log file), code:bash (# Add timestamps when capturing), Logs Too Large, Missing Timestamps, No Output from Agent, Troubleshooting
+Nodes (7): code:bash (# Count errors per agent), code:bash (# If logs have timestamps, extract timeline), code:bash (# Count tool calls by type), Count Errors, Log Analysis, Timeline of Actions, Tool Usage Analysis
 
 ### Community 855 - "Community 855"
 Cohesion: 0.29
-Nodes (6): 1. Assess (First 5 minutes), 2. Mitigate (Stop the bleeding), 3. Investigate (Once stable), 4. Fix, 5. Postmortem, Incident Response
+Nodes (7): code:bash (# Check if session exists), code:bash (# Truncate log file), code:bash (# Add timestamps when capturing), Logs Too Large, Missing Timestamps, No Output from Agent, Troubleshooting
 
 ### Community 856 - "Community 856"
 Cohesion: 0.29
-Nodes (7): code:bash (bd init myproject), code:bash (bd daemon --global=false &), code:bash (#!/bin/bash), JSONL File Not Created, Resolution, Root Cause, Symptom
+Nodes (6): 1. Assess (First 5 minutes), 2. Mitigate (Stop the bleeding), 3. Investigate (Once stable), 4. Fix, 5. Postmortem, Incident Response
 
 ### Community 857 - "Community 857"
 Cohesion: 0.29
@@ -4527,7 +4534,7 @@ Nodes (7): code:bash (bd daemon), code:bash (# In your project directory), code:
 
 ### Community 858 - "Community 858"
 Cohesion: 0.29
-Nodes (7): code:bash (# Project A ships a capability), code:bash (bd ship <capability>            # Ship capability (requires ), code:bash (bd dep add <issue> external:<project>:<capability>), Concept, Cross-Project Dependencies, Depending on External Capabilities, Shipping Capabilities
+Nodes (7): code:bash (bd init myproject), code:bash (bd daemon --global=false &), code:bash (#!/bin/bash), JSONL File Not Created, Resolution, Root Cause, Symptom
 
 ### Community 859 - "Community 859"
 Cohesion: 0.29
@@ -4535,19 +4542,19 @@ Nodes (7): code:bash (# Manual creation), code:bash (bd formula list            
 
 ### Community 860 - "Community 860"
 Cohesion: 0.29
-Nodes (6): CLI Command Reference, Dependency Types, Issue Types, Priorities, Quick Navigation, See Also
+Nodes (7): code:bash (# Project A ships a capability), code:bash (bd ship <capability>            # Ship capability (requires ), code:bash (bd dep add <issue> external:<project>:<capability>), Concept, Cross-Project Dependencies, Depending on External Capabilities, Shipping Capabilities
 
 ### Community 861 - "Community 861"
 Cohesion: 0.29
-Nodes (6): code:bash (pan wipe <issue-id>), pan wipe, See Also, Warning, What It Does, When to Use
+Nodes (6): CLI Command Reference, Dependency Types, Issue Types, Priorities, Quick Navigation, See Also
 
 ### Community 862 - "Community 862"
 Cohesion: 0.29
-Nodes (7): Check Current Status, code:bash (pan doctor), code:bash (# Clone the repository), code:bash (# Use automated installer), Install Panopticon, Install Prerequisites, Step 2: Installation (5 minutes)
+Nodes (6): code:bash (pan wipe <issue-id>), pan wipe, See Also, Warning, What It Does, When to Use
 
 ### Community 863 - "Community 863"
 Cohesion: 0.29
-Nodes (7): Auto-Start on Boot, code:ini ([Unit]), code:bash (sudo systemctl enable panopticon), code:xml (<?xml version="1.0" encoding="UTF-8"?>), code:bash (launchctl load ~/Library/LaunchAgents/com.panopticon.dashboa), Using launchd (macOS), Using systemd (Linux)
+Nodes (7): Check Current Status, code:bash (pan doctor), code:bash (# Clone the repository), code:bash (# Use automated installer), Install Panopticon, Install Prerequisites, Step 2: Installation (5 minutes)
 
 ### Community 864 - "Community 864"
 Cohesion: 0.29
@@ -4555,15 +4562,15 @@ Nodes (7): Advanced Usage, code:bash (# Start with hot reload for development), 
 
 ### Community 865 - "Community 865"
 Cohesion: 0.29
-Nodes (7): Check Resource Usage, Check Service Status, Check Specific Agent, code:bash (# Check if dashboard is running), code:bash (# Verbose status with CPU/memory), code:bash (# Show detailed status for one agent), Detailed Status Checks
+Nodes (7): Auto-Start on Boot, code:ini ([Unit]), code:bash (sudo systemctl enable panopticon), code:xml (<?xml version="1.0" encoding="UTF-8"?>), code:bash (launchctl load ~/Library/LaunchAgents/com.panopticon.dashboa), Using launchd (macOS), Using systemd (Linux)
 
 ### Community 866 - "Community 866"
 Cohesion: 0.29
-Nodes (7): Border Radius, Border & Shadow, code:block5 (rounded-md   (6px)  Buttons, inputs, small cards), code:block6 (shadow-sm   Sidebar cards, secondary), code:tsx (bg-muted/40         // Very subtle containers), Opacity Modifiers, Shadows
+Nodes (7): Check Resource Usage, Check Service Status, Check Specific Agent, code:bash (# Check if dashboard is running), code:bash (# Verbose status with CPU/memory), code:bash (# Show detailed status for one agent), Detailed Status Checks
 
 ### Community 867 - "Community 867"
 Cohesion: 0.29
-Nodes (6): code:block14 (src/), Design Principles, File Structure, Key Files, Mind Your Now Design System & Coding Standards, Tech Stack
+Nodes (7): Agent shows as crashed, code:bash (# Check tmux sessions directly), code:bash (# Check agent logs), code:bash (# Check Docker containers directly), No agents showing, Troubleshooting Status Issues, Workspace shows wrong status
 
 ### Community 868 - "Community 868"
 Cohesion: 0.29
@@ -4571,11 +4578,11 @@ Nodes (7): App Background, code:block2 (--background       Page background (whit
 
 ### Community 869 - "Community 869"
 Cohesion: 0.29
-Nodes (7): code:bash (# Plan parent issue), code:bash (# Planning agent creates plan), code:bash (# Start planning with research focus), Collaborative Planning, Planning Workflow Variations, Research-Heavy Planning, Sequential Planning
+Nodes (7): Border Radius, Border & Shadow, code:block5 (rounded-md   (6px)  Buttons, inputs, small cards), code:block6 (shadow-sm   Sidebar cards, secondary), code:tsx (bg-muted/40         // Very subtle containers), Opacity Modifiers, Shadows
 
 ### Community 870 - "Community 870"
 Cohesion: 0.29
-Nodes (7): Advanced Planning, code:bash (# Focus on security), code:bash (# Create high-level plan first), code:bash (# Plan with reference to related issues), Iterative Planning, Planning Focus Areas, Planning with Context
+Nodes (6): code:block14 (src/), Design Principles, File Structure, Key Files, Mind Your Now Design System & Coding Standards, Tech Stack
 
 ### Community 871 - "Community 871"
 Cohesion: 0.29
@@ -4583,439 +4590,445 @@ Nodes (7): 1. Start with Planning for Complex Issues, 2. Guide the Planning Agen
 
 ### Community 872 - "Community 872"
 Cohesion: 0.29
-Nodes (6): Code Review, Correctness, Design, Output Format, Performance, Security
+Nodes (7): code:bash (# Plan parent issue), code:bash (# Planning agent creates plan), code:bash (# Start planning with research focus), Collaborative Planning, Planning Workflow Variations, Research-Heavy Planning, Sequential Planning
 
 ### Community 873 - "Community 873"
 Cohesion: 0.29
-Nodes (6): 1. Reproduce, 2. Investigate Root Cause, 3. Implement Fix, 4. Add Regression Test, 5. Verify, Bug Fix
+Nodes (7): Advanced Planning, code:bash (# Focus on security), code:bash (# Create high-level plan first), code:bash (# Plan with reference to related issues), Iterative Planning, Planning Focus Areas, Planning with Context
 
 ### Community 874 - "Community 874"
 Cohesion: 0.29
-Nodes (7): "Cannot find module" errors, code:bash (# Check if installed), code:bash (# Reinstall dependencies), code:bash (# Check version), Installation Issues, Node.js version issues, "pan: command not found"
+Nodes (6): Code Review, Correctness, Design, Output Format, Performance, Security
 
 ### Community 875 - "Community 875"
 Cohesion: 0.29
-Nodes (7): code:bash (# Check sync status), code:bash (# Check what's there), code:bash (# Check trigger patterns in SKILL.md), "Skill already exists", Skill Issues, Skill not triggering, Skills not showing up
+Nodes (6): 1. Reproduce, 2. Investigate Root Cause, 3. Implement Fix, 4. Add Regression Test, 5. Verify, Bug Fix
 
 ### Community 876 - "Community 876"
 Cohesion: 0.29
-Nodes (6): code:bash (# System info), Collecting Diagnostics, Issue Categories, Overview, Related Skills, Troubleshooting Guide
+Nodes (7): "Cannot find module" errors, code:bash (# Check if installed), code:bash (# Reinstall dependencies), code:bash (# Check version), Installation Issues, Node.js version issues, "pan: command not found"
 
 ### Community 877 - "Community 877"
 Cohesion: 0.29
-Nodes (7): Can't reach Linear API, code:bash (# Test connectivity), code:bash (# Check Traefik is running), code:bash (# Get WSL2 IP), Network Issues, Traefik not routing, WSL2 networking
+Nodes (7): code:bash (# Check sync status), code:bash (# Check what's there), code:bash (# Check trigger patterns in SKILL.md), "Skill already exists", Skill Issues, Skill not triggering, Skills not showing up
 
 ### Community 878 - "Community 878"
 Cohesion: 0.29
-Nodes (6): code:block1 (LIFECYCLE VERBS (top-level)), code:bash (pan <args>), Command Taxonomy (0.7.0), Dispatch, Panopticon CLI Umbrella Skill, Usage
+Nodes (7): Can't reach Linear API, code:bash (# Test connectivity), code:bash (# Check Traefik is running), code:bash (# Get WSL2 IP), Network Issues, Traefik not routing, WSL2 networking
 
 ### Community 879 - "Community 879"
 Cohesion: 0.29
-Nodes (6): 1. High-Level Structure, 2. Tech Stack, 3. Architecture Patterns, 4. Development Workflow, 5. Document Findings, Codebase Onboarding
+Nodes (6): code:bash (# System info), Collecting Diagnostics, Issue Categories, Overview, Related Skills, Troubleshooting Guide
 
 ### Community 880 - "Community 880"
 Cohesion: 0.29
-Nodes (7): Advanced Usage, code:bash (# Force kill all processes), code:bash (# Stop only dashboard (keep API running)), code:bash (# Stop services and all workspace containers), Force Stop, Stop and Clean Up Workspaces, Stop Specific Services
+Nodes (6): code:block1 (LIFECYCLE VERBS (top-level)), code:bash (pan <args>), Command Taxonomy (0.7.0), Dispatch, Panopticon CLI Umbrella Skill, Usage
 
 ### Community 881 - "Community 881"
 Cohesion: 0.29
-Nodes (6): code:bash (GITHUB_TOKEN=ghp_xxxxx     # For GitHub-tracked projects), Configuration, Issue Tracker Integration, Related Guides, Supported Trackers, Unified Dashboard
+Nodes (6): 1. High-Level Structure, 2. Tech Stack, 3. Architecture Patterns, 4. Development Workflow, 5. Document Findings, Codebase Onboarding
 
 ### Community 882 - "Community 882"
 Cohesion: 0.29
-Nodes (6): code:bash (# Install mkcert), Docker & HTTPS Setup, Overview, Prerequisites, Quick Setup, Related Guides
+Nodes (7): Advanced Usage, code:bash (# Force kill all processes), code:bash (# Stop only dashboard (keep API running)), code:bash (# Stop services and all workspace containers), Force Stop, Stop and Clean Up Workspaces, Stop Specific Services
 
 ### Community 883 - "Community 883"
 Cohesion: 0.29
-Nodes (7): code:yaml (# In projects.yaml), code:bash (# Add manually or let Panopticon manage it), code:yaml (dns:), DNS Configuration, Option 1: .localhost (Recommended), Option 2: /etc/hosts, Option 3: WSL2 Hosts Sync (Windows)
+Nodes (6): code:bash (GITHUB_TOKEN=ghp_xxxxx     # For GitHub-tracked projects), Configuration, Issue Tracker Integration, Related Guides, Supported Trackers, Unified Dashboard
 
 ### Community 884 - "Community 884"
 Cohesion: 0.29
-Nodes (7): 11. Theme Toggle, code:html (<script>), code:css (.no-transitions,), code:typescript (function toggleTheme() {), Flash Prevention, Implementation, Transition Suppression
+Nodes (6): code:bash (# Install mkcert), Docker & HTTPS Setup, Overview, Prerequisites, Quick Setup, Related Guides
 
 ### Community 885 - "Community 885"
 Cohesion: 0.29
-Nodes (6): code:bash (# Set up Kimi API), Files, Model Capability Research Framework, Overview, Research Workflow, Using Kimi 2.5 for Research
+Nodes (7): code:yaml (# In projects.yaml), code:bash (# Add manually or let Panopticon manage it), code:yaml (dns:), DNS Configuration, Option 1: .localhost (Recommended), Option 2: /etc/hosts, Option 3: WSL2 Hosts Sync (Windows)
 
 ### Community 886 - "Community 886"
-Cohesion: 0.33
-Nodes (5): cache, cacheKey, config, configRepos, keys
+Cohesion: 0.29
+Nodes (7): 11. Theme Toggle, code:html (<script>), code:css (.no-transitions,), code:typescript (function toggleTheme() {), Flash Prevention, Implementation, Transition Suppression
 
 ### Community 887 - "Community 887"
-Cohesion: 0.33
-Nodes (5): globalSettings, hookPath, result, validHookPath, workspaceSettings
+Cohesion: 0.29
+Nodes (6): code:bash (# Set up Kimi API), Files, Model Capability Research Framework, Overview, Research Workflow, Using Kimi 2.5 for Research
 
 ### Community 888 - "Community 888"
 Cohesion: 0.33
-Nodes (5): beads, capturedArgs, err, mockExecFileFn, mockExecFn
+Nodes (5): cache, cacheKey, config, configRepos, keys
 
 ### Community 889 - "Community 889"
 Cohesion: 0.33
-Nodes (4): desktopVersion, __dirname, repoRoot, rootVersion
+Nodes (5): globalSettings, hookPath, result, validHookPath, workspaceSettings
 
 ### Community 890 - "Community 890"
-Cohesion: 0.47
-Nodes (5): create_agent(), get_agent_path(), main(), Get the appropriate agent directory based on scope., Create a new subagent file.
+Cohesion: 0.33
+Nodes (5): beads, capturedArgs, err, mockExecFileFn, mockExecFn
 
 ### Community 891 - "Community 891"
-Cohesion: 0.47
-Nodes (5): main(), package_skill(), Validate skill structure and contents., Package a skill folder into a .skill file., validate_skill()
+Cohesion: 0.33
+Nodes (4): desktopVersion, __dirname, repoRoot, rootVersion
 
 ### Community 892 - "Community 892"
 Cohesion: 0.47
-Nodes (3): emit(), load_model(), main()
+Nodes (5): create_agent(), get_agent_path(), main(), Get the appropriate agent directory based on scope., Create a new subagent file.
 
 ### Community 893 - "Community 893"
-Cohesion: 0.33
-Nodes (5): listener(), electron, IPC, result, wrapped()
+Cohesion: 0.47
+Nodes (5): main(), package_skill(), Validate skill structure and contents., Package a skill folder into a .skill file., validate_skill()
 
 ### Community 894 - "Community 894"
+Cohesion: 0.47
+Nodes (3): emit(), load_model(), main()
+
+### Community 895 - "Community 895"
+Cohesion: 0.53
+Nodes (5): getHeader(), getTrustedOrigins(), normalizeOrigin(), _resetTrustedOriginsForTests(), validateOrigin()
+
+### Community 896 - "Community 896"
 Cohesion: 0.33
 Nodes (5): mockConversation, mockMessages, raw, toggle, url
 
-### Community 895 - "Community 895"
+### Community 897 - "Community 897"
 Cohesion: 0.4
 Nodes (3): LogViewerProps, SpecialistLogViewer(), SSEMessage
 
-### Community 897 - "Community 897"
+### Community 899 - "Community 899"
 Cohesion: 0.33
 Nodes (5): Audit Prompt: Distinct Data Captured from tmux Scrollback, Constraints, Instructions, Objective, Output Format
 
-### Community 898 - "Community 898"
+### Community 900 - "Community 900"
 Cohesion: 0.33
 Nodes (6): Auth Flow, code:bash (pan specialists done uat <issueId> --status passed   # Signa), Four Verification Phases, Pipeline Trigger, UAT Specialist (PAN-383), Why UAT Exists
 
-### Community 899 - "Community 899"
+### Community 901 - "Community 901"
 Cohesion: 0.33
 Nodes (6): Agent Behavior After Reopen, Preserving History, Preventing Stale Dispatch, Reopening Issues for Re-Work, What Reopen Resets, Why "In Progress" and Not Backlog
 
-### Community 900 - "Community 900"
+### Community 902 - "Community 902"
 Cohesion: 0.33
 Nodes (6): Browser-Only Mode, code:bash (npx panopticon serve), Desktop App, Installation, Key Features, `pan up` Electron Detection
 
-### Community 901 - "Community 901"
+### Community 903 - "Community 903"
 Cohesion: 0.33
 Nodes (6): code:block1 (┌───────────────────────────────────────────────────────────), code:block2 (┌───────────────────────────────────────────────────────────), Core Concept, Part 1: Architecture Vision, Success Metrics, Unified Architecture
 
-### Community 902 - "Community 902"
-Cohesion: 0.33
-Nodes (6): 8. Complete Content Inventory, MYN Project Template Content, Panopticon Agents (8), Panopticon Dev-Skills (3), Panopticon Skills (64), Project-Scoped (Panopticon repo only)
-
-### Community 903 - "Community 903"
-Cohesion: 0.33
-Nodes (6): Advanced Configuration, code:bash (# View effective configuration), code:bash (# Automatic migration (coming soon in PAN-118-6)), Debugging Model Resolution, Migration from settings.json, Validation
-
 ### Community 904 - "Community 904"
 Cohesion: 0.33
-Nodes (6): code:yaml (models:), code:block27 (Warning: Model gpt-5.2-codex requires openai API key - falli), Example Scenario, Fallback Behavior, Fallback Mappings, Fallback Strategy
+Nodes (6): 3. Real-World Conflict: Mind Your Now, code:block7 (pan workspace create MIN-678), code:yaml (agent:), MYN Project Configuration, Skill Audit (Feb 2026), The Override Problem
 
 ### Community 905 - "Community 905"
 Cohesion: 0.33
-Nodes (6): 10.1 Agent Object (Unified), 10.2 API Endpoints Needed, 10.3 Existing Endpoints to Reuse, 10.4 Real-time Updates, 10. Data Requirements, code:typescript (interface UnifiedAgent {)
+Nodes (6): 8. Complete Content Inventory, MYN Project Template Content, Panopticon Agents (8), Panopticon Dev-Skills (3), Panopticon Skills (64), Project-Scoped (Panopticon repo only)
 
 ### Community 906 - "Community 906"
 Cohesion: 0.33
-Nodes (6): 13. Implementation Plan, Phase 1: Foundation, Phase 2: Live Grid, Phase 3: Detail Panel, Phase 4: Additional Views, Phase 5: Polish
+Nodes (6): code:yaml (models:), code:block27 (Warning: Model gpt-5.2-codex requires openai API key - falli), Example Scenario, Fallback Behavior, Fallback Mappings, Fallback Strategy
 
 ### Community 907 - "Community 907"
 Cohesion: 0.33
-Nodes (6): code:typescript (// workspaces.ts processUnstickRequest — skip git check for ), code:typescript (setReviewStatusBase(issueId, {), G.1 Reuse existing unstick route — do NOT add a new endpoint, G.2 Session ownership, G.3 Liveness-check caveats, G. Recovery flow, session ownership, liveness caveats
+Nodes (6): Advanced Configuration, code:bash (# View effective configuration), code:bash (# Automatic migration (coming soon in PAN-118-6)), Debugging Model Resolution, Migration from settings.json, Validation
 
 ### Community 908 - "Community 908"
 Cohesion: 0.33
-Nodes (6): Detailed flows, Flow A — First-run, Flow B — Adding a second project, Flow C — Editing branch config, Flow D — Re-detecting repos, Flow E — Killing a stuck Setup Agent
+Nodes (6): 13. Implementation Plan, Phase 1: Foundation, Phase 2: Live Grid, Phase 3: Detail Panel, Phase 4: Additional Views, Phase 5: Polish
 
 ### Community 909 - "Community 909"
 Cohesion: 0.33
-Nodes (6): Agent Instructions, Bead Assignments, code:typescript (// src/dashboard/server/routes/{category}.ts), Pattern, Route Conversion Cheat Sheet, Route Migration Details (B6–B17)
+Nodes (6): 10.1 Agent Object (Unified), 10.2 API Endpoints Needed, 10.3 Existing Endpoints to Reuse, 10.4 Real-time Updates, 10. Data Requirements, code:typescript (interface UnifiedAgent {)
 
 ### Community 910 - "Community 910"
 Cohesion: 0.33
-Nodes (6): 1. Reviewers fan out as fresh sessions on every round, 2. Conversation view never loads for agent sessions, 3. The Command Deck has no opinion on issue + agent + workflow as one surface, 4. The view doesn't feel alive, code:block1 (review                  ○ ended), Problem
+Nodes (6): code:typescript (// workspaces.ts processUnstickRequest — skip git check for ), code:typescript (setReviewStatusBase(issueId, {), G.1 Reuse existing unstick route — do NOT add a new endpoint, G.2 Session ownership, G.3 Liveness-check caveats, G. Recovery flow, session ownership, liveness caveats
 
 ### Community 911 - "Community 911"
 Cohesion: 0.33
-Nodes (6): P3 — Merge/test/review structured events, `src/lib/cloister/merge-agent.ts:1071` — test failure baseline, `src/lib/cloister/merge-agent.ts:1744` — `resolveConflictsWithAgent()` sync-main polling, `src/lib/cloister/merge-agent.ts:412` — `parseAgentOutput()`, `src/lib/cloister/merge-agent.ts:684` — `scanGitPatterns()`, `src/lib/cloister/review-agent.ts:139` — `parseAgentOutput()`
+Nodes (6): Detailed flows, Flow A — First-run, Flow B — Adding a second project, Flow C — Editing branch config, Flow D — Re-detecting repos, Flow E — Killing a stuck Setup Agent
 
 ### Community 912 - "Community 912"
 Cohesion: 0.33
-Nodes (5): Context, Decision, Difficulty: trivial, PAN-448: Start Agent confirmation timeout too short, Scope
+Nodes (6): Agent Instructions, Bead Assignments, code:typescript (// src/dashboard/server/routes/{category}.ts), Pattern, Route Conversion Cheat Sheet, Route Migration Details (B6–B17)
 
 ### Community 913 - "Community 913"
 Cohesion: 0.33
-Nodes (6): code:bash (# Option 1: Manual cleanup), Common Causes, Corrupted Workspaces, Prevention, Resolution, Symptoms
+Nodes (6): 1. Reviewers fan out as fresh sessions on every round, 2. Conversation view never loads for agent sessions, 3. The Command Deck has no opinion on issue + agent + workflow as one surface, 4. The view doesn't feel alive, code:block1 (review                  ○ ended), Problem
 
 ### Community 914 - "Community 914"
 Cohesion: 0.33
-Nodes (6): code:bash (# Restart the dashboard), code:bash (# Check Docker memory), Dashboard slow to load, High CPU usage, High memory usage, Performance Issues
+Nodes (6): P3 — Merge/test/review structured events, `src/lib/cloister/merge-agent.ts:1071` — test failure baseline, `src/lib/cloister/merge-agent.ts:1744` — `resolveConflictsWithAgent()` sync-main polling, `src/lib/cloister/merge-agent.ts:412` — `parseAgentOutput()`, `src/lib/cloister/merge-agent.ts:684` — `scanGitPatterns()`, `src/lib/cloister/review-agent.ts:139` — `parseAgentOutput()`
 
 ### Community 915 - "Community 915"
 Cohesion: 0.33
-Nodes (6): 1. Fail loud, fail early, 2. One template, one API, 3. Composition happens in TypeScript, 4. Variables are declared, not discovered, 5. Prompts are not docstrings, Core principles
+Nodes (5): Context, Decision, Difficulty: trivial, PAN-448: Start Agent confirmation timeout too short, Scope
 
 ### Community 916 - "Community 916"
 Cohesion: 0.33
-Nodes (5): code:block9 (<!-- panopticon:orchestration-context-start -->), Further reading, Orchestration markers, Prompt Templates, Why templates at all
+Nodes (6): code:bash (# Restart the dashboard), code:bash (# Check Docker memory), Dashboard slow to load, High CPU usage, High memory usage, Performance Issues
 
 ### Community 917 - "Community 917"
 Cohesion: 0.33
-Nodes (5): Boundaries, code:bash (npm test), Completion, Panopticon Work Agent, Per-Bead Workflow
+Nodes (6): code:bash (# Option 1: Manual cleanup), Common Causes, Corrupted Workspaces, Prevention, Resolution, Symptoms
 
 ### Community 918 - "Community 918"
 Cohesion: 0.33
-Nodes (5): Additional Context (Optional), code:markdown (## Agent: {ISSUE_ID} - {ISSUE_TITLE}), Required Information Table, When to Apply This Format, Workspace Status Display Format
+Nodes (6): 1. Fail loud, fail early, 2. One template, one API, 3. Composition happens in TypeScript, 4. Variables are declared, not discovered, 5. Prompts are not docstrings, Core principles
 
 ### Community 919 - "Community 919"
 Cohesion: 0.33
-Nodes (5): code:bash (pan done <issue-id>), pan done, See Also, What It Does, When to Use
+Nodes (5): code:block9 (<!-- panopticon:orchestration-context-start -->), Further reading, Orchestration markers, Prompt Templates, Why templates at all
 
 ### Community 920 - "Community 920"
 Cohesion: 0.33
-Nodes (6): code:python (# Want: "task-2 depends on task-1" (task-1 blocks task-2)), code:python (# Correct: task-2 depends on task-1), code:bash (bd dep add task-2 task-1 --type blocks), code:bash (bd show task-2), Dependencies Created Backwards, MCP-Specific Issues
+Nodes (5): Boundaries, code:bash (npm test), Completion, Panopticon Work Agent, Per-Bead Workflow
 
 ### Community 921 - "Community 921"
 Cohesion: 0.33
-Nodes (5): Contents, Interface-Specific Troubleshooting, Quick Reference: Common Fixes, Related Documentation, Troubleshooting Guide
+Nodes (5): Additional Context (Optional), code:markdown (## Agent: {ISSUE_ID} - {ISSUE_TITLE}), Required Information Table, When to Apply This Format, Workspace Status Display Format
 
 ### Community 922 - "Community 922"
 Cohesion: 0.33
-Nodes (6): Claude Code Skill Issues, code:bash (# 1. Version), code:bash (ls -la ~/.claude/skills/bd-issue-tracking/), Debug Checklist, Getting Help, Report to beads GitHub
+Nodes (5): code:bash (pan done <issue-id>), pan done, See Also, What It Does, When to Use
 
 ### Community 923 - "Community 923"
 Cohesion: 0.33
-Nodes (5): Limitations, Reference Databases / Glossaries (Alternative Use), Using bd for Static Reference Data, When to Use This Pattern, Work Tracking (Primary Use Case)
+Nodes (6): code:python (# Want: "task-2 depends on task-1" (task-1 blocks task-2)), code:python (# Correct: task-2 depends on task-1), code:bash (bd dep add task-2 task-1 --type blocks), code:bash (bd show task-2), Dependencies Created Backwards, MCP-Specific Issues
 
 ### Community 924 - "Community 924"
 Cohesion: 0.33
-Nodes (5): code:bash (pan resources), code:bash (pan resources --json), Interpreting results, JSON output, System Resource Inventory
+Nodes (6): Claude Code Skill Issues, code:bash (# 1. Version), code:bash (ls -la ~/.claude/skills/bd-issue-tracking/), Debug Checklist, Getting Help, Report to beads GitHub
 
 ### Community 925 - "Community 925"
 Cohesion: 0.33
-Nodes (5): code:bash (pan admin hooks install), pan admin hooks install, See Also, What It Does, When to Use
+Nodes (5): Contents, Interface-Specific Troubleshooting, Quick Reference: Common Fixes, Related Documentation, Troubleshooting Guide
 
 ### Community 926 - "Community 926"
 Cohesion: 0.33
-Nodes (5): code:block1 (https://raw.githubusercontent.com/vercel-labs/web-interface-), Guidelines Source, How It Works, Usage, Web Interface Guidelines
+Nodes (5): Limitations, Reference Databases / Glossaries (Alternative Use), Using bd for Static Reference Data, When to Use This Pattern, Work Tracking (Primary Use Case)
 
 ### Community 927 - "Community 927"
 Cohesion: 0.33
-Nodes (5): Canonical paths, code:bash (# Build first if dashboard server or CLI code changed), Execution, Important Notes, Restart Panopticon
+Nodes (5): code:bash (pan resources), code:bash (pan resources --json), Interpreting results, JSON output, System Resource Inventory
 
 ### Community 928 - "Community 928"
 Cohesion: 0.33
-Nodes (5): After Refactoring, Before Starting, During Refactoring, Refactoring, Refactoring Types
+Nodes (5): code:bash (pan admin hooks install), pan admin hooks install, See Also, What It Does, When to Use
 
 ### Community 929 - "Community 929"
 Cohesion: 0.33
-Nodes (6): code:bash (# One-liner to check everything), code:bash (# Watch agent status (updates every 2 seconds)), Continuous Monitoring, Dashboard Monitoring, Monitoring Workflows, Quick Health Check
+Nodes (5): code:block1 (https://raw.githubusercontent.com/vercel-labs/web-interface-), Guidelines Source, How It Works, Usage, Web Interface Guidelines
 
 ### Community 930 - "Community 930"
 Cohesion: 0.33
-Nodes (6): Alert on Agent Crash, code:bash (#!/bin/bash), code:bash (chmod +x ~/scripts/pan-dashboard.sh), code:bash (#!/bin/bash), Custom Status Dashboard, Status Scripts
+Nodes (5): Canonical paths, code:bash (# Build first if dashboard server or CLI code changed), Execution, Important Notes, Restart Panopticon
 
 ### Community 931 - "Community 931"
 Cohesion: 0.33
-Nodes (5): Architectural rules, Execution steps, Retrieval and networking, Stitch to React Components, Troubleshooting
+Nodes (5): After Refactoring, Before Starting, During Refactoring, Refactoring, Refactoring Types
 
 ### Community 932 - "Community 932"
 Cohesion: 0.33
-Nodes (5): code:bash (pan issues), pan issues, See Also, What It Does, When to Use
+Nodes (6): code:bash (# One-liner to check everything), code:bash (# Watch agent status (updates every 2 seconds)), Continuous Monitoring, Dashboard Monitoring, Monitoring Workflows, Quick Health Check
 
 ### Community 933 - "Community 933"
 Cohesion: 0.33
-Nodes (5): 1. Version Bump, 2. Final Verification, 3. Create Release, 4. Post-Release, Release Process
+Nodes (6): Alert on Agent Crash, code:bash (#!/bin/bash), code:bash (chmod +x ~/scripts/pan-dashboard.sh), code:bash (#!/bin/bash), Custom Status Dashboard, Status Scripts
 
 ### Community 934 - "Community 934"
 Cohesion: 0.33
-Nodes (5): code:bash (pan close <issue-id>), pan close, See Also, What It Does, When to Use
+Nodes (5): Architectural rules, Execution steps, Retrieval and networking, Stitch to React Components, Troubleshooting
 
 ### Community 935 - "Community 935"
 Cohesion: 0.33
-Nodes (6): code:bash (# In ~/.panopticon.env), code:bash (DEBUG=rally pan up), code:bash (curl -X POST http://localhost:3011/api/rally/validate \), Finding Workspace and Project IDs, Rally Troubleshooting, WSAPI Query Parse Errors
+Nodes (5): code:bash (pan issues), pan issues, See Also, What It Does, When to Use
 
 ### Community 936 - "Community 936"
 Cohesion: 0.33
-Nodes (6): code:bash (LINEAR_API_KEY=lin_api_xxxxx), code:yaml (projects:), Issue States, Linear Integration, Setup, Team Mapping
+Nodes (5): 1. Version Bump, 2. Final Verification, 3. Create Release, 4. Post-Release, Release Process
 
 ### Community 937 - "Community 937"
 Cohesion: 0.33
-Nodes (6): code:block2 (~/.panopticon/traefik/), code:yaml (api:), code:yaml (http:), Dynamic Configuration, Static Configuration, Traefik Configuration
+Nodes (5): code:bash (pan close <issue-id>), pan close, See Also, What It Does, When to Use
 
 ### Community 938 - "Community 938"
 Cohesion: 0.33
-Nodes (6): 14. Accessibility, code:block33 (focus-visible:ring-[3px] focus-visible:ring-ring/24 focus-vi), Contrast Ratios, Focus Indicators, Keyboard Navigation, Touch Targets
+Nodes (6): code:bash (# In ~/.panopticon.env), code:bash (DEBUG=rally pan up), code:bash (curl -X POST http://localhost:3011/api/rally/validate \), Finding Workspace and Project IDs, Rally Troubleshooting, WSAPI Query Parse Errors
 
 ### Community 939 - "Community 939"
 Cohesion: 0.33
-Nodes (6): 12. Animation & Motion, code:block29 (Duration: 200ms (default for all state transitions)), code:block30 (Hover highlight:   transition-colors duration-200), Patterns, Rules, Standard Timing
+Nodes (6): code:bash (LINEAR_API_KEY=lin_api_xxxxx), code:yaml (projects:), Issue States, Linear Integration, Setup, Team Mapping
 
 ### Community 940 - "Community 940"
 Cohesion: 0.33
-Nodes (6): 15. Page-Specific Notes, Agents, Board (Kanban), Command Deck (formerly Mission Control), God View, Settings
+Nodes (6): code:block2 (~/.panopticon/traefik/), code:yaml (api:), code:yaml (http:), Dynamic Configuration, Static Configuration, Traefik Configuration
 
 ### Community 941 - "Community 941"
 Cohesion: 0.33
-Nodes (5): Agent Resumed — {{ISSUE_ID}}, Last Known Status: {{STATE_STATUS}}, Operator Message, What To Do Now, Where You Left Off
+Nodes (6): 12. Animation & Motion, code:block29 (Duration: 200ms (default for all state transitions)), code:block30 (Hover highlight:   transition-colors duration-200), Patterns, Rules, Standard Timing
 
 ### Community 942 - "Community 942"
 Cohesion: 0.33
-Nodes (5): Auto-Clarity, Boundaries, Intensity, Persistence, Rules
+Nodes (6): 15. Page-Specific Notes, Agents, Board (Kanban), Command Deck (formerly Mission Control), God View, Settings
 
 ### Community 943 - "Community 943"
+Cohesion: 0.33
+Nodes (6): 14. Accessibility, code:block33 (focus-visible:ring-[3px] focus-visible:ring-ring/24 focus-vi), Contrast Ratios, Focus Indicators, Keyboard Navigation, Touch Targets
+
+### Community 944 - "Community 944"
+Cohesion: 0.33
+Nodes (5): Agent Resumed — {{ISSUE_ID}}, Last Known Status: {{STATE_STATUS}}, Operator Message, What To Do Now, Where You Left Off
+
+### Community 945 - "Community 945"
+Cohesion: 0.33
+Nodes (5): Auto-Clarity, Boundaries, Intensity, Persistence, Rules
+
+### Community 946 - "Community 946"
 Cohesion: 0.4
 Nodes (3): CLI_DIST, __dirname, ROOT
 
-### Community 944 - "Community 944"
+### Community 947 - "Community 947"
 Cohesion: 0.5
 Nodes (4): computeStaleResets(), hasSessionForSpecialist(), StatusSnapshot, updates
 
-### Community 945 - "Community 945"
+### Community 948 - "Community 948"
 Cohesion: 0.4
 Nodes (3): badge, { container }, DIFFICULTY_COLORS
 
-### Community 946 - "Community 946"
-Cohesion: 0.6
-Nodes (4): getSetting(), isDeaconGloballyPaused(), setDeaconGloballyPaused(), setSetting()
-
-### Community 947 - "Community 947"
+### Community 949 - "Community 949"
 Cohesion: 0.4
 Nodes (4): consoleLogs, edges, mockGetStatus, output
 
-### Community 948 - "Community 948"
+### Community 950 - "Community 950"
 Cohesion: 0.4
 Nodes (4): hiddenDir, mockExecFn, subA, subB
 
-### Community 949 - "Community 949"
-Cohesion: 0.4
-Nodes (5): createTerminalWindow(), createWindow(), dispatchMenuAction(), resolveWindowUrl(), showOrCreateWindow()
-
-### Community 950 - "Community 950"
+### Community 951 - "Community 951"
 Cohesion: 0.4
 Nodes (5): randomHex(), resolvePort(), resolveServerEntry(), spawnServer(), startServer()
 
-### Community 951 - "Community 951"
+### Community 952 - "Community 952"
+Cohesion: 0.4
+Nodes (5): createTerminalWindow(), createWindow(), dispatchMenuAction(), resolveWindowUrl(), showOrCreateWindow()
+
+### Community 953 - "Community 953"
+Cohesion: 0.4
+Nodes (3): {
+  execMock,
+  getPullRequestStateMock,
+  isGitHubAppConfiguredMock,
+  mergePullRequestWithAppMock,
+  parsePullRequestRefMock,
+}, kCustom, mergePromise
+
+### Community 954 - "Community 954"
 Cohesion: 0.4
 Nodes (3): entries, messages, workLog
 
-### Community 954 - "Community 954"
+### Community 957 - "Community 957"
 Cohesion: 0.5
 Nodes (4): APP_DIR, generateJWT(), main(), WEBHOOK_EVENTS
 
-### Community 955 - "Community 955"
+### Community 958 - "Community 958"
 Cohesion: 0.4
 Nodes (4): mockCleanupUnreferencedConversationAttachments, mockListActiveConversations, mockListSessionNamesAsync, mockMarkConversationEnded
 
-### Community 956 - "Community 956"
+### Community 959 - "Community 959"
 Cohesion: 0.4
 Nodes (5): code:block26 (Issue Created), code:block27 (mergeStatus:  pending → merging → merged), How the Agent Pipeline Works, Review status state machine, Specialist initialization
 
-### Community 957 - "Community 957"
+### Community 960 - "Community 960"
 Cohesion: 0.4
 Nodes (5): Optional, Platform Support, Required, Requirements, Why CLI tools instead of API tokens?
 
-### Community 958 - "Community 958"
+### Community 961 - "Community 961"
 Cohesion: 0.4
 Nodes (5): code:block22 (Replace stale copies in ~/.panopticon/skills/ with fresh con), code:block23 (For each symlink in ~/.claude/skills/ pointing to ~/.panopti), code:block24 (Copy all skills, agents, rules from ~/.panopticon/ cache → <), code:block25 (Panopticon sync migration:), Migration Path
 
-### Community 959 - "Community 959"
-Cohesion: 0.4
-Nodes (5): code:bash (# Existing local workspace), code:bash (pan workspace migrate MIN-667 --to local), From Local to Remote, Migration Path, Rollback to Local
-
-### Community 960 - "Community 960"
+### Community 962 - "Community 962"
 Cohesion: 0.4
 Nodes (5): code:toml ([remote]), code:yaml (# Project-specific remote settings), Configuration, Project Config (`.panopticon/remote.yaml`), User Config (`~/.panopticon/config.toml`)
 
-### Community 961 - "Community 961"
-Cohesion: 0.4
-Nodes (5): code:yaml (models:), code:yaml (models:), Example Resolution, Precedence Rules, Resolution Order
-
-### Community 962 - "Community 962"
-Cohesion: 0.4
-Nodes (5): code:yaml (models:), code:yaml (models:), Provider Configuration, Provider Management, When Providers are Disabled
-
 ### Community 963 - "Community 963"
 Cohesion: 0.4
-Nodes (5): code:yaml (# ~/.panopticon/cloister.yaml), code:bash (# Override config file location), Configuration, Default Config File, Environment Variables
+Nodes (5): code:bash (# Existing local workspace), code:bash (pan workspace migrate MIN-667 --to local), From Local to Remote, Migration Path, Rollback to Local
 
 ### Community 964 - "Community 964"
 Cohesion: 0.4
-Nodes (5): code:typescript (interface AgentRuntime {), code:yaml (# ~/.panopticon/cloister.yaml), Model Selection, Runtime Architecture, Runtime Interface
+Nodes (5): code:yaml (models:), code:yaml (models:), Example Resolution, Precedence Rules, Resolution Order
 
 ### Community 965 - "Community 965"
 Cohesion: 0.4
-Nodes (5): 8.1 Activity Feed, 8.2 Phase Distribution (Donut Chart), 8.3 System Health Gauges, 8. Right Panel (Persistent), code:block7 (2m    ●  agent-pan-505 started)
+Nodes (5): code:yaml (# ~/.panopticon/cloister.yaml), code:bash (# Override config file location), Configuration, Default Config File, Environment Variables
 
 ### Community 966 - "Community 966"
 Cohesion: 0.4
-Nodes (5): Component, End-to-end (Playwright), Integration, Testing, Unit
+Nodes (5): code:typescript (interface AgentRuntime {), code:yaml (# ~/.panopticon/cloister.yaml), Model Selection, Runtime Architecture, Runtime Interface
 
 ### Community 967 - "Community 967"
 Cohesion: 0.4
-Nodes (5): Branch node (new), Container node (new), Data inventory, PR node (new), Resources group node (new)
+Nodes (5): 8.1 Activity Feed, 8.2 Phase Distribution (Donut Chart), 8.3 System Health Gauges, 8. Right Panel (Persistent), code:block7 (2m    ●  agent-pan-505 started)
 
 ### Community 968 - "Community 968"
 Cohesion: 0.4
-Nodes (5): Visual / data inventory by zone, Zone A — Issue header (always visible), Zone B — Agent context (selected session), Zone C — Conversation + composer (agent-selected), Zone C — Issue-selected mode (no agent selected)
+Nodes (5): Component, End-to-end (Playwright), Integration, Testing, Unit
 
 ### Community 969 - "Community 969"
 Cohesion: 0.4
-Nodes (5): JSONL Session Files (use existing), `runtime.json` (extend existing schema), Specialist Event Files (new, lightweight), WebSocket Terminal (in-memory ring buffer), What Goes Where
+Nodes (5): Branch node (new), Container node (new), Data inventory, PR node (new), Resources group node (new)
 
 ### Community 970 - "Community 970"
 Cohesion: 0.4
-Nodes (5): Hook Extensions Required, Hook reliability (PAN-759), PostToolUse hook, SessionStart hook, Specialist hooks (new)
+Nodes (5): Visual / data inventory by zone, Zone A — Issue header (always visible), Zone B — Agent context (selected session), Zone C — Conversation + composer (agent-selected), Zone C — Issue-selected mode (no agent selected)
 
 ### Community 971 - "Community 971"
 Cohesion: 0.4
-Nodes (5): Implementation Sequence (4 Phases), Phase 1: Fix hooks (BLOCKS EVERYTHING), Phase 2: Structured event files + JSONL readers (can start after Phase 1), Phase 3: Remove high-risk tmux patterns (can start after Phase 1), Phase 4: Migrate remaining consumers (can start after Phase 1)
+Nodes (5): `AgentRuntimeState` (`src/lib/agents.ts:359`), code:typescript (export interface AgentRuntimeState {), code:typescript (// review-results.json), Interface Changes, Specialist Result Files (new)
 
 ### Community 972 - "Community 972"
 Cohesion: 0.4
-Nodes (5): code:block1 (Agent → tmux pane → capture-pane → regex parsing → consumer), code:block2 (Agent → hooks → runtime.json ──┬──→ Dashboard (structured st), Data Flow: Today vs Target, Target (2 layers), Today (3 overlapping layers)
+Nodes (5): JSONL Session Files (use existing), `runtime.json` (extend existing schema), Specialist Event Files (new, lightweight), WebSocket Terminal (in-memory ring buffer), What Goes Where
 
 ### Community 973 - "Community 973"
 Cohesion: 0.4
-Nodes (5): `AgentRuntimeState` (`src/lib/agents.ts:359`), code:typescript (export interface AgentRuntimeState {), code:typescript (// review-results.json), Interface Changes, Specialist Result Files (new)
+Nodes (5): code:block1 (Agent → tmux pane → capture-pane → regex parsing → consumer), code:block2 (Agent → hooks → runtime.json ──┬──→ Dashboard (structured st), Data Flow: Today vs Target, Target (2 layers), Today (3 overlapping layers)
 
 ### Community 974 - "Community 974"
 Cohesion: 0.4
-Nodes (5): Core Changes, Documentation, Error Handling & Validation, Files Modified, Testing
+Nodes (5): Implementation Sequence (4 Phases), Phase 1: Fix hooks (BLOCKS EVERYTHING), Phase 2: Structured event files + JSONL readers (can start after Phase 1), Phase 3: Remove high-risk tmux patterns (can start after Phase 1), Phase 4: Migrate remaining consumers (can start after Phase 1)
 
 ### Community 975 - "Community 975"
 Cohesion: 0.4
-Nodes (4): code:javascript (server: {), Related Guides, Slow Vite/React Frontend with Multiple Workspaces, Troubleshooting
+Nodes (5): Hook Extensions Required, Hook reliability (PAN-759), PostToolUse hook, SessionStart hook, Specialist hooks (new)
 
 ### Community 976 - "Community 976"
 Cohesion: 0.4
-Nodes (5): Can't delete workspace, code:bash (# Check for existing workspace), code:bash (# Via Panopticon (handles Docker cleanup)), Workspace creation fails, Workspace Issues
+Nodes (5): Core Changes, Documentation, Error Handling & Validation, Files Modified, Testing
 
 ### Community 977 - "Community 977"
 Cohesion: 0.4
-Nodes (5): 1. Loader contract tests, 2. Live-template smoke tests, 3. Caller-side tests, Testing prompts, Writing a new smoke test
+Nodes (4): code:javascript (server: {), Related Guides, Slow Vite/React Frontend with Multiple Workspaces, Troubleshooting
 
 ### Community 978 - "Community 978"
 Cohesion: 0.4
-Nodes (5): code:markdown (---), Fields, Frontmatter contract, `requires` vs `optional`, Unknown keys are an error
+Nodes (5): Can't delete workspace, code:bash (# Check for existing workspace), code:bash (# Via Panopticon (handles Docker cleanup)), Workspace creation fails, Workspace Issues
 
 ### Community 979 - "Community 979"
 Cohesion: 0.4
-Nodes (5): Adding a new template, Authoring workflow, code:typescript (import { renderPrompt } from './prompts.js';), Editing an existing template, Migrating a legacy ad-hoc prompt
+Nodes (5): 1. Loader contract tests, 2. Live-template smoke tests, 3. Caller-side tests, Testing prompts, Writing a new smoke test
 
 ### Community 980 - "Community 980"
 Cohesion: 0.4
-Nodes (5): code:mustache ({{#PENDING_FEEDBACK_BLOCK}}), code:typescript (const pendingFeedbackBlock = ctx.pendingFeedback.length > 0), Composition pattern, Example: `resume-work.md`, When to use in-template conditionals vs pre-built blocks
+Nodes (5): code:markdown (---), Fields, Frontmatter contract, `requires` vs `optional`, Unknown keys are an error
 
 ### Community 981 - "Community 981"
 Cohesion: 0.4
-Nodes (4): Boundaries, Outputs, Panopticon Planning Agent, Process
+Nodes (5): code:mustache ({{#PENDING_FEEDBACK_BLOCK}}), code:typescript (const pendingFeedbackBlock = ctx.pendingFeedback.length > 0), Composition pattern, Example: `resume-work.md`, When to use in-template conditionals vs pre-built blocks
 
 ### Community 982 - "Community 982"
 Cohesion: 0.4
-Nodes (5): API Requests, code:bash (# If running in foreground, logs go to stdout), code:bash (# Filter API calls), Dashboard Logs, Server Logs
+Nodes (5): Adding a new template, Authoring workflow, code:typescript (import { renderPrompt } from './prompts.js';), Editing an existing template, Migrating a legacy ad-hoc prompt
 
 ### Community 983 - "Community 983"
 Cohesion: 0.4
-Nodes (5): Clean Old Logs, code:bash (# Create log archive for an issue), code:bash (# Remove logs older than 7 days), Log Retention, Save Important Logs
+Nodes (4): Boundaries, Outputs, Panopticon Planning Agent, Process
 
 ### Community 984 - "Community 984"
 Cohesion: 0.4
@@ -5023,291 +5036,303 @@ Nodes (5): code:block15 (# Automatic logging), code:javascript (// Enable verbos
 
 ### Community 985 - "Community 985"
 Cohesion: 0.4
-Nodes (5): code:bash (# Command history (if configured)), code:bash (# Traefik logs), Docker Logs (if using), Panopticon Commands, System Logs
+Nodes (5): Clean Old Logs, code:bash (# Create log archive for an issue), code:bash (# Remove logs older than 7 days), Log Retention, Save Important Logs
 
 ### Community 986 - "Community 986"
 Cohesion: 0.4
-Nodes (5): code:bash (rm .panopticon/knowledge-capture.json), code:bash (rm -rf .claude/skills/project-knowledge/), code:bash (rm -rf .claude/skills/knowledge-capture/), code:bash (# Edit ~/.claude/CLAUDE.md and remove the "AI Suggestion Pre), Reset / Clean Slate
+Nodes (5): API Requests, code:bash (# If running in foreground, logs go to stdout), code:bash (# Filter API calls), Dashboard Logs, Server Logs
 
 ### Community 987 - "Community 987"
 Cohesion: 0.4
-Nodes (5): Breaking Changes, code:bash (bd version), code:bash (# Update Claude Code beads plugin), Minimum Version for Dependency Persistence, Version Requirements
+Nodes (5): code:bash (# Command history (if configured)), code:bash (# Traefik logs), Docker Logs (if using), Panopticon Commands, System Logs
 
 ### Community 988 - "Community 988"
 Cohesion: 0.4
-Nodes (5): code:bash (bd version), code:bash (# Via Homebrew (macOS/Linux)), code:bash (pkill -f "bd daemon"  # Kill old daemon), code:bash (bd create "Test A" -t task), Resolution
+Nodes (5): code:bash (rm .panopticon/knowledge-capture.json), code:bash (rm -rf .claude/skills/project-knowledge/), code:bash (rm -rf .claude/skills/knowledge-capture/), code:bash (# Edit ~/.claude/CLAUDE.md and remove the "AI Suggestion Pre), Reset / Clean Slate
 
 ### Community 989 - "Community 989"
 Cohesion: 0.4
-Nodes (5): code:bash (# Single issue), code:bash (bd ready), Human-Readable Output, JSON Output (Recommended for Agents), Output Formats
+Nodes (5): Breaking Changes, code:bash (bd version), code:bash (# Update Claude Code beads plugin), Minimum Version for Dependency Persistence, Version Requirements
 
 ### Community 990 - "Community 990"
 Cohesion: 0.4
-Nodes (5): code:bash (# Link discovered work (old way - two commands)), code:bash (# Label management (supports multiple IDs)), Dependencies, Dependencies & Labels, Labels
+Nodes (5): code:bash (# Single issue), code:bash (bd ready), Human-Readable Output, JSON Output (Recommended for Agents), Output Formats
 
 ### Community 991 - "Community 991"
 Cohesion: 0.4
-Nodes (5): Basic Operations, Check Status, code:bash (# Check database path and daemon status), code:bash (# Find ready work (no blockers)), Find Work
+Nodes (5): code:bash (# Link discovered work (old way - two commands)), code:bash (# Label management (supports multiple IDs)), Dependencies, Dependencies & Labels, Labels
 
 ### Community 992 - "Community 992"
 Cohesion: 0.4
-Nodes (5): Background vs Foreground, Check Running Processes, code:bash (# Using pan), code:bash (# Background (default) - services run as daemons), Process Management
+Nodes (5): Basic Operations, Check Status, code:bash (# Check database path and daemon status), code:bash (# Find ready work (no blockers)), Find Work
 
 ### Community 993 - "Community 993"
 Cohesion: 0.4
-Nodes (5): Animation System, code:tsx (// Container: stagger children by 0.1s), Framer Motion (Auth/Splash), Tailwind Keyframes, Task Completion
+Nodes (5): Background vs Foreground, Check Running Processes, code:bash (# Using pan), code:bash (# Background (default) - services run as daemons), Process Management
 
 ### Community 994 - "Community 994"
 Cohesion: 0.4
-Nodes (5): Breakpoints, code:tsx (// Page container), Common Patterns, Spacing & Layout, Spacing Scale
+Nodes (5): code:bash (nvm install 18), code:bash (sudo systemctl start docker  # Linux), code:bash (pan up), code:bash (# Check API key in config), `pan doctor` shows errors
 
 ### Community 995 - "Community 995"
 Cohesion: 0.4
-Nodes (5): code:block3 (text-foreground         Primary text), Font Stack, Text Colors, Type Scale, Typography
+Nodes (5): Brand Colors, Brand Identity, Brand Wordmark, code:tsx (<h1>), Logo
 
 ### Community 996 - "Community 996"
 Cohesion: 0.4
-Nodes (5): Brand Colors, Brand Identity, Brand Wordmark, code:tsx (<h1>), Logo
+Nodes (5): Breakpoints, code:tsx (// Page container), Common Patterns, Spacing & Layout, Spacing Scale
 
 ### Community 997 - "Community 997"
 Cohesion: 0.4
-Nodes (4): Architecture Quality Gate, Structural integrity, Styling and theming, Type safety and syntax
+Nodes (5): Animation System, code:tsx (// Container: stagger children by 0.1s), Framer Motion (Auth/Splash), Tailwind Keyframes, Task Completion
 
 ### Community 998 - "Community 998"
 Cohesion: 0.4
-Nodes (4): Additional Checks, Output Format, OWASP Top 10 Checklist, Security Review
+Nodes (5): code:block3 (text-foreground         Primary text), Font Stack, Text Colors, Type Scale, Typography
 
 ### Community 999 - "Community 999"
 Cohesion: 0.4
-Nodes (5): code:bash (pan down), code:bash (pan down --force), Forceful Shutdown, Graceful Shutdown (default), Graceful vs Forceful Shutdown
+Nodes (4): Architecture Quality Gate, Structural integrity, Styling and theming, Type safety and syntax
 
 ### Community 1000 - "Community 1000"
 Cohesion: 0.4
-Nodes (5): code:yaml (projects:), Configuration Fields, Custom ID Patterns, Supported Formats, Unified Issue ID Parser
+Nodes (4): Additional Checks, Output Format, OWASP Top 10 Checklist, Security Review
 
 ### Community 1001 - "Community 1001"
 Cohesion: 0.4
-Nodes (5): code:yaml (projects:), code:markdown (<!-- In an agent's STATE.md -->), Mixed Tracker Pattern, Multi-Tracker Workflows, Syncing Between Trackers
+Nodes (5): code:bash (pan down), code:bash (pan down --force), Forceful Shutdown, Graceful Shutdown (default), Graceful vs Forceful Shutdown
 
 ### Community 1002 - "Community 1002"
 Cohesion: 0.4
-Nodes (5): code:block10 (myproject!23  # GitLab issue/MR), code:bash (# Authenticate with GitLab CLI), GitLab Issues, Issue Prefix, Setup
+Nodes (5): code:yaml (projects:), Configuration Fields, Custom ID Patterns, Supported Formats, Unified Issue ID Parser
 
 ### Community 1003 - "Community 1003"
 Cohesion: 0.4
-Nodes (5): code:yaml (# infra/.devcontainer-template/docker-compose.yml.template), code:bash (docker network create panopticon), Docker Compose Template, Network Setup, Workspace Container Setup
+Nodes (5): code:block10 (myproject!23  # GitLab issue/MR), code:bash (# Authenticate with GitLab CLI), GitLab Issues, Issue Prefix, Setup
 
 ### Community 1004 - "Community 1004"
 Cohesion: 0.4
-Nodes (5): Certificate Generation, code:bash (# Generate certificates for localhost domains), code:bash (# Generate certificates for custom domain), For Custom Domains, Using mkcert
+Nodes (5): code:yaml (projects:), code:markdown (<!-- In an agent's STATE.md -->), Mixed Tracker Pattern, Multi-Tracker Workflows, Syncing Between Trackers
 
 ### Community 1005 - "Community 1005"
 Cohesion: 0.4
-Nodes (5): code:bash (pan up), code:bash (# Start Traefik container), Manually, Starting Traefik, Via Dashboard
+Nodes (5): code:yaml (# infra/.devcontainer-template/docker-compose.yml.template), code:bash (docker network create panopticon), Docker Compose Template, Network Setup, Workspace Container Setup
 
 ### Community 1006 - "Community 1006"
 Cohesion: 0.4
-Nodes (5): 8. Navigation (Sidebar), code:block22 (Sidebar), code:block23 (Expanded width:  256px  (16rem)), Specs, Structure
+Nodes (5): code:bash (pan up), code:bash (# Start Traefik container), Manually, Starting Traefik, Via Dashboard
 
 ### Community 1007 - "Community 1007"
 Cohesion: 0.4
-Nodes (5): 13. Icons, code:block31 (Default:  18px (w-[18px] h-[18px])), code:block32 (Command Deck:  Compass), Nav Icons, Sizing
+Nodes (5): Certificate Generation, code:bash (# Generate certificates for localhost domains), code:bash (# Generate certificates for custom domain), For Custom Domains, Using mkcert
 
 ### Community 1008 - "Community 1008"
 Cohesion: 0.4
-Nodes (4): Acceptance Criteria, Scope, Summary, What NOT to do
+Nodes (5): 13. Icons, code:block31 (Default:  18px (w-[18px] h-[18px])), code:block32 (Command Deck:  Compass), Nav Icons, Sizing
 
 ### Community 1009 - "Community 1009"
 Cohesion: 0.4
-Nodes (4): Auto-Clarity, Boundaries, Examples, Rules
+Nodes (5): 8. Navigation (Sidebar), code:block22 (Sidebar), code:block23 (Expanded width:  256px  (16rem)), Specs, Structure
 
 ### Community 1010 - "Community 1010"
+Cohesion: 0.4
+Nodes (4): Acceptance Criteria, Scope, Summary, What NOT to do
+
+### Community 1011 - "Community 1011"
+Cohesion: 0.4
+Nodes (4): Auto-Clarity, Boundaries, Examples, Rules
+
+### Community 1012 - "Community 1012"
 Cohesion: 0.5
 Nodes (3): client, content, mockExeca
 
-### Community 1011 - "Community 1011"
+### Community 1013 - "Community 1013"
 Cohesion: 0.5
 Nodes (3): mockGetVBriefACStatus, mockSyncBeadStatusToVBrief, result
 
-### Community 1013 - "Community 1013"
+### Community 1014 - "Community 1014"
 Cohesion: 0.5
 Nodes (3): config, env, mockExistsSync
 
-### Community 1014 - "Community 1014"
+### Community 1015 - "Community 1015"
 Cohesion: 0.5
 Nodes (3): src, stripped, topLevelAwaits
 
-### Community 1016 - "Community 1016"
+### Community 1017 - "Community 1017"
 Cohesion: 0.5
 Nodes (4): buildMenuTemplate(), configureApplicationMenu(), onUpdateStatusChange(), rebuildMenu()
 
-### Community 1017 - "Community 1017"
+### Community 1019 - "Community 1019"
 Cohesion: 0.67
 Nodes (3): execAsync, rebaseFeatureBranch(), RebaseResult
 
-### Community 1018 - "Community 1018"
+### Community 1020 - "Community 1020"
 Cohesion: 0.5
 Nodes (3): mockLoadConfig, mockResolveModelId, settings
 
-### Community 1020 - "Community 1020"
+### Community 1022 - "Community 1022"
 Cohesion: 0.5
 Nodes (3): mockSystemHealth, pill, requests
 
-### Community 1021 - "Community 1021"
+### Community 1023 - "Community 1023"
 Cohesion: 0.5
 Nodes (3): MOTION_CATALOG, MotionEntry, MotionEventType
 
-### Community 1022 - "Community 1022"
+### Community 1024 - "Community 1024"
 Cohesion: 0.5
 Nodes (3): mockExecAsync, mockSpawn, program
 
-### Community 1023 - "Community 1023"
+### Community 1025 - "Community 1025"
 Cohesion: 0.5
 Nodes (4): Merge Agent Workflow, Review Agent Workflow, Specialist Agent Processing, Test Agent Workflow
 
-### Community 1024 - "Community 1024"
-Cohesion: 0.5
-Nodes (4): Comparison, Cost Analysis, exe.dev Pricing, Recommended Setup
-
-### Community 1025 - "Community 1025"
-Cohesion: 0.5
-Nodes (4): Implementation phases, Phase 1: Core resource tree, Phase 2: Container actions, Phase 3: Data enrichment
-
 ### Community 1026 - "Community 1026"
 Cohesion: 0.5
-Nodes (4): Component architecture, Existing components reused, Modified components, New components
+Nodes (4): code:block19 (~/.claude/skills/my-override/               ← WINS (personal), code:block20 (~/.claude/skills/my-override/               ← WINS (personal), code:block21 (workspace/.claude/skills/session-health/   ← MYN template ve), Precedence in Practice
 
 ### Community 1027 - "Community 1027"
 Cohesion: 0.5
-Nodes (4): code:typescript (return conditions.length > 0 ? conditions.join(' AND ') : ''), code:block3 (((ScheduleState != "Completed") AND (ScheduleState != "Accep), code:block4 ((((ScheduleState != "Completed") AND (ScheduleState != "Acce), Root Cause Analysis
+Nodes (4): C.3 Add pulsing border and recovery badge to the card, code:typescript (<div), code:typescript (const recoveryBorderClass = isRecoveryInProgress && !isPerma), code:typescript (className={`relative ... bg-gradient-to-br ${cardTone} ${rec)
 
 ### Community 1028 - "Community 1028"
 Cohesion: 0.5
-Nodes (4): Phase 1: Core Fix (Immediate), Phase 2: Validation & Testing (Same PR), Phase 3: Integration & Documentation (Follow-up), Rollout Plan
+Nodes (4): Component architecture, Existing components reused, Modified components, New components
 
 ### Community 1029 - "Community 1029"
 Cohesion: 0.5
-Nodes (4): Integration Tests, Manual Testing, Testing Strategy, Unit Tests
+Nodes (4): Implementation phases, Phase 1: Core resource tree, Phase 2: Container actions, Phase 3: Data enrichment
 
 ### Community 1030 - "Community 1030"
 Cohesion: 0.5
-Nodes (4): code:markdown (### Rally Troubleshooting), code:block15, code:block16 (This will log the actual WSAPI queries being sent.), Task 8: Update Documentation
+Nodes (4): Integration Tests, Manual Testing, Testing Strategy, Unit Tests
 
 ### Community 1031 - "Community 1031"
 Cohesion: 0.5
-Nodes (4): code:bash (# System info), Diagnostic Information, Getting Help, Resources
+Nodes (4): code:markdown (### Rally Troubleshooting), code:block15, code:block16 (This will log the actual WSAPI queries being sent.), Task 8: Update Documentation
 
 ### Community 1032 - "Community 1032"
 Cohesion: 0.5
-Nodes (3): Boundaries, Panopticon Review Agent, Responsibilities
+Nodes (4): code:typescript (return conditions.length > 0 ? conditions.join(' AND ') : ''), code:block3 (((ScheduleState != "Completed") AND (ScheduleState != "Accep), code:block4 ((((ScheduleState != "Completed") AND (ScheduleState != "Acce), Root Cause Analysis
 
 ### Community 1033 - "Community 1033"
 Cohesion: 0.5
-Nodes (3): Boundaries, Panopticon Merge Agent, Responsibilities
+Nodes (4): Phase 1: Core Fix (Immediate), Phase 2: Validation & Testing (Same PR), Phase 3: Integration & Documentation (Follow-up), Rollout Plan
 
 ### Community 1034 - "Community 1034"
 Cohesion: 0.5
-Nodes (3): Boundaries, Panopticon UAT Agent, Responsibilities
+Nodes (4): code:bash (# System info), Diagnostic Information, Getting Help, Resources
 
 ### Community 1035 - "Community 1035"
 Cohesion: 0.5
-Nodes (3): Boundaries, Panopticon Test Agent, Responsibilities
+Nodes (3): Boundaries, Panopticon Review Agent, Responsibilities
 
 ### Community 1036 - "Community 1036"
 Cohesion: 0.5
-Nodes (3): Boundaries, Panopticon Inspect Agent, Responsibilities
+Nodes (3): Boundaries, Panopticon Merge Agent, Responsibilities
 
 ### Community 1037 - "Community 1037"
 Cohesion: 0.5
-Nodes (4): High-Confidence Triggers (Always Invoke), Low-Confidence Triggers (Check Config First), Medium-Confidence Triggers (Invoke After 2+ Occurrences), When to Trigger (Self-Assessment)
+Nodes (3): Boundaries, Panopticon UAT Agent, Responsibilities
 
 ### Community 1038 - "Community 1038"
 Cohesion: 0.5
-Nodes (3): pan approve — REMOVED, What to do instead, Why
+Nodes (3): Boundaries, Panopticon Test Agent, Responsibilities
 
 ### Community 1039 - "Community 1039"
 Cohesion: 0.5
-Nodes (4): code:block2 (After Compaction:), code:block3 (bd update issue-42 --notes "COMPLETED: User authentication -), code:block4 (bd update issue-42 --notes "Working on auth feature. Made so), Compaction Survival {#compaction-survival}
+Nodes (3): Boundaries, Panopticon Inspect Agent, Responsibilities
 
 ### Community 1040 - "Community 1040"
 Cohesion: 0.5
-Nodes (4): Advanced Features, Learn More, Next Steps, Productivity Tips
+Nodes (4): High-Confidence Triggers (Always Invoke), Low-Confidence Triggers (Check Config First), Medium-Confidence Triggers (Invoke After 2+ Occurrences), When to Trigger (Self-Assessment)
 
 ### Community 1041 - "Community 1041"
 Cohesion: 0.5
-Nodes (4): Critical Issues, Healthy System, Needs Attention, Performance Indicators
+Nodes (3): pan approve — REMOVED, What to do instead, Why
 
 ### Community 1042 - "Community 1042"
 Cohesion: 0.5
-Nodes (4): Agent States, Service States, Status Interpretation, Workspace States
+Nodes (4): code:block2 (After Compaction:), code:block3 (bd update issue-42 --notes "COMPLETED: User authentication -), code:block4 (bd update issue-42 --notes "Working on auth feature. Made so), Compaction Survival {#compaction-survival}
 
 ### Community 1043 - "Community 1043"
 Cohesion: 0.5
-Nodes (3): Metadata schema, Stitch API reference, Technical mapping rules
+Nodes (4): Advanced Features, Learn More, Next Steps, Productivity Tips
 
 ### Community 1044 - "Community 1044"
 Cohesion: 0.5
-Nodes (4): Auto-Shutdown, code:bash (# Stop on user logout), Manual Triggers, On System Shutdown (systemd)
+Nodes (4): Critical Issues, Healthy System, Needs Attention, Performance Indicators
 
 ### Community 1045 - "Community 1045"
 Cohesion: 0.5
+Nodes (4): Agent States, Service States, Status Interpretation, Workspace States
+
+### Community 1046 - "Community 1046"
+Cohesion: 0.5
+Nodes (3): Metadata schema, Stitch API reference, Technical mapping rules
+
+### Community 1047 - "Community 1047"
+Cohesion: 0.5
+Nodes (4): Auto-Shutdown, code:bash (# Stop on user logout), Manual Triggers, On System Shutdown (systemd)
+
+### Community 1048 - "Community 1048"
+Cohesion: 0.5
 Nodes (4): Best Practices, Performance, Resource Management, Security
 
-### Community 1053 - "Community 1053"
-Cohesion: 0.67
-Nodes (3): code:block10 (pan sync), code:block11 (pan sync), What `pan sync` Does: Today vs End-State
-
-### Community 1054 - "Community 1054"
+### Community 1056 - "Community 1056"
 Cohesion: 0.67
 Nodes (3): code:json ({), code:json ({), Manifest Tracking
 
-### Community 1055 - "Community 1055"
+### Community 1057 - "Community 1057"
 Cohesion: 0.67
-Nodes (3): C.5 Update `phaseLabel` to show recovery state, code:typescript (const phaseLabel =), code:typescript (const phaseLabel =)
+Nodes (3): code:block10 (pan sync), code:block11 (pan sync), What `pan sync` Does: Today vs End-State
 
-### Community 1056 - "Community 1056"
+### Community 1058 - "Community 1058"
+Cohesion: 0.67
+Nodes (3): code:bash (pan conversations embed                      # all enriched,), code:yaml (# config.yaml), Embeddings
+
+### Community 1059 - "Community 1059"
 Cohesion: 0.67
 Nodes (3): code:block1 (<Project: mind-your-now>), Problem, What the user wants
 
 ### Community 1060 - "Community 1060"
 Cohesion: 0.67
+Nodes (3): code:typescript (export function validateRallyConfig(config: RallyConfig): {), code:typescript (private async pollRally(): Promise<void> {), Task 5: Add Configuration Validation
+
+### Community 1064 - "Community 1064"
+Cohesion: 0.67
 Nodes (3): code:bash (grep -A 20 "## AI Suggestion Preferences" ~/.claude/CLAUDE.m), code:markdown (## AI Suggestion Preferences), Step 0.5: Check User Preferences for Category Exclusions
 
-### Community 1061 - "Community 1061"
-Cohesion: 0.67
-Nodes (3): code:block23 (Unblocking Workflow:), code:block24 (Situation: bd ready shows nothing), Unblocking Work {#unblocking}
-
-### Community 1062 - "Community 1062"
+### Community 1065 - "Community 1065"
 Cohesion: 0.67
 Nodes (3): code:block13 (Side Quest Workflow:), code:block14 (Main task: Adding user profiles), Side Quest Handling {#side-quests}
 
-### Community 1063 - "Community 1063"
+### Community 1066 - "Community 1066"
 Cohesion: 0.67
 Nodes (3): High-Quality Plan, Needs Improvement, Plan Quality Indicators
 
-### Community 1064 - "Community 1064"
+### Community 1067 - "Community 1067"
 Cohesion: 0.67
 Nodes (3): After Planning, code:bash (# Create workspace with plan), code:bash (# Agent reads plan)
 
 ## Knowledge Gaps
-- **11459 isolated node(s):** `FIXTURES_DIR`, `TEMP_ROOT_DIR`, `__dirname`, `ROOT`, `CLI_DIST` (+11454 more)
+- **11461 isolated node(s):** `FIXTURES_DIR`, `TEMP_ROOT_DIR`, `__dirname`, `ROOT`, `CLI_DIST` (+11456 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **37 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **36 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `fetch` connect `Community 8` to `Community 641`, `Community 3`, `Community 133`, `Community 6`, `Community 9`, `Community 10`, `Community 396`, `Community 140`, `Community 526`, `Community 15`, `Community 14`, `Community 276`, `Community 20`, `Community 21`, `Community 22`, `Community 24`, `Community 25`, `Community 26`, `Community 29`, `Community 30`, `Community 159`, `Community 32`, `Community 33`, `Community 548`, `Community 36`, `Community 38`, `Community 39`, `Community 40`, `Community 556`, `Community 45`, `Community 44`, `Community 48`, `Community 51`, `Community 180`, `Community 954`, `Community 58`, `Community 61`, `Community 64`, `Community 65`, `Community 77`, `Community 86`, `Community 87`, `Community 743`, `Community 491`, `Community 247`, `Community 633`?**
-  _High betweenness centrality (0.049) - this node is a cross-community bridge._
-- **Why does `ComplexityLevel` connect `Community 131` to `Community 0`, `Community 202`, `Community 14`?**
-  _High betweenness centrality (0.017) - this node is a cross-community bridge._
-- **Why does `notifyPipeline()` connect `Community 40` to `Community 8`, `Community 1`, `Community 3`?**
+- **Why does `fetch` connect `Community 1` to `Community 0`, `Community 641`, `Community 2`, `Community 133`, `Community 6`, `Community 10`, `Community 14`, `Community 527`, `Community 16`, `Community 400`, `Community 272`, `Community 17`, `Community 20`, `Community 21`, `Community 528`, `Community 279`, `Community 23`, `Community 26`, `Community 156`, `Community 30`, `Community 34`, `Community 36`, `Community 40`, `Community 554`, `Community 45`, `Community 177`, `Community 178`, `Community 55`, `Community 56`, `Community 57`, `Community 957`, `Community 76`, `Community 589`, `Community 15`, `Community 209`, `Community 594`, `Community 741`, `Community 490`, `Community 107`, `Community 117`, `Community 373`, `Community 635`, `Community 637`?**
+  _High betweenness centrality (0.043) - this node is a cross-community bridge._
+- **Why does `ComplexityLevel` connect `Community 130` to `Community 10`, `Community 19`, `Community 7`?**
+  _High betweenness centrality (0.019) - this node is a cross-community bridge._
+- **Why does `notifyPipeline()` connect `Community 16` to `Community 1`, `Community 2`, `Community 3`?**
   _High betweenness centrality (0.010) - this node is a cross-community bridge._
 - **Are the 158 inferred relationships involving `fetch` (e.g. with `main()` and `main()`) actually correct?**
   _`fetch` has 158 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `FIXTURES_DIR`, `TEMP_ROOT_DIR`, `__dirname` to the rest of the system?**
-  _11459 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _11461 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.03 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.02 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.03 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.02 - nodes in this community are weakly interconnected._

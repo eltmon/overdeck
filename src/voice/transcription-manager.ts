@@ -1,3 +1,4 @@
+import { createGoogleCloudTranscription } from './google-cloud-transcription.js';
 import { createMoonshineTranscription, type ITurnEmitter } from './transcription.js';
 
 export interface VoiceSettings {
@@ -21,7 +22,10 @@ export function createTranscriptionManager(settings: VoiceSettings): Transcripti
     if (settings.stt.provider === 'moonshine') {
       return createMoonshineTranscription(settings.stt.moonshine.model);
     }
-    throw new Error('Google Cloud STT provider is not implemented yet');
+    return createGoogleCloudTranscription(
+      settings.stt.googleCloud.apiKey,
+      settings.stt.googleCloud.model
+    );
   };
 
   return {
