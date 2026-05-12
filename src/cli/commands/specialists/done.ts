@@ -118,13 +118,17 @@ export async function doneCommand(
       break;
 
     case 'ship':
+      // Ship role completion: mark ready for merge when passed
+      // Cost capture happens async via the specialists/done HTTP endpoint
       if (options.status === 'passed') {
         update.readyForMerge = true;
         console.log(chalk.green(`✓ Ship completed for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Ready for merge'));
+        console.log(chalk.dim('  Ready for human merge'));
       } else {
-        console.log(chalk.yellow(`✗ Ship failed for ${normalizedIssueId}`));
+        console.log(chalk.red(`✗ Ship failed for ${normalizedIssueId}`));
+        console.log(chalk.dim('  Human triage required'));
       }
+      if (options.notes) update.reviewNotes = options.notes;
       break;
   }
 

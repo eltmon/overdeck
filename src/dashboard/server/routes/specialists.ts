@@ -229,6 +229,44 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
   })),
 );
 
+/**
+ * Capture ship role cost from session file (async, non-blocking)
+ * Called via setImmediate to avoid blocking the HTTP response handler.
+ */
+async function captureShipCost(
+  issueId: string,
+  sessionId: string,
+  status: string,
+): Promise<void> {
+  try {
+    const { findSessionFile } = await import('../../../lib/cloister/specialists.js');
+    const { parseClaudeSession } = await import('../../../lib/cost-parsers/jsonl-parser.js');
+    const { emitActivityEntry } = await import('../../../lib/activity-logger.js');
+    const sessionFile = findSessionFile(sessionId);
+    if (sessionFile) {
+      const usage = parseClaudeSession(sessionFile);
+      if (usage) {
+        const cost = usage.cost_v2 ?? usage.cost;
+        const model = usage.model;
+        const duration = usage.endTime && usage.startTime
+          ? Math.round((new Date(usage.endTime).getTime() - new Date(usage.startTime).getTime()) / 1000)
+          : null;
+        emitActivityEntry({
+          source: 'ship',
+          level: status === 'passed' ? 'success' : 'error',
+          message: `Ship role ${status} for ${issueId}: cost $${cost.toFixed(4)} (${model})${duration ? `, ${duration}s` : ''}`,
+          issueId,
+        });
+        console.log(`[specialists/done] Ship role cost captured: $${cost.toFixed(4)} for ${issueId} (session: ${sessionId})`);
+      }
+    } else {
+      console.log(`[specialists/done] Ship session file not found for ${sessionId}`);
+    }
+  } catch (err) {
+    console.error(`[specialists/done] Failed to capture ship cost:`, err instanceof Error ? err.message : String(err));
+  }
+}
+
 // ─── Route: POST /api/specialists/done ───────────────────────────────────────
 // CRITICAL: This endpoint has idempotency guards — see CLAUDE.md.
 // Must be registered before /:name/* routes to prevent "done" matching as :name.
@@ -333,38 +371,17 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         break;
 
       case 'ship':
-        // Ship role completion: capture cost from session file and log to audit log
-        // No reviewStatus field to update for ship - it runs as part of merge flow
+        // Ship role completion: set readyForMerge when passed, and capture cost async
+        if (status === 'passed') {
+          update.readyForMerge = true;
+        }
+        // Emit cost capture as a fire-and-forget async task (does not block route response)
         if (sessionId) {
-          yield* Effect.promise(async () => {
-            try {
-              const { findSessionFile } = await import('../../../lib/cloister/specialists.js');
-              const { parseClaudeSession } = await import('../../../lib/cost-parsers/jsonl-parser.js');
-              const { emitActivityEntry } = await import('../../../lib/activity-logger.js');
-              const sessionFile = findSessionFile(sessionId);
-              if (sessionFile) {
-                const usage = parseClaudeSession(sessionFile);
-                if (usage) {
-                  const cost = usage.cost_v2 ?? usage.cost;
-                  const model = usage.model;
-                  const duration = usage.endTime && usage.startTime
-                    ? Math.round((new Date(usage.endTime).getTime() - new Date(usage.startTime).getTime()) / 1000)
-                    : null;
-                  // Emit activity entry for dashboard visibility
-                  emitActivityEntry({
-                    source: 'ship',
-                    level: status === 'passed' ? 'success' : 'error',
-                    message: `Ship role ${status} for ${normalizedIssueId}: cost $${cost.toFixed(4)} (${model})${duration ? `, ${duration}s` : ''}`,
-                    issueId: normalizedIssueId,
-                  });
-                  console.log(`[specialists/done] Ship role cost captured: $${cost.toFixed(4)} for ${normalizedIssueId} (session: ${sessionId})`);
-                }
-              } else {
-                console.log(`[specialists/done] Ship session file not found for ${sessionId}`);
-              }
-            } catch (err) {
+          // Use setImmediate to avoid blocking the HTTP response handler
+          setImmediate(() => {
+            captureShipCost(normalizedIssueId, sessionId, status).catch((err) => {
               console.error(`[specialists/done] Failed to capture ship cost:`, err instanceof Error ? err.message : String(err));
-            }
+            });
           });
         }
         break;

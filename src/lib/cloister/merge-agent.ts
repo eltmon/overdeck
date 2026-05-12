@@ -982,6 +982,11 @@ TARGET BRANCH: ${options.targetBranch}
 
 Prepare this already-reviewed branch for the dashboard's human Merge button.
 
+IMPORTANT - Conflict resolution rule:
+- When rebase reports conflicts, resolve only the files git reports as conflicting.
+- Do NOT run 'git diff --check' or full-file conflict-marker scans on the entire tree.
+- A stale tool call referencing a path that no longer exists means you are using cached state. Always read the actual workspace tree.
+
 Bail-out threshold:
 - If total cost exceeds $5.00 USD, stop and report SHIP BLOCKED with the cost and conflict count.
 - If there are more than 10 conflict files, stop and report SHIP BLOCKED — this needs human triage.
@@ -994,10 +999,8 @@ Required steps:
 4. Resolve rebase conflicts if they are narrow and source-level. If conflicts are broad, abort and report SHIP BLOCKED.
 5. Run the required verification gates from the project instructions (at minimum: npm run typecheck, npm run lint, npm test when present/applicable).
 6. Push the prepared feature branch with --force-with-lease.
-7. Mark the issue ready for the human merge button:
-   curl -s -X POST ${options.apiUrl}/api/review/${options.issueId}/status \\
-     -H "Content-Type: application/json" \\
-     -d '{"readyForMerge":true}'
+7. Mark the issue ready for merge by calling:
+   pan admin specialists done ship ${options.issueId} --status passed --notes "<summary of verification results>"
 8. Report SHIP READY with the pushed commit and verification summary.
 
 No-rescan rule:
@@ -1040,7 +1043,9 @@ Required steps:
 3. Resolve conflict markers in each listed file by preserving the feature branch intent and current main behavior.
 4. Run the relevant verification gates from the project instructions.
 5. Commit the sync-main conflict resolution if the merge requires a commit, then push the workspace branch with --force-with-lease if needed.
-6. Report SHIP READY for the sync-main conflict resolution, or SHIP BLOCKED with exact files and reasons.
+6. Mark completion by calling:
+   pan admin specialists done ship ${options.issueId} --status passed --notes "Resolved ${options.conflictFiles.length} sync-main conflicts"
+   Or if blocked: pan admin specialists done ship ${options.issueId} --status failed --notes "<reason>"
 
 Bail-out threshold:
 - If total cost exceeds $5.00 USD, stop and report SHIP BLOCKED with the cost and conflict count.

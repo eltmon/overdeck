@@ -92,9 +92,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
       prompt: expect.stringContaining('Prepare this already-reviewed branch for the dashboard\'s human Merge button'),
     }));
     const prompt = vi.mocked(spawnRun).mock.calls[0]?.[2]?.prompt as string;
-    expect(prompt).toContain('curl -s -X POST');
-    expect(prompt).toContain('/api/review/PAN-1/status');
-    expect(prompt).toContain('"readyForMerge":true');
+    expect(prompt).toContain('pan admin specialists done ship PAN-1 --status passed');
     expect(prompt).toContain('Do NOT run gh pr merge');
     expect(dropStash).not.toHaveBeenCalled();
   });
