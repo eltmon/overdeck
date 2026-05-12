@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-12T18:24:00.269141Z"
+    "updated": "2026-05-12T18:30:06.694000Z"
   },
   "plan": {
     "id": "pan-1053",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-12T18:24:00.269141Z",
+    "updated": "2026-05-12T18:30:06.694000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -1089,7 +1089,7 @@
       {
         "id": "autopreso-view-tsx",
         "title": "Implement AutoPresoView.tsx — Excalidraw canvas + control panel",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:00:00.000Z",
         "metadata": {
@@ -1104,7 +1104,7 @@
           {
             "id": "autopreso-view-tsx.ac1",
             "title": "Excalidraw canvas rendered with controlled elements from useAutoPresoWebSocket",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1112,7 +1112,7 @@
           {
             "id": "autopreso-view-tsx.ac2",
             "title": "Staging mode: Excalidraw fully interactive (user can draw)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1120,7 +1120,7 @@
           {
             "id": "autopreso-view-tsx.ac3",
             "title": "Live mode: server elements are source of truth, local edits do not overwrite server state",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1128,7 +1128,7 @@
           {
             "id": "autopreso-view-tsx.ac4",
             "title": "AutoPresoControls and TranscriptPanel rendered in sidebar panel",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

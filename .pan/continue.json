@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1053",
   "created": "2026-05-09T16:09:08.344Z",
-  "updated": "2026-05-12T18:24:00.269141Z",
+  "updated": "2026-05-12T18:30:06.694000Z",
   "gitState": {
     "branch": "feature/pan-1053",
-    "sha": "232af731d",
+    "sha": "21efa62d6",
     "dirty": true
   },
   "decisions": [
@@ -83,10 +83,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-cyn8 / transcription-ts; inspection is required before proceeding to transcription-manager-ts.",
-    "beadId": "workspace-cyn8",
+    "description": "Completed bead workspace-jtej / autopreso-view-tsx; next agent should run bd ready -l pan-1053 and claim the next unblocked bead.",
+    "beadId": "workspace-jtej",
     "filesToRead": [
-      "src/voice/transcription.ts",
+      "src/dashboard/frontend/src/components/autopreso/AutoPresoView.tsx",
+      "src/dashboard/frontend/package.json",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -121,6 +122,12 @@
       "timestamp": "2026-05-12T18:24:00.269141Z",
       "reason": "bead-complete",
       "note": "Implemented ITurnEmitter and createMoonshineTranscription with sidecar binary resolution, JSONL audio writes, partial/committed callbacks, and unexpected sidecar exit error callbacks. Verified module with focused tsc command.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-12T18:30:06.694000Z",
+      "reason": "bead-complete",
+      "note": "Implemented AutoPresoView with Excalidraw canvas, staging/live behavior, controls sidebar, and transcript panel. Added @excalidraw/excalidraw dependency. Frontend build passed and Playwright verified /autopreso renders the AutoPreso nav item, drawing canvas, controls, and transcript panel.",
       "agentModel": "gpt-5.5"
     }
   ],
