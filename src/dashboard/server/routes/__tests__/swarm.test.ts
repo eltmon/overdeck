@@ -164,6 +164,53 @@ describe('swarm route helpers', () => {
     rmSync(testHome, { recursive: true, force: true });
   });
 
+  // PAN-977 review-round-18 regression: `continueDirForWorkspace` must return
+  // the workspace root, not `${workspacePath}/.pan`. Internally
+  // `writeContinueStateAsync` appends `.pan/continues/` via getContinuesDir, so
+  // a `.pan/`-suffixed argument produced `${workspace}/.pan/.pan/continues/`
+  // that `work-agent-prompt.ts:99` (which reads from the correct path) could
+  // never see — silently dropping synthesisOutputs delivery for every
+  // convergence-item work agent after its initial spawn.
+  it('persists swarm runtime to the canonical .pan/continues/ path (not the double-.pan bug)', async () => {
+    const { existsSync } = await import('node:fs');
+    const cont = await import('../../../../lib/vbrief/continue-state.js');
+    const { __testInternals } = await import('../swarm.js');
+
+    const featureWorkspace = join(projectPath, 'workspaces', 'feature-pan-971');
+    const runtimeState = {
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 1,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-0-item',
+          itemTitle: 'First',
+          sessionName: 'agent-pan-971-1',
+          workspace: join(featureWorkspace, 'slot-1'),
+          status: 'running' as const,
+          phase: 'implementation' as const,
+          startedAt: '2026-05-12T00:00:00Z',
+        },
+      ],
+      createdAt: '2026-05-12T00:00:00Z',
+      updatedAt: '2026-05-12T00:00:00Z',
+    };
+    await __testInternals.persistSwarmRuntime(featureWorkspace, runtimeState as any);
+
+    // Canonical path — what work-agent-prompt.ts:99 reads.
+    expect(existsSync(join(featureWorkspace, '.pan', 'continues', 'pan-971.vbrief.json'))).toBe(true);
+    // The double-.pan path must NEVER be created.
+    expect(existsSync(join(featureWorkspace, '.pan', '.pan', 'continues', 'pan-971.vbrief.json'))).toBe(false);
+
+    // Round-trip via the public reader using the workspace-root argument.
+    const persisted = await cont.readContinueStateAsync(featureWorkspace, 'PAN-971');
+    expect(persisted).not.toBeNull();
+    expect(persisted?.swarmRuntime?.slots?.[0]?.itemId).toBe('wave-0-item');
+  });
+
   it('builds structured AgentTaskInput with dependencies and acceptance criteria', async () => {
     const { __testInternals } = await import('../swarm.js');
 
@@ -518,7 +565,10 @@ describe('swarm route helpers', () => {
     // surgery needed for the slot list. Then patch synthesisOutputs in-place.
     await __testInternals.persistSwarmRuntime(featureWorkspace, initialState as any);
 
-    const continueDir = join(featureWorkspace, '.pan');
+    // PAN-977 review-round-18: pass the workspace root, NOT `.pan/`.
+    // `writeContinueStateAsync` appends `.pan/continues/` internally via
+    // `getContinuesDir(projectRoot)`.
+    const continueDir = featureWorkspace;
     const cont = await import('../../../../lib/vbrief/continue-state.js');
     const existingCont = (await cont.readContinueStateAsync(continueDir, 'PAN-971'))!;
     await cont.writeContinueStateAsync(continueDir, 'PAN-971', {

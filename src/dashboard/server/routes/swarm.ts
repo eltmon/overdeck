@@ -173,8 +173,16 @@ function getSwarmStatePath(issueId: string): string {
   return join(getSwarmDir(), `${issueId.toLowerCase()}.json`);
 }
 
+// PAN-977 review-round-18 blocker: `readContinueStateAsync` / `writeContinueStateAsync`
+// internally call `getContinuesDir(projectRoot)` which appends `.pan/continues/`, so
+// callers must pass the **workspace root** (or project root), NOT the workspace's
+// `.pan/` directory. Returning `join(workspacePath, '.pan')` made every swarm-side
+// write land at `${workspace}/.pan/.pan/continues/...` while
+// `work-agent-prompt.ts:99` reads from the canonical `${workspace}/.pan/continues/...`
+// path — silently dropping `synthesisOutputs` delivery for every convergence-item
+// work agent after the initial spawn.
 function continueDirForWorkspace(workspacePath: string): string {
-  return join(workspacePath, '.pan');
+  return workspacePath;
 }
 
 function emptyContinueState(issueId: string, now: string): ContinueState {
