@@ -1963,6 +1963,14 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
+  // PAN-1059 / PAN-977: specialist roles (review sub-roles, test, ship) must not
+  // pass the prompt as a positional argument to Claude Code. Inside a detached
+  // tmux session, `--session-id` combined with a large positional prompt causes
+  // Claude Code to exit immediately (session-env directory created, then silent
+  // death). Work agents avoid this by delivering the prompt via tmux send-keys
+  // after Claude boots. Specialist roles now use the same delivery path.
+  const shouldDeliverPromptViaTmux = isSpecialistRole;
+
   const launcherContent = generateLauncherScript({
     role,
     workingDir: workspace,
@@ -1970,8 +1978,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setCi: true,
     setTerminalEnv: true,
     providerExports,
-    promptFile,
-    promptFileMode: role === 'review' && options.subRole && resolvedHarness === 'claude-code' ? 'stdin' : undefined,
+    promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
     sessionId,
@@ -2006,6 +2013,31 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       ...providerEnv,
     },
   });
+
+  // Deliver prompt via tmux for specialist roles after Claude boots.
+  if (shouldDeliverPromptViaTmux && options.prompt) {
+    let ready = false;
+    for (let i = 0; i < 30; i++) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      if (!(await sessionExistsAsync(agentId))) {
+        console.error(`[${agentId}] Tmux session died before becoming ready`);
+        break;
+      }
+      try {
+        const pane = await capturePaneAsync(agentId, 200);
+        if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
+          ready = true;
+          break;
+        }
+      } catch { /* non-fatal */ }
+    }
+    if (ready) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+      await deliverAgentMessage(agentId, options.prompt, 'spawnRun:initial-prompt');
+    } else {
+      console.error(`[${agentId}] Claude did not become ready within 30s`);
+    }
+  }
 
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
