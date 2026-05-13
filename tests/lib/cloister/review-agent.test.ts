@@ -478,7 +478,7 @@ describe('template/output contract', () => {
       it(`${role}: reads the context manifest before review`, () => {
         const content = readTemplate(role);
         expect(content).toMatch(/Context manifest/i);
-        expect(content).toMatch(/read this first/i);
+        expect(content).toMatch(/read on demand/i);
         expect(content).not.toMatch(/complete 3 review passes/i);
         expect(content).not.toMatch(/changed file for context/i);
       });
