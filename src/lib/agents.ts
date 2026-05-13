@@ -579,15 +579,9 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
   try {
     const state = JSON.parse(content) as Partial<AgentState>;
     if (!isRole(state.role)) {
-      // Infer role from agent ID suffix for old states created before the role
-      // field was mandatory (e.g. PAN-913 and other pre-PAN-1048 agents).
-      let inferred: Role | undefined;
-      if (normalizedId.endsWith('-review')) inferred = 'review';
-      else if (normalizedId.endsWith('-test')) inferred = 'test';
-      else if (normalizedId.endsWith('-ship')) inferred = 'ship';
-      else if (normalizedId.endsWith('-plan')) inferred = 'plan';
-      else inferred = 'work';
-      state.role = inferred;
+      // Roleless states are invisible to getAgentState; cleanup is handled
+      // by warnOnBareNumericIssueIds / dropLegacyAgentStatesMissingRoleAsync.
+      return null;
     }
     if (!state.id) state.id = normalizedId;
     return cleanAgentState(state as AgentState);
@@ -1027,7 +1021,7 @@ export function decideChannelsForWorkAgent(
  * stdio server. The path is the workspace-local <workspace>/.pan/agent-mcp.json
  * — one config per agent, never shared, never reused.
  */
-async function writeChannelsBridgeMcpConfig(
+export async function writeChannelsBridgeMcpConfig(
   configPath: string,
   agentId: string,
 ): Promise<void> {

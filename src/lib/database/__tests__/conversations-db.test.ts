@@ -148,10 +148,13 @@ describe('conversations-db', () => {
     expect(list.every(c => c.status === 'ended')).toBe(true);
   });
 
-  it('name has UNIQUE constraint — duplicate throws', async () => {
-    const { createConversation } = await import('../conversations-db.js');
+  it('name collision replaces stale row instead of throwing', async () => {
+    const { createConversation, getConversationByName } = await import('../conversations-db.js');
     createConversation({ name: 'unique-name', tmuxSession: 'conv-unique-name', cwd: '/cwd' });
-    expect(() => createConversation({ name: 'unique-name', tmuxSession: 'conv-unique-name-2', cwd: '/cwd' })).toThrow();
+    createConversation({ name: 'unique-name', tmuxSession: 'conv-unique-name-2', cwd: '/cwd' });
+    const conv = getConversationByName('unique-name');
+    expect(conv).not.toBeNull();
+    expect(conv!.tmuxSession).toBe('conv-unique-name-2');
   });
 
   it('canReplaceTitle returns true only for auto titles', async () => {

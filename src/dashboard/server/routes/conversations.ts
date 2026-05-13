@@ -74,7 +74,7 @@ import {
   waitForClaudePrompt,
   listSessionNamesAsync,
 } from '../../../lib/tmux.js';
-import { deliverAgentMessage } from '../../../lib/agents.js';
+import { deliverAgentMessage, writeChannelsBridgeMcpConfig } from '../../../lib/agents.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -82,6 +82,8 @@ import {
   getProviderEnvForModel,
   getProviderAuthMode,
 } from '../../../lib/agents.js';
+import { writeBridgeToken } from '../../../lib/bridge-token.js';
+import { isClaudeCodeChannelsEnabled } from '../../../lib/config-yaml.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
 import { getProviderForModel } from '../../../lib/providers.js';
 import type { RuntimeName } from '../../../lib/runtimes/types.js';
@@ -900,6 +902,25 @@ async function spawnConversationSession(
     throw new Error('Invalid effort level');
   }
 
+  // Channels setup for Claude Code conversations when the experimental flag
+  // is on. Writes a per-session bridge token and MCP config so Claude loads
+  // the panopticon-bridge stdio server on startup.
+  let channelsBridgeMcpConfig: string | undefined;
+  if (
+    !piFields &&
+    isClaudeCodeChannelsEnabled() &&
+    (!model || getProviderForModel(model).name === 'anthropic') &&
+    process.env.CLAUDE_CODE_USE_BEDROCK !== '1' &&
+    process.env.CLAUDE_CODE_USE_VERTEX !== '1' &&
+    process.env.CLAUDE_CODE_USE_FOUNDRY !== '1' &&
+    process.env.PANOPTICON_DOCKER_WORKSPACE !== '1' &&
+    process.env.PAN_DOCKER !== '1'
+  ) {
+    channelsBridgeMcpConfig = join(stateDir, 'agent-mcp.json');
+    writeBridgeToken(tmuxSession);
+    await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
+  }
+
   await writeFile(
     launcherScript,
     generateLauncherScript({
@@ -920,6 +941,7 @@ async function spawnConversationSession(
       extraArgs: !piFields && effort ? `--effort "${effort}"` : undefined,
       keepAlive: true,
       fileMode: 0o700,
+      channelsBridgeMcpConfig,
     }),
     { mode: 0o700 },
   );
