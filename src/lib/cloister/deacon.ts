@@ -1932,7 +1932,8 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         }
 
         // Agent is alive but idle — nudge it to signal completion
-        const nudge = `You have already written the synthesis report for ${issueId} (verdict: ${verdict.toUpperCase()}). You MUST now signal completion with:\n\n  pan admin specialists done review ${issueId} --status ${verdict}${verdict === 'blocked' || verdict === 'failed' ? ` --notes "${topBlocker || 'See synthesis.md'}"` : ''}\n\nDo NOT wait for further instructions — run the command now.`;
+        const cmd = `pan admin specialists done review ${issueId} --status ${verdict}${verdict === 'blocked' || verdict === 'failed' ? ` --notes "${topBlocker || 'See synthesis.md'}"` : ''}`;
+        const nudge = `Your review synthesis is already written and saved. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
         try {
           const { messageAgent } = await import('../agents.js');
           await messageAgent(reviewSession, nudge);
