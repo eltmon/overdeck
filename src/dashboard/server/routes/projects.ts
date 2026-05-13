@@ -29,7 +29,8 @@ import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatus } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
-import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../../lib/pan-dir/index.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
+import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -233,12 +234,9 @@ async function collectSessionTreeNodes(
 
   if (!hasPlanningSection) {
     const panContinuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
-    const panSpecPath = join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
     const planningPathForTimestamp = await pathExists(panContinuePath)
       ? panContinuePath
-      : await pathExists(panSpecPath)
-        ? panSpecPath
-        : null;
+      : null;
     if (planningPathForTimestamp) {
       const planningStat = await stat(planningPathForTimestamp).catch(() => null);
       const sessionId = `planning-${issueLower}-state`;
@@ -314,15 +312,14 @@ async function resolveFeatureTitle(
   if (project) {
     try {
       const projectPath = (project.config as { path: string }).path;
-      const workspaceConfig = (project.config as { workspace?: { workspaces_dir?: string } }).workspace;
-      const workspacesDir = join(projectPath, workspaceConfig?.workspaces_dir || 'workspaces');
-      const specContent = await readOptional(
-        join(workspacesDir, `feature-${issueLower}`, PAN_DIRNAME, PAN_SPEC_FILENAME),
-      );
-      if (specContent) {
-        const parsed = JSON.parse(specContent) as { plan?: { title?: string } };
-        const title = sanitizeDisplayTitle(parsed.plan?.title ?? '');
-        if (title) return title;
+      const entry = findSpecByIssue(projectPath, issueId);
+      if (entry) {
+        const specContent = await readOptional(entry.path);
+        if (specContent) {
+          const parsed = JSON.parse(specContent) as { plan?: { title?: string } };
+          const title = sanitizeDisplayTitle(parsed.plan?.title ?? '');
+          if (title) return title;
+        }
       }
     } catch { /* non-fatal */ }
   }

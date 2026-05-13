@@ -17,6 +17,7 @@ import { readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } fr
 import { readWorkspaceContinue } from '../../src/lib/pan-dir/continue.js';
 import type { VBriefDocument } from '../../src/lib/vbrief/types.js';
 
+let PROJECT_ROOT: string;
 let TEST_DIR: string;
 
 function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBriefDocument {
@@ -30,7 +31,7 @@ function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBrie
     plan: {
       id: 'pan-453',
       title: 'Full vBRIEF v0.5 Spec Support',
-      status: 'approved',
+      status: 'active',
       uid: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       sequence: 1,
       created: '2026-01-01T00:00:00Z',
@@ -63,12 +64,21 @@ function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBrie
   };
 }
 
+/**
+ * Write the spec to the main-side `.pan/specs/` directory (canonical location)
+ * AND to the workspace `.pan/spec.vbrief.json` for tests that read directly.
+ */
 function writePlanDoc(workspacePath: string, doc: VBriefDocument): string {
+  const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
+  mkdirSync(specsDir, { recursive: true });
+  const specPath = join(specsDir, '2026-01-01-PAN-453-full-vbrief-spec-support.vbrief.json');
+  writeFileSync(specPath, JSON.stringify(doc, null, 2));
+
   const panDir = join(workspacePath, '.pan');
   mkdirSync(panDir, { recursive: true });
-  const planPath = join(panDir, 'spec.vbrief.json');
-  writeFileSync(planPath, JSON.stringify(doc, null, 2));
-  return planPath;
+  const localPath = join(panDir, 'spec.vbrief.json');
+  writeFileSync(localPath, JSON.stringify(doc, null, 2));
+  return localPath;
 }
 
 function readPlanFromWorkspace(workspacePath: string): VBriefDocument {
@@ -76,12 +86,13 @@ function readPlanFromWorkspace(workspacePath: string): VBriefDocument {
 }
 
 beforeEach(() => {
-  TEST_DIR = join(tmpdir(), `vbrief-spec-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  PROJECT_ROOT = join(tmpdir(), `vbrief-project-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  TEST_DIR = join(PROJECT_ROOT, 'workspaces', 'feature-pan-453');
   mkdirSync(TEST_DIR, { recursive: true });
 });
 
 afterEach(() => {
-  rmSync(TEST_DIR, { recursive: true, force: true });
+  rmSync(PROJECT_ROOT, { recursive: true, force: true });
 });
 
 // ─── vBRIEFInfo fields ────────────────────────────────────────────────────────

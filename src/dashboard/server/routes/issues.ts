@@ -2627,7 +2627,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     const planPath = findPlan(workspacePath);
     if (!planPath || !existsSync(planPath)) {
       return jsonResponse(
-        { success: false, error: `No vBRIEF plan at ${join(workspacePath, '.pan', 'spec.vbrief.json')} — run planning first.` },
+        { success: false, error: `No vBRIEF spec found on main for ${id} — run planning first.` },
         409,
       );
     }

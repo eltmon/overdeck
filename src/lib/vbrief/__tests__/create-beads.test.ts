@@ -23,17 +23,18 @@ vi.mock('util', async (importOriginal) => {
 });
 
 // Import after mocks are registered
-import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../pan-dir/index.js';
 import { createBeadsFromVBrief } from '../beads.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function writePlan(workspacePath: string, doc: VBriefDocument): void {
-  const planDir = join(workspacePath, PAN_DIRNAME);
-  mkdirSync(planDir, { recursive: true });
-  writeFileSync(join(planDir, PAN_SPEC_FILENAME), JSON.stringify(doc));
+function writePlan(projectRoot: string, issueId: string, doc: VBriefDocument): void {
+  const specsDir = join(projectRoot, '.pan', 'specs');
+  mkdirSync(specsDir, { recursive: true });
+  const slug = doc.plan.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const filename = `2026-01-01-${issueId}-${slug}.vbrief.json`;
+  writeFileSync(join(specsDir, filename), JSON.stringify({ ...doc, status: 'active' }, null, 2));
 }
 
 function makeDoc(planId: string, items: Array<{ id: string; title: string }>): VBriefDocument {
@@ -42,7 +43,7 @@ function makeDoc(planId: string, items: Array<{ id: string; title: string }>): V
     plan: {
       id: planId,
       title: `${planId} Test Plan`,
-      status: 'approved',
+      status: 'active',
       items: items.map(i => ({
         id: i.id,
         title: i.title,
@@ -61,24 +62,35 @@ function setupRedirect(workspacePath: string): void {
   writeFileSync(join(beadsDir, 'redirect'), '../../.beads');
 }
 
+/**
+ * Create the standard project + workspace directory structure.
+ * Issue ID must match PREFIX-NUMBER format (e.g. PAN-500).
+ * Returns { projectRoot, workspacePath }.
+ */
+function createWorkspace(issueId: string): { projectRoot: string; workspacePath: string } {
+  const projectRoot = join(tmpdir(), `cbfv-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const workspacePath = join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  mkdirSync(workspacePath, { recursive: true });
+  return { projectRoot, workspacePath };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
 describe('createBeadsFromVBrief', () => {
+  let projectRoot: string;
   let WORKSPACE_DIR: string;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    WORKSPACE_DIR = join(
-      tmpdir(),
-      `cbfv-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    );
-    mkdirSync(WORKSPACE_DIR, { recursive: true });
+    const ws = createWorkspace('PAN-500');
+    projectRoot = ws.projectRoot;
+    WORKSPACE_DIR = ws.workspacePath;
   });
 
   afterEach(() => {
-    rmSync(WORKSPACE_DIR, { recursive: true, force: true });
+    rmSync(projectRoot, { recursive: true, force: true });
   });
 
   it('returns error when bd CLI is not found', async () => {
@@ -92,15 +104,10 @@ describe('createBeadsFromVBrief', () => {
   });
 
   it('creates .beads/redirect when main repo has .beads/ but workspace does not', async () => {
-    // Workspace lives two levels below the project root: projectRoot/workspaces/feature-x/
-    const projectRoot = WORKSPACE_DIR;
-    const workspacePath = join(projectRoot, 'workspaces', 'feature-test');
-    mkdirSync(workspacePath, { recursive: true });
-
     // Main .beads/ exists at project root — no redirect in workspace yet
     mkdirSync(join(projectRoot, '.beads'), { recursive: true });
 
-    writePlan(workspacePath, makeDoc('PAN-TEST', [{ id: 'item-1', title: 'First task' }]));
+    writePlan(projectRoot, 'PAN-500', makeDoc('PAN-500', [{ id: 'item-1', title: 'First task' }]));
 
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
@@ -108,35 +115,27 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ...
       .mockResolvedValueOnce({ stdout: 'bead-001\n', stderr: '' });    // bd create
 
-    const result = await createBeadsFromVBrief(workspacePath);
+    const result = await createBeadsFromVBrief(WORKSPACE_DIR);
 
     // Redirect file must have been written
-    const redirectContent = readFileSync(join(workspacePath, '.beads', 'redirect'), 'utf-8');
+    const redirectContent = readFileSync(join(WORKSPACE_DIR, '.beads', 'redirect'), 'utf-8');
     expect(redirectContent).toBe('../../.beads');
 
     expect(result.success).toBe(true);
-    expect(result.created).toContain('PAN-TEST: First task');
+    expect(result.created).toContain('PAN-500: First task');
   });
 
   it('refuses to bd init when redirect exists and probe fails (would clobber redirect)', async () => {
-    // Regression: createBeadsFromVBrief used to run `bd init --prefix` in a worktree
-    // whenever the connectivity probe failed AND a redirect existed. `bd init` creates
-    // a self-contained local Dolt DB, clobbering the redirect — and if init then failed
-    // partway, the worktree was left with metadata.json pointing at a schema-less local
-    // DB that broke every subsequent bd call ("table not found: issues").
-    const projectRoot = WORKSPACE_DIR;
-    const workspacePath = join(projectRoot, 'workspaces', 'feature-redirect-probe-fail');
-    mkdirSync(workspacePath, { recursive: true });
-
-    setupRedirect(workspacePath);
-    writePlan(workspacePath, makeDoc('PAN-NOINIT', [{ id: 'item-1', title: 'Should not init' }]));
+    const ws2 = createWorkspace('PAN-501');
+    setupRedirect(ws2.workspacePath);
+    writePlan(ws2.projectRoot, 'PAN-501', makeDoc('PAN-501', [{ id: 'item-1', title: 'Should not init' }]));
 
     const dbError = new Error('Error 1146 (HY000): table not found: issues');
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
       .mockRejectedValueOnce(dbError);                                 // bd list --json --limit 0 (probe)
 
-    const result = await createBeadsFromVBrief(workspacePath);
+    const result = await createBeadsFromVBrief(ws2.workspacePath);
 
     // bd init must NOT have been called.
     const initCall = mockExecAsync.mock.calls.find(
@@ -148,21 +147,15 @@ describe('createBeadsFromVBrief', () => {
     expect(result.success).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
     expect(result.errors[0]).toMatch(/redirect|main beads/i);
+
+    rmSync(ws2.projectRoot, { recursive: true, force: true });
   });
 
   it('runs bd init only when there is no redirect AND no main beads (true fresh install)', async () => {
-    // Standalone path: a single-repo project (not a worktree) with no .beads/ anywhere.
-    // The early setup block in createBeadsFromVBrief runs `bd init` here (line ~92),
-    // because mainBeadsDir doesn't exist and beadsDir doesn't exist. The probe that
-    // follows then succeeds against the freshly-initialized DB.
-    const projectRoot = WORKSPACE_DIR;
-    const workspacePath = join(projectRoot, 'workspaces', 'feature-init');
-    mkdirSync(workspacePath, { recursive: true });
-    // No setupRedirect, no main .beads/ — true fresh-install scenario.
+    const ws3 = createWorkspace('PAN-502');
+    writePlan(ws3.projectRoot, 'PAN-502', makeDoc('PAN-502', [{ id: 'item-1', title: 'Setup task' }]));
 
-    writePlan(workspacePath, makeDoc('PAN-INIT', [{ id: 'item-1', title: 'Setup task' }]));
-
-    const expectedPrefix = basename(projectRoot).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const expectedPrefix = basename(ws3.projectRoot).toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
@@ -173,7 +166,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ... (idempotency)
       .mockResolvedValueOnce({ stdout: 'bead-002\n', stderr: '' });    // bd create
 
-    const result = await createBeadsFromVBrief(workspacePath);
+    const result = await createBeadsFromVBrief(ws3.workspacePath);
 
     const initCall = mockExecAsync.mock.calls.find(
       ([file, args]: [string, string[]]) =>
@@ -183,12 +176,15 @@ describe('createBeadsFromVBrief', () => {
     expect(initCall![1]).toContain(expectedPrefix);
 
     expect(result.success).toBe(true);
-    expect(result.created).toContain('PAN-INIT: Setup task');
+    expect(result.created).toContain('PAN-502: Setup task');
+
+    rmSync(ws3.projectRoot, { recursive: true, force: true });
   });
 
   it('creates beads for each plan item and returns their IDs', async () => {
-    setupRedirect(WORKSPACE_DIR);
-    writePlan(WORKSPACE_DIR, makeDoc('PAN-MULTI', [
+    const ws4 = createWorkspace('PAN-503');
+    setupRedirect(ws4.workspacePath);
+    writePlan(ws4.projectRoot, 'PAN-503', makeDoc('PAN-503', [
       { id: 'item-a', title: 'Alpha task' },
       { id: 'item-b', title: 'Beta task' },
     ]));
@@ -200,18 +196,21 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: 'bead-alpha\n', stderr: '' })  // bd create item-a
       .mockResolvedValueOnce({ stdout: 'bead-beta\n', stderr: '' });  // bd create item-b
 
-    const result = await createBeadsFromVBrief(WORKSPACE_DIR);
+    const result = await createBeadsFromVBrief(ws4.workspacePath);
 
     expect(result.success).toBe(true);
     expect(result.errors).toHaveLength(0);
-    expect(result.created).toEqual(['PAN-MULTI: Alpha task', 'PAN-MULTI: Beta task']);
+    expect(result.created).toEqual(['PAN-503: Alpha task', 'PAN-503: Beta task']);
     expect(result.beadIds.get('item-a')).toBe('bead-alpha');
     expect(result.beadIds.get('item-b')).toBe('bead-beta');
+
+    rmSync(ws4.projectRoot, { recursive: true, force: true });
   });
 
   it('deletes existing beads for the same label before creating new ones', async () => {
-    setupRedirect(WORKSPACE_DIR);
-    writePlan(WORKSPACE_DIR, makeDoc('PAN-IDEM', [{ id: 'item-1', title: 'Rebuilt task' }]));
+    const ws5 = createWorkspace('PAN-504');
+    setupRedirect(ws5.workspacePath);
+    writePlan(ws5.projectRoot, 'PAN-504', makeDoc('PAN-504', [{ id: 'item-1', title: 'Rebuilt task' }]));
 
     const existingBeads = JSON.stringify([{ id: 'stale-bead-42' }, { id: 'stale-bead-43' }]);
     mockExecAsync
@@ -222,7 +221,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '', stderr: '' })                // bd delete stale-bead-43
       .mockResolvedValueOnce({ stdout: 'fresh-bead-1\n', stderr: '' }); // bd create
 
-    const result = await createBeadsFromVBrief(WORKSPACE_DIR);
+    const result = await createBeadsFromVBrief(ws5.workspacePath);
 
     // execFile form: mockExecAsync('bd', ['delete', '<id>', '--force'], opts)
     const deleteCalls = mockExecAsync.mock.calls.filter(
@@ -234,20 +233,23 @@ describe('createBeadsFromVBrief', () => {
     expect(deleteCalls[1][1]).toContain('stale-bead-43');
 
     expect(result.success).toBe(true);
-    expect(result.created).toContain('PAN-IDEM: Rebuilt task');
+    expect(result.created).toContain('PAN-504: Rebuilt task');
     expect(result.beadIds.get('item-1')).toBe('fresh-bead-1');
+
+    rmSync(ws5.projectRoot, { recursive: true, force: true });
   });
 
   it('defaults missing inspection policy to auto and preserves per-item metadata', async () => {
-    setupRedirect(WORKSPACE_DIR);
-    const doc = makeDoc('PAN-AUTO', [{ id: 'item-1', title: 'Auto task' }]);
+    const ws6 = createWorkspace('PAN-505');
+    setupRedirect(ws6.workspacePath);
+    const doc = makeDoc('PAN-505', [{ id: 'item-1', title: 'Auto task' }]);
     doc.plan.items[0].metadata = {
       difficulty: 'simple',
-      issueLabel: 'pan-auto',
+      issueLabel: 'pan-505',
       requiresInspection: true,
       inspectionDepth: 'deep',
     };
-    writePlan(WORKSPACE_DIR, doc);
+    writePlan(ws6.projectRoot, 'PAN-505', doc);
 
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
@@ -255,7 +257,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce({ stdout: 'bead-auto\n', stderr: '' });
 
-    await createBeadsFromVBrief(WORKSPACE_DIR);
+    await createBeadsFromVBrief(ws6.workspacePath);
 
     const createCall = mockExecAsync.mock.calls.find(
       ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',
@@ -263,19 +265,22 @@ describe('createBeadsFromVBrief', () => {
     const metadata = JSON.parse(createCall![1][createCall![1].indexOf('--metadata') + 1]);
     expect(metadata.requiresInspection).toBe(true);
     expect(metadata.inspectionDepth).toBe('deep');
+
+    rmSync(ws6.projectRoot, { recursive: true, force: true });
   });
 
   it('materializes global inspection policy into bead metadata', async () => {
-    setupRedirect(WORKSPACE_DIR);
-    const doc = makeDoc('PAN-DEEP', [{ id: 'item-1', title: 'Deep task' }]);
+    const ws7 = createWorkspace('PAN-506');
+    setupRedirect(ws7.workspacePath);
+    const doc = makeDoc('PAN-506', [{ id: 'item-1', title: 'Deep task' }]);
     doc.vBRIEFInfo.inspectionPolicy = 'deep';
     doc.plan.items[0].metadata = {
       difficulty: 'simple',
-      issueLabel: 'pan-deep',
+      issueLabel: 'pan-506',
       requiresInspection: false,
       inspectionDepth: 'fast',
     };
-    writePlan(WORKSPACE_DIR, doc);
+    writePlan(ws7.projectRoot, 'PAN-506', doc);
 
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
@@ -283,7 +288,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
       .mockResolvedValueOnce({ stdout: 'bead-deep\n', stderr: '' });
 
-    await createBeadsFromVBrief(WORKSPACE_DIR);
+    await createBeadsFromVBrief(ws7.workspacePath);
 
     const createCall = mockExecAsync.mock.calls.find(
       ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',
@@ -291,5 +296,7 @@ describe('createBeadsFromVBrief', () => {
     const metadata = JSON.parse(createCall![1][createCall![1].indexOf('--metadata') + 1]);
     expect(metadata.requiresInspection).toBe(true);
     expect(metadata.inspectionDepth).toBe('deep');
+
+    rmSync(ws7.projectRoot, { recursive: true, force: true });
   });
 });

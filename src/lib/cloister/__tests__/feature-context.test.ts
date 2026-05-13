@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, existsSync
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { readFeatureContext, writeStoryFeatureContext } from '../work-agent-prompt.js';
-import { PAN_DIRNAME, PAN_CONTEXT_FILENAME, PAN_SPEC_FILENAME } from '../../pan-dir/index.js';
+import { PAN_DIRNAME, PAN_CONTEXT_FILENAME } from '../../pan-dir/index.js';
 
 // Mock tracker factory
 const mockGetIssue = vi.hoisted(() => vi.fn());
@@ -41,7 +41,7 @@ describe('readFeatureContext', () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'fc-test-'));
-    workspacePath = join(tmpDir, 'workspaces', 'feature-us123');
+    workspacePath = join(tmpDir, 'workspaces', 'feature-us-123');
     mkdirSync(join(workspacePath, PAN_DIRNAME), { recursive: true });
     mockGetIssue.mockReset();
   });
@@ -51,28 +51,28 @@ describe('readFeatureContext', () => {
   });
 
   it('returns local .pan/context.md when present', async () => {
-    const content = '# Feature Context: US123\nLocal context';
+    const content = '# Feature Context: US-123\nLocal context';
     writeFileSync(join(workspacePath, PAN_DIRNAME, PAN_CONTEXT_FILENAME), content, 'utf-8');
-    const result = await readFeatureContext(workspacePath, 'US123');
+    const result = await readFeatureContext(workspacePath, 'US-123');
     expect(result).toBe(content);
   });
 
   it('falls back to deterministic parent workspace lookup via tracker', async () => {
-    const parentWorkspace = join(tmpDir, 'workspaces', 'feature-f456');
+    const parentWorkspace = join(tmpDir, 'workspaces', 'feature-f-456');
     mkdirSync(join(parentWorkspace, PAN_DIRNAME), { recursive: true });
-    const parentContent = '# Feature Context: F456\nParent context';
+    const parentContent = '# Feature Context: F-456\nParent context';
     writeFileSync(join(parentWorkspace, PAN_DIRNAME, PAN_CONTEXT_FILENAME), parentContent, 'utf-8');
 
-    mockTrackerResponse('US123', 'F456');
+    mockTrackerResponse('US-123', 'F-456');
 
-    const result = await readFeatureContext(workspacePath, 'US123');
+    const result = await readFeatureContext(workspacePath, 'US-123');
     expect(result).toBe(parentContent);
-    expect(mockGetIssue).toHaveBeenCalledWith('US123');
+    expect(mockGetIssue).toHaveBeenCalledWith('US-123');
   });
 
   it('returns null when no local file and no parent ref', async () => {
     mockGetIssue.mockResolvedValue({ parentRef: undefined });
-    const result = await readFeatureContext(workspacePath, 'US123');
+    const result = await readFeatureContext(workspacePath, 'US-123');
     expect(result).toBeNull();
   });
 });
@@ -84,8 +84,8 @@ describe('writeStoryFeatureContext', () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'fc-test-'));
-    storyWorkspace = join(tmpDir, 'workspaces', 'feature-us123');
-    parentWorkspace = join(tmpDir, 'workspaces', 'feature-f456');
+    storyWorkspace = join(tmpDir, 'workspaces', 'feature-us-123');
+    parentWorkspace = join(tmpDir, 'workspaces', 'feature-f-456');
     mkdirSync(join(storyWorkspace, PAN_DIRNAME), { recursive: true });
     mkdirSync(join(parentWorkspace, PAN_DIRNAME), { recursive: true });
     mockGetIssue.mockReset();
@@ -97,36 +97,44 @@ describe('writeStoryFeatureContext', () => {
 
   it('no-ops when local .pan/context.md already exists', async () => {
     writeFileSync(join(storyWorkspace, PAN_DIRNAME, PAN_CONTEXT_FILENAME), 'existing', 'utf-8');
-    mockTrackerResponse('US123', 'F456');
+    mockTrackerResponse('US-123', 'F-456');
 
-    await writeStoryFeatureContext(storyWorkspace, 'US123');
+    await writeStoryFeatureContext(storyWorkspace, 'US-123');
     expect(mockGetIssue).not.toHaveBeenCalled();
   });
 
-  it('synthesizes context from parent .pan/spec.vbrief.json', async () => {
-    mockTrackerResponse('US123', 'F456', 'The Big Feature');
+  it('synthesizes context from parent vBRIEF spec on main', async () => {
+    mockTrackerResponse('US-123', 'F-456', 'The Big Feature');
 
+    // Write the parent spec to the main-side .pan/specs/ directory
     const planDoc = {
       vBRIEFInfo: { version: '0.5', created: '2024-01-01T00:00:00Z' },
       plan: {
-        id: 'plan-1',
+        id: 'F-456',
         title: 'Feature Plan',
-        status: 'approved',
+        status: 'active',
         items: [
-          { id: 'item-1', title: 'US123: Build widget', status: 'pending', narrative: { Action: 'Build it' }, subItems: [] },
-          { id: 'item-2', title: 'US789: Other thing', status: 'pending' },
+          { id: 'item-1', title: 'US-123: Build widget', status: 'pending', narrative: { Action: 'Build it' }, subItems: [] },
+          { id: 'item-2', title: 'US-789: Other thing', status: 'pending' },
         ],
         edges: [{ from: 'item-1', to: 'item-2', type: 'blocks' }],
         narratives: { Problem: 'We need widgets', Proposal: 'Build them' },
       },
+      status: 'active',
     };
-    writeFileSync(join(parentWorkspace, PAN_DIRNAME, PAN_SPEC_FILENAME), JSON.stringify(planDoc, null, 2), 'utf-8');
+    const specsDir = join(tmpDir, '.pan', 'specs');
+    mkdirSync(specsDir, { recursive: true });
+    writeFileSync(
+      join(specsDir, '2024-01-01-F-456-feature-plan.vbrief.json'),
+      JSON.stringify(planDoc, null, 2),
+      'utf-8',
+    );
 
-    await writeStoryFeatureContext(storyWorkspace, 'US123');
+    await writeStoryFeatureContext(storyWorkspace, 'US-123');
 
     const written = readFileSync(join(storyWorkspace, PAN_DIRNAME, PAN_CONTEXT_FILENAME), 'utf-8');
-    expect(written).toContain('Feature Context for US123');
-    expect(written).toContain('Parent Feature:** The Big Feature (F456)');
+    expect(written).toContain('Feature Context for US-123');
+    expect(written).toContain('Parent Feature:** The Big Feature (F-456)');
     expect(written).toContain('Problem');
     expect(written).toContain('We need widgets');
     expect(written).toContain('Cross-Story Dependencies');
@@ -136,11 +144,11 @@ describe('writeStoryFeatureContext', () => {
     expect(written).not.toContain('Other thing');
   });
 
-  it('falls back to parent .pan/context.md when .pan/spec.vbrief.json is absent', async () => {
-    mockTrackerResponse('US123', 'F456', 'The Big Feature');
+  it('falls back to parent .pan/context.md when no spec exists on main', async () => {
+    mockTrackerResponse('US-123', 'F-456', 'The Big Feature');
     writeFileSync(join(parentWorkspace, PAN_DIRNAME, PAN_CONTEXT_FILENAME), '# Parent Context\nFallback', 'utf-8');
 
-    await writeStoryFeatureContext(storyWorkspace, 'US123');
+    await writeStoryFeatureContext(storyWorkspace, 'US-123');
 
     const written = readFileSync(join(storyWorkspace, PAN_DIRNAME, PAN_CONTEXT_FILENAME), 'utf-8');
     expect(written).toBe('# Parent Context\nFallback');
@@ -148,7 +156,7 @@ describe('writeStoryFeatureContext', () => {
 
   it('no-ops when issue has no parentRef', async () => {
     mockGetIssue.mockResolvedValue({ parentRef: undefined });
-    await writeStoryFeatureContext(storyWorkspace, 'US123');
+    await writeStoryFeatureContext(storyWorkspace, 'US-123');
     expect(existsSync(join(storyWorkspace, PAN_DIRNAME, PAN_CONTEXT_FILENAME))).toBe(false);
   });
 });

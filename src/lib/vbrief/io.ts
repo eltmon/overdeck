@@ -15,12 +15,11 @@
  * continue file — they cannot mutate the spec on main.
  */
 
-import { existsSync, readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { findSpecByIssue } from '../pan-dir/specs.js';
 import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
-import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
 
 /**
@@ -39,20 +38,15 @@ function projectRootFromWorkspace(workspacePath: string): string {
 }
 
 /**
- * Returns the path to the vBRIEF spec for this workspace's issue.
- * Checks main's `.pan/specs/` first (canonical), falls back to workspace-local
- * `.pan/spec.vbrief.json` for in-flight migration compatibility.
+ * Returns the path to the canonical vBRIEF spec on main for this workspace's issue.
+ * Returns null if no spec exists — callers must handle the missing-spec case.
  */
 export function findPlan(workspacePath: string): string | null {
   const issueId = issueIdFromWorkspacePath(workspacePath);
-  if (issueId) {
-    const projectRoot = projectRootFromWorkspace(workspacePath);
-    const entry = findSpecByIssue(projectRoot, issueId);
-    if (entry) return entry.path;
-  }
-  // Fallback: workspace-local spec (migration compat for in-flight workspaces)
-  const localPath = join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
-  return existsSync(localPath) ? localPath : null;
+  if (!issueId) return null;
+  const projectRoot = projectRootFromWorkspace(workspacePath);
+  const entry = findSpecByIssue(projectRoot, issueId);
+  return entry ? entry.path : null;
 }
 
 /**
@@ -188,37 +182,19 @@ export function isPlanningComplete(workspacePath: string, planningDir?: string):
 
 function checkPlanStatus(
   workspacePath: string,
-  planningDir: string | undefined,
+  _planningDir: string | undefined,
   matchStatus: (status: string) => boolean,
 ): boolean {
-  // Primary: check main-side spec via findPlan (resolves .pan/specs/ first)
   const planPath = findPlan(workspacePath);
-  if (planPath) {
-    try {
-      const doc = readPlan(planPath);
-      const status = doc.plan?.status;
-      if (status && matchStatus(status)) return true;
-      if (status) return false;
-    } catch {
-      // Corrupt / unreadable plan — fall through to local check
-    }
+  if (!planPath) return false;
+  try {
+    const doc = readPlan(planPath);
+    const status = doc.plan?.status;
+    if (status && matchStatus(status)) return true;
+    if (status) return false;
+  } catch {
+    // Corrupt / unreadable plan
   }
-
-  // Fallback: check workspace-local spec (planningDir override) for migration compat
-  if (planningDir) {
-    const localPath = join(planningDir, PAN_SPEC_FILENAME);
-    if (existsSync(localPath)) {
-      try {
-        const doc = readPlan(localPath);
-        const status = doc.plan?.status;
-        if (status && matchStatus(status)) return true;
-        if (status) return false;
-      } catch {
-        // Corrupt — treat as not found
-      }
-    }
-  }
-
   return false;
 }
 
