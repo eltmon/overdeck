@@ -646,12 +646,20 @@ export async function handleConversationMessage(
   // Deliver via deliverAgentMessage so channels eligibility and fallback
   // policy are respected (PAN-1123). For Pi agents this resolves to tmux
   // because channels eligibility requires harness === 'claude-code'.
-  await deliverAgentMessage(
-    conv.tmuxSession,
-    message,
-    'conversation-message',
-    conv.deliveryMethod ?? undefined,
-  );
+  try {
+    await deliverAgentMessage(
+      conv.tmuxSession,
+      message,
+      'conversation-message',
+      conv.deliveryMethod ?? undefined,
+    );
+  } catch (deliveryErr: unknown) {
+    const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
+    if (errMsg.includes('MessageDeliveryFailed')) {
+      return jsonResponse({ error: errMsg.replace('MessageDeliveryFailed: ', '') }, { status: 503 });
+    }
+    throw deliveryErr;
+  }
 
   // Generate AI title for conversations created via instant-start (no message at creation)
   if (conv.titleSource === 'default') {
