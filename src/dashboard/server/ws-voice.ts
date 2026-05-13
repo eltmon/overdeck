@@ -20,7 +20,7 @@ function rawDataToBuffer(data: WebSocket.RawData): Buffer {
 
 function isTrustedWebSocketOrigin(request: http.IncomingMessage): boolean {
   const origin = request.headers.origin;
-  if (!origin) return true;
+  if (typeof origin !== 'string') return false;
   return isTrustedOriginForHost(origin, request.headers.host);
 }
 
