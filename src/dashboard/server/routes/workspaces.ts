@@ -3720,6 +3720,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           issueId,
           workspace: workspacePath,
           branch: branchName,
+          force: true,
         });
       });
 

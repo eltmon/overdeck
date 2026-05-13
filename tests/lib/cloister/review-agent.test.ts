@@ -317,6 +317,26 @@ describe('reviewStatus type-safety regression', () => {
 // Replaces the dispatchParallelReview pin from the legacy `pan review run`
 // coordinator era.
 
+describe('request-review fresh convoy regression', () => {
+  it('forces review respawn so stale synthesis sessions cannot short-circuit re-review', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      'utf-8',
+    );
+
+    const requestReviewMatch = routeSrc.match(
+      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+    );
+    expect(requestReviewMatch).not.toBeNull();
+    const requestReviewBlock = requestReviewMatch![0];
+
+    expect(requestReviewBlock).toContain('spawnReviewRoleForIssue');
+    expect(requestReviewBlock).toMatch(/force:\s*true/);
+  });
+});
+
 describe('passed-state rerun regression', () => {
   it('workspaces.ts request-review route uses spawnReviewRoleForIssue in the rerun path', async () => {
     const { readFileSync } = await import('fs');
