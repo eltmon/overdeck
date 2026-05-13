@@ -1,0 +1,195 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-08T07:05:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-558: Auto-update mechanism for Electron app"
+  },
+  "plan": {
+    "id": "pan-558",
+    "title": "Auto-update mechanism for Electron app",
+    "status": "approved",
+    "uid": "0d0f26c2-4dc7-43b3-8302-7c7306eccd95",
+    "author": "agent:minimax-m2.7-highspeed",
+    "sequence": 1,
+    "created": "2026-04-08T07:05:00.000Z",
+    "updated": "2026-04-08T07:05:00.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/558",
+        "label": "PAN-558",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "electron",
+      "auto-update",
+      "desktop",
+      "electron-updater"
+    ],
+    "narratives": {
+      "Problem": "When users run `npx panopticon`, they get the version published to npm, not the latest. No auto-update mechanism exists for installed desktop app copies.",
+      "Proposal": "Implement electron-updater with GitHub Releases as the update server. App checks for updates on startup and every 4 hours. Downloads update in background. Prompts user via Help menu to restart and apply. Stable channel only for v1."
+    },
+    "items": [
+      {
+        "id": "electron-updater-dependency",
+        "title": "Add electron-updater dependency",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T07:05:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-558"
+        },
+        "narrative": {
+          "Action": "Add `electron-updater` package to `apps/desktop/package.json` dependencies via `bun add electron-updater`."
+        },
+        "subItems": []
+      },
+      {
+        "id": "electron-builder-config",
+        "title": "Configure electron-builder publish settings",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T07:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-558"
+        },
+        "narrative": {
+          "Action": "Update `apps/desktop/package.json` build.publish config with GitHub repository owner/repo and artifact formats (AppImage, dmg, nsis). This tells electron-builder where to publish and enables electron-updater to find release metadata."
+        },
+        "subItems": []
+      },
+      {
+        "id": "auto-updater-service",
+        "title": "Implement auto-updater main process service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T07:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-558"
+        },
+        "narrative": {
+          "Action": "Create `apps/desktop/src/updater.ts` module. Initialize auto-updater with `setFeedURL({ provider: 'github', owner: 'eltmon', repo: 'panopticon-cli' })`. Call `checkForUpdates()` on app startup and every 4 hours via `setInterval`. Handle `update-available`, `download-progress`, `update-downloaded`, and error events. Export functions for manual check and quit-and-install."
+        },
+        "subItems": [
+          {
+            "id": "auto-updater-service.ac1",
+            "title": "App detects new version on startup (automatic check)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-updater-service.ac2",
+            "title": "Downloads update in background without blocking UI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-ipc-bridge",
+        "title": "Add update status IPC bridge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-08T07:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-558"
+        },
+        "narrative": {
+          "Action": "Add IPC channels in `apps/desktop/src/main.ts` for renderer to query update state: `update-status` (returns {checking, available, downloaded, version}), `check-for-updates` (triggers manual check), `quit-and-install` (triggers restart). Wire auto-updater events to send status to renderer via `webContents.send()`."
+        },
+        "subItems": []
+      },
+      {
+        "id": "menu-integration",
+        "title": "Add Check for Updates to Help menu",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-08T07:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-558"
+        },
+        "narrative": {
+          "Action": "Update `apps/desktop/src/menu.ts` Help submenu to add 'Check for Updates\u2026' item that triggers `checkForUpdates()` via IPC to main process. After update is downloaded, dynamically show 'Install Update and Restart' item in Help menu."
+        },
+        "subItems": [
+          {
+            "id": "menu-integration.ac1",
+            "title": "Prompts user to restart when update is ready",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "release-workflow",
+        "title": "Update release workflow to build and attach desktop artifacts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T07:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-558"
+        },
+        "narrative": {
+          "Action": "Modify `.github/workflows/release.yml` to: (1) install desktop app dependencies before build, (2) run `npm run build:desktop` to produce Electron packages via electron-builder, (3) use `softprops/action-gh-release` with `assets: [glob pattern]` to attach the built `.AppImage`, `.dmg`, `.exe` artifacts to the GitHub Release. electron-updater requires artifacts attached to the release to download them."
+        },
+        "subItems": []
+      },
+      {
+        "id": "cli-version-sync",
+        "title": "Verify CLI/desktop version sync",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-08T07:05:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-558"
+        },
+        "narrative": {
+          "Action": "Confirm that root `package.json` version and `apps/desktop/package.json` version stay in sync. Both should update together on release since root version propagates to workspaces via the workspace protocol."
+        },
+        "subItems": []
+      }
+    ],
+    "edges": [
+      {
+        "from": "electron-updater-dependency",
+        "to": "electron-builder-config",
+        "type": "blocks"
+      },
+      {
+        "from": "electron-updater-dependency",
+        "to": "auto-updater-service",
+        "type": "blocks"
+      },
+      {
+        "from": "electron-builder-config",
+        "to": "release-workflow",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-updater-service",
+        "to": "update-ipc-bridge",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-updater-service",
+        "to": "menu-integration",
+        "type": "blocks"
+      }
+    ]
+  }
+}

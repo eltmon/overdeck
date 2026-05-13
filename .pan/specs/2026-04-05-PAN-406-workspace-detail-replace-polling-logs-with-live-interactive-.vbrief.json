@@ -1,0 +1,94 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-05T12:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-406: Workspace detail \u2014 replace polling logs with live interactive terminal"
+  },
+  "plan": {
+    "id": "pan-406",
+    "title": "Workspace detail: replace polling logs with live interactive terminal",
+    "status": "approved",
+    "uid": "cf5882de-b185-44fe-bc9c-ecc9a87a5ce4",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-05T12:00:00Z",
+    "updated": "2026-04-05T12:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/406",
+        "label": "PAN-406",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "terminal",
+      "websocket",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "The workspace detail TerminalPanel polls /api/agents/{id}/output every 1s and renders plain text. Users see delayed output with frozen timers and no interactivity, while the planning dialog already has a live interactive terminal via XTerminal.",
+      "Proposal": "Replace the polling <pre> in TerminalPanel with XTerminal (xterm.js + WebSocket PTY) for running agents. Keep static output fallback for stopped agents. Remove the redundant Status tab and send-message input box."
+    },
+    "items": [
+      {
+        "id": "replace-polling-with-xterminal",
+        "title": "Replace polling log view with XTerminal for running agents",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-406"
+        },
+        "narrative": {
+          "Action": "In TerminalPanel.tsx, when agent.status is not 'stopped', render <XTerminal sessionName={agent.id} /> instead of the polling <pre> block. Import XTerminal component. Remove the useQuery polling hook for running agents (keep it for stopped fallback). Remove the Status tab, tab state, and tab bar UI entirely. Remove the send-message input, sendMutation, and message state. For stopped agents, keep the existing static output fetch and <pre> rendering. Simplify the header to just show a close button and refresh (for stopped agents only)."
+        },
+        "subItems": [
+          {
+            "id": "replace-polling-with-xterminal.ac1",
+            "title": "Running agent renders XTerminal with live WebSocket terminal (no polling)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "replace-polling-with-xterminal.ac2",
+            "title": "Stopped agent shows static last output from /api/agents/{id}/output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "replace-polling-with-xterminal.ac3",
+            "title": "No Status tab \u2014 terminal fills the entire panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "replace-polling-with-xterminal.ac4",
+            "title": "No separate send-message input \u2014 user types directly in the terminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "replace-polling-with-xterminal.ac5",
+            "title": "TypeScript compiles without errors (npm run typecheck passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-06T12:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-494: pan start fails if workspace doesn't exist \u2014 requires separate pan workspace create"
+  },
+  "plan": {
+    "id": "pan-494",
+    "title": "pan start fails if workspace doesn't exist \u2014 requires separate pan workspace create",
+    "status": "approved",
+    "uid": "a3f7c1e2-8b4d-4f6a-9e2c-5d1b3a7f9e4c",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-06T12:00:00Z",
+    "updated": "2026-04-06T12:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/494",
+        "label": "PAN-494",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cli",
+      "bug-fix",
+      "workspace"
+    ],
+    "narratives": {
+      "Problem": "pan start errors out when no workspace exists, requiring a manual pan workspace create step. The dashboard already auto-creates workspaces, so the CLI is inconsistent.",
+      "Proposal": "Replace the error-and-exit block in issue.ts with auto-creation logic using execAsync to call pan workspace create, matching the dashboard's existing pattern."
+    },
+    "items": [
+      {
+        "id": "auto-create-workspace",
+        "title": "Auto-create workspace in pan start when missing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-494"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/work/issue.ts, replace the error block at lines 543-555 with workspace auto-creation logic. When findWorkspaceWithLocation returns no workspace: (1) update spinner to 'Creating workspace for {id}...', (2) call execAsync('pan workspace create ${id} --local') with projectRoot as cwd, (3) set workspace to the expected path and continue, (4) on failure, show error and exit. Follow the same pattern used in src/dashboard/server/routes/agents.ts:1135-1148."
+        },
+        "subItems": [
+          {
+            "id": "auto-create-workspace.ac1",
+            "title": "pan start PAN-XXX succeeds when no workspace exists, creating the workspace automatically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-create-workspace.ac2",
+            "title": "pan start PAN-XXX still works normally when workspace already exists (no regression)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-create-workspace.ac3",
+            "title": "If workspace creation fails, a clear error message is shown (not a cryptic crash)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

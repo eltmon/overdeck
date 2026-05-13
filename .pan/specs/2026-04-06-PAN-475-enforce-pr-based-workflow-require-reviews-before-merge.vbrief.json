@@ -1,0 +1,313 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-06T20:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-475: Enforce PR-based workflow \u2014 require reviews before merge"
+  },
+  "plan": {
+    "id": "pan-475",
+    "title": "Enforce PR-based workflow \u2014 require reviews before merge",
+    "status": "approved",
+    "uid": "56a68971-5d64-4078-89fd-ca16d0f21367",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-06T20:00:00Z",
+    "updated": "2026-04-06T20:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/475",
+        "label": "PAN-475",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "workflow",
+      "merge",
+      "pr",
+      "ci",
+      "review"
+    ],
+    "narratives": {
+      "Problem": "Local workspaces merge via git merge, bypassing PRs. No audit trail, no CI gate, incomplete work reaches main uncaught, and hotfixes get wiped by merge-agent's git restore.",
+      "Proposal": "Replace local git merge with gh pr create + gh pr merge --squash for all workspaces. Review agent posts GitHub PR reviews. CI workflow enforces typecheck, lint, and tests on every PR."
+    },
+    "items": [
+      {
+        "id": "ci-workflow",
+        "title": "Fix CI workflow to enforce quality gates on PRs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-475"
+        },
+        "narrative": {
+          "Action": "Update .github/workflows/ci.yml: remove `|| true` from lint step so failures block PRs. Add a real test step running `npm test` (currently only does CLI smoke test). Ensure typecheck, lint, and test are all separate jobs that must pass for the PR to be mergeable."
+        },
+        "subItems": [
+          {
+            "id": "ci-workflow.ac1",
+            "title": "Lint failures cause CI to fail (no || true)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-workflow.ac2",
+            "title": "CI runs npm test (Vitest suite), not just CLI smoke test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-workflow.ac3",
+            "title": "CI runs on pull_request events targeting main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-creation",
+        "title": "Create PR with rich description on work completion",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-475"
+        },
+        "narrative": {
+          "Action": "Expand ensurePRExists() in workspaces.ts to: (1) work for ALL workspaces, not just remote; (2) generate a rich PR body with issue link, beads task summary, and acceptance criteria checklist from the vBRIEF plan. Call ensurePRExists() during the work-completion flow (when pan work done triggers the specialist pipeline), not during triggerMerge(). Store the PR URL in review status so downstream agents can reference it."
+        },
+        "subItems": [
+          {
+            "id": "pr-creation.ac1",
+            "title": "PR is created for local workspaces (not just remote)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-creation.ac2",
+            "title": "PR body includes issue link, beads summary, and AC checklist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-creation.ac3",
+            "title": "PR URL is stored in review status for downstream use",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-github",
+        "title": "Review agent posts GitHub PR reviews",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-475"
+        },
+        "narrative": {
+          "Action": "After convoy synthesis in spawnReviewAgent() (review-agent.ts), post the review result as a GitHub PR review via `gh pr review <pr-url> --approve` or `--request-changes --body <synthesis>`. Keep existing feedback file writing for agent-to-agent communication. The PR URL comes from the ReviewContext (stored in review status during PR creation step)."
+        },
+        "subItems": [
+          {
+            "id": "review-github.ac1",
+            "title": "Review agent calls gh pr review --approve on pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-github.ac2",
+            "title": "Review agent calls gh pr review --request-changes with synthesis body on fail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-github.ac3",
+            "title": "Feedback files still written to .planning/feedback/ for agent consumption",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-pr-based",
+        "title": "Replace local git merge with rebase + gh pr merge --squash",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-475"
+        },
+        "narrative": {
+          "Action": "Rewrite triggerMerge() for local monorepo workspaces: (1) ensure PR exists, (2) call merge-agent to rebase feature branch on main and resolve conflicts, (3) push rebased branch, (4) call `gh pr merge --squash`, (5) run postMergeLifecycle(). Update buildMergePrompt() to instruct merge-agent to rebase instead of git merge. Remove the old local git merge code path. Keep the remote workspace path unchanged (already uses gh pr merge). Preserve all idempotency guards and mergeStatus state machine."
+        },
+        "subItems": [
+          {
+            "id": "merge-pr-based.ac1",
+            "title": "triggerMerge() uses gh pr merge --squash for local workspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-pr-based.ac2",
+            "title": "Merge agent rebases feature branch on main before merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-pr-based.ac3",
+            "title": "Merge conflicts are resolved by merge-agent during rebase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-pr-based.ac4",
+            "title": "postMergeLifecycle() still runs after successful PR merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-pr-based.ac5",
+            "title": "Idempotency guards and mergeStatus state machine preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "correctness-completeness",
+        "title": "Extend correctness reviewer to flag incomplete work patterns",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-475"
+        },
+        "narrative": {
+          "Action": "Update the correctness convoy sub-agent prompt (code-review-correctness) to include consistency/completeness checks: (1) if a pattern is applied to some files in a directory, flag files that don't have it, (2) if beads tasks reference files, verify those files were actually modified, (3) if acceptance criteria exist in the vBRIEF plan, verify each one is addressed. This catches the PAN-470 class of bugs (httpHandler applied to 9/13 files)."
+        },
+        "subItems": [
+          {
+            "id": "correctness-completeness.ac1",
+            "title": "Correctness reviewer checks for inconsistent pattern application across related files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "correctness-completeness.ac2",
+            "title": "Correctness reviewer verifies acceptance criteria from vBRIEF plan are addressed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Update CONTRIBUTING.md and work-agent prompt for PR workflow",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-475"
+        },
+        "narrative": {
+          "Action": "Update CONTRIBUTING.md to accurately reflect the new PR-based merge flow (it already describes it aspirationally \u2014 make it factual). Update work-agent.md prompt to mention that `pan work done` creates a PR. Update merge-agent.md prompt to describe rebase-based conflict resolution instead of local git merge."
+        },
+        "subItems": [
+          {
+            "id": "docs-update.ac1",
+            "title": "CONTRIBUTING.md merge workflow section reflects actual PR-based flow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "work-agent.md mentions PR creation on completion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac3",
+            "title": "merge-agent.md describes rebase + gh pr merge flow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ci-workflow",
+        "to": "merge-pr-based",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-creation",
+        "to": "review-github",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-creation",
+        "to": "merge-pr-based",
+        "type": "blocks"
+      },
+      {
+        "from": "review-github",
+        "to": "merge-pr-based",
+        "type": "informs"
+      },
+      {
+        "from": "merge-pr-based",
+        "to": "docs-update",
+        "type": "informs"
+      }
+    ]
+  }
+}

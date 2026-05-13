@@ -1,0 +1,648 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-03T12:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-532: Per-project and per-issue model overrides for workflow agent model selection"
+  },
+  "plan": {
+    "id": "pan-532",
+    "title": "Per-project and per-issue model overrides for workflow agent model selection",
+    "status": "approved",
+    "uid": "a3f7e1d2-8b4c-4f9a-b6e3-2d5a8c1f0e7b",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-05-03T12:00:00Z",
+    "updated": "2026-05-03T12:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/532",
+        "label": "PAN-532",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "model-selection",
+      "config",
+      "dashboard",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "Model selection is global \u2014 the same model is used for each workflow phase across all projects and issues. Users need per-project and per-issue control for different cost/quality tradeoffs.",
+      "Proposal": "Add two new resolution layers (per-issue workspace overrides and per-project projects.yaml models block) above the existing config chain, a split Start Agent button with model dropdown, a pan workspace config CLI command, and InspectorPanel model badges."
+    },
+    "items": [
+      {
+        "id": "projects-yaml-models-schema",
+        "title": "Parse models block from projects.yaml project entries",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Add a `models` field (Partial<Record<WorkTypeId, ModelId>>) to the project entry type in projects.ts. Update loadProjectsConfig() to parse and validate this field. Update the ProjectConfig type to include models."
+        },
+        "subItems": [
+          {
+            "id": "projects-yaml-models-schema.ac1",
+            "title": "ProjectConfig type includes optional `models: Partial<Record<WorkTypeId, ModelId>>` field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "projects-yaml-models-schema.ac2",
+            "title": "loadProjectsConfig() parses `models` block from YAML without error when present or absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "projects-yaml-models-schema.ac3",
+            "title": "Invalid model IDs in the models block produce a warning log, not a crash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "per-issue-overrides-io",
+        "title": "Per-issue model overrides reader/writer for workspace .panopticon/overrides.json",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Create functions to read/write per-issue model overrides from `<workspace>/.panopticon/overrides.json`. Format: `{ models: Partial<Record<WorkTypeId, ModelId>> }`. Functions: `readIssueModelOverrides(workspacePath)`, `writeIssueModelOverride(workspacePath, workType, modelId)`, `clearIssueModelOverride(workspacePath, workType)`. Clearing the last key removes the file. Use async fs operations only (dashboard-reachable code)."
+        },
+        "subItems": [
+          {
+            "id": "per-issue-overrides-io.ac1",
+            "title": "readIssueModelOverrides returns empty object when file doesn't exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-issue-overrides-io.ac2",
+            "title": "writeIssueModelOverride creates .panopticon/ directory and writes JSON atomically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-issue-overrides-io.ac3",
+            "title": "clearIssueModelOverride deletes the key; deletes the file when no keys remain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "per-issue-overrides-io.ac4",
+            "title": "All IO uses async fs operations (no readFileSync/writeFileSync)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolve-model-helper",
+        "title": "Create resolveModelForWorkType() helper with full resolution chain",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Create `resolveModelForWorkType(issueId: string, workTypeId: WorkTypeId): Promise<{ model: ModelId; source: 'issue' | 'project' | 'config' | 'smart' } | undefined>` that checks: 1) per-issue overrides (requires resolving workspace path from issue ID), 2) per-project overrides (resolveProjectFromIssue \u2192 project.models), 3) returns undefined to fall through to existing config chain. Place in src/lib/model-resolution.ts as a new module."
+        },
+        "subItems": [
+          {
+            "id": "resolve-model-helper.ac1",
+            "title": "Per-issue override takes precedence over per-project override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-model-helper.ac2",
+            "title": "Per-project override takes precedence over global config (returns before config chain)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-model-helper.ac3",
+            "title": "Returns source field indicating which layer provided the override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-model-helper.ac4",
+            "title": "Returns undefined when no issue or project overrides exist, allowing fallthrough to existing chain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-determine-model",
+        "title": "Wire resolveModelForWorkType into determineModel() resolution chain",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Modify `determineModel()` in src/lib/agents.ts (line 785) to call `resolveModelForWorkType()` after the explicit `options.model` check but before the work-type-router lookup. Since resolveModelForWorkType is async, determineModel must become async (or accept a pre-resolved override). Update all callers of determineModel to handle the async change. The function needs issueId, which is already available in SpawnOptions."
+        },
+        "subItems": [
+          {
+            "id": "wire-determine-model.ac1",
+            "title": "determineModel checks per-issue and per-project overrides before work-type-router",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-determine-model.ac2",
+            "title": "Explicit options.model still takes highest precedence (unchanged behavior)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-determine-model.ac3",
+            "title": "All callers of determineModel updated to handle async",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "specialist-spawn-wiring",
+        "title": "Update specialist spawn to use resolveModelForWorkType",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Update specialist spawn in src/lib/cloister/specialists.ts (line ~950) to consult per-issue and per-project overrides via resolveModelForWorkType before falling back to the existing specialist model resolution. The specialist spawn has access to the issue ID through the agent state."
+        },
+        "subItems": [
+          {
+            "id": "specialist-spawn-wiring.ac1",
+            "title": "Specialist agents (review, test, merge, uat, inspect) respect per-issue model overrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "specialist-spawn-wiring.ac2",
+            "title": "Specialist agents respect per-project model overrides when no per-issue override exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-resolve-model-endpoint",
+        "title": "Add GET /api/models/resolve endpoint for frontend model resolution",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Add a GET /api/models/resolve?issueId=X&workType=Y endpoint in routes/ that returns the resolved model and its source (issue/project/config/smart). The frontend needs this to show the resolved model on the Start Agent button without duplicating resolution logic. Returns { model: string, source: string, overrides: Record<string, {model, source}> } for all work types relevant to the issue."
+        },
+        "subItems": [
+          {
+            "id": "api-resolve-model-endpoint.ac1",
+            "title": "GET /api/models/resolve?issueId=PAN-532 returns resolved model for all work types with source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-resolve-model-endpoint.ac2",
+            "title": "Response includes the primary resolved model (for the default work type) and source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-issue-overrides-endpoint",
+        "title": "Add POST/DELETE /api/models/issue-overrides endpoint for setting/clearing overrides",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Add POST /api/models/issue-overrides with body { issueId, workType, modelId } that writes to workspace .panopticon/overrides.json. Add DELETE /api/models/issue-overrides with body { issueId, workType } that clears the override. The workspace path is resolved from the issue ID via existing workspace resolution. Returns 404 if workspace doesn't exist yet."
+        },
+        "subItems": [
+          {
+            "id": "api-issue-overrides-endpoint.ac1",
+            "title": "POST sets a per-issue model override and returns the updated overrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-issue-overrides-endpoint.ac2",
+            "title": "DELETE clears a per-issue model override and returns the updated overrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-issue-overrides-endpoint.ac3",
+            "title": "Returns 404 with helpful message when workspace doesn't exist yet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "split-start-button",
+        "title": "Create SplitStartButton component with model selector dropdown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Create a SplitStartButton component that renders a two-zone button: main click starts agent with resolved model, chevron opens a dropdown. Dropdown reuses ModelSelect from ModelPicker.tsx and adds an 'Auto (Cloister)' option at the top. Button label shows 'Start Agent (Model Name)'. Selecting a model calls POST /api/models/issue-overrides to persist it. Selecting 'Auto' calls DELETE to clear the override. Component fetches resolved model from GET /api/models/resolve on mount."
+        },
+        "subItems": [
+          {
+            "id": "split-start-button.ac1",
+            "title": "Main button area click starts agent with the currently resolved model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-start-button.ac2",
+            "title": "Chevron click opens dropdown with available models grouped by provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-start-button.ac3",
+            "title": "Button label shows resolved model name: 'Start Agent (Sonnet 4.6)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-start-button.ac4",
+            "title": "'Auto (Cloister)' option clears the per-issue override (deletes key, does NOT write 'auto' as value)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-start-button.ac5",
+            "title": "Visual indicator (badge/highlight) when non-default model is selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kanban-integration",
+        "title": "Replace Start Agent buttons on KanbanBoard with SplitStartButton",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Replace the two Start Agent button instances in KanbanBoard.tsx (lines ~3348-3358 and ~3397-3407) with the new SplitStartButton component. Wire up the startAgentMutation to pass the resolved model in the request body. The handleStartAgent function (line 2823) needs to accept a model parameter."
+        },
+        "subItems": [
+          {
+            "id": "kanban-integration.ac1",
+            "title": "Both Start Agent button locations on kanban cards use SplitStartButton",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kanban-integration.ac2",
+            "title": "startAgentMutation sends the resolved model in the POST /api/agents body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kanban-integration.ac3",
+            "title": "Model selection dropdown works on cards in both 'planning complete' and 'in progress, no agent' states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "planning-dialog-persist",
+        "title": "Planning dialog persists model override as per-issue override",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Update PlanDialog.tsx to persist the selected model as a per-issue override when the user picks a non-default model. Currently the dialog has modelOverride state (line 78) but doesn't persist it. After workspace creation but before planning agent spawn, call POST /api/models/issue-overrides with the selected model for work type 'planning-agent'. Also offer to persist for 'issue-agent:implementation' so the work agent inherits it."
+        },
+        "subItems": [
+          {
+            "id": "planning-dialog-persist.ac1",
+            "title": "Selecting a non-default model in the planning dialog persists it as a per-issue override for planning-agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "planning-dialog-persist.ac2",
+            "title": "Planning dialog model override is passed to the planning agent spawn request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inspector-model-badges",
+        "title": "Show model override badges in InspectorPanel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Add model override indicators to the InspectorPanel. Show badges indicating the override source: 'Issue Override' (amber), 'Project Default' (blue), or no badge (global/auto). When overrides exist, show a collapsible section with per-work-type breakdown. Fetch override data from GET /api/models/resolve?issueId=X."
+        },
+        "subItems": [
+          {
+            "id": "inspector-model-badges.ac1",
+            "title": "InspectorPanel shows 'Issue Override' badge when per-issue override is active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspector-model-badges.ac2",
+            "title": "InspectorPanel shows 'Project Default' badge when per-project override is active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspector-model-badges.ac3",
+            "title": "No badge shown when using global/auto model selection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-workspace-config",
+        "title": "Add pan workspace config CLI subcommand for model overrides",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Add `pan workspace config <issue-id>` subcommand to src/cli/commands/workspace.ts. Subcommands: (1) no flags = show current overrides with source for each work type, (2) `--model <work-type>=<model-id>` = set override, (3) `--clear-model <work-type>` = clear override, (4) `--clear-all` = clear all overrides. Uses the same reader/writer functions from per-issue-overrides-io."
+        },
+        "subItems": [
+          {
+            "id": "cli-workspace-config.ac1",
+            "title": "`pan workspace config PAN-532` displays current model overrides with their source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-workspace-config.ac2",
+            "title": "`pan workspace config PAN-532 --model planning-agent=claude-opus-4-6` sets per-issue override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-workspace-config.ac3",
+            "title": "`pan workspace config PAN-532 --clear-model planning-agent` clears the override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-workspace-config.ac4",
+            "title": "Command validates that the model ID is a known model before writing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolution-chain-tests",
+        "title": "Unit tests for model resolution chain",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-03T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-532"
+        },
+        "narrative": {
+          "Action": "Write unit tests for the resolution chain in a new test file. Test cases: (1) per-issue override wins over per-project, (2) per-project wins over global config, (3) no overrides falls through to existing chain, (4) clearing an override removes it, (5) invalid model IDs are handled gracefully, (6) missing workspace returns no override. Mock filesystem for overrides.json, mock projects.yaml for project overrides."
+        },
+        "subItems": [
+          {
+            "id": "resolution-chain-tests.ac1",
+            "title": "Test: per-issue override takes precedence over per-project override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolution-chain-tests.ac2",
+            "title": "Test: per-project override takes precedence over global config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolution-chain-tests.ac3",
+            "title": "Test: no overrides returns undefined (falls through)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolution-chain-tests.ac4",
+            "title": "Test: clearing last override removes file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "projects-yaml-models-schema",
+        "to": "resolve-model-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "per-issue-overrides-io",
+        "to": "resolve-model-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-model-helper",
+        "to": "wire-determine-model",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-model-helper",
+        "to": "specialist-spawn-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-model-helper",
+        "to": "api-resolve-model-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "per-issue-overrides-io",
+        "to": "api-issue-overrides-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "api-resolve-model-endpoint",
+        "to": "split-start-button",
+        "type": "blocks"
+      },
+      {
+        "from": "api-issue-overrides-endpoint",
+        "to": "split-start-button",
+        "type": "blocks"
+      },
+      {
+        "from": "split-start-button",
+        "to": "kanban-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "api-issue-overrides-endpoint",
+        "to": "planning-dialog-persist",
+        "type": "blocks"
+      },
+      {
+        "from": "api-resolve-model-endpoint",
+        "to": "inspector-model-badges",
+        "type": "blocks"
+      },
+      {
+        "from": "per-issue-overrides-io",
+        "to": "cli-workspace-config",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-determine-model",
+        "to": "resolution-chain-tests",
+        "type": "blocks"
+      }
+    ]
+  }
+}

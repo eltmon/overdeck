@@ -1,0 +1,57 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-02T00:00:00Z"
+  },
+  "plan": {
+    "id": "PAN-415",
+    "title": "Test: trace what calls complete-planning after agent finishes",
+    "status": "approved",
+    "author": "plan",
+    "tags": [
+      "test",
+      "orchestration"
+    ],
+    "narratives": {
+      "Problem": "Need to verify the complete-planning orchestration flow works end-to-end.",
+      "Proposal": "Create test-trace.txt as a trivial task to exercise the planning \u2192 implementation \u2192 completion pipeline.",
+      "Constraint": "File must be deleted after testing \u2014 no artifacts should remain.",
+      "Risk": "None \u2014 this is a throwaway test.",
+      "Alternative": "None considered \u2014 the issue is prescriptive."
+    },
+    "items": [
+      {
+        "id": "create-test-file",
+        "title": "Create and delete test-trace.txt",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-415"
+        },
+        "narrative": {
+          "Action": "Create test-trace.txt in the workspace root with a simple message, then delete it."
+        },
+        "subItems": [
+          {
+            "id": "create-test-file.file-created",
+            "title": "test-trace.txt is created in workspace root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-test-file.file-deleted",
+            "title": "test-trace.txt is deleted after creation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

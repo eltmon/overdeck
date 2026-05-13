@@ -1,0 +1,303 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-06T22:30:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-512: Effect yield* failures not caught by JS try/catch \u2014 audit all agent route Effect.gen blocks"
+  },
+  "plan": {
+    "id": "pan-512",
+    "title": "Effect yield* failures not caught by JS try/catch \u2014 audit all agent route Effect.gen blocks",
+    "status": "completed",
+    "uid": "56561b7c-9181-491b-8cc9-6c3955995da5",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 2,
+    "created": "2026-04-06T22:30:00.000Z",
+    "updated": "2026-04-07T03:40:00.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/512",
+        "label": "PAN-512",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effect",
+      "error-handling",
+      "routes",
+      "lint"
+    ],
+    "narratives": {
+      "Problem": "JS try/catch around yield* inside Effect.gen is a no-op \u2014 Effect fiber failures bypass catch blocks entirely, causing silent error swallowing or uncaught 500s in 17 route handler locations.",
+      "Proposal": "Replace all 17 try/catch-around-yield* instances with proper Effect error combinators (catchAll, catchTag, either), and add an ESLint rule to prevent reintroduction."
+    },
+    "items": [
+      {
+        "id": "fix-agents",
+        "title": "Fix 5 try/catch-around-yield* instances in routes/agents.ts",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
+        "priority": "high",
+        "created": "2026-04-06T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-512"
+        },
+        "narrative": {
+          "Action": "Replace try/catch blocks at lines ~218, ~362, ~1340, ~1346, ~1455, ~1487 with Effect.catchAll/Effect.either patterns. For the mixed JSON.parse+yield* case (line 218/362), separate the yield* from the sync parse."
+        },
+        "subItems": [
+          {
+            "id": "fix-agents.ac1",
+            "title": "No JS try/catch blocks contain yield* calls in agents.ts",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-agents.ac2",
+            "title": "Agent start route still gracefully handles tmux kill-session failure (no existing session)",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-agents.ac3",
+            "title": "Docker availability check still sets dockerRunning=false on failure instead of crashing",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-workspaces",
+        "title": "Fix 9 try/catch-around-yield* instances in routes/workspaces.ts",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
+        "priority": "high",
+        "created": "2026-04-06T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-512"
+        },
+        "narrative": {
+          "Action": "Replace 9 try/catch blocks wrapping yield* calls with Effect error combinators. Special attention to: (1) the container control retry loop (needs Effect.either), (2) Docker check that returns 400 error response (needs Effect.catchAll returning Effect.succeed(jsonResponse)), (3) large .env repair block with multiple yield* calls."
+        },
+        "subItems": [
+          {
+            "id": "fix-workspaces.ac1",
+            "title": "No JS try/catch blocks contain yield* calls in workspaces.ts",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-workspaces.ac2",
+            "title": "Container control retry loop still tries multiple service names on failure",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-workspaces.ac3",
+            "title": "Docker-not-running check still returns 400 JSON error (not 500)",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-mission-control",
+        "title": "Fix 2 try/catch-around-yield* instances in routes/mission-control.ts",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
+        "priority": "medium",
+        "created": "2026-04-06T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-512"
+        },
+        "narrative": {
+          "Action": "Fix Linear comment sync and Rally story sync blocks. These already have partial inner Effect error handling (Effect.catchCause, Effect.tryPromise) \u2014 remove the redundant outer try/catch and ensure the inner handlers cover all failure paths."
+        },
+        "subItems": [
+          {
+            "id": "fix-mission-control.ac1",
+            "title": "No JS try/catch blocks contain yield* calls in mission-control.ts",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fix-specialists",
+        "title": "Fix 1 try/catch-around-yield* instance in routes/specialists.ts",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
+        "priority": "medium",
+        "created": "2026-04-06T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-512"
+        },
+        "narrative": {
+          "Action": "Separate the yield* (file read) from the sync JSON.parse. yield* into a variable first, then try/catch only the JSON.parse."
+        },
+        "subItems": [
+          {
+            "id": "fix-specialists.ac1",
+            "title": "No JS try/catch blocks contain yield* calls in specialists.ts",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "eslint-rule",
+        "title": "Add ESLint rule to prevent try/catch around yield* in Effect.gen",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
+        "priority": "high",
+        "created": "2026-04-06T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-512"
+        },
+        "narrative": {
+          "Action": "Add a no-restricted-syntax ESLint rule (or custom rule) that flags TryStatement nodes containing YieldExpression descendants when inside an Effect.gen callback. Verify it catches the pattern and passes on legitimate try/catch (sync-only code). Must pass `npm run lint` after all fixes are applied."
+        },
+        "subItems": [
+          {
+            "id": "eslint-rule.ac1",
+            "title": "ESLint config contains a rule that flags try { yield* } catch inside generators",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eslint-rule.ac2",
+            "title": "npm run lint passes with all 17 instances fixed",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quality-gates",
+        "title": "Verify typecheck, lint, and tests pass",
+        "status": "completed",
+        "completed": "2026-04-07T03:40:00.000Z",
+        "priority": "high",
+        "created": "2026-04-06T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-512"
+        },
+        "narrative": {
+          "Action": "Run npm run typecheck, npm run lint, and npm test. All must pass. No behavioral changes expected \u2014 the fixes make error handling actually work where it was silently broken before."
+        },
+        "subItems": [
+          {
+            "id": "quality-gates.ac1",
+            "title": "npm run typecheck passes",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gates.ac2",
+            "title": "npm run lint passes",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gates.ac3",
+            "title": "npm test passes",
+            "status": "completed",
+            "completed": "2026-04-07T03:40:00.000Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fix-agents",
+        "to": "eslint-rule",
+        "type": "informs"
+      },
+      {
+        "from": "fix-workspaces",
+        "to": "eslint-rule",
+        "type": "informs"
+      },
+      {
+        "from": "fix-mission-control",
+        "to": "eslint-rule",
+        "type": "informs"
+      },
+      {
+        "from": "fix-specialists",
+        "to": "eslint-rule",
+        "type": "informs"
+      },
+      {
+        "from": "fix-agents",
+        "to": "quality-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-workspaces",
+        "to": "quality-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-mission-control",
+        "to": "quality-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-specialists",
+        "to": "quality-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "eslint-rule",
+        "to": "quality-gates",
+        "type": "blocks"
+      }
+    ]
+  }
+}

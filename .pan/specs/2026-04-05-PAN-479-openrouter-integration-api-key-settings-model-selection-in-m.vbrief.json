@@ -1,0 +1,454 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-05T18:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-479: OpenRouter integration \u2014 API key settings + model selection in Mission Control"
+  },
+  "plan": {
+    "id": "pan-479",
+    "title": "OpenRouter integration \u2014 API key settings + model selection in Mission Control",
+    "status": "approved",
+    "uid": "33cb6bf0-6fe4-4951-93e9-df844ac758d4",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-05T18:00:00Z",
+    "updated": "2026-04-05T18:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/479",
+        "label": "PAN-479",
+        "type": "issue"
+      },
+      {
+        "uri": "https://openrouter.ai/docs/api/api-reference/anthropic-messages/create-messages",
+        "label": "OpenRouter Anthropic Skin API",
+        "type": "reference"
+      },
+      {
+        "uri": "https://openrouter.ai/docs/guides/coding-agents/claude-code-integration",
+        "label": "OpenRouter Claude Code Guide",
+        "type": "reference"
+      }
+    ],
+    "tags": [
+      "openrouter",
+      "mission-control",
+      "model-selection",
+      "multi-provider",
+      "settings"
+    ],
+    "narratives": {
+      "Problem": "Mission Control only supports 3 hardcoded Claude models. Users want access to the full spectrum of LLMs available through OpenRouter (Qwen, DeepSeek, Llama, Mistral, etc.) including free models, while keeping the existing Claude models as first-class options.",
+      "Proposal": "Add OpenRouter as a full provider in the existing multi-provider system. Create a backend service for model discovery with caching, a dedicated Settings page for API key and model favorites, unify the ModelPicker to show all enabled providers, and modify conversation/agent launchers to set Anthropic SDK env overrides when spawning OpenRouter model sessions."
+    },
+    "items": [
+      {
+        "id": "openrouter-service",
+        "title": "Create OpenRouter backend service",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-479"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/openrouter-service.ts. Implement: (1) fetchModels() \u2014 GET https://openrouter.ai/api/v1/models with in-memory cache (5min TTL), (2) validateApiKey() \u2014 test key with a lightweight API call, (3) getModelCapabilities() \u2014 extract thinking/tool support from model metadata. Use async fetch (no blocking calls). Follow existing service patterns from tracker-config.ts."
+        },
+        "subItems": [
+          {
+            "id": "openrouter-service.ac1",
+            "title": "fetchModels returns typed model list with id, name, pricing, context_length, capabilities",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openrouter-service.ac2",
+            "title": "Model list is cached in memory with 5-minute TTL, subsequent calls return cache",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openrouter-service.ac3",
+            "title": "validateApiKey returns success/error without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openrouter-service.ac4",
+            "title": "Model capabilities include supports_thinking boolean derived from model metadata",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-integration",
+        "title": "Add OpenRouter to provider system",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-479"
+        },
+        "narrative": {
+          "Action": "Add 'openrouter' to ModelProvider enum in model-capabilities.ts. Add openrouter API key field to config-yaml.ts schema and NormalizedConfig. Add OPENROUTER_API_KEY extraction to env-loader.ts getApiKeysFromEnv(). Add openrouter to settings-api.ts conversion functions. Add openrouter favorites array to config schema (openrouter.favorites: string[])."
+        },
+        "subItems": [
+          {
+            "id": "provider-integration.ac1",
+            "title": "ModelProvider enum includes 'openrouter' and it's recognized throughout the settings pipeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-integration.ac2",
+            "title": "OPENROUTER_API_KEY is loaded from ~/.panopticon.env and config.yaml with correct priority",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-integration.ac3",
+            "title": "OpenRouter favorites list persists in config.yaml across restarts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-routes",
+        "title": "Add OpenRouter API endpoints to settings routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-479"
+        },
+        "narrative": {
+          "Action": "Add to src/dashboard/server/routes/settings.ts: (1) GET /api/settings/openrouter/models \u2014 fetch available models via openrouter-service, (2) PUT /api/settings/openrouter/favorites \u2014 save/update favorite model IDs, (3) POST /api/settings/openrouter/test-key \u2014 validate API key. Follow existing Effect.js httpHandler pattern. Ensure GET /api/settings includes openrouter state."
+        },
+        "subItems": [
+          {
+            "id": "settings-routes.ac1",
+            "title": "GET /api/settings/openrouter/models returns model list with pricing and capabilities",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-routes.ac2",
+            "title": "PUT /api/settings/openrouter/favorites persists favorites to config.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-routes.ac3",
+            "title": "POST /api/settings/openrouter/test-key returns validation result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "openrouter-settings-page",
+        "title": "Create dedicated OpenRouter settings page with model browser",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-479"
+        },
+        "narrative": {
+          "Action": "Create new React components: (1) OpenRouterPage.tsx \u2014 dedicated settings page with API key input + test button at top, model catalog below, (2) OpenRouterModelBrowser.tsx \u2014 searchable/filterable model list with star-to-favorite toggle, category filters (Free/Chat/Code), pricing display per model. Favorites section pinned at top. Add navigation to this page from SettingsPage. Use existing Settings component patterns."
+        },
+        "subItems": [
+          {
+            "id": "openrouter-settings-page.ac1",
+            "title": "API key field validates on save and shows success/error state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openrouter-settings-page.ac2",
+            "title": "Model browser shows all OpenRouter models with search and category filters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openrouter-settings-page.ac3",
+            "title": "Starring a model adds it to favorites, which persist across page reloads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openrouter-settings-page.ac4",
+            "title": "Each model shows pricing info (cost per million tokens) and context length",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "model-picker-unification",
+        "title": "Unify ModelPicker with full provider system",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-479"
+        },
+        "narrative": {
+          "Action": "Refactor ModelPicker.tsx to: (1) fetch available models from GET /api/settings/available-models (all enabled providers) plus OpenRouter favorites, (2) group by provider with section headers (Anthropic, OpenRouter, OpenAI, etc.), (3) show per-model cost indicator, (4) update EffortPicker.tsx to check model capability metadata for effort support instead of hardcoded MODEL_EFFORT_SUPPORT map. Update DraftConversationPanel.tsx to pass provider info alongside model ID."
+        },
+        "subItems": [
+          {
+            "id": "model-picker-unification.ac1",
+            "title": "ModelPicker shows models from all enabled providers grouped by provider name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-picker-unification.ac2",
+            "title": "OpenRouter favorites appear in the OpenRouter section of the picker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-picker-unification.ac3",
+            "title": "EffortPicker dynamically enables/disables based on selected model's capabilities",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-picker-unification.ac4",
+            "title": "Per-model cost indicator visible in the dropdown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-launcher",
+        "title": "OpenRouter env overrides in conversation and agent launchers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-479"
+        },
+        "narrative": {
+          "Action": "Modify spawnConversationSession() in conversations.ts: detect if selected model is an OpenRouter model (check against favorites list or model ID pattern). If so, add ANTHROPIC_BASE_URL=https://openrouter.ai/api, ANTHROPIC_AUTH_TOKEN=<key>, ANTHROPIC_API_KEY='' to the launcher script. Apply same pattern to agent launcher scripts in agents.ts for work agent integration. Native provider models continue using existing flow unchanged."
+        },
+        "subItems": [
+          {
+            "id": "conversation-launcher.ac1",
+            "title": "Selecting an OpenRouter model spawns a session with correct ANTHROPIC_BASE_URL and AUTH_TOKEN env vars",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-launcher.ac2",
+            "title": "Native Claude models continue working without any env var overrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-launcher.ac3",
+            "title": "Work agent launchers support OpenRouter models via model override settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-launcher.ac4",
+            "title": "End-to-end test: spawn conversation with qwen/qwen3.6-plus:free, receive a response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-tracking",
+        "title": "Cost tracking and usage display for OpenRouter models",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-05T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-479"
+        },
+        "narrative": {
+          "Action": "Implement cost visibility: (1) show per-model pricing in ModelPicker from OpenRouter model metadata (prompt/completion cost per million tokens), (2) display pricing in the OpenRouter Settings model browser. Track OpenRouter API usage if the OpenRouter API provides usage/billing endpoints, otherwise display static pricing only for v1."
+        },
+        "subItems": [
+          {
+            "id": "cost-tracking.ac1",
+            "title": "ModelPicker shows cost-per-million-tokens for OpenRouter models",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-tracking.ac2",
+            "title": "Free models are clearly labeled as FREE in both picker and settings browser",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "typecheck-lint-test",
+        "title": "Quality gates: typecheck, lint, and test pass",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-479"
+        },
+        "narrative": {
+          "Action": "Ensure npm run typecheck, npm run lint, and npm test all pass with the new code. Fix any type errors from the provider system changes. Add unit tests for openrouter-service (model fetching, caching, key validation)."
+        },
+        "subItems": [
+          {
+            "id": "typecheck-lint-test.ac1",
+            "title": "npm run typecheck passes with zero errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "typecheck-lint-test.ac2",
+            "title": "npm run lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "typecheck-lint-test.ac3",
+            "title": "npm test passes including new OpenRouter service tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "openrouter-service",
+        "to": "settings-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "openrouter-service",
+        "to": "conversation-launcher",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-integration",
+        "to": "settings-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-integration",
+        "to": "model-picker-unification",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-routes",
+        "to": "openrouter-settings-page",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-routes",
+        "to": "model-picker-unification",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-integration",
+        "to": "conversation-launcher",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-launcher",
+        "to": "typecheck-lint-test",
+        "type": "blocks"
+      },
+      {
+        "from": "openrouter-settings-page",
+        "to": "typecheck-lint-test",
+        "type": "blocks"
+      },
+      {
+        "from": "model-picker-unification",
+        "to": "typecheck-lint-test",
+        "type": "blocks"
+      },
+      {
+        "from": "openrouter-service",
+        "to": "cost-tracking",
+        "type": "blocks"
+      },
+      {
+        "from": "model-picker-unification",
+        "to": "cost-tracking",
+        "type": "informs"
+      }
+    ]
+  }
+}

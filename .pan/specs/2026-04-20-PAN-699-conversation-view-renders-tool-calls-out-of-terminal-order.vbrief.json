@@ -1,0 +1,515 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-20T22:21:27Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-699: Conversation view renders tool calls out of terminal order"
+  },
+  "plan": {
+    "id": "pan-699",
+    "title": "Conversation view renders tool calls out of terminal order",
+    "status": "approved",
+    "uid": "557afeee-8e75-4507-8839-f0f54fd35a4f",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 1,
+    "created": "2026-04-20T22:21:27Z",
+    "updated": "2026-04-20T22:21:27Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/699",
+        "label": "PAN-699",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "conversation",
+      "ordering",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "parseConversationMessages emits entries in JSONL read order and never sorts. Parallel tool calls, buffered writes, and compact boundaries render out of terminal order. tool_result arriving before tool_use is orphaned. pendingToolUse map is rebuilt each incremental parse call, so cross-batch tool pairing is also broken.",
+      "Proposal": "Capture a monotonic sequence per JSONL line, keep an unresolvedResults map for backward pairing, persist parse state across incremental calls, and sort messages + workLog by (createdAt, sequence) before returning. Propagate sequence through the wire contract so the client can sort defensively."
+    },
+    "items": [
+      {
+        "id": "contract-sequence",
+        "title": "Add optional sequence field to ChatMessage and WorkLogEntry contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T22:21:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-699"
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/rpc.ts, add `sequence: Schema.optional(Schema.Number)` to ChatMessage and WorkLogEntry. Rebuild contracts (cd packages/contracts && npm run build)."
+        },
+        "subItems": [
+          {
+            "id": "contract-sequence.ac1",
+            "title": "ChatMessage schema exposes optional numeric `sequence` field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-sequence.ac2",
+            "title": "WorkLogEntry schema exposes optional numeric `sequence` field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-sequence.ac3",
+            "title": "packages/contracts builds cleanly; `npm run typecheck` passes at repo root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parse-sequence",
+        "title": "Emit monotonic sequence on every parsed message and workLog entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T22:21:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-699"
+        },
+        "narrative": {
+          "Action": "In conversation-service.ts `parseConversationMessages`, maintain a local `sequence` counter that increments per JSONL line processed. Stash it on every ChatMessage and WorkLogEntry produced (user, assistant, pendingAssistant flush, tool_use, tool_result-resolved workLog push)."
+        },
+        "subItems": [
+          {
+            "id": "parse-sequence.ac1",
+            "title": "Every ChatMessage returned by parseConversationMessages has a numeric sequence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-sequence.ac2",
+            "title": "Every WorkLogEntry returned by parseConversationMessages has a numeric sequence matching the JSONL line index of its tool_use",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-sequence.ac3",
+            "title": "sequence values are strictly monotonically increasing in emission order within a single parse call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parse-unresolved-results",
+        "title": "Two-pass pairing: handle tool_result that arrives before tool_use",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T22:21:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-699"
+        },
+        "narrative": {
+          "Action": "Add an `unresolvedResults: Map<tool_use_id, {result, isError, sequence, createdAt}>` alongside `pendingToolUse`. On tool_result: if no matching pendingToolUse, stash in unresolvedResults (never drop). On tool_use: check unresolvedResults first and merge into a completed WorkLogEntry immediately if present. Never orphan a tool_result."
+        },
+        "subItems": [
+          {
+            "id": "parse-unresolved-results.ac1",
+            "title": "tool_result preceding its tool_use in the JSONL is paired correctly into workLog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-unresolved-results.ac2",
+            "title": "No tool_result is silently dropped \u2014 all tool_result entries either pair with a tool_use or remain in unresolvedResults carried state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-unresolved-results.ac3",
+            "title": "Existing forward-paired case (tool_use then tool_result) still works identically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parse-sort",
+        "title": "Sort messages and workLog by (createdAt, sequence) before returning",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T22:21:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-699"
+        },
+        "narrative": {
+          "Action": "After the JSONL walk in parseConversationMessages, sort `messages` and `workLog` independently by (createdAt ISO string compare, then sequence). Return sorted arrays. Preserve streaming/totalCost/byteOffset fields unchanged."
+        },
+        "subItems": [
+          {
+            "id": "parse-sort.ac1",
+            "title": "Returned messages array is sorted by (createdAt, sequence)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-sort.ac2",
+            "title": "Returned workLog array is sorted by (createdAt, sequence)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-sort.ac3",
+            "title": "Identical timestamps are deterministically ordered by sequence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parse-persist-state",
+        "title": "Persist pendingToolUse, unresolvedResults, and sequence across incremental parse calls",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T22:21:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-699"
+        },
+        "narrative": {
+          "Action": "Extend ParseResult with `parseState: { pendingToolUse, unresolvedResults, lastSequence }`. parseConversationMessages accepts an optional prior parseState as a second/third argument (alongside byteOffset) and seeds its maps + counter from it. Update the watchConversation caller in conversation-service.ts and any agents.ts callers to thread parseState through successive calls. Flushing of unpaired pendingToolUse only happens at boundaries that own the full window (e.g. summarizeConversationActivity, parseFromLastCompactBoundary non-incremental use), never mid-stream in the watcher."
+        },
+        "subItems": [
+          {
+            "id": "parse-persist-state.ac1",
+            "title": "A tool_use in parse call N pairs correctly with its tool_result in parse call N+1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-persist-state.ac2",
+            "title": "sequence counter continues monotonically across incremental calls (does not reset to 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-persist-state.ac3",
+            "title": "watchConversation and agents.ts conversation route thread parseState through successive reads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parse-persist-state.ac4",
+            "title": "Unpaired tool_use entries are only flushed by non-incremental entry points, not by the watcher",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-wire-sequence",
+        "title": "Thread sequence through the agents.ts conversation response",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T22:21:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-699"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/agents.ts, ensure the conversation response shape passes each message/workLog entry's `sequence` through untouched. Update any intermediate mapping that would drop unknown fields."
+        },
+        "subItems": [
+          {
+            "id": "route-wire-sequence.ac1",
+            "title": "GET /api/agents/:id/conversation returns `sequence` on every message and workLog entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-wire-sequence.ac2",
+            "title": "No backwards-compatibility break: clients that ignore sequence still render correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client-defensive-sort",
+        "title": "MessagesTimeline defensive client-side sort by (createdAt, sequence)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T22:21:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-699"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx, apply a `.toSorted((a,b) => a.createdAt.localeCompare(b.createdAt) || (a.sequence ?? 0) - (b.sequence ?? 0))` to the combined timeline before render. Server is authoritative; this is a belt-and-braces tiebreaker."
+        },
+        "subItems": [
+          {
+            "id": "client-defensive-sort.ac1",
+            "title": "Rendered timeline is sorted by (createdAt, sequence) regardless of server array order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-defensive-sort.ac2",
+            "title": "Sort is stable and does not re-run on every render unless inputs change (useMemo or equivalent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tests-unit",
+        "title": "Unit tests for conversation-service ordering and pairing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T22:21:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-699"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation-service.test.ts with synthetic JSONL fixtures covering: (a) parallel tool calls in one assistant turn, (b) tool_result before its tool_use, (c) incremental parse boundary splitting a tool_use/tool_result pair, (d) three entries with identical timestamps using sequence as tiebreaker, (e) compact boundary mid-turn."
+        },
+        "subItems": [
+          {
+            "id": "tests-unit.ac1",
+            "title": "Parallel tool call fixture: messages + workLog sorted in terminal order, both tools paired",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests-unit.ac2",
+            "title": "Backward-pairing fixture: tool_result preceding tool_use is correctly merged into workLog",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests-unit.ac3",
+            "title": "Incremental fixture: two parseConversationMessages calls with state threading produce the same output as one full parse",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests-unit.ac4",
+            "title": "Timestamp-tie fixture: three entries at identical timestamp are ordered by sequence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests-unit.ac5",
+            "title": "Compact boundary fixture: parseFromLastCompactBoundary returns correctly ordered post-boundary content",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests-unit.ac6",
+            "title": "All new tests pass under `npm test`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tests-regression-fixture",
+        "title": "Regression fixture from a real mis-ordered session",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T22:21:27Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-699"
+        },
+        "narrative": {
+          "Action": "Capture (or scrub and commit) a real ~/.claude JSONL session that currently renders out of order. Store under src/dashboard/server/services/__fixtures__/pan-699-regression.jsonl with any user/secret content redacted. Add a snapshot test asserting the expected ordered output."
+        },
+        "subItems": [
+          {
+            "id": "tests-regression-fixture.ac1",
+            "title": "Fixture JSONL exists in __fixtures__/ and is scrubbed of any secrets / PII",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests-regression-fixture.ac2",
+            "title": "Snapshot test asserts ordered messages + workLog and fails if ordering regresses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "uat-playwright",
+        "title": "Playwright UAT: conversation view renders in terminal order",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T22:21:27Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-699"
+        },
+        "narrative": {
+          "Action": "Add a Playwright spec under the existing dashboard UAT harness that opens an agent with a known-good session fixture and asserts the rendered conversation matches expected order (including parallel tool calls). Must use an isolated browser instance/profile \u2014 no shared state with other agents' sessions. All required login/setup reproducible inside the isolated session."
+        },
+        "subItems": [
+          {
+            "id": "uat-playwright.ac1",
+            "title": "Playwright spec runs against an isolated browser instance/profile",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-playwright.ac2",
+            "title": "Spec opens the dashboard conversation view and asserts rendered order matches expected sequence for a parallel-tool-call session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-playwright.ac3",
+            "title": "Spec does not depend on any other agent's Playwright browser or shared login state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-playwright.ac4",
+            "title": "Spec passes locally via the project's dashboard UAT runner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contract-sequence",
+        "to": "parse-sequence",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-sequence",
+        "to": "route-wire-sequence",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-sequence",
+        "to": "client-defensive-sort",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-sequence",
+        "to": "parse-sort",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-sequence",
+        "to": "parse-persist-state",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-unresolved-results",
+        "to": "parse-persist-state",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-sort",
+        "to": "tests-unit",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-unresolved-results",
+        "to": "tests-unit",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-persist-state",
+        "to": "tests-unit",
+        "type": "blocks"
+      },
+      {
+        "from": "parse-sort",
+        "to": "tests-regression-fixture",
+        "type": "blocks"
+      },
+      {
+        "from": "route-wire-sequence",
+        "to": "uat-playwright",
+        "type": "blocks"
+      },
+      {
+        "from": "client-defensive-sort",
+        "to": "uat-playwright",
+        "type": "blocks"
+      }
+    ]
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-08T00:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-557: Add conversation deep linking and copy buttons"
+  },
+  "plan": {
+    "id": "pan-557",
+    "title": "Add conversation deep linking and copy buttons",
+    "status": "approved",
+    "uid": "1df76d41-85cf-4edb-a50b-488bab656afb",
+    "author": "agent:minimax-m2.7-highspeed",
+    "sequence": 1,
+    "created": "2026-04-08T00:00:00.000Z",
+    "updated": "2026-04-08T00:00:00.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/557",
+        "label": "PAN-557",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "routing",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "Conversations are not directly linkable \u2014 users cannot share a URL to a specific conversation. Selection is internal React state only.",
+      "Proposal": "Add /conv/:id URL route, backend endpoint to fetch conversation by ID, and copy-link buttons in ConversationList and ConversationPanel using the same icon-swap pattern as code block copy buttons."
+    },
+    "items": [
+      {
+        "id": "backend-conv-by-id",
+        "title": "Add GET /api/conversations/:id endpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-557"
+        },
+        "narrative": {
+          "Action": "Add a backend route to fetch a single conversation by its numeric ID"
+        },
+        "subItems": [
+          {
+            "id": "backend-conv-by-id.ac1",
+            "title": "GET /api/conversations/:id returns the conversation record with all fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routing-conv-deep-link",
+        "title": "Add /conv/:id route in App.tsx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-557"
+        },
+        "narrative": {
+          "Action": "Add /conv/:id path handling that sets convId state and navigates to MissionControl with the conversation selected"
+        },
+        "subItems": [
+          {
+            "id": "routing-conv-deep-link.ac1",
+            "title": "/conv/:id URL loads the conversation in MissionControl main panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routing-conv-deep-link.ac2",
+            "title": "Deep link syncs with browser history (back/forward work)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "missioncontrol-conv-prop",
+        "title": "Pass convId prop to MissionControl",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-557"
+        },
+        "narrative": {
+          "Action": "Update MissionControl to accept convId prop, look up conversation name from list, and auto-select it on mount"
+        },
+        "subItems": [
+          {
+            "id": "missioncontrol-conv-prop.ac1",
+            "title": "MissionControl selects conversation by ID when convId prop is provided",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "copy-btn-list",
+        "title": "Add copy-link button in ConversationList",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-557"
+        },
+        "narrative": {
+          "Action": "Add Copy icon button next to the archive button in ConversationList, using same hover-reveal pattern"
+        },
+        "subItems": [
+          {
+            "id": "copy-btn-list.ac1",
+            "title": "Copy button appears on hover next to archive button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "copy-btn-list.ac2",
+            "title": "Clicking copy button copies /conv/:id URL to clipboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "copy-btn-list.ac3",
+            "title": "Icon swaps to Check for 2s then reverts to Copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "copy-btn-panel",
+        "title": "Add copy-link button in ConversationPanel header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-557"
+        },
+        "narrative": {
+          "Action": "Add Copy icon button in ConversationPanel header area, next to the archive button"
+        },
+        "subItems": [
+          {
+            "id": "copy-btn-panel.ac1",
+            "title": "Copy button visible in ConversationPanel header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "copy-btn-panel.ac2",
+            "title": "Clicking copy button copies /conv/:id URL to clipboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "copy-btn-panel.ac3",
+            "title": "Icon swaps to Check for 2s then reverts to Copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

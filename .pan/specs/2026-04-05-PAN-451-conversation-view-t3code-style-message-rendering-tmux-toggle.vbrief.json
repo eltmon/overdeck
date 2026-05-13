@@ -1,0 +1,694 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-05T18:30:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-451: Conversation view \u2014 T3Code-style message rendering + tmux toggle for agent sessions"
+  },
+  "plan": {
+    "id": "pan-451",
+    "title": "Conversation view \u2014 T3Code-style message rendering + tmux toggle for agent sessions",
+    "status": "approved",
+    "uid": "b55a7695-6756-417e-b6be-151953dda7cc",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-05T18:30:00Z",
+    "updated": "2026-04-05T18:30:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/451",
+        "label": "PAN-451",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-451/docs/prds/planned/pan-451-conversation-view.md",
+        "label": "pan-451-conversation-view.md",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/panopticon-cli/docs/prds/planned/pan-451-conversation-view.md",
+        "label": "pan-451-conversation-view.md",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "mission-control",
+      "conversation-ui",
+      "streaming",
+      "lexical",
+      "shiki"
+    ],
+    "narratives": {
+      "Problem": "MissionControl shows agent conversations only as raw tmux terminal output. Users cannot read structured conversation history, see tool calls, or interact without understanding ANSI escape codes. There is no way to view the rich message data that Claude Code already persists in JSONL session files.",
+      "Proposal": "Mirror T3Code's conversation UI in MissionControl: structured message rendering with ChatMarkdown, virtualized MessagesTimeline, Lexical-based ComposerPromptEditor, and a toggle to switch between the rendered conversation view and the live tmux terminal. Server-side JSONL parsing with file watching enables streaming message updates. Session file paths stored in the conversations DB for reliable mapping."
+    },
+    "items": [
+      {
+        "id": "chat-types",
+        "title": "Define ChatMessage, WorkLogEntry, and TimelineEntry types",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-451"
+        },
+        "narrative": {
+          "Action": "Add ChatMessage, WorkLogEntry, TimelineEntry, MessagesTimelineRow, and ConversationEvent types to @panopticon/contracts or frontend types.ts. Mirror T3Code's type shapes exactly: ChatMessage with id/role/text/attachments/turnId/createdAt/completedAt/streaming, WorkLogEntry with id/createdAt/label/detail/command/changedFiles/tone/toolTitle, TimelineEntry as discriminated union (message|work|working)."
+        },
+        "subItems": [
+          {
+            "id": "chat-types.ac1",
+            "title": "ChatMessage type has id, role (user|assistant|system), text, attachments, turnId, createdAt, completedAt, streaming fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-types.ac2",
+            "title": "WorkLogEntry type has id, createdAt, label, detail, command, changedFiles, tone (thinking|tool|info|error), toolTitle fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-types.ac3",
+            "title": "TimelineEntry is discriminated union with kind: message | work | working",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-types.ac4",
+            "title": "MessagesTimelineRow type defines row variants for virtualized rendering (message, work group, working indicator)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-deps",
+        "title": "Install frontend dependencies",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:30:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-451"
+        },
+        "narrative": {
+          "Action": "Install @pierre/diffs, react-markdown, remark-gfm, lexical, @lexical/react, and @tanstack/react-virtual in the frontend workspace. Verify versions match T3Code: react-markdown ^10.1.0, remark-gfm ^4.0.1, lexical ^0.41.0, @lexical/react ^0.41.0, @tanstack/react-virtual ^3.13.18. For @pierre/diffs, npm pack from T3Code's node_modules or add as local file reference if not published."
+        },
+        "subItems": [
+          {
+            "id": "frontend-deps.ac1",
+            "title": "All six packages installed with versions matching T3Code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-deps.ac2",
+            "title": "bun install succeeds and frontend build completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schema-migration",
+        "title": "Add session_file column to conversations table (schema v7)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-451"
+        },
+        "narrative": {
+          "Action": "Bump SCHEMA_VERSION to 7. Add migration block: ALTER TABLE conversations ADD COLUMN session_file TEXT. Add updateSessionFile(name, path) function to conversations-db.ts. The column stores the absolute path to the JSONL session file for each conversation, populated asynchronously after Claude Code starts."
+        },
+        "subItems": [
+          {
+            "id": "schema-migration.ac1",
+            "title": "SCHEMA_VERSION bumped to 7 with ALTER TABLE adding session_file TEXT column",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-migration.ac2",
+            "title": "updateSessionFile(name, sessionFilePath) function added to conversations-db.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema-migration.ac3",
+            "title": "getConversationByName returns session_file field in Conversation type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "jsonl-conversation-service",
+        "title": "JSONL conversation service \u2014 parser, file watcher, session discovery",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-451"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/conversation-service.ts. Implement: (1) discoverSessionFile(cwd, afterTimestamp) \u2014 encode CWD to project dir path, poll for new .jsonl files created after the given timestamp, return path when found; (2) parseConversationMessages(sessionFile, fromByteOffset) \u2014 read JSONL from offset, parse each line into ChatMessage + WorkLogEntry arrays, return new offset for incremental parsing; (3) watchConversation(sessionFile, callback) \u2014 use fs.watch with 500ms polling fallback, call callback with new messages on file append. Transform JSONL content blocks: text \u2192 ChatMessage, tool_use \u2192 WorkLogEntry, tool_result \u2192 WorkLogEntry update. Cache parsed state per file (byte offset + parsed messages). Use async file reading only (fs/promises)."
+        },
+        "subItems": [
+          {
+            "id": "jsonl-conversation-service.ac1",
+            "title": "discoverSessionFile encodes CWD to ~/.claude/projects/ path and finds new JSONL files created after a given timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jsonl-conversation-service.ac2",
+            "title": "parseConversationMessages reads from byte offset and returns ChatMessage[] + WorkLogEntry[] + new offset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jsonl-conversation-service.ac3",
+            "title": "text blocks become ChatMessage entries with correct role, tool_use/tool_result become WorkLogEntry entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jsonl-conversation-service.ac4",
+            "title": "watchConversation detects file appends via fs.watch with 500ms polling fallback and invokes callback with new messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jsonl-conversation-service.ac5",
+            "title": "All file I/O uses fs/promises (no sync calls)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "jsonl-conversation-service.ac6",
+            "title": "Streaming detection: last message has streaming=true if file was recently modified and last assistant message has no completedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-api",
+        "title": "REST and RPC endpoints for conversation messages",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-05T18:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-451"
+        },
+        "narrative": {
+          "Action": "Add GET /api/conversations/:name/messages endpoint to conversations.ts route. Returns { messages: ChatMessage[], workLog: WorkLogEntry[], streaming: boolean }. Reads from conversation's stored session_file path. If session_file is null (not yet discovered), return empty result with a 'discovering' flag. Add subscribeConversationMessages(name) RPC method to ws-rpc.ts that streams ConversationEvent objects (new messages, streaming updates) using the conversation service's file watcher. Modify POST /api/conversations to kick off async session file discovery after spawning, storing result in DB when found."
+        },
+        "subItems": [
+          {
+            "id": "conversation-api.ac1",
+            "title": "GET /api/conversations/:name/messages returns ChatMessage[] and WorkLogEntry[] from the JSONL session file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-api.ac2",
+            "title": "Endpoint returns { discovering: true } when session_file is not yet stored, not an error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-api.ac3",
+            "title": "RPC subscribeConversationMessages streams new messages as they appear in the JSONL file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-api.ac4",
+            "title": "POST /api/conversations triggers async session file discovery and stores path in DB",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chat-markdown",
+        "title": "ChatMarkdown component \u2014 markdown rendering with Shiki syntax highlighting",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-05T18:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-451"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/chat/ChatMarkdown.tsx mirroring T3Code's ChatMarkdown. Use react-markdown with remark-gfm for GFM support. Use @pierre/diffs getSharedHighlighter for Shiki syntax highlighting. Implement LRU cache (500 entries) for highlighted code blocks keyed by fnv1a32(code):length:language:theme. Skip cache during streaming (isStreaming prop). Add copy button on code blocks with visual feedback. Custom <pre> component wraps code blocks with Shiki output. Custom <a> component for file path links. Error boundary fallback to plain text. Add chat-markdown.css with T3Code's exact styles for code blocks, copy buttons, and typography."
+        },
+        "subItems": [
+          {
+            "id": "chat-markdown.ac1",
+            "title": "Renders GFM markdown (headers, lists, links, tables, strikethrough) correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-markdown.ac2",
+            "title": "Code blocks use Shiki syntax highlighting via @pierre/diffs with LRU cache (500 entries)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-markdown.ac3",
+            "title": "Copy button appears on hover over code blocks, copies content to clipboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-markdown.ac4",
+            "title": "isStreaming prop skips highlight cache to avoid stale renders during streaming",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-markdown.ac5",
+            "title": "Error boundary falls back to plain text rendering on highlight failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "messages-timeline",
+        "title": "MessagesTimeline \u2014 virtualized scrolling message display",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-05T18:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-451"
+        },
+        "narrative": {
+          "Action": "Create MessagesTimeline.tsx and MessagesTimeline.logic.ts in src/dashboard/frontend/src/components/chat/. Mirror T3Code's approach: use @tanstack/react-virtual useVirtualizer for large message histories. Implement deriveTimelineEntries() in session-logic.ts to transform ChatMessage[] + WorkLogEntry[] into TimelineEntry[]. Convert to MessagesTimelineRow[] (group consecutive work entries, add working indicator). Render row types: user messages (right-aligned bubbles), assistant messages (left-aligned with ChatMarkdown), work log groups (collapsible, max 6 visible), working indicator (animated dots + elapsed time). Auto-scroll pinned to bottom during streaming. Last 8 rows unvirtualized for fast streaming updates. Dynamic height estimation with width-scoped measurement cache."
+        },
+        "subItems": [
+          {
+            "id": "messages-timeline.ac1",
+            "title": "User messages render right-aligned with rounded-2xl rounded-br-sm bubble styling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messages-timeline.ac2",
+            "title": "Assistant messages render left-aligned using ChatMarkdown component",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messages-timeline.ac3",
+            "title": "Work log entries grouped and collapsible with max 6 visible, expand/collapse toggle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messages-timeline.ac4",
+            "title": "Working indicator shows animated dots and elapsed time during active streaming",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messages-timeline.ac5",
+            "title": "Virtual scrolling via @tanstack/react-virtual handles 1000+ messages without lag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "messages-timeline.ac6",
+            "title": "Auto-scroll stays pinned to bottom during streaming, releases when user scrolls up",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-prompt-editor",
+        "title": "ComposerPromptEditor \u2014 Lexical-based text input",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-05T18:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-451"
+        },
+        "narrative": {
+          "Action": "Create ComposerPromptEditor.tsx in src/dashboard/frontend/src/components/chat/. Mirror T3Code's Lexical setup but simplified: no ComposerMentionNode or ComposerTerminalContextNode for v1. Implement: Lexical editor with single ParagraphNode/TextNode, Enter key submits (via onCommandKeyDown callback), Shift+Enter inserts newline, auto-expand height up to max-h-[200px], draft persistence to localStorage (debounced 300ms), HistoryPlugin for undo/redo. Props: value, cursor, disabled, placeholder, onChange, onCommandKeyDown, onPaste. Style: text-[14px] leading-relaxed, min-h-17.5, max-w full width."
+        },
+        "subItems": [
+          {
+            "id": "composer-prompt-editor.ac1",
+            "title": "Enter key submits the message (calls onCommandKeyDown with 'Enter')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-prompt-editor.ac2",
+            "title": "Shift+Enter inserts a newline without submitting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-prompt-editor.ac3",
+            "title": "Editor auto-expands vertically up to max-h-[200px], scrolls beyond that",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-prompt-editor.ac4",
+            "title": "Draft text persisted to localStorage with 300ms debounce, restored on mount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-prompt-editor.ac5",
+            "title": "Undo/redo works via Lexical HistoryPlugin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "composer-footer",
+        "title": "ComposerFooter \u2014 input bar with model picker, effort picker, send button",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-05T18:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-451"
+        },
+        "narrative": {
+          "Action": "Create ComposerFooter.tsx, ModelPicker.tsx, and EffortPicker.tsx in src/dashboard/frontend/src/components/chat/. ComposerFooter assembles the input bar: ComposerPromptEditor on top, toolbar row below with ModelPicker (left), EffortPicker (center-left), SendButton (right). ModelPicker shows Claude models only: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5, stored in localStorage. EffortPicker shows low/medium/high/max, stored in localStorage. SendButton collects text from editor, sends to conversation's tmux session via POST /api/agents/:id/message (or new POST /api/conversations/:name/message endpoint). Clears editor and refocuses after send."
+        },
+        "subItems": [
+          {
+            "id": "composer-footer.ac1",
+            "title": "ModelPicker dropdown shows three Claude models, selection persisted to localStorage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-footer.ac2",
+            "title": "EffortPicker shows low/medium/high/max options, selection persisted to localStorage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-footer.ac3",
+            "title": "Send button submits message text to conversation's tmux session via existing message delivery pattern",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-footer.ac4",
+            "title": "Editor clears and refocuses after successful message send",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "composer-footer.ac5",
+            "title": "Send button is disabled when editor is empty or conversation session is ended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-panel",
+        "title": "ConversationPanel \u2014 toggle wrapper with conversation and terminal views",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-05T18:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-451"
+        },
+        "narrative": {
+          "Action": "Create ConversationPanel.tsx in src/dashboard/frontend/src/components/chat/. Accepts conversation: Conversation prop (same as ConversationTerminal). Renders: header bar with conversation name + status dot + toggle button [Conversation | Terminal]. Conversation view: MessagesTimeline + ComposerFooter, fetches messages from GET /api/conversations/:name/messages on mount, subscribes to RPC stream for updates, stores messages in local state or Zustand slice. Terminal view: renders existing XTerminal component with conversation.tmuxSession. Toggle state persisted to localStorage. Handles session lifecycle: if session ended, shows resume overlay (same as current ConversationTerminal). If session_file not yet discovered, shows 'Connecting to session...' placeholder in conversation view."
+        },
+        "subItems": [
+          {
+            "id": "conversation-panel.ac1",
+            "title": "Toggle button switches between Conversation and Terminal views",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-panel.ac2",
+            "title": "Conversation view default, toggle state persisted to localStorage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-panel.ac3",
+            "title": "Terminal view renders XTerminal with conversation's tmux session (identical to current ConversationTerminal)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-panel.ac4",
+            "title": "Session ended state shows resume overlay with Resume button (preserves existing behavior)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-panel.ac5",
+            "title": "Messages load on mount and stream in real-time as JSONL file is appended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-panel.ac6",
+            "title": "Shows 'Connecting to session...' placeholder while session_file is being discovered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mission-control-integration",
+        "title": "Wire ConversationPanel into MissionControl",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-05T18:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-451"
+        },
+        "narrative": {
+          "Action": "In MissionControl/index.tsx, replace <ConversationTerminal conversation={conv} /> with <ConversationPanel conversation={conv} /> in the content area rendering (around line 252). Update imports. Ensure ConversationTerminal.tsx is either removed or kept as a fallback. Update CSS module if needed for ConversationPanel layout. Verify selection behavior (conversation selected \u2192 content shows ConversationPanel, feature selected \u2192 shows ActivityView) is preserved."
+        },
+        "subItems": [
+          {
+            "id": "mission-control-integration.ac1",
+            "title": "ConversationPanel renders in MissionControl content area when a conversation is selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mission-control-integration.ac2",
+            "title": "Mutual exclusivity preserved: selecting conversation clears feature selection and vice versa",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mission-control-integration.ac3",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "chat-types",
+        "to": "jsonl-conversation-service",
+        "type": "blocks"
+      },
+      {
+        "from": "chat-types",
+        "to": "chat-markdown",
+        "type": "blocks"
+      },
+      {
+        "from": "chat-types",
+        "to": "messages-timeline",
+        "type": "blocks"
+      },
+      {
+        "from": "chat-types",
+        "to": "composer-footer",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-deps",
+        "to": "chat-markdown",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-deps",
+        "to": "messages-timeline",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-deps",
+        "to": "composer-prompt-editor",
+        "type": "blocks"
+      },
+      {
+        "from": "schema-migration",
+        "to": "jsonl-conversation-service",
+        "type": "blocks"
+      },
+      {
+        "from": "jsonl-conversation-service",
+        "to": "conversation-api",
+        "type": "blocks"
+      },
+      {
+        "from": "chat-markdown",
+        "to": "messages-timeline",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-api",
+        "to": "conversation-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "messages-timeline",
+        "to": "conversation-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-prompt-editor",
+        "to": "composer-footer",
+        "type": "blocks"
+      },
+      {
+        "from": "composer-footer",
+        "to": "conversation-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-panel",
+        "to": "mission-control-integration",
+        "type": "blocks"
+      }
+    ]
+  }
+}

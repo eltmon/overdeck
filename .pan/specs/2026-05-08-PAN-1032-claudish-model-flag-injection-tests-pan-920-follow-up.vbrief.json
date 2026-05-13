@@ -1,0 +1,114 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "author": "agent:claude-opus-4-6",
+    "description": "PAN-1032: claudish model-flag injection + tier-model env vars for claudish and CLIProxy paths",
+    "created": "2026-05-08T00:00:00Z"
+  },
+  "plan": {
+    "issueId": "PAN-1032",
+    "title": "claudish model-flag injection + tests (PAN-920 follow-up)",
+    "status": "proposed",
+    "sequence": 0,
+    "updated": "2026-05-08T00:00:00Z",
+    "narratives": {
+      "Overview": "PAN-920 added tierModels to all ProviderConfig entries and injected subagent tier-model env vars for direct providers. Two gaps remain: (1) claudish-backed providers receive no tier-model env vars and no CLI flags; (2) the CLIProxy path (OpenAI subscription) also misses tier-model injection. Additionally PROVIDER_ENV_KEYS in agents.ts and child-env.ts are incomplete.",
+      "Architecture": "Single source of truth: provider.tierModels. Two emit paths per spawn: CLI flags in getAgentRuntimeBaseCommand (agents.ts) and env vars in getProviderEnv (providers.ts) or getProviderEnvForModel CLIProxy path (agents.ts). PROVIDER_ENV_KEYS tracking in agents.ts and child-env.ts must include all five tier-model vars."
+    },
+    "items": [
+      {
+        "id": "env-keys",
+        "title": "Expand PROVIDER_ENV_KEYS in agents.ts and child-env.ts",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "PROVIDER_ENV_KEYS array in agents.ts adds ANTHROPIC_DEFAULT_OPUS_MODEL, ANTHROPIC_DEFAULT_SONNET_MODEL, ANTHROPIC_SMALL_FAST_MODEL, CLAUDE_CODE_SUBAGENT_MODEL",
+          "PROVIDER_ENV_KEYS Set in child-env.ts adds the same four vars",
+          "getProviderExportsForModel test updated to expect 12 unset lines"
+        ]
+      },
+      {
+        "id": "claudish-env",
+        "title": "Inject tier-model env vars into claudish branch of getProviderEnv (providers.ts)",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "getProviderEnv for kimi returns KIMI_CODING_API_KEY plus tier-model env vars",
+          "getProviderEnv for openai API-key returns OPENAI_API_KEY plus tier-model env vars",
+          "getProviderEnv for google returns GEMINI_API_KEY plus tier-model env vars",
+          "getProviderEnv for minimax returns MINIMAX_API_KEY plus tier-model env vars",
+          "getProviderEnv for zai returns ZHIPU_API_KEY plus tier-model env vars",
+          "getProviderEnv for mimo returns ANTHROPIC_API_KEY plus tier-model env vars",
+          "getProviderEnv for openrouter returns OPENROUTER_API_KEY only (no tierModels)",
+          "subscription-oauth path (Google CodeAssist OAuth) returns tier-model env vars without an API key var",
+          "providers.test.ts exact-match assertions updated to include tier-model vars alongside each API key var"
+        ]
+      },
+      {
+        "id": "cliproxy-env",
+        "title": "Inject tier-model env vars into CLIProxy path of getProviderEnvForModel (agents.ts)",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "When OpenAI subscription login is active, getProviderEnvForModel returns cliproxy env PLUS tier-model env vars from PROVIDERS.openai.tierModels",
+          "Tier-model vars: ANTHROPIC_DEFAULT_OPUS_MODEL=gpt-5.5-pro, ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5.5, ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5.5-mini, ANTHROPIC_SMALL_FAST_MODEL=gpt-5.5-mini, CLAUDE_CODE_SUBAGENT_MODEL=gpt-5.5-mini",
+          "agents-auth-routing.test.ts GPT subscription test asserts tier-model env vars in result"
+        ]
+      },
+      {
+        "id": "claudish-flags",
+        "title": "Append --model-opus/sonnet/haiku/subagent flags to claudish command in getAgentRuntimeBaseCommand",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "getAgentRuntimeBaseCommand for kimi-k2.6 includes --model-opus kc@kimi-k2.6 --model-sonnet kc@kimi-k2.5 --model-haiku kc@kimi-k2 --model-subagent kc@kimi-k2",
+          "getAgentRuntimeBaseCommand for minimax-m2.7 includes --model-opus mm@minimax-m2.7 --model-sonnet mm@minimax-m2.7 --model-haiku mm@minimax-m2.7-highspeed --model-subagent mm@minimax-m2.7-highspeed",
+          "Provider without tierModels (openrouter bare) does not append --model-* flags",
+          "Flags use claudish-prefixed form from getLaunchModelForModel (e.g. kc@kimi-k2 not bare kimi-k2)",
+          "--model-subagent maps to tierModels.haiku",
+          "agents-auth-routing.test.ts claudish command string tests updated to assert --model-* flags"
+        ]
+      },
+      {
+        "id": "tests",
+        "title": "Add new Vitest assertions for behaviors not covered by per-bead test updates",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "New test: subscription-oauth path (google provider) returns tier-model vars (no API key var)",
+          "New test: openrouter (no tierModels) does not append --model-* flags to claudish command",
+          "New test: Anthropic direct path unchanged \u2014 no tier-model vars in env, no flags in command",
+          "npm test passes"
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Update HARNESSES.md with claudish model-flag documentation",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "HARNESSES.md has a subsection documenting --model-opus/sonnet/haiku/subagent flags",
+          "Documents that flag values come from provider.tierModels in claudish-prefixed form",
+          "Documents that env vars are also injected for in-process subagent spawning",
+          "CLAUDE.md is NOT modified"
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "env-keys",
+        "to": "tests",
+        "label": "tests assert on unset line count which depends on PROVIDER_ENV_KEYS"
+      },
+      {
+        "from": "claudish-env",
+        "to": "tests",
+        "label": "providers.test.ts assertions depend on claudish env injection"
+      },
+      {
+        "from": "cliproxy-env",
+        "to": "tests",
+        "label": "CLIProxy test depends on CLIProxy env injection"
+      },
+      {
+        "from": "claudish-flags",
+        "to": "tests",
+        "label": "command string tests depend on flag injection"
+      }
+    ]
+  }
+}

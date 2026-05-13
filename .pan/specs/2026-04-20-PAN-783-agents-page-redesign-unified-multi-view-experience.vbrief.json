@@ -1,0 +1,1454 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-20T00:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-783: Agents Page Redesign \u2014 Unified Multi-View Experience"
+  },
+  "plan": {
+    "id": "pan-783",
+    "title": "Agents Page Redesign \u2014 Unified Multi-View Experience",
+    "status": "approved",
+    "uid": "55b53b25-fdca-4ac2-b3d7-467b34f770e7",
+    "author": "agent:K2.6-code-preview",
+    "sequence": 1,
+    "created": "2026-04-20T00:00:00.000Z",
+    "updated": "2026-04-20T00:00:00.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/783",
+        "label": "PAN-783",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "agents",
+      "ui",
+      " redesign"
+    ],
+    "narratives": {
+      "Problem": "The current agent experience is fragmented: AgentList shows only Cloister + specialists (no work agents), GodView shows work agents in a cinematic grid but lacks dense views, timeline history, and relationship topology. Detail view is a full-screen modal that loses context.",
+      "Proposal": "Create a single AgentsPage with four view modes (Live Grid, Command Table, Timeline, Topology), a slide-out detail panel, unified agent type, Cloister banner, stats row, and right panel \u2014 all event-sourced via WebSocket with URL-addressable state and keyboard shortcuts."
+    },
+    "items": [
+      {
+        "id": "unified-agent-type",
+        "title": "Create UnifiedAgent type and adapter layer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Define UnifiedAgent frontend type and adapter that normalizes work agents, planning agents, and specialists into a common shape. Document EVERY field mapping for EVERY agent type in code comments."
+        },
+        "subItems": [
+          {
+            "id": "unified-agent-type.ac1",
+            "title": "UnifiedAgent type exists in AgentsPage/types.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unified-agent-type.ac2",
+            "title": "Adapter function maps work agents (agent-*) fields 1:1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unified-agent-type.ac3",
+            "title": "Adapter function maps planning agents (planning-*) fields 1:1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unified-agent-type.ac4",
+            "title": "Adapter function maps specialists (specialist-*) with documented synthetic fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unified-agent-type.ac5",
+            "title": "Field mapping is documented in code comments for all 3 agent types",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unified-agent-selector",
+        "title": "Add selectUnifiedAgentList selector to store",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Add Zustand selector that merges agents[] and specialists[] from DashboardSnapshot into a single UnifiedAgent[] array."
+        },
+        "subItems": [
+          {
+            "id": "unified-agent-selector.ac1",
+            "title": "selectUnifiedAgentList returns merged array of all agent types",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unified-agent-selector.ac2",
+            "title": "Selector is memoized (does not re-render unnecessarily)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unified-agent-selector.ac3",
+            "title": "TypeScript strict mode passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "global-timeline-api",
+        "title": "Add GET /api/agents/timeline endpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Add backend endpoint that returns global timeline events across all agents, with optional agentId filter."
+        },
+        "subItems": [
+          {
+            "id": "global-timeline-api.ac1",
+            "title": "GET /api/agents/timeline returns {timeline: Array<{timestamp, type, message, agentId}>}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "global-timeline-api.ac2",
+            "title": "Supports ?limit, ?since, ?agentId query params",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "global-timeline-api.ac3",
+            "title": "Returns events from all agent types (work, planning, specialists)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-page-shell",
+        "title": "Create AgentsPage shell with view mode state and URL sync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Create the main AgentsPage component with view mode state management, URL-addressable state (?view=grid&agent=...), and localStorage persistence for view mode."
+        },
+        "subItems": [
+          {
+            "id": "agents-page-shell.ac1",
+            "title": "AgentsPage component exists and renders without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-shell.ac2",
+            "title": "URL ?view= parameter controls current view mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-shell.ac3",
+            "title": "URL &agent= parameter opens detail panel for that agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-shell.ac4",
+            "title": "View mode persists in localStorage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-shell.ac5",
+            "title": "Invalid view param falls back to grid and updates URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-shell.ac6",
+            "title": "Invalid agent ID clears selection gracefully",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-page-keyboard-shortcuts",
+        "title": "Add keyboard shortcuts to AgentsPage",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Implement keyboard shortcuts: Esc (close panel), 1-4 (switch views), j/k (navigate), Enter (open detail), r (refresh)."
+        },
+        "subItems": [
+          {
+            "id": "agents-page-keyboard-shortcuts.ac1",
+            "title": "Esc closes detail panel / clears selection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-keyboard-shortcuts.ac2",
+            "title": "1-4 switch to Grid/Table/Timeline/Topology views",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-keyboard-shortcuts.ac3",
+            "title": "j/k navigate up/down agent list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-keyboard-shortcuts.ac4",
+            "title": "Enter opens detail panel for focused agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-keyboard-shortcuts.ac5",
+            "title": "r triggers snapshot refresh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-keyboard-shortcuts.ac6",
+            "title": "Shortcuts disabled when focus is in input/textarea",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-page-responsive",
+        "title": "Implement responsive layout breakpoints",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Implement responsive design at 768px, 1200px, and 1400px breakpoints with appropriate layout changes."
+        },
+        "subItems": [
+          {
+            "id": "agents-page-responsive.ac1",
+            "title": "At 768px: single column grid, table horizontal-scroll, detail full-width, right panel hidden",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-responsive.ac2",
+            "title": "At 1200px: 2-column grid, table visible, detail 520px, right panel visible",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-responsive.ac3",
+            "title": "At 1400px: 3+ column grid, all panels visible, optimal layout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cloister-banner",
+        "title": "Create Cloister Banner component",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build always-visible Cloister Banner with real-time patrol status, last check time, and start/stop controls."
+        },
+        "subItems": [
+          {
+            "id": "cloister-banner.ac1",
+            "title": "Banner is always visible at top of AgentsPage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-banner.ac2",
+            "title": "Shows real patrol status (running/stopped)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-banner.ac3",
+            "title": "Shows last patrol check time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-banner.ac4",
+            "title": "Start/Stop patrol buttons work and update status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-banner.ac5",
+            "title": "Uses obsidian design system styling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stats-row",
+        "title": "Create Stats Row component",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build stats row showing active agent count, total cost, patrol status, and alert count."
+        },
+        "subItems": [
+          {
+            "id": "stats-row.ac1",
+            "title": "Shows active agent count (all types)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-row.ac2",
+            "title": "Shows total cost across work agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-row.ac3",
+            "title": "Shows patrol status indicator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stats-row.ac4",
+            "title": "Shows alert count (stuck/dead agents)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "right-panel-activity",
+        "title": "Build activity feed in right panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Create activity feed component for the right panel, reusing/refactoring the existing GodView ActivityFeed."
+        },
+        "subItems": [
+          {
+            "id": "right-panel-activity.ac1",
+            "title": "Activity feed shows real-time events from WebSocket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "right-panel-activity.ac2",
+            "title": "Events include agent starts, stops, completions, errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "right-panel-activity.ac3",
+            "title": "Uses obsidian design system styling",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "right-panel-distribution",
+        "title": "Build phase distribution donut in right panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Create phase/status distribution donut chart for the right panel, reusing the existing CostDonut pattern from GodView."
+        },
+        "subItems": [
+          {
+            "id": "right-panel-distribution.ac1",
+            "title": "Donut shows distribution of agents by phase/status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "right-panel-distribution.ac2",
+            "title": "Updates in real-time as agents change phase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "right-panel-distribution.ac3",
+            "title": "Uses obsidian color palette",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "right-panel-health",
+        "title": "Build health gauges in right panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Create system health gauges (CPU, memory) for the right panel, reusing the existing InfraGauges from GodView."
+        },
+        "subItems": [
+          {
+            "id": "right-panel-health.ac1",
+            "title": "Shows CPU usage gauge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "right-panel-health.ac2",
+            "title": "Shows memory usage gauge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "right-panel-health.ac3",
+            "title": "Updates in real-time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-grid-view",
+        "title": "Implement Live Grid view mode",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build card grid view with live terminal previews, phase/status filtering, and agent type badges. Reuse/refactor GodView AgentCard and CanvasTerminal."
+        },
+        "subItems": [
+          {
+            "id": "live-grid-view.ac1",
+            "title": "Grid shows cards for all unified agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-grid-view.ac2",
+            "title": "Cards show live terminal preview via CanvasTerminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-grid-view.ac3",
+            "title": "Phase/status filtering works (filter by planning, implementation, review, etc.)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-grid-view.ac4",
+            "title": "Agent type badge visible on each card (work/planning/specialist)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-grid-view.ac5",
+            "title": "Clicking a card opens detail panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-grid-view.ac6",
+            "title": "Responsive grid columns (1/2/3+ based on breakpoint)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "command-table-view",
+        "title": "Implement Command Table view mode",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build dense sortable table view with columns for type, status, phase, issue, model, uptime, cost, and actions."
+        },
+        "subItems": [
+          {
+            "id": "command-table-view.ac1",
+            "title": "Table shows all unified agents in dense rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-table-view.ac2",
+            "title": "Columns: Type, Status, Phase, Issue, Model, Uptime, Cost, Actions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-table-view.ac3",
+            "title": "Clicking column header sorts by that column",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-table-view.ac4",
+            "title": "Clicking a row opens detail panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "command-table-view.ac5",
+            "title": "Horizontal scroll at small breakpoints",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "global-timeline-view",
+        "title": "Implement Global Timeline view mode",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build global chronological timeline view with color-coded events and per-agent filter toggle. Consumes the new GET /api/agents/timeline endpoint."
+        },
+        "subItems": [
+          {
+            "id": "global-timeline-view.ac1",
+            "title": "Shows chronological events for all agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "global-timeline-view.ac2",
+            "title": "Events are color-coded by type (started, stopped, error, commit, activity)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "global-timeline-view.ac3",
+            "title": "Filter toggle to show only selected agent's events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "global-timeline-view.ac4",
+            "title": "Auto-scrolls to newest event on update",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "topology-pipeline-view",
+        "title": "Implement Topology Pipeline Flow view",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build pipeline flow topology showing issue lifecycle: planning \u2192 work \u2192 review \u2192 test \u2192 merge. Agents grouped by issue."
+        },
+        "subItems": [
+          {
+            "id": "topology-pipeline-view.ac1",
+            "title": "Shows pipeline stages: planning \u2192 work \u2192 review \u2192 test \u2192 merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topology-pipeline-view.ac2",
+            "title": "Agents grouped by issue and placed in correct stage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topology-pipeline-view.ac3",
+            "title": "Issues without agents in a stage show empty stage placeholder",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topology-pipeline-view.ac4",
+            "title": "Clicking an agent opens detail panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "topology-interaction-view",
+        "title": "Implement Topology Interaction Graph view",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build agent interaction graph showing trigger relationships between agents (e.g., work agent spawned review-agent). Uses issue-based grouping as fallback if explicit trigger data is unavailable."
+        },
+        "subItems": [
+          {
+            "id": "topology-interaction-view.ac1",
+            "title": "Shows agents as nodes with connection lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topology-interaction-view.ac2",
+            "title": "Connected agents share same issueId or explicit trigger relationship",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topology-interaction-view.ac3",
+            "title": "Clicking an agent opens detail panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "slide-out-detail-panel",
+        "title": "Create 520px slide-out detail panel shell",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build the 520px animated slide-out panel from the right side with tab navigation. Not a modal \u2014 preserves context of the view behind it."
+        },
+        "subItems": [
+          {
+            "id": "slide-out-detail-panel.ac1",
+            "title": "Panel slides in from right (520px width)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slide-out-detail-panel.ac2",
+            "title": "Not a modal overlay \u2014 view behind remains visible and interactive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slide-out-detail-panel.ac3",
+            "title": "Tab navigation: Terminal, Info, Beads, Files, Timeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slide-out-detail-panel.ac4",
+            "title": "Specialists hide/disable Beads and Files tabs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slide-out-detail-panel.ac5",
+            "title": "Close button and Esc key dismiss panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "slide-out-detail-panel.ac6",
+            "title": "Uses framer-motion for slide animation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "detail-panel-terminal-tab",
+        "title": "Build Terminal tab in detail panel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build Terminal tab showing live XTerminal for running agents or saved output for stopped agents. Reuse existing TerminalView / XTerminal / AgentOutputPanel patterns."
+        },
+        "subItems": [
+          {
+            "id": "detail-panel-terminal-tab.ac1",
+            "title": "Running agents show live XTerminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detail-panel-terminal-tab.ac2",
+            "title": "Stopped agents show saved output or fallback message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detail-panel-terminal-tab.ac3",
+            "title": "Specialists show their tmux session or conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "detail-panel-info-tab",
+        "title": "Build Info tab in detail panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build Info tab showing agent metadata, health status, lifecycle state, and issue details."
+        },
+        "subItems": [
+          {
+            "id": "detail-panel-info-tab.ac1",
+            "title": "Shows agent ID, type, status, phase, model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detail-panel-info-tab.ac2",
+            "title": "Shows health status and lifecycle state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detail-panel-info-tab.ac3",
+            "title": "Shows issue details with link to issue tracker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detail-panel-info-tab.ac4",
+            "title": "Specialists show specialist-specific metadata (type, current issue, last wake)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "detail-panel-beads-tab",
+        "title": "Build Beads tab in detail panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build Beads tab showing beads kanban for work agents. Reuse GodView BeadsKanban. Hidden/unavailable for specialists."
+        },
+        "subItems": [
+          {
+            "id": "detail-panel-beads-tab.ac1",
+            "title": "Shows beads kanban for work agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detail-panel-beads-tab.ac2",
+            "title": "Hidden or shows 'Not applicable' for specialists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "detail-panel-files-tab",
+        "title": "Build Files tab in detail panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build Files tab showing changed files tree for work agents. Reuse GodView FileActivityTree. Hidden/unavailable for specialists."
+        },
+        "subItems": [
+          {
+            "id": "detail-panel-files-tab.ac1",
+            "title": "Shows changed files tree for work agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detail-panel-files-tab.ac2",
+            "title": "Hidden or shows 'Not applicable' for specialists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "detail-panel-timeline-tab",
+        "title": "Build Timeline tab in detail panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Build Timeline tab showing per-agent timeline events. Reuse GodView AgentTimeline."
+        },
+        "subItems": [
+          {
+            "id": "detail-panel-timeline-tab.ac1",
+            "title": "Shows color-coded timeline events for selected agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "detail-panel-timeline-tab.ac2",
+            "title": "Fetches from /api/agents/:id/timeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-actions-unified",
+        "title": "Preserve all agent actions in unified UI",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Ensure all existing actions work in the new UI: stop, kill, tell (message), view workspace, resume, suspend. Actions available in both card/table views and detail panel."
+        },
+        "subItems": [
+          {
+            "id": "agent-actions-unified.ac1",
+            "title": "Stop action stops the agent via POST /api/agents/:id/stop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-actions-unified.ac2",
+            "title": "Kill action kills the agent via POST /api/agents/:id/stop (force)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-actions-unified.ac3",
+            "title": "Tell action sends message via POST /api/agents/:id/message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-actions-unified.ac4",
+            "title": "View workspace action navigates to workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-actions-unified.ac5",
+            "title": "Resume action works for stopped agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-actions-unified.ac6",
+            "title": "Suspend action works for running agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-agents-page",
+        "title": "Wire AgentsPage into App.tsx routing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Replace AgentList with AgentsPage on the /agents route in App.tsx. Keep /god-view tab temporarily."
+        },
+        "subItems": [
+          {
+            "id": "wire-agents-page.ac1",
+            "title": "/agents route renders AgentsPage instead of AgentList",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-agents-page.ac2",
+            "title": "/god-view route still renders GodViewPage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-agents-page.ac3",
+            "title": "Agent selection hash (#agent=) works with new page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deprecate-agent-list",
+        "title": "Deprecate AgentList component",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Remove AgentList.tsx import and usage from App.tsx. Mark component as deprecated. Do NOT delete the file yet \u2014 keep for reference during transition."
+        },
+        "subItems": [
+          {
+            "id": "deprecate-agent-list.ac1",
+            "title": "AgentList no longer imported or used in App.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deprecate-agent-list.ac2",
+            "title": "AgentDetailView no longer imported or used in App.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-page-typecheck",
+        "title": "Pass TypeScript strict mode",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Ensure npm run typecheck passes in strict mode across all modified and new files."
+        },
+        "subItems": [
+          {
+            "id": "agents-page-typecheck.ac1",
+            "title": "npm run typecheck passes with zero errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-page-lint",
+        "title": "Pass ESLint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Ensure npm run lint passes across all modified and new files."
+        },
+        "subItems": [
+          {
+            "id": "agents-page-lint.ac1",
+            "title": "npm run lint passes with zero errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agents-page-tests",
+        "title": "Add component tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-20T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-783"
+        },
+        "narrative": {
+          "Action": "Add Vitest tests for new components: view mode switching, agent selection, keyboard shortcuts, detail panel tabs."
+        },
+        "subItems": [
+          {
+            "id": "agents-page-tests.ac1",
+            "title": "Tests exist for view mode switching",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-tests.ac2",
+            "title": "Tests exist for agent selection and detail panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-tests.ac3",
+            "title": "Tests exist for keyboard shortcuts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agents-page-tests.ac4",
+            "title": "npm test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "unified-agent-type",
+        "to": "unified-agent-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "unified-agent-selector",
+        "to": "live-grid-view",
+        "type": "blocks"
+      },
+      {
+        "from": "unified-agent-selector",
+        "to": "command-table-view",
+        "type": "blocks"
+      },
+      {
+        "from": "unified-agent-selector",
+        "to": "stats-row",
+        "type": "blocks"
+      },
+      {
+        "from": "unified-agent-selector",
+        "to": "right-panel-distribution",
+        "type": "blocks"
+      },
+      {
+        "from": "global-timeline-api",
+        "to": "global-timeline-view",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-shell",
+        "to": "live-grid-view",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-shell",
+        "to": "command-table-view",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-shell",
+        "to": "global-timeline-view",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-shell",
+        "to": "topology-pipeline-view",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-shell",
+        "to": "topology-interaction-view",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-shell",
+        "to": "cloister-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-shell",
+        "to": "stats-row",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-shell",
+        "to": "right-panel-activity",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-shell",
+        "to": "right-panel-distribution",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-shell",
+        "to": "right-panel-health",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-shell",
+        "to": "slide-out-detail-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "slide-out-detail-panel",
+        "to": "detail-panel-terminal-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "slide-out-detail-panel",
+        "to": "detail-panel-info-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "slide-out-detail-panel",
+        "to": "detail-panel-beads-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "slide-out-detail-panel",
+        "to": "detail-panel-files-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "slide-out-detail-panel",
+        "to": "detail-panel-timeline-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "live-grid-view",
+        "to": "wire-agents-page",
+        "type": "blocks"
+      },
+      {
+        "from": "command-table-view",
+        "to": "wire-agents-page",
+        "type": "blocks"
+      },
+      {
+        "from": "global-timeline-view",
+        "to": "wire-agents-page",
+        "type": "blocks"
+      },
+      {
+        "from": "topology-pipeline-view",
+        "to": "wire-agents-page",
+        "type": "blocks"
+      },
+      {
+        "from": "topology-interaction-view",
+        "to": "wire-agents-page",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-agents-page",
+        "to": "deprecate-agent-list",
+        "type": "blocks"
+      },
+      {
+        "from": "agents-page-keyboard-shortcuts",
+        "to": "agents-page-tests",
+        "type": "informs"
+      },
+      {
+        "from": "agents-page-responsive",
+        "to": "agents-page-tests",
+        "type": "informs"
+      }
+    ]
+  }
+}

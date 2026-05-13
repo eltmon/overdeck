@@ -1,0 +1,283 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-07T12:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-513: Memory monitoring: show available RAM in dashboard + guard rails before spawning agents"
+  },
+  "plan": {
+    "id": "pan-513",
+    "title": "Memory monitoring: show available RAM in dashboard + guard rails before spawning agents",
+    "status": "approved",
+    "uid": "ad0bbd0c-edc2-49ca-8296-22c6f54a51c7",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-07T12:00:00Z",
+    "updated": "2026-04-07T12:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/513",
+        "label": "PAN-513",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "memory",
+      "guardrails",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "Spawning multiple planning agents simultaneously can exhaust 64GB system RAM, causing systemd memory pressure and full system crash. No memory visibility in the main dashboard and no pre-spawn guardrails exist.",
+      "Proposal": "Add a memory indicator pill in the dashboard header, a two-tier pre-spawn memory guard (warning at 4GB free, hard block at 2GB free), a sticky warning banner with top memory consumers, and configurable thresholds via ~/.panopticon.env."
+    },
+    "items": [
+      {
+        "id": "backend-health-extend",
+        "title": "Extend system health endpoint with memFree and threshold config",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-07T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-513"
+        },
+        "narrative": {
+          "Action": "Add memFree (bytes) to the godview system-health cache response in misc.ts. Add getMemoryThresholds() to env-loader.ts that reads PAN_MEMORY_WARN_GB (default 4) and PAN_MEMORY_BLOCK_GB (default 2) from ~/.panopticon.env. Include thresholds in the health response so the frontend can evaluate warning/critical states."
+        },
+        "subItems": [
+          {
+            "id": "backend-health-extend.ac1",
+            "title": "GET /api/godview/system-health returns memFree in bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backend-health-extend.ac2",
+            "title": "Health response includes warnThresholdBytes and blockThresholdBytes from env config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backend-health-extend.ac3",
+            "title": "Thresholds default to 4GB warn / 2GB block when env vars not set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-memory-guard",
+        "title": "Add two-tier memory guard to POST /api/agents",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-07T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-513"
+        },
+        "narrative": {
+          "Action": "In routes/agents.ts POST /api/agents handler, after existing validation guards and before workspace creation: check os.freemem() against thresholds. If below critical (2GB default), return 422 with memoryBlocked: true, current stats, and Fly.io hint. If below warning (4GB default) and request does not include bypassMemoryWarning: true, return 200 with memoryWarning: true and stats (frontend shows confirmation). If bypassMemoryWarning: true is set, proceed normally."
+        },
+        "subItems": [
+          {
+            "id": "spawn-memory-guard.ac1",
+            "title": "Spawning agent when RAM < critical threshold returns 422 with memoryBlocked flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-memory-guard.ac2",
+            "title": "Spawning agent when RAM < warning threshold returns memoryWarning requiring confirmation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-memory-guard.ac3",
+            "title": "Passing bypassMemoryWarning: true skips warning tier and proceeds with spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-memory-guard.ac4",
+            "title": "Critical block response includes Fly.io remote offloading hint message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "header-memory-indicator",
+        "title": "Create MemoryIndicator pill component in dashboard header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-07T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-513"
+        },
+        "narrative": {
+          "Action": "Create MemoryIndicator.tsx \u2014 a compact pill showing 'XX / YY GB' with a color-coded dot (green > 30% free, yellow 15-30%, red < 15%). Polls GET /api/godview/system-health every 10s via React Query or a shared hook. Add it to Header.tsx between CloisterStatusBar and FreshnessIndicator. Tooltip shows exact percentages."
+        },
+        "subItems": [
+          {
+            "id": "header-memory-indicator.ac1",
+            "title": "Dashboard header shows live RAM usage (used / total) with color-coded status dot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-memory-indicator.ac2",
+            "title": "Color transitions: green > 30% free, yellow 15-30%, red < 15%",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-memory-indicator.ac3",
+            "title": "Indicator auto-refreshes every 10 seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-warning-banner",
+        "title": "Create sticky MemoryWarningBanner below header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-07T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-513"
+        },
+        "narrative": {
+          "Action": "Create MemoryWarningBanner.tsx \u2014 a sticky amber/red banner rendered in App.tsx below the Header when system memory is below the warning threshold. Shows 'System memory low: X.X GB free of Y GB'. Lists top 3-5 running agents as memory consumers with Kill action buttons (calls existing agent stop endpoint). Dismissible, but re-appears if memory drops further. Uses the same health polling data as MemoryIndicator."
+        },
+        "subItems": [
+          {
+            "id": "memory-warning-banner.ac1",
+            "title": "Warning banner appears when RAM is below warning threshold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-warning-banner.ac2",
+            "title": "Banner lists top memory consumers with kill action buttons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-warning-banner.ac3",
+            "title": "Banner is dismissible but re-appears if memory drops further",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-confirmation-dialog",
+        "title": "Handle memory warning response in spawn UI with confirmation dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-07T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-513"
+        },
+        "narrative": {
+          "Action": "In the frontend spawn flow (KanbanBoard, IssueAgentCard, or wherever POST /api/agents is called): when response contains memoryWarning: true, show a confirmation dialog via DialogProvider explaining current memory state and asking to proceed or cancel. On confirm, re-submit with bypassMemoryWarning: true. When response contains memoryBlocked: true (422), show an error toast with the block message and Fly.io hint. No retry option for blocked state."
+        },
+        "subItems": [
+          {
+            "id": "spawn-confirmation-dialog.ac1",
+            "title": "Warning-tier spawn shows confirmation dialog with memory stats before proceeding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-confirmation-dialog.ac2",
+            "title": "Critical-tier block shows error message with Fly.io remote hint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "env-config-docs",
+        "title": "Document PAN_MEMORY_WARN_GB and PAN_MEMORY_BLOCK_GB configuration",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-07T12:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-513"
+        },
+        "narrative": {
+          "Action": "Add PAN_MEMORY_WARN_GB and PAN_MEMORY_BLOCK_GB to the example env file or settings documentation so users know the thresholds are configurable."
+        },
+        "subItems": [
+          {
+            "id": "env-config-docs.ac1",
+            "title": "Thresholds are configurable via ~/.panopticon.env (PAN_MEMORY_WARN_GB, PAN_MEMORY_BLOCK_GB)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "backend-health-extend",
+        "to": "header-memory-indicator",
+        "type": "blocks"
+      },
+      {
+        "from": "backend-health-extend",
+        "to": "memory-warning-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "backend-health-extend",
+        "to": "spawn-memory-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-memory-guard",
+        "to": "spawn-confirmation-dialog",
+        "type": "blocks"
+      }
+    ]
+  }
+}

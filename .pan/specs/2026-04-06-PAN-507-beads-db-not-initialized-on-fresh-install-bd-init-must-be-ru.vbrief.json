@@ -1,0 +1,93 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-06T18:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-507: beads db not initialized on fresh install \u2014 bd init must be run once per project"
+  },
+  "plan": {
+    "id": "pan-507",
+    "title": "beads db not initialized on fresh install \u2014 bd init must be run once per project",
+    "status": "approved",
+    "uid": "54d72dd0-7620-47b1-bb22-57ad0d823384",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-06T18:00:00Z",
+    "updated": "2026-04-06T18:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/507",
+        "label": "PAN-507",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "testing",
+      "beads",
+      "auto-init"
+    ],
+    "narratives": {
+      "Problem": "The three-layer beads auto-init fix (commit a2663a0b) has zero test coverage. createBeadsFromVBrief has 5 distinct code paths (CLI missing, redirect creation, db not found auto-init, successful creation, idempotent cleanup) that are untested.",
+      "Proposal": "Add unit tests for createBeadsFromVBrief covering all auto-init paths, using the established vi.hoisted + mockExecAsync pattern from compact-beads.test.ts."
+    },
+    "items": [
+      {
+        "id": "test-auto-init",
+        "title": "Add unit tests for createBeadsFromVBrief auto-init and recovery paths",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-507"
+        },
+        "narrative": {
+          "Action": "Add a new describe block in src/lib/vbrief/__tests__/beads.test.ts for createBeadsFromVBrief. Mock execAsync via vi.hoisted pattern. Test 5 paths: (1) bd CLI not found returns error, (2) worktree redirect file creation when main .beads/ exists, (3) database not found triggers bd init --prefix, (4) successful bead creation from plan items with correct labels/deps, (5) idempotent cleanup of existing beads before re-creation."
+        },
+        "subItems": [
+          {
+            "id": "test-auto-init.ac1",
+            "title": "Test returns error when bd CLI is not in PATH",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-auto-init.ac2",
+            "title": "Test creates .beads/redirect file when workspace is a worktree and main repo has .beads/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-auto-init.ac3",
+            "title": "Test auto-runs bd init --prefix when bd list fails with database not found",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-auto-init.ac4",
+            "title": "Test creates beads from plan items with correct labels and dependency edges",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-auto-init.ac5",
+            "title": "Test deletes existing beads for same label before creating new ones (idempotency)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

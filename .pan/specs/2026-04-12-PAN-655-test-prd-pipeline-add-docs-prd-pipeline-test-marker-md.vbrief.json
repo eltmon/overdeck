@@ -1,0 +1,86 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-12T15:34:22Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-655: test(prd-pipeline): add docs/prd-pipeline-test-marker.md"
+  },
+  "plan": {
+    "id": "pan-655",
+    "title": "test(prd-pipeline): add docs/prd-pipeline-test-marker.md",
+    "status": "approved",
+    "uid": "f3fd3f49-ab3e-4f93-ba24-8849caf1d9ce",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-12T15:34:22Z",
+    "updated": "2026-04-12T15:34:22Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/655",
+        "label": "PAN-655",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "test",
+      "pipeline",
+      "smoke-test",
+      "prd"
+    ],
+    "narratives": {
+      "Problem": "Need an end-to-end smoke test that the planning \u2192 work \u2192 review \u2192 test \u2192 merge pipeline correctly handles PRD/STATE.md/vBRIEF artifacts in canonical lowercase locations after the recent PRD-location refactor.",
+      "Proposal": "Add a single trivial marker file at docs/prd-pipeline-test-marker.md. The value is in exercising the pipeline, not in the file content itself. After merge, verify artifacts land in docs/prds/completed/pan-655/ and ~/.panopticon/archives/pan-655/."
+    },
+    "items": [
+      {
+        "id": "add-marker-file",
+        "title": "Add docs/prd-pipeline-test-marker.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-12T15:34:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-655"
+        },
+        "narrative": {
+          "Action": "Create docs/prd-pipeline-test-marker.md with the exact marker content specified in the issue body. No other files should be modified."
+        },
+        "subItems": [
+          {
+            "id": "add-marker-file.ac1",
+            "title": "File docs/prd-pipeline-test-marker.md exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-marker-file.ac2",
+            "title": "File contains the heading '# PRD Pipeline Test Marker' and the explanatory text from the issue body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-marker-file.ac3",
+            "title": "No other files in the repo are modified by this change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-marker-file.ac4",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

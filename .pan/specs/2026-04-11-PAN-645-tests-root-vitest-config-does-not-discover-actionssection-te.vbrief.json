@@ -1,0 +1,141 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-11T12:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-645: Tests: root Vitest config does not discover ActionsSection.test.tsx"
+  },
+  "plan": {
+    "id": "pan-645",
+    "title": "Tests: root Vitest config does not discover ActionsSection.test.tsx",
+    "status": "approved",
+    "uid": "a3f7e1c2-8d4b-4f6a-9e3c-5b2d1a0f8e7c",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-11T12:00:00Z",
+    "updated": "2026-04-11T12:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/645",
+        "label": "PAN-645",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "testing",
+      "vitest",
+      "config"
+    ],
+    "narratives": {
+      "Problem": "Root vitest include patterns only match tests/**/*.test.ts and src/**/__tests__/**/*.test.ts, missing 13 colocated *.test.tsx frontend files. Even expanding patterns wouldn't work because root config lacks jsdom environment and React plugin.",
+      "Proposal": "Create a vitest.workspace.ts that references all three project vitest configs (root, frontend, desktop), letting root vitest discover and run all tests with correct environments. Simplify npm test script to a single vitest invocation."
+    },
+    "items": [
+      {
+        "id": "create-workspace-config",
+        "title": "Create vitest.workspace.ts at project root",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-11T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-645"
+        },
+        "narrative": {
+          "Action": "Create vitest.workspace.ts referencing vitest.config.ts, src/dashboard/frontend/vitest.config.ts, and apps/desktop/vitest.config.ts. Each project keeps its own environment, plugins, and include patterns."
+        },
+        "subItems": [
+          {
+            "id": "create-workspace-config.ac1",
+            "title": "vitest.workspace.ts exists at project root and references all three vitest configs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-workspace-config.ac2",
+            "title": "npx vitest --run from root discovers ActionsSection.test.tsx and other colocated frontend tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-test-script",
+        "title": "Simplify npm test script to single vitest invocation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-11T12:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-645"
+        },
+        "narrative": {
+          "Action": "Update package.json test script from 'vitest --run --no-file-parallelism && cd src/dashboard/frontend && npm test' to 'vitest --run --no-file-parallelism' since the workspace config handles frontend test discovery."
+        },
+        "subItems": [
+          {
+            "id": "update-test-script.ac1",
+            "title": "npm test runs both backend and frontend tests in a single vitest invocation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-discovery",
+        "title": "Verify test discovery and execution",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-11T12:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-645"
+        },
+        "narrative": {
+          "Action": "Run npx vitest --run against ActionsSection.test.tsx from root to confirm it executes. Run npm test to confirm all backend and frontend tests pass. Verify no regressions in existing test runs."
+        },
+        "subItems": [
+          {
+            "id": "verify-discovery.ac1",
+            "title": "npx vitest --run src/dashboard/frontend/src/components/inspector/ActionsSection.test.tsx succeeds from project root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-discovery.ac2",
+            "title": "npm test passes with no regressions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "create-workspace-config",
+        "to": "update-test-script",
+        "type": "blocks"
+      },
+      {
+        "from": "create-workspace-config",
+        "to": "verify-discovery",
+        "type": "blocks"
+      },
+      {
+        "from": "update-test-script",
+        "to": "verify-discovery",
+        "type": "blocks"
+      }
+    ]
+  }
+}

@@ -1,0 +1,1246 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-12T00:00:00Z",
+    "author": "panopticon-cli/0.6.0",
+    "description": "Plan for PAN-457: Conversation discovery \u2014 index sessions inside and outside Panopticon"
+  },
+  "plan": {
+    "id": "pan-457",
+    "title": "Conversation discovery \u2014 index sessions inside and outside Panopticon",
+    "status": "completed",
+    "uid": "11a0ca78-86d3-4568-9fe8-a99ad5d0eb16",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 2,
+    "created": "2026-04-12T00:00:00Z",
+    "updated": "2026-04-20T19:14:39.650802Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/457",
+        "label": "PAN-457",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "discovery",
+      "search",
+      "enrichment",
+      "embeddings",
+      "fts5",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "Panopticon only sees conversations it spawned. Ad-hoc `claude` sessions started from a terminal \u2014 debugging, exploration, one-off fixes \u2014 are invisible. The user has hundreds of such JSONL sessions under ~/.claude/projects with no way to search, review, correlate cost, or learn from them.",
+      "Proposal": "Add a `conversations` subsystem: a new discovered_sessions SQLite table indexed from ~/.claude/projects JSONLs via a scripted (zero-LLM) scanner with adaptive parallelism; three-tier search (structured filters + SQLite FTS5 + optional vector embeddings); three-level user-initiated enrichment (quick/deep/custom-model) reusing Panopticon's model-fallback router; a Mission Control Conversations panel with faceted search and enrichment controls. All five phases ship in this issue."
+    },
+    "items": [
+      {
+        "id": "schema",
+        "title": "Add discovered_sessions, sessions_fts, session_embeddings tables + migration",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "In src/lib/database/schema.ts, add idempotent CREATE TABLE IF NOT EXISTS for discovered_sessions (per spec columns), sessions_fts (FTS5 virtual table with BM25 + column weights), session_embeddings (BLOB storage). Add all indexes per spec. Add the same tables to the per-workspace DB block. Create src/lib/database/discovered-sessions-db.ts with CRUD, FTS sync, and embedding helpers. Include a vitest suite mirroring existing conversations-db tests."
+        },
+        "subItems": [
+          {
+            "id": "schema.ac1",
+            "title": "All three tables created idempotently in main + per-workspace DB on startup",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "schema.ac2",
+            "title": "discovered-sessions-db.ts exposes insert/upsert, findByFilters, searchFTS, insertEmbedding, topKCosine, getByJsonlPath",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "schema.ac3",
+            "title": "Upsert is idempotent on (jsonl_path) \u2014 re-inserting same row updates file_size/file_mtime without duplicates",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "schema.ac4",
+            "title": "Unit tests cover CRUD, filter composition, FTS insert/search, and embedding storage round-trip",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "async-jsonl",
+        "title": "Async streaming JSONL parser for scanner use in dashboard server",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Create src/lib/conversations/jsonl-async.ts. Uses fs/promises + readline streaming to parse a JSONL and return { messageCount, firstTs, lastTs, modelsUsed, primaryModel, tokenInput, tokenOutput, toolsUsed[], filesTouched[], cwdFromFirstMessage }. Zero sync FS calls. Do NOT modify the existing sync cost-parsers/jsonl-parser.ts \u2014 the CLI cost command still uses it. Reuse its ClaudeMessage type."
+        },
+        "subItems": [
+          {
+            "id": "async-jsonl.ac1",
+            "title": "Parses message_count, timestamps, models, token totals from a sample JSONL correctly (vitest fixture)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "async-jsonl.ac2",
+            "title": "Extracts tools_used and files_touched arrays from tool_use blocks (Edit/Write/Read paths, Bash commands excluded)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "async-jsonl.ac3",
+            "title": "Reads cwd from first JSONL message when present; returns null if absent or unparseable",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "async-jsonl.ac4",
+            "title": "Handles corrupt/empty/partial JSONLs without throwing \u2014 returns partial metadata",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "async-jsonl.ac5",
+            "title": "Uses only fs/promises + stream APIs \u2014 no sync FS calls (verified by lint rule or review)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "hash-resolver",
+        "title": "Claude project hash \u2192 workspace path resolver",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Create src/lib/conversations/hash-resolver.ts. Primary strategy: use cwd from the first JSONL message (from async parser). Fallback strategy: build a reverse map by walking configured watchDirs + projects.yaml entries, encoding each with existing encodeClaudeProjectDir (src/lib/paths.ts), and keying by hash. On hash collision between multiple known workspaces, prefer an exact match if any JSONL row hints at it; otherwise return null and log a warning. Cache the reverse map per scan run."
+        },
+        "subItems": [
+          {
+            "id": "hash-resolver.ac1",
+            "title": "JSONL-cwd primary path resolves correctly for a session with a cwd field",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "hash-resolver.ac2",
+            "title": "Reverse-map fallback resolves a hash to a known workspace when JSONL has no cwd",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "hash-resolver.ac3",
+            "title": "Returns null (not crashes) when hash is unknown and no JSONL cwd exists",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "hash-resolver.ac4",
+            "title": "Reverse map is built once per scan run (cached), not per session",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "system-probe",
+        "title": "SystemCapabilities probe for adaptive scan parallelism",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Create src/lib/conversations/system-probe.ts. Detects cpuCores (os.cpus().length), driveType (lsblk -d -o name,rota via execAsync on Linux; 'unknown' on macOS/Windows), driveReadMBps (read a 10MB sample file using fs/promises, measure elapsed), availableMemoryMB (os.freemem / 1024 / 1024). Cache result per-process. Parallelism strategy table from spec: SSD \u2192 min(cpuCores, 16); HDD \u2192 2; unknown \u2192 4. Respect optional config override conversations.scanMaxParallel."
+        },
+        "subItems": [
+          {
+            "id": "system-probe.ac1",
+            "title": "Probe returns SystemCapabilities with all four fields populated on Linux (SSD case)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "system-probe.ac2",
+            "title": "Gracefully falls back to 'unknown' driveType on macOS/Windows without throwing",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "system-probe.ac3",
+            "title": "Chosen parallelism matches spec table (SSD\u2192min(cores,16), HDD\u21922, unknown\u21924)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "system-probe.ac4",
+            "title": "conversations.scanMaxParallel config override takes precedence over probe result",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "system-probe.ac5",
+            "title": "Probe uses execAsync + fs/promises \u2014 zero sync FS or execSync calls",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "scanner",
+        "title": "Scanner orchestrator with bounded parallelism work pool",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Create src/lib/conversations/scanner.ts and work-pool.ts. The scanner accepts { mode: 'targeted'|'watched'|'system', dirs?: string[], onProgress?: (p) => void } and emits progress events. Walks ~/.claude/projects/*/ for *.jsonl files (async readdir), filters by mode (targeted \u2192 under given dirs; watched \u2192 under config watchDirs; system \u2192 all). Uses a bounded promise work pool sized by system-probe. For each JSONL: stat for (size, mtime), skip if unchanged vs DB row, else parse async, resolve hash via hash-resolver, correlate against conversations + cost_events tables, insert/upsert into discovered_sessions. SQLite writes serialized through a batch queue. Build a correlator.ts helper that queries existing conversations.session_file and cost_events.session_id for Panopticon-managed detection."
+        },
+        "subItems": [
+          {
+            "id": "scanner.ac1",
+            "title": "Targeted mode scans only JSONLs whose resolved workspace is under the given dirs",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "scanner.ac2",
+            "title": "Watched mode reads dirs from config.yaml conversations.watchDirs",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "scanner.ac3",
+            "title": "System mode discovers all sessions under ~/.claude/projects",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "scanner.ac4",
+            "title": "Change detection: re-scan of unchanged file does not re-parse JSONL (verified via parser call counter in test)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "scanner.ac5",
+            "title": "Work pool respects maxParallel from system-probe; concurrent reads never exceed limit",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "scanner.ac6",
+            "title": "Progress callback fires with { dirsProcessed, dirsTotal, sessionsFound, elapsedMs }",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "scanner.ac7",
+            "title": "Sessions matching existing conversations.session_file are marked panopticon_managed=1 with pan_issue_id + pan_agent_id populated",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "scanner.ac8",
+            "title": "Permission-denied directories are skipped with a warning, not a crash",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "scanner.ac9",
+            "title": "Cost estimate populated from token counts using model-capabilities.ts pricing",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "cli-scan",
+        "title": "CLI: pan conversations scan [dirs...] [--watched|--system|--dry-run]",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Register `pan conversations` parent command and `scan` subcommand in src/cli/commands/conversations/. Wires through the scanner service. Renders live progress with a simple stderr bar (cliProgressOrMinimal) including the format from spec: [\u2588\u2588\u2588\u2588] 847/1203 dirs | 2341 sessions found | 12.3s. --dry-run only reports what would be scanned (counts by dir)."
+        },
+        "subItems": [
+          {
+            "id": "cli-scan.ac1",
+            "title": "`pan conversations scan ~/Projects/foo` scans and reports inserted/updated/skipped counts",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "cli-scan.ac2",
+            "title": "`pan conversations scan --watched` reads watchDirs from config",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "cli-scan.ac3",
+            "title": "`pan conversations scan --system` walks entire ~/.claude/projects",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "cli-scan.ac4",
+            "title": "`--dry-run` performs no DB writes; prints planned counts",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "cli-scan.ac5",
+            "title": "Progress bar renders with matching format to spec",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "search",
+        "title": "Search composer: structured filters + FTS5 + semantic + output formats",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Create src/lib/conversations/search.ts. Parses filter flags (--workspace/--model/--managed/--unmanaged/--since/--before/--after/--min-cost/--max-cost/--min-messages/--tag/--tool/--file/--issue/--enriched/--not-enriched) into a typed ConversationFilter, composes SQL with AND logic, runs FTS5 MATCH when a free-text query is given (with BM25 ranking, column weighting summary_detailed=2/summary=1.5/tags=1/files=0.5), and intersects with semantic results when --semantic or --similar is set. Relative time parsing (7d, 24h, 30m) via existing duration util. --format table|json|brief|ids renders via a small formatter module."
+        },
+        "subItems": [
+          {
+            "id": "search.ac1",
+            "title": "All structured filters compose with AND and produce correct SQL",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "search.ac2",
+            "title": "--since 7d, --before ISO date, --after ISO date all parse and filter correctly",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "search.ac3",
+            "title": "--tag/--tool/--file match against JSON array columns",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "search.ac4",
+            "title": "FTS5 query with prefix (refact*), phrase (\"error handling\"), boolean (redis AND cache NOT test) all return BM25-ranked results",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "search.ac5",
+            "title": "Filters + FTS compose: FTS query runs within the filtered set",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "search.ac6",
+            "title": "--format table|json|brief|ids all produce correct shape",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "cli-search-list-show-cost",
+        "title": "CLI: search, list, show, cost subcommands",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/conversations/: add search.ts (wires to search composer), list.ts (--managed/--unmanaged, defaults to recent), show.ts (full detail for a session id including messages/cost/models/duration/tools/files/summaries), cost.ts (aggregate --by workspace|model)."
+        },
+        "subItems": [
+          {
+            "id": "cli-search-list-show-cost.ac1",
+            "title": "`pan conversations search \"query\"` runs FTS and prints table results",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "cli-search-list-show-cost.ac2",
+            "title": "`pan conversations list --managed` lists only panopticon_managed=1 rows",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "cli-search-list-show-cost.ac3",
+            "title": "`pan conversations show <id>` prints full session detail including current enrichment level",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "cli-search-list-show-cost.ac4",
+            "title": "`pan conversations cost --by workspace` matches sum of discovered_sessions.estimated_cost grouped by workspace_path",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "enrichment",
+        "title": "Tiered enrichment engine (L1 quick / L2 deep / L3 custom) via model-fallback router",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Create src/lib/conversations/enrichment/. index.ts is enrich(sessionIds, level, opts). level1.ts samples first + last + 1 middle message, calls Haiku tier via existing model-fallback.ts, produces { summary, tags[] }. level2.ts samples first 3 + last 3 + 5 middle + tool_use summaries, calls Sonnet tier, produces { summary_detailed, tags[] }. level3.ts takes a user-specified model id; sample by default or full transcript if --full; optional --prompt appended to system prompt. Writes update discovered_sessions, bump enrichment_level, record enrichment_model + enriched_at, and sync FTS5. Subagent parallelism = bounded promise pool (config.conversations.enrichment.maxParallel, default 4). Cost estimation before each batch; prompts confirmation when total estimated cost exceeds costConfirmThreshold. Auto-embed on L2+ if conversations.embeddingAutoOnDeep."
+        },
+        "subItems": [
+          {
+            "id": "enrichment.ac1",
+            "title": "Level 1 sends exactly 3 messages (first + last + 1 middle) to Haiku tier",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "enrichment.ac2",
+            "title": "Level 2 sends 11 messages + tool_use summaries to Sonnet tier",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "enrichment.ac3",
+            "title": "Level 3 with --with <model> calls the specified model; --full sends the entire transcript",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "enrichment.ac4",
+            "title": "--prompt \"...\" is appended to the enrichment system prompt",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "enrichment.ac5",
+            "title": "Re-enrichment preserves level-1 summary while overwriting summary_detailed and tags",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "enrichment.ac6",
+            "title": "Cost estimate printed and user prompted [y/N] when total exceeds costConfirmThreshold",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "enrichment.ac7",
+            "title": "Model API failure marks session as enrichment_failed (does not crash pool)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "enrichment.ac8",
+            "title": "FTS5 rows are upserted after each successful enrichment",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "enrichment.ac9",
+            "title": "Enrichment goes through src/lib/model-fallback.ts (respects provider disabled state)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "enrichment.ac10",
+            "title": "Cost estimate vs actual from cost_events stays within 20% on sample run",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "cli-enrich",
+        "title": "CLI: pan conversations enrich with all flags",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Add src/cli/commands/conversations/enrich.ts. Flags per spec: --limit, --workspace, --since, --deep, --with <model>, --full, --prompt, --upgrade. Selects target session set, calls enrichment engine, renders per-session progress + final totals (sessions processed, cost actual, failures)."
+        },
+        "subItems": [
+          {
+            "id": "cli-enrich.ac1",
+            "title": "`pan conversations enrich --limit 50` enriches up to 50 un-enriched sessions at level 1",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "cli-enrich.ac2",
+            "title": "`--deep --upgrade` converts all level-1 sessions to level 2",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "cli-enrich.ac3",
+            "title": "`--with claude-opus-4-6 --full <id>` runs level 3 with full transcript",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "cli-enrich.ac4",
+            "title": "All flag combinations from spec CLI section parse and execute",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "embeddings",
+        "title": "Embedding providers + pure-JS cosine similarity + semantic search",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Create src/lib/conversations/embeddings/. providers/openai.ts, voyage.ts, ollama.ts all implement EmbeddingProvider { embed(texts: string[]): Promise<Float32Array[]> }. cosine.ts implements pure-JS cosine over Float32Array in memory (normalize once, dot product). index.ts is embed(sessionIds). Selection via config.conversations.embeddingProvider. Stored as BLOB in session_embeddings with dim + model. Search integration: search --semantic \"text\" embeds the query with the same provider, loads all embeddings into memory, computes topK by cosine, optionally intersects with structured filters. --similar <id> loads that session's embedding and does the same comparison."
+        },
+        "subItems": [
+          {
+            "id": "embeddings.ac1",
+            "title": "OpenAI provider calls text-embedding-3-small and stores 1536-dim Float32 BLOB",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "embeddings.ac2",
+            "title": "Voyage provider calls voyage-code-3 and stores 1024-dim BLOB",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "embeddings.ac3",
+            "title": "Ollama provider calls nomic-embed-text via local HTTP and stores BLOB",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "embeddings.ac4",
+            "title": "Cosine function ranks identical vectors as 1.0 and orthogonal as 0.0 (unit test)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "embeddings.ac5",
+            "title": "`pan conversations embed` embeds all enriched un-embedded sessions",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "embeddings.ac6",
+            "title": "`pan conversations embed --regenerate` overwrites all embeddings",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "embeddings.ac7",
+            "title": "`pan conversations embed --status` prints indexed/embedded counts + model name",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "embeddings.ac8",
+            "title": "`pan conversations search --semantic \"race condition\"` returns cosine-ranked results",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "embeddings.ac9",
+            "title": "`pan conversations search --similar <id>` returns sessions ranked by similarity to that id",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "embeddings.ac10",
+            "title": "Missing API key produces an actionable error (not a silent crash)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "contracts",
+        "title": "RPC + events contracts for conversation subsystem",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "In packages/contracts/src/: add DiscoveredSession + ConversationFilter + search result types to types.ts; add conversation RPC procs (scan, search, listDiscovered, showDiscovered, enrich, embed, cost) to rpc.ts; add domain events scan.started/scan.progress/scan.complete/enrich.progress/enrich.complete/embed.progress to events.ts. Rebuild contracts package."
+        },
+        "subItems": [
+          {
+            "id": "contracts.ac1",
+            "title": "All new types exported from @panopticon/contracts and typecheck passes project-wide",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "contracts.ac2",
+            "title": "New RPC procs appear in PanRpcGroup with Effect Schema",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "contracts.ac3",
+            "title": "Domain events are added to event-reducers.ts so the frontend store receives them",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "server-routes",
+        "title": "Dashboard server routes + service for conversations",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/conversations.ts (Effect HTTP routes: POST /scan, GET /search, GET /list, GET /:id, POST /enrich, POST /embed, GET /cost) and src/dashboard/server/services/conversation-index.ts (service layer wrapping src/lib/conversations, emitting domain events during scan/enrich/embed). All FS access must be async (fs/promises + execAsync per CLAUDE.md). Register routes in server.ts."
+        },
+        "subItems": [
+          {
+            "id": "server-routes.ac1",
+            "title": "All seven endpoints return correct shapes and pass Effect Schema validation",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "server-routes.ac2",
+            "title": "Scan progress emits domain events on /ws/rpc subscribeDomainEvents stream",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "server-routes.ac3",
+            "title": "Enrichment progress emits per-session domain events with model + cost",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "server-routes.ac4",
+            "title": "Zero execSync/readFileSync/writeFileSync/readdirSync/statSync in routes or service (grep + review)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "dashboard-ui",
+        "title": "Dashboard Conversations panel: search, facets, detail, enrichment controls",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/conversations/. ConversationsPanel.tsx is the top-level panel added to Mission Control navigation. ConversationSearchBar.tsx combines a free-text input (FTS), filter chips (workspace/model/managed/tag/tool/file/since), and a semantic toggle when embeddings enabled. ConversationTimeline.tsx renders grouped, faceted results (workspace/model/time/cost/enrichment-level) with click-to-filter. ConversationDetail.tsx is a drawer with messages, cost, models, duration, tools, files, summaries at each level, and EnrichmentControls.tsx buttons (quick/deep/custom-model). FacetPanel.tsx shows counts. All data flows through RPC client (WsTransport) and the Zustand store receives scan/enrich progress events."
+        },
+        "subItems": [
+          {
+            "id": "dashboard-ui.ac1",
+            "title": "Conversations panel appears in Mission Control nav and loads recent sessions on open",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "dashboard-ui.ac2",
+            "title": "Search bar: free-text, filter chips, semantic toggle all work and compose",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "dashboard-ui.ac3",
+            "title": "Faceted results group by workspace/model/time/cost/enrichment-level; clicking a facet filters",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "dashboard-ui.ac4",
+            "title": "Detail drawer shows full session with visual distinction between managed and ad-hoc sessions",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "dashboard-ui.ac5",
+            "title": "Enrichment buttons trigger RPC calls and show live progress via domain events",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "dashboard-ui.ac6",
+            "title": "Aggregate cost view matches `pan conversations cost --by workspace` output",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "dashboard-ui.ac7",
+            "title": "Manual browser test: scan + search + enrich + detail view all work end-to-end",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "config",
+        "title": "config.yaml schema additions for conversations subsystem",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Extend src/lib/config.ts / config-yaml.ts with the conversations block: watchDirs (default ['~/Projects']), scanMaxParallel (null = auto), embeddings (false), embeddingProvider ('openai'), embeddingModel ('text-embedding-3-small'), embeddingAutoOnDeep (true), enrichment.quickModel (null), enrichment.deepModel (null), enrichment.maxParallel (4), enrichment.costConfirmThreshold (1.00). Add migration for existing config files."
+        },
+        "subItems": [
+          {
+            "id": "config.ac1",
+            "title": "New conversations config block loads with defaults when missing from config.yaml",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "config.ac2",
+            "title": "Config migration leaves existing user values intact and fills defaults",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "config.ac3",
+            "title": "Typed access via getConfig() for all new fields",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      },
+      {
+        "id": "integration-tests",
+        "title": "End-to-end integration tests: scan \u2192 enrich \u2192 embed \u2192 search",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-12T00:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-457"
+        },
+        "narrative": {
+          "Action": "Add a vitest integration suite that (1) seeds a temp ~/.claude/projects fixture with 3 sample JSONLs, (2) runs the scanner against it, (3) runs L1 enrichment with a mocked model router, (4) generates embeddings with a stub provider, (5) runs structured + FTS + semantic searches and asserts results. Also assert cost aggregation and that re-scan on unchanged files skips parsing. Mirrors the test matrix from the spec."
+        },
+        "subItems": [
+          {
+            "id": "integration-tests.ac1",
+            "title": "Full pipeline test: scan \u2192 enrich \u2192 embed \u2192 search returns expected top result",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "integration-tests.ac2",
+            "title": "Re-scan on unchanged files does not re-parse (parser mock call count unchanged)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "integration-tests.ac3",
+            "title": "Cost aggregation equals sum of individual session estimated_cost",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "integration-tests.ac4",
+            "title": "FTS stays in sync after re-enrichment (old summary text no longer matches; new text matches)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          },
+          {
+            "id": "integration-tests.ac5",
+            "title": "Managed session is correctly linked to an issue_id when conversations table has a matching session_file",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-20T19:14:39.650802Z"
+          }
+        ],
+        "completed": "2026-04-20T19:14:39.650802Z"
+      }
+    ],
+    "edges": [
+      {
+        "from": "schema",
+        "to": "async-jsonl",
+        "type": "informs"
+      },
+      {
+        "from": "schema",
+        "to": "scanner",
+        "type": "blocks"
+      },
+      {
+        "from": "async-jsonl",
+        "to": "scanner",
+        "type": "blocks"
+      },
+      {
+        "from": "hash-resolver",
+        "to": "scanner",
+        "type": "blocks"
+      },
+      {
+        "from": "system-probe",
+        "to": "scanner",
+        "type": "blocks"
+      },
+      {
+        "from": "scanner",
+        "to": "cli-scan",
+        "type": "blocks"
+      },
+      {
+        "from": "schema",
+        "to": "search",
+        "type": "blocks"
+      },
+      {
+        "from": "search",
+        "to": "cli-search-list-show-cost",
+        "type": "blocks"
+      },
+      {
+        "from": "schema",
+        "to": "enrichment",
+        "type": "blocks"
+      },
+      {
+        "from": "scanner",
+        "to": "enrichment",
+        "type": "informs"
+      },
+      {
+        "from": "enrichment",
+        "to": "cli-enrich",
+        "type": "blocks"
+      },
+      {
+        "from": "schema",
+        "to": "embeddings",
+        "type": "blocks"
+      },
+      {
+        "from": "enrichment",
+        "to": "embeddings",
+        "type": "informs"
+      },
+      {
+        "from": "embeddings",
+        "to": "search",
+        "type": "informs"
+      },
+      {
+        "from": "contracts",
+        "to": "server-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "scanner",
+        "to": "server-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "search",
+        "to": "server-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "enrichment",
+        "to": "server-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "embeddings",
+        "to": "server-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "server-routes",
+        "to": "dashboard-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts",
+        "to": "dashboard-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "config",
+        "to": "scanner",
+        "type": "informs"
+      },
+      {
+        "from": "config",
+        "to": "enrichment",
+        "type": "informs"
+      },
+      {
+        "from": "config",
+        "to": "embeddings",
+        "type": "informs"
+      },
+      {
+        "from": "scanner",
+        "to": "integration-tests",
+        "type": "informs"
+      },
+      {
+        "from": "enrichment",
+        "to": "integration-tests",
+        "type": "informs"
+      },
+      {
+        "from": "embeddings",
+        "to": "integration-tests",
+        "type": "informs"
+      },
+      {
+        "from": "search",
+        "to": "integration-tests",
+        "type": "informs"
+      }
+    ]
+  }
+}

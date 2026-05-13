@@ -1,0 +1,243 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-06T12:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-485: Add workspace lifecycle events to fix stale UI after wipe/cleanup/abort"
+  },
+  "plan": {
+    "id": "pan-485",
+    "title": "Add workspace lifecycle events to fix stale UI after wipe/cleanup/abort",
+    "status": "approved",
+    "uid": "b7f3a1d2-9e4c-4b8a-a6d1-3f7e2c5b9a04",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-06T12:00:00Z",
+    "updated": "2026-04-06T12:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/485",
+        "label": "PAN-485",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "events",
+      "workspace-lifecycle",
+      "ui-consistency",
+      "contracts"
+    ],
+    "narratives": {
+      "Problem": "Workspace operations (wipe, cleanup, abort, start-planning) don't emit domain events, so the frontend stays stale until tracker poll fires (1-3s delay).",
+      "Proposal": "Define 5 new workspace lifecycle events in contracts, emit them in the 4 affected routes, and add reducer cases. The shared reducer pattern means the frontend reacts automatically \u2014 no frontend code changes needed."
+    },
+    "items": [
+      {
+        "id": "define-events",
+        "title": "Define workspace lifecycle event schemas in contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-485"
+        },
+        "narrative": {
+          "Action": "Add 5 new event schemas (WorkspaceCreatedEvent, WorkspaceWipeStartedEvent, WorkspaceDestroyedEvent, WorkspaceDeletedEvent, WorkspaceAbortedEvent) to packages/contracts/src/events.ts following the existing pattern. Add all 5 to the DomainEvent union."
+        },
+        "subItems": [
+          {
+            "id": "define-events.ac1",
+            "title": "5 new event schemas exist in events.ts with correct type literals and payload shapes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "define-events.ac2",
+            "title": "All 5 events are included in the DomainEvent union",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "define-events.ac3",
+            "title": "contracts package builds cleanly with npm run build",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-reducers",
+        "title": "Add reducer cases for all workspace lifecycle events",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-485"
+        },
+        "narrative": {
+          "Action": "Add switch cases in applyEvent() for workspace.created (no-op), workspace.wipe_started (set wiping state on issue), workspace.destroyed (remove agents, reset to todo), workspace.deleted (same as destroyed), workspace.aborted (remove planning agent). The exhaustive switch ensures TypeScript catches missing cases."
+        },
+        "subItems": [
+          {
+            "id": "add-reducers.ac1",
+            "title": "workspace.destroyed and workspace.deleted remove agent entries and reset canonicalStatus to todo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-reducers.ac2",
+            "title": "workspace.wipe_started sets a wiping transitional state on the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-reducers.ac3",
+            "title": "workspace.aborted removes the planning agent from agentsById",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-reducers.ac4",
+            "title": "TypeScript exhaustive check passes (no compile errors)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "emit-in-routes",
+        "title": "Emit workspace events in the 4 affected route handlers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-485"
+        },
+        "narrative": {
+          "Action": "In issues.ts routes: (1) start-planning: emit workspace.created after worktree setup, before planning.started. (2) abort-planning: emit workspace.aborted after tmux kill-session. (3) cleanup-workspace: emit workspace.deleted after successful cleanup. (4) deep-wipe: emit workspace.wipe_started at start, workspace.destroyed at end. Use existing eventStore.append() pattern via Effect DI."
+        },
+        "subItems": [
+          {
+            "id": "emit-in-routes.ac1",
+            "title": "start-planning emits workspace.created after worktree creation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-in-routes.ac2",
+            "title": "deep-wipe emits workspace.wipe_started immediately and workspace.destroyed on completion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-in-routes.ac3",
+            "title": "cleanup-workspace emits workspace.deleted on success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-in-routes.ac4",
+            "title": "abort-planning emits workspace.aborted after session kill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-in-routes.ac5",
+            "title": "All new events appear in the event store audit log (SQLite events table)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quality-gates",
+        "title": "Pass all quality gates (typecheck, lint, test)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-485"
+        },
+        "narrative": {
+          "Action": "Run npm run typecheck, npm run lint, and npm test. Fix any issues. Rebuild contracts package first since server depends on it."
+        },
+        "subItems": [
+          {
+            "id": "quality-gates.ac1",
+            "title": "npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gates.ac2",
+            "title": "npm run lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quality-gates.ac3",
+            "title": "npm test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "define-events",
+        "to": "add-reducers",
+        "type": "blocks"
+      },
+      {
+        "from": "define-events",
+        "to": "emit-in-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "add-reducers",
+        "to": "quality-gates",
+        "type": "blocks"
+      },
+      {
+        "from": "emit-in-routes",
+        "to": "quality-gates",
+        "type": "blocks"
+      }
+    ]
+  }
+}

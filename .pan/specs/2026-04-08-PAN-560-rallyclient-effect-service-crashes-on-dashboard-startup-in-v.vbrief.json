@@ -1,0 +1,78 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-08T00:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-560: RallyClient Effect service crashes on dashboard startup in v0.6.0"
+  },
+  "plan": {
+    "id": "pan-560",
+    "title": "RallyClient Effect service crashes on dashboard startup in v0.6.0",
+    "status": "approved",
+    "uid": "6e251f0f-a0e1-4504-ad3a-594d61c96c3f",
+    "author": "agent:minimax-m2.7-highspeed",
+    "sequence": 1,
+    "created": "2026-04-08T00:00:00.000Z",
+    "updated": "2026-04-08T00:00:00.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/560",
+        "label": "PAN-560",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "bug",
+      "effect",
+      "rally",
+      "startup-crash"
+    ],
+    "narratives": {
+      "Problem": "Dashboard server crashes on startup with Fiber.runLoop error because RallyClientOptionalLive passes a raw Service tag to Effect.provide instead of a valid Effect",
+      "Proposal": "Replace Layer.effect + broken delegation with Layer.unwrap + Effect.gen, which properly handles conditional Layer returns (stub when unconfigured, RallyClientLive when configured)"
+    },
+    "items": [
+      {
+        "id": "fix-rally-optional-layer",
+        "title": "Fix RallyClientOptionalLive layer composition",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-560"
+        },
+        "narrative": {
+          "Action": "Replace Layer.effect + yield* RallyClient.pipe(Effect.provide(RallyClientLive)) with Layer.unwrap + Effect.gen that conditionally returns Layer.succeed (stub) or RallyClientLive"
+        },
+        "subItems": [
+          {
+            "id": "fix-rally-optional-layer.ac1",
+            "title": "Dashboard starts without Fiber.runLoop crash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-rally-optional-layer.ac2",
+            "title": "RallyClientOptionalLive returns TrackerNotConfigured when Rally is not configured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-rally-optional-layer.ac3",
+            "title": "Existing rally-client tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}
