@@ -89,6 +89,14 @@ describe('getDispatchableItems', () => {
     expect(getDispatchableItems(doc, new Set())).toHaveLength(0);
   });
 
+  it('excludes running items from task graph waves', () => {
+    const doc = makeDoc([{ id: 'a', status: 'running' }, { id: 'b' }], []);
+    const view = getTaskGraphView(doc);
+    expect(view.next.map(i => i.id)).not.toContain('a');
+    expect(view.waves.flatMap(w => w.items.map(i => i.id))).not.toContain('a');
+    expect(view.waves.flatMap(w => w.items.map(i => i.id))).toContain('b');
+  });
+
   it('excludes cancelled items', () => {
     const doc = makeDoc([{ id: 'a', status: 'cancelled' }], []);
     expect(getDispatchableItems(doc, new Set())).toHaveLength(0);

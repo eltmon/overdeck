@@ -31,7 +31,7 @@ export interface Wave {
  * can execute in parallel.
  */
 export function groupItemsByWave(doc: VBriefDocument): Wave[] {
-  const skipStatuses = new Set(['completed', 'cancelled', 'blocked']);
+  const skipStatuses = new Set(['completed', 'cancelled', 'blocked', 'running']);
   const actionable = doc.plan.items.filter(i => !skipStatuses.has(i.status));
   if (actionable.length === 0) return [];
 
