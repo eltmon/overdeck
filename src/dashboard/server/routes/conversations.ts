@@ -1772,12 +1772,12 @@ const postConversationDeliveryMethodRoute = HttpRouter.add(
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
-        const method = body['method'];
-        if (method !== 'auto' && method !== 'channels' && method !== 'tmux' && method !== null) {
-          return jsonResponse({ error: "method must be 'auto', 'channels', 'tmux', or null" }, { status: 400 });
+        const deliveryMethod = body['deliveryMethod'] ?? body['method'];
+        if (deliveryMethod !== 'auto' && deliveryMethod !== 'channels' && deliveryMethod !== 'tmux' && deliveryMethod !== null) {
+          return jsonResponse({ error: "deliveryMethod must be 'auto', 'channels', 'tmux', or null" }, { status: 400 });
         }
-        updateConversationDeliveryMethod(name, method as 'auto' | 'channels' | 'tmux' | null);
-        return jsonResponse({ ok: true, method });
+        updateConversationDeliveryMethod(name, deliveryMethod as 'auto' | 'channels' | 'tmux' | null);
+        return jsonResponse({ ok: true, deliveryMethod });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] update delivery method failed:', msg);

@@ -305,7 +305,7 @@ export async function getRoleRuntimeBaseCommand(
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
-const AGENT_PREFIXES = ['agent-', 'planning-'];
+const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-'];
 
 /** Normalize agent ID: preserve known prefixes, add 'agent-' for bare issue IDs */
 export function normalizeAgentId(agentId: string): string {
