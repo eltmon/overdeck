@@ -892,6 +892,7 @@ export interface NestedPlanPipelineMirror {
   sqliteAuthoritative: true;
   updatedAt: string;
   work: PlanPipelineStageMirror;
+  verification: PlanPipelineStageMirror;
   review: PlanPipelineReviewMirror;
   test: PlanPipelineStageMirror;
   uat: PlanPipelineStageMirror;
@@ -948,6 +949,7 @@ export function buildPipelineMirrorFromStatus(issueId: string, status: Record<st
     sqliteAuthoritative: true,
     updatedAt: now,
     work: stageFromStatus(status, 'work', now),
+    verification: stageFromStatus(status, 'verification', now),
     review,
     test: stageFromStatus(status, 'test', now),
     uat: stageFromStatus(status, 'uat', now),

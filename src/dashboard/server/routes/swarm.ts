@@ -1452,7 +1452,8 @@ async function resumeSwarmAutoAdvanceLoopOnStartup(): Promise<void> {
   for (const issueId of issueIds) {
     const state = await loadSwarmState(issueId);
     if (!state?.autoAdvance) continue;
-    if (state.currentWave >= state.totalWaves - 1 && !state.deferred?.length) continue;
+    const stillActive = state.slots.some(slot => slot.status === 'running' || slot.status === 'pending');
+    if (state.currentWave >= state.totalWaves - 1 && !state.deferred?.length && !stillActive) continue;
     activeSwarmIssueIds.add(issueId);
   }
   if (activeSwarmIssueIds.size > 0) ensureSwarmAutoAdvanceLoop();

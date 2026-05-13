@@ -286,6 +286,9 @@ describe('active slices and task operations', () => {
     expect(stored.review.agentId).toBe('review-agent');
     expect(stored.merge.prUrl).toBe('https://github.com/example/repo/pull/1');
     expect(stored.review.history[0].status).toBe('CHANGES_REQUESTED');
+    expect(stored.verification).toBeDefined();
+    expect(stored.verification.status).toBeUndefined();
+    expect(Array.isArray(stored.verification.history)).toBe(true);
   });
 
   it('maps production review statuses and ignores pending phases', () => {
@@ -307,6 +310,24 @@ describe('active slices and task operations', () => {
       mergeStatus: 'pending',
     }, '2026-01-01T00:00:00Z');
     expect(defaults.phase).toBe('work');
+  });
+
+  it('mirrors verification status and notes from ReviewStatus', () => {
+    const mirror = buildPipelineMirrorFromStatus('PAN-977', {
+      verificationStatus: 'passed',
+      verificationNotes: 'All checks green',
+      verificationAgentId: 'verifier-1',
+      verificationStartedAt: '2026-01-01T00:00:00Z',
+      verificationCompletedAt: '2026-01-01T00:01:00Z',
+    }, '2026-01-01T00:02:00Z');
+    expect(mirror.verification.status).toBe('passed');
+    expect(mirror.verification.notes).toBe('All checks green');
+    expect(mirror.verification.agentId).toBe('verifier-1');
+    expect(mirror.verification.startedAt).toBe('2026-01-01T00:00:00Z');
+    expect(mirror.verification.completedAt).toBe('2026-01-01T00:01:00Z');
+    expect(mirror.verification.history).toEqual([
+      { status: 'passed', at: '2026-01-01T00:02:00Z', agentId: 'verifier-1', notes: 'All checks green' },
+    ]);
   });
 
   it('derives requiresSynthesis metadata from DAG fan-in', () => {
