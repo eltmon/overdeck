@@ -675,7 +675,15 @@ function assertSingleWriter(planPath: string, writerId: string): void {
   const lockPath = lockPathForPlan(planPath);
   try {
     mkdirSync(lockPath, { mode: 0o700 });
-    writeFileSync(lockOwnerPath(planPath), JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2), 'utf-8');
+    // PAN-977 review-round-17 blocker: same orphan-lock vulnerability as
+    // assertSingleWriterAsync. If owner.json write throws non-EEXIST, the
+    // mkdir'd lockPath must be cleaned up before re-throwing.
+    try {
+      writeFileSync(lockOwnerPath(planPath), JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2), 'utf-8');
+    } catch (writeErr) {
+      try { rmSync(lockPath, { recursive: true, force: true }); } catch { /* best effort */ }
+      throw writeErr;
+    }
   } catch (err: any) {
     if (err?.code !== 'EEXIST') throw err;
     let lockOwner = 'unknown writer';
@@ -704,11 +712,24 @@ async function assertSingleWriterAsync(planPath: string, writerId: string): Prom
     if (!owner || owner === writerId) {
       try {
         await mkdir(lockPath, { mode: 0o700 });
-        await writeFile(
-          lockOwnerPath(planPath),
-          JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2),
-          'utf-8',
-        );
+        // PAN-977 review-round-17 blocker: once mkdir succeeds we own the
+        // lock directory. If the owner.json write throws a non-EEXIST error
+        // (ENOSPC, EPERM, ENAMETOOLONG, …), we must remove the directory
+        // before re-throwing — otherwise the orphan lock wedges every
+        // subsequent assertSingleWriterAsync call (mkdir → EEXIST →
+        // owner.json read → ENOENT → "unknown writer" → permanent
+        // writer-conflict), and `activePlanWriters.set` never ran so
+        // `releasePlanWriterAsync` won't free it either.
+        try {
+          await writeFile(
+            lockOwnerPath(planPath),
+            JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2),
+            'utf-8',
+          );
+        } catch (writeErr) {
+          try { await rm(lockPath, { recursive: true, force: true }); } catch { /* best effort */ }
+          throw writeErr;
+        }
         activePlanWriters.set(planPath, writerId);
         return;
       } catch (err: any) {
