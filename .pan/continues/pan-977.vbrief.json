@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-977",
   "created": "2026-05-08T09:40:09.134Z",
-  "updated": "2026-05-13T22:49:21.149Z",
+  "updated": "2026-05-13T23:22:21.371Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -516,13 +516,5 @@
       "timestamp": "2026-05-13T22:49:21.149Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-05-13T22:49:21Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-977\n\n# Synthesis Report — PAN-977 Review\n**Run ID:** agent-pan-977-review-61fc5eb7\n**Branch:** feature/pan-977 (61fc5eb76762c20a6793550422f90186529b58a6)\n**Date:** 2026-05-13\n\n## Convoy Verdict\n\n| Reviewer | Verdict | Blockers |\n|---|---|---|\n| Security | PASS | 0 |\n| Correctness | BLOCKED | 1 |\n| Performance | PASS | 0 |\n| Requirements | PARTIAL | 1 (same root cause) |\n\n**Overall: BLOCKED**\n\n---\n\n## Blocker\n\n### `groupItemsByWave()` omits `running` status — task graph waves show already-claimed work\n\n**File:** `src/lib/vbrief/dag.ts:34`\n**Severity:** Functional correctness — acceptance criterion 1 violation\n\n`getDispatchableItems()` at line 211 correctly builds `nonDispatchableStatuses = new Set(['running', 'completed', 'cancelled', 'blocked'])` and filters all four statuses from dispatchable results.\n\nHowever, `groupItemsByWave()` at line 34 builds `skipStatuses = new Set(['completed', 'cancelled', 'blocked'])` — **`running` is absent**. Since `getTaskGraphView()` at line 641 returns `waves: groupItemsByWave(doc)`, the task graph view API, CLI dry-run visualization, and any dashboard consumer will surface already-claimed (`running`) items as available in dependency waves.\n\n**Fix:** Add `'running'` to `groupItemsByWave`'s `skipStatuses` set at `src/lib/vbrief/dag.ts:34`, and add or adjust a test asserting `getTaskGraphView(doc).waves` excludes `running` items (separate from the existing `getDispatchableItems` coverage).\n\n---\n\n## Clean Areas\n\n- **Security:** All state-changing swarm endpoints are token-gated; synthesis output is size-bounded before persisting; no new injection, traversal, or SSRF vectors in changed paths.\n- **Performance:** Bounded concurrency on tmux pane checks and slot spawning; no steady-state full-workspace scans; async filesystem operations throughout dashboard routes.\n- **Task operations:** CAS/sequence enforcement, durable temp-file+rename writes, single-writer locking — all correctly implemented.\n- **Prompt generation:** Bounded active slices with target item, blockers, acceptance criteria, and synthesis context; outlier fixture verifies substantial size reduction.\n- **Pipeline mirror:** Nested mirror with verification, review, test, uat, merge fields including readyForMerge and PR URL.\n- **SQLite authoritative:** pan-oversee and dashboard readers use the vBRIEF mirror as corroborating input only.\n- **Swarm routes:** Dispatch claim-before-spawn, slot-merge callbacks, synthesis-vs-implementation handling, auto-advance polling, authenticated endpoints.\n- **CLI:** Task operations and dry-run wave display wiring.\n- **Merge agent:** Slot-branch post-merge callback and retry-marker persistence.\n- **Review status mirror:** Non-blocking asynchronous mirror writes after SQLite remains authoritative.\n\n---\n\n## Recommendation\n\nFix the single `skipStatuses` exclusion in `groupItemsByWave` and add regression coverage for task graph wave filtering of `running` items. All other acceptance criteria are satisfied.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/.pan/review/agent-pan-977-review-61fc5eb7/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-977 -m \"Fixed review issues\"`"
-    }
-  ]
+  "feedback": []
 }
