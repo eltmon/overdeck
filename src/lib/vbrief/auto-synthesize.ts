@@ -2,7 +2,6 @@ import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 
-import { getWorkspacePanPaths } from '../pan-dir/index.js';
 import { generateVBriefFilename } from './lifecycle.js';
 import type { VBriefDocument, VBriefSubItem } from './types.js';
 
@@ -126,7 +125,6 @@ export async function writeAutoStartVBrief(
 ): Promise<AutoSynthesizeResult> {
   const document = synthesizeMinimalVBrief(issue);
   const canonicalFilename = document.plan.metadata?.canonicalFilename as string;
-  const workspacePaths = getWorkspacePanPaths(workspacePath);
 
   const projectSpecsDir = join(projectRoot, '.pan', 'specs');
   const projectSpecPath = join(projectSpecsDir, canonicalFilename);
@@ -135,14 +133,12 @@ export async function writeAutoStartVBrief(
     plan: { ...document.plan, status: 'proposed' },
   };
 
-  await mkdir(workspacePaths.panDir, { recursive: true });
   await mkdir(projectSpecsDir, { recursive: true });
-  await writeFile(workspacePaths.specPath, JSON.stringify(document, null, 2), 'utf-8');
   await writeFile(projectSpecPath, JSON.stringify(projectDocument, null, 2), 'utf-8');
 
   return {
     document,
-    workspaceSpecPath: workspacePaths.specPath,
+    workspaceSpecPath: projectSpecPath,
     projectSpecPath,
     canonicalFilename,
   };

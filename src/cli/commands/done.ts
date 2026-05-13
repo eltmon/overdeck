@@ -267,17 +267,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         process.exit(1);
       }
 
-      // Commit the workspace spec dirtied by the bead→vBRIEF sync in this preflight run.
-      try {
-        const { stdout: syncDirty } = await execAsync(
-          'git status --porcelain .pan/spec.vbrief.json',
-          { cwd: workspacePath, encoding: 'utf-8' }
-        );
-        if (syncDirty.trim()) {
-          await execAsync('git add .pan/spec.vbrief.json', { cwd: workspacePath });
-          await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
-        }
-      } catch { /* non-fatal */ }
+      // Status updates now live in continue.json statusOverrides (PAN-1124),
+      // so there is no workspace spec to commit.
     }
   }
 

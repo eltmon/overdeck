@@ -448,21 +448,20 @@ Panopticon uses **vBRIEF v0.5** for machine-readable work plans. Key references:
 - **Extension proposal:** [deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)
 - **Panopticon docs:** [docs/VBRIEF.md](docs/VBRIEF.md) — full schema, lifecycle, and migration notes
 
-### The five-artifact model (PAN-967 + PAN-946)
+### The four-artifact model (PAN-1124: single-spec-on-main)
 
-There are five artifacts. They are distinct — do not conflate them.
+There are four artifacts. They are distinct — do not conflate them.
 
 | Artifact | Location | Writer | Mutability |
 | --- | --- | --- | --- |
 | **PRD draft** (`.md`) | `<projectRoot>/.pan/drafts/<issue>.md` | Human or planning agent | Free-form narrative, human-mutable |
-| **vBRIEF spec** (`.json`) on main | `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` | Pipeline only (single writer) | Status changes are atomic field flips on the same file — files do NOT move between directories |
+| **vBRIEF spec** (`.json`) on main | `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` | Pipeline only (single writer) | Immutable after planning — only `plan.status` changes via `updateSpecStatus()` |
 | **Project-side continue state** (`.json`) | `<projectRoot>/.pan/continues/<issue-lowercase>.vbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback — one canonical file per issue, never moves |
-| **Workspace working copy** (`.json`) | `<workspace>/.pan/spec.vbrief.json` | Work agent (one per issue) | Copied from main at branch creation; mutated during work; never reaches back into main's spec |
-| **Workspace-side continue state** (`.json`) | `<workspace>/.pan/continue.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback |
+| **Workspace-side continue state** (`.json`) | `<workspace>/.pan/continue.json` | Pipeline + work agent | Session state + `statusOverrides` map tracking item/subItem completion |
 
-**The PAN-946 invariant — workspace mutations never reach lifecycle directories.** `findPlan`, `readWorkspacePlan`, `updateItemStatus`, and `updateSubItemStatus` resolve ONLY the workspace-local `.pan/spec.vbrief.json`. Lifecycle/archive lookups go through `findVBriefByIssue` in `lifecycle-io.ts` (read-only) or `findVBriefByIssueAsync` in `vbrief-index.ts` (read-only, indexed). Conflating these two surfaces caused a high-severity correctness bug; the comment at `src/lib/vbrief/io.ts:5-17` is the canonical reminder.
+**The PAN-1124 invariant — the spec on main is immutable after planning.** `findPlan()` resolves the main-side spec via `findSpecByIssue()`. `readWorkspacePlan()` returns a merged view: main spec + `statusOverrides` from workspace continue.json. `updateItemStatus()` and `updateSubItemStatus()` write ONLY to the workspace continue file's `statusOverrides` map — they cannot mutate the spec. The only legal spec mutation is `plan.status` via `updateSpecStatus()` in `pan-dir/specs.ts`. This replaces the old PAN-946 invariant (workspace-spec isolation) with a stronger guarantee: there is no workspace spec to isolate.
 
-**Gitignore policy.** The two workspace-only files (`.pan/spec.vbrief.json` and `.pan/continue.json`) are listed in `.gitignore` and must NEVER be tracked in main. If they leak into main's tree, every new git worktree inherits the most-recently-committed workspace's spec and `pan start` refuses with a misleading "workspace planning artifacts are for PAN-XXXX" error (see PAN-1073 for the cleanup). The lifecycle artifacts (`.pan/specs/`, `.pan/continues/`, `.pan/drafts/`) remain tracked — they're the canonical record of plans, continue states, and PRD drafts at rest.
+**Gitignore policy.** `.pan/continue.json` is listed in `.gitignore` and must NEVER be tracked in main. `.pan/spec.vbrief.json` may still exist in older workspaces (migration compat) but is no longer written by the pipeline. The lifecycle artifacts (`.pan/specs/`, `.pan/continues/`, `.pan/drafts/`) remain tracked — they're the canonical record of plans, continue states, and PRD drafts at rest.
 
 ### Status is a JSON field, not a directory
 
@@ -478,7 +477,7 @@ draft (in .pan/drafts/*.md) ──► proposed ──► approved ──► acti
 | --- | --- | --- |
 | (new) → draft | `pan plan` starts | Markdown PRD written to `<projectRoot>/.pan/drafts/<issue>.md` |
 | draft → proposed | Planning completes | vBRIEF created in `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"` |
-| proposed → approved/running | `pan start` | Status field flipped on main; spec copied to workspace `.pan/spec.vbrief.json` |
+| proposed → approved/running | `pan start` | Status field flipped on main; work agent reads spec from main via `findPlan()` |
 | running → completed | PR merges | Status field flipped to `"completed"` on main |
 | any → cancelled | Issue closed | Status field flipped to `"cancelled"` on main |
 
@@ -494,18 +493,19 @@ If you see an agent referencing `.planning/`, `docs/prds/planned/*.vbrief.json`,
 
 ### Auto-Behaviors
 
-- `io.ts` (`updateItemStatus`/`updateSubItemStatus`) auto-increments `plan.sequence` and sets `updated` timestamps on every write.
+- `io.ts` (`updateItemStatus`/`updateSubItemStatus`) write to workspace continue.json `statusOverrides` map — they do NOT mutate the spec.
+- `readWorkspacePlan()` returns a merged view: main spec + `statusOverrides` overlay from workspace continue.json.
 - `complete-planning` writes the vBRIEF to `<projectRoot>/.pan/specs/...` with `plan.status: "proposed"`.
-- `start-agent` materializes the workspace working copy at `<workspace>/.pan/spec.vbrief.json` (copying from the canonical spec on main, importing from `.pan/drafts/` PRDs when needed — PAN-945) and flips the main-side status field.
+- `start-agent` flips the main-side status field. Work agents read the spec from main via `findPlan()`.
 - `postMergeLifecycle` flips the main-side `plan.status` to `"completed"` after merge.
-- `findPlan(workspacePath)` returns the workspace-local spec only. Read-only lifecycle lookups go through `findVBriefByIssue(projectRoot, issueId)` in `lifecycle-io.ts`.
+- `findPlan(workspacePath)` resolves main-side spec via `findSpecByIssue(projectRoot, issueId)`, with fallback to workspace-local `.pan/spec.vbrief.json` for migration compat.
 
 ### Dashboard Viewer
 
 VBriefViewer components at `src/dashboard/frontend/src/components/vbrief/`:
 - Accessible via **vBRIEF button** on kanban issue cards and InspectorPanel
 - List / DAG / Raw JSON tabs
-- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from `.pan/specs/` first via the read-only lifecycle helpers, then workspace `.pan/spec.vbrief.json`)
+- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from `.pan/specs/` on main via `findSpecByIssue`, with workspace fallback for migration compat)
 
 ## Issue Creation from PRDs
 
