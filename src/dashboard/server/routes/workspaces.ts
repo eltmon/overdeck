@@ -2960,15 +2960,14 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     const update: Partial<ReviewStatus> = {};
     if (reviewStatus === 'passed') {
       const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-      if (workspaceInfo.exists) {
+      if (workspaceInfo.exists && workspaceInfo.localPath) {
         const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
         try {
-          const gitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(workspaceInfo.path));
+          const gitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(workspaceInfo.localPath));
           if (gitInfo.HEAD) {
             update.reviewedAtCommit = gitInfo.HEAD;
-            console.log(`[review-status] Will snapshot reviewedAtCommit=${gitInfo.HEAD.substring(0, 8)} for ${issueId}`);
           }
-        } catch {}
+        } catch { /* non-fatal */ }
       }
     }
     if (reviewStatus) update.reviewStatus = reviewStatus as any;
@@ -2980,7 +2979,6 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     if (readyForMerge !== undefined) update.readyForMerge = readyForMerge;
 
     const status = setReviewStatus(issueId, update);
-    console.log(`[review-status] Updated ${issueId}:`, status);
 
     const { getTmuxSessionName } =
       yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
