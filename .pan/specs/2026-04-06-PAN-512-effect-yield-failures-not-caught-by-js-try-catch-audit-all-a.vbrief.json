@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-06T22:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-512: Effect yield* failures not caught by JS try/catch \u2014 audit all agent route Effect.gen blocks"
+    "description": "Plan for PAN-512: Effect yield* failures not caught by JS try/catch — audit all agent route Effect.gen blocks"
   },
   "plan": {
     "id": "pan-512",
-    "title": "Effect yield* failures not caught by JS try/catch \u2014 audit all agent route Effect.gen blocks",
+    "title": "Effect yield* failures not caught by JS try/catch — audit all agent route Effect.gen blocks",
     "status": "completed",
     "uid": "56561b7c-9181-491b-8cc9-6c3955995da5",
     "author": "agent:claude-opus-4-6",
@@ -28,7 +28,7 @@
       "lint"
     ],
     "narratives": {
-      "Problem": "JS try/catch around yield* inside Effect.gen is a no-op \u2014 Effect fiber failures bypass catch blocks entirely, causing silent error swallowing or uncaught 500s in 17 route handler locations.",
+      "Problem": "JS try/catch around yield* inside Effect.gen is a no-op — Effect fiber failures bypass catch blocks entirely, causing silent error swallowing or uncaught 500s in 17 route handler locations.",
       "Proposal": "Replace all 17 try/catch-around-yield* instances with proper Effect error combinators (catchAll, catchTag, either), and add an ESLint rule to prevent reintroduction."
     },
     "items": [
@@ -132,7 +132,7 @@
           "issueLabel": "pan-512"
         },
         "narrative": {
-          "Action": "Fix Linear comment sync and Rally story sync blocks. These already have partial inner Effect error handling (Effect.catchCause, Effect.tryPromise) \u2014 remove the redundant outer try/catch and ensure the inner handlers cover all failure paths."
+          "Action": "Fix Linear comment sync and Rally story sync blocks. These already have partial inner Effect error handling (Effect.catchCause, Effect.tryPromise) — remove the redundant outer try/catch and ensure the inner handlers cover all failure paths."
         },
         "subItems": [
           {
@@ -219,7 +219,7 @@
           "issueLabel": "pan-512"
         },
         "narrative": {
-          "Action": "Run npm run typecheck, npm run lint, and npm test. All must pass. No behavioral changes expected \u2014 the fixes make error handling actually work where it was silently broken before."
+          "Action": "Run npm run typecheck, npm run lint, and npm test. All must pass. No behavioral changes expected — the fixes make error handling actually work where it was silently broken before."
         },
         "subItems": [
           {
@@ -299,5 +299,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "completed"
 }

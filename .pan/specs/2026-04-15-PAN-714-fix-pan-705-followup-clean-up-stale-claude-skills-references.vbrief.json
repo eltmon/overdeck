@@ -33,7 +33,7 @@
       "skills"
     ],
     "narratives": {
-      "Problem": "PAN-705 command taxonomy reorg (pan work list \u2192 pan issues, pan cloister/specialists \u2192 pan admin *) left project-level .claude/skills/ with stale command refs, 5 orphan skills, 56 missing new skills, and structural bugs (nested dirs). Separately, work/done.ts (535 lines) and work/approve.ts (214 lines) have zero unit tests despite complex pre-flight logic, tracker API paths, and issue-id normalization.",
+      "Problem": "PAN-705 command taxonomy reorg (pan work list → pan issues, pan cloister/specialists → pan admin *) left project-level .claude/skills/ with stale command refs, 5 orphan skills, 56 missing new skills, and structural bugs (nested dirs). Separately, work/done.ts (535 lines) and work/approve.ts (214 lines) have zero unit tests despite complex pre-flight logic, tracker API paths, and issue-id normalization.",
       "Proposal": "Regenerate .claude/skills/ as an exact mirror of canonical skills/, then extend pan sync to auto-mirror project-level skills on future runs so drift cannot recur. Extract pre-flight checks from doneCommand into src/lib/work/done-preflight.ts and export the existing approve.ts helpers, unit-test both at the helper and command-behavior level following the reopen.test.ts convention."
     },
     "items": [
@@ -104,7 +104,7 @@
           "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "In src/lib/sync.ts (or a helper called from it), after the existing user-level sync, detect whether the current working directory contains a top-level `skills/` tree with one or more SKILL.md files. If so, mirror skills/* into .claude/skills/* \u2014 creating missing directories, updating out-of-date SKILL.md files, and removing directories in .claude/skills/ that no longer exist in skills/. Preserve .claude/skills/.gitignore untouched. Report the count of added/updated/removed skills in the sync output. This must be a no-op for any project without a top-level skills/ directory (i.e., every non-panopticon-cli project)."
+          "Action": "In src/lib/sync.ts (or a helper called from it), after the existing user-level sync, detect whether the current working directory contains a top-level `skills/` tree with one or more SKILL.md files. If so, mirror skills/* into .claude/skills/* — creating missing directories, updating out-of-date SKILL.md files, and removing directories in .claude/skills/ that no longer exist in skills/. Preserve .claude/skills/.gitignore untouched. Report the count of added/updated/removed skills in the sync output. This must be a no-op for any project without a top-level skills/ directory (i.e., every non-panopticon-cli project)."
         },
         "subItems": [
           {
@@ -168,7 +168,7 @@
           "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Create src/lib/work/done-preflight.ts exporting `checkOpenBeads(workspacePath, issueId)`, `checkUncommittedChanges(workspacePath)`, `checkVBriefACStatus(workspacePath)`, and a composed `runPreflightChecks(workspacePath, issueId)` that returns a string[] of failure lines (empty array = pass). The composed function must also invoke the existing `syncBeadStatusToVBrief` pass over closed beads before running checkVBriefACStatus so the AC check sees the latest state. Refactor doneCommand in src/cli/commands/work/done.ts to call `runPreflightChecks` and, on failure, print the same output and exit(1) \u2014 the surface behavior must be byte-identical to the current implementation."
+          "Action": "Create src/lib/work/done-preflight.ts exporting `checkOpenBeads(workspacePath, issueId)`, `checkUncommittedChanges(workspacePath)`, `checkVBriefACStatus(workspacePath)`, and a composed `runPreflightChecks(workspacePath, issueId)` that returns a string[] of failure lines (empty array = pass). The composed function must also invoke the existing `syncBeadStatusToVBrief` pass over closed beads before running checkVBriefACStatus so the AC check sees the latest state. Refactor doneCommand in src/cli/commands/work/done.ts to call `runPreflightChecks` and, on failure, print the same output and exit(1) — the surface behavior must be byte-identical to the current implementation."
         },
         "subItems": [
           {
@@ -216,7 +216,7 @@
           "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Create tests/lib/work/done-preflight.beads.test.ts. Mock execAsync or use a fake workspace with a scripted bd binary. Cover: (1) zero open beads \u2192 returns []; (2) N open beads \u2192 returns N+1 lines starting with `  Open beads (N):`; (3) bd not installed \u2192 returns [] (silent skip); (4) issue-id is lowercased correctly in the bd query."
+          "Action": "Create tests/lib/work/done-preflight.beads.test.ts. Mock execAsync or use a fake workspace with a scripted bd binary. Cover: (1) zero open beads → returns []; (2) N open beads → returns N+1 lines starting with `  Open beads (N):`; (3) bd not installed → returns [] (silent skip); (4) issue-id is lowercased correctly in the bd query."
         },
         "subItems": [
           {
@@ -256,7 +256,7 @@
           "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Create tests/lib/work/done-preflight.git.test.ts. Build tmp-dir fixtures via mkdtempSync that simulate (a) monorepo \u2014 single top-level .git marker, clean and dirty states; (b) polyrepo \u2014 multiple subdirs each with their own .git marker, mixed clean/dirty. Use real `git init` + `git add` where feasible, or mock execAsync to return canned `git status --porcelain` output. Assert failure-line format: `  Uncommitted changes:` for monorepo, `  Uncommitted changes in <subdir>/:` for polyrepo."
+          "Action": "Create tests/lib/work/done-preflight.git.test.ts. Build tmp-dir fixtures via mkdtempSync that simulate (a) monorepo — single top-level .git marker, clean and dirty states; (b) polyrepo — multiple subdirs each with their own .git marker, mixed clean/dirty. Use real `git init` + `git add` where feasible, or mock execAsync to return canned `git status --porcelain` output. Assert failure-line format: `  Uncommitted changes:` for monorepo, `  Uncommitted changes in <subdir>/:` for polyrepo."
         },
         "subItems": [
           {
@@ -304,7 +304,7 @@
           "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Create tests/lib/work/done-preflight.ac.test.ts. Build a tmp-dir workspace with a synthetic .planning/plan.vbrief.json containing items with mixed AC statuses. Cover: (1) all AC completed \u2192 returns []; (2) one pending AC \u2192 returns two lines (header + `  - [ ] <title>`); (3) multiple items with pending AC \u2192 returns grouped output; (4) no vBRIEF file present \u2192 returns [] (silent skip, matching current behavior)."
+          "Action": "Create tests/lib/work/done-preflight.ac.test.ts. Build a tmp-dir workspace with a synthetic .planning/plan.vbrief.json containing items with mixed AC statuses. Cover: (1) all AC completed → returns []; (2) one pending AC → returns two lines (header + `  - [ ] <title>`); (3) multiple items with pending AC → returns grouped output; (4) no vBRIEF file present → returns [] (silent skip, matching current behavior)."
         },
         "subItems": [
           {
@@ -344,7 +344,7 @@
           "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "Add `export` keywords to findPRForBranch, mergePR, and updateLinearStatus in src/cli/commands/work/approve.ts (checkGhCli already trivially testable). Create tests/cli/commands/work/approve.test.ts following the reopen.test.ts dynamic-import pattern. Cover: (1) findPRForBranch \u2014 mocked `gh pr list --json` output returns PR object; empty output returns null; gh failure returns null. (2) mergePR \u2014 success returns {success:true}; non-zero exit returns {success:false,error}. (3) updateLinearStatus \u2014 mock @linear/sdk; happy path returns true; team-missing returns false; target-state-missing returns false. Use vi.mock or monkey-patch imports as existing tests do."
+          "Action": "Add `export` keywords to findPRForBranch, mergePR, and updateLinearStatus in src/cli/commands/work/approve.ts (checkGhCli already trivially testable). Create tests/cli/commands/work/approve.test.ts following the reopen.test.ts dynamic-import pattern. Cover: (1) findPRForBranch — mocked `gh pr list --json` output returns PR object; empty output returns null; gh failure returns null. (2) mergePR — success returns {success:true}; non-zero exit returns {success:false,error}. (3) updateLinearStatus — mock @linear/sdk; happy path returns true; team-missing returns false; target-state-missing returns false. Use vi.mock or monkey-patch imports as existing tests do."
         },
         "subItems": [
           {
@@ -440,7 +440,7 @@
           "issueLabel": "pan-714"
         },
         "narrative": {
-          "Action": "In tests/cli/commands/work/approve.test.ts (same file as export-test-approve-helpers), add a describe block for approveCommand covering: (1) agent not found \u2192 exits with error; (2) PR not found in workspace \u2192 exits with error; (3) happy path (PR found, merge succeeds, Linear update succeeds) exits 0 and marks agent state stopped; (4) shouldSkipTrackerUpdate=true skips Linear update but still merges PR. Mock getAgentState/saveAgentState, findPRForBranch, mergePR, updateLinearStatus."
+          "Action": "In tests/cli/commands/work/approve.test.ts (same file as export-test-approve-helpers), add a describe block for approveCommand covering: (1) agent not found → exits with error; (2) PR not found in workspace → exits with error; (3) happy path (PR found, merge succeeds, Linear update succeeds) exits 0 and marks agent state stopped; (4) shouldSkipTrackerUpdate=true skips Linear update but still merges PR. Mock getAgentState/saveAgentState, findPRForBranch, mergePR, updateLinearStatus."
         },
         "subItems": [
           {
@@ -494,5 +494,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

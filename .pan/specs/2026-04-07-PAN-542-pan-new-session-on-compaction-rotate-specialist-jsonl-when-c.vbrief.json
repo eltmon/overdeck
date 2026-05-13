@@ -7,7 +7,7 @@
   },
   "plan": {
     "id": "pan-542",
-    "title": "PAN: New session on compaction \u2014 rotate specialist JSONL when Claude compacts",
+    "title": "PAN: New session on compaction — rotate specialist JSONL when Claude compacts",
     "status": "approved",
     "uid": "ffbb6b17-59b7-466d-8483-31499b0d0bc3",
     "author": "agent:minimax-m2.7-highspeed",
@@ -175,5 +175,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

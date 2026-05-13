@@ -3,7 +3,7 @@
     "version": "0.5",
     "created": "2026-05-06T17:00:00.000Z",
     "author": "panopticon-cli/0.8.15",
-    "description": "Plan for PAN-969: Directive Flow \u2014 DAG-centric issue overview with live lifecycle visualization (includes PAN-965 resource tree)",
+    "description": "Plan for PAN-969: Directive Flow — DAG-centric issue overview with live lifecycle visualization (includes PAN-965 resource tree)",
     "updated": "2026-05-06T16:50:12.756Z"
   },
   "plan": {
@@ -86,7 +86,7 @@
           },
           {
             "id": "beads-api.ac4",
-            "title": "No sync FS calls (readFileSync, readdirSync) in the handler \u2014 uses fs/promises or execAsync throughout",
+            "title": "No sync FS calls (readFileSync, readdirSync) in the handler — uses fs/promises or execAsync throughout",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -158,7 +158,7 @@
         "subItems": [
           {
             "id": "container-name-parser.ac1",
-            "title": "'myn-feature-min-846-api-1' \u2192 'api'",
+            "title": "'myn-feature-min-846-api-1' → 'api'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -166,7 +166,7 @@
           },
           {
             "id": "container-name-parser.ac2",
-            "title": "'myn-feature-min-846-postgres-1' \u2192 'postgres'",
+            "title": "'myn-feature-min-846-postgres-1' → 'postgres'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -174,7 +174,7 @@
           },
           {
             "id": "container-name-parser.ac3",
-            "title": "'panopticon-traefik' \u2192 'traefik' (no issue ID, no instance number)",
+            "title": "'panopticon-traefik' → 'traefik' (no issue ID, no instance number)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -288,7 +288,7 @@
       },
       {
         "id": "inline-sparkline",
-        "title": "InlineSparkline.tsx \u2014 reusable micro SVG sparkline component",
+        "title": "InlineSparkline.tsx — reusable micro SVG sparkline component",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-06T17:00:00.000Z",
@@ -310,7 +310,7 @@
           },
           {
             "id": "inline-sparkline.ac2",
-            "title": "Renders a polyline with points derived from the data array (length N \u2192 N evenly spaced x positions)",
+            "title": "Renders a polyline with points derived from the data array (length N → N evenly spaced x positions)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -336,7 +336,7 @@
       },
       {
         "id": "container-node",
-        "title": "ContainerNode.tsx \u2014 container row with status dot, metrics, sparkline",
+        "title": "ContainerNode.tsx — container row with status dot, metrics, sparkline",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-06T17:00:00.000Z",
@@ -345,7 +345,7 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "Create src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ContainerNode.tsx. Props: { name, serviceName, status: 'running'|'stopped'|'unhealthy'|'restarting', cpuPercent, memoryUsage (bytes), cpuHistory?: number[], onViewLogs?, onRestart?, onStop?, onStart?, onInspect? }. Render a single row: Container lucide icon \u2192 StatusDot (map status to alive/waiting/thinking/ended) \u2192 serviceName \u2192 CPU% \u2192 memory (MB/GB formatted) \u2192 InlineSparkline (when cpuHistory provided). CSS: indent 40px matching PAN-965 PRD spec. Format memoryUsage to MB or GB. Display full name in title attribute for tooltip."
+          "Action": "Create src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ContainerNode.tsx. Props: { name, serviceName, status: 'running'|'stopped'|'unhealthy'|'restarting', cpuPercent, memoryUsage (bytes), cpuHistory?: number[], onViewLogs?, onRestart?, onStop?, onStart?, onInspect? }. Render a single row: Container lucide icon → StatusDot (map status to alive/waiting/thinking/ended) → serviceName → CPU% → memory (MB/GB formatted) → InlineSparkline (when cpuHistory provided). CSS: indent 40px matching PAN-965 PRD spec. Format memoryUsage to MB or GB. Display full name in title attribute for tooltip."
         },
         "subItems": [
           {
@@ -392,7 +392,7 @@
       },
       {
         "id": "branch-pr-nodes",
-        "title": "BranchNode.tsx and PrNode.tsx \u2014 tree node components",
+        "title": "BranchNode.tsx and PrNode.tsx — tree node components",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-06T17:00:00.000Z",
@@ -401,7 +401,7 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "Create src/dashboard/frontend/src/components/CommandDeck/ProjectTree/BranchNode.tsx: props { name: string, isLocal: boolean }. Render GitBranch lucide icon \u2192 branch name \u2192 '(local)' or '(remote)' badge in 9px muted text. Create PrNode.tsx: props { number: number, title: string, state: string, isDraft: boolean, url?: string }. Render GitPullRequest icon \u2192 '#N' in mono font \u2192 title (truncated ellipsis, max 200px) \u2192 state badge. Click opens url in new tab. Both use 40px left indent."
+          "Action": "Create src/dashboard/frontend/src/components/CommandDeck/ProjectTree/BranchNode.tsx: props { name: string, isLocal: boolean }. Render GitBranch lucide icon → branch name → '(local)' or '(remote)' badge in 9px muted text. Create PrNode.tsx: props { number: number, title: string, state: string, isDraft: boolean, url?: string }. Render GitPullRequest icon → '#N' in mono font → title (truncated ellipsis, max 200px) → state badge. Click opens url in new tab. Both use 40px left indent."
         },
         "subItems": [
           {
@@ -440,7 +440,7 @@
       },
       {
         "id": "resources-group",
-        "title": "ResourcesGroup.tsx \u2014 collapsible resource group with CSS",
+        "title": "ResourcesGroup.tsx — collapsible resource group with CSS",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-06T17:00:00.000Z",
@@ -449,7 +449,7 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "Create src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ResourcesGroup.tsx. Props: { issueId, containers: ContainerNodeProps[], branches: BranchNodeProps[], prs: PrNodeProps[], onContainerAction? }. Expand/collapse state stored in localStorage key 'pan-tree-resources-{issueId}'. Default: expanded when any container is running, collapsed otherwise. Render: separator line above, chevron toggle header with counts ('4 containers \u00b7 1 PR \u00b7 2 branches'), then child nodes when expanded (containers alphabetically by serviceName, PRs by number, branches local-before-remote). Add CSS to src/dashboard/frontend/src/components/CommandDeck/styles/ following the exact selectors from the PAN-965 PRD."
+          "Action": "Create src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ResourcesGroup.tsx. Props: { issueId, containers: ContainerNodeProps[], branches: BranchNodeProps[], prs: PrNodeProps[], onContainerAction? }. Expand/collapse state stored in localStorage key 'pan-tree-resources-{issueId}'. Default: expanded when any container is running, collapsed otherwise. Render: separator line above, chevron toggle header with counts ('4 containers · 1 PR · 2 branches'), then child nodes when expanded (containers alphabetically by serviceName, PRs by number, branches local-before-remote). Add CSS to src/dashboard/frontend/src/components/CommandDeck/styles/ following the exact selectors from the PAN-965 PRD."
         },
         "subItems": [
           {
@@ -470,7 +470,7 @@
           },
           {
             "id": "resources-group.ac3",
-            "title": "Header shows item counts: 'N containers \u00b7 N PR \u00b7 N branches' (singular/plural handled correctly)",
+            "title": "Header shows item counts: 'N containers · N PR · N branches' (singular/plural handled correctly)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -505,7 +505,7 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "Add a right-click context menu to ContainerNode using the same absolute-positioned div pattern as SessionNode's context menu. Menu items: View Logs (always), Restart (when running), Stop (when running), Start (when stopped), Inspect. Wire each item: Restart \u2192 POST /api/resources/docker/container/:id/restart, Stop \u2192 existing DELETE endpoint, Start \u2192 POST /api/resources/docker/container/:id/start, Logs \u2192 call onViewLogs prop (caller decides rendering), Inspect \u2192 onInspect prop. Menu dismisses on outside click or Escape."
+          "Action": "Add a right-click context menu to ContainerNode using the same absolute-positioned div pattern as SessionNode's context menu. Menu items: View Logs (always), Restart (when running), Stop (when running), Start (when stopped), Inspect. Wire each item: Restart → POST /api/resources/docker/container/:id/restart, Stop → existing DELETE endpoint, Start → POST /api/resources/docker/container/:id/start, Logs → call onViewLogs prop (caller decides rendering), Inspect → onInspect prop. Menu dismisses on outside click or Escape."
         },
         "subItems": [
           {
@@ -601,7 +601,7 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "In src/dashboard/frontend/src/components/CommandDeck/index.tsx, add a useEffect that polls GET /api/resources every 5 seconds when the CommandDeck is mounted AND at least one ResourcesGroup is expanded. Store containerStats as Record<string, ContainerStats> in local state (or a shallow Zustand slice if cross-component access is needed). Pass stats down through ProjectNode \u2192 FeatureItem \u2192 ResourcesGroup \u2192 ContainerNode. Guard: stop polling when no ResourcesGroups are expanded to avoid unnecessary load."
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/index.tsx, add a useEffect that polls GET /api/resources every 5 seconds when the CommandDeck is mounted AND at least one ResourcesGroup is expanded. Store containerStats as Record<string, ContainerStats> in local state (or a shallow Zustand slice if cross-component access is needed). Pass stats down through ProjectNode → FeatureItem → ResourcesGroup → ContainerNode. Guard: stop polling when no ResourcesGroups are expanded to avoid unnecessary load."
         },
         "subItems": [
           {
@@ -632,7 +632,7 @@
       },
       {
         "id": "directive-flow-scaffold",
-        "title": "DirectiveFlow.tsx \u2014 fork PlanDAG, replace OverviewTab, render basic nodes + gate tails",
+        "title": "DirectiveFlow.tsx — fork PlanDAG, replace OverviewTab, render basic nodes + gate tails",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-06T17:00:00.000Z",
@@ -686,7 +686,7 @@
           },
           {
             "id": "directive-flow-scaffold.ac6",
-            "title": "The existing vBRIEF tab (List/DAG/Raw JSON) is unchanged \u2014 PlanDAG.tsx is not modified",
+            "title": "The existing vBRIEF tab (List/DAG/Raw JSON) is unchanged — PlanDAG.tsx is not modified",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -913,7 +913,7 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "Add inspection status to WorkItemNode. Source: the read model may not have per-item inspection results today \u2014 check if reviewStatusByIssueId or the snapshot has inspection data. If not available, add a GET /api/workspaces/:issueId/inspection endpoint that reads the workspace's last inspect-agent output (look in .pan/ or .planning/ for inspection results). Display as a small badge: green 'Passed' or red 'Blocked' with the specialist name. Show only for running or completed items where inspection data exists."
+          "Action": "Add inspection status to WorkItemNode. Source: the read model may not have per-item inspection results today — check if reviewStatusByIssueId or the snapshot has inspection data. If not available, add a GET /api/workspaces/:issueId/inspection endpoint that reads the workspace's last inspect-agent output (look in .pan/ or .planning/ for inspection results). Display as a small badge: green 'Passed' or red 'Blocked' with the specialist name. Show only for running or completed items where inspection data exists."
         },
         "subItems": [
           {
@@ -953,12 +953,12 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "Add difficulty and priority badges to WorkItemNode. Source: item.metadata.difficulty and item.priority from the vBRIEF. Difficulty badge: small pill in bottom-right of node header \u2014 'trivial' (gray), 'simple' (blue), 'medium' (yellow), 'complex' (orange), 'expert' (red). Priority badge: only show 'critical' (red) and 'high' (orange) explicitly; hide medium/low to avoid noise. Both badges are small (10px font)."
+          "Action": "Add difficulty and priority badges to WorkItemNode. Source: item.metadata.difficulty and item.priority from the vBRIEF. Difficulty badge: small pill in bottom-right of node header — 'trivial' (gray), 'simple' (blue), 'medium' (yellow), 'complex' (orange), 'expert' (red). Priority badge: only show 'critical' (red) and 'high' (orange) explicitly; hide medium/low to avoid noise. Both badges are small (10px font)."
         },
         "subItems": [
           {
             "id": "work-item-badges.ac1",
-            "title": "Difficulty badge renders with correct text and color for all 5 levels (trivial\u2192gray, simple\u2192blue, medium\u2192yellow, complex\u2192orange, expert\u2192red)",
+            "title": "Difficulty badge renders with correct text and color for all 5 levels (trivial→gray, simple→blue, medium→yellow, complex→orange, expert→red)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1024,7 +1024,7 @@
       },
       {
         "id": "gate-verify",
-        "title": "VERIFY quality gate node \u2014 typecheck/lint/test substeps",
+        "title": "VERIFY quality gate node — typecheck/lint/test substeps",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-06T17:00:00.000Z",
@@ -1072,7 +1072,7 @@
       },
       {
         "id": "gate-review",
-        "title": "REVIEW quality gate node \u2014 5 reviewer columns, round number",
+        "title": "REVIEW quality gate node — 5 reviewer columns, round number",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-06T17:00:00.000Z",
@@ -1120,7 +1120,7 @@
       },
       {
         "id": "gate-test",
-        "title": "TEST quality gate node \u2014 test-agent status and skip reason",
+        "title": "TEST quality gate node — test-agent status and skip reason",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-06T17:00:00.000Z",
@@ -1168,7 +1168,7 @@
       },
       {
         "id": "gate-merge",
-        "title": "MERGE quality gate node \u2014 substep progress, queue, human gate",
+        "title": "MERGE quality gate node — substep progress, queue, human gate",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-06T17:00:00.000Z",
@@ -1177,7 +1177,7 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "Implement the MERGE QualityGateNode variant \u2014 the most complex gate node. Source: reviewStatus.mergeStatus, reviewStatus.mergeStep, reviewStatus.queuePosition, reviewStatus.blockerReasons, reviewStatus.readyForMerge from Zustand. Render: 'MERGE' header, merge step progress bar/indicator (queued \u2192 validating-pr \u2192 rebasing \u2192 stripping-planning \u2192 verifying \u2192 squash-merging \u2192 post-merge-cleanup). Show queue position when queued ('Queue #N'). Show blocker reasons as bullet list when blockerReasons is non-empty. Prominently display 'Awaiting human merge' when readyForMerge is true (green pulsing banner). Node border: gray=pending, blue=merging/verifying, green=merged, red=failed."
+          "Action": "Implement the MERGE QualityGateNode variant — the most complex gate node. Source: reviewStatus.mergeStatus, reviewStatus.mergeStep, reviewStatus.queuePosition, reviewStatus.blockerReasons, reviewStatus.readyForMerge from Zustand. Render: 'MERGE' header, merge step progress bar/indicator (queued → validating-pr → rebasing → stripping-planning → verifying → squash-merging → post-merge-cleanup). Show queue position when queued ('Queue #N'). Show blocker reasons as bullet list when blockerReasons is non-empty. Prominently display 'Awaiting human merge' when readyForMerge is true (green pulsing banner). Node border: gray=pending, blue=merging/verifying, green=merged, red=failed."
         },
         "subItems": [
           {
@@ -1224,7 +1224,7 @@
       },
       {
         "id": "gate-done",
-        "title": "DONE quality gate node \u2014 merged commit, total cost, duration",
+        "title": "DONE quality gate node — merged commit, total cost, duration",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-06T17:00:00.000Z",
@@ -1233,7 +1233,7 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "Implement the DONE QualityGateNode variant. Rendered only when mergeStatus === 'merged'. Shows: 'DONE' header (green filled background), merged commit SHA (short, 8 chars), total issue cost formatted as '$X.XX', total elapsed duration (from issue creation to merge). Source: mergeStatus, total cost from useIssueCostsQuery, duration from issue created timestamp vs now. This node is always fully collapsed \u2014 no expandable content."
+          "Action": "Implement the DONE QualityGateNode variant. Rendered only when mergeStatus === 'merged'. Shows: 'DONE' header (green filled background), merged commit SHA (short, 8 chars), total issue cost formatted as '$X.XX', total elapsed duration (from issue creation to merge). Source: mergeStatus, total cost from useIssueCostsQuery, duration from issue created timestamp vs now. This node is always fully collapsed — no expandable content."
         },
         "subItems": [
           {
@@ -1312,7 +1312,7 @@
       },
       {
         "id": "escape-overlays",
-        "title": "Escape state overlays \u2014 BLOCKED, CANCELLED, circuit-breaker",
+        "title": "Escape state overlays — BLOCKED, CANCELLED, circuit-breaker",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-06T17:00:00.000Z",
@@ -1321,7 +1321,7 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "Add three escape-state overlays to the DirectiveFlow canvas. BLOCKED: when reviewStatus.stuck === true, show a yellow semi-transparent banner overlaid on the current stage gate node showing stuckReason. CANCELLED: when the issue is cancelled, gray out all nodes with reduced opacity and add a 'CANCELLED' diagonal watermark on the canvas. Circuit breaker: when autoRequeueCount >= 3, show a red banner on the REVIEW gate node reading 'Human intervention needed \u2014 circuit breaker tripped (N/3)'. Use absolute-positioned divs over the ReactFlow canvas for the global overlays; use ReactFlow's node data to pass the overlay state down to individual nodes."
+          "Action": "Add three escape-state overlays to the DirectiveFlow canvas. BLOCKED: when reviewStatus.stuck === true, show a yellow semi-transparent banner overlaid on the current stage gate node showing stuckReason. CANCELLED: when the issue is cancelled, gray out all nodes with reduced opacity and add a 'CANCELLED' diagonal watermark on the canvas. Circuit breaker: when autoRequeueCount >= 3, show a red banner on the REVIEW gate node reading 'Human intervention needed — circuit breaker tripped (N/3)'. Use absolute-positioned divs over the ReactFlow canvas for the global overlays; use ReactFlow's node data to pass the overlay state down to individual nodes."
         },
         "subItems": [
           {
@@ -1352,7 +1352,7 @@
       },
       {
         "id": "resource-dock",
-        "title": "Resource Dock \u2014 collapsible right sidebar (Agents, Workspace, Services, Attach, Actions, Cost)",
+        "title": "Resource Dock — collapsible right sidebar (Agents, Workspace, Services, Attach, Actions, Cost)",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-06T17:00:00.000Z",
@@ -1361,7 +1361,7 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "Add a collapsible right sidebar to the DirectiveFlow canvas. Width: 280px when expanded, collapsed to a 32px icon strip. Persists collapse state in localStorage key 'directive-dock-collapsed'. Sections (each collapsible independently): AGENTS \u2014 tree showing work-agent and review-agent with nested sub-reviewers, model, runtime state, cost; WORKSPACE \u2014 path, branch, VS Code button, Stop button; SERVICES \u2014 frontend/API URL chips from workspaceQuery; ATTACH \u2014 tmux command with copy-to-clipboard button; ACTIONS \u2014 Review & Test, Recover, Sync, Stop buttons (moved from OverviewTab); COST \u2014 total cost + per-model breakdown. Source data: Zustand store (agentsById, reviewStatusByIssueId) + React Query hooks (useWorkspaceQuery, useIssueCostsQuery). The dock overlays the right edge of the ReactFlow canvas; the canvas pans/zooms behind it."
+          "Action": "Add a collapsible right sidebar to the DirectiveFlow canvas. Width: 280px when expanded, collapsed to a 32px icon strip. Persists collapse state in localStorage key 'directive-dock-collapsed'. Sections (each collapsible independently): AGENTS — tree showing work-agent and review-agent with nested sub-reviewers, model, runtime state, cost; WORKSPACE — path, branch, VS Code button, Stop button; SERVICES — frontend/API URL chips from workspaceQuery; ATTACH — tmux command with copy-to-clipboard button; ACTIONS — Review & Test, Recover, Sync, Stop buttons (moved from OverviewTab); COST — total cost + per-model breakdown. Source data: Zustand store (agentsById, reviewStatusByIssueId) + React Query hooks (useWorkspaceQuery, useIssueCostsQuery). The dock overlays the right edge of the ReactFlow canvas; the canvas pans/zooms behind it."
         },
         "subItems": [
           {
@@ -1416,7 +1416,7 @@
       },
       {
         "id": "summary-strip",
-        "title": "Summary Strip \u2014 bottom progress bar with critical path, lanes, and cost sparkline",
+        "title": "Summary Strip — bottom progress bar with critical path, lanes, and cost sparkline",
         "status": "pending",
         "priority": "medium",
         "created": "2026-05-06T17:00:00.000Z",
@@ -1425,7 +1425,7 @@
           "issueLabel": "pan-969"
         },
         "narrative": {
-          "Action": "Add a fixed bottom bar to the DirectiveFlow canvas (40px height). Shows: overall item progress ('\u2713 6/8 items'), current gate status ('\u25cf REVIEW running'), critical path step count ('Critical path: N steps' from plan.criticalPath), parallel lane count (count of independent chains in the DAG \u2014 items with no shared dependency path), total cost with an ActivitySparkline (reuse the existing component). The bar sits above the ReactFlow canvas and does not scroll with it. Use a dark semi-transparent background."
+          "Action": "Add a fixed bottom bar to the DirectiveFlow canvas (40px height). Shows: overall item progress ('✓ 6/8 items'), current gate status ('● REVIEW running'), critical path step count ('Critical path: N steps' from plan.criticalPath), parallel lane count (count of independent chains in the DAG — items with no shared dependency path), total cost with an ActivitySparkline (reuse the existing component). The bar sits above the ReactFlow canvas and does not scroll with it. Use a dark semi-transparent background."
         },
         "subItems": [
           {
@@ -1658,5 +1658,6 @@
     "metadata": {
       "canonicalFilename": "2026-05-06-PAN-969-directive-flow-dag-centric-issue-overview-with-live-lifecycle-visualization.vbrief.json"
     }
-  }
+  },
+  "status": "proposed"
 }

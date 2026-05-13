@@ -139,7 +139,7 @@
           "issueLabel": "pan-442"
         },
         "narrative": {
-          "Action": "Register panopticon:// custom protocol in main process to serve static files from bundled dist/dashboard/public/. In dev mode, load BrowserWindow from Vite dev server URL (VITE_DEV_SERVER_URL env). In packaged builds, load panopticon://app/index.html. Handle WebSocket connections (ws/rpc and ws/terminal) correctly in both modes \u2014 protocol handler serves static assets, WS connections go to localhost server port. Configure CSP headers appropriately for both modes."
+          "Action": "Register panopticon:// custom protocol in main process to serve static files from bundled dist/dashboard/public/. In dev mode, load BrowserWindow from Vite dev server URL (VITE_DEV_SERVER_URL env). In packaged builds, load panopticon://app/index.html. Handle WebSocket connections (ws/rpc and ws/terminal) correctly in both modes — protocol handler serves static assets, WS connections go to localhost server port. Configure CSP headers appropriately for both modes."
         },
         "subItems": [
           {
@@ -275,7 +275,7 @@
           "issueLabel": "pan-442"
         },
         "narrative": {
-          "Action": "Implement auto-start toggle using Electron's app.setLoginItemSettings(). Build the nag flow: Launch 1 shows a full dialog with warm copy explaining auto-start value (never miss an agent asking for help). Launches 2-5 show in-app toasts with personality and countdown ('Reminder 3 of 5'). Three buttons: 'Enable' (primary, prominent, inviting), 'Not yet' (neutral), 'Stop reminding me' (subtle). 'Enable' should be the lowest-friction path \u2014 large, colored, positioned for natural click. Track nag state (launch count, dismissed permanently) in electron-store. After 5 prompts or 'Stop reminding me': never prompt again."
+          "Action": "Implement auto-start toggle using Electron's app.setLoginItemSettings(). Build the nag flow: Launch 1 shows a full dialog with warm copy explaining auto-start value (never miss an agent asking for help). Launches 2-5 show in-app toasts with personality and countdown ('Reminder 3 of 5'). Three buttons: 'Enable' (primary, prominent, inviting), 'Not yet' (neutral), 'Stop reminding me' (subtle). 'Enable' should be the lowest-friction path — large, colored, positioned for natural click. Track nag state (launch count, dismissed permanently) in electron-store. After 5 prompts or 'Stop reminding me': never prompt again."
         },
         "subItems": [
           {
@@ -464,7 +464,7 @@
           },
           {
             "id": "npx-launcher.ac2",
-            "title": "Works without Electron installed \u2014 no native addon requirements for the npx path",
+            "title": "Works without Electron installed — no native addon requirements for the npx path",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -693,5 +693,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

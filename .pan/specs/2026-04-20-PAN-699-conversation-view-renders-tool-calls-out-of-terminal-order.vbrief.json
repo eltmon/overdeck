@@ -136,7 +136,7 @@
           },
           {
             "id": "parse-unresolved-results.ac2",
-            "title": "No tool_result is silently dropped \u2014 all tool_result entries either pair with a tool_use or remain in unresolvedResults carried state",
+            "title": "No tool_result is silently dropped — all tool_result entries either pair with a tool_use or remain in unresolvedResults carried state",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -411,7 +411,7 @@
           "issueLabel": "pan-699"
         },
         "narrative": {
-          "Action": "Add a Playwright spec under the existing dashboard UAT harness that opens an agent with a known-good session fixture and asserts the rendered conversation matches expected order (including parallel tool calls). Must use an isolated browser instance/profile \u2014 no shared state with other agents' sessions. All required login/setup reproducible inside the isolated session."
+          "Action": "Add a Playwright spec under the existing dashboard UAT harness that opens an agent with a known-good session fixture and asserts the rendered conversation matches expected order (including parallel tool calls). Must use an isolated browser instance/profile — no shared state with other agents' sessions. All required login/setup reproducible inside the isolated session."
         },
         "subItems": [
           {
@@ -511,5 +511,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

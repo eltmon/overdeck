@@ -28,8 +28,8 @@
       "pipeline"
     ],
     "narratives": {
-      "Problem": "The Inspector panel's terminal pane is hardwired to the work-agent tmux session (agent.id). When review/test/merge specialists are running, or post-completion verification is executing, the Inspector still shows an idle or stopped work agent \u2014 users have to leave the Inspector to find the currently-active terminal.",
-      "Proposal": "Add a client-side pipeline-phase derivation (usePipelinePhase hook) driven by the already-fetched reviewStatus/testStatus/mergeStatus plus agent state. Render a tab strip above the terminal pane with Planning / Work / Review / Test / Merge tabs; the tab strip auto-follows the current phase and supports a per-issue manual pin persisted to localStorage. Session names are resolved client-side using the existing specialist-<projectKey>-<role> naming convention; the existing /ws/terminal endpoint already streams any tmux session by name, so no backend changes are needed. Merged issues get a summary card instead of a live stream. Verification output reuses the work-agent terminal (verification feedback is already routed into the work-agent tmux via sendKeysAsync) \u2014 a dedicated verification log stream is explicitly out of scope."
+      "Problem": "The Inspector panel's terminal pane is hardwired to the work-agent tmux session (agent.id). When review/test/merge specialists are running, or post-completion verification is executing, the Inspector still shows an idle or stopped work agent — users have to leave the Inspector to find the currently-active terminal.",
+      "Proposal": "Add a client-side pipeline-phase derivation (usePipelinePhase hook) driven by the already-fetched reviewStatus/testStatus/mergeStatus plus agent state. Render a tab strip above the terminal pane with Planning / Work / Review / Test / Merge tabs; the tab strip auto-follows the current phase and supports a per-issue manual pin persisted to localStorage. Session names are resolved client-side using the existing specialist-<projectKey>-<role> naming convention; the existing /ws/terminal endpoint already streams any tmux session by name, so no backend changes are needed. Merged issues get a summary card instead of a live stream. Verification output reuses the work-agent terminal (verification feedback is already routed into the work-agent tmux via sendKeysAsync) — a dedicated verification log stream is explicitly out of scope."
     },
     "items": [
       {
@@ -43,7 +43,7 @@
           "issueLabel": "pan-509"
         },
         "narrative": {
-          "Action": "Add src/dashboard/frontend/src/components/inspector/usePipelinePhase.ts. Pure function signature: usePipelinePhase({ issueId, agent, reviewStatus, projectKey }) returns { phase, activeSession, availableTerminals }. Phase precedence (first match wins): merging \u2192 testing \u2192 reviewing \u2192 verifying \u2192 working \u2192 planning \u2192 merged. Map each phase to a tmux session name: work \u2192 agent.id; review/test/merge \u2192 specialist-<projectKey>-<role>-agent; planning \u2192 planning-<issueId>; merged \u2192 null (summary card). availableTerminals is the full list of tabs to render (regardless of which is active) with a disabled flag for phases whose session doesn't exist yet. Export a plain TypeScript function alongside the hook for unit testing without React."
+          "Action": "Add src/dashboard/frontend/src/components/inspector/usePipelinePhase.ts. Pure function signature: usePipelinePhase({ issueId, agent, reviewStatus, projectKey }) returns { phase, activeSession, availableTerminals }. Phase precedence (first match wins): merging → testing → reviewing → verifying → working → planning → merged. Map each phase to a tmux session name: work → agent.id; review/test/merge → specialist-<projectKey>-<role>-agent; planning → planning-<issueId>; merged → null (summary card). availableTerminals is the full list of tabs to render (regardless of which is active) with a disabled flag for phases whose session doesn't exist yet. Export a plain TypeScript function alongside the hook for unit testing without React."
         },
         "subItems": [
           {
@@ -80,7 +80,7 @@
           },
           {
             "id": "phase-hook.ac5",
-            "title": "Vitest unit test file usePipelinePhase.test.ts covers every row of the precedence table in STATE.md (Files to change \u00a7 Phase \u2192 session mapping) with at least one positive and one negative case per phase; tests pass under npm test",
+            "title": "Vitest unit test file usePipelinePhase.test.ts covers every row of the precedence table in STATE.md (Files to change § Phase → session mapping) with at least one positive and one negative case per phase; tests pass under npm test",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -99,7 +99,7 @@
           "issueLabel": "pan-509"
         },
         "narrative": {
-          "Action": "Update src/dashboard/frontend/src/components/TerminalPanel.tsx to accept an optional sessionName?: string and title?: string prop, falling back to agent.id and the current title when unset (back-compat for any other callers). Pass the value through to <XTerminal sessionName={...}/>. Update DetailPanelLayout.tsx to compute activeSession via usePipelinePhase and pass it to <TerminalPanel sessionName={activeSession} \u2026/>. Keep the key tied to the session so the XTerminal remounts cleanly on switch."
+          "Action": "Update src/dashboard/frontend/src/components/TerminalPanel.tsx to accept an optional sessionName?: string and title?: string prop, falling back to agent.id and the current title when unset (back-compat for any other callers). Pass the value through to <XTerminal sessionName={...}/>. Update DetailPanelLayout.tsx to compute activeSession via usePipelinePhase and pass it to <TerminalPanel sessionName={activeSession} …/>. Keep the key tied to the session so the XTerminal remounts cleanly on switch."
         },
         "subItems": [
           {
@@ -120,7 +120,7 @@
           },
           {
             "id": "terminal-panel-session-prop.ac3",
-            "title": "Switching phase (e.g., work \u2192 review) causes the XTerminal component to remount with the new sessionName (React key includes sessionName); no stale data from the previous session leaks into the new terminal",
+            "title": "Switching phase (e.g., work → review) causes the XTerminal component to remount with the new sessionName (React key includes sessionName); no stale data from the previous session leaks into the new terminal",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -144,7 +144,7 @@
         "subItems": [
           {
             "id": "terminal-tabs.ac1",
-            "title": "Tab strip auto-switches to the active phase tab when the derived phase changes (e.g., work \u2192 reviewing), after a 1s debounce",
+            "title": "Tab strip auto-switches to the active phase tab when the derived phase changes (e.g., work → reviewing), after a 1s debounce",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -195,7 +195,7 @@
           "issueLabel": "pan-509"
         },
         "narrative": {
-          "Action": "In src/dashboard/frontend/src/components/InspectorPanel.tsx, add a small badge next to the issueId in the header showing the current phase label (Planning / Working / Verifying / Reviewing / Testing / Merging / Merged). Reuse the existing reviewStatus query already on the component \u2014 do NOT add a second network fetch. Drive the label from the same usePipelinePhase hook so the Inspector header and the tab strip stay in sync."
+          "Action": "In src/dashboard/frontend/src/components/InspectorPanel.tsx, add a small badge next to the issueId in the header showing the current phase label (Planning / Working / Verifying / Reviewing / Testing / Merging / Merged). Reuse the existing reviewStatus query already on the component — do NOT add a second network fetch. Drive the label from the same usePipelinePhase hook so the Inspector header and the tab strip stay in sync."
         },
         "subItems": [
           {
@@ -208,7 +208,7 @@
           },
           {
             "id": "phase-badge-inspector.ac2",
-            "title": "The phase badge does NOT add a new network request \u2014 it reuses the already-fetched reviewStatus query (confirmed by no new useQuery in the component diff)",
+            "title": "The phase badge does NOT add a new network request — it reuses the already-fetched reviewStatus query (confirmed by no new useQuery in the component diff)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -259,7 +259,7 @@
           "issueLabel": "pan-509"
         },
         "narrative": {
-          "Action": "When the tab strip's active session websocket fails to connect after 2 reconnect attempts (~3s), show an inline 'Session ended' empty state in the terminal pane with a button to 'Show last output' that fetches the most recent buffered output from the existing agent activity endpoint (or falls back to nothing if unavailable). Do NOT modify XTerminal's reconnect loop itself \u2014 wrap it in a small status-aware container component. The tab stays visible but gets a 'dimmed' style to indicate the session is gone."
+          "Action": "When the tab strip's active session websocket fails to connect after 2 reconnect attempts (~3s), show an inline 'Session ended' empty state in the terminal pane with a button to 'Show last output' that fetches the most recent buffered output from the existing agent activity endpoint (or falls back to nothing if unavailable). Do NOT modify XTerminal's reconnect loop itself — wrap it in a small status-aware container component. The tab stays visible but gets a 'dimmed' style to indicate the session is gone."
         },
         "subItems": [
           {
@@ -272,7 +272,7 @@
           },
           {
             "id": "stale-session-fallback.ac2",
-            "title": "Auto-switching skips over phases whose session is dead \u2014 e.g., if review passed and the review-agent tmux was killed, phase=reviewing will NOT be auto-selected",
+            "title": "Auto-switching skips over phases whose session is dead — e.g., if review passed and the review-agent tmux was killed, phase=reviewing will NOT be auto-selected",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -318,5 +318,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

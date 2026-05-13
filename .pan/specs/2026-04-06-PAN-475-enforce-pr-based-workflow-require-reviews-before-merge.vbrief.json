@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-06T20:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-475: Enforce PR-based workflow \u2014 require reviews before merge"
+    "description": "Plan for PAN-475: Enforce PR-based workflow — require reviews before merge"
   },
   "plan": {
     "id": "pan-475",
-    "title": "Enforce PR-based workflow \u2014 require reviews before merge",
+    "title": "Enforce PR-based workflow — require reviews before merge",
     "status": "approved",
     "uid": "56a68971-5d64-4078-89fd-ca16d0f21367",
     "author": "agent:claude-opus-4-6",
@@ -252,7 +252,7 @@
           "issueLabel": "pan-475"
         },
         "narrative": {
-          "Action": "Update CONTRIBUTING.md to accurately reflect the new PR-based merge flow (it already describes it aspirationally \u2014 make it factual). Update work-agent.md prompt to mention that `pan work done` creates a PR. Update merge-agent.md prompt to describe rebase-based conflict resolution instead of local git merge."
+          "Action": "Update CONTRIBUTING.md to accurately reflect the new PR-based merge flow (it already describes it aspirationally — make it factual). Update work-agent.md prompt to mention that `pan work done` creates a PR. Update merge-agent.md prompt to describe rebase-based conflict resolution instead of local git merge."
         },
         "subItems": [
           {
@@ -309,5 +309,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

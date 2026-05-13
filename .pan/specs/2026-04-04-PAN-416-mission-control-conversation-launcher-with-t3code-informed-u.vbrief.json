@@ -51,7 +51,7 @@
         "title": "Create conversation REST API routes",
         "status": "completed",
         "narrative": {
-          "Action": "Create src/dashboard/server/routes/conversations.ts with four endpoints: GET /api/conversations (list all sessions from SQLite), POST /api/conversations (spawn new tmux session via createSession + insert SQLite row), DELETE /api/conversations/:name (kill tmux session + mark ended), POST /api/conversations/:name/resume (check tmux existence \u2014 reattach if alive, respawn if dead). Wire routes into src/dashboard/server/server.ts. All operations MUST be async (no execSync). Session naming: conv-{name}. Spawn command: 'claude' in ~/Projects cwd."
+          "Action": "Create src/dashboard/server/routes/conversations.ts with four endpoints: GET /api/conversations (list all sessions from SQLite), POST /api/conversations (spawn new tmux session via createSession + insert SQLite row), DELETE /api/conversations/:name (kill tmux session + mark ended), POST /api/conversations/:name/resume (check tmux existence — reattach if alive, respawn if dead). Wire routes into src/dashboard/server/server.ts. All operations MUST be async (no execSync). Session naming: conv-{name}. Spawn command: 'claude' in ~/Projects cwd."
         },
         "metadata": {
           "difficulty": "medium",
@@ -92,7 +92,7 @@
           },
           {
             "id": "conversations-api.ac5",
-            "title": "No execSync or other blocking calls \u2014 all async",
+            "title": "No execSync or other blocking calls — all async",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -113,7 +113,7 @@
         "title": "Create ConversationList sidebar component",
         "status": "completed",
         "narrative": {
-          "Action": "Create src/dashboard/frontend/src/components/MissionControl/ConversationList.tsx \u2014 a collapsible section rendered at the top of the Mission Control sidebar (above ProjectTree). Shows active sessions with green dot, ended sessions with gray dot. Includes [+] button that reveals an inline text input for naming new sessions. Enter spawns (POST /api/conversations), Escape cancels. Auto-generates name if blank (conv-YYYYMMDD-N). Clicking a session calls onSelect(name). Uses TanStack Query to poll GET /api/conversations every 5s."
+          "Action": "Create src/dashboard/frontend/src/components/MissionControl/ConversationList.tsx — a collapsible section rendered at the top of the Mission Control sidebar (above ProjectTree). Shows active sessions with green dot, ended sessions with gray dot. Includes [+] button that reveals an inline text input for naming new sessions. Enter spawns (POST /api/conversations), Escape cancels. Auto-generates name if blank (conv-YYYYMMDD-N). Clicking a session calls onSelect(name). Uses TanStack Query to poll GET /api/conversations every 5s."
         },
         "metadata": {
           "difficulty": "medium",
@@ -167,7 +167,7 @@
         "title": "Create ConversationTerminal panel component",
         "status": "completed",
         "narrative": {
-          "Action": "Create src/dashboard/frontend/src/components/MissionControl/ConversationTerminal.tsx \u2014 wraps the existing XTerminal component for conversation context. When conversation is active, renders XTerminal with session='conv-{name}'. When conversation is ended, shows 'Session ended' message with a 'Resume' button that calls POST /api/conversations/:name/resume and then reattaches the terminal. Include a small toolbar with session name display and a Stop button (DELETE /api/conversations/:name)."
+          "Action": "Create src/dashboard/frontend/src/components/MissionControl/ConversationTerminal.tsx — wraps the existing XTerminal component for conversation context. When conversation is active, renders XTerminal with session='conv-{name}'. When conversation is ended, shows 'Session ended' message with a 'Resume' button that calls POST /api/conversations/:name/resume and then reattaches the terminal. Include a small toolbar with session name display and a Stop button (DELETE /api/conversations/:name)."
         },
         "metadata": {
           "difficulty": "medium",
@@ -284,7 +284,7 @@
           },
           {
             "id": "session-lifecycle-polling.ac3",
-            "title": "Only checks conv-* sessions \u2014 does not interfere with agent/planning sessions",
+            "title": "Only checks conv-* sessions — does not interfere with agent/planning sessions",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -373,5 +373,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

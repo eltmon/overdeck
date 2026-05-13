@@ -28,7 +28,7 @@
       "prd"
     ],
     "narratives": {
-      "Problem": "Need an end-to-end smoke test that the planning \u2192 work \u2192 review \u2192 test \u2192 merge pipeline correctly handles PRD/STATE.md/vBRIEF artifacts in canonical lowercase locations after the recent PRD-location refactor.",
+      "Problem": "Need an end-to-end smoke test that the planning → work → review → test → merge pipeline correctly handles PRD/STATE.md/vBRIEF artifacts in canonical lowercase locations after the recent PRD-location refactor.",
       "Proposal": "Add a single trivial marker file at docs/prd-pipeline-test-marker.md. The value is in exercising the pipeline, not in the file content itself. After merge, verify artifacts land in docs/prds/completed/pan-655/ and ~/.panopticon/archives/pan-655/."
     },
     "items": [
@@ -82,5 +82,6 @@
       }
     ],
     "edges": []
-  }
+  },
+  "status": "proposed"
 }

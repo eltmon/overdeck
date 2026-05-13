@@ -165,12 +165,12 @@
           "issueLabel": "pan-946"
         },
         "narrative": {
-          "Action": "Implement core lifecycle IO operations. findVBriefByIssue searches all lifecycle directories (proposed \u2192 active \u2192 completed \u2192 cancelled) for a vBRIEF matching an issue ID. moveVBrief atomically moves scope vBRIEF + continue file between lifecycle directories and runs git add. updatePlanStatus updates plan.status with sequence increment."
+          "Action": "Implement core lifecycle IO operations. findVBriefByIssue searches all lifecycle directories (proposed → active → completed → cancelled) for a vBRIEF matching an issue ID. moveVBrief atomically moves scope vBRIEF + continue file between lifecycle directories and runs git add. updatePlanStatus updates plan.status with sequence increment."
         },
         "subItems": [
           {
             "id": "vbrief-lifecycle-io.ac1",
-            "title": "findVBriefByIssue(projectRoot, issueId) returns {path, lifecycleDir, document} searching proposed \u2192 active \u2192 completed \u2192 cancelled",
+            "title": "findVBriefByIssue(projectRoot, issueId) returns {path, lifecycleDir, document} searching proposed → active → completed → cancelled",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -215,7 +215,7 @@
           "issueLabel": "pan-946"
         },
         "narrative": {
-          "Action": "Update the plan-finalize command to generate a canonical filename in YYYY-MM-DD-ISSUE-SLUG format (stored in plan metadata as canonicalFilename), set plan.status to 'proposed', and still write .planning-complete for backward compat during transition. The vBRIEF stays in .planning/ during planning \u2014 complete-planning promotes it to proposed/."
+          "Action": "Update the plan-finalize command to generate a canonical filename in YYYY-MM-DD-ISSUE-SLUG format (stored in plan metadata as canonicalFilename), set plan.status to 'proposed', and still write .planning-complete for backward compat during transition. The vBRIEF stays in .planning/ during planning — complete-planning promotes it to proposed/."
         },
         "subItems": [
           {
@@ -812,7 +812,7 @@
       },
       {
         "id": "scope-list",
-        "title": "pan scope list \u2014 show all vBRIEFs with lifecycle status",
+        "title": "pan scope list — show all vBRIEFs with lifecycle status",
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
@@ -856,7 +856,7 @@
       },
       {
         "id": "scope-show",
-        "title": "pan scope show <issue> \u2014 display plan details",
+        "title": "pan scope show <issue> — display plan details",
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
@@ -900,7 +900,7 @@
       },
       {
         "id": "scope-propose",
-        "title": "pan scope propose <issue> \u2014 manual move to proposed/",
+        "title": "pan scope propose <issue> — manual move to proposed/",
         "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
@@ -935,7 +935,7 @@
       },
       {
         "id": "scope-approve",
-        "title": "pan scope approve <issue> \u2014 manual move to active/",
+        "title": "pan scope approve <issue> — manual move to active/",
         "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
@@ -970,7 +970,7 @@
       },
       {
         "id": "scope-complete",
-        "title": "pan scope complete <issue> \u2014 manual move to completed/",
+        "title": "pan scope complete <issue> — manual move to completed/",
         "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
@@ -1005,7 +1005,7 @@
       },
       {
         "id": "scope-cancel",
-        "title": "pan scope cancel <issue> \u2014 manual move to cancelled/",
+        "title": "pan scope cancel <issue> — manual move to cancelled/",
         "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
@@ -1040,7 +1040,7 @@
       },
       {
         "id": "scope-restore",
-        "title": "pan scope restore <issue> \u2014 restore from completed/cancelled to active/",
+        "title": "pan scope restore <issue> — restore from completed/cancelled to active/",
         "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
@@ -1259,5 +1259,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "completed"
 }

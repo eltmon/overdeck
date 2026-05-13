@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-12T00:00:00Z",
     "author": "panopticon-cli/0.6.0",
-    "description": "Plan for PAN-457: Conversation discovery \u2014 index sessions inside and outside Panopticon"
+    "description": "Plan for PAN-457: Conversation discovery — index sessions inside and outside Panopticon"
   },
   "plan": {
     "id": "pan-457",
-    "title": "Conversation discovery \u2014 index sessions inside and outside Panopticon",
+    "title": "Conversation discovery — index sessions inside and outside Panopticon",
     "status": "completed",
     "uid": "11a0ca78-86d3-4568-9fe8-a99ad5d0eb16",
     "author": "agent:claude-opus-4-6",
@@ -31,7 +31,7 @@
       "dashboard"
     ],
     "narratives": {
-      "Problem": "Panopticon only sees conversations it spawned. Ad-hoc `claude` sessions started from a terminal \u2014 debugging, exploration, one-off fixes \u2014 are invisible. The user has hundreds of such JSONL sessions under ~/.claude/projects with no way to search, review, correlate cost, or learn from them.",
+      "Problem": "Panopticon only sees conversations it spawned. Ad-hoc `claude` sessions started from a terminal — debugging, exploration, one-off fixes — are invisible. The user has hundreds of such JSONL sessions under ~/.claude/projects with no way to search, review, correlate cost, or learn from them.",
       "Proposal": "Add a `conversations` subsystem: a new discovered_sessions SQLite table indexed from ~/.claude/projects JSONLs via a scripted (zero-LLM) scanner with adaptive parallelism; three-tier search (structured filters + SQLite FTS5 + optional vector embeddings); three-level user-initiated enrichment (quick/deep/custom-model) reusing Panopticon's model-fallback router; a Mission Control Conversations panel with faceted search and enrichment controls. All five phases ship in this issue."
     },
     "items": [
@@ -69,7 +69,7 @@
           },
           {
             "id": "schema.ac3",
-            "title": "Upsert is idempotent on (jsonl_path) \u2014 re-inserting same row updates file_size/file_mtime without duplicates",
+            "title": "Upsert is idempotent on (jsonl_path) — re-inserting same row updates file_size/file_mtime without duplicates",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -99,7 +99,7 @@
           "issueLabel": "pan-457"
         },
         "narrative": {
-          "Action": "Create src/lib/conversations/jsonl-async.ts. Uses fs/promises + readline streaming to parse a JSONL and return { messageCount, firstTs, lastTs, modelsUsed, primaryModel, tokenInput, tokenOutput, toolsUsed[], filesTouched[], cwdFromFirstMessage }. Zero sync FS calls. Do NOT modify the existing sync cost-parsers/jsonl-parser.ts \u2014 the CLI cost command still uses it. Reuse its ClaudeMessage type."
+          "Action": "Create src/lib/conversations/jsonl-async.ts. Uses fs/promises + readline streaming to parse a JSONL and return { messageCount, firstTs, lastTs, modelsUsed, primaryModel, tokenInput, tokenOutput, toolsUsed[], filesTouched[], cwdFromFirstMessage }. Zero sync FS calls. Do NOT modify the existing sync cost-parsers/jsonl-parser.ts — the CLI cost command still uses it. Reuse its ClaudeMessage type."
         },
         "subItems": [
           {
@@ -131,7 +131,7 @@
           },
           {
             "id": "async-jsonl.ac4",
-            "title": "Handles corrupt/empty/partial JSONLs without throwing \u2014 returns partial metadata",
+            "title": "Handles corrupt/empty/partial JSONLs without throwing — returns partial metadata",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -140,7 +140,7 @@
           },
           {
             "id": "async-jsonl.ac5",
-            "title": "Uses only fs/promises + stream APIs \u2014 no sync FS calls (verified by lint rule or review)",
+            "title": "Uses only fs/promises + stream APIs — no sync FS calls (verified by lint rule or review)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -152,7 +152,7 @@
       },
       {
         "id": "hash-resolver",
-        "title": "Claude project hash \u2192 workspace path resolver",
+        "title": "Claude project hash → workspace path resolver",
         "status": "completed",
         "priority": "high",
         "created": "2026-04-12T00:00:00Z",
@@ -214,7 +214,7 @@
           "issueLabel": "pan-457"
         },
         "narrative": {
-          "Action": "Create src/lib/conversations/system-probe.ts. Detects cpuCores (os.cpus().length), driveType (lsblk -d -o name,rota via execAsync on Linux; 'unknown' on macOS/Windows), driveReadMBps (read a 10MB sample file using fs/promises, measure elapsed), availableMemoryMB (os.freemem / 1024 / 1024). Cache result per-process. Parallelism strategy table from spec: SSD \u2192 min(cpuCores, 16); HDD \u2192 2; unknown \u2192 4. Respect optional config override conversations.scanMaxParallel."
+          "Action": "Create src/lib/conversations/system-probe.ts. Detects cpuCores (os.cpus().length), driveType (lsblk -d -o name,rota via execAsync on Linux; 'unknown' on macOS/Windows), driveReadMBps (read a 10MB sample file using fs/promises, measure elapsed), availableMemoryMB (os.freemem / 1024 / 1024). Cache result per-process. Parallelism strategy table from spec: SSD → min(cpuCores, 16); HDD → 2; unknown → 4. Respect optional config override conversations.scanMaxParallel."
         },
         "subItems": [
           {
@@ -237,7 +237,7 @@
           },
           {
             "id": "system-probe.ac3",
-            "title": "Chosen parallelism matches spec table (SSD\u2192min(cores,16), HDD\u21922, unknown\u21924)",
+            "title": "Chosen parallelism matches spec table (SSD→min(cores,16), HDD→2, unknown→4)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -255,7 +255,7 @@
           },
           {
             "id": "system-probe.ac5",
-            "title": "Probe uses execAsync + fs/promises \u2014 zero sync FS or execSync calls",
+            "title": "Probe uses execAsync + fs/promises — zero sync FS or execSync calls",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -276,7 +276,7 @@
           "issueLabel": "pan-457"
         },
         "narrative": {
-          "Action": "Create src/lib/conversations/scanner.ts and work-pool.ts. The scanner accepts { mode: 'targeted'|'watched'|'system', dirs?: string[], onProgress?: (p) => void } and emits progress events. Walks ~/.claude/projects/*/ for *.jsonl files (async readdir), filters by mode (targeted \u2192 under given dirs; watched \u2192 under config watchDirs; system \u2192 all). Uses a bounded promise work pool sized by system-probe. For each JSONL: stat for (size, mtime), skip if unchanged vs DB row, else parse async, resolve hash via hash-resolver, correlate against conversations + cost_events tables, insert/upsert into discovered_sessions. SQLite writes serialized through a batch queue. Build a correlator.ts helper that queries existing conversations.session_file and cost_events.session_id for Panopticon-managed detection."
+          "Action": "Create src/lib/conversations/scanner.ts and work-pool.ts. The scanner accepts { mode: 'targeted'|'watched'|'system', dirs?: string[], onProgress?: (p) => void } and emits progress events. Walks ~/.claude/projects/*/ for *.jsonl files (async readdir), filters by mode (targeted → under given dirs; watched → under config watchDirs; system → all). Uses a bounded promise work pool sized by system-probe. For each JSONL: stat for (size, mtime), skip if unchanged vs DB row, else parse async, resolve hash via hash-resolver, correlate against conversations + cost_events tables, insert/upsert into discovered_sessions. SQLite writes serialized through a batch queue. Build a correlator.ts helper that queries existing conversations.session_file and cost_events.session_id for Panopticon-managed detection."
         },
         "subItems": [
           {
@@ -374,7 +374,7 @@
           "issueLabel": "pan-457"
         },
         "narrative": {
-          "Action": "Register `pan conversations` parent command and `scan` subcommand in src/cli/commands/conversations/. Wires through the scanner service. Renders live progress with a simple stderr bar (cliProgressOrMinimal) including the format from spec: [\u2588\u2588\u2588\u2588] 847/1203 dirs | 2341 sessions found | 12.3s. --dry-run only reports what would be scanned (counts by dir)."
+          "Action": "Register `pan conversations` parent command and `scan` subcommand in src/cli/commands/conversations/. Wires through the scanner service. Renders live progress with a simple stderr bar (cliProgressOrMinimal) including the format from spec: [████] 847/1203 dirs | 2341 sessions found | 12.3s. --dry-run only reports what would be scanned (counts by dir)."
         },
         "subItems": [
           {
@@ -1039,7 +1039,7 @@
       },
       {
         "id": "integration-tests",
-        "title": "End-to-end integration tests: scan \u2192 enrich \u2192 embed \u2192 search",
+        "title": "End-to-end integration tests: scan → enrich → embed → search",
         "status": "completed",
         "priority": "high",
         "created": "2026-04-12T00:00:00Z",
@@ -1053,7 +1053,7 @@
         "subItems": [
           {
             "id": "integration-tests.ac1",
-            "title": "Full pipeline test: scan \u2192 enrich \u2192 embed \u2192 search returns expected top result",
+            "title": "Full pipeline test: scan → enrich → embed → search returns expected top result",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1242,5 +1242,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "completed"
 }

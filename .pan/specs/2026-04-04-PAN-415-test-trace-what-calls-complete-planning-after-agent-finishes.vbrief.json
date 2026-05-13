@@ -14,10 +14,10 @@
     ],
     "narratives": {
       "Problem": "Need to verify the complete-planning orchestration flow works end-to-end.",
-      "Proposal": "Create test-trace.txt as a trivial task to exercise the planning \u2192 implementation \u2192 completion pipeline.",
-      "Constraint": "File must be deleted after testing \u2014 no artifacts should remain.",
-      "Risk": "None \u2014 this is a throwaway test.",
-      "Alternative": "None considered \u2014 the issue is prescriptive."
+      "Proposal": "Create test-trace.txt as a trivial task to exercise the planning → implementation → completion pipeline.",
+      "Constraint": "File must be deleted after testing — no artifacts should remain.",
+      "Risk": "None — this is a throwaway test.",
+      "Alternative": "None considered — the issue is prescriptive."
     },
     "items": [
       {
@@ -53,5 +53,6 @@
       }
     ],
     "edges": []
-  }
+  },
+  "status": "proposed"
 }

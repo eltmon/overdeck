@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-08T00:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-486: Detachable terminal \u2014 popout workspace terminal into OS window"
+    "description": "Plan for PAN-486: Detachable terminal — popout workspace terminal into OS window"
   },
   "plan": {
     "id": "pan-486",
-    "title": "Detachable terminal \u2014 popout workspace terminal into OS window",
+    "title": "Detachable terminal — popout workspace terminal into OS window",
     "status": "approved",
     "uid": "9d74e4e3-fc34-4939-a32f-5569300f015a",
     "author": "agent:minimax-m2.7-highspeed",
@@ -34,7 +34,7 @@
     ],
     "narratives": {
       "Problem": "The terminal is the primary interaction surface for Panopticon agents. Users cannot easily monitor a running agent while working in another workspace, give the terminal more screen real estate, or switch to it via Alt+Tab without the full dashboard in the taskbar.",
-      "Proposal": "Add a popout button to the terminal panel header that opens the terminal in a dedicated OS-managed window. In browser mode, use window.open() with a named popup. In Electron, create a native BrowserWindow with IPC for title and always-on-top control. The underlying tmux session is shared \u2014 no new PTY is spawned."
+      "Proposal": "Add a popout button to the terminal panel header that opens the terminal in a dedicated OS-managed window. In browser mode, use window.open() with a named popup. In Electron, create a native BrowserWindow with IPC for title and always-on-top control. The underlying tmux session is shared — no new PTY is spawned."
     },
     "items": [
       {
@@ -109,7 +109,7 @@
           },
           {
             "id": "standalone-terminal-route.ac2",
-            "title": "Window title reflects agent ID + issue ID (e.g. agent-PAN-486 \u00b7 PAN-486)",
+            "title": "Window title reflects agent ID + issue ID (e.g. agent-PAN-486 · PAN-486)",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -194,5 +194,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

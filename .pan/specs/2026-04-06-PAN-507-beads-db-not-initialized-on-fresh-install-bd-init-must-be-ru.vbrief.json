@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-06T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-507: beads db not initialized on fresh install \u2014 bd init must be run once per project"
+    "description": "Plan for PAN-507: beads db not initialized on fresh install — bd init must be run once per project"
   },
   "plan": {
     "id": "pan-507",
-    "title": "beads db not initialized on fresh install \u2014 bd init must be run once per project",
+    "title": "beads db not initialized on fresh install — bd init must be run once per project",
     "status": "approved",
     "uid": "54d72dd0-7620-47b1-bb22-57ad0d823384",
     "author": "agent:claude-opus-4-6",
@@ -89,5 +89,6 @@
       }
     ],
     "edges": []
-  }
+  },
+  "status": "proposed"
 }

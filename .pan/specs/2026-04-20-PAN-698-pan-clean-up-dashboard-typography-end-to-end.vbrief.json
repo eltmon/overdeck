@@ -35,8 +35,8 @@
       "design-system"
     ],
     "narratives": {
-      "Problem": "Dashboard typography has drifted into three competing systems: the intended canonical Tailwind tokens (DM Sans body, SF Mono, Space Grotesk display), a Mission Control island (Inter/SF Pro/Segoe UI hardcoded stacks, mono conversation titles), and ad hoc display-font and mono usage across non\u2013God-View components. The style guide is ambiguous, so drift keeps returning.",
-      "Proposal": "Establish one enforceable policy: DM Sans for all non\u2013God-View UI; SF Mono only for code and technical identifiers; Space Grotesk only for the sidebar Panopticon wordmark; God View untouched. Normalize canonical stacks in the typography foundation, eliminate the Mission Control island, convert non-wordmark display-font usage to DM Sans, replace ad hoc mono stacks, normalize conversation prose vs code, sweep the rest of the non\u2013God-View dashboard, rewrite STYLE-GUIDE.md with crisp boundaries, align related PRDs/docs, and verify with static grep + isolated Playwright + quality gates."
+      "Problem": "Dashboard typography has drifted into three competing systems: the intended canonical Tailwind tokens (DM Sans body, SF Mono, Space Grotesk display), a Mission Control island (Inter/SF Pro/Segoe UI hardcoded stacks, mono conversation titles), and ad hoc display-font and mono usage across non–God-View components. The style guide is ambiguous, so drift keeps returning.",
+      "Proposal": "Establish one enforceable policy: DM Sans for all non–God-View UI; SF Mono only for code and technical identifiers; Space Grotesk only for the sidebar Panopticon wordmark; God View untouched. Normalize canonical stacks in the typography foundation, eliminate the Mission Control island, convert non-wordmark display-font usage to DM Sans, replace ad hoc mono stacks, normalize conversation prose vs code, sweep the rest of the non–God-View dashboard, rewrite STYLE-GUIDE.md with crisp boundaries, align related PRDs/docs, and verify with static grep + isolated Playwright + quality gates."
     },
     "items": [
       {
@@ -384,7 +384,7 @@
       },
       {
         "id": "sweep-audit",
-        "title": "Repo-wide sweep: remove remaining non\u2013God-View font drift",
+        "title": "Repo-wide sweep: remove remaining non–God-View font drift",
         "status": "completed",
         "priority": "high",
         "created": "2026-04-20T22:50:32Z",
@@ -416,7 +416,7 @@
           },
           {
             "id": "sweep-audit.ac3",
-            "title": "Every remaining font-mono usage in non\u2013God-View components is on code, terminal, command, or identifier content (documented in the PR description)",
+            "title": "Every remaining font-mono usage in non–God-View components is on code, terminal, command, or identifier content (documented in the PR description)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -446,7 +446,7 @@
           "issueLabel": "pan-698"
         },
         "narrative": {
-          "Action": "design/style-guide/STYLE-GUIDE.md: rewrite the typography section to encode the final policy exactly. Default non\u2013God-View UI = DM Sans. Technical strings/code = SF Mono (enumerate the categories). Sidebar Panopticon wordmark = only approved non\u2013God-View display-font exception. Conversations = DM Sans prose, SF Mono for code and technical strings only. God View uses its own scoped system. Remove all ambiguous heuristics (e.g. 'use judgment if the heading has a g')."
+          "Action": "design/style-guide/STYLE-GUIDE.md: rewrite the typography section to encode the final policy exactly. Default non–God-View UI = DM Sans. Technical strings/code = SF Mono (enumerate the categories). Sidebar Panopticon wordmark = only approved non–God-View display-font exception. Conversations = DM Sans prose, SF Mono for code and technical strings only. God View uses its own scoped system. Remove all ambiguous heuristics (e.g. 'use judgment if the heading has a g')."
         },
         "subItems": [
           {
@@ -525,7 +525,7 @@
       },
       {
         "id": "playwright-verify",
-        "title": "Playwright visual verification of non\u2013God-View typography surfaces",
+        "title": "Playwright visual verification of non–God-View typography surfaces",
         "status": "completed",
         "priority": "medium",
         "created": "2026-04-20T22:50:32Z",
@@ -722,5 +722,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

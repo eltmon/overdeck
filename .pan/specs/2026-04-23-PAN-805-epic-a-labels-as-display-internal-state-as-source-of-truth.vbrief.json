@@ -3,7 +3,7 @@
     "version": "0.5",
     "created": "2026-04-23T10:38:50.728Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-805: Epic A \u2014 Labels as display, internal state as source of truth"
+    "description": "Plan for PAN-805: Epic A — Labels as display, internal state as source of truth"
   },
   "plan": {
     "id": "pan-805",
@@ -102,7 +102,7 @@
           "issueLabel": "pan-805"
         },
         "narrative": {
-          "Action": "Create src/lib/lifecycle/reconciler/ with index.ts (public API), loop.ts (fixed-interval tick driver + single-instance in-process mutex), config.ts (reads PANOPTICON_RECONCILER_INTERVAL_MS env var, default 30000). loop.ts exports startReconciler() and stopReconciler(); each tick is wrapped in try/catch so one failure does not kill the loop. No push/pull/sweep logic in this bead \u2014 just the runner and an empty tick fn."
+          "Action": "Create src/lib/lifecycle/reconciler/ with index.ts (public API), loop.ts (fixed-interval tick driver + single-instance in-process mutex), config.ts (reads PANOPTICON_RECONCILER_INTERVAL_MS env var, default 30000). loop.ts exports startReconciler() and stopReconciler(); each tick is wrapped in try/catch so one failure does not kill the loop. No push/pull/sweep logic in this bead — just the runner and an empty tick fn."
         },
         "subItems": [
           {
@@ -150,7 +150,7 @@
           "issueLabel": "pan-805"
         },
         "narrative": {
-          "Action": "Add src/lib/lifecycle/reconciler/github-client.ts \u2014 a thin wrapped fetch for label add/remove, issue state fetch, and list-issues. Every call checks response.ok; on 429 or 5xx retries with exponential backoff (initial 1s, cap 60s, max 5 attempts); honors Retry-After header when present. Emits structured error logs with issueId, operation, status, body snippet. Never swallows errors \u2014 throws after max retries."
+          "Action": "Add src/lib/lifecycle/reconciler/github-client.ts — a thin wrapped fetch for label add/remove, issue state fetch, and list-issues. Every call checks response.ok; on 429 or 5xx retries with exponential backoff (initial 1s, cap 60s, max 5 attempts); honors Retry-After header when present. Emits structured error logs with issueId, operation, status, body snippet. Never swallows errors — throws after max retries."
         },
         "subItems": [
           {
@@ -163,7 +163,7 @@
           },
           {
             "id": "reconciler-github-client.ac2",
-            "title": "On 429 or 5xx: exponential backoff 1s \u2192 2s \u2192 4s \u2192 ... capped at 60s, max 5 attempts",
+            "title": "On 429 or 5xx: exponential backoff 1s → 2s → 4s → ... capped at 60s, max 5 attempts",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -229,7 +229,7 @@
       },
       {
         "id": "reconciler-desired-labels",
-        "title": "Pure function mapping canonical_state \u2192 desired label set",
+        "title": "Pure function mapping canonical_state → desired label set",
         "status": "completed",
         "priority": "medium",
         "created": "2026-04-23T10:38:50.728Z",
@@ -275,7 +275,7 @@
         "subItems": [
           {
             "id": "reconciler-push.ac1",
-            "title": "Only deltas are written \u2014 if desired == last-synced, no API call is made",
+            "title": "Only deltas are written — if desired == last-synced, no API call is made",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -419,7 +419,7 @@
           },
           {
             "id": "reconciler-boot-backfill.ac2",
-            "title": "Backfill is idempotent \u2014 running it twice produces no duplicate rows and no extra API calls",
+            "title": "Backfill is idempotent — running it twice produces no duplicate rows and no extra API calls",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -526,7 +526,7 @@
           "issueLabel": "pan-805"
         },
         "narrative": {
-          "Action": "In src/dashboard/server/main.ts (around line 154), delete the commented-out repair* calls and any surrounding dead imports. Do this cleanly \u2014 no // removed comments left behind."
+          "Action": "In src/dashboard/server/main.ts (around line 154), delete the commented-out repair* calls and any surrounding dead imports. Do this cleanly — no // removed comments left behind."
         },
         "subItems": [
           {
@@ -606,7 +606,7 @@
           "issueLabel": "pan-805"
         },
         "narrative": {
-          "Action": "In src/cli/commands/done.ts (note: spec cites src/dashboard/server/done.ts but the current code lives in cli/commands/done.ts \u2014 work agent should verify path), route the in-review transition through the reconciler. Any remaining direct fetch gets an explicit .ok check + structured error log (issueId, operation, status, body snippet) and throws instead of swallowing the error."
+          "Action": "In src/cli/commands/done.ts (note: spec cites src/dashboard/server/done.ts but the current code lives in cli/commands/done.ts — work agent should verify path), route the in-review transition through the reconciler. Any remaining direct fetch gets an explicit .ok check + structured error log (issueId, operation, status, body snippet) and throws instead of swallowing the error."
         },
         "subItems": [
           {
@@ -789,7 +789,7 @@
       },
       {
         "id": "test-respawn-flood",
-        "title": "Test: respawn flood \u2014 1000x transitionIssueToInProgress yields 0 API calls",
+        "title": "Test: respawn flood — 1000x transitionIssueToInProgress yields 0 API calls",
         "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
@@ -829,7 +829,7 @@
       },
       {
         "id": "test-rate-limit-recovery",
-        "title": "Test: rate-limit recovery \u2014 429 Retry-After handling and audit trail",
+        "title": "Test: rate-limit recovery — 429 Retry-After handling and audit trail",
         "status": "completed",
         "priority": "high",
         "created": "2026-04-23T10:38:50.728Z",
@@ -1197,5 +1197,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

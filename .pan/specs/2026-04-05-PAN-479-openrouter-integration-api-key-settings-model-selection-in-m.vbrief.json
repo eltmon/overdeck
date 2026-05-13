@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-05T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-479: OpenRouter integration \u2014 API key settings + model selection in Mission Control"
+    "description": "Plan for PAN-479: OpenRouter integration — API key settings + model selection in Mission Control"
   },
   "plan": {
     "id": "pan-479",
-    "title": "OpenRouter integration \u2014 API key settings + model selection in Mission Control",
+    "title": "OpenRouter integration — API key settings + model selection in Mission Control",
     "status": "approved",
     "uid": "33cb6bf0-6fe4-4951-93e9-df844ac758d4",
     "author": "agent:claude-opus-4-6",
@@ -54,7 +54,7 @@
           "issueLabel": "pan-479"
         },
         "narrative": {
-          "Action": "Create src/dashboard/server/services/openrouter-service.ts. Implement: (1) fetchModels() \u2014 GET https://openrouter.ai/api/v1/models with in-memory cache (5min TTL), (2) validateApiKey() \u2014 test key with a lightweight API call, (3) getModelCapabilities() \u2014 extract thinking/tool support from model metadata. Use async fetch (no blocking calls). Follow existing service patterns from tracker-config.ts."
+          "Action": "Create src/dashboard/server/services/openrouter-service.ts. Implement: (1) fetchModels() — GET https://openrouter.ai/api/v1/models with in-memory cache (5min TTL), (2) validateApiKey() — test key with a lightweight API call, (3) getModelCapabilities() — extract thinking/tool support from model metadata. Use async fetch (no blocking calls). Follow existing service patterns from tracker-config.ts."
         },
         "subItems": [
           {
@@ -142,7 +142,7 @@
           "issueLabel": "pan-479"
         },
         "narrative": {
-          "Action": "Add to src/dashboard/server/routes/settings.ts: (1) GET /api/settings/openrouter/models \u2014 fetch available models via openrouter-service, (2) PUT /api/settings/openrouter/favorites \u2014 save/update favorite model IDs, (3) POST /api/settings/openrouter/test-key \u2014 validate API key. Follow existing Effect.js httpHandler pattern. Ensure GET /api/settings includes openrouter state."
+          "Action": "Add to src/dashboard/server/routes/settings.ts: (1) GET /api/settings/openrouter/models — fetch available models via openrouter-service, (2) PUT /api/settings/openrouter/favorites — save/update favorite model IDs, (3) POST /api/settings/openrouter/test-key — validate API key. Follow existing Effect.js httpHandler pattern. Ensure GET /api/settings includes openrouter state."
         },
         "subItems": [
           {
@@ -182,7 +182,7 @@
           "issueLabel": "pan-479"
         },
         "narrative": {
-          "Action": "Create new React components: (1) OpenRouterPage.tsx \u2014 dedicated settings page with API key input + test button at top, model catalog below, (2) OpenRouterModelBrowser.tsx \u2014 searchable/filterable model list with star-to-favorite toggle, category filters (Free/Chat/Code), pricing display per model. Favorites section pinned at top. Add navigation to this page from SettingsPage. Use existing Settings component patterns."
+          "Action": "Create new React components: (1) OpenRouterPage.tsx — dedicated settings page with API key input + test button at top, model catalog below, (2) OpenRouterModelBrowser.tsx — searchable/filterable model list with star-to-favorite toggle, category filters (Free/Chat/Code), pricing display per model. Favorites section pinned at top. Add navigation to this page from SettingsPage. Use existing Settings component patterns."
         },
         "subItems": [
           {
@@ -450,5 +450,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

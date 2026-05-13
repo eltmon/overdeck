@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-06T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-494: pan start fails if workspace doesn't exist \u2014 requires separate pan workspace create"
+    "description": "Plan for PAN-494: pan start fails if workspace doesn't exist — requires separate pan workspace create"
   },
   "plan": {
     "id": "pan-494",
-    "title": "pan start fails if workspace doesn't exist \u2014 requires separate pan workspace create",
+    "title": "pan start fails if workspace doesn't exist — requires separate pan workspace create",
     "status": "approved",
     "uid": "a3f7c1e2-8b4d-4f6a-9e2c-5d1b3a7f9e4c",
     "author": "agent:claude-opus-4-6",
@@ -73,5 +73,6 @@
       }
     ],
     "edges": []
-  }
+  },
+  "status": "proposed"
 }

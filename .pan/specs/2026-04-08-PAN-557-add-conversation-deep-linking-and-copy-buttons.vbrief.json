@@ -27,7 +27,7 @@
       "ux"
     ],
     "narratives": {
-      "Problem": "Conversations are not directly linkable \u2014 users cannot share a URL to a specific conversation. Selection is internal React state only.",
+      "Problem": "Conversations are not directly linkable — users cannot share a URL to a specific conversation. Selection is internal React state only.",
       "Proposal": "Add /conv/:id URL route, backend endpoint to fetch conversation by ID, and copy-link buttons in ConversationList and ConversationPanel using the same icon-swap pattern as code block copy buttons."
     },
     "items": [
@@ -193,5 +193,6 @@
       }
     ],
     "edges": []
-  }
+  },
+  "status": "proposed"
 }

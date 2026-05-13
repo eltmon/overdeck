@@ -29,7 +29,7 @@
     ],
     "narratives": {
       "Problem": "The convoy abstraction exists solely to let review-agent.ts spawn 4 parallel reviewers + synthesis in a fixed order. The generic template registry, state persistence in ~/.panopticon/convoys/, CLI commands, dashboard panel/hook/nav, and convoy:* model router keys are all overhead for a single use case. The intended multi-issue fleet runner was never built.",
-      "Proposal": "Inline the parallel-review pipeline directly into review-agent.ts and delete the convoy abstraction entirely. Keep the 4+1 reviewer pipeline (correctness, security, performance, requirements + synthesis) hardcoded \u2014 no new YAML config schema. Rename convoy:* model router keys to review:* as a clean break. Delete all convoy CLI, API, and dashboard surface immediately."
+      "Proposal": "Inline the parallel-review pipeline directly into review-agent.ts and delete the convoy abstraction entirely. Keep the 4+1 reviewer pipeline (correctness, security, performance, requirements + synthesis) hardcoded — no new YAML config schema. Rename convoy:* model router keys to review:* as a clean break. Delete all convoy CLI, API, and dashboard surface immediately."
     },
     "items": [
       {
@@ -96,7 +96,7 @@
           },
           {
             "id": "inline-review-pipeline.ac7",
-            "title": "No blocking sync IO (readFileSync/writeFileSync/execSync) is added in the refactored code path \u2014 use fs/promises and execAsync",
+            "title": "No blocking sync IO (readFileSync/writeFileSync/execSync) is added in the refactored code path — use fs/promises and execAsync",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -123,7 +123,7 @@
           "issueLabel": "pan-540"
         },
         "narrative": {
-          "Action": "Rename the five convoy:* work type keys to review:* in src/lib/work-types.ts, src/lib/smart-model-selector.ts, and src/lib/settings-api.ts. Mapping: convoy:correctness-reviewer \u2192 review:correctness, convoy:security-reviewer \u2192 review:security, convoy:performance-reviewer \u2192 review:performance, convoy:requirements-reviewer \u2192 review:requirements, convoy:synthesis-agent \u2192 review:synthesis. Default model assignments (opus for security, sonnet for others) are preserved unchanged. No legacy fallback \u2014 clean break."
+          "Action": "Rename the five convoy:* work type keys to review:* in src/lib/work-types.ts, src/lib/smart-model-selector.ts, and src/lib/settings-api.ts. Mapping: convoy:correctness-reviewer → review:correctness, convoy:security-reviewer → review:security, convoy:performance-reviewer → review:performance, convoy:requirements-reviewer → review:requirements, convoy:synthesis-agent → review:synthesis. Default model assignments (opus for security, sonnet for others) are preserved unchanged. No legacy fallback — clean break."
         },
         "subItems": [
           {
@@ -267,7 +267,7 @@
           "issueLabel": "pan-540"
         },
         "narrative": {
-          "Action": "Remove the five convoy routes from src/dashboard/server/routes/metrics.ts: GET /api/convoys, GET /api/convoys/:id, POST /api/convoys/start, POST /api/convoys/:id/stop, GET /api/convoys/:id/output. Remove the associated handler functions and imports from ../../../lib/convoy.js. If metrics.ts becomes empty after this, leave the file in place with its other metrics routes intact \u2014 do not delete metrics.ts itself."
+          "Action": "Remove the five convoy routes from src/dashboard/server/routes/metrics.ts: GET /api/convoys, GET /api/convoys/:id, POST /api/convoys/start, POST /api/convoys/:id/stop, GET /api/convoys/:id/output. Remove the associated handler functions and imports from ../../../lib/convoy.js. If metrics.ts becomes empty after this, leave the file in place with its other metrics routes intact — do not delete metrics.ts itself."
         },
         "subItems": [
           {
@@ -379,7 +379,7 @@
           "issueLabel": "pan-540"
         },
         "narrative": {
-          "Action": "Remove the Convoys TOC entry and section from docs/USAGE.md. Remove any convoy references from docs/INDEX.md if present. Do not introduce new documentation for the inlined review pipeline \u2014 the feature is internal and existing review-agent docs (if any) remain accurate."
+          "Action": "Remove the Convoys TOC entry and section from docs/USAGE.md. Remove any convoy references from docs/INDEX.md if present. Do not introduce new documentation for the inlined review pipeline — the feature is internal and existing review-agent docs (if any) remain accurate."
         },
         "subItems": [
           {
@@ -514,5 +514,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

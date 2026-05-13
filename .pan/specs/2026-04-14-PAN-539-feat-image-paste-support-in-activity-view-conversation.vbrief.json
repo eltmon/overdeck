@@ -28,8 +28,8 @@
       "paste"
     ],
     "narratives": {
-      "Problem": "Users cannot share images with Claude Code agents via the conversation composer. The ComposerFooter in ConversationPanel only accepts plain text, requiring users to manually upload files and type paths \u2014 friction that breaks workflow.",
-      "Proposal": "Intercept paste/drop events on the ComposerFooter wrapper div to capture image clipboard data. Upload the image to a new POST /api/conversations/:name/upload-image endpoint (which saves to OS temp dir). Show a thumbnail preview with a remove button. On submit, prepend @/tmp/... path lines before the message text \u2014 Claude Code's Read tool handles the @path syntax natively, converting the file to a vision content block automatically."
+      "Problem": "Users cannot share images with Claude Code agents via the conversation composer. The ComposerFooter in ConversationPanel only accepts plain text, requiring users to manually upload files and type paths — friction that breaks workflow.",
+      "Proposal": "Intercept paste/drop events on the ComposerFooter wrapper div to capture image clipboard data. Upload the image to a new POST /api/conversations/:name/upload-image endpoint (which saves to OS temp dir). Show a thumbnail preview with a remove button. On submit, prepend @/tmp/... path lines before the message text — Claude Code's Read tool handles the @path syntax natively, converting the file to a vision content block automatically."
     },
     "items": [
       {
@@ -139,7 +139,7 @@
           "issueLabel": "pan-539"
         },
         "narrative": {
-          "Action": "In src/dashboard/frontend/src/components/chat/ComposerFooter.tsx: Add onPaste handler on the outer wrapper div (not on ComposerPromptEditor/Lexical). When paste event contains image ClipboardItems, call e.preventDefault() and extract the File via item.getAsFile(). Add onDrop handler on the same div for drag-drop support (prevent default, extract image files from dataTransfer.files). For each image: assign a local id, create an object URL for preview, add to pendingImages state as { id, file, previewUrl, serverPath: null | string, error: null | string }. Immediately trigger upload to /api/conversations/:name/upload-image. On upload success: set serverPath. On upload failure: set error. Text paste events must NOT be intercepted \u2014 only image types."
+          "Action": "In src/dashboard/frontend/src/components/chat/ComposerFooter.tsx: Add onPaste handler on the outer wrapper div (not on ComposerPromptEditor/Lexical). When paste event contains image ClipboardItems, call e.preventDefault() and extract the File via item.getAsFile(). Add onDrop handler on the same div for drag-drop support (prevent default, extract image files from dataTransfer.files). For each image: assign a local id, create an object URL for preview, add to pendingImages state as { id, file, previewUrl, serverPath: null | string, error: null | string }. Immediately trigger upload to /api/conversations/:name/upload-image. On upload success: set serverPath. On upload failure: set error. Text paste events must NOT be intercepted — only image types."
         },
         "subItems": [
           {
@@ -160,7 +160,7 @@
           },
           {
             "id": "frontend-paste-drop.ac3",
-            "title": "Pasting plain text is NOT intercepted \u2014 Lexical handles it normally",
+            "title": "Pasting plain text is NOT intercepted — Lexical handles it normally",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -195,7 +195,7 @@
           "issueLabel": "pan-539"
         },
         "narrative": {
-          "Action": "In ComposerFooter.tsx, render a thumbnail strip above the editor when pendingImages is non-empty. Each thumbnail shows: a small image preview (48x48px or similar), the filename truncated, a spinner while uploading, an error badge if upload failed, and a \u00d7 button to remove. The \u00d7 button calls URL.revokeObjectURL and removes from pendingImages state. Thumbnails sit inside the composerBox container so they feel integrated with the editor. Style should match the existing composerBox/composerToolbar aesthetic."
+          "Action": "In ComposerFooter.tsx, render a thumbnail strip above the editor when pendingImages is non-empty. Each thumbnail shows: a small image preview (48x48px or similar), the filename truncated, a spinner while uploading, an error badge if upload failed, and a × button to remove. The × button calls URL.revokeObjectURL and removes from pendingImages state. Thumbnails sit inside the composerBox container so they feel integrated with the editor. Style should match the existing composerBox/composerToolbar aesthetic."
         },
         "subItems": [
           {
@@ -208,7 +208,7 @@
           },
           {
             "id": "frontend-thumbnail-preview.ac2",
-            "title": "\u00d7 button removes the image and revokes its object URL",
+            "title": "× button removes the image and revokes its object URL",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -243,7 +243,7 @@
           "issueLabel": "pan-539"
         },
         "narrative": {
-          "Action": "Modify handleSubmit in ComposerFooter.tsx. Before sending: check if any pendingImages have no serverPath yet (still uploading) \u2014 if so, show a toast and abort (user must wait). Filter to images that have serverPath (exclude errored). Build prefix: join serverPaths as '@{path}\\n' lines. Final message = prefix + '\\n' + messageText (or just prefix if messageText is empty). After successful sendConversationMessage: revoke all object URLs, clear pendingImages state."
+          "Action": "Modify handleSubmit in ComposerFooter.tsx. Before sending: check if any pendingImages have no serverPath yet (still uploading) — if so, show a toast and abort (user must wait). Filter to images that have serverPath (exclude errored). Build prefix: join serverPaths as '@{path}\\n' lines. Final message = prefix + '\\n' + messageText (or just prefix if messageText is empty). After successful sendConversationMessage: revoke all object URLs, clear pendingImages state."
         },
         "subItems": [
           {
@@ -303,5 +303,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

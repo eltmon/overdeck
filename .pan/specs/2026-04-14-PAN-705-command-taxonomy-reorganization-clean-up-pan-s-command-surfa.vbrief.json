@@ -128,7 +128,7 @@
       },
       {
         "id": "p2-show",
-        "title": "pan show <id> \u2014 unified observation command",
+        "title": "pan show <id> — unified observation command",
         "status": "pending",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
@@ -138,12 +138,12 @@
           "phase": "2"
         },
         "narrative": {
-          "Action": "New src/cli/commands/show.ts. Default view: compact summary (shadow state line, current specialist + last heartbeat, top-3 cv entries, health summary). Flags --cv / --context / --health / --shadow / --json scope the output. Handlers delegate to the existing shadow/cv/context/health code \u2014 no logic duplication. Registered at top level from src/cli/index.ts."
+          "Action": "New src/cli/commands/show.ts. Default view: compact summary (shadow state line, current specialist + last heartbeat, top-3 cv entries, health summary). Flags --cv / --context / --health / --shadow / --json scope the output. Handlers delegate to the existing shadow/cv/context/health code — no logic duplication. Registered at top level from src/cli/index.ts."
         },
         "subItems": [
           {
             "id": "p2-show.ac1",
-            "title": "'pan show <id>' default view is \u2264 25 lines and covers shadow, specialist, heartbeat, and cv",
+            "title": "'pan show <id>' default view is ≤ 25 lines and covers shadow, specialist, heartbeat, and cv",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -185,7 +185,7 @@
       },
       {
         "id": "p2-review",
-        "title": "pan review \u2014 pending/request/reset subcommands",
+        "title": "pan review — pending/request/reset subcommands",
         "status": "pending",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
@@ -234,7 +234,7 @@
       },
       {
         "id": "p2-issues",
-        "title": "pan issues \u2014 merged list + triage",
+        "title": "pan issues — merged list + triage",
         "status": "pending",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
@@ -244,7 +244,7 @@
           "phase": "2"
         },
         "narrative": {
-          "Action": "New src/cli/commands/issues.ts. Merge 'pan work list' and 'pan work triage' into one top-level command. Use either --triage flag or 'issues triage' subcommand (decide during implementation based on ergonomic feel \u2014 document the choice in the bead's PR description)."
+          "Action": "New src/cli/commands/issues.ts. Merge 'pan work list' and 'pan work triage' into one top-level command. Use either --triage flag or 'issues triage' subcommand (decide during implementation based on ergonomic feel — document the choice in the bead's PR description)."
         },
         "subItems": [
           {
@@ -639,7 +639,7 @@
           "phase": "3"
         },
         "narrative": {
-          "Action": "Move src/cli/commands/work/wipe.ts to src/cli/commands/wipe.ts. Register at top level. Delete the work file. Destructive \u2014 confirmation prompt preserved."
+          "Action": "Move src/cli/commands/work/wipe.ts to src/cli/commands/wipe.ts. Register at top level. Delete the work file. Destructive — confirmation prompt preserved."
         },
         "subItems": [
           {
@@ -713,7 +713,7 @@
           "phase": "3"
         },
         "narrative": {
-          "Action": "Remove src/cli/commands/work/index.ts and any remaining work/*.ts files (only internal hooks like hook.ts and tldr.ts should remain at this point \u2014 they move to pan admin in Phase 4). Remove registerWorkCommands() call from src/cli/index.ts. Running 'pan work <anything>' must fail with commander's default 'unknown command' error; do NOT add a stub handler. Acceptance test: 'git ls-files src/cli/commands/work/' is empty."
+          "Action": "Remove src/cli/commands/work/index.ts and any remaining work/*.ts files (only internal hooks like hook.ts and tldr.ts should remain at this point — they move to pan admin in Phase 4). Remove registerWorkCommands() call from src/cli/index.ts. Running 'pan work <anything>' must fail with commander's default 'unknown command' error; do NOT add a stub handler. Acceptance test: 'git ls-files src/cli/commands/work/' is empty."
         },
         "subItems": [
           {
@@ -1182,7 +1182,7 @@
           "phase": "4.5"
         },
         "narrative": {
-          "Action": "Update RPC type definitions in packages/contracts/ and the Effect RPC group in src/dashboard/server/ws-rpc.ts to rename verbs: work/* procedures split into issues/*, review/*, show/*, admin/*. Rebuild packages/contracts ('cd packages/contracts && npm run build'). This is the type-propagation bead \u2014 it must land before routes and frontend client beads."
+          "Action": "Update RPC type definitions in packages/contracts/ and the Effect RPC group in src/dashboard/server/ws-rpc.ts to rename verbs: work/* procedures split into issues/*, review/*, show/*, admin/*. Rebuild packages/contracts ('cd packages/contracts && npm run build'). This is the type-propagation bead — it must land before routes and frontend client beads."
         },
         "subItems": [
           {
@@ -1223,7 +1223,7 @@
           "phase": "4.5"
         },
         "narrative": {
-          "Action": "In src/dashboard/server/routes/, rename all lifecycle verb routes (start/done/approve/close/reopen/wipe/tell/kill/resume/recover/sync-main/inspect) from /api/work/* to /api/issues/*. Router wiring only \u2014 handlers unchanged. Update the integration tests that hit these paths in the same commit."
+          "Action": "In src/dashboard/server/routes/, rename all lifecycle verb routes (start/done/approve/close/reopen/wipe/tell/kill/resume/recover/sync-main/inspect) from /api/work/* to /api/issues/*. Router wiring only — handlers unchanged. Update the integration tests that hit these paths in the same commit."
         },
         "subItems": [
           {
@@ -1236,7 +1236,7 @@
           },
           {
             "id": "p45-route-issues.ac2",
-            "title": "No handler code was duplicated \u2014 pure routing rename",
+            "title": "No handler code was duplicated — pure routing rename",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1376,7 +1376,7 @@
         "subItems": [
           {
             "id": "p45-frontend-client.ac1",
-            "title": "Frontend calls /api/issues/*, /api/review/*, /api/show/*, /api/admin/* \u2014 no /api/work/* hits",
+            "title": "Frontend calls /api/issues/*, /api/review/*, /api/show/*, /api/admin/* — no /api/work/* hits",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1453,7 +1453,7 @@
           "phase": "4.5"
         },
         "narrative": {
-          "Action": "Kanban card action buttons and inspector panel actions that call backend routes must show the new verb names in their UI copy and tooltips. E.g. 'Mark done', 'Approve & merge', 'Wipe' \u2014 with hover-tooltip showing the equivalent 'pan <verb> <id>' invocation."
+          "Action": "Kanban card action buttons and inspector panel actions that call backend routes must show the new verb names in their UI copy and tooltips. E.g. 'Mark done', 'Approve & merge', 'Wipe' — with hover-tooltip showing the equivalent 'pan <verb> <id>' invocation."
         },
         "subItems": [
           {
@@ -1618,7 +1618,7 @@
           "phase": "5"
         },
         "narrative": {
-          "Action": "Commit tests/fixtures/pan-help.txt with the full 'pan --help' output. Write a Vitest test tests/fixtures/pan-help.test.ts that spawns the CLI, captures --help, and asserts byte-for-byte equality against the fixture. Support UPDATE_FIXTURES=1 env var to rewrite the fixture in place (single update path). Establishes the repo convention for locking user-facing text surfaces \u2014 see STATE.md for rationale. DO NOT use Vitest '.snap' files."
+          "Action": "Commit tests/fixtures/pan-help.txt with the full 'pan --help' output. Write a Vitest test tests/fixtures/pan-help.test.ts that spawns the CLI, captures --help, and asserts byte-for-byte equality against the fixture. Support UPDATE_FIXTURES=1 env var to rewrite the fixture in place (single update path). Establishes the repo convention for locking user-facing text surfaces — see STATE.md for rationale. DO NOT use Vitest '.snap' files."
         },
         "subItems": [
           {
@@ -1667,7 +1667,7 @@
           "phase": "5"
         },
         "narrative": {
-          "Action": "Extend src/cli/commands/doctor.ts to grep the user's shell rc files (~/.bashrc, ~/.zshrc, ~/.config/fish/config.fish) for 'pan work ', 'pan plan-finalize', 'pan cloister', 'pan specialists', 'pan sync-costs', etc. Print a warning with the replacement when found. Do not auto-rewrite \u2014 inform only."
+          "Action": "Extend src/cli/commands/doctor.ts to grep the user's shell rc files (~/.bashrc, ~/.zshrc, ~/.config/fish/config.fish) for 'pan work ', 'pan plan-finalize', 'pan cloister', 'pan specialists', 'pan sync-costs', etc. Print a warning with the replacement when found. Do not auto-rewrite — inform only."
         },
         "subItems": [
           {
@@ -1680,7 +1680,7 @@
           },
           {
             "id": "p5-doctor-legacy.ac2",
-            "title": "Doctor does NOT modify rc files \u2014 warning only",
+            "title": "Doctor does NOT modify rc files — warning only",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1708,7 +1708,7 @@
           "phase": "5.5"
         },
         "narrative": {
-          "Action": "Create .claude/skills/_template/pan-verb-skill.md \u2014 the shared template that the 8\u201310 flat shortcut skills extend. Template includes frontmatter slots for name/description, a standard body structure, and a pointer to the umbrella skill for users who want the taxonomy. 'pan sync' must NOT distribute _template/ to user skill dirs \u2014 extend the sync code to ignore paths starting with '_'."
+          "Action": "Create .claude/skills/_template/pan-verb-skill.md — the shared template that the 8–10 flat shortcut skills extend. Template includes frontmatter slots for name/description, a standard body structure, and a pointer to the umbrella skill for users who want the taxonomy. 'pan sync' must NOT distribute _template/ to user skill dirs — extend the sync code to ignore paths starting with '_'."
         },
         "subItems": [
           {
@@ -1749,7 +1749,7 @@
           "phase": "5.5"
         },
         "narrative": {
-          "Action": "Create .claude/skills/pan/SKILL.md. Bare invocation: print the embedded six-bucket taxonomy cheat sheet (not fetched at runtime \u2014 inlined in the SKILL body). With args: instruct Claude to run 'pan <args>' as a single Bash invocation and report stdout/stderr. Destructive verbs (wipe, kill, close, approve, admin cloister emergency-stop) require chat-layer confirmation before the Bash call. Shell metacharacters in user args are refused with a message asking the user to run the command directly. Unknown top-level verb: print the cheat sheet and suggest the nearest match (prefix match, no Levenshtein required). Description field leads with 'pan <verb> <args> \u2014 Umbrella for all pan commands'."
+          "Action": "Create .claude/skills/pan/SKILL.md. Bare invocation: print the embedded six-bucket taxonomy cheat sheet (not fetched at runtime — inlined in the SKILL body). With args: instruct Claude to run 'pan <args>' as a single Bash invocation and report stdout/stderr. Destructive verbs (wipe, kill, close, approve, admin cloister emergency-stop) require chat-layer confirmation before the Bash call. Shell metacharacters in user args are refused with a message asking the user to run the command directly. Unknown top-level verb: print the cheat sheet and suggest the nearest match (prefix match, no Levenshtein required). Description field leads with 'pan <verb> <args> — Umbrella for all pan commands'."
         },
         "subItems": [
           {
@@ -1786,7 +1786,7 @@
           },
           {
             "id": "p55-umbrella.ac5",
-            "title": "Shell metacharacters (;, |, &&, $ (), backticks) in args are refused \u2014 skill instructs user to run directly",
+            "title": "Shell metacharacters (;, |, &&, $ (), backticks) in args are refused — skill instructs user to run directly",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1794,7 +1794,7 @@
           },
           {
             "id": "p55-umbrella.ac6",
-            "title": "Unknown verb prints the cheat sheet plus nearest-match suggestion \u2014 no blind 'pan <gibberish>' invocation",
+            "title": "Unknown verb prints the cheat sheet plus nearest-match suggestion — no blind 'pan <gibberish>' invocation",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1822,7 +1822,7 @@
           "phase": "5.5"
         },
         "narrative": {
-          "Action": "Rename the distributed skills under .claude/skills/ so their directory names match the new CLI verbs. Drop pan-work-* prefix; collapse pan-plan + pan-plan-finalize into one pan-plan skill that takes a 'finalize' subcommand; move plumbing under pan-admin-* prefix (pan-cloister \u2192 pan-admin-cloister, pan-tldr \u2192 pan-admin-tldr, pan-rescue \u2192 pan-admin-rescue, etc.). Delete skills whose commands are being dropped (sync-costs, etc.). Update each skill's frontmatter 'name:' field to match the new directory name."
+          "Action": "Rename the distributed skills under .claude/skills/ so their directory names match the new CLI verbs. Drop pan-work-* prefix; collapse pan-plan + pan-plan-finalize into one pan-plan skill that takes a 'finalize' subcommand; move plumbing under pan-admin-* prefix (pan-cloister → pan-admin-cloister, pan-tldr → pan-admin-tldr, pan-rescue → pan-admin-rescue, etc.). Delete skills whose commands are being dropped (sync-costs, etc.). Update each skill's frontmatter 'name:' field to match the new directory name."
         },
         "subItems": [
           {
@@ -1861,7 +1861,7 @@
       },
       {
         "id": "p55-flat-shortcuts",
-        "title": "Curate 8\u201310 flat shortcut skills",
+        "title": "Curate 8–10 flat shortcut skills",
         "status": "pending",
         "priority": "high",
         "created": "2026-04-14T13:00:56Z",
@@ -1871,7 +1871,7 @@
           "phase": "5.5"
         },
         "narrative": {
-          "Action": "The flat top-level skills in the slash menu are exactly: pan, pan-status, pan-plan, pan-start, pan-show, pan-review, pan-done, pan-approve, pan-close, pan-issues. All other skills live under pan-admin-* and are surfaced only via the umbrella '/pan admin \u2026'. The shortcut skills reuse the template from p55-verb-template for consistent maintenance. Each shortcut is tailored with verb-specific examples and flag guidance in its body."
+          "Action": "The flat top-level skills in the slash menu are exactly: pan, pan-status, pan-plan, pan-start, pan-show, pan-review, pan-done, pan-approve, pan-close, pan-issues. All other skills live under pan-admin-* and are surfaced only via the umbrella '/pan admin …'. The shortcut skills reuse the template from p55-verb-template for consistent maintenance. Each shortcut is tailored with verb-specific examples and flag guidance in its body."
         },
         "subItems": [
           {
@@ -1912,12 +1912,12 @@
           "phase": "5.5"
         },
         "narrative": {
-          "Action": "Every distributed skill's frontmatter description MUST follow the format: 'pan <verb> <args> \u2014 one-line what it does'. The literal CLI invocation is always first so fuzzy search matches from both ends. Example: 'pan kill <id> \u2014 stop a running agent (workspace preserved)'."
+          "Action": "Every distributed skill's frontmatter description MUST follow the format: 'pan <verb> <args> — one-line what it does'. The literal CLI invocation is always first so fuzzy search matches from both ends. Example: 'pan kill <id> — stop a running agent (workspace preserved)'."
         },
         "subItems": [
           {
             "id": "p55-descriptions.ac1",
-            "title": "Every skill frontmatter description begins with 'pan <verb>' followed by ' \u2014 ' and a short explanation",
+            "title": "Every skill frontmatter description begins with 'pan <verb>' followed by ' — ' and a short explanation",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -2027,7 +2027,7 @@
           "phase": "6"
         },
         "narrative": {
-          "Action": "Add a CHANGELOG entry for the next minor version. Embed the full legacy\u2192new migration table from docs/QUICK-REFERENCE.md. Call out that this is a breaking change (pre-1.0 clean break) and point users at QUICK-REFERENCE.md and 'pan doctor'."
+          "Action": "Add a CHANGELOG entry for the next minor version. Embed the full legacy→new migration table from docs/QUICK-REFERENCE.md. Call out that this is a breaking change (pre-1.0 clean break) and point users at QUICK-REFERENCE.md and 'pan doctor'."
         },
         "subItems": [
           {
@@ -2101,7 +2101,7 @@
           "phase": "6"
         },
         "narrative": {
-          "Action": "At the very end of the work, move docs/prds/planned/pan-command-taxonomy-reorg.md \u2192 docs/prds/active/pan-705/pan-command-taxonomy-reorg.md. This signals the PRD has shipped. Update any incoming links (QUICK-REFERENCE.md uses a relative link to the planned path)."
+          "Action": "At the very end of the work, move docs/prds/planned/pan-command-taxonomy-reorg.md → docs/prds/active/pan-705/pan-command-taxonomy-reorg.md. This signals the PRD has shipped. Update any incoming links (QUICK-REFERENCE.md uses a relative link to the planned path)."
         },
         "subItems": [
           {
@@ -2518,5 +2518,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

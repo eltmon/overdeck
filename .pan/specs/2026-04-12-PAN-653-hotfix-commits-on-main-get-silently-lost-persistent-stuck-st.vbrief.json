@@ -278,7 +278,7 @@
           "issueLabel": "pan-653"
         },
         "narrative": {
-          "Action": "Add POST /api/workspaces/:issueId/unstick that calls clearWorkspaceStuck and emits a domain event. Create StuckBadge.tsx component with red-border card indicator + warning icon when stuck=1. Add an 'Unstick' menu item to the kanban card context menu. No new lane \u2014 card stays where it is per the issue comment clarification."
+          "Action": "Add POST /api/workspaces/:issueId/unstick that calls clearWorkspaceStuck and emits a domain event. Create StuckBadge.tsx component with red-border card indicator + warning icon when stuck=1. Add an 'Unstick' menu item to the kanban card context menu. No new lane — card stays where it is per the issue comment clarification."
         },
         "subItems": [
           {
@@ -323,7 +323,7 @@
         "subItems": [
           {
             "id": "tmux-stream-patterns.ac1",
-            "title": "User sees 'pushing\u2026', 'rejected non-fast-forward', 'retrying\u2026' events live in the activity panel during an approve",
+            "title": "User sees 'pushing…', 'rejected non-fast-forward', 'retrying…' events live in the activity panel during an approve",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -564,5 +564,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

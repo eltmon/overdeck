@@ -120,7 +120,7 @@
           "issueLabel": "pan-558"
         },
         "narrative": {
-          "Action": "Update `apps/desktop/src/menu.ts` Help submenu to add 'Check for Updates\u2026' item that triggers `checkForUpdates()` via IPC to main process. After update is downloaded, dynamically show 'Install Update and Restart' item in Help menu."
+          "Action": "Update `apps/desktop/src/menu.ts` Help submenu to add 'Check for Updates…' item that triggers `checkForUpdates()` via IPC to main process. After update is downloaded, dynamically show 'Install Update and Restart' item in Help menu."
         },
         "subItems": [
           {
@@ -191,5 +191,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

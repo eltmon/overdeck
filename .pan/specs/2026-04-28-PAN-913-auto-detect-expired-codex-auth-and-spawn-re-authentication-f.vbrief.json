@@ -30,7 +30,7 @@
       "ux"
     ],
     "narratives": {
-      "Problem": "When Codex OAuth tokens expire or refresh tokens get burned, all gpt-5.4 agents fail with 503 auth_unavailable. Users have no visibility until agents start dying \u2014 the real cause is buried in cliproxy logs.",
+      "Problem": "When Codex OAuth tokens expire or refresh tokens get burned, all gpt-5.4 agents fail with 503 auth_unavailable. Users have no visibility until agents start dying — the real cause is buried in cliproxy logs.",
       "Proposal": "Add proactive auth detection (JWT expiry + log monitoring), a dashboard banner with one-click re-auth via terminal panel (supporting both browser and device-auth for headless), spawn guardrails that block before wasting API credits, and auto-retry after successful re-authentication."
     },
     "items": [
@@ -45,7 +45,7 @@
           "issueLabel": "pan-913"
         },
         "narrative": {
-          "Action": "Create src/lib/codex-auth.ts with an async checkCodexAuthStatus() function. It reads ~/.panopticon/cliproxy/auth/codex-primary.json, decodes the JWT access_token exp claim (reuse the existing decodeJwtPayload from cliproxy.ts \u2014 export it), and returns a status object. Extract the JWT decode helper from cliproxy.ts into an exported function so both modules can use it."
+          "Action": "Create src/lib/codex-auth.ts with an async checkCodexAuthStatus() function. It reads ~/.panopticon/cliproxy/auth/codex-primary.json, decodes the JWT access_token exp claim (reuse the existing decodeJwtPayload from cliproxy.ts — export it), and returns a status object. Extract the JWT decode helper from cliproxy.ts into an exported function so both modules can use it."
         },
         "subItems": [
           {
@@ -94,7 +94,7 @@
           "issueLabel": "pan-913"
         },
         "narrative": {
-          "Action": "Extend checkCodexAuthStatus() to also read the last ~50 lines of ~/.panopticon/cliproxy/cliproxy.log and search for the pattern 'refresh token has already been used'. If found (and the log line is recent \u2014 within last hour), override status to 'burned'. This is best-effort: if the log file doesn't exist or the pattern format changes, fall back gracefully to JWT-only detection."
+          "Action": "Extend checkCodexAuthStatus() to also read the last ~50 lines of ~/.panopticon/cliproxy/cliproxy.log and search for the pattern 'refresh token has already been used'. If found (and the log line is recent — within last hour), override status to 'burned'. This is best-effort: if the log file doesn't exist or the pattern format changes, fall back gracefully to JWT-only detection."
         },
         "subItems": [
           {
@@ -209,7 +209,7 @@
           "issueLabel": "pan-913"
         },
         "narrative": {
-          "Action": "Add POST /api/settings/codex-reauth to codex-auth.ts. It spawns a tmux session named 'codex-reauth' running 'codex login' (or 'codex login --device-auth' if headless \u2014 detect via !DISPLAY && !WAYLAND_DISPLAY on server). Returns {sessionName, headless: boolean}. If a reauth session already exists and is alive, return it rather than spawning a duplicate."
+          "Action": "Add POST /api/settings/codex-reauth to codex-auth.ts. It spawns a tmux session named 'codex-reauth' running 'codex login' (or 'codex login --device-auth' if headless — detect via !DISPLAY && !WAYLAND_DISPLAY on server). Returns {sessionName, headless: boolean}. If a reauth session already exists and is alive, return it rather than spawning a duplicate."
         },
         "subItems": [
           {
@@ -250,7 +250,7 @@
           "issueLabel": "pan-913"
         },
         "narrative": {
-          "Action": "Add POST /api/settings/codex-reauth/status that accepts the generated re-auth session name and status token in a JSON body, then checks if the codex-reauth tmux session has exited. When it has, call bridgeCodexAuthToCliproxy() to re-bridge the fresh tokens, then return {completed: true, authStatus: <fresh check>}. The frontend polls this endpoint after spawning the reauth session. bridgeCodexAuthToCliproxy() currently uses sync FS \u2014 create an async wrapper or use fs/promises for the server-reachable path."
+          "Action": "Add POST /api/settings/codex-reauth/status that accepts the generated re-auth session name and status token in a JSON body, then checks if the codex-reauth tmux session has exited. When it has, call bridgeCodexAuthToCliproxy() to re-bridge the fresh tokens, then return {completed: true, authStatus: <fresh check>}. The frontend polls this endpoint after spawning the reauth session. bridgeCodexAuthToCliproxy() currently uses sync FS — create an async wrapper or use fs/promises for the server-reachable path."
         },
         "subItems": [
           {
@@ -291,7 +291,7 @@
           "issueLabel": "pan-913"
         },
         "narrative": {
-          "Action": "Create src/dashboard/frontend/src/components/CodexAuthBanner.tsx \u2014 a warning banner (similar pattern to StoppedAgentsBanner) that shows when Codex auth is expired/burned. Displays a message ('Codex authentication expired \u2014 gpt-5.4 agents will fail') with a 'Re-authenticate' button. The button calls POST /api/settings/codex-reauth, then opens the terminal panel for the returned session. Render it in App.tsx alongside existing banners."
+          "Action": "Create src/dashboard/frontend/src/components/CodexAuthBanner.tsx — a warning banner (similar pattern to StoppedAgentsBanner) that shows when Codex auth is expired/burned. Displays a message ('Codex authentication expired — gpt-5.4 agents will fail') with a 'Re-authenticate' button. The button calls POST /api/settings/codex-reauth, then opens the terminal panel for the returned session. Render it in App.tsx alongside existing banners."
         },
         "subItems": [
           {
@@ -332,7 +332,7 @@
           "issueLabel": "pan-913"
         },
         "narrative": {
-          "Action": "Create src/dashboard/frontend/src/hooks/useCodexAuthStatus.ts \u2014 a React Query hook that polls GET /api/settings/codex-auth every ~120 seconds. Returns the auth status for consumption by CodexAuthBanner and SettingsPage. Use refetchInterval with a reasonable default (~120s)."
+          "Action": "Create src/dashboard/frontend/src/hooks/useCodexAuthStatus.ts — a React Query hook that polls GET /api/settings/codex-auth every ~120 seconds. Returns the auth status for consumption by CodexAuthBanner and SettingsPage. Use refetchInterval with a reasonable default (~120s)."
         },
         "subItems": [
           {
@@ -406,7 +406,7 @@
           "issueLabel": "pan-913"
         },
         "narrative": {
-          "Action": "In the frontend spawn flow: when a spawn is blocked by codex auth (429 with codex-auth error), hold the spawn parameters in component state. After the re-auth terminal completes (polling reauth/status returns completed with valid auth), automatically re-fire the POST /api/agents request with the same parameters. Show a toast: 'Codex re-authenticated \u2014 retrying agent spawn'. No server-side queue needed \u2014 the frontend holds the retry state."
+          "Action": "In the frontend spawn flow: when a spawn is blocked by codex auth (429 with codex-auth error), hold the spawn parameters in component state. After the re-auth terminal completes (polling reauth/status returns completed with valid auth), automatically re-fire the POST /api/agents request with the same parameters. Show a toast: 'Codex re-authenticated — retrying agent spawn'. No server-side queue needed — the frontend holds the retry state."
         },
         "subItems": [
           {
@@ -542,5 +542,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

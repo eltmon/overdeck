@@ -29,7 +29,7 @@
     ],
     "narratives": {
       "Problem": "Workspace operations (wipe, cleanup, abort, start-planning) don't emit domain events, so the frontend stays stale until tracker poll fires (1-3s delay).",
-      "Proposal": "Define 5 new workspace lifecycle events in contracts, emit them in the 4 affected routes, and add reducer cases. The shared reducer pattern means the frontend reacts automatically \u2014 no frontend code changes needed."
+      "Proposal": "Define 5 new workspace lifecycle events in contracts, emit them in the 4 affected routes, and add reducer cases. The shared reducer pattern means the frontend reacts automatically — no frontend code changes needed."
     },
     "items": [
       {
@@ -239,5 +239,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

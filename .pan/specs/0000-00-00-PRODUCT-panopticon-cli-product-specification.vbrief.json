@@ -392,22 +392,81 @@
       }
     ],
     "edges": [
-      { "from": "server", "to": "dashboard", "type": "blocks" },
-      { "from": "contracts", "to": "server", "type": "blocks" },
-      { "from": "contracts", "to": "dashboard", "type": "blocks" },
-      { "from": "cloister", "to": "server", "type": "blocks" },
-      { "from": "workspaces", "to": "cloister", "type": "blocks" },
-      { "from": "planning", "to": "cloister", "type": "blocks" },
-      { "from": "trackers", "to": "planning", "type": "blocks" },
-      { "from": "config", "to": "cloister", "type": "blocks" },
-      { "from": "skills", "to": "cli", "type": "blocks" }
+      {
+        "from": "server",
+        "to": "dashboard",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts",
+        "to": "server",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts",
+        "to": "dashboard",
+        "type": "blocks"
+      },
+      {
+        "from": "cloister",
+        "to": "server",
+        "type": "blocks"
+      },
+      {
+        "from": "workspaces",
+        "to": "cloister",
+        "type": "blocks"
+      },
+      {
+        "from": "planning",
+        "to": "cloister",
+        "type": "blocks"
+      },
+      {
+        "from": "trackers",
+        "to": "planning",
+        "type": "blocks"
+      },
+      {
+        "from": "config",
+        "to": "cloister",
+        "type": "blocks"
+      },
+      {
+        "from": "skills",
+        "to": "cli",
+        "type": "blocks"
+      }
     ],
-    "tags": ["orchestration", "multi-agent", "cli", "dashboard", "local-first"],
+    "tags": [
+      "orchestration",
+      "multi-agent",
+      "cli",
+      "dashboard",
+      "local-first"
+    ],
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli", "label": "GitHub repo", "type": "repository" },
-      { "uri": "docs/PRD.md", "label": "Product Requirements Document", "type": "prd" },
-      { "uri": "docs/VISION.md", "label": "Product Vision", "type": "reference" },
-      { "uri": "docs/INDEX.md", "label": "Documentation Index", "type": "reference" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli",
+        "label": "GitHub repo",
+        "type": "repository"
+      },
+      {
+        "uri": "docs/PRD.md",
+        "label": "Product Requirements Document",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/VISION.md",
+        "label": "Product Vision",
+        "type": "reference"
+      },
+      {
+        "uri": "docs/INDEX.md",
+        "label": "Documentation Index",
+        "type": "reference"
+      }
     ]
-  }
+  },
+  "status": "proposed"
 }

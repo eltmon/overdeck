@@ -72,7 +72,7 @@
         "acceptanceCriteria": [
           "New test: subscription-oauth path (google provider) returns tier-model vars (no API key var)",
           "New test: openrouter (no tierModels) does not append --model-* flags to claudish command",
-          "New test: Anthropic direct path unchanged \u2014 no tier-model vars in env, no flags in command",
+          "New test: Anthropic direct path unchanged — no tier-model vars in env, no flags in command",
           "npm test passes"
         ]
       },
@@ -110,5 +110,6 @@
         "label": "command string tests depend on flag injection"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

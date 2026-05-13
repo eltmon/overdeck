@@ -139,7 +139,7 @@
           },
           {
             "id": "sidebar-nav.ac4",
-            "title": "Header.tsx is a minimal top bar with logo, breadcrumb, and theme toggle \u2014 no nav items",
+            "title": "Header.tsx is a minimal top bar with logo, breadcrumb, and theme toggle — no nav items",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -206,7 +206,7 @@
           "issueLabel": "pan-460"
         },
         "narrative": {
-          "Action": "Apply PRD migration table (bg-gray-900 -> bg-background, text-white -> text-foreground, etc.) to core layout and board components: KanbanBoard.tsx (31 occurrences \u2014 highest density), DetailPanelLayout.tsx, DialogProvider.tsx, PlanDialog.tsx, TerminalPanel.tsx, TerminalView.tsx, XTerminal.tsx, ActivityPanel.tsx, IssueAgentCard.tsx, SpecialistAgentCard.tsx. Also apply font-medium everywhere and ensure Space Grotesk is restricted to brand text and numeric stats only."
+          "Action": "Apply PRD migration table (bg-gray-900 -> bg-background, text-white -> text-foreground, etc.) to core layout and board components: KanbanBoard.tsx (31 occurrences — highest density), DetailPanelLayout.tsx, DialogProvider.tsx, PlanDialog.tsx, TerminalPanel.tsx, TerminalView.tsx, XTerminal.tsx, ActivityPanel.tsx, IssueAgentCard.tsx, SpecialistAgentCard.tsx. Also apply font-medium everywhere and ensure Space Grotesk is restricted to brand text and numeric stats only."
         },
         "subItems": [
           {
@@ -510,5 +510,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

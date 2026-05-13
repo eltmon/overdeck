@@ -228,7 +228,7 @@
           "issueLabel": "pan-478"
         },
         "narrative": {
-          "Action": "Run npm run typecheck, npm run lint, npm test. Fix any type errors from the migration \u2014 especially around Effect type signatures and error channel types."
+          "Action": "Run npm run typecheck, npm run lint, npm test. Fix any type errors from the migration — especially around Effect type signatures and error channel types."
         },
         "subItems": [
           {
@@ -288,5 +288,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "completed"
 }

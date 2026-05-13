@@ -131,7 +131,7 @@
           "issueLabel": "pan-513"
         },
         "narrative": {
-          "Action": "Create MemoryIndicator.tsx \u2014 a compact pill showing 'XX / YY GB' with a color-coded dot (green > 30% free, yellow 15-30%, red < 15%). Polls GET /api/godview/system-health every 10s via React Query or a shared hook. Add it to Header.tsx between CloisterStatusBar and FreshnessIndicator. Tooltip shows exact percentages."
+          "Action": "Create MemoryIndicator.tsx — a compact pill showing 'XX / YY GB' with a color-coded dot (green > 30% free, yellow 15-30%, red < 15%). Polls GET /api/godview/system-health every 10s via React Query or a shared hook. Add it to Header.tsx between CloisterStatusBar and FreshnessIndicator. Tooltip shows exact percentages."
         },
         "subItems": [
           {
@@ -171,7 +171,7 @@
           "issueLabel": "pan-513"
         },
         "narrative": {
-          "Action": "Create MemoryWarningBanner.tsx \u2014 a sticky amber/red banner rendered in App.tsx below the Header when system memory is below the warning threshold. Shows 'System memory low: X.X GB free of Y GB'. Lists top 3-5 running agents as memory consumers with Kill action buttons (calls existing agent stop endpoint). Dismissible, but re-appears if memory drops further. Uses the same health polling data as MemoryIndicator."
+          "Action": "Create MemoryWarningBanner.tsx — a sticky amber/red banner rendered in App.tsx below the Header when system memory is below the warning threshold. Shows 'System memory low: X.X GB free of Y GB'. Lists top 3-5 running agents as memory consumers with Kill action buttons (calls existing agent stop endpoint). Dismissible, but re-appears if memory drops further. Uses the same health polling data as MemoryIndicator."
         },
         "subItems": [
           {
@@ -279,5 +279,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

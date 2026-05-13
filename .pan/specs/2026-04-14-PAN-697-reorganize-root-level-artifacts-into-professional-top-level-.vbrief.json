@@ -37,7 +37,7 @@
       "repo-hygiene"
     ],
     "narratives": {
-      "Problem": "The repo root mixes canonical entrypoint files with stray audit reports, historical writeups, and unused screenshots. The top level looks improvised rather than intentional \u2014 a poor first impression for anyone opening the repo.",
+      "Problem": "The repo root mixes canonical entrypoint files with stray audit reports, historical writeups, and unused screenshots. The top level looks improvised rather than intentional — a poor first impression for anyone opening the repo.",
       "Proposal": "Move the 14 listed artifacts into purpose-specific homes under docs/ using git mv (audits -> docs/audits/, historical writeups -> docs/history/, screenshots -> docs/screenshots/root-cleanup/). Update the one internal reference in docs/AGENT_TYPES_INDEX.md. Document the root-directory policy in docs/REPO-ARTIFACTS.md. No source-code reorg, no content rewrites."
     },
     "items": [
@@ -148,7 +148,7 @@
           "issueLabel": "pan-697"
         },
         "narrative": {
-          "Action": "Create docs/screenshots/root-cleanup/ and git mv all nine root-level PNG screenshots (command-deck-full.png, command-deck.png, composer-fullpage.png, composer-visible.png, dashboard-home.png, dropdown-narrow.png, dropdown-open.png, final-dropdown-test.png, normal-viewport.png) into it. Discovery confirmed zero inbound references, so no link updates are required \u2014 but verify again after the move with a grep sweep."
+          "Action": "Create docs/screenshots/root-cleanup/ and git mv all nine root-level PNG screenshots (command-deck-full.png, command-deck.png, composer-fullpage.png, composer-visible.png, dashboard-home.png, dropdown-narrow.png, dropdown-open.png, final-dropdown-test.png, normal-viewport.png) into it. Discovery confirmed zero inbound references, so no link updates are required — but verify again after the move with a grep sweep."
         },
         "subItems": [
           {
@@ -273,5 +273,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

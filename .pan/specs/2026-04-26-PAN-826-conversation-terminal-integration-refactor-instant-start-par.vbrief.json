@@ -3,7 +3,7 @@
     "version": "0.5",
     "created": "2026-04-26T01:33:53Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-826: Conversation/terminal integration refactor \u2014 instant-start + parser correctness + tmux delivery verification + thinking-block UX + signature prevention + outbox + favorite-star reposition + T3Code structural alignment"
+    "description": "Plan for PAN-826: Conversation/terminal integration refactor — instant-start + parser correctness + tmux delivery verification + thinking-block UX + signature prevention + outbox + favorite-star reposition + T3Code structural alignment"
   },
   "plan": {
     "id": "pan-826",
@@ -22,27 +22,27 @@
       },
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/691",
-        "label": "#691 \u2014 Out-of-order tool activities",
+        "label": "#691 — Out-of-order tool activities",
         "type": "issue"
       },
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/696",
-        "label": "#696 \u2014 Duplicate assistant message ids",
+        "label": "#696 — Duplicate assistant message ids",
         "type": "issue"
       },
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/612",
-        "label": "#612 \u2014 Corrupted thinking signatures",
+        "label": "#612 — Corrupted thinking signatures",
         "type": "issue"
       },
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/823",
-        "label": "#823 \u2014 Fork thinking-block handling",
+        "label": "#823 — Fork thinking-block handling",
         "type": "issue"
       },
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/739",
-        "label": "#739 \u2014 Failed sends disappear",
+        "label": "#739 — Failed sends disappear",
         "type": "issue"
       },
       {
@@ -79,7 +79,7 @@
     ],
     "narratives": {
       "Problem": "The Mission Control conversation viewer drifts from the live terminal in ways that share underlying machinery: orphaned tool_results when paired tool_use lives in a prior poll, duplicate rows from message.id collisions, a five-layer startup dance for new conversations, fixed-delay tmux delivery that loses Enter under busy state, thinking blocks that can't be expanded and whose signatures get corrupted by compaction or cross-model forks, and silently dropped failed user sends. The chat module's structure has also drifted from T3Code's, making future ports expensive.",
-      "Proposal": "Single coordinated refactor sequenced foundation-first: (1) make the parser stateful across incremental parses + fix all sort sites + audit message-id keying; (2) replace fixed-delay sendKeysAsync with capture-pane verification on both paste and Enter, with busy-state detection and a structured MessageDeliveryFailed error surfaced to a dashboard error channel; (3) make POST /api/conversations synchronous to tmux+Claude readiness so clicking + mounts a live conversation immediately and DraftConversationPanel/sessionAlive grace/message-arrival polling are deleted; (4) ship thinking-block expand UX, prevent signature corruption at write-time by stripping signature fields in copySessionFromCompactBoundary and forcing --no-resume on every specialist spawn, plus surface fork options (localSummaryOnly, includeThinkingInSummary) and a model-switch warning; (5) add a SQLite-backed outbox for HTTP-layer optimistic-send failures with retry/edit/copy/discard and merge it into the conversation timeline; (6) reposition the persistent favorited star into the right-aligned actions slot; (7) finish with a mechanical T3Code structural alignment (rename session-logic\u2192MessagesTimeline.logic, WorkLogEntryRow\u2192SimpleWorkEntryRow, adopt MessagesTimelineRow union, align .chat-markdown* class names). Critically: NO Panopticon code writes to user JSONL files \u2014 recovery is prevention-only; deacon detects and surfaces the corruption error but never repairs the file."
+      "Proposal": "Single coordinated refactor sequenced foundation-first: (1) make the parser stateful across incremental parses + fix all sort sites + audit message-id keying; (2) replace fixed-delay sendKeysAsync with capture-pane verification on both paste and Enter, with busy-state detection and a structured MessageDeliveryFailed error surfaced to a dashboard error channel; (3) make POST /api/conversations synchronous to tmux+Claude readiness so clicking + mounts a live conversation immediately and DraftConversationPanel/sessionAlive grace/message-arrival polling are deleted; (4) ship thinking-block expand UX, prevent signature corruption at write-time by stripping signature fields in copySessionFromCompactBoundary and forcing --no-resume on every specialist spawn, plus surface fork options (localSummaryOnly, includeThinkingInSummary) and a model-switch warning; (5) add a SQLite-backed outbox for HTTP-layer optimistic-send failures with retry/edit/copy/discard and merge it into the conversation timeline; (6) reposition the persistent favorited star into the right-aligned actions slot; (7) finish with a mechanical T3Code structural alignment (rename session-logic→MessagesTimeline.logic, WorkLogEntryRow→SimpleWorkEntryRow, adopt MessagesTimelineRow union, align .chat-markdown* class names). Critically: NO Panopticon code writes to user JSONL files — recovery is prevention-only; deacon detects and surfaces the corruption error but never repairs the file."
     },
     "items": [
       {
@@ -253,7 +253,7 @@
           "issueLabel": "pan-826"
         },
         "narrative": {
-          "Action": "Replace the fixed 600-3000ms delay in sendKeysAsync with a verification loop. (1) Paste via load-buffer + paste-buffer (existing pattern). (2) Poll capture-pane at 50ms intervals up to a 3s cap until the pasted text is visible in the input region. (3) Send C-m. (4) Poll capture-pane until the input region is empty / text moved out, with a bounded retry budget. (5) On failure, raise a structured MessageDeliveryFailed error with the captured pane state attached. (6) Detect Claude-busy state (e.g. 'Whirring\u2026' indicator) before paste and route to a busy-aware path that does NOT immediately paste-then-Enter, since the TUI buffers text without submitting in that state. The new helpers must be drop-in replacements at the call-site level."
+          "Action": "Replace the fixed 600-3000ms delay in sendKeysAsync with a verification loop. (1) Paste via load-buffer + paste-buffer (existing pattern). (2) Poll capture-pane at 50ms intervals up to a 3s cap until the pasted text is visible in the input region. (3) Send C-m. (4) Poll capture-pane until the input region is empty / text moved out, with a bounded retry budget. (5) On failure, raise a structured MessageDeliveryFailed error with the captured pane state attached. (6) Detect Claude-busy state (e.g. 'Whirring…' indicator) before paste and route to a busy-aware path that does NOT immediately paste-then-Enter, since the TUI buffers text without submitting in that state. The new helpers must be drop-in replacements at the call-site level."
         },
         "subItems": [
           {
@@ -330,7 +330,7 @@
           },
           {
             "id": "tmux-verify-callers.ac2",
-            "title": "Each caller has an explicit MessageDeliveryFailed handler \u2014 propagate, retry-once, or surface as a dashboard error event as appropriate for its context",
+            "title": "Each caller has an explicit MessageDeliveryFailed handler — propagate, retry-once, or surface as a dashboard error event as appropriate for its context",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -389,7 +389,7 @@
           "issueLabel": "pan-826"
         },
         "narrative": {
-          "Action": "In src/dashboard/server/routes/conversations.ts, await spawnConversationSession() and waitForClaudeReady() before returning. The 201 response carries the live conversation record. Remove the fire-and-forget background void task that paste-buffers a queued message \u2014 there is no queued message in the new flow. The request body becomes { model, effort } only (no `message`). Honor the existing 30s waitForClaudeReady timeout; on timeout return 504 with the partial conversation record so the user can retry or inspect tmux. All work must use execAsync / fs.promises per the dashboard server no-blocking-calls rule."
+          "Action": "In src/dashboard/server/routes/conversations.ts, await spawnConversationSession() and waitForClaudeReady() before returning. The 201 response carries the live conversation record. Remove the fire-and-forget background void task that paste-buffers a queued message — there is no queued message in the new flow. The request body becomes { model, effort } only (no `message`). Honor the existing 30s waitForClaudeReady timeout; on timeout return 504 with the partial conversation record so the user can retry or inspect tmux. All work must use execAsync / fs.promises per the dashboard server no-blocking-calls rule."
         },
         "subItems": [
           {
@@ -410,7 +410,7 @@
           },
           {
             "id": "synchronous-conversation-spawn.ac3",
-            "title": "Request body schema is { model, effort } only \u2014 no `message` field",
+            "title": "Request body schema is { model, effort } only — no `message` field",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -557,7 +557,7 @@
           "issueLabel": "pan-826"
         },
         "narrative": {
-          "Action": "Write a Playwright UAT that (a) clicks + and asserts the conversation mounts in under 1s with terminal + transcript visible, (b) sends a prompt that triggers three parallel tool calls plus a thinking block, (c) forces an incremental parse boundary mid-stream, (d) snapshots the rendered transcript order, (e) captures the terminal scrollback via the existing terminal stream, (f) asserts the transcript order matches the scrollback. The browser instance/profile MUST be isolated \u2014 do not depend on or share state with another agent's Playwright session. Any required login/setup must be reproducible inside the isolated session."
+          "Action": "Write a Playwright UAT that (a) clicks + and asserts the conversation mounts in under 1s with terminal + transcript visible, (b) sends a prompt that triggers three parallel tool calls plus a thinking block, (c) forces an incremental parse boundary mid-stream, (d) snapshots the rendered transcript order, (e) captures the terminal scrollback via the existing terminal stream, (f) asserts the transcript order matches the scrollback. The browser instance/profile MUST be isolated — do not depend on or share state with another agent's Playwright session. Any required login/setup must be reproducible inside the isolated session."
         },
         "subItems": [
           {
@@ -605,7 +605,7 @@
           "issueLabel": "pan-826"
         },
         "narrative": {
-          "Action": "Extend the per-row toggle pattern used for isTerminal entries to tone === 'thinking' rows in WorkLogEntryRow (will be SimpleWorkEntryRow after the rename \u2014 pick whichever name exists at implementation time and let the rename bead carry the change). Render the expanded body using the same container Bash uses, with prose-friendly styling for reasoning text (no monospace if not appropriate). Persist expansion state via the same expandedWorkGroups mechanism if T3Code does, otherwise per-row local state."
+          "Action": "Extend the per-row toggle pattern used for isTerminal entries to tone === 'thinking' rows in WorkLogEntryRow (will be SimpleWorkEntryRow after the rename — pick whichever name exists at implementation time and let the rename bead carry the change). Render the expanded body using the same container Bash uses, with prose-friendly styling for reasoning text (no monospace if not appropriate). Persist expansion state via the same expandedWorkGroups mechanism if T3Code does, otherwise per-row local state."
         },
         "subItems": [
           {
@@ -789,7 +789,7 @@
           "issueLabel": "pan-826"
         },
         "narrative": {
-          "Action": "In the deacon patrol loop (src/lib/cloister/deacon.ts), scan recent agent output for the literal 'Invalid signature in thinking block' error string. On detection, emit a structured `recovery.signature_corruption` event to the dashboard event stream with the workspace id, agent id, and a short user-facing message describing the corruption. Per the user's explicit decision: deacon performs NO automatic repair \u2014 no rename, no move, no JSONL writes. The dashboard surface tells the user the error occurred and (optionally) suggests next steps. Prevention via fork-strip-thinking-signature + specialists-no-resume removes the corruption source going forward; this detector only catches pre-existing corrupted JSONLs."
+          "Action": "In the deacon patrol loop (src/lib/cloister/deacon.ts), scan recent agent output for the literal 'Invalid signature in thinking block' error string. On detection, emit a structured `recovery.signature_corruption` event to the dashboard event stream with the workspace id, agent id, and a short user-facing message describing the corruption. Per the user's explicit decision: deacon performs NO automatic repair — no rename, no move, no JSONL writes. The dashboard surface tells the user the error occurred and (optionally) suggests next steps. Prevention via fork-strip-thinking-signature + specialists-no-resume removes the corruption source going forward; this detector only catches pre-existing corrupted JSONLs."
         },
         "subItems": [
           {
@@ -829,7 +829,7 @@
           "issueLabel": "pan-826"
         },
         "narrative": {
-          "Action": "Refresh docs/FORKS.md to cover: (1) summary fork vs plain fork \u2014 behavior and when to use each, (2) thinking-block behavior across forks (signatures stripped on summary, preserved on same-model plain), (3) token cost implications (summary much cheaper, plain re-uploads transcript), (4) cross-model gotchas (signatures, capability mismatches, why summary is safer across models), (5) the new localSummaryOnly and includeThinkingInSummary options."
+          "Action": "Refresh docs/FORKS.md to cover: (1) summary fork vs plain fork — behavior and when to use each, (2) thinking-block behavior across forks (signatures stripped on summary, preserved on same-model plain), (3) token cost implications (summary much cheaper, plain re-uploads transcript), (4) cross-model gotchas (signatures, capability mismatches, why summary is safer across models), (5) the new localSummaryOnly and includeThinkingInSummary options."
         },
         "subItems": [
           {
@@ -1060,7 +1060,7 @@
       },
       {
         "id": "t3code-rename-session-logic",
-        "title": "Rename src/dashboard/frontend/src/components/chat/session-logic.ts \u2192 MessagesTimeline.logic.ts",
+        "title": "Rename src/dashboard/frontend/src/components/chat/session-logic.ts → MessagesTimeline.logic.ts",
         "status": "pending",
         "priority": "medium",
         "created": "2026-04-26T01:33:53Z",
@@ -1092,7 +1092,7 @@
       },
       {
         "id": "t3code-rename-worklog-row",
-        "title": "Rename WorkLogEntryRow \u2192 SimpleWorkEntryRow and sweep all callers",
+        "title": "Rename WorkLogEntryRow → SimpleWorkEntryRow and sweep all callers",
         "status": "pending",
         "priority": "medium",
         "created": "2026-04-26T01:33:53Z",
@@ -1133,7 +1133,7 @@
           "issueLabel": "pan-826"
         },
         "narrative": {
-          "Action": "Replace ad-hoc row branching in MessagesTimeline with a `MessagesTimelineRow` discriminated union (`kind: 'message' | 'work' | 'proposed-plan' | 'working'` \u2014 confirm the exact variants by reading T3Code's chat module). Update the renderer to switch on `kind`. No feature regressions; pure structural alignment."
+          "Action": "Replace ad-hoc row branching in MessagesTimeline with a `MessagesTimelineRow` discriminated union (`kind: 'message' | 'work' | 'proposed-plan' | 'working'` — confirm the exact variants by reading T3Code's chat module). Update the renderer to switch on `kind`. No feature regressions; pure structural alignment."
         },
         "subItems": [
           {
@@ -1173,7 +1173,7 @@
           "issueLabel": "pan-826"
         },
         "narrative": {
-          "Action": "Rename CSS classes in the chat module's CSS module to match T3Code: .chat-markdown, .chat-markdown-codeblock, .chat-markdown-copy-button, .chat-markdown-shiki. Update all consumers. Markdown / Shiki rendering behavior is unchanged \u2014 only class names align."
+          "Action": "Rename CSS classes in the chat module's CSS module to match T3Code: .chat-markdown, .chat-markdown-codeblock, .chat-markdown-copy-button, .chat-markdown-shiki. Update all consumers. Markdown / Shiki rendering behavior is unchanged — only class names align."
         },
         "subItems": [
           {
@@ -1505,5 +1505,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

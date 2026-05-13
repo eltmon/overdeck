@@ -43,7 +43,7 @@
           "issueLabel": "pan-488"
         },
         "narrative": {
-          "Action": "Copy docs/REPO-ARTIFACTS.md from the main worktree (/home/eltmon/Projects/panopticon-cli/docs/REPO-ARTIFACTS.md) into the workspace branch and commit it. This is the authoritative design doc \u2014 do not rewrite it."
+          "Action": "Copy docs/REPO-ARTIFACTS.md from the main worktree (/home/eltmon/Projects/panopticon-cli/docs/REPO-ARTIFACTS.md) into the workspace branch and commit it. This is the authoritative design doc — do not rewrite it."
         },
         "subItems": [
           {
@@ -187,7 +187,7 @@
           "issueLabel": "pan-488"
         },
         "narrative": {
-          "Action": "Update planSync() and executeSync() in sync.ts to include .pan/skills/ from the project repo (at devroot) as a sync source. Precedence: 1) .claude/skills/<name>/ already exists \u2192 skip, 2) .pan/skills/<name>/ in project \u2192 write, 3) ~/.panopticon/skills/<name>/ \u2192 global fallback. Must integrate with the existing manifest-based conflict resolution."
+          "Action": "Update planSync() and executeSync() in sync.ts to include .pan/skills/ from the project repo (at devroot) as a sync source. Precedence: 1) .claude/skills/<name>/ already exists → skip, 2) .pan/skills/<name>/ in project → write, 3) ~/.panopticon/skills/<name>/ → global fallback. Must integrate with the existing manifest-based conflict resolution."
         },
         "subItems": [
           {
@@ -275,7 +275,7 @@
           "issueLabel": "pan-488"
         },
         "narrative": {
-          "Action": "Add a migration step in pan sync (or pan install) that renames .panopticon/ subdirs to .pan/ in active workspaces. Safety: check old path exists, verify new path does NOT already exist, then move. If both exist (partial previous run), log warning and skip \u2014 never overwrite silently. Skip ~/.panopticon/ (global tool dir, unchanged)."
+          "Action": "Add a migration step in pan sync (or pan install) that renames .panopticon/ subdirs to .pan/ in active workspaces. Safety: check old path exists, verify new path does NOT already exist, then move. If both exist (partial previous run), log warning and skip — never overwrite silently. Skip ~/.panopticon/ (global tool dir, unchanged)."
         },
         "subItems": [
           {
@@ -411,5 +411,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

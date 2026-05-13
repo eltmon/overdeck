@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-05T18:30:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-451: Conversation view \u2014 T3Code-style message rendering + tmux toggle for agent sessions"
+    "description": "Plan for PAN-451: Conversation view — T3Code-style message rendering + tmux toggle for agent sessions"
   },
   "plan": {
     "id": "pan-451",
-    "title": "Conversation view \u2014 T3Code-style message rendering + tmux toggle for agent sessions",
+    "title": "Conversation view — T3Code-style message rendering + tmux toggle for agent sessions",
     "status": "approved",
     "uid": "b55a7695-6756-417e-b6be-151953dda7cc",
     "author": "agent:claude-opus-4-6",
@@ -166,7 +166,7 @@
       },
       {
         "id": "jsonl-conversation-service",
-        "title": "JSONL conversation service \u2014 parser, file watcher, session discovery",
+        "title": "JSONL conversation service — parser, file watcher, session discovery",
         "status": "pending",
         "priority": "high",
         "created": "2026-04-05T18:30:00Z",
@@ -175,7 +175,7 @@
           "issueLabel": "pan-451"
         },
         "narrative": {
-          "Action": "Create src/dashboard/server/services/conversation-service.ts. Implement: (1) discoverSessionFile(cwd, afterTimestamp) \u2014 encode CWD to project dir path, poll for new .jsonl files created after the given timestamp, return path when found; (2) parseConversationMessages(sessionFile, fromByteOffset) \u2014 read JSONL from offset, parse each line into ChatMessage + WorkLogEntry arrays, return new offset for incremental parsing; (3) watchConversation(sessionFile, callback) \u2014 use fs.watch with 500ms polling fallback, call callback with new messages on file append. Transform JSONL content blocks: text \u2192 ChatMessage, tool_use \u2192 WorkLogEntry, tool_result \u2192 WorkLogEntry update. Cache parsed state per file (byte offset + parsed messages). Use async file reading only (fs/promises)."
+          "Action": "Create src/dashboard/server/services/conversation-service.ts. Implement: (1) discoverSessionFile(cwd, afterTimestamp) — encode CWD to project dir path, poll for new .jsonl files created after the given timestamp, return path when found; (2) parseConversationMessages(sessionFile, fromByteOffset) — read JSONL from offset, parse each line into ChatMessage + WorkLogEntry arrays, return new offset for incremental parsing; (3) watchConversation(sessionFile, callback) — use fs.watch with 500ms polling fallback, call callback with new messages on file append. Transform JSONL content blocks: text → ChatMessage, tool_use → WorkLogEntry, tool_result → WorkLogEntry update. Cache parsed state per file (byte offset + parsed messages). Use async file reading only (fs/promises)."
         },
         "subItems": [
           {
@@ -278,7 +278,7 @@
       },
       {
         "id": "chat-markdown",
-        "title": "ChatMarkdown component \u2014 markdown rendering with Shiki syntax highlighting",
+        "title": "ChatMarkdown component — markdown rendering with Shiki syntax highlighting",
         "status": "pending",
         "priority": "medium",
         "created": "2026-04-05T18:30:00Z",
@@ -334,7 +334,7 @@
       },
       {
         "id": "messages-timeline",
-        "title": "MessagesTimeline \u2014 virtualized scrolling message display",
+        "title": "MessagesTimeline — virtualized scrolling message display",
         "status": "pending",
         "priority": "medium",
         "created": "2026-04-05T18:30:00Z",
@@ -398,7 +398,7 @@
       },
       {
         "id": "composer-prompt-editor",
-        "title": "ComposerPromptEditor \u2014 Lexical-based text input",
+        "title": "ComposerPromptEditor — Lexical-based text input",
         "status": "pending",
         "priority": "medium",
         "created": "2026-04-05T18:30:00Z",
@@ -454,7 +454,7 @@
       },
       {
         "id": "composer-footer",
-        "title": "ComposerFooter \u2014 input bar with model picker, effort picker, send button",
+        "title": "ComposerFooter — input bar with model picker, effort picker, send button",
         "status": "pending",
         "priority": "medium",
         "created": "2026-04-05T18:30:00Z",
@@ -510,7 +510,7 @@
       },
       {
         "id": "conversation-panel",
-        "title": "ConversationPanel \u2014 toggle wrapper with conversation and terminal views",
+        "title": "ConversationPanel — toggle wrapper with conversation and terminal views",
         "status": "pending",
         "priority": "medium",
         "created": "2026-04-05T18:30:00Z",
@@ -583,7 +583,7 @@
           "issueLabel": "pan-451"
         },
         "narrative": {
-          "Action": "In MissionControl/index.tsx, replace <ConversationTerminal conversation={conv} /> with <ConversationPanel conversation={conv} /> in the content area rendering (around line 252). Update imports. Ensure ConversationTerminal.tsx is either removed or kept as a fallback. Update CSS module if needed for ConversationPanel layout. Verify selection behavior (conversation selected \u2192 content shows ConversationPanel, feature selected \u2192 shows ActivityView) is preserved."
+          "Action": "In MissionControl/index.tsx, replace <ConversationTerminal conversation={conv} /> with <ConversationPanel conversation={conv} /> in the content area rendering (around line 252). Update imports. Ensure ConversationTerminal.tsx is either removed or kept as a fallback. Update CSS module if needed for ConversationPanel layout. Verify selection behavior (conversation selected → content shows ConversationPanel, feature selected → shows ActivityView) is preserved."
         },
         "subItems": [
           {
@@ -690,5 +690,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

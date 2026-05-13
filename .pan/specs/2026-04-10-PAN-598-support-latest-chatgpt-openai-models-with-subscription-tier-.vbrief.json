@@ -124,7 +124,7 @@
           "issueLabel": "pan-598"
         },
         "narrative": {
-          "Action": "Add getClaudishPrefix(model, authMode) function to providers.ts or agents.ts. Maps model + auth mode to claudish prefix: subscription \u2192 cx@ (or verified ChatGPT OAuth prefix), api-key \u2192 oai@. Verify correct ChatGPT OAuth prefix from claudish source/docs."
+          "Action": "Add getClaudishPrefix(model, authMode) function to providers.ts or agents.ts. Maps model + auth mode to claudish prefix: subscription → cx@ (or verified ChatGPT OAuth prefix), api-key → oai@. Verify correct ChatGPT OAuth prefix from claudish source/docs."
         },
         "subItems": [
           {
@@ -188,7 +188,7 @@
           "issueLabel": "pan-598"
         },
         "narrative": {
-          "Action": "Extend model-fallback.ts to prefer within-provider downgrade (e.g., gpt-5.4 Pro unavailable \u2192 gpt-5.4-mini Plus) before switching to Anthropic. Update FALLBACK_MAP and applyFallback() to check tier availability."
+          "Action": "Extend model-fallback.ts to prefer within-provider downgrade (e.g., gpt-5.4 Pro unavailable → gpt-5.4-mini Plus) before switching to Anthropic. Update FALLBACK_MAP and applyFallback() to check tier availability."
         },
         "subItems": [
           {
@@ -444,5 +444,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

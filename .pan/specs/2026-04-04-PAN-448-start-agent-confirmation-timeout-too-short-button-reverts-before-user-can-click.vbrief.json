@@ -1,21 +1,54 @@
 {
-  "issue": "PAN-448",
-  "title": "Start Agent confirmation timeout too short \u2014 button reverts before user can click",
-  "summary": "Increase the Start Agent inline confirmation timeout from 6s to 7s in KanbanBoard.tsx",
-  "difficulty": "trivial",
-  "model": "haiku",
-  "items": [
-    {
-      "id": "pan-448-1",
-      "title": "Increase confirmation timeout to 7s",
-      "description": "Change setTimeout value from 6000 to 7000 in handleStartAgent function and update the comment from '6s' to '7s'",
-      "file": "src/dashboard/frontend/src/components/KanbanBoard.tsx",
-      "difficulty": "trivial",
-      "acceptance": [
-        "setTimeout value is 7000 (was 6000)",
-        "Comment reflects 7s timeout",
-        "Typecheck passes"
-      ]
-    }
-  ]
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-13T21:33:31.081Z"
+  },
+  "plan": {
+    "id": "PAN-448",
+    "title": "Start Agent confirmation timeout too short — button reverts before user can click",
+    "status": "proposed",
+    "items": [
+      {
+        "id": "pan-448-1",
+        "title": "Increase confirmation timeout to 7s",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "trivial",
+          "files": []
+        },
+        "narrative": {
+          "Action": "Change setTimeout value from 6000 to 7000 in handleStartAgent function and update the comment from '6s' to '7s'"
+        },
+        "subItems": [
+          {
+            "id": "pan-448-1.ac1",
+            "title": "setTimeout value is 7000 (was 6000)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-448-1.ac2",
+            "title": "Comment reflects 7s timeout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-448-1.ac3",
+            "title": "Typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
 }

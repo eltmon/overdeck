@@ -28,7 +28,7 @@
       "cli"
     ],
     "narratives": {
-      "Problem": "Model selection is global \u2014 the same model is used for each workflow phase across all projects and issues. Users need per-project and per-issue control for different cost/quality tradeoffs.",
+      "Problem": "Model selection is global — the same model is used for each workflow phase across all projects and issues. Users need per-project and per-issue control for different cost/quality tradeoffs.",
       "Proposal": "Add two new resolution layers (per-issue workspace overrides and per-project projects.yaml models block) above the existing config chain, a split Start Agent button with model dropdown, a pan workspace config CLI command, and InspectorPanel model badges."
     },
     "items": [
@@ -131,7 +131,7 @@
           "issueLabel": "pan-532"
         },
         "narrative": {
-          "Action": "Create `resolveModelForWorkType(issueId: string, workTypeId: WorkTypeId): Promise<{ model: ModelId; source: 'issue' | 'project' | 'config' | 'smart' } | undefined>` that checks: 1) per-issue overrides (requires resolving workspace path from issue ID), 2) per-project overrides (resolveProjectFromIssue \u2192 project.models), 3) returns undefined to fall through to existing config chain. Place in src/lib/model-resolution.ts as a new module."
+          "Action": "Create `resolveModelForWorkType(issueId: string, workTypeId: WorkTypeId): Promise<{ model: ModelId; source: 'issue' | 'project' | 'config' | 'smart' } | undefined>` that checks: 1) per-issue overrides (requires resolving workspace path from issue ID), 2) per-project overrides (resolveProjectFromIssue → project.models), 3) returns undefined to fall through to existing config chain. Place in src/lib/model-resolution.ts as a new module."
         },
         "subItems": [
           {
@@ -644,5 +644,6 @@
         "type": "blocks"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

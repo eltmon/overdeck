@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-05T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-470: Rewrite route handlers to idiomatic Effect \u2014 eliminate runSync, try/catch, sync I/O"
+    "description": "Plan for PAN-470: Rewrite route handlers to idiomatic Effect — eliminate runSync, try/catch, sync I/O"
   },
   "plan": {
     "id": "pan-470",
-    "title": "Rewrite route handlers to idiomatic Effect \u2014 eliminate runSync, try/catch, sync I/O",
+    "title": "Rewrite route handlers to idiomatic Effect — eliminate runSync, try/catch, sync I/O",
     "status": "completed",
     "uid": "6b133a22-8001-4a98-970d-918f6eda7f4d",
     "author": "agent:claude-opus-4-6",
@@ -29,7 +29,7 @@
       "async"
     ],
     "narratives": {
-      "Problem": "Route handlers wrap imperative code in Effect.promise(async () => { try/catch }) and call Effect.runSync \u2014 48 runSync calls, 376 try/catch blocks, 335 sync FS calls across 13 files (15K lines). This defeats Effect's error channels, blocks the event loop, and duplicates error-handling boilerplate.",
+      "Problem": "Route handlers wrap imperative code in Effect.promise(async () => { try/catch }) and call Effect.runSync — 48 runSync calls, 376 try/catch blocks, 335 sync FS calls across 13 files (15K lines). This defeats Effect's error channels, blocks the event loop, and duplicates error-handling boilerplate.",
       "Proposal": "Create a typed httpHandler wrapper that maps TaggedErrors to HTTP status codes, then rewrite all 13 route files to compose effects idiomatically with yield*, replace sync FS with fs/promises, fix 5 service-layer issues, and add proper Effect-level tests."
     },
     "items": [
@@ -45,7 +45,7 @@
           "issueLabel": "pan-470"
         },
         "narrative": {
-          "Action": "Create src/dashboard/server/routes/http-handler.ts. Implement httpHandler<R>(effect) that uses Effect.catchTags to map each TaggedError to the correct HTTP status (IssueNotFound\u2192404, RateLimited\u2192429, TrackerNotConfigured\u2192503, AgentAlreadyRunning\u2192409, BeadsNotInitialized/PlanEmpty\u2192422, TrackerApiError\u2192502, WorkspaceCreateError/AgentStartError\u2192500) with a catchAll fallback to 500. Export a RouteError union type."
+          "Action": "Create src/dashboard/server/routes/http-handler.ts. Implement httpHandler<R>(effect) that uses Effect.catchTags to map each TaggedError to the correct HTTP status (IssueNotFound→404, RateLimited→429, TrackerNotConfigured→503, AgentAlreadyRunning→409, BeadsNotInitialized/PlanEmpty→422, TrackerApiError→502, WorkspaceCreateError/AgentStartError→500) with a catchAll fallback to 500. Export a RouteError union type."
         },
         "subItems": [
           {
@@ -68,7 +68,7 @@
           },
           {
             "id": "http-handler.ac3",
-            "title": "Unit test covers each error type \u2192 status code mapping",
+            "title": "Unit test covers each error type → status code mapping",
             "status": "completed",
             "completed": "2026-04-05T23:15:00Z",
             "metadata": {
@@ -274,7 +274,7 @@
           "issueLabel": "pan-470"
         },
         "narrative": {
-          "Action": "1) Add httpHandler unit tests covering all error\u2192status mappings. 2) Add integration tests using *Live layers with only external APIs (Linear, GitHub, filesystem) mocked \u2014 test that Effect composition actually works end-to-end. 3) Test error channel propagation through composed layers. 4) Rename current 'integration' test files to 'unit' since they use full vi.mock. 5) Verify existing tests still pass after route rewrites."
+          "Action": "1) Add httpHandler unit tests covering all error→status mappings. 2) Add integration tests using *Live layers with only external APIs (Linear, GitHub, filesystem) mocked — test that Effect composition actually works end-to-end. 3) Test error channel propagation through composed layers. 4) Rename current 'integration' test files to 'unit' since they use full vi.mock. 5) Verify existing tests still pass after route rewrites."
         },
         "subItems": [
           {
@@ -353,5 +353,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "completed"
 }

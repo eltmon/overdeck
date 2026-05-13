@@ -33,10 +33,10 @@
       "dag"
     ],
     "narratives": {
-      "Problem": "Panopticon runs one work agent per issue. vBRIEF DAGs often have independent parallel lanes, but items execute serially. Deft's swarm requires Warp terminal \u2014 we need a terminal-agnostic approach that leverages our existing tmux, Cloister, and worktree infrastructure.",
+      "Problem": "Panopticon runs one work agent per issue. vBRIEF DAGs often have independent parallel lanes, but items execute serially. Deft's swarm requires Warp terminal — we need a terminal-agnostic approach that leverages our existing tmux, Cloister, and worktree infrastructure.",
       "Proposal": "Build a wave scheduler that partitions vBRIEF items by dependency waves, spawns one agent per item-group in separate git worktrees, and orchestrates merge cascades between waves. Cloister is the monitor. The specialist pipeline runs once on the final merged result.",
-      "Constraint": "Must not break single-agent mode \u2014 swarm is opt-in via `pan swarm`. Must use existing workspace, tmux, and Cloister infrastructure. Merge cascade must be serialized to avoid conflict races. File-overlap audit must prevent concurrent modification of the same files.",
-      "Risk": "Merge conflicts between worktrees in the same wave. File-overlap detection is heuristic \u2014 narrative analysis may miss implicit dependencies. Resource consumption scales linearly with agent count (RAM, API cost)."
+      "Constraint": "Must not break single-agent mode — swarm is opt-in via `pan swarm`. Must use existing workspace, tmux, and Cloister infrastructure. Merge cascade must be serialized to avoid conflict races. File-overlap audit must prevent concurrent modification of the same files.",
+      "Risk": "Merge conflicts between worktrees in the same wave. File-overlap detection is heuristic — narrative analysis may miss implicit dependencies. Resource consumption scales linearly with agent count (RAM, API cost)."
     },
     "items": [
       {
@@ -49,12 +49,12 @@
           "phase": 1
         },
         "narrative": {
-          "Action": "Create a wave scheduler function that takes a VBriefDocument and partitions items into ordered waves using Kahn's algorithm on `blocks` edges (same foundation as criticalPath() in dag.ts). Wave 1 contains items with no unmet dependencies, wave 2 contains items whose blockers are all in wave 1, etc. Only `blocks` edges constrain wave assignment \u2014 `informs`, `suggests`, `invalidates` are ignored. Output: Wave[] with item assignments per wave, total wave count, and max parallelism (largest wave). Add to src/lib/vbrief/dag.ts alongside criticalPath()."
+          "Action": "Create a wave scheduler function that takes a VBriefDocument and partitions items into ordered waves using Kahn's algorithm on `blocks` edges (same foundation as criticalPath() in dag.ts). Wave 1 contains items with no unmet dependencies, wave 2 contains items whose blockers are all in wave 1, etc. Only `blocks` edges constrain wave assignment — `informs`, `suggests`, `invalidates` are ignored. Output: Wave[] with item assignments per wave, total wave count, and max parallelism (largest wave). Add to src/lib/vbrief/dag.ts alongside criticalPath()."
         },
         "subItems": [
           {
             "id": "wave-scheduler.partition",
-            "title": "Items correctly partitioned into waves using only `blocks` edges \u2014 no item appears before its blockers",
+            "title": "Items correctly partitioned into waves using only `blocks` edges — no item appears before its blockers",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -88,7 +88,7 @@
           "phase": 1
         },
         "narrative": {
-          "Action": "Before assigning items within a wave to separate agents, analyze which files each item is likely to touch. Sources: vBRIEF narrative text (extract file paths and component names), acceptance criteria text, and optionally historical file-touch data from prior agent runs (git log of completed items). When two items in the same wave have overlapping file sets, serialize them \u2014 move one to the next wave or group them on the same agent. Output a conflict report showing which items were regrouped and why. This is heuristic, not perfect \u2014 the goal is to catch obvious conflicts (two items both editing the same component file)."
+          "Action": "Before assigning items within a wave to separate agents, analyze which files each item is likely to touch. Sources: vBRIEF narrative text (extract file paths and component names), acceptance criteria text, and optionally historical file-touch data from prior agent runs (git log of completed items). When two items in the same wave have overlapping file sets, serialize them — move one to the next wave or group them on the same agent. Output a conflict report showing which items were regrouped and why. This is heuristic, not perfect — the goal is to catch obvious conflicts (two items both editing the same component file)."
         },
         "subItems": [
           {
@@ -127,7 +127,7 @@
           "phase": 2
         },
         "narrative": {
-          "Action": "Extend createWorkspace() in workspace-manager.ts to support slot-numbered worktrees: `workspaces/feature-<issueId>-slot-<N>/` with branches `feature/<issueId>/slot-<N>`. Each slot gets its own bun install, build, and .pan/spec.vbrief.json. Extend agent spawn (start-agent endpoint) to accept a slot number \u2014 tmux sessions become `agent-<issueId>-<N>`. Agent state directories become `~/.panopticon/agents/agent-<issueId>-<N>/`. The full vBRIEF is copied to each slot but the agent prompt includes only its assigned item IDs. Beads are created per-slot with bd claims on the assigned items. Single-agent mode (no slot parameter) remains the default \u2014 backward compatible."
+          "Action": "Extend createWorkspace() in workspace-manager.ts to support slot-numbered worktrees: `workspaces/feature-<issueId>-slot-<N>/` with branches `feature/<issueId>/slot-<N>`. Each slot gets its own bun install, build, and .pan/spec.vbrief.json. Extend agent spawn (start-agent endpoint) to accept a slot number — tmux sessions become `agent-<issueId>-<N>`. Agent state directories become `~/.panopticon/agents/agent-<issueId>-<N>/`. The full vBRIEF is copied to each slot but the agent prompt includes only its assigned item IDs. Beads are created per-slot with bd claims on the assigned items. Single-agent mode (no slot parameter) remains the default — backward compatible."
         },
         "subItems": [
           {
@@ -213,12 +213,12 @@
           "phase": 3
         },
         "narrative": {
-          "Action": "Extend Cloister's lifecycle management to handle swarm orchestration. Add a wave state machine: idle \u2192 wave-N-running \u2192 wave-N-merging \u2192 wave-N+1-running \u2192 all-waves-complete \u2192 specialist-pipeline. On swarm start: spawn all agents for wave 1 (one per slot). Monitor all slots \u2014 existing stuck detection and health checks apply per-slot. A wave completes when ALL slots signal done. On wave completion: trigger merge cascade, then spawn next wave. On all-waves-complete: transition to specialist pipeline (VERIFY \u2192 REVIEW \u2192 TEST \u2192 MERGE) which runs once on the merged feature branch. Handle partial wave failure: if one slot is stuck and unstuck-able, allow manual override to proceed."
+          "Action": "Extend Cloister's lifecycle management to handle swarm orchestration. Add a wave state machine: idle → wave-N-running → wave-N-merging → wave-N+1-running → all-waves-complete → specialist-pipeline. On swarm start: spawn all agents for wave 1 (one per slot). Monitor all slots — existing stuck detection and health checks apply per-slot. A wave completes when ALL slots signal done. On wave completion: trigger merge cascade, then spawn next wave. On all-waves-complete: transition to specialist pipeline (VERIFY → REVIEW → TEST → MERGE) which runs once on the merged feature branch. Handle partial wave failure: if one slot is stuck and unstuck-able, allow manual override to proceed."
         },
         "subItems": [
           {
             "id": "cloister-monitor.wave-fsm",
-            "title": "Wave state machine transitions correctly through running \u2192 merging \u2192 next-wave \u2192 specialist-pipeline",
+            "title": "Wave state machine transitions correctly through running → merging → next-wave → specialist-pipeline",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -234,7 +234,7 @@
           },
           {
             "id": "cloister-monitor.stuck-per-slot",
-            "title": "Stuck detection operates per-slot \u2014 one stuck agent does not block health checks on other slots",
+            "title": "Stuck detection operates per-slot — one stuck agent does not block health checks on other slots",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -260,7 +260,7 @@
           "phase": 3
         },
         "narrative": {
-          "Action": "When a wave completes, run the merge cascade on all slot worktrees. Order worktrees by topological sort of their assigned items. For each worktree in order: (1) rebase onto latest feature branch, (2) run verification gate (typecheck + lint + test), (3) if verification passes squash-merge into feature branch, (4) if conflict arises attempt auto-resolution and if that fails mark the wave as 'conflict' and halt for human intervention. The cascade is serialized \u2014 no concurrent merges. After successful cascade, clean up slot worktrees and branches. Use the existing verification gate infrastructure from PAN-174."
+          "Action": "When a wave completes, run the merge cascade on all slot worktrees. Order worktrees by topological sort of their assigned items. For each worktree in order: (1) rebase onto latest feature branch, (2) run verification gate (typecheck + lint + test), (3) if verification passes squash-merge into feature branch, (4) if conflict arises attempt auto-resolution and if that fails mark the wave as 'conflict' and halt for human intervention. The cascade is serialized — no concurrent merges. After successful cascade, clean up slot worktrees and branches. Use the existing verification gate infrastructure from PAN-174."
         },
         "subItems": [
           {
@@ -346,7 +346,7 @@
           "phase": 4
         },
         "narrative": {
-          "Action": "Create a WorkGroup component in FeatureItem.tsx that mirrors the existing ReviewGroup pattern. When an issue has swarm state (mode='swarm'), render work agents under a collapsible '\u25b8 Work (Wave N \u00b7 X/Y items)' heading. Each agent node shows: assigned vBRIEF item titles, beads completion progress, agent status, model name. The group header shows the current wave number and aggregate progress. When mode='single', fall back to existing flat session display. Extend collectSessionTreeNodes() in projects.ts to discover slot-numbered agent sessions."
+          "Action": "Create a WorkGroup component in FeatureItem.tsx that mirrors the existing ReviewGroup pattern. When an issue has swarm state (mode='swarm'), render work agents under a collapsible '▸ Work (Wave N · X/Y items)' heading. Each agent node shows: assigned vBRIEF item titles, beads completion progress, agent status, model name. The group header shows the current wave number and aggregate progress. When mode='single', fall back to existing flat session display. Extend collectSessionTreeNodes() in projects.ts to discover slot-numbered agent sessions."
         },
         "subItems": [
           {
@@ -385,7 +385,7 @@
           "phase": 5
         },
         "narrative": {
-          "Action": "Extend the PAN-969 Directive Flow DAG to render swarm state. Work item nodes get a colored slot badge when assigned to an agent (slot 1 = blue, slot 2 = green, slot 3 = orange, etc.). Multiple items glow simultaneously when their agents are running. Add subtle horizontal wave separators between dependency waves in the Dagre layout (using rank constraints). Summary strip shows wave progress: 'Wave 2/3 \u00b7 3 agents \u00b7 5/11 items'. Merge cascade state shows on the DAG as a temporary overlay between waves. When mode='single', no slot badges or wave separators render."
+          "Action": "Extend the PAN-969 Directive Flow DAG to render swarm state. Work item nodes get a colored slot badge when assigned to an agent (slot 1 = blue, slot 2 = green, slot 3 = orange, etc.). Multiple items glow simultaneously when their agents are running. Add subtle horizontal wave separators between dependency waves in the Dagre layout (using rank constraints). Summary strip shows wave progress: 'Wave 2/3 · 3 agents · 5/11 items'. Merge cascade state shows on the DAG as a temporary overlay between waves. When mode='single', no slot badges or wave separators render."
         },
         "subItems": [
           {
@@ -432,7 +432,7 @@
           "phase": 2
         },
         "narrative": {
-          "Action": "Create a swarm variant of the work agent prompt that constrains the agent to its assigned items. The prompt includes: the full vBRIEF (for context), the list of item IDs this agent owns, explicit instruction to only modify files related to its items, instruction to use bd claim to mark items in_progress and bd close on completion, and coordination notes (other agents are working on other items simultaneously \u2014 do not modify shared files outside your scope). The prompt template lives alongside the existing agent prompt templates. The agent still sees the full DAG so it understands how its work fits into the larger picture."
+          "Action": "Create a swarm variant of the work agent prompt that constrains the agent to its assigned items. The prompt includes: the full vBRIEF (for context), the list of item IDs this agent owns, explicit instruction to only modify files related to its items, instruction to use bd claim to mark items in_progress and bd close on completion, and coordination notes (other agents are working on other items simultaneously — do not modify shared files outside your scope). The prompt template lives alongside the existing agent prompt templates. The agent still sees the full DAG so it understands how its work fits into the larger picture."
         },
         "subItems": [
           {
@@ -529,5 +529,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

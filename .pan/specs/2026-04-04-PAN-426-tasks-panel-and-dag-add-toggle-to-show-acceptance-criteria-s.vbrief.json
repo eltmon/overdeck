@@ -18,8 +18,8 @@
       "Problem": "The Tasks panel and DAG visualization show beads (top-level plan items) but not their acceptance criteria subtasks. Users cannot see AC progress without clicking into individual DAG nodes. There is no real-time update when AC status changes.",
       "Proposal": "Add AC visibility to both views: (1) List view gets expand/collapse per bead with AC checklist and count badge, (2) DAG gets a Show AC toggle that expands nodes to show inline checklists plus an always-visible AC progress badge, (3) New socket.io event for real-time subitem status updates.",
       "Constraint": "Must reuse existing plan data (already fetched via useQuery). No new API endpoints. Follow existing patterns for socket.io events (parallel to plan:item-status-changed). DAG node height must be dynamic when AC is shown.",
-      "Risk": "DAG layout must re-run when AC toggle changes (dagre recompute). Large plans with many ACs per node could make the DAG visually busy \u2014 mitigated by off-by-default toggle. Bead-to-plan-item matching relies on title convention which could fail for renamed items.",
-      "Alternative": "Child nodes in DAG (rejected \u2014 makes DAG too large/busy). Always-visible AC in list (rejected \u2014 list becomes too long). Global toggle for list view (rejected \u2014 per-bead expand gives more control)."
+      "Risk": "DAG layout must re-run when AC toggle changes (dagre recompute). Large plans with many ACs per node could make the DAG visually busy — mitigated by off-by-default toggle. Bead-to-plan-item matching relies on title convention which could fail for renamed items.",
+      "Alternative": "Child nodes in DAG (rejected — makes DAG too large/busy). Always-visible AC in list (rejected — list becomes too long). Global toggle for list view (rejected — per-bead expand gives more control)."
     },
     "items": [
       {
@@ -139,7 +139,7 @@
           },
           {
             "id": "dag-ac-toggle.off-by-default",
-            "title": "Toggle is off by default \u2014 current compact node behavior preserved",
+            "title": "Toggle is off by default — current compact node behavior preserved",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -157,7 +157,7 @@
           "issueLabel": "pan-426"
         },
         "narrative": {
-          "Action": "Server side: emit 'plan:subitem-status-changed' event (with issueId, itemId, subItemId, status) wherever subitem status is updated \u2014 find the call sites for updateSubItemStatus in dashboard server code. Frontend side: in PlanDAGViewer, add a socket listener for 'plan:subitem-status-changed' that updates the React Query cache in-place (updating the specific subItem's status within the matching item). BeadsTasksPanel already shares the same query key so both views update."
+          "Action": "Server side: emit 'plan:subitem-status-changed' event (with issueId, itemId, subItemId, status) wherever subitem status is updated — find the call sites for updateSubItemStatus in dashboard server code. Frontend side: in PlanDAGViewer, add a socket listener for 'plan:subitem-status-changed' that updates the React Query cache in-place (updating the specific subItem's status within the matching item). BeadsTasksPanel already shares the same query key so both views update."
         },
         "subItems": [
           {
@@ -204,5 +204,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }

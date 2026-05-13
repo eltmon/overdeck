@@ -3,7 +3,7 @@
     "version": "0.5",
     "created": "2026-04-05T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-406: Workspace detail \u2014 replace polling logs with live interactive terminal"
+    "description": "Plan for PAN-406: Workspace detail — replace polling logs with live interactive terminal"
   },
   "plan": {
     "id": "pan-406",
@@ -64,7 +64,7 @@
           },
           {
             "id": "replace-polling-with-xterminal.ac3",
-            "title": "No Status tab \u2014 terminal fills the entire panel",
+            "title": "No Status tab — terminal fills the entire panel",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -72,7 +72,7 @@
           },
           {
             "id": "replace-polling-with-xterminal.ac4",
-            "title": "No separate send-message input \u2014 user types directly in the terminal",
+            "title": "No separate send-message input — user types directly in the terminal",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -90,5 +90,6 @@
       }
     ],
     "edges": []
-  }
+  },
+  "status": "proposed"
 }

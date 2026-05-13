@@ -3,11 +3,11 @@
     "version": "0.5",
     "created": "2026-04-20T00:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-783: Agents Page Redesign \u2014 Unified Multi-View Experience"
+    "description": "Plan for PAN-783: Agents Page Redesign — Unified Multi-View Experience"
   },
   "plan": {
     "id": "pan-783",
-    "title": "Agents Page Redesign \u2014 Unified Multi-View Experience",
+    "title": "Agents Page Redesign — Unified Multi-View Experience",
     "status": "approved",
     "uid": "55b53b25-fdca-4ac2-b3d7-467b34f770e7",
     "author": "agent:K2.6-code-preview",
@@ -30,7 +30,7 @@
     ],
     "narratives": {
       "Problem": "The current agent experience is fragmented: AgentList shows only Cloister + specialists (no work agents), GodView shows work agents in a cinematic grid but lacks dense views, timeline history, and relationship topology. Detail view is a full-screen modal that loses context.",
-      "Proposal": "Create a single AgentsPage with four view modes (Live Grid, Command Table, Timeline, Topology), a slide-out detail panel, unified agent type, Cloister banner, stats row, and right panel \u2014 all event-sourced via WebSocket with URL-addressable state and keyboard shortcuts."
+      "Proposal": "Create a single AgentsPage with four view modes (Live Grid, Command Table, Timeline, Topology), a slide-out detail panel, unified agent type, Cloister banner, stats row, and right panel — all event-sourced via WebSocket with URL-addressable state and keyboard shortcuts."
     },
     "items": [
       {
@@ -740,12 +740,12 @@
           "issueLabel": "pan-783"
         },
         "narrative": {
-          "Action": "Build pipeline flow topology showing issue lifecycle: planning \u2192 work \u2192 review \u2192 test \u2192 merge. Agents grouped by issue."
+          "Action": "Build pipeline flow topology showing issue lifecycle: planning → work → review → test → merge. Agents grouped by issue."
         },
         "subItems": [
           {
             "id": "topology-pipeline-view.ac1",
-            "title": "Shows pipeline stages: planning \u2192 work \u2192 review \u2192 test \u2192 merge",
+            "title": "Shows pipeline stages: planning → work → review → test → merge",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -828,7 +828,7 @@
           "issueLabel": "pan-783"
         },
         "narrative": {
-          "Action": "Build the 520px animated slide-out panel from the right side with tab navigation. Not a modal \u2014 preserves context of the view behind it."
+          "Action": "Build the 520px animated slide-out panel from the right side with tab navigation. Not a modal — preserves context of the view behind it."
         },
         "subItems": [
           {
@@ -841,7 +841,7 @@
           },
           {
             "id": "slide-out-detail-panel.ac2",
-            "title": "Not a modal overlay \u2014 view behind remains visible and interactive",
+            "title": "Not a modal overlay — view behind remains visible and interactive",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1180,7 +1180,7 @@
           "issueLabel": "pan-783"
         },
         "narrative": {
-          "Action": "Remove AgentList.tsx import and usage from App.tsx. Mark component as deprecated. Do NOT delete the file yet \u2014 keep for reference during transition."
+          "Action": "Remove AgentList.tsx import and usage from App.tsx. Mark component as deprecated. Do NOT delete the file yet — keep for reference during transition."
         },
         "subItems": [
           {
@@ -1450,5 +1450,6 @@
         "type": "informs"
       }
     ]
-  }
+  },
+  "status": "proposed"
 }
