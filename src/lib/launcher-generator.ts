@@ -328,6 +328,8 @@ function buildCommand(config: LauncherConfig): string[] {
 
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
+      let cmd = config.baseCommand;
+      cmd += buildChannelsArgs(config);
       const args: string[] = [];
       if (config.resumeSessionId) {
         args.push(`--resume ${shellQuote(config.resumeSessionId)}`);
@@ -337,7 +339,7 @@ function buildCommand(config: LauncherConfig): string[] {
       if (config.extraArgs) {
         args.push(config.extraArgs);
       }
-      parts.push(`${config.baseCommand} ${args.join(' ')}`.trim());
+      parts.push(`${cmd} ${args.join(' ')}`.trim());
     }
     return parts;
   }

@@ -74,7 +74,7 @@ import {
   waitForClaudePrompt,
   listSessionNamesAsync,
 } from '../../../lib/tmux.js';
-import { deliverAgentMessage, writeChannelsBridgeMcpConfig } from '../../../lib/agents.js';
+import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog } from '../../../lib/agents.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
 import {
   getAgentRuntimeBaseCommand,
@@ -974,6 +974,12 @@ async function spawnConversationSession(
       );
     }
     throw err;
+  }
+
+  // Channels: dismiss the dev-channels confirmation dialog so the bridge
+  // MCP server starts and the socket is created before any message delivery.
+  if (channelsBridgeMcpConfig) {
+    await dismissDevChannelsDialog(tmuxSession);
   }
 
   // Keep session alive when clients disconnect

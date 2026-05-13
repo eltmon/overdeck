@@ -1027,15 +1027,14 @@ export async function writeChannelsBridgeMcpConfig(
 ): Promise<void> {
   const fsp = await import('fs/promises');
   await fsp.mkdir(dirname(configPath), { recursive: true });
-  // Resolve the bridge entrypoint relative to this module so the config is
-  // valid no matter where the workspace lives. We write the path of the
-  // checked-in bridge script — the launcher invokes it with `bun run`.
-  const repoBridgePath = join(
-    // src/lib/agents.ts → src/lib/channels/panopticon-bridge.ts
-    dirname(import.meta.url.replace('file://', '')),
-    'channels',
-    'panopticon-bridge.ts',
-  );
+  // Resolve the bridge entrypoint from the project root. The source file
+  // lives in src/lib/channels/ and is executed directly via `bun run`
+  // (Bun runs TypeScript without pre-compilation). We must point at the
+  // source, not a dist copy, because the build does not copy the bridge
+  // script into the bundle output.
+  const here = dirname(import.meta.url.replace('file://', ''));
+  const projectRoot = join(here, '..', '..');
+  const repoBridgePath = join(projectRoot, 'src', 'lib', 'channels', 'panopticon-bridge.ts');
   const mcpConfig = {
     mcpServers: {
       'panopticon-bridge': {
