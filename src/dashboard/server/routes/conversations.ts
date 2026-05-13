@@ -75,6 +75,7 @@ import {
   listSessionNamesAsync,
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage } from '../../../lib/agents.js';
+import { loadSettingsApi } from '../../../lib/settings-api.js';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
@@ -646,12 +647,17 @@ export async function handleConversationMessage(
   // Deliver via deliverAgentMessage so channels eligibility and fallback
   // policy are respected (PAN-1123). For Pi agents this resolves to tmux
   // because channels eligibility requires harness === 'claude-code'.
+  let deliveryMethod = conv.deliveryMethod;
+  if (!deliveryMethod) {
+    const settings = loadSettingsApi();
+    deliveryMethod = settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux';
+  }
   try {
     await deliverAgentMessage(
       conv.tmuxSession,
       message,
       'conversation-message',
-      conv.deliveryMethod ?? undefined,
+      deliveryMethod,
     );
   } catch (deliveryErr: unknown) {
     const errMsg = deliveryErr instanceof Error ? deliveryErr.message : String(deliveryErr);
@@ -1244,7 +1250,9 @@ const postConversationRoute = HttpRouter.add(
         // If a message was provided (legacy callers), send it now.
         // Both harnesses now use tmux paste-buffer delivery (Pi TUI mode + Claude Code).
         if (message) {
-          await sendKeysAsync(tmuxSession, message, 'conversation-message');
+          const settings = loadSettingsApi();
+          const deliveryMethod = settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux';
+          await deliverAgentMessage(tmuxSession, message, 'conversation-message', deliveryMethod);
         }
 
         // Title = truncated first message (T3Code pattern), or default
@@ -2053,15 +2061,15 @@ async function injectForkSummary(conv: Conversation, summary: string): Promise<v
   updateForkStatus(conv.name, 'injecting');
   if (conv.harness === 'pi') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
-    await sendKeysAsync(conv.tmuxSession, summary, 'summary-fork');
-    return;
+  } else {
+    const ready = await waitForClaudePrompt(conv.tmuxSession, 60000).catch(() => false);
+    if (!ready) {
+      console.warn(`[summary-fork] Prompt not detected in time for ${conv.name}, sending summary anyway`);
+    }
   }
-
-  const ready = await waitForClaudePrompt(conv.tmuxSession, 60000).catch(() => false);
-  if (!ready) {
-    console.warn(`[summary-fork] Prompt not detected in time for ${conv.name}, sending summary anyway`);
-  }
-  await sendKeysAsync(conv.tmuxSession, summary, 'summary-fork');
+  const settings = loadSettingsApi();
+  const deliveryMethod = conv.deliveryMethod ?? (settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux');
+  await deliverAgentMessage(conv.tmuxSession, summary, 'summary-fork', deliveryMethod);
 }
 
 async function runForkPipeline(
@@ -2295,7 +2303,9 @@ const postConversationPlanActionRoute = HttpRouter.add(
           await sendRawKeystrokeAsync(conv.tmuxSession, '4', 'plan-action-reject');
           if (feedback) {
             await new Promise(r => setTimeout(r, 300));
-            await sendKeysAsync(conv.tmuxSession, feedback, 'plan-action-feedback');
+            const settings = loadSettingsApi();
+            const deliveryMethod = conv.deliveryMethod ?? (settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux');
+            await deliverAgentMessage(conv.tmuxSession, feedback, 'plan-action-feedback', deliveryMethod);
           }
           return jsonResponse({ ok: true });
         }
