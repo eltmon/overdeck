@@ -542,6 +542,14 @@ export interface AgentState {
    * channels entirely. When absent, resolved from global settings.
    */
   deliveryMethod?: 'auto' | 'channels' | 'tmux';
+
+  /** Review-convoy metadata for server-side reviewer lifecycle monitoring. */
+  reviewSubRole?: string;
+  reviewRunId?: string;
+  reviewOutputPath?: string;
+  reviewSynthesisAgentId?: string;
+  reviewDeadlineAt?: string;
+  reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
 }
 
 export function getAgentDir(agentId: string): string {
@@ -572,6 +580,13 @@ function cleanAgentState(raw: AgentState): AgentState {
     preSpawnStashMessage: raw.preSpawnStashMessage,
     preSpawnBaselineHead: raw.preSpawnBaselineHead,
     channelsEnabled: raw.channelsEnabled,
+    deliveryMethod: raw.deliveryMethod,
+    reviewSubRole: raw.reviewSubRole,
+    reviewRunId: raw.reviewRunId,
+    reviewOutputPath: raw.reviewOutputPath,
+    reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
+    reviewDeadlineAt: raw.reviewDeadlineAt,
+    reviewMonitorSignaled: raw.reviewMonitorSignaled,
   };
 }
 

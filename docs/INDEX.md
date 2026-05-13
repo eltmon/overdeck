@@ -28,6 +28,7 @@
 | [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | Deeper workflow guide for how the work agent and specialist agents interact |
 | [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md) | End-to-end code review architecture: synthesis-as-review, convoy reviewers as harness-agnostic prompt templates inlined by the orchestrator, output-file contract, and verdict signaling |
 | [SKILL-DISTRIBUTION-ANALYSIS.md](./SKILL-DISTRIBUTION-ANALYSIS.md) | Skill distribution architecture: Claude Code precedence, symlink issues, proposed changes |
+| [SKILLS-INVENTORY.md](./SKILLS-INVENTORY.md) | Installed Claude Code skills inventory, including scope and one-line purpose for each skill |
 | [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo: `.pan/`, skills hierarchy, `vbrief/` lifecycle dirs, PRD vs vBRIEF, multi-tool sync |
 | [VISION.md](./VISION.md) | Product vision and deployment model roadmap (local → shared → SaaS) |
 | [PRD.md](./PRD.md) | Product requirements document for Panopticon |

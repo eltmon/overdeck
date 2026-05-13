@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../lib/agents.js', () => ({
+  messageAgent: vi.fn(async () => {}),
   listRunningAgents: vi.fn(),
   getAgentRuntimeState: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
@@ -54,6 +55,7 @@ vi.mock('../../../lib/tmux.js', () => ({
   sessionExists: vi.fn(() => false),
   sessionExistsAsync: vi.fn(async () => false),
   sendKeysAsync: vi.fn(async () => {}),
+  isPaneDeadAsync: vi.fn(async () => false),
 }));
 vi.mock('../../paths.js', () => ({
   PANOPTICON_HOME: '/tmp/test-panopticon',
@@ -84,7 +86,7 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, exec: execMock, execFile: vi.fn() };
 });
 
-import { cleanupOrphanedReviewSessions, cleanupSpawnAndOrphanedStashes, loadConfig, logNonCanonicalStashesOnStartup } from '../deacon.js';
+import { cleanupOrphanedReviewSessions, cleanupSpawnAndOrphanedStashes, loadConfig, logNonCanonicalStashesOnStartup, monitorReviewConvoySignals } from '../deacon.js';
 import { listRunningAgents, getAgentState, saveAgentState } from '../../../lib/agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../../../lib/stashes.js';
 import { resolveProjectFromIssue, getProject } from '../../projects.js';
@@ -92,7 +94,7 @@ import { findWorkspacePath } from '../../lifecycle/archive-planning.js';
 import { getReviewStatus, setReviewStatus } from '../../review-status.js';
 import { createTracker } from '../../tracker/factory.js';
 import { loadCloisterConfig } from '../config.js';
-import { listSessionNamesAsync, killSessionAsync, sessionExists } from '../../../lib/tmux.js';
+import { listSessionNamesAsync, killSessionAsync, sessionExists, sessionExistsAsync } from '../../../lib/tmux.js';
 
 const mockListRunningAgents = vi.mocked(listRunningAgents);
 const mockGetAgentState = vi.mocked(getAgentState);
@@ -100,6 +102,7 @@ const mockSaveAgentState = vi.mocked(saveAgentState);
 const mockListSessionNamesAsync = vi.mocked(listSessionNamesAsync);
 const mockKillSessionAsync = vi.mocked(killSessionAsync);
 const mockSessionExists = vi.mocked(sessionExists);
+const mockSessionExistsAsync = vi.mocked(sessionExistsAsync);
 const mockDropStash = vi.mocked(dropStash);
 const mockIsOlderThanDays = vi.mocked(isOlderThanDays);
 const mockListStashes = vi.mocked(listStashes);
@@ -317,8 +320,8 @@ describe('cleanupOrphanedReviewSessions', () => {
     expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-correctness');
     expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-synthesis');
     expect(actions).toEqual([
-      'Killed orphaned specialist-panopticon-PAN-879-review-correctness (work agent agent-pan-879 not running)',
-      'Killed orphaned specialist-panopticon-PAN-879-review-synthesis (work agent agent-pan-879 not running)',
+      'Killed orphaned specialist-panopticon-PAN-879-review-correctness (synthesis agent-pan-879-review and work agent-pan-879 not running)',
+      'Killed orphaned specialist-panopticon-PAN-879-review-synthesis (synthesis agent-pan-879-review and work agent-pan-879 not running)',
     ]);
   });
 
@@ -347,5 +350,45 @@ describe('cleanupOrphanedReviewSessions', () => {
 
     expect(mockKillSessionAsync).not.toHaveBeenCalled();
     expect(actions).toEqual([]);
+  });
+});
+
+describe('monitorReviewConvoySignals', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSessionExistsAsync.mockImplementation(async (name: string) => name === 'agent-pan-879-review');
+  });
+
+  it('signals synthesis when a reviewer disappears before writing output', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents');
+    vi.mocked(agents.getAgentState).mockReturnValue({
+      id: 'agent-pan-879-review-security',
+      issueId: 'PAN-879',
+      workspace: '/workspace',
+      role: 'review',
+      model: 'model',
+      status: 'running',
+      startedAt: '2026-05-13T00:00:00.000Z',
+      reviewSubRole: 'security',
+      reviewRunId: 'agent-pan-879-review-abcdef12',
+      reviewOutputPath: '/tmp/test-agents/agent-pan-879-review-security/review-security.md',
+      reviewSynthesisAgentId: 'agent-pan-879-review',
+    } as any);
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(agents.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-879-review',
+      'REVIEWER_FAILED security reviewer session missing before output file was written',
+    );
+    expect(agents.saveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+      reviewMonitorSignaled: 'failed',
+    }));
+    expect(actions).toEqual([
+      'Signaled REVIEWER_FAILED security reviewer session missing before output file was written to agent-pan-879-review',
+    ]);
   });
 });

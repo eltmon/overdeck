@@ -3730,6 +3730,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...planningCleanupActions);
   for (const a of planningCleanupActions) addLog('action', a, state.patrolCycle);
 
+  // Notify review synthesis when server-owned convoy reviewers crash or time out.
+  const reviewerMonitorActions = await monitorReviewConvoySignals();
+  actions.push(...reviewerMonitorActions);
+  for (const a of reviewerMonitorActions) addLog('action', a, state.patrolCycle);
+
   // Kill orphaned review sessions whose work agent is no longer running.
   // Review sessions are named review-<issueId>-<timestamp>-<role> and are
   // never killed by teardown because the exact-match pattern doesn't catch them.
@@ -4230,6 +4235,94 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
     logDeaconEvent(`cleanupOrphanedPlanningSessions completed: killed ${actions.length} orphaned session(s)`);
   } else {
     logDeaconEvent(`cleanupOrphanedPlanningSessions completed: no orphaned sessions found`);
+  }
+
+  return actions;
+}
+
+export async function monitorReviewConvoySignals(): Promise<string[]> {
+  const actions: string[] = [];
+  if (!existsSync(AGENTS_DIR)) return actions;
+
+  let agentDirs: string[];
+  try {
+    agentDirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
+  } catch {
+    return actions;
+  }
+
+  for (const agentId of agentDirs) {
+    const state = getAgentState(agentId);
+    if (!state) continue;
+    if (state.role !== 'review') continue;
+    if (!state.reviewSubRole || !state.reviewSynthesisAgentId) continue;
+    if (state.reviewMonitorSignaled) continue;
+
+    const outputPath = state.reviewOutputPath;
+    const outputExists = outputPath ? existsSync(outputPath) : false;
+    const deadlineMs = state.reviewDeadlineAt ? Date.parse(state.reviewDeadlineAt) : Number.NaN;
+
+    if (outputExists) {
+      const sessionAlive = await sessionExistsAsync(agentId);
+      if (!sessionAlive || state.status === 'stopped') {
+        state.reviewMonitorSignaled = 'ready';
+        saveAgentState(state);
+        try {
+          const { notifyPipeline } = await import('../pipeline-notifier.js');
+          notifyPipeline({ type: 'reviewer_completed', issueId: state.issueId, role: state.reviewSubRole });
+        } catch { /* non-fatal */ }
+      }
+      continue;
+    }
+
+    const synthesisAlive = await sessionExistsAsync(state.reviewSynthesisAgentId);
+    if (!synthesisAlive) continue;
+
+    let signal: 'failed' | 'timeout' | null = null;
+    let reason = '';
+
+    const sessionAlive = await sessionExistsAsync(agentId);
+    const paneDead = sessionAlive ? await isPaneDeadAsync(agentId).catch(() => true) : true;
+    if (!sessionAlive || paneDead || state.status === 'stopped' || state.status === 'error') {
+      signal = 'failed';
+      reason = !sessionAlive ? 'reviewer session missing before output file was written' : 'reviewer exited before output file was written';
+    } else if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs) {
+      signal = 'timeout';
+      reason = `reviewer exceeded deadline ${state.reviewDeadlineAt}`;
+    }
+
+    if (!signal) continue;
+
+    const message = signal === 'timeout'
+      ? `REVIEWER_TIMEOUT ${state.reviewSubRole} ${reason}`
+      : `REVIEWER_FAILED ${state.reviewSubRole} ${reason}`;
+
+    try {
+      const { messageAgent } = await import('../agents.js');
+      await messageAgent(state.reviewSynthesisAgentId, message);
+      state.reviewMonitorSignaled = signal;
+      saveAgentState(state);
+      const action = `Signaled ${message} to ${state.reviewSynthesisAgentId}`;
+      actions.push(action);
+      logDeaconEvent(`monitorReviewConvoySignals: ${action}`);
+      if (signal === 'timeout') {
+        try {
+          const { notifyPipeline } = await import('../pipeline-notifier.js');
+          notifyPipeline({
+            type: 'reviewer_timed_out',
+            issueId: state.issueId,
+            role: state.reviewSubRole,
+            sessionName: agentId,
+            attempt: 1,
+            maxRetries: 1,
+            willRetry: false,
+          });
+        } catch { /* non-fatal */ }
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logDeaconEvent(`monitorReviewConvoySignals: failed to signal ${state.reviewSynthesisAgentId} for ${agentId}: ${errMsg}`);
+    }
   }
 
   return actions;

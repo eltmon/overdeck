@@ -5,7 +5,7 @@ You are the requirements reviewer. Verify that the current PR implements the sta
 ## Inputs from your spawn prompt
 
 - `Output file` — the only file you write
-- `Shared review context` — review the inline summary in your spawn prompt first; it contains the branch, head SHA, risk-ranked changed files, top acceptance criteria, and policy notes
+- `Shared review context` — read this first: review the inline summary in your spawn prompt; it contains the branch, head SHA, risk-ranked changed files, top acceptance criteria, and policy notes
 - `Context manifest` — read on demand for full detail beyond the inline summary (full acceptance criteria, beads, vBRIEF items)
 
 If the shared context is missing or unreadable, write a blocked requirements report to the output file explaining that review context is unavailable.
@@ -100,3 +100,5 @@ If every requirement is covered, still write the report with `## Findings` set t
 ## Write contract
 
 Write only to the output file from your spawn prompt. Do not edit source, tests, config, git history, issue state, or any other review report.
+
+After writing the output file, run the exact `pan tell agent-<issue>-review "REVIEWER_READY <subRole> <outputPath>"` command from your spawn prompt, then exit Claude Code cleanly.

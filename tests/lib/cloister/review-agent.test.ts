@@ -22,12 +22,15 @@ import {
   isReviewSessionForIssue,
   killAllReviewerSessions,
   killAllReviewSessions,
+  spawnReviewRoleForIssue,
   spawnReviewSubRoleForIssue,
 } from '../../../src/lib/cloister/review-agent.js';
 
-const { mockKillSessionAsync, mockSpawnRun, mockNotifyPipeline } = vi.hoisted(() => ({
+const { mockKillSessionAsync, mockSaveAgentStateAsync, mockSpawnRun, mockMessageAgent, mockNotifyPipeline } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
+  mockSaveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
   mockSpawnRun: vi.fn().mockResolvedValue({ id: 'agent-pan-1059-review-security' }),
+  mockMessageAgent: vi.fn().mockResolvedValue(undefined),
   mockNotifyPipeline: vi.fn(),
 }));
 
@@ -45,6 +48,8 @@ vi.mock('../../../src/lib/tmux.js', async () => {
 });
 
 vi.mock('../../../src/lib/agents.js', () => ({
+  messageAgent: mockMessageAgent,
+  saveAgentStateAsync: mockSaveAgentStateAsync,
   spawnRun: mockSpawnRun,
 }));
 
@@ -391,6 +396,8 @@ describe('template/output contract', () => {
       it(`${role}: instructs exactly one final output-file report`, () => {
         const content = readTemplate(role);
         expect(content).toMatch(/Write exactly one final report to the output file/i);
+        expect(content).toMatch(/REVIEWER_READY/i);
+        expect(content).toMatch(/exit Claude Code cleanly/i);
       });
     }
   });
@@ -408,13 +415,15 @@ describe('convoy orchestration', () => {
     const prompt = await buildConvoyPrompt({
       issueId: 'PAN-1059',
       subRole: 'security',
-      outputPath: '/workspace/.pan/review/run-1/security.md',
+      outputPath: '/home/test/.panopticon/agents/agent-pan-1059-review-security/review-security.md',
+      synthesisAgentId: 'agent-pan-1059-review',
       contextManifestPath: '/workspace/.pan/review/run-1/context.json',
     });
 
     expect(prompt).toContain('REVIEW TASK for PAN-1059 — SECURITY REVIEW');
-    expect(prompt).toContain('/workspace/.pan/review/run-1/security.md');
+    expect(prompt).toContain('/home/test/.panopticon/agents/agent-pan-1059-review-security/review-security.md');
     expect(prompt).toContain('/workspace/.pan/review/run-1/context.json');
+    expect(prompt).toContain('REVIEWER_READY security /home/test/.panopticon/agents/agent-pan-1059-review-security/review-security.md');
     expect(prompt).toContain('Write exactly one final report to the output file');
     expect(prompt).not.toContain('.claude/reviews/');
   });
@@ -438,6 +447,14 @@ describe('convoy orchestration', () => {
       subRole: 'security',
       model: 'configured-reviewer-model',
       prompt: expect.stringContaining('REVIEW TASK for PAN-1059 — SECURITY REVIEW'),
+    }));
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'agent-pan-1059-review-security',
+      reviewSubRole: 'security',
+      reviewRunId: 'agent-pan-1059-review-abcdef12',
+      reviewOutputPath: '/workspace/.pan/review/agent-pan-1059-review-abcdef12/security.md',
+      reviewSynthesisAgentId: 'agent-pan-1059-review',
+      reviewDeadlineAt: expect.any(String),
     }));
     expect(mockNotifyPipeline).toHaveBeenCalledWith({
       type: 'reviewer_started',
