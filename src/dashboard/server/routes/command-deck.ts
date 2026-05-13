@@ -495,10 +495,12 @@ export async function fetchActivityDataWithContext(
       if (ss.type === 'review') {
         if (i !== lastReviewIndex) continue;
         const synthesisRoundMetadata = await readSynthesisRounds(issueId, reviewerProjectKey);
-        const orchestratorSessionName = getTmuxSessionName('review-agent', reviewerProjectKey);
+        // PAN-1048: review orchestrator uses spawnRun naming — agent-<issue>-review
+        const orchestratorSessionName = `agent-${issueLower}-review`;
         const orchestratorPresence: SessionNodePresence = tmuxSessionNames.has(orchestratorSessionName)
           ? (ss.status === 'running' ? 'active' : 'idle')
           : 'ended';
+        const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
         sections.push({
           type: 'review',
           sessionId: orchestratorSessionName,
@@ -514,6 +516,8 @@ export async function fetchActivityDataWithContext(
           status: ss.status,
           presence: orchestratorPresence,
           roundMetadata: synthesisRoundMetadata,
+          hasJsonl: !!orchestratorJsonlPath,
+          tmuxSession: orchestratorSessionName,
         });
         const reviewerNodes = await buildReviewerNodes({
           issueId,

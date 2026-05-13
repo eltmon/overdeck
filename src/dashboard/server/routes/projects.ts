@@ -263,10 +263,12 @@ async function collectSessionTreeNodes(
       const resolvedProject = resolveProjectFromIssue(issueId);
       const reviewerProjectKey = resolvedProject?.projectKey ?? issuePrefix.toLowerCase();
       const synthesisRoundMetadata = await readSynthesisRounds(issueId, reviewerProjectKey);
-      const orchestratorSessionName = getTmuxSessionName('review-agent', reviewerProjectKey);
+      // PAN-1048: review orchestrator uses spawnRun naming — agent-<issue>-review
+      const orchestratorSessionName = `agent-${issueLower}-review`;
       const orchestratorPresence: SessionNodePresence = context.tmuxSessionNames.has(orchestratorSessionName)
         ? (latestReview.status === 'reviewing' ? 'active' : 'idle')
         : 'ended';
+      const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
       sections.push({
         type: 'review',
         sessionId: orchestratorSessionName,
@@ -277,6 +279,8 @@ async function collectSessionTreeNodes(
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
         presence: orchestratorPresence,
         roundMetadata: synthesisRoundMetadata,
+        hasJsonl: !!orchestratorJsonlPath,
+        tmuxSession: orchestratorSessionName,
       });
       const reviewerNodes = await buildReviewerNodes({
         issueId,

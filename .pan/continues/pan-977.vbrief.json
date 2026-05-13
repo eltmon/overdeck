@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-977",
   "created": "2026-05-08T09:40:09.134Z",
-  "updated": "2026-05-12T20:05:43.675Z",
+  "updated": "2026-05-13T03:50:53.664Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -409,7 +409,57 @@
       "reason": "resume",
       "agentModel": "claude-opus-4-7",
       "timestamp": "2026-05-12T20:05:43.674Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-4-7",
+      "timestamp": "2026-05-13T01:23:11.122Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-13T01:28Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-13T01:28:08.706Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-13T02:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-13T02:01:04.640Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-13T02:22Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-05-13T02:22:26.446Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-13T02:46Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-13T02:46:14.023Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-13T03:38Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-13T03:38:13.137Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-13T03:50Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-13T03:50:53.664Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-13T03:38:13Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-977\n\n# PAN-977 Review Synthesis — 2026-05-13\n\n**Run ID:** agent-pan-977-review-9434938a\n**Branch:** feature/pan-977 (9434938aa)\n**Reviewers:** security · correctness · performance · requirements\n\n---\n\n## Verdict: **BLOCKED** (1 blocker)\n\n### Blocker\n\n**`continueDirForWorkspace` creates a double-`.pan` path, silently breaking `synthesisOutputs` delivery**  \n`src/dashboard/server/routes/swarm.ts:176`\n\n`continueDirForWorkspace` returns `join(workspacePath, '.pan')` and passes it as `projectRoot` to `readContinueStateAsync` / `writeContinueStateAsync`. Those helpers internally call `getContinuesDir(projectRoot)` which appends `.pan/continues/`, so swarm runtime data lands at `workspacePath/.pan/.pan/continues/<issue>.vbrief.json` instead of `workspacePath/.pan/continues/<issue>.vbrief.json`.\n\nThe swarm module is internally self-consistent (both read and write use the same wrong path), so dispatch and synthesis-output *writing* work correctly. But `work-agent-prompt.ts:99` calls `readContinueStateAsync(workspacePath, issueId)` — passing the workspace root directly — and resolves to the correct `workspacePath/.pan/continues/` path, finding nothing. The `synthesisOutputs` field injected into conversation-panel and resume-path prompts is therefore always `undefined`, silently degrading convergence-item work agents after their initial spawn.\n\nSecondary consequence: `.pan/.pan/` is not covered by the workspace `.gitignore`, so these files can accidentally leak into commits.\n\n**Fix:** `continueDirForWorkspace` should return `workspacePath` unchanged:\n```typescript\nfunction continueDirForWorkspace(workspacePath: string): string {\n  return workspacePath; // not join(workspacePath, '.pan')\n}\n```\n\n---\n\n## Other Reviewer Findings\n\n### Security — **CLEAN** (no blockers)\n- `POST /api/swarm` auth gate uses `timingSafeEqual` via `constantTimeTokenEqual` — correct\n- `canonicalIssueId` / `validateModelId` grammars enforced at API boundary — correct\n- Child-process calls switched from `exec` (shell) to `execFile` (argv) — correct\n- `assertPathInside` guards path traversal — correct\n- `MAX_SYNTHESIS_OUTPUT_BYTES` cap (64 KiB) bounds prompt blast radius — correct\n- Non-blocking: `.pan/agent-mcp.json` hardcodes absolute `$HOME` path — defense-in-depth note, not attacker-reachable\n\n### Performance — **CLEAN** (no blockers)\n- `activeSwarmIssueIds` registry correctly self-suspends when empty — no unbounded workspace scan\n- All server-path file I/O is async — no blocking calls introduced\n- Non-blocking: `bun install` (60 s timeout, sequential per slot under concurrency cap 3) and `git fetch origin` (network-bound, unconditional) on first dispatch latency — acceptable as-is for one-time worktree setup\n- Non-blocking: shared mutable `doc`/`annotatedDoc` closure variables written by up to 3 concurrent runners — correctness footgun for future readers, negligible cost today\n\n### Requirements — **PARTIAL PASS** (7/8 implemented, 1 partial)\n- Implemented: per-item DAG dispatch, `files_scope`/`requiresSynthesis` metadata, continue vBRIEF as canonical swarm state, `onSlotMergeComplete` hook, file-overlap enforcement, swarm state migration from sidecar, scope agent deferred\n- Partial: synthesis agent is an inline prompt variation of `spawnAgent` with `phase: 'synthesis'` rather than a distinct agent type — achieves functional outcome but synthesis would need branching in the dispatch code to differentiate model/timeout/failure policy\n- Non-blocking: `.pan/agent-mcp.json` not listed in workspace `.gitignore` — should likely be added\n\n### Correctness — **Clean areas**\n- Slot allocation (lowest free slot id) — correct\n- Phase-aware reuse guard (same item + same phase + `status='running'`) — correct\n- `allSlotsReadyToAdvance` allows `completed`-status synthesis slots — correct\n- `onSlotMergeComplete` reverse-scan by `(slotId, itemId)` tuple — correct\n- Cumulative slot history deduplication via `${slot}::${itemId}` — correct\n- `runWithConcurrencyLimit` concurrency helper — correct, no shared-variable races\n- Non-blocking: `VBriefMergeConflictError` propagates uncaught through `dispatchSwarmWave` → 500 instead of 422 on conflict\n- Non-blocking: `saveSwarmState` mutates caller's state object in place\n\n---\n\n## Recommendation\n\nFix the `continueDirForWorkspace` path construction (one line) and add `.pan/agent-mcp.json` to the workspace `.gitignore` before re-review. All other findings are non-blocking and can be addressed in follow-up issues.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/.pan/review/agent-pan-977-review-9434938a/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-977 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-05-13T03:50:53Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-977 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (11176ms):\n\nkB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 91.80 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m1758ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m 79.82 kB\u001b[22m \u001b[2m│ gzip: 13.79 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m151.38 kB\u001b[22m \u001b[2m│ gzip: 25.05 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 17.09 kB\u001b[22m \u001b[2m│ gzip:  2.34 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m278.88 kB\u001b[22m \u001b[2m│ gzip: 25.08 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 527.17 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m1771ms\u001b[39m\n\n> @panctl/cli@0.9.3 test\n> vitest run --run\n\n\n RUN  v4.1.6 /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977\n\n ❯ |root| tests/dashboard/issue-filtering.test.ts (12 tests | 1 failed) 38ms\n     × should return a new Date object each time 10ms\n\n Test Files  1 failed | 316 passed | 4 skipped (321)\n      Tests  1 failed | 3558 passed | 49 skipped (3615)\n   Start at  23:50:44\n   Duration  8.04s (transform 8.98s, setup 11.84s, import 59.13s, tests 44.44s, environment 40ms)\n\n DEPRECATED  `test.poolOptions` was removed in Vitest 4. All previous `poolOptions` are now top-level options. Please, refer to the migration guide: https://vitest.dev/guide/migration#pool-rework\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/dashboard/issue-filtering.test.ts > getOneDayAgo helper > should return a new Date object each time\nAssertionError: expected 1778557849588 to be 1778557849589 // Object.is equality\n\n- Expected\n+ Received\n\n- 1778557849589\n+ 1778557849588\n\n ❯ tests/dashboard/issue-filtering.test.ts:371:29\n    369|     expect(date1).not.toBe(date2);\n    370|     // With frozen clocks they have the same value\n    371|     expect(date1.getTime()).toBe(date2.getTime());\n       |                             ^\n    372|   });\n    373| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-977 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-977 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ]
 }

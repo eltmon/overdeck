@@ -3383,6 +3383,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               branch: branchName,
               workspace: workspacePath,
               prUrl,
+              force: forceReview,
             });
 
             if (!reviewResult.success) {
@@ -3511,6 +3512,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               workspace: workspacePathRerun,
               branch: branchNameRerun,
               prUrl,
+              force: true,
             });
 
             if (result.success) {

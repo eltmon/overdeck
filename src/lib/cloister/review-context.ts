@@ -19,9 +19,12 @@ import { getDevrootPath } from '../config.js';
 
 const execAsync = promisify(exec);
 
-// Max raw diff bytes to embed in the manifest (128 KB).
+// Max raw diff bytes to embed in the manifest (48 KB).
 // Reviewers read per-file diffs on demand for anything larger.
-const MAX_DIFF_BYTES = 128 * 1024;
+// Must stay well under Claude Code's Read tool limit (~25K tokens ≈ 75-100KB
+// of code text). The manifest also carries JSON overhead, changedFiles,
+// acceptanceCriteria and policyNotes, so the diff budget is conservative.
+const MAX_DIFF_BYTES = 48 * 1024;
 
 const RISK_HIGH = 5;
 const RISK_MED  = 3;

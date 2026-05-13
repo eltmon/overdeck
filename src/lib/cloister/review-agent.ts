@@ -279,7 +279,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
 }
 
 export async function spawnReviewRoleForIssue(
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; force?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string }> {
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
 
@@ -287,16 +287,19 @@ export async function spawnReviewRoleForIssue(
   // tmux pane, treat the current dispatch as a no-op. spawnRun has its own
   // session-exists check but it throws — we want soft "already running"
   // semantics so callers can keep their existing success-path messaging.
+  //
+  // Force mode (human override from dashboard) kills the old session and
+  // respawns so the review runs against current HEAD, not stale state.
   try {
     const sessions = await listSessionNamesAsync();
     if (sessions.includes(reviewSessionName)) {
       const paneDead = await isPaneDeadAsync(reviewSessionName);
-      if (!paneDead) {
+      if (!paneDead && !opts.force) {
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
         return { success: true, message: `Review already in progress: ${reviewSessionName}` };
       }
-      // Session exists but pane is dead — fall through and respawn.
-      console.log(`[review-agent] ${reviewSessionName} pane is dead — killing and respawning`);
+      // Session exists but pane is dead, or force mode — kill and respawn.
+      console.log(`[review-agent] ${reviewSessionName} ${opts.force ? 'force-killed for re-review' : 'pane is dead'} — respawning`);
       await killSessionAsync(reviewSessionName).catch(() => {});
     }
   } catch (err) {

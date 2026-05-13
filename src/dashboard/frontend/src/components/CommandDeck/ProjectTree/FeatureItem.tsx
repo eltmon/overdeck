@@ -737,6 +737,7 @@ function FeatureContextMenu({
       const res = await fetch(`/api/review/${encodeURIComponent(feature.issueId)}/trigger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true }),
       });
       const data = await res.json().catch(() => ({})) as { error?: string; success?: boolean; message?: string };
       if (!res.ok) throw new Error(data.error || 'Failed to start review');

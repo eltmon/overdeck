@@ -213,6 +213,12 @@ export function createConversation(opts: {
   const db = getDatabase();
   const now = new Date().toISOString();
 
+  // Remove any stale row with the same name so respawned specialist roles
+  // (e.g. review convoy sub-roles re-running on a new review cycle) do not
+  // hit UNIQUE constraint failures. The old JSONL session file is left
+  // intact per the sacred-JSONL rule; only the DB record is replaced.
+  db.prepare(`DELETE FROM conversations WHERE name = ?`).run(opts.name);
+
   // title_source is NOT NULL but has a DB-side default of 'auto'. Omit from
   // INSERT column list when not provided so the default applies.
   let sql: string;

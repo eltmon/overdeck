@@ -75,8 +75,11 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
   const resolvedModels = useResolvedModels();
   const [view, setView] = useState<PanelView>(() => {
     const stored = readView(session.sessionId);
-    // Default review sessions to summary tab
-    if (isReviewSession && stored === 'conversation') return 'findings';
+    // Default review sessions without JSONL to summary tab; with JSONL default
+    // to conversation so the user sees what the agent is doing.
+    if (isReviewSession && stored === 'conversation' && !session.hasJsonl) {
+      return 'findings';
+    }
     return stored;
   });
 
@@ -126,19 +129,20 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
       {/* View toggle — slim tab bar (info already shown in ZoneB) */}
       <div className={styles.sessionPanelHeader}>
         <div className={styles.sessionPanelToggle}>
-          {isReviewSession ? (
-            <button
-              className={`${styles.sessionPanelToggleBtn} ${view === 'findings' ? styles.sessionPanelToggleBtnActive : ''}`}
-              onClick={() => handleSetView('findings')}
-            >
-              Summary
-            </button>
-          ) : (
+          {(hasJsonl || !isReviewSession) && (
             <button
               className={`${styles.sessionPanelToggleBtn} ${view === 'conversation' ? styles.sessionPanelToggleBtnActive : ''}`}
               onClick={() => handleSetView('conversation')}
             >
               Conversation
+            </button>
+          )}
+          {isReviewSession && (
+            <button
+              className={`${styles.sessionPanelToggleBtn} ${view === 'findings' ? styles.sessionPanelToggleBtnActive : ''}`}
+              onClick={() => handleSetView('findings')}
+            >
+              Summary
             </button>
           )}
           {!isReviewSession && hasFindings && (
