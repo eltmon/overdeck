@@ -12,7 +12,7 @@ import { createSession, createSessionAsync, killSession, killSessionAsync, sendK
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
-import type { ModelId } from './settings.js';
+import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
 import { loadConfig as loadYamlConfig, isClaudeCodeChannelsEnabled, resolveModel } from './config-yaml.js';
@@ -541,7 +541,7 @@ export interface AgentState {
 
   // Work type system (PAN-118)
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
-  workType?: WorkTypeId; // Current work type ID
+  workType?: string; // Current work type ID
   preSpawnStashRef?: string;
   preSpawnStashMessage?: string;
   preSpawnBaselineHead?: string;
@@ -1473,7 +1473,7 @@ export interface SpawnOptions {
 
   // Work type system (PAN-118)
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
-  workType?: WorkTypeId; // Explicit work type ID (overrides phase-based detection)
+  workType?: string; // Explicit work type ID (overrides phase-based detection)
 
   // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
   // and the one-agent-per-issue uniqueness check is scoped to the slot.

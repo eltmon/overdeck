@@ -320,7 +320,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
         }, null, 2), 'utf-8');
         try {
           emitActivityEntry({
-            source: 'merge-agent',
+            source: 'ship',
             level: 'warn',
             issueId,
             message: `Slot ${slotInfo.itemSlot} merged but /api/swarm/slot-merged delivery failed (${deliveryError}); retry queued at ${retryFile}.`,

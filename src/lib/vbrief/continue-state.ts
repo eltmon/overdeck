@@ -16,7 +16,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { rename, readFile, writeFile } from 'fs/promises';
+import { mkdir, rename, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 import { getContinuesDir } from '../pan-dir/continues.js';
@@ -339,6 +339,7 @@ export async function writeContinueStateAsync(dir: string, issueId: string, stat
     created: state.created || now,
     updated: now,
   };
+  await mkdir(getContinuesDir(dir), { recursive: true });
   const tmp = path + '.tmp';
   await writeFile(tmp, JSON.stringify(next, null, 2), 'utf-8');
   await rename(tmp, path);

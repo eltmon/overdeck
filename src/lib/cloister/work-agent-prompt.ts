@@ -96,7 +96,10 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
       ?? doc.plan.items.find(item => item.status === 'running')
       ?? doc.plan.items.find(item => item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'blocked');
     if (!nextItem) return '';
-    const cont = await readContinueStateAsync(join(workspacePath, PAN_DIRNAME), issueId.toUpperCase());
+    // PAN-977: `readContinueStateAsync` internally calls `getContinuesDir(projectRoot)`
+    // which appends `.pan/continues/`. Callers must pass the workspace root, NOT the
+    // `.pan` subdirectory, to avoid the double-`.pan` path bug.
+    const cont = await readContinueStateAsync(workspacePath, issueId.toUpperCase());
     const currentItemIds = doc.plan.items
       .filter(item => item.status === 'running' || item.id === nextItem.id)
       .map(item => item.id);

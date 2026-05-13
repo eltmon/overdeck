@@ -20,7 +20,7 @@ describe('PAN-977 work-agent active slice prompt', () => {
   it('injects persisted synthesis context from continue state without full-plan measurement text', async () => {
     const workspace = mkdtempSync(`${tmpdir()}/work-agent-pan977-`);
     try {
-      mkdirSync(join(workspace, '.pan'), { recursive: true });
+      mkdirSync(join(workspace, '.pan', 'continues'), { recursive: true });
       mkdirSync(join(workspace, '.beads'), { recursive: true });
       const doc: VBriefDocument = {
         vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z', description: 'Prompt slice objective' },
@@ -64,7 +64,7 @@ describe('PAN-977 work-agent active slice prompt', () => {
           updatedAt: '2026-01-01T00:00:00Z',
         },
       };
-      writeFileSync(join(workspace, '.pan', 'continue-PAN-977.vbrief.json'), JSON.stringify(cont, null, 2), 'utf-8');
+      writeFileSync(join(workspace, '.pan', 'continues', 'pan-977.vbrief.json'), JSON.stringify(cont, null, 2), 'utf-8');
 
       const prompt = await buildWorkAgentPrompt({ issueId: 'PAN-977', env: 'LOCAL', workspacePath: workspace, projectRoot: workspace });
 
