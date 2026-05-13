@@ -41,6 +41,22 @@ export function ensurePanDirs(projectRoot: string): ProjectPanPaths {
   return paths
 }
 
+function mapVBriefPlanStatusToPanSpec(status: unknown): PanSpecStatus | null {
+  if (isPanSpecStatus(status)) return status
+  if (typeof status !== 'string') return null
+  switch (status) {
+    case 'approved':
+    case 'draft':
+    case 'pending':
+    case 'blocked':
+      return 'proposed'
+    case 'running':
+      return 'active'
+    default:
+      return null
+  }
+}
+
 function parsePanSpecDocument(path: string): PanSpecDocument {
   const raw = readFileSync(path, 'utf-8')
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
@@ -67,11 +83,9 @@ function parsePanSpecDocument(path: string): PanSpecDocument {
   // Also map vBRIEF legacy statuses (approved, running) → active.
   if (!isPanSpecStatus(doc.status)) {
     const plan = doc.plan as Record<string, unknown> | undefined
-    const planStatus = plan?.status as string | undefined
-    if (planStatus === 'approved' || planStatus === 'running') {
-      doc.status = 'active'
-    } else if (plan && isPanSpecStatus(plan.status)) {
-      doc.status = plan.status
+    const mapped = mapVBriefPlanStatusToPanSpec(plan?.status)
+    if (mapped) {
+      doc.status = mapped
     } else {
       throw new Error(`Invalid pan spec format in ${path}: missing valid root status`)
     }
