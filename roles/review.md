@@ -51,11 +51,11 @@ You are the review synthesis agent. You orchestrate four convoy reviewers in sep
 
 ## Process
 
-### 1. Read the context manifest first
+### 1. Review the shared context first
 
-Read the manifest before reading reviewer findings. It contains the branch diff, per-file risk ranking, TLDR summaries when available, acceptance criteria, and policy notes.
+Your spawn prompt includes an inline summary with the branch, head SHA, risk-ranked changed files, top acceptance criteria, and policy notes. Review this before reading reviewer findings.
 
-Use the manifest as the review scope. Do not run a broad `git diff` or rediscover changed files independently. If the manifest is missing or unreadable, write a blocked synthesis report that names the missing manifest and signal `blocked`.
+Use the inline summary as the review scope. The full context manifest is available for additional detail if needed. Do not run a broad `git diff` or rediscover changed files independently. If the shared context is missing or unreadable, write a blocked synthesis report that names the missing context and signal `blocked`.
 
 ### 2. Spawn convoy reviewers
 

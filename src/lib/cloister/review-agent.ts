@@ -48,7 +48,7 @@ import { emitActivityEntry } from '../activity-logger.js';
 import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
 import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
-import { buildReviewContext } from './review-context.js';
+import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { REVIEW_SUB_ROLES, reviewerOutputPath, type ReviewSubRole } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { packageRoot } from '../paths.js';
@@ -146,9 +146,10 @@ export async function buildConvoyPrompt(opts: {
   subRole: string;
   outputPath: string;
   contextManifestPath?: string;
+  tier1Summary?: string;
 }): Promise<string> {
   const template = await readConvoySubRoleTemplate(opts.subRole);
-  return [
+  const prompt = [
     `REVIEW TASK for ${opts.issueId} — ${opts.subRole.toUpperCase()} REVIEW:`,
     '',
     `Issue: ${opts.issueId}`,
@@ -157,13 +158,24 @@ export async function buildConvoyPrompt(opts: {
     'Output file — write your full findings here when done:',
     `  ${opts.outputPath}`,
     '',
-    opts.contextManifestPath
+    opts.tier1Summary
       ? [
-          'Context manifest (read this first; do not run git diff yourself):',
-          `  ${opts.contextManifestPath}`,
-          'The manifest contains the full diff, per-file risk ranking, TLDR summaries when available, and acceptance criteria.',
+          'Shared review context (read this first; do not run git diff yourself):',
+          '─────────────────────────────────────────────────────────────',
+          opts.tier1Summary,
+          '─────────────────────────────────────────────────────────────',
+          '',
+          opts.contextManifestPath
+            ? `Full manifest (read on demand for additional detail): ${opts.contextManifestPath}`
+            : '',
         ].join('\n')
-      : 'No context manifest available. Write a blocked reviewer report explaining that the shared review context is missing.',
+      : opts.contextManifestPath
+        ? [
+            'Context manifest (read this first; do not run git diff yourself):',
+            `  ${opts.contextManifestPath}`,
+            'The manifest contains per-file risk ranking and acceptance criteria.',
+          ].join('\n')
+        : 'No context manifest available. Write a blocked reviewer report explaining that the shared review context is missing.',
     '',
     '─────────────────────────────────────────────────────────────',
     'REVIEW METHODOLOGY (inlined from roles/review-' + opts.subRole + '.md):',
@@ -176,6 +188,10 @@ export async function buildConvoyPrompt(opts: {
     'Write exactly one final report to the output file shown above.',
     'Only the output file is consumed by synthesis; your chat response is not the review report.',
   ].filter(Boolean).join('\n');
+
+  const sizeBytes = Buffer.byteLength(prompt, 'utf-8');
+  console.log(`[review-agent] Convoy prompt for ${opts.issueId}/${opts.subRole}: ${sizeBytes} bytes`);
+  return prompt;
 }
 
 function buildReviewRolePrompt(opts: {
@@ -186,6 +202,7 @@ function buildReviewRolePrompt(opts: {
   runId: string;
   reviewDir: string;
   contextManifestPath?: string;
+  tier1Summary?: string;
 }): string {
   const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${opts.reviewDir}/${r}.md`).join('\n');
   const spawnCommands = REVIEW_SUB_ROLES.map((r) => {
@@ -194,7 +211,7 @@ function buildReviewRolePrompt(opts: {
     return `  pan review spawn-reviewer ${opts.issueId} --sub-role ${r} --run-id "${opts.runId}" --workspace "${opts.workspace}" --output "${outputPath}"${contextArg}`;
   }).join('\n');
   const synthesisPath = join(opts.reviewDir, 'synthesis.md');
-  return [
+  const prompt = [
     `REVIEW TASK for ${opts.issueId}:`,
     '',
     `Issue: ${opts.issueId}`,
@@ -204,7 +221,19 @@ function buildReviewRolePrompt(opts: {
     `Run ID: ${opts.runId}`,
     `Review directory: ${opts.reviewDir}`,
     `Synthesis output file: ${synthesisPath}`,
-    opts.contextManifestPath ? `Context manifest: ${opts.contextManifestPath}` : 'Context manifest: (missing — block review per roles/review.md)',
+    '',
+    opts.tier1Summary
+      ? [
+          'Shared review context:',
+          '─────────────────────────────────────────────────────────────',
+          opts.tier1Summary,
+          '─────────────────────────────────────────────────────────────',
+          '',
+          opts.contextManifestPath ? `Full manifest: ${opts.contextManifestPath}` : '',
+        ].join('\n')
+      : opts.contextManifestPath
+        ? `Context manifest: ${opts.contextManifestPath}`
+        : 'Context manifest: (missing — block review per roles/review.md)',
     '',
     'Convoy reviewer output files:',
     subRoleFiles,
@@ -223,6 +252,10 @@ function buildReviewRolePrompt(opts: {
     '',
     'Reactive Cloister dispatches the test role after review passes. Never queue tests yourself and never edit code.',
   ].filter(Boolean).join('\n');
+
+  const sizeBytes = Buffer.byteLength(prompt, 'utf-8');
+  console.log(`[review-agent] Synthesis prompt for ${opts.issueId}: ${sizeBytes} bytes`);
+  return prompt;
 }
 
 /**
@@ -250,11 +283,25 @@ export async function spawnReviewSubRoleForIssue(opts: {
     const cfg = loadYamlConfig().config;
     const outputPath = opts.outputPath ?? reviewerOutputPath(opts.workspace, opts.runId, opts.subRole);
     const model = opts.model ?? resolveModel('review', opts.subRole, cfg);
+
+    // Build Tier-1 inline summary from manifest when available (PAN-1125)
+    let tier1Summary: string | undefined;
+    if (opts.contextManifestPath) {
+      try {
+        const manifestRaw = await readFile(opts.contextManifestPath, 'utf-8');
+        const manifest = JSON.parse(manifestRaw) as ReviewContextManifest;
+        tier1Summary = formatTier1Summary(manifest);
+      } catch (manifestErr) {
+        console.warn(`[review-agent] Failed to read manifest for Tier-1 summary (${opts.issueId}/${opts.subRole}):`, manifestErr);
+      }
+    }
+
     const prompt = await buildConvoyPrompt({
       issueId: opts.issueId,
       subRole: opts.subRole,
       outputPath,
       contextManifestPath: opts.contextManifestPath,
+      tier1Summary,
     });
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
@@ -377,6 +424,7 @@ export async function spawnReviewRoleForIssue(
       : `agent-${opts.issueId.toLowerCase()}-review`;
     const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', runId);
     let contextManifestPath: string | undefined;
+    let tier1Summary: string | undefined;
     try {
       const manifest = await buildReviewContext({
         runId,
@@ -385,12 +433,13 @@ export async function spawnReviewRoleForIssue(
         branch: opts.branch,
       });
       contextManifestPath = manifest.manifestPath;
-      console.log(`[review-agent] Context manifest built: ${contextManifestPath} (${manifest.changedFiles.length} files, truncated=${manifest.diff.truncated})`);
+      tier1Summary = formatTier1Summary(manifest);
+      console.log(`[review-agent] Context manifest built: ${contextManifestPath} (${manifest.changedFiles.length} files)`);
     } catch (ctxErr) {
       console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will block on missing shared context:`, ctxErr);
     }
 
-    const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath });
+    const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,

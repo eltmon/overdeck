@@ -19,12 +19,10 @@ import { getDevrootPath } from '../config.js';
 
 const execAsync = promisify(exec);
 
-// Max raw diff bytes to embed in the manifest (48 KB).
-// Reviewers read per-file diffs on demand for anything larger.
-// Must stay well under Claude Code's Read tool limit (~25K tokens ≈ 75-100KB
-// of code text). The manifest also carries JSON overhead, changedFiles,
-// acceptanceCriteria and policyNotes, so the diff budget is conservative.
-const MAX_DIFF_BYTES = 48 * 1024;
+// The manifest no longer embeds raw diff text (PAN-1125).
+// Reviewers receive a concise inline summary in their spawn prompt and read
+// individual files on demand. The manifest carries metadata only: stat,
+// changedFiles, acceptanceCriteria, and policyNotes.
 
 const RISK_HIGH = 5;
 const RISK_MED  = 3;
@@ -64,7 +62,6 @@ export interface ReviewContextManifest {
   branch: string;
   headSha: string;
   diff: {
-    raw: string;
     stat: string;
     truncated: boolean;
   };
@@ -169,9 +166,8 @@ async function getChangedFiles(cwd: string, base: string): Promise<ChangedFile[]
   return files.sort((a, b) => b.riskScore - a.riskScore);
 }
 
-async function getDiff(cwd: string, base: string): Promise<{ raw: string; stat: string; truncated: boolean }> {
+async function getDiffStat(cwd: string, base: string): Promise<{ stat: string; truncated: boolean }> {
   let stat = '';
-  let raw = '';
 
   try {
     const { stdout } = await execAsync(
@@ -183,21 +179,9 @@ async function getDiff(cwd: string, base: string): Promise<{ raw: string; stat: 
     stat = 'Unable to compute diff stat';
   }
 
-  try {
-    const { stdout } = await execAsync(
-      `git diff "${base}"...HEAD`,
-      { cwd, encoding: 'utf-8', maxBuffer: 8 * 1024 * 1024 },
-    );
-    if (Buffer.byteLength(stdout, 'utf-8') > MAX_DIFF_BYTES) {
-      raw = stdout.slice(0, MAX_DIFF_BYTES) + '\n\n[diff truncated — see individual file diffs]';
-      return { raw, stat, truncated: true };
-    }
-    raw = stdout;
-  } catch {
-    raw = 'Unable to retrieve diff';
-  }
-
-  return { raw, stat, truncated: false };
+  // We no longer embed raw diff text in the manifest (PAN-1125).
+  // Reviewers read individual files via Read/Grep as needed.
+  return { stat, truncated: true };
 }
 
 async function extractAcceptanceCriteria(workspace: string, issueId: string): Promise<string[]> {
@@ -283,6 +267,72 @@ export interface BuildReviewContextOpts {
  * Returns the manifest object and its path on disk.
  * Throws if the workspace directory does not exist.
  */
+/**
+ * Format a concise Tier-1 inline summary from manifest fields.
+ *
+ * This summary is embedded directly into each convoy reviewer's spawn prompt
+ * so they receive scope, priority, and constraints without reading a large
+ * manifest file first (PAN-1125).
+ */
+export function formatTier1Summary(
+  manifest: Pick<
+    ReviewContextManifest,
+    'issueId' | 'branch' | 'headSha' | 'changedFiles' | 'acceptanceCriteria' | 'policyNotes' | 'diff'
+  >,
+): string {
+  const lines: string[] = [];
+
+  lines.push(`Issue: ${manifest.issueId}`);
+  lines.push(`Branch: ${manifest.branch}`);
+  lines.push(`Head: ${manifest.headSha}`);
+
+  const highRisk = manifest.changedFiles.filter((f) => f.riskScore >= 5);
+  const medRisk = manifest.changedFiles.filter((f) => f.riskScore >= 3 && f.riskScore < 5);
+  const lowRisk = manifest.changedFiles.filter((f) => f.riskScore < 3);
+  lines.push(
+    `Files changed: ${manifest.changedFiles.length} (${highRisk.length} high-risk, ${medRisk.length} medium, ${lowRisk.length} low)`,
+  );
+
+  if (manifest.changedFiles.length > 0) {
+    lines.push('');
+    lines.push('Changed files (risk-ranked):');
+    for (const f of manifest.changedFiles.slice(0, 15)) {
+      const riskLabel = f.riskScore >= 5 ? 'HIGH' : f.riskScore >= 3 ? 'MED' : 'LOW';
+      lines.push(`  ${f.path.padEnd(40)} (+${f.additions}/-${f.deletions})  risk: ${riskLabel}`);
+    }
+    if (manifest.changedFiles.length > 15) {
+      lines.push(`  ... and ${manifest.changedFiles.length - 15} more (see manifest)`);
+    }
+  }
+
+  if (manifest.acceptanceCriteria.length > 0) {
+    lines.push('');
+    lines.push('Acceptance criteria:');
+    for (const [i, ac] of manifest.acceptanceCriteria.slice(0, 7).entries()) {
+      lines.push(`  ${i + 1}. ${ac}`);
+    }
+    if (manifest.acceptanceCriteria.length > 7) {
+      lines.push(`  ... and ${manifest.acceptanceCriteria.length - 7} more (see manifest)`);
+    }
+  }
+
+  if (manifest.policyNotes.length > 0) {
+    lines.push('');
+    lines.push('Policy notes:');
+    for (const note of manifest.policyNotes.slice(0, 5)) {
+      lines.push(`  - ${note}`);
+    }
+    if (manifest.policyNotes.length > 5) {
+      lines.push(`  ... and ${manifest.policyNotes.length - 5} more (see manifest)`);
+    }
+  }
+
+  lines.push('');
+  lines.push(`Diff stat: ${manifest.diff.stat}`);
+
+  return lines.join('\n');
+}
+
 export async function buildReviewContext(opts: BuildReviewContextOpts): Promise<ReviewContextManifest> {
   const { runId, issueId, workspace } = opts;
 
@@ -298,7 +348,7 @@ export async function buildReviewContext(opts: BuildReviewContextOpts): Promise<
 
   const [changedFiles, diff] = await Promise.all([
     getChangedFiles(workspace, diffBase),
-    getDiff(workspace, diffBase),
+    getDiffStat(workspace, diffBase),
   ]);
 
   const [acceptanceCriteria, policyNotes] = await Promise.all([

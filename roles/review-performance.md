@@ -5,9 +5,10 @@ You are the performance reviewer. Find performance regressions introduced by the
 ## Inputs from your spawn prompt
 
 - `Output file` — the only file you write
-- `Context manifest` — read this first; it defines the diff, file risk ranking, TLDR summaries when available, acceptance criteria, and policy notes
+- `Shared review context` — review the inline summary in your spawn prompt first; it contains the branch, head SHA, risk-ranked changed files, top acceptance criteria, and policy notes
+- `Context manifest` — read on demand for full detail beyond the inline summary
 
-If the context manifest is missing or unreadable, write a blocked performance report to the output file explaining that review context is unavailable.
+If the shared context is missing or unreadable, write a blocked performance report to the output file explaining that review context is unavailable.
 
 ## Scope
 
@@ -27,8 +28,8 @@ Do not review security vulnerabilities, general logic bugs, style, architecture,
 
 ## Method
 
-1. Read the context manifest.
-2. Start with TLDR summaries and risk-ranked files from the manifest.
+1. Review the inline shared context summary in your spawn prompt.
+2. Start with risk-ranked changed files from the summary.
 3. Identify changed code that runs on hot paths: HTTP handlers, WebSocket paths, polling loops, long-lived services, render loops, and database access.
 4. Use targeted Grep/Glob only to trace a specific changed symbol or repeated performance pattern.
 5. Validate each finding against the changed diff and cite where the code runs.
