@@ -459,6 +459,7 @@ export const SessionNode = Schema.Struct({
   awaitingInputPrompt: Schema.optional(Schema.String),
   awaitingInputReason: Schema.optional(Schema.String),
   roundMetadata: Schema.optional(ReviewerRoundMetadata),
+  deliveryMethod: Schema.optional(Schema.Literals(['auto', 'channels', 'tmux'])),
 })
 export type SessionNode = typeof SessionNode.Type
 

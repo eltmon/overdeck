@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { Conversation } from '../ConversationList';
 import { ConversationPanel } from '../../chat/ConversationPanel';
@@ -70,6 +70,58 @@ function deriveRoundData(metadata: SessionNodeType['roundMetadata']): RoundData[
   }));
 }
 
+async function updateAgentDeliveryMethod(agentId: string, deliveryMethod: 'auto' | 'channels' | 'tmux'): Promise<void> {
+  const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/delivery-method`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deliveryMethod }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to update delivery method (${res.status})${body ? `: ${body}` : ''}`);
+  }
+}
+
+function DeliveryMethodToggle({ sessionId, deliveryMethod }: { sessionId: string; deliveryMethod?: 'auto' | 'channels' | 'tmux' }) {
+  const [current, setCurrent] = useState(deliveryMethod ?? 'auto');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (deliveryMethod && deliveryMethod !== current) {
+      setCurrent(deliveryMethod);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deliveryMethod]);
+
+  const handleChange = useCallback(async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const method = e.target.value as 'auto' | 'channels' | 'tmux';
+    setSaving(true);
+    try {
+      await updateAgentDeliveryMethod(sessionId, method);
+      setCurrent(method);
+    } catch (err) {
+      console.error('[DeliveryMethodToggle] Failed:', err);
+    } finally {
+      setSaving(false);
+    }
+  }, [sessionId]);
+
+  return (
+    <select
+      className={styles.deliveryMethodSelect}
+      value={current}
+      onChange={handleChange}
+      disabled={saving}
+      title="Message delivery method"
+      aria-label="Message delivery method"
+    >
+      <option value="auto">Auto</option>
+      <option value="channels">Channels</option>
+      <option value="tmux">Tmux</option>
+    </select>
+  );
+}
+
 export function SessionPanel({ session, issueId, roundMarkers, reviewers }: SessionPanelProps) {
   const isReviewSession = session.type === 'review';
   const resolvedModels = useResolvedModels();
@@ -109,6 +161,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
       sessionAlive: session.presence !== 'ended',
       sessionFile: session.sessionId,
       model: actualModel ?? fallbackModel,
+      deliveryMethod: session.deliveryMethod ?? null,
     };
   }, [session, issueId, resolvedModels]);
 
@@ -160,6 +213,9 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
             Terminal
           </button>
         </div>
+        {session.deliveryMethod !== undefined && (
+          <DeliveryMethodToggle sessionId={session.sessionId} deliveryMethod={session.deliveryMethod} />
+        )}
       </div>
 
       {/* View content */}

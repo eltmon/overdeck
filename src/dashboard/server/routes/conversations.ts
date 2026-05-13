@@ -51,6 +51,7 @@ import {
   updateConversationCost,
   setConversationModel,
   setConversationHarness,
+  updateConversationDeliveryMethod,
   backfillConversationModel,
   archiveConversation,
   unarchiveConversation,
@@ -73,6 +74,7 @@ import {
   waitForClaudePrompt,
   listSessionNamesAsync,
 } from '../../../lib/tmux.js';
+import { deliverAgentMessage } from '../../../lib/agents.js';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
@@ -598,7 +600,6 @@ export async function handleConversationImageUpload(
 export async function handleConversationMessage(
   name: string,
   body: Record<string, unknown>,
-  deliverMessage: typeof sendKeysAsync = sendKeysAsync,
 ): Promise<ReturnType<typeof jsonResponse>> {
   const conv = getConversationByName(name);
   if (!conv) {
@@ -642,10 +643,15 @@ export async function handleConversationMessage(
     // Unmanaged @paths in prose are allowed to pass through
   }
 
-  // Pi conversations now run in TUI mode (PAN-1067), so dashboard messages
-  // are delivered via the same tmux paste-buffer pattern as Claude Code.
-  // The legacy FIFO/RPC path is retained only for work-agents in src/lib/runtimes/pi.ts.
-  await deliverMessage(conv.tmuxSession, message, 'conversation-message');
+  // Deliver via deliverAgentMessage so channels eligibility and fallback
+  // policy are respected (PAN-1123). For Pi agents this resolves to tmux
+  // because channels eligibility requires harness === 'claude-code'.
+  await deliverAgentMessage(
+    conv.tmuxSession,
+    message,
+    'conversation-message',
+    conv.deliveryMethod ?? undefined,
+  );
 
   // Generate AI title for conversations created via instant-start (no message at creation)
   if (conv.titleSource === 'default') {
@@ -1746,6 +1752,41 @@ const postConversationMessageRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/delivery-method ─────────────────────
+
+const postConversationDeliveryMethodRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/delivery-method',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+        const method = body['method'];
+        if (method !== 'auto' && method !== 'channels' && method !== 'tmux' && method !== null) {
+          return jsonResponse({ error: "method must be 'auto', 'channels', 'tmux', or null" }, { status: 400 });
+        }
+        updateConversationDeliveryMethod(name, method as 'auto' | 'channels' | 'tmux' | null);
+        return jsonResponse({ ok: true, method });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] update delivery method failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Route: PATCH /api/conversations/:name ────────────────────────────────────
 
 const MAX_TITLE_LENGTH = 200;
@@ -2620,6 +2661,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationUploadImageRoute,
   postConversationDeleteImageRoute,
   postConversationMessageRoute,
+  postConversationDeliveryMethodRoute,
   postConversationFavoriteRoute,
   deleteConversationFavoriteRoute,
   postConversationSummaryForkRoute,

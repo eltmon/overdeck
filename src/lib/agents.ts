@@ -536,6 +536,12 @@ export interface AgentState {
    * sendKeysAsync. Absent or false means tmux-only delivery (current default).
    */
   channelsEnabled?: boolean;
+  /**
+   * Delivery method for agent messages. 'auto' tries channels then falls back
+   * to tmux; 'channels' is strict (throws on failure); 'tmux' bypasses
+   * channels entirely. When absent, resolved from global settings.
+   */
+  deliveryMethod?: 'auto' | 'channels' | 'tmux';
 }
 
 export function getAgentDir(agentId: string): string {
@@ -662,6 +668,17 @@ export async function saveAgentStateAsync(state: AgentState): Promise<void> {
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateAsync)`);
   }
+}
+
+/** Update just the delivery method on an agent's state file. */
+export async function setAgentDeliveryMethod(
+  agentId: string,
+  deliveryMethod: 'auto' | 'channels' | 'tmux',
+): Promise<void> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return;
+  state.deliveryMethod = deliveryMethod;
+  await saveAgentStateAsync(state);
 }
 
 /**
@@ -794,24 +811,37 @@ export async function deliverAgentMessage(
   agentId: string,
   message: string,
   caller: string = 'unknown',
+  deliveryMethod?: 'auto' | 'channels' | 'tmux',
 ): Promise<void> {
   const normalizedId = normalizeAgentId(agentId);
 
-  let channelsEnabled = false;
-  try {
-    const state = await getAgentStateAsync(normalizedId);
-    channelsEnabled = Boolean(state?.channelsEnabled);
-  } catch {
-    channelsEnabled = false;
+  // Resolve delivery method.
+  let resolvedMethod = deliveryMethod;
+  if (!resolvedMethod) {
+    let channelsEnabled = false;
+    try {
+      const state = await getAgentStateAsync(normalizedId);
+      channelsEnabled = Boolean(state?.channelsEnabled);
+      resolvedMethod = state?.deliveryMethod ?? (channelsEnabled ? 'auto' : 'tmux');
+    } catch {
+      resolvedMethod = 'tmux';
+    }
   }
 
-  if (!channelsEnabled) {
+  if (resolvedMethod === 'tmux') {
     await sendKeysAsync(normalizedId, message);
     return;
   }
 
+  // resolvedMethod is 'auto' or 'channels' — attempt channels delivery.
   const socketPath = join(panopticonHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
   if (!existsSync(socketPath)) {
+    const errMsg = `Channels socket missing for ${normalizedId} (${caller})`;
+    if (resolvedMethod === 'channels') {
+      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
+    }
+    // auto mode: log visibly and fallback
+    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
     await appendChannelDeliveryLog(normalizedId, {
       path: 'tmux',
       reason: 'socket-missing',
@@ -823,6 +853,11 @@ export async function deliverAgentMessage(
 
   const bridgeToken = readBridgeToken(normalizedId);
   if (!bridgeToken) {
+    const errMsg = `Channels bridge token missing for ${normalizedId} (${caller})`;
+    if (resolvedMethod === 'channels') {
+      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
+    }
+    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
     await appendChannelDeliveryLog(normalizedId, {
       path: 'tmux',
       reason: 'bridge-token-missing',
@@ -843,6 +878,11 @@ export async function deliverAgentMessage(
     return;
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
+    const errMsg = `Channels socket post failed for ${normalizedId} (${caller}): ${reason}`;
+    if (resolvedMethod === 'channels') {
+      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
+    }
+    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
     await appendChannelDeliveryLog(normalizedId, {
       path: 'tmux',
       reason: `socket-post-failed: ${reason}`,
@@ -2105,7 +2145,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     if (ready) {
       // Small delay after ready to ensure Claude is fully rendered and accepting input
       await new Promise(r => setTimeout(r, 500));
-      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt');
+      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt', state.deliveryMethod);
     } else {
       console.error(`[${agentId}] Claude did not become ready within 30s`);
     }
@@ -2507,7 +2547,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     const ready = await waitForReadySignal(normalizedId, 30);
     const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
     if (ready) {
-      await deliverAgentMessage(normalizedId, resumePrompt, 'resumeAgent:resume-prompt');
+      await deliverAgentMessage(normalizedId, resumePrompt, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
       console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
     } else {
       console.warn(`[agents] Fallback-restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
@@ -2562,7 +2602,8 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     console.warn(`[agents] ${normalizedId} not at ready prompt after 5s — sending message anyway`);
   }
 
-  await deliverAgentMessage(normalizedId, message, 'messageAgent:pan-tell');
+  const deliveryMethod = agentState?.deliveryMethod;
+  await deliverAgentMessage(normalizedId, message, 'messageAgent:pan-tell', deliveryMethod);
 
   // Also save to mail queue
   const mailDir = join(getAgentDir(normalizedId), 'mail');
@@ -2725,7 +2766,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
       const ready = await waitForReadySignal(normalizedId, 30);
       if (ready) {
-        await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue');
+        await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue', agentState.deliveryMethod);
         messageDelivered = true;
       } else {
         console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');

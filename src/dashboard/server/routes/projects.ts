@@ -185,7 +185,7 @@ async function collectSessionTreeNodes(
     if (!stateText) continue;
 
     try {
-      const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string };
+      const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string; deliveryMethod?: 'auto' | 'channels' | 'tmux' };
       const isPlanning = checkId.startsWith('planning-');
       const sectionType = isPlanning ? 'planning' : 'work';
       if (isPlanning) hasPlanningSection = true;
@@ -224,6 +224,7 @@ async function collectSessionTreeNodes(
         awaitingInputPrompt: awaitingInput?.prompt,
         awaitingInputReason: awaitingInput?.reason,
         hasJsonl: !!jsonlPath,
+        deliveryMethod: state.deliveryMethod,
       });
     } catch {
       // skip malformed state

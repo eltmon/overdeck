@@ -534,7 +534,8 @@ function initSchema(db) {
       effort           TEXT,                               -- effort level (e.g. 'low', 'medium', 'high')
       fork_status      TEXT,                               -- async fork provisioning: summarizing, spawning, injecting, failed (null = not a fork or done)
       fork_error       TEXT,                               -- error message when fork_status='failed'
-      harness          TEXT                                -- coding harness used for conversation runtime
+      harness          TEXT,                                -- coding harness used for conversation runtime
+      delivery_method  TEXT                                -- 'auto', 'channels', or 'tmux'
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -634,7 +635,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 33`);
+	db.pragma(`user_version = 34`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -642,7 +643,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 33) return;
+	if (currentVersion === 34) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -958,7 +959,10 @@ function runMigrations(db) {
 	if (currentVersion < 33) try {
 		db.exec(`ALTER TABLE conversations ADD COLUMN harness TEXT`);
 	} catch {}
-	db.pragma(`user_version = 33`);
+	if (currentVersion < 34) try {
+		db.exec(`ALTER TABLE conversations ADD COLUMN delivery_method TEXT`);
+	} catch {}
+	db.pragma(`user_version = 34`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
