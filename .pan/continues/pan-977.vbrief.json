@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-977",
   "created": "2026-05-08T09:40:09.134Z",
-  "updated": "2026-05-13T23:22:21.371Z",
+  "updated": "2026-05-13T23:29:41.060Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -514,7 +514,20 @@
       "reason": "resume",
       "agentModel": "kimi-k2.6",
       "timestamp": "2026-05-13T22:49:21.149Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-13T23:29Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-13T23:29:41.060Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-13T23:29:41Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-977\n\n# Review Synthesis — PAN-977\n\n## Run\n- **Run ID:** agent-pan-977-review-da2f385f\n- **Branch:** feature/pan-977\n- **Head:** da2f385fd6fbb0aa793a29185c51995094f10b9d\n- **Synthesized:** 2026-05-13\n\n## Verdict: BLOCKED\n\nAll four convoy sub-reviewers returned blocked reports. The review pipeline produced no usable findings.\n\n---\n\n## Sub-Reviewer Results\n\n| Sub-role | Output | Status | Blocking Issue |\n|---|---|---|---|\n| security | — | BLOCKED | No shared review context — reviewers received \"No context manifest available\" in spawn prompt |\n| correctness | — | BLOCKED | No shared review context — reviewers received \"No context manifest available\" in spawn prompt |\n| performance | — | BLOCKED | No shared review context — reviewers received \"No context manifest available\" in spawn prompt |\n| requirements | — | BLOCKED | No shared review context — reviewers received \"No context manifest available\" in spawn prompt |\n\n---\n\n## Evidence of Pipeline Failure\n\n### Context manifest was built\n`buildReviewContext` succeeded — the manifest exists at:\n```\n.pan/review/agent-pan-977-review-da2f385f/context.json\n```\nIt contains 26 changed files, 7 acceptance criteria, and the correct head SHA (da2f385fd6fbb0aa793a29185c51995094f10b9d).\n\n### Context was not propagated to reviewers\nAll four reviewer initial prompts contained:\n```\nNo context manifest available. Write a blocked reviewer report explaining that the shared review context is missing.\n```\n\nThis string is produced by `buildConvoyPrompt` in `review-agent.ts` (line 188) only when **both** `tier1Summary` and `contextManifestPath` are `undefined`. The manifest was successfully written to disk but its path was not passed to the reviewer spawn calls.\n\n### ENOENT on role files (prior cycle)\nAn earlier review cycle produced:\n```\nENOENT: no such file or directory, open '/home/eltmon/Projects/panopticon-cli/dist/roles/review-security.md'\n```\nRole files are at `roles/review-security.md` (source tree). The `dist/roles/` path is incorrect — `resolvePackageRootForDir` in `paths.ts` returns `dist/` instead of the workspace root for `dist/dashboard/*` paths, causing `readConvoySubRoleTemplate` to look in the wrong location. This blocked the first cycle but the second cycle proceeded past it (roles found), yet still failed to deliver context.\n\n---\n\n## Root Cause (Preliminary)\n\n`spawnReviewRoleForIssue` calls `buildReviewContext`, then passes the result (`contextManifestPath`, `tier1Summary`) to `spawnReviewSubRoleForIssue` for each sub-role. The evidence shows the manifest was successfully created but the reviewers received neither value — indicating the result of `buildReviewContext` is not being wired correctly to the per-sub-role spawn calls, or the spawn calls are using a different code path than `spawnReviewSubRoleForIssue`.\n\nAdditionally, `resolvePackageRootForDir` in `src/lib/paths.ts` does not handle `dist/dashboard/*` paths correctly — it returns `dist/` instead of the parent workspace/project root, breaking role template resolution for dashboard-server进程.\n\n---\n\n## Acceptance Criteria Status\n\nCannot be assessed — all reviewers blocked before examining changed code.\n\n---\n\n## Action Required\n\n1. **Fix review context propagation** — trace why `buildReviewContext` result is not reaching `spawnReviewSubRoleForIssue` callers\n2. **Fix `resolvePackageRootForDir`** — add handling for `dist/dashboard/*` paths so role templates are found at `<root>/roles/` not `<root>/dist/roles/`\n3. **Re-run review** once pipeline is fixed\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/.pan/review/agent-pan-977-review-da2f385f/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-977 -m \"Fixed review issues\"`"
+    }
+  ]
 }

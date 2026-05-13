@@ -1,5 +1,5 @@
 import { homedir } from 'os';
-import { join } from 'path';
+import { join, sep } from 'path';
 import { existsSync } from 'fs';
 
 // Panopticon home directory (can be overridden for testing)
@@ -64,19 +64,24 @@ import { dirname } from 'path';
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = dirname(currentFile);
 
-// Handle both development (src/lib/) and production (dist/) modes
-// In dev: /path/to/panopticon/src/lib/paths.ts -> /path/to/panopticon
-// In prod: /path/to/panopticon/dist/lib/paths.js -> /path/to/panopticon
-export let packageRoot: string;
-if (currentDir.includes('/src/')) {
-  // Development mode - go up from src/lib to package root
-  packageRoot = dirname(dirname(currentDir));
-} else {
-  // Production mode - go up from dist (or dist/lib) to package root
-  packageRoot = currentDir.endsWith('/lib')
-    ? dirname(dirname(currentDir))
-    : dirname(currentDir);
+export function resolvePackageRootForDir(dir: string): string {
+  const srcSegment = `${sep}src${sep}`;
+  const distSegment = `${sep}dist`;
+  const nestedDistSegment = `${distSegment}${sep}`;
+
+  if (dir.includes(srcSegment)) {
+    return dir.slice(0, dir.indexOf(srcSegment));
+  }
+  if (dir.endsWith(distSegment)) {
+    return dirname(dir);
+  }
+  if (dir.includes(nestedDistSegment)) {
+    return dir.slice(0, dir.indexOf(nestedDistSegment));
+  }
+  return dir.endsWith(`${sep}lib`) ? dirname(dirname(dir)) : dirname(dir);
 }
+
+export const packageRoot = resolvePackageRootForDir(currentDir);
 
 export const SOURCE_TEMPLATES_DIR = join(packageRoot, 'templates');
 export const SOURCE_TRAEFIK_TEMPLATES = join(SOURCE_TEMPLATES_DIR, 'traefik');

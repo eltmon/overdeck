@@ -2,7 +2,7 @@
 import { createRequire } from "node:module";
 import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "fs";
 import { exec, execFileSync } from "child_process";
-import { dirname, join } from "path";
+import { dirname, join, sep } from "path";
 import { homedir } from "os";
 import { fileURLToPath } from "url";
 import { createRequire as createRequire$1 } from "module";
@@ -38,9 +38,16 @@ join(homedir(), ".codex"), join(homedir(), ".cursor"), join(homedir(), ".gemini"
 join(CLAUDE_DIR, "skills"), join(CLAUDE_DIR, "commands"), join(CLAUDE_DIR, "agents");
 join(join(PANOPTICON_HOME, "templates"), "claude-md", "sections");
 const currentDir = dirname(fileURLToPath(import.meta.url));
-let packageRoot;
-if (currentDir.includes("/src/")) packageRoot = dirname(dirname(currentDir));
-else packageRoot = currentDir.endsWith("/lib") ? dirname(dirname(currentDir)) : dirname(currentDir);
+function resolvePackageRootForDir(dir) {
+	const srcSegment = `${sep}src${sep}`;
+	const distSegment = `${sep}dist`;
+	const nestedDistSegment = `${distSegment}${sep}`;
+	if (dir.includes(srcSegment)) return dir.slice(0, dir.indexOf(srcSegment));
+	if (dir.endsWith(distSegment)) return dirname(dir);
+	if (dir.includes(nestedDistSegment)) return dir.slice(0, dir.indexOf(nestedDistSegment));
+	return dir.endsWith(`${sep}lib`) ? dirname(dirname(dir)) : dirname(dir);
+}
+const packageRoot = resolvePackageRootForDir(currentDir);
 join(join(packageRoot, "templates"), "traefik");
 join(packageRoot, "scripts");
 join(packageRoot, "skills");
