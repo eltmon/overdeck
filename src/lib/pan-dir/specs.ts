@@ -64,9 +64,13 @@ function parsePanSpecDocument(path: string): PanSpecDocument {
   // every issue in the project (PAN-1015 spec on main → review feedback
   // for PAN-977 silently dropped). Derive root status from plan.status
   // when missing rather than throwing.
+  // Also map vBRIEF legacy statuses (approved, running) → active.
   if (!isPanSpecStatus(doc.status)) {
     const plan = doc.plan as Record<string, unknown> | undefined
-    if (plan && isPanSpecStatus(plan.status)) {
+    const planStatus = plan?.status as string | undefined
+    if (planStatus === 'approved' || planStatus === 'running') {
+      doc.status = 'active'
+    } else if (plan && isPanSpecStatus(plan.status)) {
       doc.status = plan.status
     } else {
       throw new Error(`Invalid pan spec format in ${path}: missing valid root status`)
@@ -93,15 +97,20 @@ function entryFromFile(specsDir: string, filename: string): PanSpecEntry | null 
   const parts = parseVBriefFilename(filename)
   if (!parts) return null
   const path = join(specsDir, filename)
-  const document = readSpec(path)
-  return {
-    path,
-    filename,
-    issueId: parts.issueId,
-    slug: parts.slug,
-    date: parts.date,
-    status: document.status,
-    document,
+  try {
+    const document = readSpec(path)
+    return {
+      path,
+      filename,
+      issueId: parts.issueId,
+      slug: parts.slug,
+      date: parts.date,
+      status: document.status,
+      document,
+    }
+  } catch (err) {
+    console.warn(`[specs] Skipping invalid spec ${filename}: ${(err as Error).message}`)
+    return null
   }
 }
 
