@@ -1919,6 +1919,18 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
       const paneDead = sessionAlive ? await isPaneDeadAsync(reviewSession).catch(() => true) : true;
 
       if (sessionAlive && !paneDead) {
+        // If we already nudged once and 30+ min have passed with no signal,
+        // the agent is unresponsive — auto-complete so the pipeline isn't blocked.
+        if (lastNudged) {
+          setReviewStatus(issueId, {
+            reviewStatus: verdict,
+            reviewNotes: topBlocker || `Review auto-completed by deacon: ${verdict} (agent alive but unresponsive after nudge, synthesis exists)`,
+          });
+          actions.push(`Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge, synthesis written ${Math.round((now - latestMtime) / 60000)}min ago)`);
+          console.log(`[deacon] Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge)`);
+          continue;
+        }
+
         // Agent is alive but idle — nudge it to signal completion
         const nudge = `You have already written the synthesis report for ${issueId} (verdict: ${verdict.toUpperCase()}). You MUST now signal completion with:\n\n  pan admin specialists done review ${issueId} --status ${verdict}${verdict === 'blocked' || verdict === 'failed' ? ` --notes "${topBlocker || 'See synthesis.md'}"` : ''}\n\nDo NOT wait for further instructions — run the command now.`;
         try {
