@@ -1728,7 +1728,7 @@ function buildSynthesisPrompt(
     '',
     '```bash',
     `TOKEN=$(cat ~/.panopticon/internal-token)`,
-    `curl -fsS -X POST http://localhost:7878/api/swarm/slot-merged \\`,
+    `curl -fsS -X POST http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}/api/swarm/slot-merged \\`,
     `  -H 'Content-Type: application/json' \\`,
     `  -H "x-panopticon-internal-token: $TOKEN" \\`,
     `  -d @- <<'JSON'`,
