@@ -4287,7 +4287,15 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
       continue;
     }
 
+    // PAN-1059 convoy sub-reviewers are owned by the synthesis agent
+    // (agent-<id>-review), not the work agent. Check synthesis first,
+    // then fall back to work agent for legacy review sessions.
+    const synthesisAgentSession = `agent-${issueId.toLowerCase()}-review`;
     const workAgentSession = `agent-${issueId.toLowerCase()}`;
+    if (sessionExists(synthesisAgentSession)) {
+      logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} kept — synthesis agent ${synthesisAgentSession} exists`);
+      continue;
+    }
     if (sessionExists(workAgentSession)) {
       logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} kept — work agent ${workAgentSession} exists`);
       continue;
@@ -4300,7 +4308,7 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
       logDeaconEvent(`cleanupOrphanedReviewSessions: error killing ${reviewSession}: ${reason}`);
     }
 
-    const msg = `Killed orphaned ${reviewSession} (work agent ${workAgentSession} not running)`;
+    const msg = `Killed orphaned ${reviewSession} (synthesis ${synthesisAgentSession} and work ${workAgentSession} not running)`;
     actions.push(msg);
     console.log(`[deacon] ${msg}`);
     logDeaconEvent(`cleanupOrphanedReviewSessions: ${msg}`);
