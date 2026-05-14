@@ -95,7 +95,7 @@ import { findPlan, readPlan, readPlanAsync, readWorkspacePlan, isPlanningComplet
 import { VBRIEF_INSPECTION_POLICIES } from '../../../lib/vbrief/types.js';
 import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief/types.js';
 import { findVBriefByIssueAsync, readVBriefDocumentAsync } from '../../../lib/vbrief/vbrief-index.js';
-import { criticalPath } from '../../../lib/vbrief/dag.js';
+import { criticalPath, actionableDoc } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
 import { capturePaneAsync, killSessionAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { queryBeadsForIssue } from '../../../lib/beads-query.js';
@@ -1681,7 +1681,7 @@ const getWorkspacePlanRoute = HttpRouter.add(
       );
     }
 
-    const cp = criticalPath(location.doc);
+    const cp = criticalPath(actionableDoc(location.doc));
     return jsonResponse({ ...location.doc, criticalPath: cp, lifecycleDir: location.lifecycleDir });
   }))
 );

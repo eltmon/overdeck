@@ -19,7 +19,7 @@ import { readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { findSpecByIssue, findSpecByIssueAsync } from '../pan-dir/specs.js';
-import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
+import { readWorkspaceContinue, readWorkspaceContinueAsync, writeWorkspaceContinue } from '../pan-dir/continue.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
 
 /**
@@ -154,6 +154,19 @@ export function readWorkspacePlan(workspacePath: string): VBriefDocument | null 
   const doc = readPlan(planPath);
 
   const continueState = readWorkspaceContinue(workspacePath);
+  if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
+    return applyStatusOverrides(doc, continueState.statusOverrides);
+  }
+  return doc;
+}
+
+/** Async variant of readWorkspacePlan — safe for dashboard server code. */
+export async function readWorkspacePlanAsync(workspacePath: string): Promise<VBriefDocument | null> {
+  const planPath = await findPlanAsync(workspacePath);
+  if (!planPath) return null;
+  const doc = await readPlanAsync(planPath);
+
+  const continueState = await readWorkspaceContinueAsync(workspacePath);
   if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
     return applyStatusOverrides(doc, continueState.statusOverrides);
   }

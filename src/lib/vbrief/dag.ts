@@ -646,13 +646,33 @@ export interface TaskGraphView {
   criticalPath: string[];
 }
 
+const NON_ACTIONABLE_STATUSES = new Set(['completed', 'cancelled', 'running', 'blocked']);
+
+/** Build a document containing only actionable (non-terminal) items and their block edges. */
+export function actionableDoc(doc: VBriefDocument): VBriefDocument {
+  const actionableItems = doc.plan.items.filter(i => !NON_ACTIONABLE_STATUSES.has(i.status));
+  const actionableIds = new Set(actionableItems.map(i => i.id));
+  const actionableEdges = (doc.plan.edges ?? []).filter(
+    e => e.type === 'blocks' && actionableIds.has(e.from) && actionableIds.has(e.to),
+  );
+  return {
+    ...doc,
+    plan: {
+      ...doc.plan,
+      items: actionableItems,
+      edges: actionableEdges,
+    },
+  };
+}
+
 /** vBRIEF-first task graph view. Beads are intentionally not consulted here. */
 export function getTaskGraphView(doc: VBriefDocument, mergedItemIds: Set<string> = new Set()): TaskGraphView {
+  const filtered = actionableDoc(doc);
   return {
     source: 'vbrief',
     next: getDispatchableItems(doc, mergedItemIds),
     waves: groupItemsByWave(doc),
-    criticalPath: criticalPath(doc),
+    criticalPath: criticalPath(filtered),
   };
 }
 
