@@ -2,10 +2,11 @@
  * vBRIEF DAG utilities — critical path, graph analysis, wave scheduling, per-item dispatch
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { mkdir, readFile, rename, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
+import { readWorkspaceContinueAsync, writeWorkspaceContinueAsync } from '../pan-dir/continue.js';
 
 export interface WaveItem {
   id: string;
@@ -661,43 +662,14 @@ export interface PersistedTaskOperation extends TaskOperation {
   writerId: string;
 }
 
-const activePlanWriters = new Map<string, string>();
+export const activePlanWriters = new Map<string, string>();
 
-function lockPathForPlan(planPath: string): string {
+export function lockPathForPlan(planPath: string): string {
   return `${planPath}.writer.lock`;
 }
 
-function lockOwnerPath(planPath: string): string {
+export function lockOwnerPath(planPath: string): string {
   return join(lockPathForPlan(planPath), 'owner.json');
-}
-
-function assertSingleWriter(planPath: string, writerId: string): void {
-  const owner = activePlanWriters.get(planPath);
-  if (owner && owner !== writerId) {
-    throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${owner} already owns the worktree`);
-  }
-  const lockPath = lockPathForPlan(planPath);
-  try {
-    mkdirSync(lockPath, { mode: 0o700 });
-    // PAN-977 review-round-17 blocker: same orphan-lock vulnerability as
-    // assertSingleWriterAsync. If owner.json write throws non-EEXIST, the
-    // mkdir'd lockPath must be cleaned up before re-throwing.
-    try {
-      writeFileSync(lockOwnerPath(planPath), JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2), 'utf-8');
-    } catch (writeErr) {
-      try { rmSync(lockPath, { recursive: true, force: true }); } catch { /* best effort */ }
-      throw writeErr;
-    }
-  } catch (err: any) {
-    if (err?.code !== 'EEXIST') throw err;
-    let lockOwner = 'unknown writer';
-    try {
-      const ownerData = JSON.parse(readFileSync(lockOwnerPath(planPath), 'utf-8')) as { writerId?: string; pid?: number; acquiredAt?: string };
-      lockOwner = `${ownerData.writerId ?? 'unknown writer'} pid=${ownerData.pid ?? 'unknown'} acquiredAt=${ownerData.acquiredAt ?? 'unknown'}`;
-    } catch { /* ignore malformed owner file */ }
-    throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lockOwner} already owns the worktree`);
-  }
-  activePlanWriters.set(planPath, writerId);
 }
 
 // PAN-977 round-16 blocker #2: bounded retry/wait around the writer lock so
@@ -755,11 +727,6 @@ async function assertSingleWriterAsync(planPath: string, writerId: string): Prom
   throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lastOwnerDescription} already owns the worktree`);
 }
 
-export function releasePlanWriter(planPath: string, writerId: string): void {
-  if (activePlanWriters.get(planPath) === writerId) activePlanWriters.delete(planPath);
-  rmSync(lockPathForPlan(planPath), { recursive: true, force: true });
-}
-
 async function releasePlanWriterAsync(planPath: string, writerId: string): Promise<void> {
   if (activePlanWriters.get(planPath) === writerId) activePlanWriters.delete(planPath);
   await rm(lockPathForPlan(planPath), { recursive: true, force: true });
@@ -769,23 +736,12 @@ export function workspacePlanPath(workspacePath: string): string {
   return join(workspacePath, '.pan', 'spec.vbrief.json');
 }
 
-function validatePlanIssue(doc: VBriefDocument, issueId: string): void {
+export function validatePlanIssue(doc: VBriefDocument, issueId: string): void {
   const target = issueId.toUpperCase();
   const candidates = [doc.plan.id, ...(doc.plan.tags ?? [])].map(v => String(v).toUpperCase());
   if (!candidates.some(v => v.includes(target))) {
     throw new Error(`vBRIEF plan ${doc.plan.id} is not traceable to ${target}`);
   }
-}
-
-function readPlanFile(planPath: string): VBriefDocument {
-  return JSON.parse(readFileSync(planPath, 'utf-8')) as VBriefDocument;
-}
-
-function writePlanFileAtomic(planPath: string, doc: VBriefDocument): void {
-  mkdirSync(dirname(planPath), { recursive: true });
-  const tmp = `${planPath}.${process.pid}.${Date.now()}.tmp`;
-  writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8');
-  renameSync(tmp, planPath);
 }
 
 async function writePlanFileAtomicAsync(planPath: string, doc: VBriefDocument): Promise<void> {
@@ -795,18 +751,45 @@ async function writePlanFileAtomicAsync(planPath: string, doc: VBriefDocument): 
   await rename(tmp, planPath);
 }
 
-/** Persist a task operation to workspace .pan/spec.vbrief.json with CAS + single-writer guard. */
-export function applyTaskOperationToPlanFile(planPath: string, operation: PersistedTaskOperation): TaskOperationResult {
-  if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
-  assertSingleWriter(planPath, operation.writerId);
-  try {
-    const current = readPlanFile(planPath);
-    const result = applyTaskOperation(current, operation);
-    writePlanFileAtomic(planPath, result.doc);
-    return result;
-  } finally {
-    releasePlanWriter(planPath, operation.writerId);
+/** Mirror a task operation's status changes into the workspace continue file so canonical readers see them. */
+async function mirrorTaskOperationToContinueFileAsync(
+  workspacePath: string,
+  itemId: string,
+  status: VBriefItemStatus,
+  subItemIds?: string[],
+): Promise<void> {
+  const continueState = (await readWorkspaceContinueAsync(workspacePath)) ?? {
+    version: '1' as const,
+    issueId: '',
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    gitState: {},
+    decisions: [],
+    hazards: [],
+    resumePoint: null,
+    beadsMapping: {},
+    sessionHistory: [],
+  };
+  const overrides = { ...(continueState.statusOverrides ?? {}) };
+  overrides[itemId] = status;
+
+  // Derive affected subItems from the plan for canonical overlay
+  const doc = await readPlanFileAsync(workspacePlanPath(workspacePath));
+  if (doc) {
+    const item = doc.plan.items.find(i => i.id === itemId);
+    if (item?.subItems) {
+      const allSubIds = item.subItems.map(s => s.id);
+      const affectedSubIds = subItemIds?.length
+        ? subItemIds.filter(id => allSubIds.includes(id))
+        : (status === 'completed' ? allSubIds : []);
+      for (const subId of affectedSubIds) {
+        overrides[`${itemId}.${subId}`] = status;
+      }
+    }
   }
+
+  continueState.statusOverrides = overrides;
+  await writeWorkspaceContinueAsync(workspacePath, continueState);
 }
 
 export async function applyTaskOperationToPlanFileAsync(planPath: string, operation: PersistedTaskOperation): Promise<TaskOperationResult> {
@@ -816,6 +799,9 @@ export async function applyTaskOperationToPlanFileAsync(planPath: string, operat
     const current = await readPlanFileAsync(planPath);
     const result = applyTaskOperation(current, operation);
     await writePlanFileAtomicAsync(planPath, result.doc);
+    // PAN-977: also update canonical continue-state overlay
+    const workspacePath = dirname(dirname(planPath));
+    await mirrorTaskOperationToContinueFileAsync(workspacePath, operation.itemId, result.item.status, operation.subItemIds);
     return result;
   } finally {
     await releasePlanWriterAsync(planPath, operation.writerId);
@@ -832,32 +818,6 @@ export interface TaskCommandOptions {
   expectedSequence?: number;
   reason?: string;
   mergedItemIds?: Set<string>;
-}
-
-/** CLI/API-facing vBRIEF task operations for next/show/claim/done/block/unblock/cancel. */
-export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions): VBriefItem | VBriefItem[] | TaskOperationResult {
-  if (!isTaskCommand(String(command))) {
-    throw new Error(`Unsupported vBRIEF task command: ${String(command)}`);
-  }
-  const planPath = workspacePlanPath(options.workspacePath);
-  if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
-  const doc = readPlanFile(planPath);
-  validatePlanIssue(doc, options.issueId);
-  if (command === 'next') return getDispatchableItems(doc, options.mergedItemIds ?? new Set());
-  if (command === 'show') {
-    if (!options.itemId) throw new Error('show requires itemId');
-    const item = doc.plan.items.find(i => i.id === options.itemId);
-    if (!item) throw new Error(`Plan item not found: ${options.itemId}`);
-    return item;
-  }
-  if (!options.itemId) throw new Error(`${command} requires itemId`);
-  return applyTaskOperationToPlanFile(planPath, {
-    type: command,
-    itemId: options.itemId,
-    expectedSequence: options.expectedSequence,
-    reason: options.reason,
-    writerId: options.writerId ?? `pan-task-${process.pid}`,
-  });
 }
 
 export type PlanPipelinePhase = 'work' | 'review' | 'test' | 'uat' | 'merge' | 'done';
@@ -966,24 +926,6 @@ export function buildPipelineMirrorFromStatus(issueId: string, status: Record<st
     },
   };
 }
-
-export function writePipelineMirrorToPlanFile(planPath: string, mirror: NestedPlanPipelineMirror, writerId = `pipeline-${process.pid}`): VBriefDocument | null {
-  if (!existsSync(planPath)) return null;
-  assertSingleWriter(planPath, writerId);
-  try {
-    const doc = readPlanFile(planPath);
-    setPipelineMirror(doc, mirror as unknown as PlanPipelineMirror);
-    const now = new Date().toISOString();
-    doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
-    doc.plan.updated = now;
-    doc.vBRIEFInfo.updated = now;
-    writePlanFileAtomic(planPath, doc);
-    return doc;
-  } finally {
-    releasePlanWriter(planPath, writerId);
-  }
-}
-
 
 async function readPlanFileAsync(planPath: string): Promise<VBriefDocument> {
   return JSON.parse(await readFile(planPath, 'utf-8')) as VBriefDocument;

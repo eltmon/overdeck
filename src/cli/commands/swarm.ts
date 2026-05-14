@@ -18,7 +18,8 @@ import { existsSync } from 'fs';
 import { getDashboardApiUrl } from '../../lib/config.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
 import { readWorkspacePlan } from '../../lib/vbrief/io.js';
-import { groupItemsByWave, getDispatchableItems, runTaskCommand, createActiveSlice, verifyActiveSlicePromptReduction, isTaskCommand, type TaskCommand, type Wave } from '../../lib/vbrief/dag.js';
+import { groupItemsByWave, getDispatchableItems, createActiveSlice, verifyActiveSlicePromptReduction, isTaskCommand, type TaskCommand, type Wave } from '../../lib/vbrief/dag.js';
+import { runTaskCommand } from '../../lib/vbrief/dag-cli.js';
 import { INTERNAL_TOKEN_HEADER, ensureInternalToken } from '../../lib/internal-token.js';
 
 const DASHBOARD_URL = getDashboardApiUrl();

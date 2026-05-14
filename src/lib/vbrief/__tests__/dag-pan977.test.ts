@@ -6,7 +6,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { getDispatchableItems, blockingParentCount, hasFileOverlap, createActiveSlice, applyTaskOperation, applyTaskOperationToPlanFile, runTaskCommand, getPipelineMirror, setPipelineMirror, getTaskGraphView, activeSlicePromptSize, verifyActiveSlicePromptReduction, buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFile, deriveSynthesisMetadata } from '../dag.js';
+import { getDispatchableItems, blockingParentCount, hasFileOverlap, createActiveSlice, applyTaskOperation, getPipelineMirror, setPipelineMirror, getTaskGraphView, activeSlicePromptSize, verifyActiveSlicePromptReduction, buildPipelineMirrorFromStatus, deriveSynthesisMetadata } from '../dag.js';
+import { applyTaskOperationToPlanFile, runTaskCommand, writePipelineMirrorToPlanFile } from '../dag-cli.js';
 import type { VBriefDocument, VBriefItem } from '../types.js';
 
 function makeDoc(

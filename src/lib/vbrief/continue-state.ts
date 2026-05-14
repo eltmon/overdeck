@@ -18,8 +18,27 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { mkdir, rename, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { randomBytes } from 'crypto';
 
 import { getContinuesDir } from '../pan-dir/continues.js';
+
+function uniqueTmpPath(path: string): string {
+  return `${path}.${process.pid}.${Date.now()}.${randomBytes(4).toString('hex')}.tmp`;
+}
+
+const activeContinueWriters = new Map<string, string>();
+
+function assertContinueWriter(path: string, writerId: string): void {
+  const owner = activeContinueWriters.get(path);
+  if (owner && owner !== writerId) {
+    throw new Error(`Continue-state writer conflict for ${path}: ${owner} already owns the write`);
+  }
+  activeContinueWriters.set(path, writerId);
+}
+
+function releaseContinueWriter(path: string, writerId: string): void {
+  if (activeContinueWriters.get(path) === writerId) activeContinueWriters.delete(path);
+}
 
 export const CONTINUE_FILENAME_SUFFIX = '.vbrief.json';
 
@@ -215,18 +234,24 @@ export function continueFilePath(projectRoot: string, issueId: string): string {
 export function writeContinueState(projectRoot: string, issueId: string, state: ContinueState): void {
   const canonicalIssueId = issueId.toUpperCase();
   const path = continueFilePath(projectRoot, canonicalIssueId);
-  mkdirSync(getContinuesDir(projectRoot), { recursive: true });
-  const now = new Date().toISOString();
-  const next: ContinueState = {
-    ...state,
-    issueId: issueId.toUpperCase(),
-    version: '1',
-    created: state.created || now,
-    updated: now,
-  };
-  const tmp = path + '.tmp';
-  writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf-8');
-  renameSync(tmp, path);
+  const writerId = `continue-sync-${process.pid}`;
+  assertContinueWriter(path, writerId);
+  try {
+    mkdirSync(getContinuesDir(projectRoot), { recursive: true });
+    const now = new Date().toISOString();
+    const next: ContinueState = {
+      ...state,
+      issueId: issueId.toUpperCase(),
+      version: '1',
+      created: state.created || now,
+      updated: now,
+    };
+    const tmp = uniqueTmpPath(path);
+    writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf-8');
+    renameSync(tmp, path);
+  } finally {
+    releaseContinueWriter(path, writerId);
+  }
 }
 
 /**
@@ -329,20 +354,34 @@ export function clearFeedback(projectRoot: string, issueId: string): ContinueSta
  * Async variant of `writeContinueState`. Use this from dashboard server routes
  * (sync FS calls block the event loop).
  */
+async function assertContinueWriterAsync(path: string, writerId: string): Promise<void> {
+  const owner = activeContinueWriters.get(path);
+  if (owner && owner !== writerId) {
+    throw new Error(`Continue-state writer conflict for ${path}: ${owner} already owns the write`);
+  }
+  activeContinueWriters.set(path, writerId);
+}
+
 export async function writeContinueStateAsync(dir: string, issueId: string, state: ContinueState): Promise<void> {
   const path = continueFilePath(dir, issueId);
-  const now = new Date().toISOString();
-  const next: ContinueState = {
-    ...state,
-    issueId: issueId.toUpperCase(),
-    version: '1',
-    created: state.created || now,
-    updated: now,
-  };
-  await mkdir(getContinuesDir(dir), { recursive: true });
-  const tmp = path + '.tmp';
-  await writeFile(tmp, JSON.stringify(next, null, 2), 'utf-8');
-  await rename(tmp, path);
+  const writerId = `continue-async-${process.pid}`;
+  await assertContinueWriterAsync(path, writerId);
+  try {
+    const now = new Date().toISOString();
+    const next: ContinueState = {
+      ...state,
+      issueId: issueId.toUpperCase(),
+      version: '1',
+      created: state.created || now,
+      updated: now,
+    };
+    await mkdir(getContinuesDir(dir), { recursive: true });
+    const tmp = uniqueTmpPath(path);
+    await writeFile(tmp, JSON.stringify(next, null, 2), 'utf-8');
+    await rename(tmp, path);
+  } finally {
+    releaseContinueWriter(path, writerId);
+  }
 }
 
 /**
