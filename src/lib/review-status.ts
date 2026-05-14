@@ -2,6 +2,7 @@ import { access, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { findPlan } from './vbrief/io.js';
 import { notifyPipeline } from './pipeline-notifier.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 import { buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFileAsync } from './vbrief/dag.js';
@@ -595,12 +596,19 @@ function mirrorPipelineStatusToVBrief(issueId: string, status: ReviewStatus): vo
       if (!existsSync(workStateFile)) return;
       const workState = JSON.parse(await readFile(workStateFile, 'utf-8')) as { workspace?: string };
       if (!workState.workspace) return;
-      const planPath = join(workState.workspace, '.pan', 'spec.vbrief.json');
-      await writePipelineMirrorToPlanFileAsync(
+      const planPath = findPlan(workState.workspace);
+      if (!planPath) {
+        console.warn(`[review-status] No canonical plan found for ${issueId}, skipping mirror`);
+        return;
+      }
+      const result = await writePipelineMirrorToPlanFileAsync(
         planPath,
         buildPipelineMirrorFromStatus(issueId, status as unknown as Record<string, unknown>),
         `review-status-${process.pid}`,
       );
+      if (!result) {
+        console.warn(`[review-status] Failed to write pipeline mirror to ${planPath} for ${issueId}`);
+      }
     } catch (err: any) {
       console.warn(`[review-status] Failed to mirror pipeline state to vBRIEF for ${issueId}: ${err.message}`);
     }

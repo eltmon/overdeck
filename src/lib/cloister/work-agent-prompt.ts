@@ -5,9 +5,9 @@ import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { readContinueStateAsync, type ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
-import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
-import { findPlan, readWorkspacePlan, readPlan } from '../vbrief/io.js';
-import { createActiveSlice, getDispatchableItems, workspacePlanPath } from '../vbrief/dag.js';
+import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, readWorkspaceContinueAsync, writeWorkspaceContext } from '../pan-dir/index.js';
+import { findPlan, readWorkspacePlan, readPlan, readPlanAsync, applyStatusOverrides } from '../vbrief/io.js';
+import { createActiveSlice, getDispatchableItems } from '../vbrief/dag.js';
 import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
 import { loadConfig } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
@@ -79,13 +79,18 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 
 
 async function readWorkspacePlanAsync(workspacePath: string): Promise<ReturnType<typeof readWorkspacePlan>> {
-  const planPath = workspacePlanPath(workspacePath);
-  if (!existsSync(planPath)) return null;
+  const planPath = findPlan(workspacePath);
+  if (!planPath) return null;
   const raw = await readFile(planPath, 'utf-8');
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
     return null;
   }
-  return JSON.parse(raw) as NonNullable<ReturnType<typeof readWorkspacePlan>>;
+  const doc = JSON.parse(raw) as NonNullable<ReturnType<typeof readWorkspacePlan>>;
+  const continueState = await readWorkspaceContinueAsync(workspacePath);
+  if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
+    return applyStatusOverrides(doc, continueState.statusOverrides);
+  }
+  return doc;
 }
 
 async function buildActiveSliceContext(workspacePath: string, issueId: string): Promise<string> {

@@ -18,7 +18,6 @@ import {
   lockPathForPlan,
   setPipelineMirror,
   validatePlanIssue,
-  workspacePlanPath,
   type NestedPlanPipelineMirror,
   type PersistedTaskOperation,
   type TaskCommand,
@@ -162,13 +161,8 @@ export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions
 
   // PAN-977: next/show read the canonical merged view (main spec + continue statusOverrides)
   if (command === 'next' || command === 'show') {
-    let doc = readWorkspacePlan(options.workspacePath);
-    if (!doc) {
-      // Fallback: workspace-local spec for pre-canonical or test environments
-      const planPath = workspacePlanPath(options.workspacePath);
-      if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found for workspace: ${options.workspacePath}`);
-      doc = readPlanFile(planPath);
-    }
+    const doc = readWorkspacePlan(options.workspacePath);
+    if (!doc) throw new Error(`vBRIEF plan not found for workspace: ${options.workspacePath}`);
     validatePlanIssue(doc, options.issueId);
     if (command === 'next') return getDispatchableItems(doc, options.mergedItemIds ?? new Set());
     if (!options.itemId) throw new Error('show requires itemId');
@@ -177,14 +171,10 @@ export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions
     return item;
   }
 
-  // Mutations write to the canonical spec on main (PAN-1124), with fallback to
-  // workspace-local spec for migration compat, AND to the continue file
-  // statusOverrides so canonical readers see the change.
-  let planPath = findPlan(options.workspacePath);
-  if (!planPath) {
-    planPath = workspacePlanPath(options.workspacePath);
-  }
-  if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found for workspace: ${options.workspacePath}`);
+  // Mutations write to the canonical spec on main (PAN-1124) AND to the continue
+  // file statusOverrides so canonical readers see the change.
+  const planPath = findPlan(options.workspacePath);
+  if (!planPath) throw new Error(`vBRIEF plan not found for workspace: ${options.workspacePath}`);
   const doc = readPlanFile(planPath);
   validatePlanIssue(doc, options.issueId);
   if (!options.itemId) throw new Error(`${command} requires itemId`);

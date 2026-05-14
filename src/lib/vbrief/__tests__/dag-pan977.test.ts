@@ -384,13 +384,19 @@ describe('active slices and task operations', () => {
 
 
 describe('persisted task authority', () => {
+  let projectRoot: string;
   let dir: string;
-  beforeEach(() => { dir = mkdtempSync(`${tmpdir()}/vbrief-task-`); });
-  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+  beforeEach(() => {
+    projectRoot = mkdtempSync(`${tmpdir()}/vbrief-project-`);
+    dir = join(projectRoot, 'workspaces', 'feature-pan-977');
+    mkdirSync(dir, { recursive: true });
+  });
+  afterEach(() => { rmSync(projectRoot, { recursive: true, force: true }); });
 
   function writeDoc(doc: VBriefDocument): string {
-    const planPath = join(dir, '.pan', 'spec.vbrief.json');
-    mkdirSync(join(dir, '.pan'), { recursive: true });
+    const specsDir = join(projectRoot, '.pan', 'specs');
+    mkdirSync(specsDir, { recursive: true });
+    const planPath = join(specsDir, '2026-01-01-PAN-977-test.vbrief.json');
     writeFileSync(planPath, JSON.stringify(doc, null, 2), 'utf-8');
     return planPath;
   }
