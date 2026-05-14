@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
 import { mkdir, readFile, readdir, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
-import { Agent as HttpAgent, request as httpRequest } from 'node:http';
+import { request as httpRequest } from 'node:http';
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
@@ -725,29 +725,6 @@ function panopticonHomeForChannels(): string {
   return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
 }
 
-const bridgeHttpAgents = new Map<string, HttpAgent>();
-
-function getBridgeHttpAgent(socketPath: string): HttpAgent {
-  const existing = bridgeHttpAgents.get(socketPath);
-  if (existing) {
-    return existing;
-  }
-  const agent = new HttpAgent({
-    keepAlive: true,
-    maxSockets: 1,
-    maxFreeSockets: 1,
-  });
-  bridgeHttpAgents.set(socketPath, agent);
-  return agent;
-}
-
-function destroyBridgeHttpAgent(socketPath: string): void {
-  const agent = bridgeHttpAgents.get(socketPath);
-  if (!agent) return;
-  bridgeHttpAgents.delete(socketPath);
-  agent.destroy();
-}
-
 /**
  * Append a delivery-event log line to the per-agent bridge log. Best-effort.
  */
@@ -789,7 +766,6 @@ async function postUnixSocketJson(
   bridgeToken: string,
 ): Promise<{ status: number; body: string }> {
   const payload = JSON.stringify(body);
-  const agent = getBridgeHttpAgent(socketPath);
 
   return new Promise((resolveCall, reject) => {
     // Settle exactly once. Without this guard a late idle-timeout (or a
@@ -818,7 +794,7 @@ async function postUnixSocketJson(
         socketPath,
         path: '/',
         method: 'POST',
-        agent,
+        agent: false,
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload),
