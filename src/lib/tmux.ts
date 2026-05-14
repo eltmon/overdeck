@@ -337,9 +337,23 @@ export async function getWindowDimensionsAsync(sessionName: string): Promise<{ c
   }
 }
 
+/**
+ * tmux target-session syntax: a bare name is matched as a *prefix* against
+ * existing session names. That means `has-session -t agent-pan-977` returns
+ * true when only `agent-pan-977-review` exists, `kill-session -t agent-pan-977`
+ * kills `agent-pan-977-review`, and `capture-pane -t agent-pan-977` captures the
+ * wrong pane. Prefixing the name with `=` forces an exact-name match. Every
+ * call site that targets a *whole session by its exact name* must route through
+ * this helper. (PAN-977 fallout: recoverAgent saw the lingering review session
+ * as the work agent and silently no-op'd.)
+ */
+export function exactSession(name: string): string {
+  return name.startsWith('=') ? name : `=${name}`;
+}
+
 export function sessionExists(name: string): boolean {
   try {
-    tmuxExecSync(['has-session', '-t', name], { stdio: 'ignore' });
+    tmuxExecSync(['has-session', '-t', exactSession(name)], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -348,7 +362,7 @@ export function sessionExists(name: string): boolean {
 
 export async function sessionExistsAsync(name: string): Promise<boolean> {
   try {
-    await tmuxExecAsync(['has-session', '-t', name], { encoding: 'utf-8' });
+    await tmuxExecAsync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8' });
     return true;
   } catch {
     return false;
@@ -396,11 +410,13 @@ export async function createSessionAsync(
 }
 
 export function killSession(name: string): void {
-  tmuxExecSync(['kill-session', '-t', name]);
+  // Exact-match target — a bare name prefix-matches and would kill e.g.
+  // `agent-pan-977-review` when asked to kill `agent-pan-977`.
+  tmuxExecSync(['kill-session', '-t', exactSession(name)]);
 }
 
 export async function killSessionAsync(name: string): Promise<void> {
-  await tmuxExecAsync(['kill-session', '-t', name], { encoding: 'utf-8' });
+  await tmuxExecAsync(['kill-session', '-t', exactSession(name)], { encoding: 'utf-8' });
 }
 
 export async function setOptionAsync(target: string, option: string, value: string): Promise<void> {
@@ -561,7 +577,7 @@ export function sendKeys(sessionName: string, keys: string, caller?: string): vo
 
 export function capturePane(sessionName: string, lines: number = 50): string {
   try {
-    return tmuxExecSync(['capture-pane', '-t', sessionName, '-p', '-S', `-${lines}`], {
+    return tmuxExecSync(['capture-pane', '-t', exactSession(sessionName), '-p', '-S', `-${lines}`], {
       encoding: 'utf8',
     }) as string;
   } catch {
@@ -579,7 +595,7 @@ export async function capturePaneAsync(
   options?: { escapeSequences?: boolean }
 ): Promise<string> {
   try {
-    const args = ['capture-pane', '-t', sessionName, '-p'];
+    const args = ['capture-pane', '-t', exactSession(sessionName), '-p'];
     if (options?.escapeSequences) {
       args.push('-e');
     }
@@ -593,7 +609,7 @@ export async function capturePaneAsync(
 
 export function listPaneValues(target: string, format: string): string[] {
   try {
-    const output = tmuxExecSync(['list-panes', '-t', target, '-F', format], { encoding: 'utf8' }) as string;
+    const output = tmuxExecSync(['list-panes', '-t', exactSession(target), '-F', format], { encoding: 'utf8' }) as string;
     return output.split('\n').map((line) => line.trim()).filter(Boolean);
   } catch {
     return [];
@@ -602,7 +618,7 @@ export function listPaneValues(target: string, format: string): string[] {
 
 export async function listPaneValuesAsync(target: string, format: string): Promise<string[]> {
   try {
-    const { stdout } = await tmuxExecAsync(['list-panes', '-t', target, '-F', format], { encoding: 'utf-8' });
+    const { stdout } = await tmuxExecAsync(['list-panes', '-t', exactSession(target), '-F', format], { encoding: 'utf-8' });
     return String(stdout).split('\n').map((line: string) => line.trim()).filter(Boolean);
   } catch {
     return [];
