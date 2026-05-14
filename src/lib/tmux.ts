@@ -351,6 +351,25 @@ export function exactSession(name: string): string {
   return name.startsWith('=') ? name : `=${name}`;
 }
 
+/**
+ * Exact-match target for *pane*-scoped commands (`capture-pane`, `list-panes`).
+ *
+ * The `=name` session-exact form that works for `has-session`/`kill-session`
+ * is NOT a valid pane target — `capture-pane -t '=name'` fails outright with
+ * "can't find pane". A pane target needs a window/pane component, so the
+ * correct exact form is `=name:` (session named exactly <name>, active window,
+ * active pane).
+ *
+ * Regression history: PAN-977's exact-match commit routed capture-pane and
+ * list-panes through exactSession() (`=name`), which silently broke every
+ * capturePaneAsync() call — they all started returning '' — taking down
+ * dialog dismissal, waitForClaudeReady, paste verification, and health checks.
+ */
+export function exactPaneTarget(name: string): string {
+  if (name.startsWith('=')) return name.endsWith(':') ? name : `${name}:`;
+  return `=${name}:`;
+}
+
 export function sessionExists(name: string): boolean {
   try {
     tmuxExecSync(['has-session', '-t', exactSession(name)], { stdio: 'ignore' });
@@ -588,7 +607,7 @@ export function sendKeys(sessionName: string, keys: string, caller?: string): vo
 
 export function capturePane(sessionName: string, lines: number = 50): string {
   try {
-    return tmuxExecSync(['capture-pane', '-t', exactSession(sessionName), '-p', '-S', `-${lines}`], {
+    return tmuxExecSync(['capture-pane', '-t', exactPaneTarget(sessionName), '-p', '-S', `-${lines}`], {
       encoding: 'utf8',
     }) as string;
   } catch {
@@ -606,7 +625,7 @@ export async function capturePaneAsync(
   options?: { escapeSequences?: boolean }
 ): Promise<string> {
   try {
-    const args = ['capture-pane', '-t', exactSession(sessionName), '-p'];
+    const args = ['capture-pane', '-t', exactPaneTarget(sessionName), '-p'];
     if (options?.escapeSequences) {
       args.push('-e');
     }
@@ -620,7 +639,7 @@ export async function capturePaneAsync(
 
 export function listPaneValues(target: string, format: string): string[] {
   try {
-    const output = tmuxExecSync(['list-panes', '-t', exactSession(target), '-F', format], { encoding: 'utf8' }) as string;
+    const output = tmuxExecSync(['list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf8' }) as string;
     return output.split('\n').map((line) => line.trim()).filter(Boolean);
   } catch {
     return [];
@@ -629,7 +648,7 @@ export function listPaneValues(target: string, format: string): string[] {
 
 export async function listPaneValuesAsync(target: string, format: string): Promise<string[]> {
   try {
-    const { stdout } = await tmuxExecAsync(['list-panes', '-t', exactSession(target), '-F', format], { encoding: 'utf-8' });
+    const { stdout } = await tmuxExecAsync(['list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf-8' });
     return String(stdout).split('\n').map((line: string) => line.trim()).filter(Boolean);
   } catch {
     return [];
