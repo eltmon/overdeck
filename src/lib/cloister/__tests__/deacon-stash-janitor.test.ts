@@ -391,4 +391,74 @@ describe('monitorReviewConvoySignals', () => {
       'Signaled REVIEWER_FAILED security reviewer session missing before output file was written to agent-pan-879-review',
     ]);
   });
+
+  it('does not treat stale reviewer output from a previous run as ready', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    const outputPath = '/tmp/test-agents/agent-pan-879-review-security/review-security.md';
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents' || String(path) === outputPath);
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: Date.parse('2026-05-12T00:00:00.000Z') } as any);
+    vi.mocked(agents.getAgentState).mockReturnValue({
+      id: 'agent-pan-879-review-security',
+      issueId: 'PAN-879',
+      workspace: '/workspace',
+      role: 'review',
+      model: 'model',
+      status: 'running',
+      startedAt: '2026-05-13T00:00:00.000Z',
+      reviewSubRole: 'security',
+      reviewRunId: 'agent-pan-879-review-abcdef12',
+      reviewOutputPath: outputPath,
+      reviewSynthesisAgentId: 'agent-pan-879-review',
+    } as any);
+
+    await monitorReviewConvoySignals();
+
+    expect(agents.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-879-review',
+      'REVIEWER_FAILED security reviewer session missing before output file was written',
+    );
+    expect(agents.saveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+      reviewMonitorSignaled: 'failed',
+    }));
+    expect(agents.saveAgentState).not.toHaveBeenCalledWith(expect.objectContaining({
+      reviewMonitorSignaled: 'ready',
+    }));
+  });
+
+  it('signals ready only for reviewer output written after the current run started', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    const outputPath = '/tmp/test-agents/agent-pan-879-review-security/review-security.md';
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents' || String(path) === outputPath);
+    vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: Date.parse('2026-05-13T00:00:01.000Z') } as any);
+    vi.mocked(agents.getAgentState).mockReturnValue({
+      id: 'agent-pan-879-review-security',
+      issueId: 'PAN-879',
+      workspace: '/workspace',
+      role: 'review',
+      model: 'model',
+      status: 'stopped',
+      startedAt: '2026-05-13T00:00:00.000Z',
+      reviewSubRole: 'security',
+      reviewRunId: 'agent-pan-879-review-abcdef12',
+      reviewOutputPath: outputPath,
+      reviewSynthesisAgentId: 'agent-pan-879-review',
+    } as any);
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(agents.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-879-review',
+      `REVIEWER_READY security ${outputPath}`,
+    );
+    expect(agents.saveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+      reviewMonitorSignaled: 'ready',
+    }));
+    expect(actions).toEqual([
+      `Signaled REVIEWER_READY security ${outputPath} to agent-pan-879-review`,
+    ]);
+  });
 });

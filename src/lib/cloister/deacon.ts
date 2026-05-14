@@ -4259,18 +4259,38 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     if (state.reviewMonitorSignaled) continue;
 
     const outputPath = state.reviewOutputPath;
-    const outputExists = outputPath ? existsSync(outputPath) : false;
+    const startedMs = Date.parse(state.startedAt);
+    let outputWrittenForThisRun = false;
+    if (outputPath && existsSync(outputPath)) {
+      try {
+        const outputMtimeMs = statSync(outputPath).mtimeMs;
+        outputWrittenForThisRun = Number.isFinite(startedMs) && outputMtimeMs >= startedMs;
+      } catch {
+        outputWrittenForThisRun = false;
+      }
+    }
     const deadlineMs = state.reviewDeadlineAt ? Date.parse(state.reviewDeadlineAt) : Number.NaN;
 
-    if (outputExists) {
+    if (outputWrittenForThisRun) {
       const sessionAlive = await sessionExistsAsync(agentId);
       if (!sessionAlive || state.status === 'stopped') {
-        state.reviewMonitorSignaled = 'ready';
-        saveAgentState(state);
+        const message = `REVIEWER_READY ${state.reviewSubRole} ${outputPath}`;
         try {
-          const { notifyPipeline } = await import('../pipeline-notifier.js');
-          notifyPipeline({ type: 'reviewer_completed', issueId: state.issueId, role: state.reviewSubRole });
-        } catch { /* non-fatal */ }
+          const { messageAgent } = await import('../agents.js');
+          await messageAgent(state.reviewSynthesisAgentId, message);
+          state.reviewMonitorSignaled = 'ready';
+          saveAgentState(state);
+          const action = `Signaled ${message} to ${state.reviewSynthesisAgentId}`;
+          actions.push(action);
+          logDeaconEvent(`monitorReviewConvoySignals: ${action}`);
+          try {
+            const { notifyPipeline } = await import('../pipeline-notifier.js');
+            notifyPipeline({ type: 'reviewer_completed', issueId: state.issueId, role: state.reviewSubRole });
+          } catch { /* non-fatal */ }
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          logDeaconEvent(`monitorReviewConvoySignals: failed to signal ${state.reviewSynthesisAgentId} for ${agentId}: ${errMsg}`);
+        }
       }
       continue;
     }

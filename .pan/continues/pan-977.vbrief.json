@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-977",
   "created": "2026-05-08T09:40:09.134Z",
-  "updated": "2026-05-13T23:48:03.733Z",
+  "updated": "2026-05-14T00:06:01.875Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -531,27 +531,5 @@
       "timestamp": "2026-05-13T23:48:03.733Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-05-13T23:29:41Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-977\n\n# Review Synthesis — PAN-977\n\n## Run\n- **Run ID:** agent-pan-977-review-da2f385f\n- **Branch:** feature/pan-977\n- **Head:** da2f385fd6fbb0aa793a29185c51995094f10b9d\n- **Synthesized:** 2026-05-13\n\n## Verdict: BLOCKED\n\nAll four convoy sub-reviewers returned blocked reports. The review pipeline produced no usable findings.\n\n---\n\n## Sub-Reviewer Results\n\n| Sub-role | Output | Status | Blocking Issue |\n|---|---|---|---|\n| security | — | BLOCKED | No shared review context — reviewers received \"No context manifest available\" in spawn prompt |\n| correctness | — | BLOCKED | No shared review context — reviewers received \"No context manifest available\" in spawn prompt |\n| performance | — | BLOCKED | No shared review context — reviewers received \"No context manifest available\" in spawn prompt |\n| requirements | — | BLOCKED | No shared review context — reviewers received \"No context manifest available\" in spawn prompt |\n\n---\n\n## Evidence of Pipeline Failure\n\n### Context manifest was built\n`buildReviewContext` succeeded — the manifest exists at:\n```\n.pan/review/agent-pan-977-review-da2f385f/context.json\n```\nIt contains 26 changed files, 7 acceptance criteria, and the correct head SHA (da2f385fd6fbb0aa793a29185c51995094f10b9d).\n\n### Context was not propagated to reviewers\nAll four reviewer initial prompts contained:\n```\nNo context manifest available. Write a blocked reviewer report explaining that the shared review context is missing.\n```\n\nThis string is produced by `buildConvoyPrompt` in `review-agent.ts` (line 188) only when **both** `tier1Summary` and `contextManifestPath` are `undefined`. The manifest was successfully written to disk but its path was not passed to the reviewer spawn calls.\n\n### ENOENT on role files (prior cycle)\nAn earlier review cycle produced:\n```\nENOENT: no such file or directory, open '/home/eltmon/Projects/panopticon-cli/dist/roles/review-security.md'\n```\nRole files are at `roles/review-security.md` (source tree). The `dist/roles/` path is incorrect — `resolvePackageRootForDir` in `paths.ts` returns `dist/` instead of the workspace root for `dist/dashboard/*` paths, causing `readConvoySubRoleTemplate` to look in the wrong location. This blocked the first cycle but the second cycle proceeded past it (roles found), yet still failed to deliver context.\n\n---\n\n## Root Cause (Preliminary)\n\n`spawnReviewRoleForIssue` calls `buildReviewContext`, then passes the result (`contextManifestPath`, `tier1Summary`) to `spawnReviewSubRoleForIssue` for each sub-role. The evidence shows the manifest was successfully created but the reviewers received neither value — indicating the result of `buildReviewContext` is not being wired correctly to the per-sub-role spawn calls, or the spawn calls are using a different code path than `spawnReviewSubRoleForIssue`.\n\nAdditionally, `resolvePackageRootForDir` in `src/lib/paths.ts` does not handle `dist/dashboard/*` paths correctly — it returns `dist/` instead of the parent workspace/project root, breaking role template resolution for dashboard-server进程.\n\n---\n\n## Acceptance Criteria Status\n\nCannot be assessed — all reviewers blocked before examining changed code.\n\n---\n\n## Action Required\n\n1. **Fix review context propagation** — trace why `buildReviewContext` result is not reaching `spawnReviewSubRoleForIssue` callers\n2. **Fix `resolvePackageRootForDir`** — add handling for `dist/dashboard/*` paths so role templates are found at `<root>/roles/` not `<root>/dist/roles/`\n3. **Re-run review** once pipeline is fixed\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/.pan/review/agent-pan-977-review-da2f385f/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-977 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-05-13T23:39:15Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-977 (attempt 1/10):\n\nFailed check: sync-target-branch\n\nSync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\tsrc/lib/paths.ts\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n\n\n## REQUIRED: Fix the sync failure BEFORE resubmitting\n\n1. Run: `git fetch origin main`\n2. Run: `git merge origin/main`\n3. If git reports conflicts, resolve them and verify the merge succeeds cleanly\n4. Run the project's build and tests to verify nothing broke\n5. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-977 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
-    },
-    {
-      "seq": 3,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-05-13T23:48:03Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-977 (attempt 2/10):\n\nFailed check: lint\n\nVerification FAILED at lint (22894ms):\n\n\n> @panctl/cli@0.9.3 lint\n> eslint src/ && npm run lint:permissions && npm run lint:skills\n\n\n> @panctl/cli@0.9.3 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @panctl/cli@0.9.3 lint:skills\n> bash scripts/lint-skills.sh\n\nskill CLI lint failed:\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/skills/pan-up/SKILL.md: pan up exists in top-level help but --help failed\n  /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/skills/pan-wipe/SKILL.md: pan wipe exists in top-level help but --help failed\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-977 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-977 -m \"Fixed lint\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
-    }
-  ]
+  "feedback": []
 }

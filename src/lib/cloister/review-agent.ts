@@ -40,7 +40,7 @@
  */
 
 import { exec } from 'child_process';
-import { readFile } from 'fs/promises';
+import { readFile, rm } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
 import { killSessionAsync, listSessionNamesAsync, isPaneDeadAsync } from '../tmux.js';
@@ -296,6 +296,8 @@ export async function spawnReviewSubRoleForIssue(opts: {
     const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.issueId, opts.subRole);
     const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
     const model = opts.model ?? resolveModel('review', opts.subRole, cfg);
+
+    await rm(outputPath, { force: true });
 
     // Build Tier-1 inline summary from manifest when available (PAN-1125)
     let tier1Summary: string | undefined;
