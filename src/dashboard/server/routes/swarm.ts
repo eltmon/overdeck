@@ -7,16 +7,15 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
 import { execFile } from 'node:child_process';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-
-import { timingSafeEqual } from 'node:crypto';
 
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
@@ -33,6 +32,10 @@ import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { listSessionNamesAsync, isPaneDeadAsync, killSessionAsync, listPaneValuesAsync } from '../../../lib/tmux.js';
 
 const execFileAsync = promisify(execFile);
+
+function uniqueTmpPath(path: string): string {
+  return `${path}.${process.pid}.${Date.now()}.${randomBytes(4).toString('hex')}.tmp`;
+}
 
 // ─── Swarm state persistence ────────────────────────────────────────────────
 
@@ -939,11 +942,14 @@ async function dispatchSwarmWave(
         const slotPanDir = join(worktreeResult.workspacePath, '.pan');
         await mkdir(slotPanDir, { recursive: true });
         const slotPlanPath = join(slotPanDir, 'spec.vbrief.json');
-        if (!existsSync(slotPlanPath)) {
-          try {
-            const planContent = await readFile(planPath, 'utf-8');
-            await writeFile(slotPlanPath, planContent);
-          } catch {}
+        const tmpSlotPlanPath = uniqueTmpPath(slotPlanPath);
+        try {
+          const planContent = await readFile(planPath, 'utf-8');
+          await writeFile(tmpSlotPlanPath, planContent, 'utf-8');
+          await rename(tmpSlotPlanPath, slotPlanPath);
+        } catch (err: any) {
+          await unlink(tmpSlotPlanPath).catch(() => {});
+          return `Slot ${slotNum}: failed to refresh slot-local vBRIEF — ${err?.message ?? err}`;
         }
       }
 
@@ -1307,6 +1313,27 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
         activeSwarmIssueIds.delete(issueUpper);
       }
     }
+  } else if (synthesisOutput && resolvedItemId) {
+    await writeContinueStateAsync(continueDirForWorkspace(mainWorkspace), issueUpper, (cont) => {
+      const runtime = cont?.swarmRuntime ?? {
+        model: DEFAULT_SWARM_MODEL,
+        slots: [],
+        synthesisOutputs: {},
+        createdAt: now,
+        updatedAt: now,
+      } satisfies SwarmRuntime;
+      return {
+        ...(cont ?? emptyContinueState(issueUpper, now)),
+        swarmRuntime: {
+          ...runtime,
+          synthesisOutputs: {
+            ...runtime.synthesisOutputs,
+            [resolvedItemId]: { targetItemId: resolvedItemId, writtenAt: now, contextUpdate: synthesisOutput },
+          },
+          updatedAt: now,
+        },
+      };
+    });
   }
   return { ok: true };
 }
