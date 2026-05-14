@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-977",
   "created": "2026-05-08T09:40:09.134Z",
-  "updated": "2026-05-14T19:01:03.328Z",
+  "updated": "2026-05-14T21:39:51.616Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -739,15 +739,12 @@
       "reason": "feedback",
       "note": "[2026-05-14T19:01Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-14T19:01:03.328Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T21:31Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-14T21:31:45.843Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-05-14T19:01:03Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-977\n\n# Review Synthesis — PAN-977 — 2026-05-14T19:15:00Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/.pan/review/agent-pan-977-review-e2f19d96/context.json\n- Branch: feature/pan-977\n- Head: e2f19d963d047a1d26fc34ff365510d585009994\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/.panopticon/agents/agent-pan-977-review-security/review-security.md | 0 |\n| correctness | ready | /home/eltmon/.panopticon/agents/agent-pan-977-review-correctness/review-correctness.md | 0 |\n| performance | ready | /home/eltmon/.panopticon/agents/agent-pan-977-review-performance/review-performance.md | 1 |\n| requirements | ready | /home/eltmon/.panopticon/agents/agent-pan-977-review-requirements/review-requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] Channels delivery retains one `HttpAgent` per agent forever — `src/lib/agents.ts:704`\n\n**Severity:** Blocker\n\n**Evidence tier:** Tier 1 (verified changed code)\n\n**Runtime path:** Long-lived dashboard/orchestrator process; every work-agent message delivered through the new Claude Code Channels path (`src/lib/agents.ts:704-725`).\n\n**Problem:** `bridgeHttpAgents` is a module-level `Map<string, HttpAgent>` keyed by socket path. `getBridgeHttpAgent()` inserts a new keep-alive `HttpAgent` for each socket path. Only `destroyBridgeHttpAgent()` — called only on request error — removes an entry. Successful deliveries never evict the entry. The map has no size cap, idle timeout, success-path cleanup, or lifecycle hook to delete entries when an agent stops.\n\n**Impact:** The dashboard is a long-lived process. Panopticon can launch many agents over days. This creates unbounded memory and resource growth proportional to the number of distinct channel-enabled agents. Keep-alive agents may also retain idle socket resources until process exit.\n\n**Recommended fix:** Do not cache per-agent HTTP agents indefinitely. Either (a) create the `HttpAgent` per delivery and destroy it in `finally`, or (b) add lifecycle cleanup when an agent stops plus a bounded/TTL cache that destroys evicted agents.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- **security** — No vulnerabilities found. Privileged swarm endpoints validate issue/model inputs, gate state-changing callbacks with internal token or same-origin checks, and new vBRIEF/continue-state write paths use bounded issue-derived paths plus atomic temp-file renames.\n- **correctness** — 0 blockers, 0 advisories. Swarm dispatch, vBRIEF DAG scheduling, task-status mutation, continue-state durability, active-slice prompt generation, slot-merge callbacks, and pipeline mirroring are all correct. `npm run typecheck` passed; targeted PAN-977 test suite passed (50 tests, 4 files).\n- **requirements** — All 7 acceptance criteria fully implemented with evidence:\n  1. `getDispatchableItems` and task graph views exclude running/completed/cancelled/blocked items (`dag.ts:216`, `dag.ts:649`)\n  2. Task operations mutate plan item/subItem status with durable sequence checks (`dag.ts:584`, `dag.ts:589`, `dag.ts:602`)\n  3. Plan writes use temp-file then rename with single-writer lock enforcement (`dag.ts:707`, `dag.ts:771`)\n  4. Prompt generation uses bounded active slice instead of full-plan payloads (`work-agent-prompt.ts:96`)\n  5. Active slice for 705-item plan stays below 2% of full plan JSON (`dag.ts:977`)\n  6. Nested pipeline mirror records all required fields (`dag.ts:849`, `dag.ts:879`, `dag.ts:933`)\n  7. pan-oversee and dashboard readers use mirror as corroborating input (`review-status.ts:285`, `review-status.ts:591`)\n\n## Summary\nAll 7 acceptance criteria are correctly implemented. Three of four sub-roles found zero issues. One performance blocker: the new Claude Code Channels delivery path in `src/lib/agents.ts` maintains an unbounded `Map<string, HttpAgent>` that retains one HTTP agent per channel-enabled work agent for the lifetime of the dashboard process, causing unbounded memory growth. This must be addressed before approval.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/.pan/review/agent-pan-977-review-e2f19d96/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-977 -m \"Fixed review issues\"`"
-    }
-  ]
+  "feedback": []
 }

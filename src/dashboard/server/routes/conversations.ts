@@ -1313,26 +1313,36 @@ const postConversationRoute = HttpRouter.add(
           payload: { conversationName: name },
         });
 
-        // Spawn tmux session with model + effort + deterministic session ID
-        await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
-        console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
+        // Spawn the tmux session, wait for the runtime to render, and deliver
+        // the initial message in the BACKGROUND. The POST returns as soon as
+        // the DB row exists so the client can both render AND select the new
+        // conversation immediately — previously the response was held for the
+        // whole spawn + up-to-30s ready wait, so the conversation appeared in
+        // the list but could not be auto-opened until spawn finished.
+        void (async () => {
+          try {
+            await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
+            console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
 
-        if (harness === 'pi') {
-          await waitForPiTuiReady(tmuxSession);
-        } else {
-          // Wait for Claude Code to reach its prompt before returning.
-          // Bounded by waitForClaudeReady's existing 30s timeout.
-          await waitForClaudeReady(tmuxSession);
-          console.log(`[conversations] Claude ready in ${tmuxSession}`);
-        }
+            if (harness === 'pi') {
+              await waitForPiTuiReady(tmuxSession);
+            } else {
+              // Bounded by waitForClaudeReady's existing 30s timeout.
+              await waitForClaudeReady(tmuxSession);
+              console.log(`[conversations] Claude ready in ${tmuxSession}`);
+            }
 
-        // If a message was provided (legacy callers), send it now.
-        // Both harnesses now use tmux paste-buffer delivery (Pi TUI mode + Claude Code).
-        if (message) {
-          const settings = loadSettingsApi();
-          const deliveryMethod = settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux';
-          await deliverAgentMessage(tmuxSession, message, 'conversation-message', deliveryMethod);
-        }
+            // If a message was provided, send it now that the runtime is ready.
+            if (message) {
+              const settings = loadSettingsApi();
+              const deliveryMethod = settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux';
+              await deliverAgentMessage(tmuxSession, message, 'conversation-message', deliveryMethod);
+            }
+          } catch (spawnErr: unknown) {
+            const msg = spawnErr instanceof Error ? spawnErr.message : String(spawnErr);
+            console.error(`[conversations] background spawn failed for ${tmuxSession}: ${msg}`);
+          }
+        })();
 
         // Generate AI title in background (non-blocking)
         if (message) {
@@ -1342,7 +1352,10 @@ const postConversationRoute = HttpRouter.add(
           });
         }
 
-        return jsonResponse({ ...conv, sessionAlive: true }, { status: 201 });
+        // sessionAlive is false at response time — the tmux session spawns in
+        // the background task above. The list query and terminal panel both
+        // pick up liveness on their own once the session exists.
+        return jsonResponse({ ...conv, sessionAlive: false }, { status: 201 });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] create conversation failed:', msg);
