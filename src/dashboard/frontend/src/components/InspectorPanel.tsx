@@ -186,7 +186,11 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
     refetchInterval: (workspaceCreating || containersStarting || !!agentLaunchState) ? 5000 : 30000,
   });
 
-  // Self-contained review status query (shares cache key with DetailPanelLayout)
+  // Self-contained review status query (shares cache key with DetailPanelLayout).
+  // Always fetch — the parent-provided reviewStatusProp comes from the read-model
+  // snapshot (ReviewStatusSnapshot), which intentionally omits `history` to keep
+  // the snapshot small. The /api/review/:id/status endpoint returns the full
+  // ReviewStatus including history, which the "Previous attempts" timeline needs.
   const { data: fetchedReviewStatus, isLoading: fetchedReviewStatusLoading } = useQuery<ReviewStatus>({
     queryKey: ['review-status', issueId],
     queryFn: async () => {
@@ -195,10 +199,13 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
       return res.json();
     },
     refetchInterval: 15000,
-    enabled: !reviewStatusProp, // only fetch if parent didn't provide it
+    enabled: !!issueId,
   });
 
-  const reviewStatus = reviewStatusProp ?? fetchedReviewStatus;
+  // Prefer the fetched object — it is a DB-fresh superset of the snapshot prop
+  // (includes `history`). Fall back to the prop for the instant-render window
+  // before the fetch resolves.
+  const reviewStatus = fetchedReviewStatus ?? reviewStatusProp;
   const reviewStatusLoading = reviewStatusLoadingProp ?? fetchedReviewStatusLoading ?? false;
   const pendingReviewStranded = isPendingReviewStranded(reviewStatus);
   const pendingReviewStrandedSince = pendingReviewStranded
