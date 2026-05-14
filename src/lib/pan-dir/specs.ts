@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFile
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 
-import { VBriefMergeConflictError, readPlan, readPlanAsync } from '../vbrief/io.js'
+import { VBriefMergeConflictError } from '../vbrief/io.js'
 import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'
 import { invalidateVBriefIndex } from '../vbrief/vbrief-index.js'
 import type { VBriefDocument } from '../vbrief/types.js'
@@ -92,7 +92,16 @@ function parsePanSpecDocument(path: string): PanSpecDocument {
     }
   }
 
-  return readPlan(path) as PanSpecDocument
+  // Validate required vBRIEF shape
+  if (!doc.vBRIEFInfo || !doc.plan) {
+    throw new Error(
+      `Invalid vBRIEF format in ${path}: missing 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
+        `vBRIEF v0.5 requires exactly { "vBRIEFInfo": { "version": "0.5" }, "plan": { ... } }. ` +
+        `See docs/VBRIEF.md for the correct format.`
+    )
+  }
+
+  return doc as unknown as PanSpecDocument
 }
 
 export function readSpec(path: string): PanSpecDocument {
@@ -175,7 +184,16 @@ async function parsePanSpecDocumentAsync(path: string): Promise<PanSpecDocument>
     }
   }
 
-  return readPlanAsync(path) as Promise<PanSpecDocument>
+  // Validate required vBRIEF shape
+  if (!doc.vBRIEFInfo || !doc.plan) {
+    throw new Error(
+      `Invalid vBRIEF format in ${path}: missing 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
+        `vBRIEF v0.5 requires exactly { "vBRIEFInfo": { "version": "0.5" }, "plan": { ... } }. ` +
+        `See docs/VBRIEF.md for the correct format.`
+    )
+  }
+
+  return doc as unknown as PanSpecDocument
 }
 
 /** Async variant of findSpecByIssue that does not parse unrelated specs. */
