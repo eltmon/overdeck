@@ -3842,6 +3842,19 @@ export function processResetReviewPipeline(
     verificationStatus: 'pending',
     verificationNotes: undefined,
     verificationCycleCount: 0,
+    // A human-initiated reset is an explicit circuit-breaker override: clear
+    // the stuck marker and the review/test retry counters too. Without this,
+    // a workspace stuck on review_infrastructure_failure (or with exhausted
+    // retry budgets) is reset to `pending` but immediately re-skipped by the
+    // deacon's stuck guard / retry-budget checks — the "override" is a no-op.
+    stuck: false,
+    stuckReason: undefined,
+    stuckAt: undefined,
+    stuckDetails: undefined,
+    reviewRetryCount: 0,
+    testRetryCount: 0,
+    mergeRetryCount: 0,
+    recoveryStartedAt: undefined,
   });
 
   return {
