@@ -696,6 +696,7 @@ async function fetchPlanningData(
     notes: Array<{ filename: string; content: string; uploadedAt: string }>;
     acceptanceProgress?: { completed: number; total: number; percent: number };
     stashCount?: number;
+    pipelineMirror?: unknown;
   } = { hasPrd: false, hasState: false, transcripts: [], discussions: [], notes: [] };
 
   // Helper: read PRD content from a location, handling both flat and subdir formats.
@@ -798,6 +799,7 @@ async function fetchPlanningData(
   };
 
   // Acceptance criteria progress from vBRIEF plan (PAN-847)
+  // Pipeline mirror corroboration (PAN-977)
   try {
     const planPath = findPlan(workspacePath);
     if (planPath && await pathExists(planPath)) {
@@ -812,6 +814,7 @@ async function fetchPlanningData(
           percent: Math.round((completed / items.length) * 100),
         };
       }
+      result.pipelineMirror = doc?.plan?.metadata?.pipeline;
     }
   } catch { /* no vBRIEF plan */ }
 
@@ -827,6 +830,7 @@ async function fetchPlanningData(
       hasState: result.hasState,
       hasInference: Boolean(result.inference && result.inference.trim() !== ''),
       acceptanceProgress: result.acceptanceProgress,
+      pipelineMirror: result.pipelineMirror,
       stashCount: result.stashCount,
       statusReviewedAt: result.statusReviewedAt,
       transcriptCount: transcriptFiles.length,

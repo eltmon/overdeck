@@ -31,14 +31,14 @@ export interface Wave {
  * can execute in parallel.
  */
 export function groupItemsByWave(doc: VBriefDocument): Wave[] {
-  const skipStatuses = new Set(['completed', 'cancelled', 'blocked', 'running']);
+  const skipStatuses = new Set<VBriefItemStatus>(['completed', 'cancelled', 'blocked', 'running']);
   const actionable = doc.plan.items.filter(i => !skipStatuses.has(i.status));
   if (actionable.length === 0) return [];
 
   const actionableIds = new Set(actionable.map(i => i.id));
   const allItemIds = new Set(doc.plan.items.map(i => i.id));
-  const completedIds = new Set(
-    doc.plan.items.filter(i => skipStatuses.has(i.status)).map(i => i.id),
+  const resolvedIds = new Set(
+    doc.plan.items.filter(i => i.status === 'completed' || i.status === 'cancelled').map(i => i.id),
   );
 
   const edges = doc.plan.edges ?? [];
@@ -47,7 +47,8 @@ export function groupItemsByWave(doc: VBriefDocument): Wave[] {
   );
 
   // Build in-degree for actionable items only.
-  // Edges from completed items don't contribute — those blockers are resolved.
+  // Edges from resolved items don't contribute — those blockers are resolved.
+  // Edges from running/blocked items DO contribute — those blockers are unresolved.
   const inDegree = new Map<string, number>();
   const outgoing = new Map<string, string[]>();
   const incomingFrom = new Map<string, string[]>();
@@ -60,12 +61,15 @@ export function groupItemsByWave(doc: VBriefDocument): Wave[] {
 
   for (const edge of blockEdges) {
     if (!actionableIds.has(edge.to)) continue;
-    if (completedIds.has(edge.from)) continue;
-    if (!actionableIds.has(edge.from)) continue;
+    if (resolvedIds.has(edge.from)) continue;
 
     inDegree.set(edge.to, (inDegree.get(edge.to) ?? 0) + 1);
-    outgoing.get(edge.from)?.push(edge.to);
     incomingFrom.get(edge.to)?.push(edge.from);
+
+    // Only track outgoing edges from actionable items (they're the ones that advance through waves)
+    if (actionableIds.has(edge.from)) {
+      outgoing.get(edge.from)?.push(edge.to);
+    }
   }
 
   const itemById = new Map<string, VBriefItem>(doc.plan.items.map(i => [i.id, i]));
