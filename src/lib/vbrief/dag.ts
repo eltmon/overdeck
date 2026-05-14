@@ -756,6 +756,7 @@ async function mirrorTaskOperationToContinueFileAsync(
   workspacePath: string,
   itemId: string,
   status: VBriefItemStatus,
+  doc: VBriefDocument,
   subItemIds?: string[],
 ): Promise<void> {
   const continueState = (await readWorkspaceContinueAsync(workspacePath)) ?? {
@@ -773,18 +774,15 @@ async function mirrorTaskOperationToContinueFileAsync(
   const overrides = { ...(continueState.statusOverrides ?? {}) };
   overrides[itemId] = status;
 
-  // Derive affected subItems from the plan for canonical overlay
-  const doc = await readPlanFileAsync(workspacePlanPath(workspacePath));
-  if (doc) {
-    const item = doc.plan.items.find(i => i.id === itemId);
-    if (item?.subItems) {
-      const allSubIds = item.subItems.map(s => s.id);
-      const affectedSubIds = subItemIds?.length
-        ? subItemIds.filter(id => allSubIds.includes(id))
-        : (status === 'completed' ? allSubIds : []);
-      for (const subId of affectedSubIds) {
-        overrides[`${itemId}.${subId}`] = status;
-      }
+  // Derive affected subItems from the already-mutated plan document
+  const item = doc.plan.items.find(i => i.id === itemId);
+  if (item?.subItems) {
+    const allSubIds = item.subItems.map(s => s.id);
+    const affectedSubIds = subItemIds?.length
+      ? subItemIds.filter(id => allSubIds.includes(id))
+      : (status === 'completed' ? allSubIds : []);
+    for (const subId of affectedSubIds) {
+      overrides[`${itemId}.${subId}`] = status;
     }
   }
 
@@ -805,7 +803,7 @@ export async function applyTaskOperationToPlanFileAsync(
     await writePlanFileAtomicAsync(planPath, result.doc);
     // PAN-977: also update canonical continue-state overlay
     const wsPath = workspacePath ?? dirname(dirname(planPath));
-    await mirrorTaskOperationToContinueFileAsync(wsPath, operation.itemId, result.item.status, operation.subItemIds);
+    await mirrorTaskOperationToContinueFileAsync(wsPath, operation.itemId, result.item.status, result.doc, operation.subItemIds);
     return result;
   } finally {
     await releasePlanWriterAsync(planPath, operation.writerId);
