@@ -37,9 +37,18 @@ vi.mock('node:child_process', async () => {
   return {
     ...actual,
     execFile: ((...args: any[]) => {
+      const commandArgs = Array.isArray(args[1]) ? args[1] : [];
       const cb = args[args.length - 1] as (err: null, out: { stdout: string; stderr: string }) => void;
+      let stdout = '';
+      if (args[0] === 'git' && commandArgs[0] === 'branch' && commandArgs[1] === '--show-current') {
+        stdout = 'feature/971\n';
+      } else if (args[0] === 'git' && commandArgs[0] === 'branch' && commandArgs[1] === '--list') {
+        stdout = 'feature/971\n';
+      } else if (args[0] === 'git' && commandArgs[0] === 'branch' && commandArgs[1] === '-r') {
+        stdout = 'origin/feature/971\n';
+      }
       if (typeof cb === 'function') {
-        cb(null, { stdout: '', stderr: '' });
+        cb(null, { stdout, stderr: '' });
       }
       return undefined;
     }) as any,
@@ -229,8 +238,8 @@ describe('swarm route helpers', () => {
       },
       1,
       2,
-      'feature/pan-971/slot-2',
-      'feature/pan-971',
+      'feature/971/slot-2',
+      'feature/971',
     );
 
     expect(taskInput).toEqual({
@@ -242,8 +251,8 @@ describe('swarm route helpers', () => {
       title: 'Dispatch next wave',
       wave_index: 1,
       slot: 2,
-      branch: 'feature/pan-971/slot-2',
-      pr_target: 'feature/pan-971',
+      branch: 'feature/971/slot-2',
+      pr_target: 'feature/971',
       workspace_plan_path: '.pan/spec.vbrief.json',
       dependencies: [
         { item_id: 'wave-0-item', title: 'Prepare slot input' },
@@ -268,8 +277,8 @@ describe('swarm route helpers', () => {
       },
       1,
       2,
-      'feature/pan-971/slot-2',
-      'feature/pan-971',
+      'feature/971/slot-2',
+      'feature/971',
     );
 
     const jsonBlock = prompt.match(/```json\n([\s\S]*?)\n```/);
@@ -283,12 +292,12 @@ describe('swarm route helpers', () => {
     };
 
     expect(parsed.schema).toBe('AgentTaskInput');
-    expect(parsed.branch).toBe('feature/pan-971/slot-2');
-    expect(parsed.pr_target).toBe('feature/pan-971');
+    expect(parsed.branch).toBe('feature/971/slot-2');
+    expect(parsed.pr_target).toBe('feature/971');
     expect(parsed.dependencies).toEqual([{ item_id: 'wave-0-item', title: 'Prepare slot input' }]);
     expect(prompt).toContain('The plan is in .pan/spec.vbrief.json');
     expect(prompt).toContain('Do NOT run `pan done`');
-    expect(prompt).toContain('Create a PR targeting `feature/pan-971` — do NOT target main');
+    expect(prompt).toContain('Create a PR targeting `feature/971` — do NOT target main');
   });
 
   it('auto-advances completed swarms to next wave and persists new slot state', async () => {

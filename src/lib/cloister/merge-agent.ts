@@ -242,12 +242,12 @@ async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string,
 }
 
 /**
- * Detect a swarm slot branch like `feature/pan-977/slot-3`.
+ * Detect a swarm slot branch like `feature/977/slot-3` or `feature/pan-977/slot-3`.
  * Slot branches merge into their parent feature branch, NOT into main, so we must NOT
  * run the full per-issue post-merge lifecycle for them. Instead we drive
  * `onSlotMergeComplete()` so the swarm runtime advances per-item.
  */
-const SLOT_BRANCH_PATTERN = /^feature\/[a-z][a-z0-9]*-\d+\/slot-(\d+)$/;
+const SLOT_BRANCH_PATTERN = /^feature\/[^/]+\/slot-(\d+)$/;
 function parseSlotBranch(branch: string | undefined | null): { itemSlot: number; issueLower: string } | null {
   if (!branch) return null;
   const match = SLOT_BRANCH_PATTERN.exec(branch);
@@ -259,7 +259,7 @@ function parseSlotBranch(branch: string | undefined | null): { itemSlot: number;
 }
 
 export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string, options?: { skipDeploy?: boolean }): Promise<void> {
-  // Slot-branch merges (feature/<issue>/slot-N → feature/<issue>) drive the
+  // Slot-branch merges (feature/<parent>/slot-N → feature/<parent>) drive the
   // per-item swarm runtime, not the per-issue feature lifecycle. Route them to
   // onSlotMergeComplete and return — the issue's overall postMergeLifecycle only
   // fires when the parent feature branch itself merges to main.

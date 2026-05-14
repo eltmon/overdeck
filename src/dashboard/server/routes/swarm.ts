@@ -957,7 +957,15 @@ async function dispatchSwarmWave(
       // dispatchSynthesisFirst / requestedPhase are computed above so the
       // live-session reuse guard can compare phases. Reuse them here.
       const itemPrompt = dispatchSynthesisFirst
-        ? buildSynthesisPrompt(annotatedDoc, issueUpper, item, waveIndex, slotNum, continueState.swarmRuntime?.slots ?? [])
+        ? buildSynthesisPrompt(
+            annotatedDoc,
+            issueUpper,
+            item,
+            waveIndex,
+            slotNum,
+            worktreeResult.parentBranch,
+            continueState.swarmRuntime?.slots ?? [],
+          )
         : buildSlotPrompt(
         annotatedDoc,
         issueUpper,
@@ -1582,6 +1590,32 @@ const readJsonBody = Effect.gen(function* () {
 
 const DEFAULT_SWARM_MODEL = 'kimi-k2.6';
 
+async function resolveParentFeatureBranch(
+  projectPath: string,
+  issueUpper: string,
+  localList: string[],
+  remoteList: string[],
+): Promise<string> {
+  const { stdout } = await execFileAsync('git', ['branch', '--show-current'], { cwd: projectPath });
+  const currentBranch = stdout.trim();
+  if (!currentBranch) {
+    throw new Error('Cannot resolve swarm parent branch: workspace is not on a named branch');
+  }
+  if (!currentBranch.startsWith('feature/') || currentBranch.includes('/slot-')) {
+    throw new Error(`Cannot dispatch swarm from non-feature parent branch ${currentBranch}`);
+  }
+  const issueNumber = issueUpper.split('-').at(-1);
+  const legacyIssueBranch = `feature/${issueUpper.toLowerCase()}`;
+  const numericIssueBranch = issueNumber ? `feature/${issueNumber.toLowerCase()}` : null;
+  if (currentBranch !== legacyIssueBranch && currentBranch !== numericIssueBranch) {
+    throw new Error(`Workspace branch ${currentBranch} does not match issue ${issueUpper}`);
+  }
+  if (!localList.includes(currentBranch) && !remoteList.includes(`origin/${currentBranch}`)) {
+    throw new Error(`Workspace branch ${currentBranch} does not exist locally or on origin`);
+  }
+  return currentBranch;
+}
+
 async function createSlotWorktree(
   projectPath: string,
   issueId: string,
@@ -1590,26 +1624,27 @@ async function createSlotWorktree(
   const issueUpper = canonicalIssueId(issueId);
   if (!issueUpper) return { success: false, workspacePath: '', branch: '', parentBranch: '', error: 'Invalid issue ID' };
   const issueLower = issueUpper.toLowerCase();
-  const featureBranch = `feature/${issueLower}`;
-  const slotBranch = `feature/${issueLower}/slot-${slotNum}`;
   const slotWorkspaceName = `feature-${issueLower}-slot-${slotNum}`;
   const workspacesDir = join(projectPath, 'workspaces');
   const workspacePath = join(workspacesDir, slotWorkspaceName);
   assertPathInside(workspacesDir, workspacePath);
-
-  if (existsSync(workspacePath)) {
-    return { success: true, workspacePath, branch: slotBranch, parentBranch: featureBranch };
-  }
+  let parentBranch = '';
+  let slotBranch = '';
 
   try {
     await execFileAsync('git', ['fetch', 'origin'], { cwd: projectPath });
     await execFileAsync('git', ['worktree', 'prune'], { cwd: projectPath });
 
-    // Create slot worktree branching off the main feature branch
     const { stdout: localBranches } = await execFileAsync('git', ['branch', '--list'], { cwd: projectPath });
     const { stdout: remoteBranches } = await execFileAsync('git', ['branch', '-r', '--list'], { cwd: projectPath });
     const localList = localBranches.split('\n').map(b => b.replace(/^[*+\s]+/, '').trim()).filter(Boolean);
     const remoteList = remoteBranches.split('\n').map(b => b.trim()).filter(Boolean);
+    parentBranch = await resolveParentFeatureBranch(projectPath, issueUpper, localList, remoteList);
+    slotBranch = `${parentBranch}/slot-${slotNum}`;
+
+    if (existsSync(workspacePath)) {
+      return { success: true, workspacePath, branch: slotBranch, parentBranch };
+    }
 
     const slotBranchExists =
       localList.includes(slotBranch) ||
@@ -1618,11 +1653,7 @@ async function createSlotWorktree(
     if (slotBranchExists) {
       await execFileAsync('git', ['worktree', 'add', workspacePath, slotBranch], { cwd: projectPath });
     } else {
-      // Branch off the main feature branch (or main if feature branch doesn't exist)
-      const baseBranch = localList.includes(featureBranch) || remoteList.includes(`origin/${featureBranch}`)
-        ? featureBranch
-        : 'main';
-      await execFileAsync('git', ['worktree', 'add', workspacePath, '-b', slotBranch, baseBranch], { cwd: projectPath });
+      await execFileAsync('git', ['worktree', 'add', workspacePath, '-b', slotBranch, parentBranch], { cwd: projectPath });
     }
 
     // Restore any unstaged deletions
@@ -1648,9 +1679,9 @@ async function createSlotWorktree(
       await execFileAsync('bun', ['install'], { cwd: workspacePath, timeout: 60000 });
     } catch {}
 
-    return { success: true, workspacePath, branch: slotBranch, parentBranch: featureBranch };
+    return { success: true, workspacePath, branch: slotBranch, parentBranch };
   } catch (err: any) {
-    return { success: false, workspacePath, branch: slotBranch, parentBranch: featureBranch, error: err.message };
+    return { success: false, workspacePath, branch: slotBranch, parentBranch, error: err.message };
   }
 }
 
@@ -1774,6 +1805,7 @@ function buildSynthesisPrompt(
   item: WaveItem,
   waveIndex: number,
   slotNum: number,
+  parentBranch: string,
   // PAN-977 blocker #5: pass cumulative slot runtime so the synthesis agent
   // sees the actual upstream deliverables (slot branch, workspace path, status)
   // instead of just the original plan-text parent titles.
@@ -1782,7 +1814,6 @@ function buildSynthesisPrompt(
   const parents = item.blockedBy
     .map(parentId => doc.plan.items.find(planItem => planItem.id === parentId))
     .filter((parent): parent is VBriefItem => Boolean(parent));
-  const issueLower = issueId.toLowerCase();
 
   // Map plan-item parents to runtime delivery records (most recent slot wins).
   const slotByItemId = new Map<string, typeof runtimeSlots[number]>();
@@ -1798,8 +1829,8 @@ function buildSynthesisPrompt(
       deliverableLines.push(
         `- **${parent.id}: ${parent.title}**`,
         `  - slot ${slot.slotId}, status \`${slot.status}\``,
-        `  - branch: \`feature/${issueLower}/slot-${slot.slotId}\``,
-        `  - merge target: \`feature/${issueLower}\``,
+        `  - branch: \`${parentBranch}/slot-${slot.slotId}\``,
+        `  - merge target: \`${parentBranch}\``,
         `  - slot workspace: \`${slot.workspace || '(not yet created)'}\``,
         `  - tmux session: \`${slot.sessionName}\``,
       );
@@ -1822,9 +1853,9 @@ function buildSynthesisPrompt(
     `cd <your synthesis workspace>`,
     `# changed files merged into the parent feature branch by each upstream slot:`,
     `git fetch origin`,
-    `git diff --stat origin/feature/${issueLower}...origin/feature/${issueLower}/slot-<N>`,
+    `git diff --stat origin/${parentBranch}...origin/${parentBranch}/slot-<N>`,
     `# full diff for review:`,
-    `git log --stat origin/feature/${issueLower}/slot-<N> ^origin/main`,
+    `git log --stat origin/${parentBranch}/slot-<N> ^origin/main`,
     '```',
     '',
     'Upstream parent items and their delivery records:',
