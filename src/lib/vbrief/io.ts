@@ -106,7 +106,7 @@ export async function readPlanAsync(planPath: string): Promise<VBriefDocument> {
  * Apply statusOverrides from workspace continue.json onto a deep-cloned spec.
  * Keys are either `"item-id"` (item status) or `"item-id.sub-id"` (subItem status).
  */
-function applyStatusOverrides(doc: VBriefDocument, overrides: Record<string, string>): VBriefDocument {
+export function applyStatusOverrides(doc: VBriefDocument, overrides: Record<string, string>): VBriefDocument {
   const merged = JSON.parse(JSON.stringify(doc)) as VBriefDocument;
   for (const [key, status] of Object.entries(overrides)) {
     const dotIndex = key.indexOf('.');

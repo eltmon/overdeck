@@ -792,7 +792,11 @@ async function mirrorTaskOperationToContinueFileAsync(
   await writeWorkspaceContinueAsync(workspacePath, continueState);
 }
 
-export async function applyTaskOperationToPlanFileAsync(planPath: string, operation: PersistedTaskOperation): Promise<TaskOperationResult> {
+export async function applyTaskOperationToPlanFileAsync(
+  planPath: string,
+  operation: PersistedTaskOperation,
+  workspacePath?: string,
+): Promise<TaskOperationResult> {
   if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
   await assertSingleWriterAsync(planPath, operation.writerId);
   try {
@@ -800,8 +804,8 @@ export async function applyTaskOperationToPlanFileAsync(planPath: string, operat
     const result = applyTaskOperation(current, operation);
     await writePlanFileAtomicAsync(planPath, result.doc);
     // PAN-977: also update canonical continue-state overlay
-    const workspacePath = dirname(dirname(planPath));
-    await mirrorTaskOperationToContinueFileAsync(workspacePath, operation.itemId, result.item.status, operation.subItemIds);
+    const wsPath = workspacePath ?? dirname(dirname(planPath));
+    await mirrorTaskOperationToContinueFileAsync(wsPath, operation.itemId, result.item.status, operation.subItemIds);
     return result;
   } finally {
     await releasePlanWriterAsync(planPath, operation.writerId);

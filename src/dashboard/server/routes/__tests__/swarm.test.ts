@@ -49,6 +49,8 @@ vi.mock('node:child_process', async () => {
 vi.mock('../../../../lib/vbrief/io.js', () => ({
   findPlan: vi.fn(),
   readWorkspacePlan: vi.fn(),
+  readPlanAsync: vi.fn(),
+  applyStatusOverrides: vi.fn((doc: any) => doc),
   VBriefMergeConflictError: class VBriefMergeConflictError extends Error {},
 }));
 
@@ -139,7 +141,8 @@ describe('swarm route helpers', () => {
       tracker: 'github',
     } as any);
     vi.mocked(vbriefIo.readWorkspacePlan).mockReturnValue(PLAN_DOC);
-    vi.mocked(vbriefIo.findPlan).mockReturnValue(null);
+    vi.mocked(vbriefIo.readPlanAsync).mockResolvedValue(PLAN_DOC);
+    vi.mocked(vbriefIo.findPlan).mockReturnValue(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'));
     vi.mocked(systemHealthService.getSystemHealthSnapshot).mockResolvedValue({
       summary: { workAgentCount: 0 },
     } as any);

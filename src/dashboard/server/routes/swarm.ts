@@ -22,10 +22,12 @@ import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { getSystemHealthSnapshot, getResourceConfig } from '../services/system-health-service.js';
 import { evaluateSpawnGuardrails } from './agents.js';
+import { validateOrigin } from './origin-validation.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
-import { findPlan, VBriefMergeConflictError } from '../../../lib/vbrief/io.js';
+import { findPlan, readPlanAsync, applyStatusOverrides, VBriefMergeConflictError } from '../../../lib/vbrief/io.js';
+import { readWorkspaceContinueAsync } from '../../../lib/pan-dir/continue.js';
 import { readContinueStateAsync, writeContinueStateAsync, type ContinueState, type SwarmRuntime } from '../../../lib/vbrief/continue-state.js';
-import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, workspacePlanPath, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
+import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
 import type { VBriefDocument, VBriefItem } from '../../../lib/vbrief/types.js';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { listSessionNamesAsync, isPaneDeadAsync, killSessionAsync, listPaneValuesAsync } from '../../../lib/tmux.js';
@@ -118,14 +120,21 @@ function assertPathInside(parent: string, child: string): void {
 }
 
 async function readWorkspacePlanAsync(workspacePath: string): Promise<VBriefDocument | null> {
-  const planPath = join(workspacePath, '.pan', 'spec.vbrief.json');
+  const planPath = findPlan(workspacePath);
+  if (!planPath) return null;
   try {
     const raw = await readFile(planPath, 'utf-8');
     if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
       throw new VBriefMergeConflictError(planPath);
     }
     const parsed = JSON.parse(raw);
-    if (parsed.vBRIEFInfo && parsed.plan) return parsed as VBriefDocument;
+    if (parsed.vBRIEFInfo && parsed.plan) {
+      const continueState = await readWorkspaceContinueAsync(workspacePath);
+      if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
+        return applyStatusOverrides(parsed as VBriefDocument, continueState.statusOverrides);
+      }
+      return parsed as VBriefDocument;
+    }
     throw new Error(`Invalid vBRIEF format in ${planPath}`);
   } catch (err: any) {
     if (err?.code === 'ENOENT') return null;
@@ -587,6 +596,17 @@ async function dispatchSwarmWave(
     };
   }
 
+  const canonicalPlanPath = findPlan(mainWorkspace);
+  if (!canonicalPlanPath) {
+    return {
+      status: 422,
+      body: {
+        error: `No vBRIEF plan found for ${issueUpper}`,
+        hint: 'Run planning first to produce a vBRIEF plan.',
+      },
+    };
+  }
+
   let doc = await readWorkspacePlanAsync(mainWorkspace);
   if (!doc) {
     return {
@@ -908,14 +928,14 @@ async function dispatchSwarmWave(
       // a successful claim, release the claim (`unblock`) so the next dispatch
       // can retry — never leave an orphan claim with no live agent.
       try {
-        await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+        await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
           type: 'claim',
           itemId: item.id,
           reason: dispatchSynthesisFirst
             ? `Swarm slot ${slotNum} dispatched (synthesis phase)`
             : `Swarm slot ${slotNum} dispatched`,
           writerId: `swarm-dispatch-${process.pid}`,
-        });
+        }, mainWorkspace);
       } catch (claimErr: any) {
         return `Slot ${slotNum} (${item.id}): canonical vBRIEF claim failed — ${claimErr.message}`;
       }
@@ -953,12 +973,12 @@ async function dispatchSwarmWave(
         // Spawn failed after the claim landed — release the item so the next
         // dispatch cycle can retry. If the release itself fails, the next poll
         // can repair it; record the original spawn error either way.
-        await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+        await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
           type: 'unblock',
           itemId: item.id,
           reason: `Spawn failed for slot ${slotNum}; releasing claim for retry`,
           writerId: `swarm-dispatch-${process.pid}`,
-        }).catch((releaseErr: any) => {
+        }, mainWorkspace).catch((releaseErr: any) => {
           console.warn(`[swarm] Failed to release claim after spawn error for ${item.id}: ${releaseErr.message}`);
         });
         return `Slot ${slotNum} (${item.id}): ${err.message}`;
@@ -1057,6 +1077,10 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
   const project = resolveProjectFromIssue(issueUpper);
   if (!project) return { ok: false, status: 404, error: `no project resolved for ${issueUpper}` };
   const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueUpper.toLowerCase()}`);
+  const canonicalPlanPath = findPlan(mainWorkspace);
+  if (!canonicalPlanPath) {
+    return { ok: false, status: 422, error: `No canonical vBRIEF plan found for ${issueUpper}` };
+  }
   const now = new Date().toISOString();
   const state = await loadSwarmState(issueUpper);
   // If caller could not provide itemId (e.g. merge-agent only knows slot number),
@@ -1168,19 +1192,19 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
     if (resolvedItemId) {
       try {
         if (isSynthesisCompletion) {
-          await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+          await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
             type: 'unblock',
             itemId: resolvedItemId,
             reason: `Synthesis context delivered by slot ${slotId}; released for implementation dispatch`,
             writerId: `swarm-synth-${process.pid}`,
-          });
+          }, mainWorkspace);
         } else {
-          await applyTaskOperationToPlanFileAsync(workspacePlanPath(mainWorkspace), {
+          await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
             type: 'done',
             itemId: resolvedItemId,
             reason: `Swarm slot ${slotId} merged into feature branch`,
             writerId: `swarm-merge-${process.pid}`,
-          });
+          }, mainWorkspace);
         }
       } catch (mutationErr: any) {
         // Persist a retry-needed marker on the slot so the next reconciliation
@@ -1565,9 +1589,8 @@ const postSwarmRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     // PAN-977 blocker #3: this is a privileged state-changing endpoint that
     // can spawn autonomous agents, create worktrees, and mutate canonical
-    // vBRIEF task state. Require the same internal-token gate that
-    // /api/swarm/slot-merged uses, and reject unauthenticated requests before
-    // any side-effecting work.
+    // vBRIEF task state. Require the internal-token gate (CLI callers) OR a
+    // valid same-origin check (dashboard callers) before any side-effecting work.
     const request = yield* HttpServerRequest.HttpServerRequest;
     const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
       import('../../../lib/internal-token.js'),
@@ -1579,8 +1602,12 @@ const postSwarmRoute = HttpRouter.add(
     const headers = request.headers as Record<string, string | string[] | undefined>;
     const rawHeader = headers[INTERNAL_TOKEN_HEADER];
     const provided = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
-    if (!constantTimeTokenEqual(provided, expected)) {
-      return jsonResponse({ error: 'forbidden' }, { status: 403 });
+    const tokenValid = constantTimeTokenEqual(provided, expected);
+    if (!tokenValid) {
+      const originCheck = validateOrigin(request);
+      if (!originCheck.ok) {
+        return jsonResponse({ error: 'forbidden' }, { status: 403 });
+      }
     }
 
     const body = yield* readJsonBody;
@@ -1942,8 +1969,6 @@ export const __testInternals = {
   addActiveSwarmIssueId: (issueId: string) => { activeSwarmIssueIds.add(issueId); },
   clearActiveSwarmIssueIds: () => { activeSwarmIssueIds.clear(); },
 };
-
-export { dispatchSwarmWave };
 
 export { resumeSwarmAutoAdvanceLoopOnStartup };
 

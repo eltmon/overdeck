@@ -62,7 +62,6 @@ import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { findPlan } from '../../../lib/vbrief/io.js';
-import { dispatchSwarmWave } from './swarm.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -1361,30 +1360,6 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/command-deck/swarm ───────────────────────────────────
-// PAN-977: dashboard UI entrypoint for swarm dispatch. The browser-originated
-// fetch does not carry the internal token required by POST /api/swarm, so the
-// dashboard calls this same-origin endpoint which forwards to dispatchSwarmWave
-// directly — preserving the internal-token gate on /api/swarm for CLI callers.
-
-const postCommandDeckSwarmRoute = HttpRouter.add(
-  'POST',
-  '/api/command-deck/swarm',
-  httpHandler(Effect.gen(function* () {
-    const body = yield* readJsonBody;
-    const result = yield* Effect.promise(() =>
-      dispatchSwarmWave({
-        issueId: (body as Record<string, unknown>)['issueId'],
-        wave: (body as Record<string, unknown>)['wave'],
-        model: (body as Record<string, unknown>)['model'],
-        maxSlots: (body as Record<string, unknown>)['maxSlots'],
-        autoAdvance: (body as Record<string, unknown>)['autoAdvance'],
-      } as Parameters<typeof dispatchSwarmWave>[0]),
-    );
-    return jsonResponse(result.body, { status: result.status });
-  })),
-);
-
 // ─── Route: GET /api/command-deck/projects ────────────────────────────────
 
 const getMissionControlProjectsRoute = HttpRouter.add(
@@ -1413,7 +1388,6 @@ export const commandDeckRouteLayer = Layer.mergeAll(
   postMissionControlUploadRoute,
   postMissionControlSyncDiscussionsRoute,
   postMissionControlPlanningInitRoute,
-  postCommandDeckSwarmRoute,
   getMissionControlProjectsRoute,
 );
 
