@@ -1943,6 +1943,8 @@ export const __testInternals = {
   clearActiveSwarmIssueIds: () => { activeSwarmIssueIds.clear(); },
 };
 
+export { dispatchSwarmWave };
+
 export { resumeSwarmAutoAdvanceLoopOnStartup };
 
 export const swarmRouteLayer = Layer.mergeAll(

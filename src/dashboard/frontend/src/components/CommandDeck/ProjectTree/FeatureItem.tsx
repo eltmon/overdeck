@@ -796,7 +796,7 @@ function FeatureContextMenu({
 
   const swarmMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/swarm', {
+      const res = await fetch('/api/command-deck/swarm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ issueId: feature.issueId }),
