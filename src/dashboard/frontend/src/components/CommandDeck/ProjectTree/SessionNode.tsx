@@ -230,6 +230,7 @@ function deriveSessionModel(session: SessionNodeType, resolvedModel?: string | n
 function deriveSessionLabel(session: SessionNodeType, resolvedModel?: string | null): string {
   const model = deriveSessionModel(session, resolvedModel);
   switch (session.type) {
+    case 'ship': return model ? `Ship (${model})` : 'Ship agent';
     case 'merge': return model ? `Merge (${model})` : 'Merge agent';
     case 'test': return model ? `Tests (${model})` : 'Tests';
     case 'review': return model ? `Review (${model})` : 'Review';
@@ -258,6 +259,8 @@ function describeSessionPurpose(session: SessionNodeType): string {
         : 'Specialist reviewer in the review pipeline.';
     case 'test':
       return 'Verification and test session for this issue.';
+    case 'ship':
+      return 'Ship agent — rebases, verifies, and pushes the branch for merge.';
     case 'merge':
       return 'Merge and close-out session for this issue.';
     case 'legacy':

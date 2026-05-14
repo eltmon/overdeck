@@ -441,8 +441,22 @@ export async function fetchActivityDataWithContext(
     // and persist across review rounds, so we emit exactly four convoy reviewer
     // nodes anchored to the *most recent* review section in history.
     // Earlier review sections are skipped to avoid duplicate role nodes.
+    //
+    // Same for test and merge/ship: each role has one canonical session reused
+    // across rounds, so emit exactly one node anchored to the latest section.
+    // Without this, an issue with N test/merge history entries produced N
+    // same-sessionId nodes — the frontend collapsed them and the agent
+    // effectively vanished from the tree.
     const lastReviewIndex = specialistSections.reduce(
       (idx, s, i) => (s.type === 'review' ? i : idx),
+      -1,
+    );
+    const lastTestIndex = specialistSections.reduce(
+      (idx, s, i) => (s.type === 'test' ? i : idx),
+      -1,
+    );
+    const lastMergeIndex = specialistSections.reduce(
+      (idx, s, i) => (s.type === 'merge' ? i : idx),
       -1,
     );
     const resolvedProject = resolveProjectFromIssue(issueId);
@@ -533,11 +547,26 @@ export async function fetchActivityDataWithContext(
         continue;
       }
 
-      // Normal handling for non-review types
+      // Normal handling for non-review types — test and merge/ship.
+      // Emit exactly one node per role, anchored to the latest section, the
+      // same way review does. Earlier sections are skipped (their history is
+      // still in the DB and surfaced via status history elsewhere).
+      if (ss.type === 'test' && i !== lastTestIndex) continue;
+      if (ss.type === 'merge' && i !== lastMergeIndex) continue;
+
+      // The pipeline's final stage is the `ship` role, spawned via
+      // spawnRun(issueId, 'ship') as tmux session `agent-<issue>-ship`. The
+      // `merge` history type tracks its status; surface it as a `ship` node
+      // pointed at the real session instead of the legacy `merge-agent` name.
+      const isShipStage = ss.type === 'merge';
+      const nodeType: 'ship' | 'test' = isShipStage ? 'ship' : 'test';
+      const specialistSessionId = isShipStage
+        ? `agent-${issueLower}-ship`
+        : getTmuxSessionName('test-agent', resolveProjectFromIssue(issueId)?.projectKey, issueId);
+
       if (includeTranscripts && ss.status === 'running') {
-        const tmuxName = `specialist-${ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
         try {
-          const output = (await capturePaneAsync(tmuxName, 100)).trim();
+          const output = (await capturePaneAsync(specialistSessionId, 100)).trim();
           if (output && (output.includes(issueId.toUpperCase()) || output.includes(issueId) || output.includes(issueLower))) {
             transcriptParts.push(`\n--- Live Output ---\n${output}`);
           } else if (output) {
@@ -546,16 +575,7 @@ export async function fetchActivityDataWithContext(
         } catch { /* specialist may not be running */ }
       }
 
-      const specialistType = ss.type === 'test' ? 'test-agent' : 'merge-agent';
-      const specialistProjectKey = resolveProjectFromIssue(issueId)?.projectKey;
-      const specialistSessionId = getTmuxSessionName(
-        specialistType as never,
-        specialistProjectKey,
-        issueId,
-      );
-      const tmuxSessionName = specialistSessionId;
-
-      const specialistIsLive = tmuxSessionNames.has(tmuxSessionName);
+      const specialistIsLive = tmuxSessionNames.has(specialistSessionId);
       const specialistIsZombie = specialistIsLive && (ss.status === 'completed' || ss.status === 'failed');
       const specialistPresence: SessionNodePresence = specialistIsLive && !specialistIsZombie
         ? (ss.status === 'running' ? 'active' : 'idle')
@@ -563,7 +583,7 @@ export async function fetchActivityDataWithContext(
       const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
 
       sections.push({
-        type: ss.type,
+        type: nodeType,
         sessionId: specialistSessionId,
         model: 'specialist',
         startedAt: ss.startedAt,

@@ -415,6 +415,7 @@ export const SessionNodeType = Schema.Literals([
   "review",
   "reviewer",
   "test",
+  "ship",
   "merge",
   "legacy",
 ])
