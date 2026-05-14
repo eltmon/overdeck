@@ -620,11 +620,22 @@ async function dispatchSwarmWave(
     .filter(slot => slot.status === 'running')
     .map(slot => annotatedDoc.plan.items.find(item => item.id === slot.itemId))
     .filter((item): item is VBriefItem => Boolean(item));
-  let readyItems = existingState?.deferred?.length
-    ? existingState.deferred
-      .map(deferred => annotatedDoc.plan.items.find(item => item.id === deferred.itemId))
-      .filter((item): item is VBriefItem => Boolean(item))
-    : getDispatchableItems(annotatedDoc, mergedItemIds).filter(item => !mergedItemIds.has(item.id));
+  const dispatchable = getDispatchableItems(annotatedDoc, mergedItemIds)
+    .filter(item => !mergedItemIds.has(item.id));
+
+  let readyItems: VBriefItem[];
+  if (existingState?.deferred?.length) {
+    const deferredIds = new Set(existingState.deferred.map(d => d.itemId));
+    readyItems = dispatchable.filter(item => deferredIds.has(item.id));
+    // Drop stale deferred entries that are no longer dispatchable (blocked,
+    // cancelled, completed, already running, or dependency-not-ready).
+    const stillDispatchableIds = new Set(readyItems.map(item => item.id));
+    if (existingState.deferred.some(d => !stillDispatchableIds.has(d.itemId))) {
+      existingState.deferred = existingState.deferred.filter(d => stillDispatchableIds.has(d.itemId));
+    }
+  } else {
+    readyItems = dispatchable;
+  }
 
   const waveIndex = requestedWave ?? existingState?.currentWave ?? 0;
   const requestedWaveItems = waves[waveIndex]?.items;
