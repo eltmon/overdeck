@@ -61,7 +61,7 @@ import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
-import { findPlan } from '../../../lib/vbrief/io.js';
+import { findPlanAsync } from '../../../lib/vbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -801,7 +801,7 @@ async function fetchPlanningData(
   // Acceptance criteria progress from vBRIEF plan (PAN-847)
   // Pipeline mirror corroboration (PAN-977)
   try {
-    const planPath = findPlan(workspacePath);
+    const planPath = await findPlanAsync(workspacePath);
     if (planPath && await pathExists(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);

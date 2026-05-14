@@ -24,7 +24,7 @@ import { getSystemHealthSnapshot, getResourceConfig } from '../services/system-h
 import { evaluateSpawnGuardrails } from './agents.js';
 import { validateOrigin } from './origin-validation.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
-import { findPlan, readPlanAsync, applyStatusOverrides, VBriefMergeConflictError } from '../../../lib/vbrief/io.js';
+import { findPlanAsync, readPlanAsync, applyStatusOverrides, VBriefMergeConflictError } from '../../../lib/vbrief/io.js';
 import { readWorkspaceContinueAsync } from '../../../lib/pan-dir/continue.js';
 import { readContinueStateAsync, writeContinueStateAsync, type ContinueState, type SwarmRuntime } from '../../../lib/vbrief/continue-state.js';
 import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, compileGlob, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
@@ -119,8 +119,8 @@ function assertPathInside(parent: string, child: string): void {
   }
 }
 
-async function readWorkspacePlanAsync(workspacePath: string): Promise<VBriefDocument | null> {
-  const planPath = findPlan(workspacePath);
+async function readWorkspacePlanAsync(workspacePath: string, resolvedPlanPath?: string): Promise<VBriefDocument | null> {
+  const planPath = resolvedPlanPath ?? (await findPlanAsync(workspacePath));
   if (!planPath) return null;
   try {
     const raw = await readFile(planPath, 'utf-8');
@@ -597,7 +597,7 @@ async function dispatchSwarmWave(
     };
   }
 
-  const canonicalPlanPath = findPlan(mainWorkspace);
+  const canonicalPlanPath = await findPlanAsync(mainWorkspace);
   if (!canonicalPlanPath) {
     return {
       status: 422,
@@ -608,7 +608,7 @@ async function dispatchSwarmWave(
     };
   }
 
-  let doc = await readWorkspacePlanAsync(mainWorkspace);
+  let doc = await readWorkspacePlanAsync(mainWorkspace, canonicalPlanPath);
   if (!doc) {
     return {
       status: 422,
@@ -865,7 +865,7 @@ async function dispatchSwarmWave(
 
   const dispatched: SlotAssignment[] = [];
   const errors: string[] = [];
-  const planPath = findPlan(mainWorkspace);
+  const planPath = canonicalPlanPath;
 
   const slotResults = await runWithConcurrencyLimit(
     itemSlotAssignments,
@@ -1118,7 +1118,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
   const project = resolveProjectFromIssue(issueUpper);
   if (!project) return { ok: false, status: 404, error: `no project resolved for ${issueUpper}` };
   const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueUpper.toLowerCase()}`);
-  const canonicalPlanPath = findPlan(mainWorkspace);
+  const canonicalPlanPath = await findPlanAsync(mainWorkspace);
   if (!canonicalPlanPath) {
     return { ok: false, status: 422, error: `No canonical vBRIEF plan found for ${issueUpper}` };
   }

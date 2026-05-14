@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { readFile } from 'fs/promises'
 import { join } from 'path'
 
-import { VBriefMergeConflictError, readPlan } from '../vbrief/io.js'
+import { VBriefMergeConflictError, readPlan, readPlanAsync } from '../vbrief/io.js'
 import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'
 import { invalidateVBriefIndex } from '../vbrief/vbrief-index.js'
 import type { VBriefDocument } from '../vbrief/types.js'
@@ -144,6 +145,72 @@ export function listSpecs(projectRoot: string, options: PanSpecListOptions = {})
 export function findSpecByIssue(projectRoot: string, issueId: string): PanSpecEntry | null {
   const upperIssueId = issueId.toUpperCase()
   return listSpecs(projectRoot).find(entry => entry.issueId.toUpperCase() === upperIssueId) ?? null
+}
+
+async function parsePanSpecDocumentAsync(path: string): Promise<PanSpecDocument> {
+  const raw = await readFile(path, 'utf-8')
+  if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
+    throw new VBriefMergeConflictError(path)
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    throw new Error(`Invalid JSON in pan spec ${path}: ${(error as Error).message}`)
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`Invalid pan spec format in ${path}: document is not an object`)
+  }
+
+  const doc = parsed as Record<string, unknown>
+  if (!isPanSpecStatus(doc.status)) {
+    const plan = doc.plan as Record<string, unknown> | undefined
+    const mapped = mapVBriefPlanStatusToPanSpec(plan?.status)
+    if (mapped) {
+      doc.status = mapped
+    } else {
+      throw new Error(`Invalid pan spec format in ${path}: missing valid root status`)
+    }
+  }
+
+  return readPlanAsync(path) as Promise<PanSpecDocument>
+}
+
+/** Async variant of findSpecByIssue that does not parse unrelated specs. */
+export async function findSpecByIssueAsync(projectRoot: string, issueId: string): Promise<PanSpecEntry | null> {
+  const upperIssueId = issueId.toUpperCase()
+  const { specsDir } = projectPanPaths(projectRoot)
+
+  let filenames: string[]
+  try {
+    filenames = await (await import('fs/promises')).readdir(specsDir)
+  } catch (err: any) {
+    if (err?.code === 'ENOENT') return null
+    throw err
+  }
+
+  for (const filename of filenames) {
+    const parts = parseVBriefFilename(filename)
+    if (!parts || parts.issueId.toUpperCase() !== upperIssueId) continue
+    const path = join(specsDir, filename)
+    try {
+      const document = await parsePanSpecDocumentAsync(path)
+      return {
+        path,
+        filename,
+        issueId: parts.issueId,
+        slug: parts.slug,
+        date: parts.date,
+        status: document.status,
+        document,
+      }
+    } catch (err) {
+      console.warn(`[specs] Skipping invalid spec ${filename}: ${(err as Error).message}`)
+    }
+  }
+  return null
 }
 
 export function buildPanSpecFilename(issueId: string, slug: string, createdDate?: Date | string): string {

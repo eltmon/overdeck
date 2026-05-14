@@ -18,7 +18,7 @@
 import { readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { basename, join, resolve } from 'path';
-import { findSpecByIssue } from '../pan-dir/specs.js';
+import { findSpecByIssue, findSpecByIssueAsync } from '../pan-dir/specs.js';
 import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
 
@@ -46,6 +46,15 @@ export function findPlan(workspacePath: string): string | null {
   if (!issueId) return null;
   const projectRoot = projectRootFromWorkspace(workspacePath);
   const entry = findSpecByIssue(projectRoot, issueId);
+  return entry ? entry.path : null;
+}
+
+/** Async variant of findPlan — safe to call from dashboard server code. */
+export async function findPlanAsync(workspacePath: string): Promise<string | null> {
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return null;
+  const projectRoot = projectRootFromWorkspace(workspacePath);
+  const entry = await findSpecByIssueAsync(projectRoot, issueId);
   return entry ? entry.path : null;
 }
 
