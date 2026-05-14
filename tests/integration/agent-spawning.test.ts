@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, rmSync, existsSync } from 'fs';
+import { mkdirSync, rmSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
@@ -233,6 +233,23 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       // DEFAULT_ROLES carries no per-role harness override → must default to
       // claude-code, not be left undefined.
       expect(state.harness).toBe(DEFAULT_ROLES[role].harness ?? 'claude-code');
+    });
+
+    it('launches review sub-roles in headless print mode with prompt on stdin', async () => {
+      await spawnRun('PAN-SUBREVIEW-1', 'review', {
+        workspace: '/tmp/test-workspace',
+        subRole: 'security',
+        prompt: 'review this diff',
+      });
+
+      const launcher = readFileSync(join(getAgentDir('agent-pan-subreview-1-review-security'), 'launcher.sh'), 'utf8');
+
+      expect(launcher).toContain('exec claude --print');
+      expect(launcher).toContain("--name agent-pan-subreview-1-review-security --session-id '");
+      expect(launcher).toContain("< '");
+      expect(launcher).toContain("initial-prompt.md'");
+      expect(launcher).not.toContain('prompt=$(cat');
+      expect(launcher).not.toContain('"$prompt"');
     });
 
     it('refuses to spawn when a role session is already in tmux', async () => {

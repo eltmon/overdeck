@@ -296,12 +296,14 @@ export async function getRoleRuntimeBaseCommand(
   const permissionFlags = definitionPath ? '' : ` ${getClaudePermissionFlagsString()}`;
   const bypassWithAgent = definitionPath ? bypassPrefixForAgentFlag() : '';
 
+  const printFlag = role === 'review' && subRole ? ' --print' : '';
+
   if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
-    return `claude${bypassWithAgent}${agentFlag}${permissionFlags} --model ${resolvedModel}${nameFlag}`;
+    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  return `claude${bypassWithAgent}${agentFlag}${permissionFlags} --model ${model}${nameFlag}`;
+  return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${model}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -1867,6 +1869,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setTerminalEnv: true,
     providerExports,
     promptFile,
+    promptFileMode: role === 'review' && options.subRole && resolvedHarness === 'claude-code' ? 'stdin' : undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
     sessionId,

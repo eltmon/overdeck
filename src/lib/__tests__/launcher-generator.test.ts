@@ -157,6 +157,20 @@ describe('generateLauncherScript', () => {
     `);
   });
 
+  it('supports prompt files on stdin for headless launchers', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'review',
+      promptFile: '/tmp/prompt.md',
+      promptFileMode: 'stdin',
+      baseCommand: 'claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
+      sessionId: 'sess-abc',
+    });
+
+    expect(script).not.toContain('prompt=$(cat');
+    expect(script).toContain("exec claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc' < '/tmp/prompt.md'");
+  });
+
   it('work role identity prompt launch', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,

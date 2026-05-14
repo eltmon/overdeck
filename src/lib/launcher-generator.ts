@@ -47,6 +47,7 @@ export interface LauncherConfig {
    */
   baseCommand?: string;
   promptFile?: string;
+  promptFileMode?: 'argument' | 'stdin';
   promptInline?: string;
   resumeSessionId?: string;
   sessionId?: string;
@@ -243,7 +244,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   }
 
   // Prompt file read
-  if (config.promptFile) {
+  if (config.promptFile && config.promptFileMode !== 'stdin') {
     lines.push(`prompt=$(cat ${shellQuote(config.promptFile)})`);
   }
 
@@ -400,7 +401,11 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
 
   // Append prompt reference
   if (config.promptFile) {
-    cmd += ' "$prompt"';
+    if (config.promptFileMode === 'stdin') {
+      cmd += ` < ${shellQuote(config.promptFile)}`;
+    } else {
+      cmd += ' "$prompt"';
+    }
   }
   if (config.promptInline) {
     cmd += ` ${shellQuote(config.promptInline)}`;
