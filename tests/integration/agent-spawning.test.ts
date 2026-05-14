@@ -265,14 +265,18 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
 
       // The launcher — not the agent, not Deacon — owns the signal: it runs
-      // claude as a child (no exec) so the contract block runs on exit.
+      // claude as a child (no exec) so the contract block runs on exit, and is
+      // HUP-immune so it outlives the (short-lived) tmux session.
       expect(launcher).not.toContain('exec claude');
+      expect(launcher).toContain("trap '' HUP");
       expect(launcher).toContain('timeout 1200 claude --print');
       expect(launcher).toContain('CLAUDE_EXIT=$?');
+      expect(launcher).toContain(`echo $$ > '${join(agentDir, 'reviewer-launcher.pid')}'`);
       expect(launcher).toContain('"REVIEWER_READY correctness /tmp/out/review-correctness.md"');
       expect(launcher).toContain('"REVIEWER_FAILED correctness reviewer exited (code $CLAUDE_EXIT) without writing report"');
       expect(launcher).toContain('"REVIEWER_TIMEOUT correctness reviewer exceeded 1200s deadline"');
       expect(launcher).toContain(`touch '${join(agentDir, 'reviewer-signaled')}'`);
+      expect(launcher).toContain(`rm -f '${join(agentDir, 'reviewer-launcher.pid')}'`);
 
       // Synthesis wiring is persisted on AgentState too (Deacon backup path).
       const state = getAgentState('agent-pan-subsignal-1-review-correctness');

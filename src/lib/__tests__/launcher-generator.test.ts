@@ -177,6 +177,7 @@ describe('generateLauncherScript', () => {
       role: 'review',
       promptFile: '/agents/agent-pan-1-review-security/initial-prompt.md',
       promptFileMode: 'stdin',
+      trapHup: true,
       baseCommand: 'claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.5',
       sessionId: 'sess-rev',
       reviewSignal: {
@@ -184,6 +185,7 @@ describe('generateLauncherScript', () => {
         subRole: 'security',
         outputPath: '/agents/agent-pan-1-review-security/review-security.md',
         signalMarkerPath: '/agents/agent-pan-1-review-security/reviewer-signaled',
+        launcherPidPath: '/agents/agent-pan-1-review-security/reviewer-launcher.pid',
         timeoutSeconds: 1200,
       },
     });
@@ -191,6 +193,10 @@ describe('generateLauncherScript', () => {
     // NOT exec — the launcher's bash process must outlive claude so it can
     // signal synthesis deterministically on exit.
     expect(script).not.toContain('exec claude');
+    // HUP-immune: the launcher survives the tmux session being reaped.
+    expect(script).toContain("trap '' HUP");
+    // Writes its own pid for Deacon's liveness check, removes it after signaling.
+    expect(script).toContain("echo $$ > '/agents/agent-pan-1-review-security/reviewer-launcher.pid'");
     expect(script).toContain("timeout 1200 claude --print");
     expect(script).toContain("--session-id 'sess-rev' < '/agents/agent-pan-1-review-security/initial-prompt.md'");
     expect(script).toContain('CLAUDE_EXIT=$?');
@@ -200,6 +206,7 @@ describe('generateLauncherScript', () => {
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_READY security /agents/agent-pan-1-review-security/review-security.md" || true');
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_FAILED security reviewer exited (code $CLAUDE_EXIT) without writing report" || true');
     expect(script).toContain("touch '/agents/agent-pan-1-review-security/reviewer-signaled'");
+    expect(script).toContain("rm -f '/agents/agent-pan-1-review-security/reviewer-launcher.pid'");
   });
 
   it('work role identity prompt launch', () => {

@@ -1888,6 +1888,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
         subRole: options.subRole as string,
         outputPath: options.reviewOutputPath,
         signalMarkerPath: join(getAgentDir(agentId), 'reviewer-signaled'),
+        launcherPidPath: join(getAgentDir(agentId), 'reviewer-launcher.pid'),
         timeoutSeconds: REVIEW_SUBROLE_TIMEOUT_SECONDS,
       }
     : undefined;
@@ -1907,6 +1908,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
     sessionId,
     reviewSignal,
+    // PAN-977: review sub-role launchers must outlive their tmux session. The
+    // session gets reaped quickly (orphan-recovery / cleanup / restart churn)
+    // which SIGHUPs the launcher; `trap '' HUP` keeps the launcher's bash
+    // process alive so it always runs its signal block when claude exits.
+    trapHup: reviewSignal ? true : undefined,
     ...piLauncherFields,
   });
 

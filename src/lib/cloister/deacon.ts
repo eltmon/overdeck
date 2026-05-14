@@ -4285,51 +4285,67 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     }
     const deadlineMs = state.reviewDeadlineAt ? Date.parse(state.reviewDeadlineAt) : Number.NaN;
 
-    if (outputWrittenForThisRun) {
-      const sessionAlive = await sessionExistsAsync(agentId);
-      if (!sessionAlive || state.status === 'stopped') {
-        const message = `REVIEWER_READY ${state.reviewSubRole} ${outputPath}`;
-        try {
-          const { messageAgent } = await import('../agents.js');
-          await messageAgent(state.reviewSynthesisAgentId, message);
-          state.reviewMonitorSignaled = 'ready';
-          saveAgentState(state);
-          const action = `Signaled ${message} to ${state.reviewSynthesisAgentId}`;
-          actions.push(action);
-          logDeaconEvent(`monitorReviewConvoySignals: ${action}`);
-          try {
-            const { notifyPipeline } = await import('../pipeline-notifier.js');
-            notifyPipeline({ type: 'reviewer_completed', issueId: state.issueId, role: state.reviewSubRole });
-          } catch { /* non-fatal */ }
-        } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          logDeaconEvent(`monitorReviewConvoySignals: failed to signal ${state.reviewSynthesisAgentId} for ${agentId}: ${errMsg}`);
-        }
-      }
-      continue;
-    }
-
+    // The synthesis agent must be alive to receive any signal.
     const synthesisAlive = await sessionExistsAsync(state.reviewSynthesisAgentId);
     if (!synthesisAlive) continue;
 
-    let signal: 'failed' | 'timeout' | null = null;
-    let reason = '';
+    // PAN-977: the review sub-role launcher is HUP-immune and intentionally
+    // outlives its tmux session, so "tmux session missing" is NOT a failure.
+    // The launcher writes its pid to reviewer-launcher.pid and removes it once
+    // it has signaled. Deacon checks the launcher process itself: while that
+    // pid is alive the launcher is still working (or about to signal) and
+    // Deacon stays out of the way. Deacon only steps in once the launcher pid
+    // is gone with no signal marker — the rare SIGKILL-before-signal case.
+    const launcherPidPath = join(AGENTS_DIR, agentId, 'reviewer-launcher.pid');
+    let launcherAlive = false;
+    if (existsSync(launcherPidPath)) {
+      try {
+        const pid = Number.parseInt(readFileSync(launcherPidPath, 'utf-8').trim(), 10);
+        if (Number.isInteger(pid) && pid > 0) {
+          try { process.kill(pid, 0); launcherAlive = true; } catch { launcherAlive = false; }
+        }
+      } catch { launcherAlive = false; }
+    }
 
-    const sessionAlive = await sessionExistsAsync(agentId);
-    const paneDead = sessionAlive ? await isPaneDeadAsync(agentId).catch(() => true) : true;
-    if (!sessionAlive || paneDead || state.status === 'stopped' || state.status === 'error') {
-      signal = 'failed';
-      reason = !sessionAlive ? 'reviewer session missing before output file was written' : 'reviewer exited before output file was written';
+    // Startup grace: give the launcher time to write its pid file before a
+    // missing pid is read as death (avoids racing the bash env setup).
+    const REVIEWER_LAUNCHER_GRACE_MS = 90_000;
+    const withinStartupGrace = Number.isFinite(startedMs) && (Date.now() - startedMs) < REVIEWER_LAUNCHER_GRACE_MS;
+
+    let signal: 'ready' | 'failed' | 'timeout' | null = null;
+    let reason = '';
+    if (launcherAlive) {
+      // Launcher still running — only intervene if it has blown well past its
+      // deadline (genuinely wedged, e.g. a hung `pan tell`).
+      if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs + REVIEWER_LAUNCHER_GRACE_MS) {
+        signal = 'timeout';
+        reason = `reviewer launcher still running past deadline ${state.reviewDeadlineAt}`;
+      } else {
+        continue;
+      }
+    } else if (withinStartupGrace) {
+      // Launcher pid not written yet — too early to call it dead.
+      continue;
+    } else if (outputWrittenForThisRun) {
+      // Launcher died after writing the report but before signaling READY.
+      signal = 'ready';
     } else if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs) {
       signal = 'timeout';
       reason = `reviewer exceeded deadline ${state.reviewDeadlineAt}`;
+    } else {
+      // Launcher pid is gone, no report, before deadline → the launcher bash
+      // process was SIGKILLed before it could run its signal block.
+      signal = 'failed';
+      reason = 'reviewer launcher process died before signaling synthesis';
     }
 
     if (!signal) continue;
 
-    const message = signal === 'timeout'
-      ? `REVIEWER_TIMEOUT ${state.reviewSubRole} ${reason}`
-      : `REVIEWER_FAILED ${state.reviewSubRole} ${reason}`;
+    const message = signal === 'ready'
+      ? `REVIEWER_READY ${state.reviewSubRole} ${outputPath}`
+      : signal === 'timeout'
+        ? `REVIEWER_TIMEOUT ${state.reviewSubRole} ${reason}`
+        : `REVIEWER_FAILED ${state.reviewSubRole} ${reason}`;
 
     try {
       const { messageAgent } = await import('../agents.js');
@@ -4339,7 +4355,12 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
       const action = `Signaled ${message} to ${state.reviewSynthesisAgentId}`;
       actions.push(action);
       logDeaconEvent(`monitorReviewConvoySignals: ${action}`);
-      if (signal === 'timeout') {
+      if (signal === 'ready') {
+        try {
+          const { notifyPipeline } = await import('../pipeline-notifier.js');
+          notifyPipeline({ type: 'reviewer_completed', issueId: state.issueId, role: state.reviewSubRole });
+        } catch { /* non-fatal */ }
+      } else if (signal === 'timeout') {
         try {
           const { notifyPipeline } = await import('../pipeline-notifier.js');
           notifyPipeline({

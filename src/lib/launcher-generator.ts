@@ -68,6 +68,12 @@ export interface LauncherConfig {
     subRole: string;
     outputPath: string;
     signalMarkerPath: string;
+    /**
+     * Absolute path the launcher writes its own bash pid into at startup and
+     * removes once it has signaled. Deacon's convoy watchdog checks this pid
+     * for liveness instead of the (intentionally short-lived) tmux session.
+     */
+    launcherPidPath: string;
     timeoutSeconds: number;
   };
 
@@ -399,8 +405,13 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
   const synth = shellQuote(sig.synthesisAgentId);
   const out = sig.outputPath;
   const role = sig.subRole;
+  const pidFile = shellQuote(sig.launcherPidPath);
 
   return [
+    // Record this launcher's pid so Deacon's convoy watchdog can check the
+    // launcher process itself for liveness — the tmux session is short-lived
+    // and `trap '' HUP` keeps this bash alive after the session is reaped.
+    `echo $$ > ${pidFile}`,
     claudeCmd,
     'CLAUDE_EXIT=$?',
     `if [ "$CLAUDE_EXIT" = "124" ]; then`,
@@ -411,6 +422,7 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
     `  pan tell ${synth} "REVIEWER_FAILED ${role} reviewer exited (code $CLAUDE_EXIT) without writing report" || true`,
     `fi`,
     `touch ${shellQuote(sig.signalMarkerPath)}`,
+    `rm -f ${pidFile}`,
   ];
 }
 
