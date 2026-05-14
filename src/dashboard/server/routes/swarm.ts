@@ -1154,6 +1154,60 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
   // call picks it up as an implementation slot (hasSynthesisOutput=true ⇒
   // buildSlotPrompt receives the persisted context).
   const isSynthesisCompletion = Boolean(synthesisOutput) || matchedSlot?.phase === 'synthesis';
+
+  // If the swarm runtime is missing and we couldn't resolve an itemId from it,
+  // we cannot perform any durable mutation. Return non-2xx so the merge-agent
+  // writes a retry marker rather than silently believing the slot was handled.
+  if (!state && (!resolvedItemId || resolvedItemId.length === 0)) {
+    return { ok: false, status: 500, error: `Swarm runtime not found for ${issueUpper} and itemId could not be resolved from slot ${slotId}` };
+  }
+
+  // PAN-977 blocker: the canonical vBRIEF task transition must land even when
+  // the swarm runtime state is missing, as long as we know which item to mutate.
+  // Only the runtime-slot bookkeeping is gated on state existence.
+  if (resolvedItemId) {
+    try {
+      if (isSynthesisCompletion) {
+        await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
+          type: 'unblock',
+          itemId: resolvedItemId,
+          reason: `Synthesis context delivered by slot ${slotId}; released for implementation dispatch`,
+          writerId: `swarm-synth-${process.pid}`,
+        }, mainWorkspace);
+      } else {
+        await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
+          type: 'done',
+          itemId: resolvedItemId,
+          reason: `Swarm slot ${slotId} merged into feature branch`,
+          writerId: `swarm-merge-${process.pid}`,
+        }, mainWorkspace);
+      }
+    } catch (mutationErr: any) {
+      // Persist a retry-needed marker on the slot so the next reconciliation
+      // pass can repair it, then bubble the failure up so the HTTP route
+      // returns non-2xx and the caller knows to retry.
+      if (state) {
+        try {
+          const retryNote = `vBRIEF task mutation failed: ${mutationErr.message}`;
+          // PAN-977 round-11 blocker #1: only flag the resolved slot index, not
+          // every historical record sharing the numeric slot.
+          const retrySlots = matchedSlotIndex >= 0
+            ? state.slots.map((s, idx) => idx === matchedSlotIndex
+              ? { ...s, status: 'failed' as const, failureReason: retryNote }
+              : s)
+            : state.slots;
+          const retryState = { ...state, slots: retrySlots, lastAutoAdvanceError: retryNote, updatedAt: new Date().toISOString() };
+          await saveSwarmState(retryState);
+        } catch { /* best effort — original error still propagates */ }
+      }
+      return {
+        ok: false,
+        status: 500,
+        error: `Failed to apply canonical vBRIEF mutation for ${resolvedItemId}: ${mutationErr.message}`,
+      };
+    }
+  }
+
   if (state) {
     // PAN-977 round-11 blocker #1: mutate ONLY the resolved slot index. Older
     // history records with the same numeric slot or itemId stay untouched, so
@@ -1195,56 +1249,6 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
           },
         };
       });
-    }
-
-    // PAN-977 blocker #1: the canonical vBRIEF task transition MUST land BEFORE
-    // we kick off auto-advance. Otherwise the next dispatch sees the convergence
-    // item still claimed/running and skips it, leaving the implementation slot
-    // un-spawned. Apply the durable mutation, *then* compute readiness from the
-    // refreshed plan via dispatchSwarmWave.
-    // PAN-977 blocker #2: durable vBRIEF mutation failures MUST surface to the
-    // caller. Swallowing them previously allowed /api/swarm/slot-merged to
-    // report success while the canonical plan item was still `running`,
-    // wedging downstream synthesis/implementation dispatch.
-    if (resolvedItemId) {
-      try {
-        if (isSynthesisCompletion) {
-          await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
-            type: 'unblock',
-            itemId: resolvedItemId,
-            reason: `Synthesis context delivered by slot ${slotId}; released for implementation dispatch`,
-            writerId: `swarm-synth-${process.pid}`,
-          }, mainWorkspace);
-        } else {
-          await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
-            type: 'done',
-            itemId: resolvedItemId,
-            reason: `Swarm slot ${slotId} merged into feature branch`,
-            writerId: `swarm-merge-${process.pid}`,
-          }, mainWorkspace);
-        }
-      } catch (mutationErr: any) {
-        // Persist a retry-needed marker on the slot so the next reconciliation
-        // pass can repair it, then bubble the failure up so the HTTP route
-        // returns non-2xx and the caller knows to retry.
-        try {
-          const retryNote = `vBRIEF task mutation failed: ${mutationErr.message}`;
-          // PAN-977 round-11 blocker #1: only flag the resolved slot index, not
-          // every historical record sharing the numeric slot.
-          const retrySlots = matchedSlotIndex >= 0
-            ? nextState.slots.map((s, idx) => idx === matchedSlotIndex
-              ? { ...s, status: 'failed' as const, failureReason: retryNote }
-              : s)
-            : nextState.slots;
-          const retryState = { ...nextState, slots: retrySlots, lastAutoAdvanceError: retryNote, updatedAt: new Date().toISOString() };
-          await saveSwarmState(retryState);
-        } catch { /* best effort — original error still propagates */ }
-        return {
-          ok: false,
-          status: 500,
-          error: `Failed to apply canonical vBRIEF mutation for ${resolvedItemId}: ${mutationErr.message}`,
-        };
-      }
     }
 
     let dispatched = false;
