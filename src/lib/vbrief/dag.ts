@@ -298,13 +298,13 @@ function globToRegex(pattern: string): RegExp {
  * Returns true if a path matches at least one glob pattern in the list.
  * Patterns ending in `/**` also match exact directory paths.
  */
-interface CompiledGlob {
+export interface CompiledGlob {
   pattern: string;
   regex: RegExp;
   exactDirectory?: string;
 }
 
-function compileGlob(pattern: string): CompiledGlob {
+export function compileGlob(pattern: string): CompiledGlob {
   const withoutTrail = pattern.replace(/\/\*\*$/, '');
   return {
     pattern,
@@ -328,16 +328,20 @@ function pathMatchesAny(filePath: string, patterns: string[]): boolean {
  * Overlap is bidirectional: a file in the candidate matched by a running item's
  * patterns, or a file in a running item matched by the candidate's patterns.
  */
-export function hasFileOverlap(runningItems: VBriefItem[], candidate: VBriefItem): boolean {
+export function hasFileOverlap(
+  runningItems: VBriefItem[],
+  candidate: VBriefItem,
+  precompiled?: Map<string, CompiledGlob[]>,
+): boolean {
   const candidateScope = candidate.metadata?.files_scope;
   if (!candidateScope || candidateScope.length === 0) return false;
 
-  const compiledCandidateScope = candidateScope.map(compileGlob);
+  const compiledCandidateScope = precompiled?.get(candidate.id) ?? candidateScope.map(compileGlob);
 
   for (const running of runningItems) {
     const runningScope = running.metadata?.files_scope;
     if (!runningScope || runningScope.length === 0) continue;
-    const compiledRunningScope = runningScope.map(compileGlob);
+    const compiledRunningScope = precompiled?.get(running.id) ?? runningScope.map(compileGlob);
 
     // Check candidate patterns against running scope paths
     for (const runningPath of runningScope) {

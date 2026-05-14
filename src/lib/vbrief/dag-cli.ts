@@ -118,16 +118,19 @@ function mirrorTaskOperationToContinueFile(
 }
 
 /** Persist a task operation to workspace .pan/spec.vbrief.json with CAS + single-writer guard. */
-export function applyTaskOperationToPlanFile(planPath: string, operation: PersistedTaskOperation): TaskOperationResult {
+export function applyTaskOperationToPlanFile(planPath: string, operation: PersistedTaskOperation, workspacePath?: string): TaskOperationResult {
   if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
   assertSingleWriter(planPath, operation.writerId);
   try {
     const current = readPlanFile(planPath);
     const result = applyTaskOperation(current, operation);
     writePlanFileAtomic(planPath, result.doc);
-    // PAN-977: also update canonical continue-state overlay
-    const workspacePath = dirname(dirname(planPath));
-    mirrorTaskOperationToContinueFile(workspacePath, operation.itemId, result.item.status, operation.subItemIds);
+    // PAN-977: also update canonical continue-state overlay. When the planPath
+    // is a canonical spec on main (PAN-1124), dirname(dirname(planPath)) yields
+    // the project root, not the workspace root. Callers must pass the correct
+    // workspacePath so the mirror lands in <workspace>/.pan/continue.json.
+    const wsPath = workspacePath ?? dirname(dirname(planPath));
+    mirrorTaskOperationToContinueFile(wsPath, operation.itemId, result.item.status, operation.subItemIds);
     return result;
   } finally {
     releasePlanWriter(planPath, operation.writerId);
@@ -191,5 +194,5 @@ export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions
     expectedSequence: options.expectedSequence,
     reason: options.reason,
     writerId: options.writerId ?? `pan-task-${process.pid}`,
-  });
+  }, options.workspacePath);
 }

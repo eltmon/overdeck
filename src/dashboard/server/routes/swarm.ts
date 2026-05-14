@@ -27,7 +27,7 @@ import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js'
 import { findPlan, readPlanAsync, applyStatusOverrides, VBriefMergeConflictError } from '../../../lib/vbrief/io.js';
 import { readWorkspaceContinueAsync } from '../../../lib/pan-dir/continue.js';
 import { readContinueStateAsync, writeContinueStateAsync, type ContinueState, type SwarmRuntime } from '../../../lib/vbrief/continue-state.js';
-import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
+import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, compileGlob, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
 import type { VBriefDocument, VBriefItem } from '../../../lib/vbrief/types.js';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { listSessionNamesAsync, isPaneDeadAsync, killSessionAsync, listPaneValuesAsync } from '../../../lib/tmux.js';
@@ -671,39 +671,8 @@ async function dispatchSwarmWave(
     readyItems = readyItems.filter(item => waveItemIds.has(item.id));
   }
 
-  const selectedItems: VBriefItem[] = [];
-  const deferredByOverlap: VBriefItem[] = [];
-  for (const item of readyItems) {
-    if (hasFileOverlap([...runningItems, ...selectedItems], item)) {
-      deferredByOverlap.push(item);
-      continue;
-    }
-    selectedItems.push(item);
-  }
-  const candidates = selectedItems;
-  if (candidates.length === 0) {
-    return {
-      status: 422,
-      body: {
-        error: `No dispatchable items in the plan for ${issueUpper}`,
-        hint: readyItems.length > 0
-          ? 'Ready items are waiting for overlapping files_scope work to finish.'
-          : 'All items may already be running, completed, blocked, or waiting on dependencies.',
-        wavePlan: waves,
-      },
-    };
-  }
-
-  const itemById = new Map(annotatedDoc.plan.items.map((planItem) => [planItem.id, planItem]));
-  const pendingItems: WaveItem[] = candidates.map(item => ({
-    id: item.id,
-    title: item.title,
-    difficulty: item.metadata?.difficulty,
-    blockedBy: annotatedDoc.plan.edges
-      .filter(edge => edge.type === 'blocks' && edge.to === item.id)
-      .map(edge => edge.from),
-  }));
-
+  // Health check and capacity calculation BEFORE overlap-selection pass
+  // so the expensive overlap loop is bounded by actual dispatch capacity.
   const health = await getSystemHealthSnapshot();
   const guardrails = evaluateSpawnGuardrails(health);
   if (guardrails.blocked) {
@@ -745,8 +714,57 @@ async function dispatchSwarmWave(
     };
   }
 
-  const maxConcurrent = Math.min(pendingItems.length, userMax, systemAvailable);
-  const itemsToDispatch = pendingItems.slice(0, maxConcurrent);
+  const maxConcurrent = Math.min(userMax, systemAvailable);
+
+  // Precompile files_scope patterns once per dispatch to avoid recompiling
+  // on every comparison inside hasFileOverlap.
+  const precompiledScopes = new Map<string, ReturnType<typeof compileGlob>[]>();
+  for (const item of readyItems) {
+    const scope = item.metadata?.files_scope;
+    if (scope && scope.length > 0) {
+      precompiledScopes.set(item.id, scope.map(compileGlob));
+    }
+  }
+
+  const selectedItems: VBriefItem[] = [];
+  const deferredByOverlap: VBriefItem[] = [];
+  const deferredByCapacity: VBriefItem[] = [];
+  for (const item of readyItems) {
+    if (selectedItems.length >= maxConcurrent) {
+      deferredByCapacity.push(item);
+      continue;
+    }
+    if (hasFileOverlap([...runningItems, ...selectedItems], item, precompiledScopes)) {
+      deferredByOverlap.push(item);
+      continue;
+    }
+    selectedItems.push(item);
+  }
+  const candidates = selectedItems;
+  if (candidates.length === 0) {
+    return {
+      status: 422,
+      body: {
+        error: `No dispatchable items in the plan for ${issueUpper}`,
+        hint: readyItems.length > 0
+          ? 'Ready items are waiting for overlapping files_scope work to finish.'
+          : 'All items may already be running, completed, blocked, or waiting on dependencies.',
+        wavePlan: waves,
+      },
+    };
+  }
+
+  const itemById = new Map(annotatedDoc.plan.items.map((planItem) => [planItem.id, planItem]));
+  const pendingItems: WaveItem[] = candidates.map(item => ({
+    id: item.id,
+    title: item.title,
+    difficulty: item.metadata?.difficulty,
+    blockedBy: annotatedDoc.plan.edges
+      .filter(edge => edge.type === 'blocks' && edge.to === item.id)
+      .map(edge => edge.from),
+  }));
+
+  const itemsToDispatch = pendingItems;
 
   // PAN-977: when dispatching by DAG readiness without an explicit wave,
   // derive the persisted currentWave from the max wave index of dispatched
@@ -763,7 +781,14 @@ async function dispatchSwarmWave(
       );
 
   const deferredItems = [
-    ...pendingItems.slice(maxConcurrent),
+    ...deferredByCapacity.map(item => ({
+      id: item.id,
+      title: item.title,
+      difficulty: item.metadata?.difficulty,
+      blockedBy: annotatedDoc.plan.edges
+        .filter(edge => edge.type === 'blocks' && edge.to === item.id)
+        .map(edge => edge.from),
+    })),
     ...deferredByOverlap.map(item => ({
       id: item.id,
       title: item.title,
