@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-977",
   "created": "2026-05-08T09:40:09.134Z",
-  "updated": "2026-05-14T00:06:01.875Z",
+  "updated": "2026-05-14T04:55:37.881Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -529,7 +529,50 @@
       "reason": "feedback",
       "note": "[2026-05-13T23:48Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-05-13T23:48:03.733Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T00:18Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T00:18:17.633Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T00:18:17.660Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T00:41Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T00:41:07.011Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T04:31Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T04:31:02.257Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T04:31:02.292Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T04:45Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T04:45:59.067Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T04:55Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T04:55:37.881Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-14T04:55:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-977\n\n# PAN-977 Review Synthesis — 2026-05-14\n\n## Verdict: BLOCKED\n\nThree blockers must be resolved before this PR can advance to test.\n\n---\n\n## Blocker 1 (Correctness): Task operations write workspace-local spec that canonical readers ignore\n\n**Source:** Correctness reviewer  \n**File:** `src/lib/vbrief/dag.ts:838–861`\n\n**Finding:** `runTaskCommand()` (and its async variant `applyTaskOperationToPlanFileAsync`) writes item/subItem status mutations to `workspace/.pan/spec.vbrief.json`. However, the canonical workspace plan reader `readWorkspacePlan()` in `io.ts` resolves the workspace plan via `findPlan()` which reads the **main-side spec** and applies `statusOverrides` from the continue file. The workspace-local spec is **not consulted** by the canonical reader.\n\n**Impact:**\n- `pan swarm --task done --item X` reports success and bumps the workspace-local spec sequence, but dashboard readers, `pan swarm --dry-run`, and any code using `readWorkspacePlan()` see X at its old status.\n- Dispatch filtering can re-offer or re-dispatch work that was already claimed/completed.\n- Completed task state is not durably represented in the canonical continue overlay.\n\n**Fix:** Route task operations through the canonical continue-state path: update `statusOverrides` in the continue file (which the canonical reader already merges), or unify the I/O layer so all readers and writers use the same authoritative storage.\n\n---\n\n## Blocker 2 (Correctness): Concurrent continue-state writes share one temp filename\n\n**Source:** Correctness reviewer  \n**File:** `src/lib/vbrief/continue-state.ts:343`\n\n**Finding:** Both `writeContinueState()` (sync) and `writeContinueStateAsync()` use a shared temp path `path + '.tmp'` before rename. Multiple concurrent swarm lifecycle writers (parallel slot merges, synthesis output persistence, auto-advance updates) hitting the same continue file can overwrite each other's temp file or commit the wrong writer's JSON.\n\n**Impact:** Concurrent slot completion can drop slot status, synthesisOutputs, deferred items, or auto-advance retry state from the canonical swarm runtime. Spurious `ENOENT` on rename or silent data loss.\n\n**Fix:** Use a unique temp filename per write (`${path}.${process.pid}.${Date.now()}.${randomHex}.tmp`) and add a single-writer/CAS guard for concurrent continue-state mutations.\n\n---\n\n## Blocker 3 (Requirements): Sync fs calls in dag.ts reachable from dashboard server\n\n**Source:** Requirements reviewer  \n**Files:** `src/lib/vbrief/dag.ts:5,780,784,799,970`\n\n**Finding:** `src/dashboard/server/routes/swarm.ts:28` imports `dag.ts`. That module exposes `readFileSync`, `writeFileSync`, `renameSync`, `mkdirSync`, and `rmSync` (line 5) and exports synchronous mutation helpers (`applyTaskOperationToPlanFile` at line 799, `writePipelineMirrorToPlanFile` at line 970). Although the swarm route itself uses the async variants, the module is dashboard-reachable and the sync helpers remain callable by any future dashboard caller.\n\n**Policy reference:** CLAUDE.md — \"NEVER use execSync, readFileSync, writeFileSync, readdirSync, or statSync in any code reachable from the dashboard server (Effect route handlers in src/dashboard/server/routes/, services in src/dashboard/server/services/, or any module imported by them).\"\n\n**Impact:** Any dashboard/server caller that uses these exported helpers can block HTTP/WebSocket handling during plan mutation or mirror writes. The async variants exist but are not the only exports.\n\n**Fix:** Split CLI-only synchronous helpers into a module not imported by dashboard server code, or mark sync helpers as internal/unexported so they cannot be invoked from dashboard-reachable call sites.\n\n---\n\n## Acceptance Criteria Coverage\n\n| # | Criterion | Status | Notes |\n|---|-----------|--------|-------|\n| 1 | getDispatchableItems and task graph views exclude running/completed/cancelled/blocked | PASS | `dag.ts:211,215,644` |\n| 2 | Task operations mutate plan item/subItem status with sequence checks | PARTIAL | Sequence check works but writes to wrong authority (see Blocker 1) |\n| 3 | Plan writes use temp-file+rename and single-writer lock | PARTIAL | Temp+rename and lock work; but concurrent continue writes share temp path (Blocker 2) |\n| 4 | Prompt generation uses bounded target item, deps, AC, synthesis context | PASS | `dag.ts:442–527`, `work-agent-prompt.ts` |\n| 5 | Large outlier plan verification proves active slice << full plan | PASS | `verifyActiveSlicePromptReduction` at `dag.ts:1015` with test at `dag-pan977.test.ts` |\n| 6 | Nested pipeline mirror records all pipeline fields | PASS | `NestedPlanPipelineMirror` at `dag.ts:893–904` |\n| 7 | pan-oversee and dashboard use mirror as corroborating input | PASS | Mirror in `review-status.ts`, SQLite remains authoritative |\n\n---\n\n## Non-Blocking Notes\n\n- Security reviewer: clean (0 issues)\n- Performance reviewer: clean (0 issues) — auto-advance uses bounded active registry, concurrency limits on slot checks\n- Correctness reviewer additionally noted that `src/cli/commands/swarm.ts` task command wiring and dry-run display behavior, `swarm.ts` dispatch filtering, slot merge ordering, phase handling, and auto-advance cleanup are all correct\n- Requirements reviewer verified all 7 acceptance criteria are implemented; the blocking issue is purely the policy-nontechnical concern about sync helpers in reachable modules\n\n---\n\n## Test Coverage Assessment\n\nThe PR adds substantial test coverage:\n- `src/lib/vbrief/__tests__/dag-pan977.test.ts` — dispatchability, blocking, wave grouping, active-slice, pipeline mirror, writer lock\n- `src/lib/vbrief/__tests__/dag-writer-lock-recovery.test.ts` — lock acquisition, contention, recovery\n- `src/lib/vbrief/__tests__/continue-state-swarm.test.ts` — continue state + swarm runtime persistence\n- `src/dashboard/server/routes/__tests__/swarm.test.ts` — extensive swarm route tests including auto-advance, slot lifecycle, double-.pan path, synthesis/implementation phase aliasing, lowest-free-slot allocation\n- `tests/unit/lib/work-agent-prompt-pan977.test.ts` — prompt generation\n\nTests use `vi.useFakeTimers()` appropriately per project rules.\n\n---\n\n## Recommendation\n\n**BLOCKED** — resolve all three blockers before re-review:\n\n1. **Blocker 1 (Critical):** Task operation writes must target the continue-state `statusOverrides` (or whichever store `readWorkspacePlan()` actually reads as canonical)\n2. **Blocker 2 (Critical):** Unique temp paths + CAS guard for concurrent continue writes\n3. **Blocker 3 (Policy):** Isolate or unexport sync helpers from `dag.ts` so it is safe to import from dashboard server routes\n\nAfter fixes, re-run the convoy reviewer to confirm resolution.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/.pan/review/agent-pan-977-review-825c719b/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-977 -m \"Fixed review issues\"`"
+    }
+  ]
 }
