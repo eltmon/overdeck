@@ -1118,18 +1118,34 @@ export async function writeChannelsBridgeMcpConfig(
  * paste-buffer machinery is for typing message bodies, not for a single
  * Enter on a TUI prompt where mistimed paste can fire before the dialog
  * accepts input.
+ *
+ * Once the dialog is detected we send Enter and KEEP checking — a single
+ * keystroke can be dropped if the TUI is still mid-render, which left the
+ * dialog on screen with the helper already returned. We re-send Enter every
+ * RESEND_INTERVAL_MS until the needle is gone (bounded by DISMISS_BUDGET_MS).
  */
 export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
   const TIMEOUT_MS = 20_000;
   const POLL_INTERVAL_MS = 200;
+  const RESEND_INTERVAL_MS = 150;
+  const DISMISS_BUDGET_MS = 5_000;
   const NEEDLE = 'WARNING: Loading development channels';
   const start = Date.now();
   while (Date.now() - start < TIMEOUT_MS) {
     try {
       const pane = await capturePaneAsync(agentId, 50);
       if (pane.includes(NEEDLE)) {
-        await sendRawKeystrokeAsync(agentId, 'C-m', 'channels:dismiss-dev-dialog');
-        await new Promise((r) => setTimeout(r, 500));
+        // Dialog is up. Send Enter, then keep re-sending until the needle
+        // clears — the first keystroke can land before the TUI is ready to
+        // accept it, leaving the dialog stuck on screen.
+        const dismissStart = Date.now();
+        while (Date.now() - dismissStart < DISMISS_BUDGET_MS) {
+          await sendRawKeystrokeAsync(agentId, 'C-m', 'channels:dismiss-dev-dialog');
+          await new Promise((r) => setTimeout(r, RESEND_INTERVAL_MS));
+          const after = await capturePaneAsync(agentId, 50).catch(() => '');
+          if (!after.includes(NEEDLE)) return;
+        }
+        console.log(`[${agentId}] channels:dismiss:dialog-still-present-after-budget`);
         return;
       }
     } catch {
