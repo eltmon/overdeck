@@ -4258,8 +4258,22 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     if (!state.reviewSubRole || !state.reviewSynthesisAgentId) continue;
     if (state.reviewMonitorSignaled) continue;
 
-    const outputPath = state.reviewOutputPath;
     const startedMs = Date.parse(state.startedAt);
+
+    // PAN-977: the review sub-role launcher now owns the convoy signal — it
+    // signals synthesis on process exit (REVIEWER_READY/FAILED/TIMEOUT) and
+    // touches `reviewer-signaled`. When that marker is newer than this run's
+    // start, the launcher already signaled and Deacon must not double-signal.
+    // Deacon stays the rare backup for the case where the launcher's bash
+    // process was SIGKILLed before it could signal.
+    const signalMarker = join(AGENTS_DIR, agentId, 'reviewer-signaled');
+    if (existsSync(signalMarker)) {
+      try {
+        if (Number.isFinite(startedMs) && statSync(signalMarker).mtimeMs >= startedMs) continue;
+      } catch { /* unreadable marker — fall through to backup signaling */ }
+    }
+
+    const outputPath = state.reviewOutputPath;
     let outputWrittenForThisRun = false;
     if (outputPath && existsSync(outputPath)) {
       try {

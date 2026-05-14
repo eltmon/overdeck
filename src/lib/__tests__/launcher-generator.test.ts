@@ -171,6 +171,37 @@ describe('generateLauncherScript', () => {
     expect(script).toContain("exec claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc' < '/tmp/prompt.md'");
   });
 
+  it('review sub-role launcher owns the synthesis signal (PAN-977)', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      role: 'review',
+      promptFile: '/agents/agent-pan-1-review-security/initial-prompt.md',
+      promptFileMode: 'stdin',
+      baseCommand: 'claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.5',
+      sessionId: 'sess-rev',
+      reviewSignal: {
+        synthesisAgentId: 'agent-pan-1-review',
+        subRole: 'security',
+        outputPath: '/agents/agent-pan-1-review-security/review-security.md',
+        signalMarkerPath: '/agents/agent-pan-1-review-security/reviewer-signaled',
+        timeoutSeconds: 1200,
+      },
+    });
+
+    // NOT exec — the launcher's bash process must outlive claude so it can
+    // signal synthesis deterministically on exit.
+    expect(script).not.toContain('exec claude');
+    expect(script).toContain("timeout 1200 claude --print");
+    expect(script).toContain("--session-id 'sess-rev' < '/agents/agent-pan-1-review-security/initial-prompt.md'");
+    expect(script).toContain('CLAUDE_EXIT=$?');
+    expect(script).toContain('if [ "$CLAUDE_EXIT" = "124" ]; then');
+    expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_TIMEOUT security reviewer exceeded 1200s deadline" || true');
+    expect(script).toContain('elif [ -s \'/agents/agent-pan-1-review-security/review-security.md\' ]; then');
+    expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_READY security /agents/agent-pan-1-review-security/review-security.md" || true');
+    expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_FAILED security reviewer exited (code $CLAUDE_EXIT) without writing report" || true');
+    expect(script).toContain("touch '/agents/agent-pan-1-review-security/reviewer-signaled'");
+  });
+
   it('work role identity prompt launch', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,

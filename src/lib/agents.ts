@@ -1426,6 +1426,14 @@ export interface SpawnRunOptions {
    * Values: 'security' | 'correctness' | 'performance' | 'requirements'
    */
   subRole?: string;
+  /**
+   * Review convoy wiring (PAN-977). When spawning a review sub-role, the
+   * synthesis agent id and the reviewer's output path are passed in up front
+   * so the generated launcher can own the REVIEWER_READY/FAILED/TIMEOUT signal
+   * deterministically on process exit. Persisted onto AgentState too.
+   */
+  reviewSynthesisAgentId?: string;
+  reviewOutputPath?: string;
 }
 
 /**
@@ -1739,6 +1747,13 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  * Spawn a role-based Panopticon run. Work delegates to the existing work-agent
  * path; review/test/ship use the role definition files under roles/.
  */
+/**
+ * Review sub-role wall-clock budget (PAN-977). Mirrors REVIEWER_TIMEOUT_MS in
+ * cloister/review-agent.ts (20 minutes). Kept as a local constant rather than
+ * an import to avoid an agents.ts ↔ review-agent.ts module cycle.
+ */
+const REVIEW_SUBROLE_TIMEOUT_SECONDS = 20 * 60;
+
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
 
@@ -1861,6 +1876,24 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
+  // PAN-977: for a Claude Code review sub-role, hand the launcher the synthesis
+  // wiring so the launcher's own bash process — not the agent's good behavior,
+  // not Deacon's patrol — owns the REVIEWER_READY/FAILED/TIMEOUT signal. The
+  // launcher signals deterministically on process exit and touches a marker
+  // file; Deacon only steps in if that bash process was SIGKILLed.
+  const isClaudeCodeReviewSubRole = role === 'review' && !!options.subRole && resolvedHarness === 'claude-code';
+  const reviewSignal = isClaudeCodeReviewSubRole && options.reviewSynthesisAgentId && options.reviewOutputPath
+    ? {
+        synthesisAgentId: options.reviewSynthesisAgentId,
+        subRole: options.subRole as string,
+        outputPath: options.reviewOutputPath,
+        signalMarkerPath: join(getAgentDir(agentId), 'reviewer-signaled'),
+        timeoutSeconds: REVIEW_SUBROLE_TIMEOUT_SECONDS,
+      }
+    : undefined;
+  if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
+  if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
+
   const launcherContent = generateLauncherScript({
     role,
     workingDir: workspace,
@@ -1873,6 +1906,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
     sessionId,
+    reviewSignal,
     ...piLauncherFields,
   });
 

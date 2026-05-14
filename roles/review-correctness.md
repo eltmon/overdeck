@@ -89,4 +89,4 @@ If you find no correctness bugs, still write the report with `## Findings` set t
 
 Write only to the output file from your spawn prompt. Do not edit source, tests, config, git history, issue state, or any other review report.
 
-After writing the output file, run the exact `pan tell agent-<issue>-review "REVIEWER_READY <subRole> <outputPath>"` command from your spawn prompt, then exit Claude Code cleanly.
+After writing the output file, you are done — stop. Do not run any `pan` command and do not signal synthesis. The Panopticon launcher that started you detects your completion on process exit and signals the synthesis agent automatically (REVIEWER_READY when the output file was written, REVIEWER_FAILED otherwise).

@@ -413,11 +413,14 @@ describe('template/output contract', () => {
         expect(content).not.toMatch(/changed file for context/i);
       });
 
-      it(`${role}: instructs exactly one final output-file report`, () => {
+      it(`${role}: instructs exactly one final output-file report, launcher owns the signal (PAN-977)`, () => {
         const content = readTemplate(role);
         expect(content).toMatch(/Write exactly one final report to the output file/i);
-        expect(content).toMatch(/REVIEWER_READY/i);
-        expect(content).toMatch(/exit Claude Code cleanly/i);
+        // PAN-977: the launcher signals synthesis on process exit — the
+        // template must NOT tell the agent to run `pan tell` or exit itself.
+        expect(content).not.toMatch(/pan tell/i);
+        expect(content).not.toMatch(/exit Claude Code cleanly/i);
+        expect(content).toMatch(/launcher .* signals the synthesis agent/i);
       });
     }
   });
@@ -443,7 +446,11 @@ describe('convoy orchestration', () => {
     expect(prompt).toContain('REVIEW TASK for PAN-1059 — SECURITY REVIEW');
     expect(prompt).toContain('/home/test/.panopticon/agents/agent-pan-1059-review-security/review-security.md');
     expect(prompt).toContain('/workspace/.pan/review/run-1/context.json');
-    expect(prompt).toContain('REVIEWER_READY security /home/test/.panopticon/agents/agent-pan-1059-review-security/review-security.md');
+    // PAN-977: the reviewer no longer signals synthesis itself — the launcher
+    // owns REVIEWER_READY/FAILED/TIMEOUT on process exit. The prompt must not
+    // tell the agent to run `pan tell`.
+    expect(prompt).not.toContain('pan tell');
+    expect(prompt).toContain('launcher that started you detects your completion');
     expect(prompt).toContain('Write exactly one final report to the output file');
     expect(prompt).not.toContain('.claude/reviews/');
   });

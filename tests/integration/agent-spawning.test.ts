@@ -252,6 +252,34 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(launcher).not.toContain('"$prompt"');
     });
 
+    it('review sub-role launcher owns the REVIEWER_READY/FAILED/TIMEOUT signal (PAN-977)', async () => {
+      await spawnRun('PAN-SUBSIGNAL-1', 'review', {
+        workspace: '/tmp/test-workspace',
+        subRole: 'correctness',
+        prompt: 'review this diff',
+        reviewSynthesisAgentId: 'agent-pan-subsignal-1-review',
+        reviewOutputPath: '/tmp/out/review-correctness.md',
+      });
+
+      const agentDir = getAgentDir('agent-pan-subsignal-1-review-correctness');
+      const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+
+      // The launcher — not the agent, not Deacon — owns the signal: it runs
+      // claude as a child (no exec) so the contract block runs on exit.
+      expect(launcher).not.toContain('exec claude');
+      expect(launcher).toContain('timeout 1200 claude --print');
+      expect(launcher).toContain('CLAUDE_EXIT=$?');
+      expect(launcher).toContain('"REVIEWER_READY correctness /tmp/out/review-correctness.md"');
+      expect(launcher).toContain('"REVIEWER_FAILED correctness reviewer exited (code $CLAUDE_EXIT) without writing report"');
+      expect(launcher).toContain('"REVIEWER_TIMEOUT correctness reviewer exceeded 1200s deadline"');
+      expect(launcher).toContain(`touch '${join(agentDir, 'reviewer-signaled')}'`);
+
+      // Synthesis wiring is persisted on AgentState too (Deacon backup path).
+      const state = getAgentState('agent-pan-subsignal-1-review-correctness');
+      expect(state?.reviewSynthesisAgentId).toBe('agent-pan-subsignal-1-review');
+      expect(state?.reviewOutputPath).toBe('/tmp/out/review-correctness.md');
+    });
+
     it('refuses to spawn when a role session is already in tmux', async () => {
       const { sessionExistsAsync } = await import('../../src/lib/tmux.js');
       vi.mocked(sessionExistsAsync).mockResolvedValue(true);

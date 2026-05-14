@@ -195,12 +195,12 @@ export async function buildConvoyPrompt(opts: {
     '',
     '─────────────────────────────────────────────────────────────',
     '',
-    'Write exactly one final report to the output file shown above.',
-    'After the report is fully written, signal synthesis with this exact command:',
-    `  pan tell ${opts.synthesisAgentId} "REVIEWER_READY ${opts.subRole} ${opts.outputPath}"`,
-    'After the pan tell command succeeds, exit Claude Code cleanly so this reviewer session frees resources:',
-    '  exit',
-    'Only the output file and REVIEWER_READY signal are consumed by synthesis; your chat response is not the review report.',
+    'Write exactly one final report to the output file shown above, then stop.',
+    'You do NOT need to signal synthesis or run any pan command. The Panopticon',
+    'launcher that started you detects your completion on process exit and signals',
+    'the synthesis agent automatically — REVIEWER_READY when the output file was',
+    'written, REVIEWER_FAILED otherwise. Your only job is to write the report file.',
+    'Only the output file is consumed by synthesis; your chat response is not the review report.',
   ].filter(Boolean).join('\n');
 
   const sizeBytes = Buffer.byteLength(prompt, 'utf-8');
@@ -324,6 +324,10 @@ export async function spawnReviewSubRoleForIssue(opts: {
       subRole: opts.subRole,
       prompt,
       model,
+      // PAN-977: thread the synthesis wiring up front so the generated launcher
+      // owns the REVIEWER_READY/FAILED/TIMEOUT signal deterministically.
+      reviewSynthesisAgentId: synthesisAgentId,
+      reviewOutputPath: outputPath,
     });
     run.reviewSubRole = opts.subRole;
     run.reviewRunId = opts.runId;
