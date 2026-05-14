@@ -25,7 +25,7 @@ import {
   type TaskCommandOptions,
   type TaskOperationResult,
 } from './dag.js';
-import { readWorkspacePlan } from './io.js';
+import { findPlan, readWorkspacePlan } from './io.js';
 import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
 
 function assertSingleWriter(planPath: string, writerId: string): void {
@@ -174,10 +174,14 @@ export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions
     return item;
   }
 
-  // Mutations write to the workspace-local spec for sequence/metadata, AND to the
-  // continue file statusOverrides so canonical readers see the change.
-  const planPath = workspacePlanPath(options.workspacePath);
-  if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
+  // Mutations write to the canonical spec on main (PAN-1124), with fallback to
+  // workspace-local spec for migration compat, AND to the continue file
+  // statusOverrides so canonical readers see the change.
+  let planPath = findPlan(options.workspacePath);
+  if (!planPath) {
+    planPath = workspacePlanPath(options.workspacePath);
+  }
+  if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found for workspace: ${options.workspacePath}`);
   const doc = readPlanFile(planPath);
   validatePlanIssue(doc, options.issueId);
   if (!options.itemId) throw new Error(`${command} requires itemId`);

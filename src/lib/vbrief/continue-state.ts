@@ -27,6 +27,7 @@ function uniqueTmpPath(path: string): string {
 }
 
 const activeContinueWriters = new Map<string, string>();
+const pendingContinueWrites = new Map<string, Promise<void>>();
 
 function assertContinueWriter(path: string, writerId: string): void {
   const owner = activeContinueWriters.get(path);
@@ -364,23 +365,41 @@ async function assertContinueWriterAsync(path: string, writerId: string): Promis
 
 export async function writeContinueStateAsync(dir: string, issueId: string, state: ContinueState): Promise<void> {
   const path = continueFilePath(dir, issueId);
-  const writerId = `continue-async-${process.pid}`;
-  await assertContinueWriterAsync(path, writerId);
+
+  // Serialize concurrent writes for the same path so read-modify-write sequences
+  // in the same process don't race and drop mutations (PAN-977 review blocker).
+  const previous = pendingContinueWrites.get(path);
+  const current = (async () => {
+    if (previous) {
+      await previous.catch(() => {});
+    }
+    const writerId = `continue-async-${process.pid}-${Date.now()}-${randomBytes(4).toString('hex')}`;
+    await assertContinueWriterAsync(path, writerId);
+    try {
+      const now = new Date().toISOString();
+      const next: ContinueState = {
+        ...state,
+        issueId: issueId.toUpperCase(),
+        version: '1',
+        created: state.created || now,
+        updated: now,
+      };
+      await mkdir(getContinuesDir(dir), { recursive: true });
+      const tmp = uniqueTmpPath(path);
+      await writeFile(tmp, JSON.stringify(next, null, 2), 'utf-8');
+      await rename(tmp, path);
+    } finally {
+      releaseContinueWriter(path, writerId);
+    }
+  })();
+
+  pendingContinueWrites.set(path, current);
   try {
-    const now = new Date().toISOString();
-    const next: ContinueState = {
-      ...state,
-      issueId: issueId.toUpperCase(),
-      version: '1',
-      created: state.created || now,
-      updated: now,
-    };
-    await mkdir(getContinuesDir(dir), { recursive: true });
-    const tmp = uniqueTmpPath(path);
-    await writeFile(tmp, JSON.stringify(next, null, 2), 'utf-8');
-    await rename(tmp, path);
+    await current;
   } finally {
-    releaseContinueWriter(path, writerId);
+    if (pendingContinueWrites.get(path) === current) {
+      pendingContinueWrites.delete(path);
+    }
   }
 }
 
