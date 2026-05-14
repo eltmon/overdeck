@@ -293,6 +293,51 @@ async function collectSessionTreeNodes(
       });
       sections.push(...reviewerNodes);
     }
+
+    // Test role — one canonical session (`agent-<issue>-test`) reused across
+    // rounds, so emit a single node anchored to the latest `test` history
+    // entry, the same way review uses latestReview.
+    const testEntries = centralStatus.history.filter((entry) => entry.type === 'test');
+    const latestTest = testEntries[testEntries.length - 1];
+    if (latestTest) {
+      const testSessionName = `agent-${issueLower}-test`;
+      const testIsLive = context.tmuxSessionNames.has(testSessionName);
+      const testJsonlPath = await resolveJsonlPath(testSessionName, workspacePath);
+      sections.push({
+        type: 'test',
+        sessionId: testSessionName,
+        model: 'specialist',
+        startedAt: latestTest.timestamp,
+        endedAt: undefined,
+        duration: 0,
+        status: normalizeAgentStatus(latestTest.status === 'testing' ? 'running' : latestTest.status),
+        presence: testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended',
+        hasJsonl: !!testJsonlPath,
+        tmuxSession: testIsLive ? testSessionName : undefined,
+      });
+    }
+
+    // Ship role — final pipeline stage, spawnRun(issueId,'ship') →
+    // `agent-<issue>-ship`. The `merge` history type tracks its status.
+    const mergeEntries = centralStatus.history.filter((entry) => entry.type === 'merge');
+    const latestMerge = mergeEntries[mergeEntries.length - 1];
+    if (latestMerge) {
+      const shipSessionName = `agent-${issueLower}-ship`;
+      const shipIsLive = context.tmuxSessionNames.has(shipSessionName);
+      const shipJsonlPath = await resolveJsonlPath(shipSessionName, workspacePath);
+      sections.push({
+        type: 'ship',
+        sessionId: shipSessionName,
+        model: 'specialist',
+        startedAt: latestMerge.timestamp,
+        endedAt: undefined,
+        duration: 0,
+        status: normalizeAgentStatus(latestMerge.status === 'merging' ? 'running' : latestMerge.status),
+        presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
+        hasJsonl: !!shipJsonlPath,
+        tmuxSession: shipIsLive ? shipSessionName : undefined,
+      });
+    }
   }
 
   return sections.filter((s) => !isStaleLegacySession(s));

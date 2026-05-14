@@ -45,7 +45,6 @@ import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
-import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
 import { getAgentCommand } from '../../../lib/settings.js';
 import { getReviewStatus } from '../review-status.js';
@@ -558,11 +557,14 @@ export async function fetchActivityDataWithContext(
       // spawnRun(issueId, 'ship') as tmux session `agent-<issue>-ship`. The
       // `merge` history type tracks its status; surface it as a `ship` node
       // pointed at the real session instead of the legacy `merge-agent` name.
+      // Both the test and ship roles are spawned via spawnRun(issueId, role),
+      // which names the tmux session `agent-<issue>-<role>` — not the legacy
+      // `specialist-<project>-<issue>-<role>-agent` form.
       const isShipStage = ss.type === 'merge';
       const nodeType: 'ship' | 'test' = isShipStage ? 'ship' : 'test';
       const specialistSessionId = isShipStage
         ? `agent-${issueLower}-ship`
-        : getTmuxSessionName('test-agent', resolveProjectFromIssue(issueId)?.projectKey, issueId);
+        : `agent-${issueLower}-test`;
 
       if (includeTranscripts && ss.status === 'running') {
         try {
