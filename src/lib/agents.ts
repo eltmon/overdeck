@@ -768,10 +768,9 @@ async function postUnixSocketJson(
   const payload = JSON.stringify(body);
 
   return new Promise((resolveCall, reject) => {
-    // Settle exactly once. Without this guard a late idle-timeout (or a
-    // post-response socket error) could fire `reject` after the response
-    // already resolved the promise — and still run destroyBridgeHttpAgent,
-    // tearing down the shared keep-alive agent under a healthy connection.
+    // Settle exactly once. Without this guard a late idle-timeout or
+    // post-response socket error could reject after the response already
+    // resolved the promise.
     let settled = false;
     const finishOk = (value: { status: number; body: string }) => {
       if (settled) return;
@@ -780,12 +779,11 @@ async function postUnixSocketJson(
       req.removeAllListeners('timeout');
       resolveCall(value);
     };
-    const finishErr = (err: Error, destroyAgent: boolean) => {
+    const finishErr = (err: Error) => {
       if (settled) return;
       settled = true;
       req.setTimeout(0);
       req.removeAllListeners('timeout');
-      if (destroyAgent) destroyBridgeHttpAgent(socketPath);
       reject(err);
     };
 
@@ -813,7 +811,7 @@ async function postUnixSocketJson(
             finishOk({ status, body: responseBody });
             return;
           }
-          finishErr(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`), false);
+          finishErr(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
         });
       },
     );
@@ -822,7 +820,7 @@ async function postUnixSocketJson(
       req.destroy(new Error('socket POST timeout'));
     });
     req.on('error', (err: Error) => {
-      finishErr(err, true);
+      finishErr(err);
     });
     req.write(payload);
     req.end();
