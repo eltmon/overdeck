@@ -18,7 +18,8 @@ import { buildWorkAgentPrompt } from '../../../src/lib/cloister/work-agent-promp
 
 describe('PAN-977 work-agent active slice prompt', () => {
   it('injects persisted synthesis context from continue state without full-plan measurement text', async () => {
-    const workspace = mkdtempSync(`${tmpdir()}/work-agent-pan977-`);
+    const projectRoot = mkdtempSync(`${tmpdir()}/work-agent-pan977-`);
+    const workspace = join(projectRoot, 'workspaces', 'feature-pan-977');
     try {
       mkdirSync(join(workspace, '.pan', 'continues'), { recursive: true });
       mkdirSync(join(workspace, '.beads'), { recursive: true });
@@ -38,7 +39,9 @@ describe('PAN-977 work-agent active slice prompt', () => {
           edges: [{ from: 'parent-a', to: 'target-b', type: 'blocks' }],
         },
       };
-      writeFileSync(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify(doc, null, 2), 'utf-8');
+      const specsDir = join(projectRoot, '.pan', 'specs');
+      mkdirSync(specsDir, { recursive: true });
+      writeFileSync(join(specsDir, '2026-01-01-PAN-977-test.vbrief.json'), JSON.stringify(doc, null, 2), 'utf-8');
       const cont: ContinueState = {
         version: '1',
         issueId: 'PAN-977',
@@ -66,14 +69,14 @@ describe('PAN-977 work-agent active slice prompt', () => {
       };
       writeFileSync(join(workspace, '.pan', 'continues', 'pan-977.vbrief.json'), JSON.stringify(cont, null, 2), 'utf-8');
 
-      const prompt = await buildWorkAgentPrompt({ issueId: 'PAN-977', env: 'LOCAL', workspacePath: workspace, projectRoot: workspace });
+      const prompt = await buildWorkAgentPrompt({ issueId: 'PAN-977', env: 'LOCAL', workspacePath: workspace, projectRoot });
 
       expect(prompt).toContain('## Active vBRIEF Slice (Canonical Task Graph)');
       expect(prompt).toContain('PAN-977 Active Slice Plan');
       expect(prompt).toContain('Persisted convergence synthesis appears here');
       expect(prompt).not.toContain('Prompt-size check: active slice');
     } finally {
-      rmSync(workspace, { recursive: true, force: true });
+      rmSync(projectRoot, { recursive: true, force: true });
     }
   });
 });
