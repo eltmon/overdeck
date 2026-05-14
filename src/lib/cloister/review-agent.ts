@@ -599,6 +599,10 @@ export function isReviewSessionForIssue(sessionName: string, projectKey: string 
   const issue = issueId.toLowerCase();
   const project = projectKey?.toLowerCase();
 
+  // Belt-and-suspenders: a user conversation session (`conv-*`) must never be
+  // classified as a reviewer session and swept into reviewer cleanup/kill.
+  if (session.startsWith('conv-')) return false;
+
   if (session === `agent-${issue}-review` || session.startsWith(`agent-${issue}-review-`)) return true;
   if (session.startsWith(`review-${issue}-`) || session.startsWith(`review-coordinator-${issue}-`)) return true;
   if (!project) return false;

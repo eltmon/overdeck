@@ -510,6 +510,17 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
         }
 
         if (attempt < PASTE_MAX_ATTEMPTS) {
+          // Before re-pasting, do one final check with a much larger capture
+          // window. The poll above uses a 10-line window; a long pasted message
+          // can scroll verifyLine out of it, false-negativing a paste that
+          // actually landed. Re-pasting on a false negative DUPLICATES the text
+          // in the input box — the root cause of "PI Harness sends messages
+          // twice" (the doubled text shows up inside a single message).
+          const wideCheck = await capturePaneAsync(sessionName, 200);
+          if (wideCheck.includes(verifyLine.slice(0, 40))) {
+            pasteVerified = true;
+            break attemptLoop;
+          }
           console.warn(`[tmux] Paste not visible on ${sessionName} after ${VERIFY_TIMEOUT_MS}ms (attempt ${attempt}/${PASTE_MAX_ATTEMPTS}) — re-pasting buffer.`);
           await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
         }

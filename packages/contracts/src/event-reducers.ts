@@ -56,6 +56,9 @@ export interface ReadModelState {
   conversationsCompactingByName: Record<string, boolean>
   /** Conversation names currently waiting for user permission (PermissionRequest hook). */
   conversationsAwaitingPermissionByName: Record<string, boolean>
+  /** Bumped whenever a conversation is created, so the sidebar list can refresh
+   * immediately instead of waiting for its poll tick. */
+  conversationsListRevision: number
 }
 
 export interface DashboardLifecycleState {
@@ -88,6 +91,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   resolvedChannelPermissionDecisionIdsByAgentId: {},
   conversationsCompactingByName: {},
   conversationsAwaitingPermissionByName: {},
+  conversationsListRevision: 0,
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -994,6 +998,10 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         conversationsCompactingByName: { ...state.conversationsCompactingByName, [conversationName]: true },
       }
+    }
+
+    case 'conversation.created': {
+      return { ...state, conversationsListRevision: state.conversationsListRevision + 1 }
     }
 
     case 'conversation.permission_changed': {

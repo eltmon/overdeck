@@ -557,6 +557,29 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
   return { exists: false, isRemote: false };
 }
 
+async function getDirtyWorkspaceErrorForReviewRequest(
+  workspacePath: string,
+  workspaceInfo: WorkspaceInfo,
+): Promise<string | null> {
+  try {
+    const statusCmd = 'git status --porcelain -uno';
+    const status = workspaceInfo.isRemote && workspaceInfo.vmName
+      ? (await execAsync(
+          flyExecCmd(workspaceInfo.vmName, `cd ${workspacePath} && ${statusCmd}`),
+          { encoding: 'utf-8', timeout: 30000 },
+        )).stdout
+      : (await execAsync(statusCmd, { cwd: workspacePath, encoding: 'utf-8' })).stdout;
+
+    if (!status.trim()) {
+      return null;
+    }
+
+    return `Workspace has uncommitted changes. Commit or stash them before requesting review:\ncd ${workspacePath}\ngit status`;
+  } catch {
+    return null;
+  }
+}
+
 function isGitHubIssue(issueId: string): {
   isGitHub: boolean;
   owner?: string;
@@ -3451,6 +3474,19 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
     if (existingStatus?.reviewStatus === 'passed') {
       if (shouldTreatAsRerun(existingStatus)) {
+        const issueLowerRerun = issueId.toLowerCase();
+        const issuePrefixRerun = extractPrefix(issueId) ?? issueId.split('-')[0];
+        const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
+        const wsInfoRerun = getWorkspaceInfoForIssue(issueId);
+        const workspacePathRerun = wsInfoRerun.isRemote
+          ? wsInfoRerun.remotePath!
+          : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
+        const dirtyError = yield* Effect.promise(() => getDirtyWorkspaceErrorForReviewRequest(workspacePathRerun, wsInfoRerun));
+        if (dirtyError) {
+          console.log(`[request-review] Rejecting ${issueId}: dirty workspace on rerun path`);
+          return jsonResponse({ success: false, error: dirtyError }, { status: 400 });
+        }
+
         console.log(`[request-review] ${issueId}: forcing full review/test rerun from passed state`);
         setPendingOperation(issueId, 'review');
         setReviewStatus(issueId, {
@@ -3471,14 +3507,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           try {
             // Resolve workspace info locally — outer scope vars (workspacePath, branchName)
             // are declared after the early return below and must not be relied on here.
-            const issueLowerRerun = issueId.toLowerCase();
-            const issuePrefixRerun = extractPrefix(issueId) ?? issueId.split('-')[0];
-            const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
             const branchNameRerun = `feature/${issueLowerRerun}`;
-            const wsInfoRerun = getWorkspaceInfoForIssue(issueId);
-            const workspacePathRerun = wsInfoRerun.isRemote
-              ? wsInfoRerun.remotePath!
-              : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
 
             transitionIssueToInReview(issueId, workspacePathRerun).catch((err: any) => {
               console.warn(`[request-review] Could not transition ${issueId} to in_review: ${err.message}`);
@@ -3636,6 +3665,14 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     if (!workspaceInfo.exists) {
       return jsonResponse(
         { success: false, error: 'Workspace does not exist' },
+        { status: 400 }
+      );
+    }
+
+    const dirtyWorkspaceError = yield* Effect.promise(() => getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo));
+    if (dirtyWorkspaceError) {
+      return jsonResponse(
+        { success: false, error: dirtyWorkspaceError },
         { status: 400 }
       );
     }

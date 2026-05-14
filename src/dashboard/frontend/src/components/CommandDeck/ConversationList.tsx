@@ -1,9 +1,10 @@
-import { useState, useCallback, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ForkModal } from './ForkModal';
 import { ConversationRow } from './ConversationRow';
 import { useConversationMutations } from './useConversationMutations';
+import { useDashboardStore } from '../../lib/store';
 import styles from './styles/command-deck.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -149,6 +150,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
   const [tab, setTab] = useState<ListTab>(loadTab);
 
   const mutations = useConversationMutations(selectedConversation, onSelectConversation);
+  const queryClient = useQueryClient();
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations'],
@@ -159,6 +161,16 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       return pending ? 2000 : 10000;
     },
   });
+
+  // Refresh the list the instant a conversation is created (server emits a
+  // `conversation.created` domain event that bumps this revision), instead of
+  // waiting up to 10s for the next poll tick.
+  const conversationsListRevision = useDashboardStore((s) => s.conversationsListRevision);
+  useEffect(() => {
+    if (conversationsListRevision > 0) {
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    }
+  }, [conversationsListRevision, queryClient]);
 
   const handleSortChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     const v = e.target.value as SortOption;

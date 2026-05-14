@@ -390,6 +390,24 @@ describe('stale synthesis session detection (PAN-1131)', () => {
 });
 
 describe('passed-state rerun regression', () => {
+  it('workspaces.ts request-review route rejects dirty workspaces before rerun dispatch', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      'utf-8',
+    );
+
+    const rerunBlockMatch = routeSrc.match(
+      /shouldTreatAsRerun\(existingStatus\)[\s\S]*?rerun:\s*true/,
+    );
+    expect(rerunBlockMatch).not.toBeNull();
+    const rerunBlock = rerunBlockMatch![0];
+
+    expect(rerunBlock).toContain('getDirtyWorkspaceErrorForReviewRequest');
+    expect(rerunBlock).toContain('dirty workspace on rerun path');
+  });
+
   it('workspaces.ts request-review route uses spawnReviewRoleForIssue in the rerun path', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
@@ -551,6 +569,28 @@ describe('convoy orchestration', () => {
 // dispatch error (e.g., tmux not ready, file-system issue).
 
 describe('dispatch failure reviewStatus regression', () => {
+  it('workspaces.ts request-review route blocks dirty worktrees before verification', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const routeSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces.ts'),
+      'utf-8',
+    );
+
+    const requestReviewMatch = routeSrc.match(
+      /postWorkspaceRequestReviewRoute[\s\S]*?postWorkspaceResetReviewRoute/,
+    );
+    expect(requestReviewMatch).not.toBeNull();
+    const requestReviewBlock = requestReviewMatch![0];
+
+    const dirtyIdx = requestReviewBlock.indexOf('getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo)');
+    const verifyIdx = requestReviewBlock.indexOf('runVerificationForIssue(');
+    expect(dirtyIdx).toBeGreaterThanOrEqual(0);
+    expect(verifyIdx).toBeGreaterThanOrEqual(0);
+    expect(dirtyIdx).toBeLessThan(verifyIdx);
+    expect(requestReviewBlock).toContain('dirtyWorkspaceError');
+  });
+
   it('workspaces.ts dispatch failure paths set reviewStatus=pending not failed', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');

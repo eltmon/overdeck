@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-977",
   "created": "2026-05-08T09:40:09.134Z",
-  "updated": "2026-05-14T04:55:37.881Z",
+  "updated": "2026-05-14T19:01:03.328Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -564,6 +564,181 @@
       "reason": "feedback",
       "note": "[2026-05-14T04:55Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-14T04:55:37.881Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T05:24Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-14T05:24:12.528Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T05:32Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T05:32:24.318Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T06:01Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-14T06:01:10.265Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T06:01:10.306Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T06:28Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-14T06:28:29.432Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T06:28:29.446Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T06:28Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-14T06:28:50.844Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T06:48Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T06:48:49.802Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T07:09Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T07:09:53.174Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T07:39Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T07:39:55.810Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T07:52Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T07:52:01.396Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T08:05Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T08:05:09.970Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T11:07Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T11:07:51.636Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T11:21Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T11:21:07.458Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T11:30Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T11:30:36.134Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T11:50Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T11:50:13.661Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T12:01Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-14T12:01:10.512Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T12:01:10.533Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T12:06Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-14T12:06:56.775Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T12:06:56.795Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T12:22Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T12:22:05.979Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T12:22:06.012Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T12:48Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T12:48:37.517Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T12:48:37.536Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T13:02Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-14T13:02:51.236Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T13:02:51.266Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T13:05Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-14T13:05:29.389Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T13:05:29.420Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T13:06Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-05-14T13:06:20.418Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T13:13Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T13:13:11.743Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T17:38Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-14T17:38:06.572Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T17:38:07.029Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T18:50Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T18:50:11.128Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-14T18:50:11.158Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-14T19:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-14T19:01:03.328Z"
     }
   ],
   "feedback": [
@@ -571,8 +746,8 @@
       "seq": 1,
       "specialist": "review-agent",
       "outcome": "changes-requested",
-      "timestamp": "2026-05-14T04:55:37Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-977\n\n# PAN-977 Review Synthesis — 2026-05-14\n\n## Verdict: BLOCKED\n\nThree blockers must be resolved before this PR can advance to test.\n\n---\n\n## Blocker 1 (Correctness): Task operations write workspace-local spec that canonical readers ignore\n\n**Source:** Correctness reviewer  \n**File:** `src/lib/vbrief/dag.ts:838–861`\n\n**Finding:** `runTaskCommand()` (and its async variant `applyTaskOperationToPlanFileAsync`) writes item/subItem status mutations to `workspace/.pan/spec.vbrief.json`. However, the canonical workspace plan reader `readWorkspacePlan()` in `io.ts` resolves the workspace plan via `findPlan()` which reads the **main-side spec** and applies `statusOverrides` from the continue file. The workspace-local spec is **not consulted** by the canonical reader.\n\n**Impact:**\n- `pan swarm --task done --item X` reports success and bumps the workspace-local spec sequence, but dashboard readers, `pan swarm --dry-run`, and any code using `readWorkspacePlan()` see X at its old status.\n- Dispatch filtering can re-offer or re-dispatch work that was already claimed/completed.\n- Completed task state is not durably represented in the canonical continue overlay.\n\n**Fix:** Route task operations through the canonical continue-state path: update `statusOverrides` in the continue file (which the canonical reader already merges), or unify the I/O layer so all readers and writers use the same authoritative storage.\n\n---\n\n## Blocker 2 (Correctness): Concurrent continue-state writes share one temp filename\n\n**Source:** Correctness reviewer  \n**File:** `src/lib/vbrief/continue-state.ts:343`\n\n**Finding:** Both `writeContinueState()` (sync) and `writeContinueStateAsync()` use a shared temp path `path + '.tmp'` before rename. Multiple concurrent swarm lifecycle writers (parallel slot merges, synthesis output persistence, auto-advance updates) hitting the same continue file can overwrite each other's temp file or commit the wrong writer's JSON.\n\n**Impact:** Concurrent slot completion can drop slot status, synthesisOutputs, deferred items, or auto-advance retry state from the canonical swarm runtime. Spurious `ENOENT` on rename or silent data loss.\n\n**Fix:** Use a unique temp filename per write (`${path}.${process.pid}.${Date.now()}.${randomHex}.tmp`) and add a single-writer/CAS guard for concurrent continue-state mutations.\n\n---\n\n## Blocker 3 (Requirements): Sync fs calls in dag.ts reachable from dashboard server\n\n**Source:** Requirements reviewer  \n**Files:** `src/lib/vbrief/dag.ts:5,780,784,799,970`\n\n**Finding:** `src/dashboard/server/routes/swarm.ts:28` imports `dag.ts`. That module exposes `readFileSync`, `writeFileSync`, `renameSync`, `mkdirSync`, and `rmSync` (line 5) and exports synchronous mutation helpers (`applyTaskOperationToPlanFile` at line 799, `writePipelineMirrorToPlanFile` at line 970). Although the swarm route itself uses the async variants, the module is dashboard-reachable and the sync helpers remain callable by any future dashboard caller.\n\n**Policy reference:** CLAUDE.md — \"NEVER use execSync, readFileSync, writeFileSync, readdirSync, or statSync in any code reachable from the dashboard server (Effect route handlers in src/dashboard/server/routes/, services in src/dashboard/server/services/, or any module imported by them).\"\n\n**Impact:** Any dashboard/server caller that uses these exported helpers can block HTTP/WebSocket handling during plan mutation or mirror writes. The async variants exist but are not the only exports.\n\n**Fix:** Split CLI-only synchronous helpers into a module not imported by dashboard server code, or mark sync helpers as internal/unexported so they cannot be invoked from dashboard-reachable call sites.\n\n---\n\n## Acceptance Criteria Coverage\n\n| # | Criterion | Status | Notes |\n|---|-----------|--------|-------|\n| 1 | getDispatchableItems and task graph views exclude running/completed/cancelled/blocked | PASS | `dag.ts:211,215,644` |\n| 2 | Task operations mutate plan item/subItem status with sequence checks | PARTIAL | Sequence check works but writes to wrong authority (see Blocker 1) |\n| 3 | Plan writes use temp-file+rename and single-writer lock | PARTIAL | Temp+rename and lock work; but concurrent continue writes share temp path (Blocker 2) |\n| 4 | Prompt generation uses bounded target item, deps, AC, synthesis context | PASS | `dag.ts:442–527`, `work-agent-prompt.ts` |\n| 5 | Large outlier plan verification proves active slice << full plan | PASS | `verifyActiveSlicePromptReduction` at `dag.ts:1015` with test at `dag-pan977.test.ts` |\n| 6 | Nested pipeline mirror records all pipeline fields | PASS | `NestedPlanPipelineMirror` at `dag.ts:893–904` |\n| 7 | pan-oversee and dashboard use mirror as corroborating input | PASS | Mirror in `review-status.ts`, SQLite remains authoritative |\n\n---\n\n## Non-Blocking Notes\n\n- Security reviewer: clean (0 issues)\n- Performance reviewer: clean (0 issues) — auto-advance uses bounded active registry, concurrency limits on slot checks\n- Correctness reviewer additionally noted that `src/cli/commands/swarm.ts` task command wiring and dry-run display behavior, `swarm.ts` dispatch filtering, slot merge ordering, phase handling, and auto-advance cleanup are all correct\n- Requirements reviewer verified all 7 acceptance criteria are implemented; the blocking issue is purely the policy-nontechnical concern about sync helpers in reachable modules\n\n---\n\n## Test Coverage Assessment\n\nThe PR adds substantial test coverage:\n- `src/lib/vbrief/__tests__/dag-pan977.test.ts` — dispatchability, blocking, wave grouping, active-slice, pipeline mirror, writer lock\n- `src/lib/vbrief/__tests__/dag-writer-lock-recovery.test.ts` — lock acquisition, contention, recovery\n- `src/lib/vbrief/__tests__/continue-state-swarm.test.ts` — continue state + swarm runtime persistence\n- `src/dashboard/server/routes/__tests__/swarm.test.ts` — extensive swarm route tests including auto-advance, slot lifecycle, double-.pan path, synthesis/implementation phase aliasing, lowest-free-slot allocation\n- `tests/unit/lib/work-agent-prompt-pan977.test.ts` — prompt generation\n\nTests use `vi.useFakeTimers()` appropriately per project rules.\n\n---\n\n## Recommendation\n\n**BLOCKED** — resolve all three blockers before re-review:\n\n1. **Blocker 1 (Critical):** Task operation writes must target the continue-state `statusOverrides` (or whichever store `readWorkspacePlan()` actually reads as canonical)\n2. **Blocker 2 (Critical):** Unique temp paths + CAS guard for concurrent continue writes\n3. **Blocker 3 (Policy):** Isolate or unexport sync helpers from `dag.ts` so it is safe to import from dashboard server routes\n\nAfter fixes, re-run the convoy reviewer to confirm resolution.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/.pan/review/agent-pan-977-review-825c719b/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-977 -m \"Fixed review issues\"`"
+      "timestamp": "2026-05-14T19:01:03Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-977\n\n# Review Synthesis — PAN-977 — 2026-05-14T19:15:00Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/.pan/review/agent-pan-977-review-e2f19d96/context.json\n- Branch: feature/pan-977\n- Head: e2f19d963d047a1d26fc34ff365510d585009994\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/.panopticon/agents/agent-pan-977-review-security/review-security.md | 0 |\n| correctness | ready | /home/eltmon/.panopticon/agents/agent-pan-977-review-correctness/review-correctness.md | 0 |\n| performance | ready | /home/eltmon/.panopticon/agents/agent-pan-977-review-performance/review-performance.md | 1 |\n| requirements | ready | /home/eltmon/.panopticon/agents/agent-pan-977-review-requirements/review-requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] Channels delivery retains one `HttpAgent` per agent forever — `src/lib/agents.ts:704`\n\n**Severity:** Blocker\n\n**Evidence tier:** Tier 1 (verified changed code)\n\n**Runtime path:** Long-lived dashboard/orchestrator process; every work-agent message delivered through the new Claude Code Channels path (`src/lib/agents.ts:704-725`).\n\n**Problem:** `bridgeHttpAgents` is a module-level `Map<string, HttpAgent>` keyed by socket path. `getBridgeHttpAgent()` inserts a new keep-alive `HttpAgent` for each socket path. Only `destroyBridgeHttpAgent()` — called only on request error — removes an entry. Successful deliveries never evict the entry. The map has no size cap, idle timeout, success-path cleanup, or lifecycle hook to delete entries when an agent stops.\n\n**Impact:** The dashboard is a long-lived process. Panopticon can launch many agents over days. This creates unbounded memory and resource growth proportional to the number of distinct channel-enabled agents. Keep-alive agents may also retain idle socket resources until process exit.\n\n**Recommended fix:** Do not cache per-agent HTTP agents indefinitely. Either (a) create the `HttpAgent` per delivery and destroy it in `finally`, or (b) add lifecycle cleanup when an agent stops plus a bounded/TTL cache that destroys evicted agents.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- **security** — No vulnerabilities found. Privileged swarm endpoints validate issue/model inputs, gate state-changing callbacks with internal token or same-origin checks, and new vBRIEF/continue-state write paths use bounded issue-derived paths plus atomic temp-file renames.\n- **correctness** — 0 blockers, 0 advisories. Swarm dispatch, vBRIEF DAG scheduling, task-status mutation, continue-state durability, active-slice prompt generation, slot-merge callbacks, and pipeline mirroring are all correct. `npm run typecheck` passed; targeted PAN-977 test suite passed (50 tests, 4 files).\n- **requirements** — All 7 acceptance criteria fully implemented with evidence:\n  1. `getDispatchableItems` and task graph views exclude running/completed/cancelled/blocked items (`dag.ts:216`, `dag.ts:649`)\n  2. Task operations mutate plan item/subItem status with durable sequence checks (`dag.ts:584`, `dag.ts:589`, `dag.ts:602`)\n  3. Plan writes use temp-file then rename with single-writer lock enforcement (`dag.ts:707`, `dag.ts:771`)\n  4. Prompt generation uses bounded active slice instead of full-plan payloads (`work-agent-prompt.ts:96`)\n  5. Active slice for 705-item plan stays below 2% of full plan JSON (`dag.ts:977`)\n  6. Nested pipeline mirror records all required fields (`dag.ts:849`, `dag.ts:879`, `dag.ts:933`)\n  7. pan-oversee and dashboard readers use mirror as corroborating input (`review-status.ts:285`, `review-status.ts:591`)\n\n## Summary\nAll 7 acceptance criteria are correctly implemented. Three of four sub-roles found zero issues. One performance blocker: the new Claude Code Channels delivery path in `src/lib/agents.ts` maintains an unbounded `Map<string, HttpAgent>` that retains one HTTP agent per channel-enabled work agent for the lifetime of the dashboard process, causing unbounded memory growth. This must be addressed before approval.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-977/.pan/review/agent-pan-977-review-e2f19d96/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-977 -m \"Fixed review issues\"`"
     }
   ]
 }

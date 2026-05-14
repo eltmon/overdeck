@@ -51,6 +51,7 @@ import {
   updateConversationCost,
   setConversationModel,
   setConversationHarness,
+  setConversationClaudeSessionId,
   updateConversationDeliveryMethod,
   backfillConversationModel,
   archiveConversation,
@@ -103,6 +104,8 @@ import {
   isCompacting,
 } from '../services/conversation-compaction.js';
 import { sessionFilePath, encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { convertConversationTranscript } from '../../../lib/session-format-converter.js';
+import { getEventStore } from '../event-store.js';
 import { generateSummaryForFork, generateFallbackSummary, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
 import {
   ensureConversationAttachmentDir,
@@ -620,7 +623,11 @@ export async function handleConversationMessage(
     );
   }
 
-  if (shouldInterceptManualCompact(message)) {
+  // Panopticon-native compaction writes Claude-format JSONL records. It must
+  // only run on Claude Code conversations — running it on a Pi conversation
+  // would corrupt the Pi transcript (P0, 2026-05-14). For Pi, let `/compact`
+  // pass through to Pi's own compaction.
+  if ((conv.harness ?? 'claude-code') === 'claude-code' && shouldInterceptManualCompact(message)) {
     const compactSessionFile = await resolveSessionFile(conv);
     if (!compactSessionFile || !existsSync(compactSessionFile)) {
       return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
@@ -921,8 +928,13 @@ async function spawnConversationSession(
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
   }
 
+  // Atomic write: a concurrent resume/switch-model for the same conversation
+  // reuses this exact path. Writing in place lets the other spawn read a
+  // half-written launcher; write to a unique temp file then rename (atomic on
+  // the same filesystem).
+  const launcherTmp = `${launcherScript}.${randomUUID()}.tmp`;
   await writeFile(
-    launcherScript,
+    launcherTmp,
     generateLauncherScript({
       role: 'work',
       spawnMode: 'conversation',
@@ -945,6 +957,7 @@ async function spawnConversationSession(
     }),
     { mode: 0o700 },
   );
+  await rename(launcherTmp, launcherScript);
 
   // Kill any stale session with the same name
   try {
@@ -976,10 +989,18 @@ async function spawnConversationSession(
     throw err;
   }
 
-  // Channels: dismiss the dev-channels confirmation dialog so the bridge
-  // MCP server starts and the socket is created before any message delivery.
+  // Channels: dismiss the dev-channels confirmation dialog so the bridge MCP
+  // server starts and the socket is created. Fire-and-forget — the helper
+  // self-polls for the dialog and presses Enter. Awaiting it here blocked the
+  // POST /api/conversations response (and therefore the conversation appearing
+  // in the list) for up to 20s. waitForClaudeReady below naturally waits for
+  // the prompt, which only appears once this dismissal lands, so the two run
+  // concurrently without a race.
   if (channelsBridgeMcpConfig) {
-    await dismissDevChannelsDialog(tmuxSession);
+    void dismissDevChannelsDialog(tmuxSession).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[conversations] dismissDevChannelsDialog failed for ${tmuxSession}: ${msg}`);
+    });
   }
 
   // Keep session alive when clients disconnect
@@ -1262,6 +1283,36 @@ const postConversationRoute = HttpRouter.add(
 
         console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'} cwd=${cwd}`);
 
+        // Title = truncated first message (T3Code pattern), or default
+        const MAX_TITLE_LEN = 60;
+        const title = message
+          ? message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '')
+          : 'New conversation';
+
+        // Create the DB record FIRST — before spawning the tmux session and
+        // waiting up to 30s for the runtime to render. Previously the row was
+        // inserted last, so a brand-new conversation did not exist in the DB
+        // (and could not appear in the list) for the entire spawn+ready window.
+        // Insert immediately, emit a realtime event, then spawn.
+        const conv = createConversation({
+          name,
+          tmuxSession,
+          cwd,
+          issueId,
+          claudeSessionId,
+          title,
+          titleSource: message ? 'auto' : 'default',
+          titleSeed: title,
+          model,
+          effort,
+          harness,
+        });
+        getEventStore().emitOnly({
+          type: 'conversation.created',
+          timestamp: new Date().toISOString(),
+          payload: { conversationName: name },
+        });
+
         // Spawn tmux session with model + effort + deterministic session ID
         await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId, false, harness);
         console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
@@ -1282,27 +1333,6 @@ const postConversationRoute = HttpRouter.add(
           const deliveryMethod = settings.experimental?.claudeCodeChannels ? 'auto' : 'tmux';
           await deliverAgentMessage(tmuxSession, message, 'conversation-message', deliveryMethod);
         }
-
-        // Title = truncated first message (T3Code pattern), or default
-        const MAX_TITLE_LEN = 60;
-        const title = message
-          ? message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '')
-          : 'New conversation';
-
-        // Create DB record
-        const conv = createConversation({
-          name,
-          tmuxSession,
-          cwd,
-          issueId,
-          claudeSessionId,
-          title,
-          titleSource: message ? 'auto' : 'default',
-          titleSeed: title,
-          model,
-          effort,
-          harness,
-        });
 
         // Generate AI title in background (non-blocking)
         if (message) {
@@ -1409,7 +1439,12 @@ const postConversationResumeRoute = HttpRouter.add(
         // Resume must never mutate the JSONL — `claude --resume` loads the full raw
         // transcript. Auto-compaction here would fork the conversation (PAN-802).
         const oldSessionId = conv.claudeSessionId;
-        const harness = await resolveAllowedHarness(body['harness'] ?? conv.harness, model ?? conv.model);
+        // Harness is PINNED per conversation. A resume must never re-derive it
+        // from the model — that silently flipped Pi conversations to Claude Code
+        // and orphaned their transcripts (P0, 2026-05-14). Changing the runtime
+        // for an existing conversation only happens through the explicit
+        // switch-model path, which converts the transcript format.
+        const harness: RuntimeName = conv.harness ?? 'claude-code';
         const modelChanged = !!model && model !== conv.model;
 
         if (!(await validateCwdContainment(conv.cwd))) {
@@ -1421,11 +1456,28 @@ const postConversationResumeRoute = HttpRouter.add(
           return jsonResponse({ error: 'Invalid model' }, { status: 400 });
         }
 
-        // Persist the new model/harness so the dropdown reflects what we're respawning with.
+        // Persist the new model so the dropdown reflects what we're respawning
+        // with. Harness is unchanged on resume — no write needed.
         if (model && modelChanged) setConversationModel(name, model);
-        setConversationHarness(name, harness);
 
-        await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, !!oldSessionId, harness);
+        // Resume only if the transcript actually exists. A conversation with a
+        // session id but no resolvable file means its history was lost or
+        // orphaned (e.g. an earlier bad harness flip) — log it loudly rather
+        // than silently `--resume`-ing into a "No conversation found" error.
+        let canResume = !!oldSessionId;
+        if (oldSessionId) {
+          const resumeFile = await resolveSessionFile(conv);
+          if (!resumeFile || !existsSync(resumeFile)) {
+            canResume = false;
+            console.error(
+              `[conversations] SESSION-LOST ${name} harness=${harness} ` +
+              `claudeSessionId=${oldSessionId} resolved=${resumeFile ?? 'null'} — ` +
+              `resuming with a fresh session`,
+            );
+          }
+        }
+
+        await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
         await waitForTmuxSession(conv.tmuxSession);
         if (harness === 'pi') {
           await waitForPiTuiReady(conv.tmuxSession);
@@ -1471,7 +1523,33 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const model = typeof body['model'] === 'string' && body['model'].trim()
           ? body['model'].trim()
           : (conv.model ?? undefined);
-        const harness = await resolveAllowedHarness(body['harness'] ?? conv.harness, model);
+
+        // Harness is PINNED per conversation. It changes ONLY when the request
+        // explicitly asks for a different one — never silently re-derived from
+        // the model (that flipped Pi conversations to Claude Code, P0). An
+        // explicit change is validated against the ToS policy gate and fails
+        // loudly rather than silently downgrading.
+        const currentHarness: RuntimeName = conv.harness ?? 'claude-code';
+        const requestedHarness = body['harness'];
+        let harness: RuntimeName = currentHarness;
+        if (requestedHarness === 'pi' || requestedHarness === 'claude-code') {
+          if (requestedHarness !== currentHarness) {
+            const policyModel = model ?? conv.model ?? '';
+            const decision = canUseHarness(
+              requestedHarness,
+              policyModel,
+              await getProviderAuthMode(policyModel),
+            );
+            if (!decision.allowed) {
+              return jsonResponse(
+                { error: decision.reason ?? 'Harness not allowed for this model' },
+                { status: 400 },
+              );
+            }
+          }
+          harness = requestedHarness;
+        }
+        const harnessChanged = harness !== currentHarness;
 
         // Always kill the existing session first (if alive) so the model change takes effect
         await killSessionAsync(conv.tmuxSession).catch(() => {});
@@ -1487,7 +1565,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
 
         // Persist the new model and harness
         if (model) setConversationModel(name, model);
-        setConversationHarness(name, harness);
+        if (harnessChanged) setConversationHarness(name, harness);
 
         // Extract the session UUID from the existing session file path
         const oldSessionId = conv.claudeSessionId;
@@ -1498,12 +1576,55 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const tmuxSession = conv.tmuxSession;
         const effort = conv.effort ?? undefined;
         const issueId = conv.issueId ?? undefined;
-        await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
+
         // Only resume if the session JSONL actually exists — Claude Code's --resume
         // fails with "No conversation found" if the file is missing (e.g., first
         // model switch on a fresh conversation or cross-provider switch).
-        const canResume = !!oldSessionId && !!sessionFile && existsSync(sessionFile);
-        await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, canResume, harness);
+        let resumeSessionId = oldSessionId ?? randomUUID();
+        let canResume = !!oldSessionId && !!sessionFile && existsSync(sessionFile);
+        if (oldSessionId && !canResume) {
+          console.error(
+            `[conversations] SESSION-LOST ${name} harness=${currentHarness} ` +
+            `claudeSessionId=${oldSessionId} resolved=${sessionFile ?? 'null'} — ` +
+            `switch-model will start a fresh session`,
+          );
+        }
+
+        if (harnessChanged) {
+          // Runtime change: convert the existing transcript into the target
+          // harness's format so history carries over. Native (Claude-format)
+          // compaction must NOT run here — it would write Claude records into a
+          // Pi JSONL (or vice versa). The converter produces a fresh session in
+          // the target format and returns its session id.
+          if (canResume && sessionFile) {
+            try {
+              const result = await convertConversationTranscript({
+                fromHarness: currentHarness,
+                toHarness: harness,
+                sourceSessionFile: sessionFile,
+                cwd,
+                tmuxSession,
+              });
+              resumeSessionId = result.sessionId;
+              canResume = true;
+              if (harness === 'claude-code') setConversationClaudeSessionId(name, result.sessionId);
+            } catch (convErr) {
+              const cm = convErr instanceof Error ? convErr.message : String(convErr);
+              console.error(`[conversations] SESSION-CONVERT-FAILED ${name} ${currentHarness}->${harness}: ${cm}`);
+              canResume = false;
+            }
+          } else {
+            // No source transcript to convert — start the new harness fresh.
+            canResume = false;
+          }
+        } else if (harness === 'claude-code') {
+          // Same harness, Claude Code: native (Claude-format) compaction is correct.
+          await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
+        }
+        // Pi staying on Pi: skip native compaction — it is Claude-format only and
+        // would corrupt the Pi JSONL. Pi manages its own context.
+
+        await spawnConversationSession(tmuxSession, cwd, resumeSessionId, model, effort, issueId, canResume, harness);
         await waitForTmuxSession(tmuxSession);
         if (harness === 'pi') {
           await waitForPiTuiReady(tmuxSession);

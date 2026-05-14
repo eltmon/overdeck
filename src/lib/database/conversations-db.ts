@@ -363,6 +363,18 @@ export function setConversationHarness(name: string, harness: 'claude-code' | 'p
   ).run(harness, name);
 }
 
+/**
+ * Point a conversation at a new session UUID. Used when a harness change
+ * converts the transcript into a new format/file — the DB must track the
+ * converted session, not the orphaned original (P0, 2026-05-14).
+ */
+export function setConversationClaudeSessionId(name: string, claudeSessionId: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET claude_session_id = ? WHERE name = ?`,
+  ).run(claudeSessionId, name);
+}
+
 export function updateConversationDeliveryMethod(name: string, method: 'auto' | 'channels' | 'tmux' | null): void {
   const db = getDatabase();
   db.prepare(

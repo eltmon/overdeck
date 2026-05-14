@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
-import { mkdir, readFile, readdir, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync } from 'fs/promises';
+import { mkdir, readFile, readdir, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
 import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
@@ -40,6 +40,19 @@ import { assertIssueHasBeads } from './beads-query.js';
 const execAsync = promisify(exec);
 
 export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship';
+
+/**
+ * Write an agent launcher script atomically. Every agent shares a fixed
+ * `launcher.sh` path inside its agent dir, and spawn/resume/restart paths can
+ * overlap (e.g. a Deacon recovery racing a manual restart). Writing in place
+ * lets one path read a half-written script; write to a unique temp file then
+ * rename (atomic on the same filesystem).
+ */
+async function writeLauncherScriptAtomic(launcherScript: string, content: string): Promise<void> {
+  const tmp = `${launcherScript}.${randomUUID()}.tmp`;
+  await writeFile(tmp, content, { mode: 0o755 });
+  await renameAsync(tmp, launcherScript);
+}
 
 /**
  * BFS-walk a process subtree rooted at `rootPid` looking for the Claude Code
@@ -766,6 +779,27 @@ async function postUnixSocketJson(
   const agent = getBridgeHttpAgent(socketPath);
 
   return new Promise((resolveCall, reject) => {
+    // Settle exactly once. Without this guard a late idle-timeout (or a
+    // post-response socket error) could fire `reject` after the response
+    // already resolved the promise — and still run destroyBridgeHttpAgent,
+    // tearing down the shared keep-alive agent under a healthy connection.
+    let settled = false;
+    const finishOk = (value: { status: number; body: string }) => {
+      if (settled) return;
+      settled = true;
+      req.setTimeout(0); // cancel the idle timer
+      req.removeAllListeners('timeout');
+      resolveCall(value);
+    };
+    const finishErr = (err: Error, destroyAgent: boolean) => {
+      if (settled) return;
+      settled = true;
+      req.setTimeout(0);
+      req.removeAllListeners('timeout');
+      if (destroyAgent) destroyBridgeHttpAgent(socketPath);
+      reject(err);
+    };
+
     const req = httpRequest(
       {
         socketPath,
@@ -787,10 +821,10 @@ async function postUnixSocketJson(
         res.on('end', () => {
           const status = res.statusCode ?? 0;
           if (status >= 200 && status < 300) {
-            resolveCall({ status, body: responseBody });
+            finishOk({ status, body: responseBody });
             return;
           }
-          reject(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
+          finishErr(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`), false);
         });
       },
     );
@@ -799,8 +833,7 @@ async function postUnixSocketJson(
       req.destroy(new Error('socket POST timeout'));
     });
     req.on('error', (err: Error) => {
-      destroyBridgeHttpAgent(socketPath);
-      reject(err);
+      finishErr(err, true);
     });
     req.write(payload);
     req.end();
@@ -1917,7 +1950,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-  await writeFileAsync(launcherScript, launcherContent, { mode: 0o755 });
+  await writeLauncherScriptAtomic(launcherScript, launcherContent);
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=role-run | role=${role} | model=${state.model} | source=agents.ts:spawnRun | session=${agentId} | command="${claudeCmd}"`);
 
@@ -2116,7 +2149,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-  await writeFile(launcherScript, launcherContent, { mode: 0o755 });
+  await writeLauncherScriptAtomic(launcherScript, launcherContent);
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=work-agent | model=${state.model} | source=agents.ts:spawnAgent | session=${agentId} | command="${claudeCmd}"`);
 
@@ -2778,7 +2811,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
+    await writeLauncherScriptAtomic(launcherScript, launcherContent);
     const claudeCmd = `bash ${launcherScript}`;
 
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
@@ -2916,7 +2949,7 @@ export async function restartAgent(
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
+    await writeLauncherScriptAtomic(launcherScript, launcherContent);
     const claudeCmd = `bash ${launcherScript}`;
 
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
@@ -3088,7 +3121,7 @@ export async function recoverAgent(
       harness: 'pi',
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
+    await writeLauncherScriptAtomic(launcherScript, launcherContent);
     await createSessionAsync(normalizedId, state.workspace, `bash ${launcherScript}`, {
       env: {
         ...BLANKED_PROVIDER_ENV,
