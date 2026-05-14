@@ -217,8 +217,8 @@ async function loadWorkspaceContinue(workspacePath: string, issueId: string): Pr
 async function saveRuntimeToContinue(workspacePath: string, issueId: string, runtime: SwarmRuntime): Promise<void> {
   const continueDir = continueDirForWorkspace(workspacePath);
   await mkdir(continueDir, { recursive: true });
-  const cont = await loadWorkspaceContinue(workspacePath, issueId);
-  await writeContinueStateAsync(continueDir, issueId, { ...cont, swarmRuntime: runtime });
+  const now = new Date().toISOString();
+  await writeContinueStateAsync(continueDir, issueId, (cont) => ({ ...(cont ?? emptyContinueState(issueId, now)), swarmRuntime: runtime }));
 }
 
 function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
@@ -306,16 +306,7 @@ async function persistSynthesisOutput(
   doc: VBriefDocument,
   item: VBriefItem,
 ): Promise<void> {
-  const cont = await loadWorkspaceContinue(workspacePath, issueId);
   const now = new Date().toISOString();
-  const existingRuntime = cont.swarmRuntime ?? {
-    model: DEFAULT_SWARM_MODEL,
-    slots: [],
-    synthesisOutputs: {},
-    createdAt: now,
-    updatedAt: now,
-  };
-  if (existingRuntime.synthesisOutputs[item.id]) return;
   const parentIds = doc.plan.edges.filter(edge => edge.type === 'blocks' && edge.to === item.id).map(edge => edge.from);
   const parents = parentIds
     .map(parentId => doc.plan.items.find(planItem => planItem.id === parentId))
@@ -326,20 +317,30 @@ async function persistSynthesisOutput(
     'Resolved upstream context:',
     ...parents.map(parent => `- ${parent.id}: ${parent.title} [${parent.status}]${parent.narrative?.Action ? ` — ${parent.narrative.Action}` : ''}`),
   ].join('\n');
-  await writeContinueStateAsync(continueDirForWorkspace(workspacePath), issueId, {
-    ...cont,
-    swarmRuntime: {
-      ...existingRuntime,
-      synthesisOutputs: {
-        ...existingRuntime.synthesisOutputs,
-        [item.id]: { targetItemId: item.id, writtenAt: now, contextUpdate },
-      },
+  await writeContinueStateAsync(continueDirForWorkspace(workspacePath), issueId, (cont) => {
+    const existingRuntime = cont?.swarmRuntime ?? {
+      model: DEFAULT_SWARM_MODEL,
+      slots: [],
+      synthesisOutputs: {},
+      createdAt: now,
       updatedAt: now,
-    },
-    sessionHistory: [
-      ...cont.sessionHistory,
-      { timestamp: now, reason: 'manual', note: `swarm synthesis prepared for ${item.id}` },
-    ],
+    };
+    if (existingRuntime.synthesisOutputs[item.id]) return cont ?? emptyContinueState(issueId, now);
+    return {
+      ...(cont ?? emptyContinueState(issueId, now)),
+      swarmRuntime: {
+        ...existingRuntime,
+        synthesisOutputs: {
+          ...existingRuntime.synthesisOutputs,
+          [item.id]: { targetItemId: item.id, writtenAt: now, contextUpdate },
+        },
+        updatedAt: now,
+      },
+      sessionHistory: [
+        ...(cont?.sessionHistory ?? []),
+        { timestamp: now, reason: 'manual', note: `swarm synthesis prepared for ${item.id}` },
+      ],
+    };
   });
 }
 
@@ -1180,18 +1181,19 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
       };
     }
     if (synthesisOutput && resolvedItemId) {
-      const cont = await loadWorkspaceContinue(mainWorkspace, issueUpper);
-      const runtime = cont.swarmRuntime ?? runtimeFromState(nextState);
-      await writeContinueStateAsync(continueDirForWorkspace(mainWorkspace), issueUpper, {
-        ...cont,
-        swarmRuntime: {
-          ...runtime,
-          synthesisOutputs: {
-            ...runtime.synthesisOutputs,
-            [resolvedItemId]: { targetItemId: resolvedItemId, writtenAt: now, contextUpdate: synthesisOutput },
+      await writeContinueStateAsync(continueDirForWorkspace(mainWorkspace), issueUpper, (cont) => {
+        const runtime = cont?.swarmRuntime ?? runtimeFromState(nextState);
+        return {
+          ...(cont ?? emptyContinueState(issueUpper, now)),
+          swarmRuntime: {
+            ...runtime,
+            synthesisOutputs: {
+              ...runtime.synthesisOutputs,
+              [resolvedItemId]: { targetItemId: resolvedItemId, writtenAt: now, contextUpdate: synthesisOutput },
+            },
+            updatedAt: now,
           },
-          updatedAt: now,
-        },
+        };
       });
     }
 

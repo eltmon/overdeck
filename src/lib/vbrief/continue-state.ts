@@ -363,11 +363,18 @@ async function assertContinueWriterAsync(path: string, writerId: string): Promis
   activeContinueWriters.set(path, writerId);
 }
 
-export async function writeContinueStateAsync(dir: string, issueId: string, state: ContinueState): Promise<void> {
+export async function writeContinueStateAsync(
+  dir: string,
+  issueId: string,
+  stateOrUpdater: ContinueState | ((current: ContinueState | null) => ContinueState),
+): Promise<void> {
   const path = continueFilePath(dir, issueId);
 
   // Serialize concurrent writes for the same path so read-modify-write sequences
   // in the same process don't race and drop mutations (PAN-977 review blocker).
+  // When an updater callback is passed, we read the latest on-disk state AFTER
+  // awaiting any prior pending write so the mutation merges against the most
+  // recently committed document rather than a stale snapshot.
   const previous = pendingContinueWrites.get(path);
   const current = (async () => {
     if (previous) {
@@ -377,6 +384,13 @@ export async function writeContinueStateAsync(dir: string, issueId: string, stat
     await assertContinueWriterAsync(path, writerId);
     try {
       const now = new Date().toISOString();
+      let state: ContinueState;
+      if (typeof stateOrUpdater === 'function') {
+        const existing = await readContinueStateAsync(dir, issueId);
+        state = stateOrUpdater(existing);
+      } else {
+        state = stateOrUpdater;
+      }
       const next: ContinueState = {
         ...state,
         issueId: issueId.toUpperCase(),
