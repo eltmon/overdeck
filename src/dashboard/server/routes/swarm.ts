@@ -746,6 +746,21 @@ async function dispatchSwarmWave(
 
   const maxConcurrent = Math.min(pendingItems.length, userMax, systemAvailable);
   const itemsToDispatch = pendingItems.slice(0, maxConcurrent);
+
+  // PAN-977: when dispatching by DAG readiness without an explicit wave,
+  // derive the persisted currentWave from the max wave index of dispatched
+  // items. This prevents multi-wave auto-advance swarms from recording a
+  // stale wave-0 currentWave after later-wave items have been dispatched.
+  const persistedWaveIndex = requestedWave !== undefined
+    ? waveIndex
+    : Math.max(
+        waveIndex,
+        ...itemsToDispatch.map(item => {
+          const foundWave = waves.find(w => w.items.some(wi => wi.id === item.id));
+          return foundWave ? foundWave.index : waveIndex;
+        }),
+      );
+
   const deferredItems = [
     ...pendingItems.slice(maxConcurrent),
     ...deferredByOverlap.map(item => ({
@@ -1022,7 +1037,7 @@ async function dispatchSwarmWave(
 
   const state: SwarmState = {
     issueId: issueUpper,
-    currentWave: waveIndex,
+    currentWave: persistedWaveIndex,
     totalWaves: waves.length,
     model: swarmModel,
     autoAdvance: autoAdvance ?? existingState?.autoAdvance ?? false,
@@ -1051,7 +1066,7 @@ async function dispatchSwarmWave(
     body: {
       success: true,
       issueId: issueUpper,
-      wave: waveIndex,
+      wave: persistedWaveIndex,
       totalWaves: waves.length,
       model: swarmModel,
       autoAdvance: state.autoAdvance,

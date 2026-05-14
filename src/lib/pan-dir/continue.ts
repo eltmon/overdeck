@@ -111,7 +111,9 @@ export async function readWorkspaceContinueAsync(workspacePath: string): Promise
 }
 
 export async function writeWorkspaceContinueAsync(workspacePath: string, state: WorkspaceContinueState): Promise<WorkspaceContinueState> {
-  const { continuePath } = ensureWorkspacePanDir(workspacePath)
+  const { continuePath, panDir, feedbackDir } = workspacePanPaths(workspacePath)
+  await mkdir(panDir, { recursive: true })
+  await mkdir(feedbackDir, { recursive: true })
   const now = new Date().toISOString()
   const next: WorkspaceContinueState = {
     ...state,
