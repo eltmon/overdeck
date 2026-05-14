@@ -337,6 +337,58 @@ describe('request-review fresh convoy regression', () => {
   });
 });
 
+// ── stale synthesis session detection (PAN-1131) ─────────────────────────────
+// The synthesis agent never self-terminates (it runs `Bash(exit)`, a subshell
+// exit — the Claude process stays idle-alive with a live pane). The
+// spawnReviewRoleForIssue idempotency guard must therefore NOT treat
+// "pane alive" alone as "actively reviewing": it must compare the existing
+// synthesis session's persisted reviewRunId against the current HEAD and kill
+// the convoy when they differ. Otherwise non-force re-dispatch (the
+// onIssueStateChange path after a work agent's `pan done`) jams forever.
+
+describe('stale synthesis session detection (PAN-1131)', () => {
+  it('idempotency guard compares persisted reviewRunId to current HEAD before skipping', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const agentSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+
+    const guardMatch = agentSrc.match(
+      /export async function spawnReviewRoleForIssue[\s\S]*?archiveFeedbackFiles/,
+    );
+    expect(guardMatch).not.toBeNull();
+    const guardBlock = guardMatch![0];
+
+    // The guard must consult the existing session's reviewRunId …
+    expect(guardBlock).toContain('reviewRunId');
+    // … derived from a HEAD probe, and use it to decide staleness.
+    expect(guardBlock).toMatch(/staleRunId/);
+    expect(guardBlock).toContain('git rev-parse --short=8 HEAD');
+    // … and the "skip" path must require NOT-stale, not just pane-alive.
+    expect(guardBlock).toMatch(/!paneDead && !opts\.force && !staleRunId/);
+  });
+
+  it('persists reviewRunId onto the synthesis agent state after spawn', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const agentSrc = readFileSync(
+      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
+      'utf-8',
+    );
+
+    const spawnMatch = agentSrc.match(
+      /const run = await spawnRun\(opts\.issueId, 'review'[\s\S]*?Review role \(synthesis\) spawned/,
+    );
+    expect(spawnMatch).not.toBeNull();
+    const spawnBlock = spawnMatch![0];
+
+    expect(spawnBlock).toMatch(/run\.reviewRunId = runId/);
+    expect(spawnBlock).toContain('saveAgentStateAsync(run)');
+  });
+});
+
 describe('passed-state rerun regression', () => {
   it('workspaces.ts request-review route uses spawnReviewRoleForIssue in the rerun path', async () => {
     const { readFileSync } = await import('fs');

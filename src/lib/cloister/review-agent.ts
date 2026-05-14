@@ -367,12 +367,55 @@ export async function spawnReviewRoleForIssue(
     const sessions = await listSessionNamesAsync();
     if (sessions.includes(reviewSessionName)) {
       const paneDead = await isPaneDeadAsync(reviewSessionName);
+
+      // A synthesis agent that has finished its verdict does NOT terminate:
+      // its role prompt tells it to "exit", but it runs `Bash(exit)` which
+      // only exits a subshell — the Claude process stays idle-alive with a
+      // live pane. So "pane alive" does NOT mean "actively reviewing", and the
+      // old guard would skip re-dispatch forever, jamming the issue at
+      // review=reviewing with no convoy actually running (PAN-1131).
+      //
+      // Disambiguate via the run id: every review run is keyed to a HEAD sha
+      // (runId = agent-<issue>-review-<head8>). If the existing synthesis
+      // session was started for a different HEAD than the one we are about to
+      // review, it is a stale leftover — kill the convoy and respawn. Only a
+      // session whose runId matches the *current* HEAD is genuinely the
+      // review-in-progress we should defer to.
+      let staleRunId = false;
       if (!paneDead && !opts.force) {
+        try {
+          const { stdout } = await execAsync('git rev-parse --short=8 HEAD', {
+            cwd: opts.workspace,
+            encoding: 'utf-8',
+          });
+          const currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${stdout.trim()}`;
+          const synthStatePath = join(AGENTS_DIR, reviewSessionName, 'state.json');
+          const synthState = JSON.parse(await readFile(synthStatePath, 'utf-8')) as { reviewRunId?: string };
+          // Stale when the existing session carries a runId that does not match
+          // the current HEAD. If it carries no runId at all (legacy session
+          // from before this field was persisted), stay conservative and keep
+          // the "skip" behaviour so we never kill a genuinely-running review.
+          if (synthState.reviewRunId && synthState.reviewRunId !== currentRunId) {
+            staleRunId = true;
+            console.log(
+              `[review-agent] ${reviewSessionName} is stale — runId ${synthState.reviewRunId} != current ${currentRunId}; killing convoy and respawning`,
+            );
+          }
+        } catch (probeErr) {
+          console.warn(
+            `[review-agent] Could not probe ${reviewSessionName} runId, falling back to pane-alive idempotency:`,
+            probeErr,
+          );
+        }
+      }
+
+      if (!paneDead && !opts.force && !staleRunId) {
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
         return { success: true, message: `Review already in progress: ${reviewSessionName}` };
       }
-      // Session exists but pane is dead, or force mode — kill the whole convoy and respawn.
-      console.log(`[review-agent] ${reviewSessionName} ${opts.force ? 'force-killed for re-review' : 'pane is dead'} — respawning convoy`);
+      // Session pane is dead, force mode, or stale runId — kill the whole convoy and respawn.
+      const reason = opts.force ? 'force-killed for re-review' : paneDead ? 'pane is dead' : 'stale runId';
+      console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
       await killAllReviewerSessions(undefined, opts.issueId).catch(() => ({ killed: [], failed: [] }));
     }
   } catch (err) {
@@ -432,7 +475,7 @@ export async function spawnReviewRoleForIssue(
   }
 
   try {
-    const { spawnRun } = await import('../agents.js');
+    const { spawnRun, saveAgentStateAsync } = await import('../agents.js');
 
     // Build the shared context manifest before spawning so all reviewers
     // read one pre-built diff+AC object instead of each running git diff
@@ -471,6 +514,16 @@ export async function spawnReviewRoleForIssue(
       prompt,
       ...(opts.model ? { model: opts.model } : {}),
     });
+    // Persist the runId on the synthesis agent's own state so the idempotency
+    // guard above can tell a genuinely-running review (runId matches current
+    // HEAD) from a finished-but-idle leftover (runId from an older HEAD) — see
+    // PAN-1131. Sub-reviewers already persist this; the synthesis agent did not.
+    run.reviewRunId = runId;
+    try {
+      await saveAgentStateAsync(run);
+    } catch (saveErr) {
+      console.warn(`[review-agent] Could not persist reviewRunId on ${run.id}:`, saveErr);
+    }
     console.log(`[review-agent] Review role (synthesis) spawned for ${opts.issueId}: ${run.id}`);
     emitActivityEntry({ source: 'review', level: 'info', message: `Review role spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
 
