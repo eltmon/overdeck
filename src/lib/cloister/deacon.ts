@@ -1386,6 +1386,33 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             reviewStatus: latestTerminalReview.status,
             reviewNotes: latestTerminalReview.notes,
           };
+          // Snapshot the workspace HEAD when restoring a passed review from
+          // history. Without reviewedAtCommit the canSkipTests fast-path and
+          // checkPostReviewCommits both go blind, and the issue can jam at
+          // passed-but-no-commit-anchor (PAN-977).
+          try {
+            const { resolveProjectFromIssue } = await import('../projects.js');
+            const project = resolveProjectFromIssue(issueId);
+            if (project) {
+              const workspacePath = join(
+                project.projectPath,
+                'workspaces',
+                `feature-${issueId.toLowerCase()}`,
+              );
+              if (existsSync(workspacePath)) {
+                const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
+                reviewUpdate['reviewedAtCommit'] = stdout.trim();
+              }
+            }
+          } catch { /* non-fatal — leave reviewedAtCommit unchanged */ }
+          // A restored terminal-passed review resolves any review-infra stuck
+          // marker — clear it so the deacon stops skipping the issue.
+          if (status.stuckReason === 'review_infrastructure_failure') {
+            reviewUpdate['stuck'] = false;
+            reviewUpdate['stuckReason'] = undefined;
+            reviewUpdate['stuckAt'] = undefined;
+            reviewUpdate['stuckDetails'] = undefined;
+          }
           if (latestTerminalTest) {
             reviewUpdate['testStatus'] = latestTerminalTest.status;
             reviewUpdate['testNotes'] = latestTerminalTest.notes;
@@ -1969,6 +1996,7 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
   const actions: string[] = [];
   try {
     const { loadReviewStatuses, setReviewStatus } = await import('../review-status.js');
+    const { resolveProjectFromIssue } = await import('../projects.js');
     const statuses = loadReviewStatuses();
 
     for (const [issueId, status] of Object.entries(statuses)) {
@@ -1977,9 +2005,37 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
         status.reviewStatus === 'reviewing' &&
         status.stuckReason === 'review_infrastructure_failure'
       ) {
+        // Snapshot the workspace HEAD so reviewedAtCommit is populated — without
+        // it, checkPostReviewCommits can never confirm the review is current and
+        // the canSkipTests fast-path in setReviewStatus never fires, leaving the
+        // issue jammed at passed-but-stuck forever (PAN-977).
+        let reviewedAtCommit: string | undefined;
+        try {
+          const project = resolveProjectFromIssue(issueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${issueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
+              reviewedAtCommit = stdout.trim();
+            }
+          }
+        } catch { /* non-fatal — leave reviewedAtCommit undefined */ }
+
+        // Clearing the stuck marker is mandatory: the bypass *resolves* the
+        // review-infra failure, so the issue must no longer be skipped by the
+        // deacon's stuck-issue guards or it deadlocks at passed+stuck.
         setReviewStatus(issueId, {
           reviewStatus: 'passed',
           reviewNotes: 'Review bypassed: verification passed but review infrastructure repeatedly failed.',
+          ...(reviewedAtCommit ? { reviewedAtCommit } : {}),
+          stuck: false,
+          stuckReason: undefined,
+          stuckAt: undefined,
+          stuckDetails: undefined,
         });
         const msg = `Bypassed review for ${issueId}: verification passed, review infra failed`;
         actions.push(msg);
@@ -4129,7 +4185,38 @@ async function recoverOrphanedAgents(context?: string): Promise<string[]> {
     try {
       const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
       if (state.status !== 'running' && state.status !== 'starting') continue;
-      if (sessionExists(dir)) {
+
+      // PAN-977: headless review sub-role agents run via `claude --print` in a
+      // detached, HUP-immune launcher with NO tmux session. "No tmux session"
+      // is their normal steady state, not orphanhood — gating their liveness on
+      // sessionExists() resets them to stopped on every patrol and thrashes the
+      // convoy. Their lifecycle is owned by monitorReviewConvoySignals via the
+      // launcher pid. Here we only orphan-recover them once that launcher pid is
+      // actually gone (the launcher removes the pid file after it signals).
+      if (state.reviewSubRole) {
+        const reviewerLauncherPid = join(AGENTS_DIR, dir, 'reviewer-launcher.pid');
+        if (existsSync(reviewerLauncherPid)) {
+          let launcherAlive = false;
+          try {
+            const pid = Number.parseInt(readFileSync(reviewerLauncherPid, 'utf-8').trim(), 10);
+            if (Number.isInteger(pid) && pid > 0) {
+              try { process.kill(pid, 0); launcherAlive = true; } catch { launcherAlive = false; }
+            }
+          } catch { launcherAlive = false; }
+          if (launcherAlive) continue; // launcher still working — not orphaned
+        } else {
+          // No pid file yet: the launcher either hasn't written it (startup
+          // race) or already finished and cleaned up. Give it a startup grace
+          // window keyed off startedAt before declaring the agent orphaned.
+          const startedMs = Date.parse(state.startedAt ?? '');
+          const REVIEWER_LAUNCHER_GRACE_MS = 90_000;
+          if (Number.isFinite(startedMs) && Date.now() - startedMs < REVIEWER_LAUNCHER_GRACE_MS) {
+            continue;
+          }
+        }
+        // Launcher pid is gone (or never appeared past the grace window) — the
+        // headless reviewer process has exited. Fall through to mark stopped.
+      } else if (sessionExists(dir)) {
         // Planning sessions use remain-on-exit, so the tmux session persists after
         // Claude exits. Check if the pane's process is actually dead.
         if (dir.startsWith('planning-')) {
