@@ -179,10 +179,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-q9z9",
-    "itemId": "b2-provider-registry",
+    "beadId": "workspace-ieha",
+    "itemId": "b3-cost-cap-fallback",
     "status": "implemented",
-    "note": "Memory extraction provider registry added with Anthropic SDK and cliproxy adapters, env/settings resolution, cost-event recording, and conformance tests; focused provider test and CLI build passed."
+    "note": "Provider policy now enforces the per-day memory extraction cost cap, updates health.json on cap/failure/success, tries one fallback provider, and drops failed extractions without throwing; focused provider policy tests, typecheck, and lint passed."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -215,6 +215,12 @@
       "timestamp": "2026-05-15T00:00:00.000Z",
       "reason": "work",
       "note": "workspace-q9z9 implemented: added memory extraction provider registry, Anthropic SDK and cliproxy adapters, env/settings resolution, cost-event recording, and tests/lib/memory/providers.test.ts; focused test and CLI build passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-15T00:00:00.000Z",
+      "reason": "work",
+      "note": "workspace-ieha implemented: added provider policy for per-day cost cap, one fallback attempt, health.json updates, and non-throwing drop results; focused policy tests, typecheck, and lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],

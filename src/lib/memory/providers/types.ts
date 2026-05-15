@@ -52,6 +52,7 @@ export interface ExtractionProviderSelection {
 export interface MemoryProviderSettings {
   provider?: string;
   model?: string;
+  perDayCostCapUsd?: number;
   fallbackChain?: ExtractionProviderTarget[];
 }
 
