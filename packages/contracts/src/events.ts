@@ -16,6 +16,13 @@ import {
   SequenceNumber,
   WaitingReason,
 } from "./types"
+import {
+  MemoryObservation,
+  MemoryStatus,
+  PendingTurn,
+  RagDecision,
+  ResetMarker,
+} from "./memory"
 
 // ─── Agent Events ─────────────────────────────────────────────────────────────
 
@@ -781,6 +788,64 @@ export const WorkspaceAbortedEvent = Schema.Struct({
 })
 export type WorkspaceAbortedEvent = typeof WorkspaceAbortedEvent.Type
 
+// ─── Memory Events ────────────────────────────────────────────────────────────
+
+export const MemoryObservationCreatedEvent = Schema.Struct({
+  type: Schema.Literal("memory.observation_created"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ observation: MemoryObservation }),
+})
+export type MemoryObservationCreatedEvent = typeof MemoryObservationCreatedEvent.Type
+
+export const MemoryStatusUpdatedEvent = Schema.Struct({
+  type: Schema.Literal("memory.status_updated"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    identity: Schema.Struct({ projectId: Schema.String, workspaceId: Schema.String, issueId: IssueId }),
+    status: MemoryStatus,
+    previousStatus: Schema.optional(MemoryStatus),
+  }),
+})
+export type MemoryStatusUpdatedEvent = typeof MemoryStatusUpdatedEvent.Type
+
+export const MemoryRollupTriggeredEvent = Schema.Struct({
+  type: Schema.Literal("memory.rollup_triggered"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    projectId: Schema.String,
+    workspaceId: Schema.String,
+    issueId: IssueId,
+    pendingTurns: Schema.Array(PendingTurn),
+    threshold: Schema.Number,
+  }),
+})
+export type MemoryRollupTriggeredEvent = typeof MemoryRollupTriggeredEvent.Type
+
+export const MemoryResetMarkerCreatedEvent = Schema.Struct({
+  type: Schema.Literal("memory.reset_marker_created"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ marker: ResetMarker }),
+})
+export type MemoryResetMarkerCreatedEvent = typeof MemoryResetMarkerCreatedEvent.Type
+
+export const MemoryHealthChangedEvent = Schema.Struct({
+  type: Schema.Literal("memory.health_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    projectId: Schema.String,
+    issueId: IssueId,
+    status: Schema.Literals(["healthy", "degraded", "failing"]),
+    reason: Schema.NullOr(Schema.String),
+    ragDecision: Schema.optional(RagDecision),
+  }),
+})
+export type MemoryHealthChangedEvent = typeof MemoryHealthChangedEvent.Type
+
 // ─── Cost Events ──────────────────────────────────────────────────────────────
 
 /** New — cost event recorded in the store */
@@ -984,6 +1049,11 @@ export const DomainEvent = Schema.Union([
   ActivityDetailedEvent,
   ActivityTtsEvent,
   ShadowInferenceUpdateEvent,
+  MemoryObservationCreatedEvent,
+  MemoryStatusUpdatedEvent,
+  MemoryRollupTriggeredEvent,
+  MemoryResetMarkerCreatedEvent,
+  MemoryHealthChangedEvent,
   CostEventRecordedEvent,
   WorkspaceCreatedEvent,
   WorkspaceWipeStartedEvent,

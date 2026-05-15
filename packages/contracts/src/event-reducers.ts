@@ -683,6 +683,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'plan.item_status_changed':
     case 'plan.subitem_status_changed':
     case 'plan.items_unblocked':
+    case 'memory.observation_created':
+    case 'memory.status_updated':
+    case 'memory.rollup_triggered':
+    case 'memory.reset_marker_created':
+    case 'memory.health_changed':
     case 'cost.event_recorded':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 

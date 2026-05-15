@@ -179,10 +179,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-g0a8",
-    "itemId": "a1-memory-contracts",
+    "beadId": "workspace-c4vp",
+    "itemId": "a2-domain-events",
     "status": "implemented",
-    "note": "Memory contract schemas and exports added; @panctl/contracts build passed."
+    "note": "Memory domain event schemas added to DomainEvent union and shared reducer; focused contract test and @panctl/contracts build passed."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -203,6 +203,12 @@
       "timestamp": "2026-05-15T00:00:00.000Z",
       "reason": "work",
       "note": "workspace-g0a8 implemented: added @panctl/contracts memory schemas/types and package export; npm run build --workspace @panctl/contracts passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-15T00:00:00.000Z",
+      "reason": "work",
+      "note": "workspace-c4vp implemented: added five memory DomainEvent schemas, union entries, reducer acceptance, and tests/contracts/memory-events.test.ts; focused test and contracts build passed.",
       "agentModel": "gpt-5.5"
     }
   ],
