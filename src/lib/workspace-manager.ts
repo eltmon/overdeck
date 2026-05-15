@@ -1069,39 +1069,66 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 }
 
 /**
- * Pre-register a directory as trusted in Claude Code's ~/.claude.json.
- * This prevents the "Quick safety check: Is this a project you created or one you trust?" prompt
- * when agents are spawned in dynamically-created workspace directories.
+ * Pre-register a directory as trusted in Claude Code's ~/.claude.json so that
+ * neither the per-project "Quick safety check" trust prompt nor the global
+ * "WARNING: Claude Code running in Bypass Permissions mode" warning blocks
+ * spawn.
+ *
+ * Two acceptances are written:
+ *
+ * 1. **Per-project** `projects[dir].hasTrustDialogAccepted = true` — suppresses
+ *    the "Is this a project you created or one you trust?" prompt for this cwd.
+ *
+ * 2. **Global** `bypassPermissionsModeAccepted = true` — suppresses the
+ *    "Bypass Permissions mode" disclaimer that Claude shows on first launch
+ *    under `--dangerously-skip-permissions`. The default selection on that
+ *    prompt is "No, exit", so an undismissed dialog tears the session down
+ *    the moment any code (dev-channels dismisser, readiness poll) sends Enter.
+ *    Spawning under Panopticon implies the user already opted into bypass
+ *    via `claude.permissionMode` / `--yolo`, so this is a pre-acknowledgement
+ *    of a choice already made, not a silent escalation.
+ *
+ * The field name (`bypassPermissionsModeAccepted`) comes straight from the
+ * Claude Code binary — strings(claude.exe) confirms it as the persistence
+ * key checked by both the bypass-mode dialog and the headless --bg gate.
  */
 export function preTrustDirectory(dirPath: string): void {
   const claudeJsonPath = join(homedir(), '.claude.json');
   if (!existsSync(claudeJsonPath)) return;
 
   const data = JSON.parse(readFileSync(claudeJsonPath, 'utf8'));
+  let dirty = false;
+
+  if (data.bypassPermissionsModeAccepted !== true) {
+    data.bypassPermissionsModeAccepted = true;
+    dirty = true;
+  }
+
   if (!data.projects) data.projects = {};
 
-  // Only add if not already present
   if (data.projects[dirPath]) {
     if (!data.projects[dirPath].hasTrustDialogAccepted) {
       data.projects[dirPath].hasTrustDialogAccepted = true;
-      writeFileSync(claudeJsonPath, JSON.stringify(data, null, 2), 'utf8');
+      dirty = true;
     }
-    return;
+  } else {
+    data.projects[dirPath] = {
+      allowedTools: [],
+      mcpContextUris: [],
+      mcpServers: {},
+      enabledMcpjsonServers: [],
+      disabledMcpjsonServers: [],
+      hasTrustDialogAccepted: true,
+      projectOnboardingSeenCount: 0,
+      hasClaudeMdExternalIncludesApproved: false,
+      hasClaudeMdExternalIncludesWarningShown: false,
+    };
+    dirty = true;
   }
 
-  data.projects[dirPath] = {
-    allowedTools: [],
-    mcpContextUris: [],
-    mcpServers: {},
-    enabledMcpjsonServers: [],
-    disabledMcpjsonServers: [],
-    hasTrustDialogAccepted: true,
-    projectOnboardingSeenCount: 0,
-    hasClaudeMdExternalIncludesApproved: false,
-    hasClaudeMdExternalIncludesWarningShown: false,
-  };
-
-  writeFileSync(claudeJsonPath, JSON.stringify(data, null, 2), 'utf8');
+  if (dirty) {
+    writeFileSync(claudeJsonPath, JSON.stringify(data, null, 2), 'utf8');
+  }
 }
 
 export interface AddReposToWorkspaceOptions {

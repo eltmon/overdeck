@@ -968,6 +968,19 @@ async function spawnConversationSession(
 
   console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}"`);
 
+  // Pre-accept Claude Code's trust + bypass-permissions disclaimers BEFORE
+  // spawn so the new claude process reads acceptance from ~/.claude.json on
+  // startup and skips both dialogs. Without this, the "Bypass Permissions
+  // mode" prompt blocks the session in the tmux pane — its default option
+  // is "No, exit", so any Enter (including from dismissDevChannelsDialog)
+  // tears the session down and the user sees "Conversation session ended"
+  // immediately after launch. Work/specialist spawns already do this in
+  // src/lib/agents.ts; conversations were the only spawn path missing it.
+  try {
+    const { preTrustDirectory } = await import('../../../lib/workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
+    preTrustDirectory(cwd);
+  } catch { /* non-fatal */ }
+
   // Spawn the session — blank out provider env vars (ANTHROPIC_BASE_URL,
   // ANTHROPIC_API_KEY, etc.) via tmux -e flags so the launcher script's
   // exports are the sole source of provider configuration. The tmux server
