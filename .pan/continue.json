@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-12T19:45:00.000Z",
-  "gitState": { "branch": "feature/pan-1052", "sha": "be3e598b4", "dirty": false },
+  "updated": "2026-05-15T00:00:00.000Z",
+  "gitState": { "branch": "feature/pan-1052", "sha": "be3e598b4", "dirty": true },
   "decisions": [
     {
       "id": "D1",
@@ -178,7 +178,12 @@
       "mitigation": "CLAUDE.md 'Deliver Complete Features' rule applies. Every bead's acceptance criteria must be met before pan done. Dependencies (edges) are encoded so the order is unambiguous. Late beads (Settings UI, CLI umbrella, daily summaries) explicitly depend on the foundation beads and the pipeline being live."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "beadId": "workspace-g0a8",
+    "itemId": "a1-memory-contracts",
+    "status": "implemented",
+    "note": "Memory contract schemas and exports added; @panctl/contracts build passed."
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
   "sessionHistory": [
@@ -193,6 +198,12 @@
       "reason": "planning",
       "note": "Decisions locked: hybrid hooks+poller, explicit identity model, central memory store, full scope + Panopticon upgrades (cross-project + pinned docs deferred to PAN-1116/PAN-1117), configurable LLM, dual injection surface. Filed PAN-1116 (cross-project search) and PAN-1117 (pinned docs) as followups.",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-15T00:00:00.000Z",
+      "reason": "work",
+      "note": "workspace-g0a8 implemented: added @panctl/contracts memory schemas/types and package export; npm run build --workspace @panctl/contracts passed.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []
