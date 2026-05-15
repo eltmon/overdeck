@@ -179,10 +179,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-ze4a",
-    "itemId": "b4-extractor",
+    "beadId": "workspace-nrd7",
+    "itemId": "h3-time-bucket",
     "status": "implemented",
-    "note": "Observation extractor now assembles outcome-oriented prompts with continuity context and domain tags, calls the provider policy, validates payloads into MemoryObservation, retries malformed responses once, and drops invalid results without throwing; focused extractor tests, typecheck, and lint passed."
+    "note": "Frontend bucketByTime helper added with Just Now, Earlier Today, Yesterday, This Week, This Month, and Older local-time buckets plus boundary tests; focused frontend test, typecheck, and lint passed."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -227,6 +227,12 @@
       "timestamp": "2026-05-15T00:00:00.000Z",
       "reason": "work",
       "note": "workspace-ze4a implemented: added observation prompt assembly, domain tag guidance, continuity context, provider-policy call, MemoryObservation validation, malformed-response retry/drop handling, and tests/lib/memory/extract.test.ts; focused tests, typecheck, and lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-15T00:00:00.000Z",
+      "reason": "work",
+      "note": "workspace-nrd7 implemented: added src/dashboard/frontend/src/lib/timeBuckets.ts with local-time buckets and src/dashboard/frontend/src/lib/__tests__/timeBuckets.test.ts boundary coverage; focused frontend test, typecheck, and lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],
