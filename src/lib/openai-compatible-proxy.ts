@@ -13,6 +13,10 @@ export function getOpenAICompatibleProxyBaseUrl(provider: string): string {
   return `http://${HOST}:${PORT}/${provider}`;
 }
 
+export function getProxyPathname(url: string | undefined): string {
+  return new URL(url ?? '/', `http://${HOST}:${PORT}`).pathname;
+}
+
 export async function ensureOpenAICompatibleProxyRunning(): Promise<void> {
   if (started && server?.listening) return;
   if (await isPortOpen()) {
@@ -54,13 +58,15 @@ async function isPortOpen(): Promise<boolean> {
 }
 
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-  if (req.method === 'GET' && req.url === '/health') {
+  const pathname = getProxyPathname(req.url);
+
+  if (req.method === 'GET' && pathname === '/health') {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ ok: true }));
     return;
   }
 
-  const match = req.url?.match(/^\/([^/]+)\/v1\/(messages|models)$/);
+  const match = pathname.match(/^\/([^/]+)\/v1\/(messages|models)$/);
   if (!match) {
     res.writeHead(404, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ error: { message: 'Unknown proxy route' } }));
