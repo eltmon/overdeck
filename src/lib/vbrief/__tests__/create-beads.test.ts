@@ -212,6 +212,39 @@ describe('createBeadsFromVBrief', () => {
     rmSync(ws3.projectRoot, { recursive: true, force: true });
   });
 
+  it('recovers from PAN-457 table-missing corruption and creates every plan item', async () => {
+    const ws9 = createWorkspace('PAN-509');
+    setupRedirect(ws9.workspacePath);
+    writePlan(ws9.projectRoot, 'PAN-509', makeDoc('PAN-509', [
+      { id: 'item-a', title: 'Recovered alpha' },
+      { id: 'item-b', title: 'Recovered beta' },
+    ]));
+
+    const tableMissing = Object.assign(new Error('table not found: issues'), {
+      stderr: 'table not found: issues',
+    });
+    mockExecAsync
+      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+      .mockRejectedValueOnce(tableMissing)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'bead-alpha\n', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'bead-beta\n', stderr: '' });
+
+    const result = await createBeadsFromVBrief(ws9.workspacePath);
+
+    const createCalls = mockExecAsync.mock.calls.filter(
+      ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',
+    );
+    expect(result.success).toBe(true);
+    expect(createCalls).toHaveLength(2);
+    expect(result.created).toEqual(['PAN-509: Recovered alpha', 'PAN-509: Recovered beta']);
+    expect(result.errors.join('\n')).not.toMatch(/stale local-DB artifacts/i);
+
+    rmSync(ws9.projectRoot, { recursive: true, force: true });
+  });
+
   it('runs bd init only when there is no redirect AND no main beads (true fresh install)', async () => {
     const ws3 = createWorkspace('PAN-502');
     writePlan(ws3.projectRoot, 'PAN-502', makeDoc('PAN-502', [{ id: 'item-1', title: 'Setup task' }]));
