@@ -1946,13 +1946,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
-  // PAN-1059 / PAN-977: specialist roles (review sub-roles, test, ship) must not
-  // pass the prompt as a positional argument to Claude Code. Inside a detached
-  // tmux session, `--session-id` combined with a large positional prompt causes
-  // Claude Code to exit immediately (session-env directory created, then silent
-  // death). Work agents avoid this by delivering the prompt via tmux send-keys
-  // after Claude boots. Specialist roles now use the same delivery path.
-  const shouldDeliverPromptViaTmux = isSpecialistRole;
+  // PAN-1059 / PAN-977: interactive specialist roles avoid positional prompts
+  // by delivering through tmux after Claude boots. Headless review sub-roles run
+  // `claude --print`, so they must receive the prompt on stdin instead.
+  const shouldDeliverPromptViaTmux = isSpecialistRole && !isClaudeCodeReviewSubRole;
 
   const launcherContent = generateLauncherScript({
     role,
@@ -1962,6 +1959,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setTerminalEnv: true,
     providerExports,
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
+    promptFileMode: isClaudeCodeReviewSubRole ? 'stdin' : undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
     sessionId,
