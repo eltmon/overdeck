@@ -151,7 +151,7 @@ describe('createBeadsFromVBrief', () => {
     expect(result.created).toContain('PAN-500: First task');
   });
 
-  it('refuses to bd init when redirect exists and probe fails (would clobber redirect)', async () => {
+  it('returns an error after bd doctor when a redirect-managed probe still fails', async () => {
     const ws2 = createWorkspace('PAN-501');
     setupRedirect(ws2.workspacePath);
     writePlan(ws2.projectRoot, 'PAN-501', makeDoc('PAN-501', [{ id: 'item-1', title: 'Should not init' }]));
@@ -165,7 +165,12 @@ describe('createBeadsFromVBrief', () => {
 
     const result = await createBeadsFromVBrief(ws2.workspacePath);
 
-    // bd init must NOT have been called.
+    const doctorCalls = mockExecAsync.mock.calls.filter(
+      ([file, args]: [string, string[]]) =>
+        file === 'bd' && Array.isArray(args) && args[0] === 'doctor' && args[1] === '--fix',
+    );
+    expect(doctorCalls).toHaveLength(1);
+
     const initCall = mockExecAsync.mock.calls.find(
       ([file, args]: [string, string[]]) =>
         file === 'bd' && Array.isArray(args) && args[0] === 'init',
@@ -177,6 +182,34 @@ describe('createBeadsFromVBrief', () => {
     expect(result.errors[0]).toMatch(/failed after recovery/i);
 
     rmSync(ws2.projectRoot, { recursive: true, force: true });
+  });
+
+  it('runs bd doctor and continues when retry ping succeeds', async () => {
+    const ws3 = createWorkspace('PAN-502');
+    setupRedirect(ws3.workspacePath);
+    writePlan(ws3.projectRoot, 'PAN-502', makeDoc('PAN-502', [{ id: 'item-1', title: 'Recovered task' }]));
+
+    const dbError = new Error('Error 1146 (HY000): table not found: issues');
+    mockExecAsync
+      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
+      .mockRejectedValueOnce(dbError)                                  // bd ping --json (probe)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd doctor --fix
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd ping --json (retry)
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ... (idempotency)
+      .mockResolvedValueOnce({ stdout: 'bead-recovered\n', stderr: '' }); // bd create
+
+    const result = await createBeadsFromVBrief(ws3.workspacePath);
+
+    const doctorCalls = mockExecAsync.mock.calls.filter(
+      ([file, args]: [string, string[]]) =>
+        file === 'bd' && Array.isArray(args) && args[0] === 'doctor' && args[1] === '--fix',
+    );
+    expect(doctorCalls).toHaveLength(1);
+    expect(result.success).toBe(true);
+    expect(result.errors).toHaveLength(0);
+    expect(result.created).toContain('PAN-502: Recovered task');
+
+    rmSync(ws3.projectRoot, { recursive: true, force: true });
   });
 
   it('runs bd init only when there is no redirect AND no main beads (true fresh install)', async () => {
