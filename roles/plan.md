@@ -44,12 +44,23 @@ Research-only agent that produces an executable plan for an issue. Never writes 
 ## Process
 
 1. Read the issue and the PRD draft at `<projectRoot>/.pan/drafts/<ISSUE-ID>.md` if it exists. For cross-issue context, look up existing specs by issue ID via the read-only lifecycle index — never write or move files in `.pan/specs/`.
-2. Explore the codebase with Read/Grep/Glob — never edit
+2. Explore the codebase. **Prefer TLDR MCP tools over full `Read` whenever possible** — see TLDR section below. Use Read/Grep/Glob for everything else, but never edit
 3. Empirically test risky assumptions (use `claude --print` to probe CLI behavior, run the dev server briefly to check shape)
 4. Surface ambiguities to the user via AskUserQuestion before committing to an approach
 5. Materialize the plan: write `.pan/spec.vbrief.json`, `.pan/continue.json`, beads (workspace-local)
 6. Run `pan plan-finalize <ISSUE-ID>` — that promotes the workspace spec to the canonical `<projectRoot>/.pan/specs/` location with `plan.status: "proposed"`
 7. Stop after planning is complete; do not start implementation work
+
+## TLDR: prefer code summaries over full reads
+
+Planning means broad exploration — exactly where TLDR pays off most. If `<workspace>/.venv` exists, you have these MCP tools:
+
+- `tldr_context <file>` — exports, imports, key functions (~1k tokens vs 10–25k)
+- `tldr_structure <directory>` — directory layout, useful when orienting in unfamiliar code
+- `tldr_semantic <query>` — natural-language search; great for "where is X handled?"
+- `tldr_calls <fn> <file>` / `tldr_impact <fn> <file>` — dependency analysis when scoping a refactor
+
+Read full files only when you need exact line numbers for a citation in the plan. The PreToolUse hook also auto-substitutes summaries for large-file `Read`s. See the `pan-tldr` skill for the full workflow.
 
 ## State model
 

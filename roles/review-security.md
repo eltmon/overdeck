@@ -39,6 +39,16 @@ Do not review performance, general logic bugs, style, architecture, or requireme
 
 Do not run broad `git diff`, rediscover all changed files, or perform a whole-repository audit.
 
+## TLDR: prefer code summaries over full reads
+
+If `<workspace>/.venv` exists, you have these MCP tools — use them in place of full `Read` when exploring code:
+
+- `tldr_context <file>` — exports, imports, key functions (~1k tokens vs 10–25k)
+- `tldr_calls <fn> <file>` / `tldr_impact <fn> <file>` — caller/callee analysis (helpful for tracing where untrusted input flows)
+- `tldr_semantic <query>` — natural-language code search
+
+Read full files only when you need exact lines. The PreToolUse hook also auto-substitutes summaries for large-file `Read`s. See the `pan-tldr` skill for details.
+
 ## Severity and evidence
 
 Use RFC 2119 severity glyphs:

@@ -7921,7 +7921,6 @@ function captureTldrMetrics(workspacePath) {
 	return metrics;
 }
 promisify(exec);
-join(PANOPTICON_HOME, "tldr");
 //#endregion
 //#region record-cost-event.ts
 /**

@@ -36,6 +36,16 @@ Do not review general bugs, security vulnerabilities, performance regressions, s
 
 Do not run broad `git diff`, rediscover all changed files, or re-gather issue context that the manifest already provides.
 
+## TLDR: prefer code summaries over full reads
+
+If `<workspace>/.venv` exists, you have these MCP tools — use them in place of full `Read` when verifying requirement coverage:
+
+- `tldr_context <file>` — exports, imports, key functions (~1k tokens vs 10–25k)
+- `tldr_semantic <query>` — natural-language search; great for mapping AC text to implementation
+- `tldr_calls <fn> <file>` — confirm a requirement's entry point actually wires up
+
+Read full files only when you need exact lines. The PreToolUse hook also auto-substitutes summaries for large-file `Read`s. See the `pan-tldr` skill for details.
+
 ## Severity and evidence
 
 Use RFC 2119 severity glyphs:

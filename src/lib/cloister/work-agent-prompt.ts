@@ -73,6 +73,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       POLYREPO_CONTEXT: polyrepoContextStr,
       PENDING_FEEDBACK: pendingFeedbackStr,
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
+      TLDR_AVAILABLE: existsSync(join(ctx.workspacePath, '.venv')),
     },
   });
 }
