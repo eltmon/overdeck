@@ -3,6 +3,13 @@ import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
+// Each workflow test fans out to dynamic imports + multiple unmocked
+// filesystem side-effects; observed wall-clock times are 1.2–7s per case
+// and several spike past the default 10s timeout under CI load. Bump the
+// per-test timeout to 30s so the suite is deterministic without
+// serialising the entire run.
+vi.setConfig({ testTimeout: 30_000 });
+
 // Use vi.hoisted to avoid initialization order issues
 const { mockExecAsync } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),

@@ -10,6 +10,11 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writ
 import { join } from 'path';
 import { tmpdir } from 'os';
 
+vi.mock('../../../../lib/agents.js', async () => {
+  const actual = await vi.importActual('../../../../lib/agents.js');
+  return { ...(actual as object), deliverAgentMessage: vi.fn().mockResolvedValue(undefined) };
+});
+
 // ─── Sanitize / name generation logic ────────────────────────────────────────
 // These are internal helpers extracted here for direct testing.
 
@@ -160,6 +165,10 @@ describe('conversations route — DB integration', () => {
   });
 
   it('rejects attachment reuse across conversations while preserving referenced uploads', async () => {
+    const { deliverAgentMessage } = await import('../../../../lib/agents.js');
+    const deliverMock = vi.mocked(deliverAgentMessage);
+    deliverMock.mockClear();
+
     const { createConversation } = await import('../../../../lib/database/conversations-db.js');
     const { handleConversationImageUpload, handleConversationMessage } = await import('../conversations.js');
 
@@ -177,18 +186,16 @@ describe('conversations route — DB integration', () => {
 
     // Prose @paths (unmanaged) are allowed to pass through
     const manualPath = '/home/eltmon/Projects/panopticon-cli/README.md';
-    const proseDelivery = vi.fn().mockResolvedValue(undefined);
-    const proseResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${manualPath}` }, proseDelivery);
+    const proseResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${manualPath}` });
     expect(proseResponse.status).toBe(200);
-    expect(proseDelivery).toHaveBeenCalledWith('conv-owner-conv', `hello\n@${manualPath}`, 'conversation-message');
+    expect(deliverMock).toHaveBeenLastCalledWith('conv-owner-conv', `hello\n@${manualPath}`, 'conversation-message', expect.any(String));
 
-    const delivery = vi.fn().mockResolvedValue(undefined);
-    const sendResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${uploadedPath}` }, delivery);
+    const sendResponse = await handleConversationMessage('owner-conv', { message: `hello\n@${uploadedPath}` });
     expect(sendResponse.status).toBe(200);
-    expect(delivery).toHaveBeenCalledWith('conv-owner-conv', `hello\n@${uploadedPath}`, 'conversation-message');
+    expect(deliverMock).toHaveBeenLastCalledWith('conv-owner-conv', `hello\n@${uploadedPath}`, 'conversation-message', expect.any(String));
     expect(existsSync(uploadedPath)).toBe(true);
 
-    const rejectedResponse = await handleConversationMessage('other-conv', { message: `hello\n@${uploadedPath}` }, delivery);
+    const rejectedResponse = await handleConversationMessage('other-conv', { message: `hello\n@${uploadedPath}` });
     expect(rejectedResponse.status).toBe(400);
     expect(decodeJsonResponse(rejectedResponse)).toEqual({ error: 'One or more attached images are unavailable for this conversation' });
     expect(existsSync(uploadedPath)).toBe(true);

@@ -33,11 +33,11 @@ Research-only agent that produces an executable plan for an issue. Never writes 
 ## Outputs
 
 1. **PRD draft** in `<projectRoot>/.pan/drafts/<ISSUE-ID>.md` if missing (markdown narrative)
-2. **vBRIEF plan** in `.pan/spec.vbrief.json` with items, acceptance criteria, and dependency edges (workspace working copy)
+2. **vBRIEF plan** in `.pan/spec.vbrief.json` (workspace working copy — `plan-finalize` promotes it to main's canonical `.pan/specs/`)
 3. **Continue context** in `.pan/continue.json` with decisions, hazards, and a clear `resumePoint` for the implementation agent
 4. **Beads** created with `bd create` and labelled with the issue id, one per `items[]` entry, with edges that mirror the plan's `edges`
 
-`pan plan-finalize` is what writes the canonical spec to `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` with `plan.status: "proposed"`. You do not write to `.pan/specs/` directly. See docs/VBRIEF.md for the four-artifact model.
+`pan plan-finalize` stamps the plan and writes the canonical spec to `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` with `plan.status: "proposed"`. Work agents read the spec from main — item/subItem status changes live in the workspace continue file's `statusOverrides` map, not in the spec itself.
 
 ## Process
 

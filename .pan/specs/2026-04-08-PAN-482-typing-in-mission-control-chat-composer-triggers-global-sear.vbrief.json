@@ -1,0 +1,108 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-08T00:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-482: Typing / in Mission Control chat composer triggers global search"
+  },
+  "plan": {
+    "id": "pan-482",
+    "title": "Typing / in Mission Control chat composer triggers global search",
+    "status": "approved",
+    "uid": "0dff0b44-7961-4464-8038-0c3040bb3070",
+    "author": "agent:minimax-m2.7-highspeed",
+    "sequence": 1,
+    "created": "2026-04-08T00:00:00.000Z",
+    "updated": "2026-04-08T00:00:00.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/482",
+        "label": "PAN-482",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "ux",
+      "mission-control"
+    ],
+    "narratives": {
+      "Problem": "Typing '/' in the Mission Control composer triggers global search instead of inserting the character, making it impossible to type slash commands or paths.",
+      "Proposal": "Two-part fix: (1) Update App.tsx global hotkey to not intercept '/' when in a contenteditable/composer element. (2) Add a slash command menu to the composer that appears when '/' is typed, providing autocomplete for slash commands like /model."
+    },
+    "items": [
+      {
+        "id": "pan-482.app-hotkey-fix",
+        "title": "Fix global / hotkey to not fire when composer is focused",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-482"
+        },
+        "narrative": {
+          "Action": "Update the inInput check in App.tsx handleKeyDown to include isContentEditable elements"
+        },
+        "subItems": [
+          {
+            "id": "pan-482.app-hotkey-fix.ac1",
+            "title": "Global search does not open when / is typed in the composer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-482.slash-menu",
+        "title": "Add slash command menu to ComposerPromptEditor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-482"
+        },
+        "narrative": {
+          "Action": "Implement a floating slash command menu that appears when / is typed in the composer, with keyboard navigation and command insertion"
+        },
+        "subItems": [
+          {
+            "id": "pan-482.slash-menu.ac1",
+            "title": "Typing / in the composer shows a command menu",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-482.slash-menu.ac2",
+            "title": "Menu closes on Escape or clicking outside",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-482.slash-menu.ac3",
+            "title": "Selecting a command inserts it and closes the menu",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pan-482.app-hotkey-fix",
+        "to": "pan-482.slash-menu",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

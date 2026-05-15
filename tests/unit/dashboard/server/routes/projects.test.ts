@@ -38,6 +38,14 @@ vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js
   }),
 }));
 
+// Mock findSpecByIssue from specs.js — used by resolveFeatureTitle in the new
+// single-spec-on-main model (PAN-1124). This replaces the old approach of
+// reading workspace-local .pan/spec.vbrief.json via async readFile.
+const mockFindSpecByIssue = vi.hoisted(() => vi.fn());
+vi.mock('../../../../../src/lib/pan-dir/specs.js', () => ({
+  findSpecByIssue: mockFindSpecByIssue,
+}));
+
 vi.mock('node:fs/promises', async () => {
   const actual = await vi.importActual('node:fs/promises') as object;
   return {
@@ -70,6 +78,7 @@ describe('fetchProjectSessionTree', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (stat as any).mockResolvedValue({ mtime: RECENT_PLANNING_MTIME });
+    mockFindSpecByIssue.mockReturnValue(null);
   });
 
   it('returns null for unknown project key', async () => {
@@ -105,7 +114,7 @@ describe('fetchProjectSessionTree', () => {
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan',
-      '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan/spec.vbrief.json',
+      '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan/continue.json',
       join(homedir(), '.panopticon', 'agents', 'agent-pan-539'),
       join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json'),
     ]));
@@ -172,7 +181,7 @@ describe('fetchProjectSessionTree', () => {
     expect(result).toEqual({ projectKey: 'Panopticon CLI', features: [] });
   });
 
-  it('resolves feature title from .pan/spec.vbrief.json when available', async () => {
+  it('resolves feature title from main-side .pan/specs/ via findSpecByIssue', async () => {
     (listProjects as any).mockReturnValue([
       {
         key: 'panopticon-cli',
@@ -183,13 +192,19 @@ describe('fetchProjectSessionTree', () => {
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-123/.pan',
-      '/tmp/panopticon-cli/workspaces/feature-pan-123/.pan/spec.vbrief.json',
+      '/tmp/panopticon-cli/workspaces/feature-pan-123/.pan/continue.json',
     ]));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-123', isDirectory: () => true },
     ]);
+
+    // Mock findSpecByIssue to return a spec entry with a path
+    const specPath = '/tmp/panopticon-cli/.pan/specs/2026-01-01-PAN-123-implement-command-deck.vbrief.json';
+    mockFindSpecByIssue.mockReturnValue({ path: specPath });
+
+    // Mock readFile to return spec content when the spec path is read (by readOptional)
     (readFile as any).mockImplementation((p: string) => {
-      if (p.includes('.pan/spec.vbrief.json')) {
+      if (p === specPath) {
         return Promise.resolve(JSON.stringify({
           plan: { title: 'Implement Command Deck Session Tree' },
         }));

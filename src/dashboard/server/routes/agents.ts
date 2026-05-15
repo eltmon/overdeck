@@ -83,6 +83,7 @@ import {
   getAgentDir,
   determineModel,
   getProviderAuthMode,
+  setAgentDeliveryMethod,
 } from '../../../lib/agents.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
@@ -2947,6 +2948,32 @@ const postAgentResetSessionRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/agents/:id/delivery-method ─────────────────────────────
+// Updates the agent's delivery method (auto | channels | tmux) in state.json.
+
+const postAgentDeliveryMethodRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/delivery-method',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const body = yield* readJsonBody;
+    const { deliveryMethod } = body as { deliveryMethod?: 'auto' | 'channels' | 'tmux' };
+
+    if (!deliveryMethod || !['auto', 'channels', 'tmux'].includes(deliveryMethod)) {
+      return jsonResponse({ error: 'deliveryMethod must be auto, channels, or tmux' }, { status: 400 });
+    }
+
+    const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
+    if (!agentState) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    yield* Effect.promise(() => setAgentDeliveryMethod(id, deliveryMethod));
+    return jsonResponse({ success: true, agentId: id, deliveryMethod });
+  })),
+);
+
 // ─── Route: POST /api/agents/:id/switch-model ────────────────────────────────
 // Prepares an agent to restart on a different model:
 //   1. Stops the agent if running
@@ -3054,6 +3081,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentHasSessionRoute,
   postAgentResetSessionRoute,
   postAgentSwitchModelRoute,
+  postAgentDeliveryMethodRoute,
 );
 
 export default agentsRouteLayer;

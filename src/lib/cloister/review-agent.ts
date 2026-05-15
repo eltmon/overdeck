@@ -40,7 +40,7 @@
  */
 
 import { exec } from 'child_process';
-import { readFile } from 'fs/promises';
+import { readFile, rm } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
 import { killSessionAsync, listSessionNamesAsync, isPaneDeadAsync } from '../tmux.js';
@@ -48,10 +48,10 @@ import { emitActivityEntry } from '../activity-logger.js';
 import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
 import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
-import { buildReviewContext } from './review-context.js';
-import { REVIEW_SUB_ROLES, reviewerOutputPath, type ReviewSubRole } from './review-monitor.js';
+import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
+import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { packageRoot } from '../paths.js';
+import { AGENTS_DIR, packageRoot } from '../paths.js';
 
 /**
  * Read a convoy sub-role prompt template from the panopticon-cli install.
@@ -70,6 +70,15 @@ async function readConvoySubRoleTemplate(subRole: string): Promise<string> {
 }
 
 const execAsync = promisify(exec);
+const REVIEWER_TIMEOUT_MS = 20 * 60 * 1000;
+
+function reviewerAgentId(issueId: string, subRole: ReviewSubRole): string {
+  return `agent-${issueId.toLowerCase()}-review-${subRole}`;
+}
+
+function reviewerAgentOutputPath(issueId: string, subRole: ReviewSubRole): string {
+  return join(AGENTS_DIR, reviewerAgentId(issueId, subRole), `review-${subRole}.md`);
+}
 
 async function ensureReviewTempStash(issueId: string, workspace: string): Promise<{ ref: string; message: string; sequence: number } | null> {
   // Drop any prior cycle's review-temp stash before creating a new one. Without
@@ -145,10 +154,12 @@ export async function buildConvoyPrompt(opts: {
   issueId: string;
   subRole: string;
   outputPath: string;
+  synthesisAgentId: string;
   contextManifestPath?: string;
+  tier1Summary?: string;
 }): Promise<string> {
   const template = await readConvoySubRoleTemplate(opts.subRole);
-  return [
+  const prompt = [
     `REVIEW TASK for ${opts.issueId} — ${opts.subRole.toUpperCase()} REVIEW:`,
     '',
     `Issue: ${opts.issueId}`,
@@ -157,13 +168,24 @@ export async function buildConvoyPrompt(opts: {
     'Output file — write your full findings here when done:',
     `  ${opts.outputPath}`,
     '',
-    opts.contextManifestPath
+    opts.tier1Summary
       ? [
-          'Context manifest (read this first; do not run git diff yourself):',
-          `  ${opts.contextManifestPath}`,
-          'The manifest contains the full diff, per-file risk ranking, TLDR summaries when available, and acceptance criteria.',
+          'Shared review context (read this first; do not run git diff yourself):',
+          '─────────────────────────────────────────────────────────────',
+          opts.tier1Summary,
+          '─────────────────────────────────────────────────────────────',
+          '',
+          opts.contextManifestPath
+            ? `Full manifest (read on demand for additional detail): ${opts.contextManifestPath}`
+            : '',
         ].join('\n')
-      : 'No context manifest available. Write a blocked reviewer report explaining that the shared review context is missing.',
+      : opts.contextManifestPath
+        ? [
+            'Context manifest (read this first; do not run git diff yourself):',
+            `  ${opts.contextManifestPath}`,
+            'The manifest contains per-file risk ranking and acceptance criteria.',
+          ].join('\n')
+        : 'No context manifest available. Write a blocked reviewer report explaining that the shared review context is missing.',
     '',
     '─────────────────────────────────────────────────────────────',
     'REVIEW METHODOLOGY (inlined from roles/review-' + opts.subRole + '.md):',
@@ -173,9 +195,17 @@ export async function buildConvoyPrompt(opts: {
     '',
     '─────────────────────────────────────────────────────────────',
     '',
-    'Write exactly one final report to the output file shown above.',
+    'Write exactly one final report to the output file shown above, then stop.',
+    'You do NOT need to signal synthesis or run any pan command. The Panopticon',
+    'launcher that started you detects your completion on process exit and signals',
+    'the synthesis agent automatically — REVIEWER_READY when the output file was',
+    'written, REVIEWER_FAILED otherwise. Your only job is to write the report file.',
     'Only the output file is consumed by synthesis; your chat response is not the review report.',
   ].filter(Boolean).join('\n');
+
+  const sizeBytes = Buffer.byteLength(prompt, 'utf-8');
+  console.log(`[review-agent] Convoy prompt for ${opts.issueId}/${opts.subRole}: ${sizeBytes} bytes`);
+  return prompt;
 }
 
 function buildReviewRolePrompt(opts: {
@@ -186,17 +216,33 @@ function buildReviewRolePrompt(opts: {
   runId: string;
   reviewDir: string;
   contextManifestPath?: string;
+  tier1Summary?: string;
 }): string {
-  const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${opts.reviewDir}/${r}.md`).join('\n');
-  const spawnCommands = REVIEW_SUB_ROLES.map((r) => {
-    const outputPath = reviewerOutputPath(opts.workspace, opts.runId, r);
-    const contextArg = opts.contextManifestPath ? ` --context "${opts.contextManifestPath}"` : '';
-    return `  pan review spawn-reviewer ${opts.issueId} --sub-role ${r} --run-id "${opts.runId}" --workspace "${opts.workspace}" --output "${outputPath}"${contextArg}`;
-  }).join('\n');
+  const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${join(AGENTS_DIR, `agent-${opts.issueId.toLowerCase()}-review-${r}`, `review-${r}.md`)}`).join('\n');
+  const expectedSignals = REVIEW_SUB_ROLES.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
   const synthesisPath = join(opts.reviewDir, 'synthesis.md');
-  return [
-    `REVIEW TASK for ${opts.issueId}:`,
+  const prompt = [
+    `STANDBY — REVIEW SYNTHESIS for ${opts.issueId}`,
     '',
+    'Do NOT do anything yet. The Panopticon server has already spawned the four',
+    'convoy reviewers (security, correctness, performance, requirements) and they',
+    'are running in parallel right now. Your work begins only once they finish.',
+    '',
+    'You will receive exactly one `pan tell` signal per sub-role as each reviewer',
+    'finishes — these are delivered to you as user messages:',
+    expectedSignals,
+    '',
+    'Until all four terminal signals have arrived: do nothing. Do not read the',
+    'reviewer output files, do not run git, do not inspect tmux sessions, do not',
+    'poll anything. Just wait — the reviewers notify you when they finish, and',
+    'Deacon is the failsafe if one never starts or never completes. Acting early',
+    'wastes tokens reviewing nothing.',
+    '',
+    'Once you have all four terminal signals, follow roles/review.md exactly to',
+    'read the reports, synthesize the verdict, write the synthesis report, and',
+    'signal the status.',
+    '',
+    '── Review context ──',
     `Issue: ${opts.issueId}`,
     `Branch: ${opts.branch}`,
     `Workspace: ${opts.workspace}`,
@@ -204,15 +250,22 @@ function buildReviewRolePrompt(opts: {
     `Run ID: ${opts.runId}`,
     `Review directory: ${opts.reviewDir}`,
     `Synthesis output file: ${synthesisPath}`,
-    opts.contextManifestPath ? `Context manifest: ${opts.contextManifestPath}` : 'Context manifest: (missing — block review per roles/review.md)',
     '',
-    'Convoy reviewer output files:',
+    opts.tier1Summary
+      ? [
+          'Shared review context:',
+          '─────────────────────────────────────────────────────────────',
+          opts.tier1Summary,
+          '─────────────────────────────────────────────────────────────',
+          '',
+          opts.contextManifestPath ? `Full manifest: ${opts.contextManifestPath}` : '',
+        ].join('\n')
+      : opts.contextManifestPath
+        ? `Context manifest: ${opts.contextManifestPath}`
+        : 'Context manifest: (missing — block review per roles/review.md)',
+    '',
+    'Convoy reviewer output files (read each one ONLY after its REVIEWER_READY signal):',
     subRoleFiles,
-    '',
-    'Spawn the convoy reviewers with these commands before waiting for their output files:',
-    spawnCommands,
-    '',
-    'Follow roles/review.md exactly.',
     '',
     'After writing the synthesis report, signal the verdict with Panopticon CLI:',
     `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>"`,
@@ -223,6 +276,10 @@ function buildReviewRolePrompt(opts: {
     '',
     'Reactive Cloister dispatches the test role after review passes. Never queue tests yourself and never edit code.',
   ].filter(Boolean).join('\n');
+
+  const sizeBytes = Buffer.byteLength(prompt, 'utf-8');
+  console.log(`[review-agent] Synthesis prompt for ${opts.issueId}: ${sizeBytes} bytes`);
+  return prompt;
 }
 
 /**
@@ -243,25 +300,54 @@ export async function spawnReviewSubRoleForIssue(opts: {
   runId: string;
   outputPath?: string;
   contextManifestPath?: string;
+  synthesisAgentId?: string;
   model?: string;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
-    const { spawnRun } = await import('../agents.js');
+    const { saveAgentStateAsync, spawnRun } = await import('../agents.js');
     const cfg = loadYamlConfig().config;
-    const outputPath = opts.outputPath ?? reviewerOutputPath(opts.workspace, opts.runId, opts.subRole);
+    const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.issueId, opts.subRole);
+    const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
     const model = opts.model ?? resolveModel('review', opts.subRole, cfg);
+
+    await rm(outputPath, { force: true });
+
+    // Build Tier-1 inline summary from manifest when available (PAN-1125)
+    let tier1Summary: string | undefined;
+    if (opts.contextManifestPath) {
+      try {
+        const manifestRaw = await readFile(opts.contextManifestPath, 'utf-8');
+        const manifest = JSON.parse(manifestRaw) as ReviewContextManifest;
+        tier1Summary = formatTier1Summary(manifest);
+      } catch (manifestErr) {
+        console.warn(`[review-agent] Failed to read manifest for Tier-1 summary (${opts.issueId}/${opts.subRole}):`, manifestErr);
+      }
+    }
+
     const prompt = await buildConvoyPrompt({
       issueId: opts.issueId,
       subRole: opts.subRole,
       outputPath,
+      synthesisAgentId,
       contextManifestPath: opts.contextManifestPath,
+      tier1Summary,
     });
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       subRole: opts.subRole,
       prompt,
       model,
+      // PAN-977: thread the synthesis wiring up front so the generated launcher
+      // owns the REVIEWER_READY/FAILED/TIMEOUT signal deterministically.
+      reviewSynthesisAgentId: synthesisAgentId,
+      reviewOutputPath: outputPath,
     });
+    run.reviewSubRole = opts.subRole;
+    run.reviewRunId = opts.runId;
+    run.reviewOutputPath = outputPath;
+    run.reviewSynthesisAgentId = synthesisAgentId;
+    run.reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
+    await saveAgentStateAsync(run);
     try {
       const { notifyPipeline } = await import('../pipeline-notifier.js');
       notifyPipeline({ type: 'reviewer_started', issueId: opts.issueId, role: opts.subRole, sessionName: run.id });
@@ -279,7 +365,7 @@ export async function spawnReviewSubRoleForIssue(opts: {
 }
 
 export async function spawnReviewRoleForIssue(
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; force?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string }> {
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
 
@@ -287,17 +373,63 @@ export async function spawnReviewRoleForIssue(
   // tmux pane, treat the current dispatch as a no-op. spawnRun has its own
   // session-exists check but it throws — we want soft "already running"
   // semantics so callers can keep their existing success-path messaging.
+  //
+  // Force mode (human override from dashboard) kills the old session and
+  // respawns so the review runs against current HEAD, not stale state.
   try {
     const sessions = await listSessionNamesAsync();
     if (sessions.includes(reviewSessionName)) {
       const paneDead = await isPaneDeadAsync(reviewSessionName);
-      if (!paneDead) {
+
+      // A synthesis agent that has finished its verdict does NOT terminate:
+      // its role prompt tells it to "exit", but it runs `Bash(exit)` which
+      // only exits a subshell — the Claude process stays idle-alive with a
+      // live pane. So "pane alive" does NOT mean "actively reviewing", and the
+      // old guard would skip re-dispatch forever, jamming the issue at
+      // review=reviewing with no convoy actually running (PAN-1131).
+      //
+      // Disambiguate via the run id: every review run is keyed to a HEAD sha
+      // (runId = agent-<issue>-review-<head8>). If the existing synthesis
+      // session was started for a different HEAD than the one we are about to
+      // review, it is a stale leftover — kill the convoy and respawn. Only a
+      // session whose runId matches the *current* HEAD is genuinely the
+      // review-in-progress we should defer to.
+      let staleRunId = false;
+      if (!paneDead && !opts.force) {
+        try {
+          const { stdout } = await execAsync('git rev-parse --short=8 HEAD', {
+            cwd: opts.workspace,
+            encoding: 'utf-8',
+          });
+          const currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${stdout.trim()}`;
+          const synthStatePath = join(AGENTS_DIR, reviewSessionName, 'state.json');
+          const synthState = JSON.parse(await readFile(synthStatePath, 'utf-8')) as { reviewRunId?: string };
+          // Stale when the existing session carries a runId that does not match
+          // the current HEAD. If it carries no runId at all (legacy session
+          // from before this field was persisted), stay conservative and keep
+          // the "skip" behaviour so we never kill a genuinely-running review.
+          if (synthState.reviewRunId && synthState.reviewRunId !== currentRunId) {
+            staleRunId = true;
+            console.log(
+              `[review-agent] ${reviewSessionName} is stale — runId ${synthState.reviewRunId} != current ${currentRunId}; killing convoy and respawning`,
+            );
+          }
+        } catch (probeErr) {
+          console.warn(
+            `[review-agent] Could not probe ${reviewSessionName} runId, falling back to pane-alive idempotency:`,
+            probeErr,
+          );
+        }
+      }
+
+      if (!paneDead && !opts.force && !staleRunId) {
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
         return { success: true, message: `Review already in progress: ${reviewSessionName}` };
       }
-      // Session exists but pane is dead — fall through and respawn.
-      console.log(`[review-agent] ${reviewSessionName} pane is dead — killing and respawning`);
-      await killSessionAsync(reviewSessionName).catch(() => {});
+      // Session pane is dead, force mode, or stale runId — kill the whole convoy and respawn.
+      const reason = opts.force ? 'force-killed for re-review' : paneDead ? 'pane is dead' : 'stale runId';
+      console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
+      await killAllReviewerSessions(undefined, opts.issueId).catch(() => ({ killed: [], failed: [] }));
     }
   } catch (err) {
     console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
@@ -356,7 +488,7 @@ export async function spawnReviewRoleForIssue(
   }
 
   try {
-    const { spawnRun } = await import('../agents.js');
+    const { spawnRun, saveAgentStateAsync } = await import('../agents.js');
 
     // Build the shared context manifest before spawning so all reviewers
     // read one pre-built diff+AC object instead of each running git diff
@@ -374,6 +506,7 @@ export async function spawnReviewRoleForIssue(
       : `agent-${opts.issueId.toLowerCase()}-review`;
     const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', runId);
     let contextManifestPath: string | undefined;
+    let tier1Summary: string | undefined;
     try {
       const manifest = await buildReviewContext({
         runId,
@@ -382,22 +515,61 @@ export async function spawnReviewRoleForIssue(
         branch: opts.branch,
       });
       contextManifestPath = manifest.manifestPath;
-      console.log(`[review-agent] Context manifest built: ${contextManifestPath} (${manifest.changedFiles.length} files, truncated=${manifest.diff.truncated})`);
+      tier1Summary = formatTier1Summary(manifest);
+      console.log(`[review-agent] Context manifest built: ${contextManifestPath} (${manifest.changedFiles.length} files)`);
     } catch (ctxErr) {
       console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will block on missing shared context:`, ctxErr);
     }
 
-    const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath });
+    const prompt = buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,
       ...(opts.model ? { model: opts.model } : {}),
     });
+    // Persist the runId on the synthesis agent's own state so the idempotency
+    // guard above can tell a genuinely-running review (runId matches current
+    // HEAD) from a finished-but-idle leftover (runId from an older HEAD) — see
+    // PAN-1131. Sub-reviewers already persist this; the synthesis agent did not.
+    run.reviewRunId = runId;
+    try {
+      await saveAgentStateAsync(run);
+    } catch (saveErr) {
+      console.warn(`[review-agent] Could not persist reviewRunId on ${run.id}:`, saveErr);
+    }
     console.log(`[review-agent] Review role (synthesis) spawned for ${opts.issueId}: ${run.id}`);
     emitActivityEntry({ source: 'review', level: 'info', message: `Review role spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
+
+    const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
+      const outputPath = reviewerAgentOutputPath(opts.issueId, subRole);
+      const result = await spawnReviewSubRoleForIssue({
+        issueId: opts.issueId,
+        workspace: opts.workspace,
+        subRole,
+        runId,
+        outputPath,
+        contextManifestPath,
+        synthesisAgentId: run.id,
+      });
+      if (!result.success) {
+        try {
+          const { messageAgent } = await import('../agents.js');
+          await messageAgent(run.id, `REVIEWER_FAILED ${subRole} ${result.error ?? result.message}`);
+        } catch (signalErr) {
+          console.warn(`[review-agent] Failed to signal ${subRole} spawn failure to ${run.id}:`, signalErr);
+        }
+      }
+      return result;
+    }));
+
+    const failedReviewers = reviewerResults.filter(r => !r.success);
+    if (failedReviewers.length > 0) {
+      console.warn(`[review-agent] Review role spawned for ${opts.issueId}, but ${failedReviewers.length} reviewer(s) failed to spawn`);
+    }
+
     return {
       success: true,
-      message: `Review role spawned: ${run.id}`,
+      message: `Review role spawned: ${run.id}; convoy reviewers started: ${reviewerResults.length - failedReviewers.length}/${REVIEW_SUB_ROLES.length}`,
     };
   } catch (err) {
     console.error(`[review-agent] Failed to spawn review role for ${opts.issueId}:`, err);
@@ -439,6 +611,10 @@ export function isReviewSessionForIssue(sessionName: string, projectKey: string 
   const session = sessionName.toLowerCase();
   const issue = issueId.toLowerCase();
   const project = projectKey?.toLowerCase();
+
+  // Belt-and-suspenders: a user conversation session (`conv-*`) must never be
+  // classified as a reviewer session and swept into reviewer cleanup/kill.
+  if (session.startsWith('conv-')) return false;
 
   if (session === `agent-${issue}-review` || session.startsWith(`agent-${issue}-review-`)) return true;
   if (session.startsWith(`review-${issue}-`) || session.startsWith(`review-coordinator-${issue}-`)) return true;

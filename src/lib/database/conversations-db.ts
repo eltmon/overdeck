@@ -43,6 +43,8 @@ export interface Conversation {
   forkError: string | null;
   /** Coding harness used to spawn this conversation. */
   harness: 'claude-code' | 'pi' | null;
+  /** Delivery method for messages: 'auto' tries channels then tmux, 'channels' is strict, 'tmux' bypasses channels. */
+  deliveryMethod: 'auto' | 'channels' | 'tmux' | null;
 }
 
 // ─── Row mapper ───────────────────────────────────────────────────────────────
@@ -69,6 +71,9 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     forkStatus: (row['fork_status'] as string | null) ?? null,
     forkError: (row['fork_error'] as string | null) ?? null,
     harness: (row['harness'] === 'pi' || row['harness'] === 'claude-code') ? row['harness'] : null,
+    deliveryMethod: (row['delivery_method'] === 'auto' || row['delivery_method'] === 'channels' || row['delivery_method'] === 'tmux')
+      ? row['delivery_method'] as 'auto' | 'channels' | 'tmux'
+      : null,
   };
 }
 
@@ -87,7 +92,7 @@ export function listConversations(options?: { limit?: number; offset?: number })
   let sql = `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error, harness
+              fork_status, fork_error, harness, delivery_method
        FROM conversations
        WHERE archived_at IS NULL
          AND name NOT LIKE 'agent-%'
@@ -114,7 +119,7 @@ export function listActiveConversations(): Conversation[] {
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error, harness
+              fork_status, fork_error, harness, delivery_method
        FROM conversations
        WHERE archived_at IS NULL AND status = 'active'
        ORDER BY created_at DESC`,
@@ -130,7 +135,7 @@ export function getConversationByName(name: string): Conversation | null {
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error, harness
+              fork_status, fork_error, harness, delivery_method
        FROM conversations
        WHERE name = ?`,
     )
@@ -145,7 +150,7 @@ export function getConversationById(id: number): Conversation | null {
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error, harness
+              fork_status, fork_error, harness, delivery_method
        FROM conversations
        WHERE id = ?`,
     )
@@ -160,7 +165,7 @@ export function getConversationByClaudeSessionId(claudeSessionId: string): Conve
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error, harness
+              fork_status, fork_error, harness, delivery_method
        FROM conversations
        WHERE claude_session_id = ?`,
     )
@@ -175,7 +180,7 @@ export function listArchivedConversations(): Conversation[] {
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error, harness
+              fork_status, fork_error, harness, delivery_method
        FROM conversations
        WHERE archived_at IS NOT NULL
        ORDER BY archived_at DESC, created_at DESC`,
@@ -209,17 +214,24 @@ export function createConversation(opts: {
   effort?: string;
   forkStatus?: string;
   harness?: 'claude-code' | 'pi';
+  deliveryMethod?: 'auto' | 'channels' | 'tmux';
 }): Conversation {
   const db = getDatabase();
   const now = new Date().toISOString();
+
+  // Remove any stale row with the same name so respawned specialist roles
+  // (e.g. review convoy sub-roles re-running on a new review cycle) do not
+  // hit UNIQUE constraint failures. The old JSONL session file is left
+  // intact per the sacred-JSONL rule; only the DB record is replaced.
+  db.prepare(`DELETE FROM conversations WHERE name = ?`).run(opts.name);
 
   // title_source is NOT NULL but has a DB-side default of 'auto'. Omit from
   // INSERT column list when not provided so the default applies.
   let sql: string;
   let params: unknown[];
   if (opts.titleSource !== undefined) {
-    sql = `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_source, title_seed, model, effort, fork_status, harness)
-           VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    sql = `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_source, title_seed, model, effort, fork_status, harness, delivery_method)
+           VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     params = [
       opts.name,
       opts.tmuxSession,
@@ -234,10 +246,11 @@ export function createConversation(opts: {
       opts.effort ?? null,
       opts.forkStatus ?? null,
       opts.harness ?? null,
+      opts.deliveryMethod ?? null,
     ];
   } else {
-    sql = `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_seed, model, effort, fork_status, harness)
-           VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    sql = `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, claude_session_id, title, title_seed, model, effort, fork_status, harness, delivery_method)
+           VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     params = [
       opts.name,
       opts.tmuxSession,
@@ -251,6 +264,7 @@ export function createConversation(opts: {
       opts.effort ?? null,
       opts.forkStatus ?? null,
       opts.harness ?? null,
+      opts.deliveryMethod ?? null,
     ];
   }
 
@@ -260,7 +274,7 @@ export function createConversation(opts: {
       `SELECT id, name, tmux_session, status, cwd, issue_id,
               created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
-              fork_status, fork_error, harness
+              fork_status, fork_error, harness, delivery_method
        FROM conversations WHERE id = ?`,
     )
     .get(result.lastInsertRowid) as Record<string, unknown>;
@@ -374,6 +388,25 @@ export function setConversationHarness(name: string, harness: 'claude-code' | 'p
   db.prepare(
     `UPDATE conversations SET harness = ? WHERE name = ?`,
   ).run(harness, name);
+}
+
+/**
+ * Point a conversation at a new session UUID. Used when a harness change
+ * converts the transcript into a new format/file — the DB must track the
+ * converted session, not the orphaned original (P0, 2026-05-14).
+ */
+export function setConversationClaudeSessionId(name: string, claudeSessionId: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET claude_session_id = ? WHERE name = ?`,
+  ).run(claudeSessionId, name);
+}
+
+export function updateConversationDeliveryMethod(name: string, method: 'auto' | 'channels' | 'tmux' | null): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET delivery_method = ? WHERE name = ?`,
+  ).run(method, name);
 }
 
 /** Backfill the model for a conversation only when currently NULL. */

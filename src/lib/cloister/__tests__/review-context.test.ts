@@ -134,22 +134,20 @@ describe('buildReviewContext', () => {
     expect(manifest.changedFiles[2].path).toBe('src/README.md');       // LOW=1
   });
 
-  it('truncates diff at 128 KB', async () => {
-    const bigDiff = 'x'.repeat(200 * 1024);
+  it('marks diff as truncated (raw diff no longer embedded)', async () => {
     mockGitOutput({
       'rev-parse HEAD': { stdout: 'abc\n' },
       'branch --show-current': { stdout: 'main\n' },
       'merge-base origin/main HEAD': { stdout: 'base\n' },
       '--name-status': { stdout: '' },
       '--numstat': { stdout: '' },
-      'diff --stat': { stdout: '' },
-      'git diff "base"...HEAD': { stdout: bigDiff },
+      'diff --stat': { stdout: '2 files changed, 200 insertions(+), 0 deletions(-)\n' },
     });
 
     const manifest = await buildReviewContext({ runId, issueId, workspace });
 
     expect(manifest.diff.truncated).toBe(true);
-    expect(manifest.diff.raw).toContain('[diff truncated');
+    expect(manifest.diff.stat).toContain('2 files changed');
   });
 
   it('gracefully handles git failures', async () => {
@@ -160,7 +158,7 @@ describe('buildReviewContext', () => {
 
     expect(manifest.changedFiles).toEqual([]);
     expect(manifest.headSha).toBe('unknown');
-    expect(manifest.diff.raw).toContain('Unable');
+    expect(manifest.diff.stat).toContain('Unable');
   });
 });
 

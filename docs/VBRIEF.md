@@ -32,8 +32,7 @@ All Panopticon orchestration state lives under `.pan/` — a single dot-director
 
 ```
 .pan/
-  spec.vbrief.json          ← this issue's scope vBRIEF (copied from main at branch creation)
-  continue.json             ← session state (resume point, decisions, hazards)
+  continue.json             ← session state (resume point, decisions, hazards, statusOverrides)
   sessions.jsonl            ← append-only session history
   feedback/
     001-review-changes-requested.md
@@ -47,7 +46,7 @@ PRDs and vBRIEFs are distinct artifacts that flow through the same pipeline:
 
 1. **PRD drafted** — human or planning agent writes a markdown PRD to `.pan/drafts/` on main
 2. **Planning completes** — planning agent converts the PRD into a machine-readable vBRIEF spec in `.pan/specs/` with `status: "proposed"`
-3. **Work starts** — `pan start` updates the spec's `status` field to `"active"` and copies it to the workspace as `.pan/spec.vbrief.json`
+3. **Work starts** — `pan start` updates the spec's `status` field to `"active"` on main; work agents read it via `findPlan()` and track item progress in workspace `continue.json` `statusOverrides`
 4. **Work completes** — after merge, `status` updated to `"completed"` on main
 
 ### Status Transitions (field-based)
@@ -64,7 +63,7 @@ draft ──► proposed ──► active ──► completed
 |-----------|---------|--------------|
 | (new) → draft | `pan plan` starts | PRD written to `.pan/drafts/` on main |
 | draft → proposed | Planning completes | vBRIEF created in `.pan/specs/` with `status: "proposed"` |
-| proposed → active | `pan start` | Status field updated to `"active"`, spec copied to workspace `.pan/spec.vbrief.json` |
+| proposed → active | `pan start` | Status field updated to `"active"` on main; agents read spec from main via `findPlan()` |
 | active → completed | PR merges | Status field updated to `"completed"` on main |
 | active → cancelled | Issue closed | Status field updated to `"cancelled"` on main |
 
@@ -84,17 +83,16 @@ The filename regex: `^(\d{4}-\d{2}-\d{2})-([A-Za-z][A-Za-z0-9]*-\d+)-([a-z0-9-]+
 
 If `slugify()` receives an empty or all-special-character title, it returns `'plan'` as the slug.
 
-### Workspace Spec
+### Workspace Spec (PAN-1124: single-spec-on-main)
 
-On the feature branch, the spec is a single file: `.pan/spec.vbrief.json`. This is a copy of the canonical spec from `.pan/specs/` on main, made at branch creation time. The agent reads and updates item statuses in this file during work. It never needs to know the issue-keyed filename — that's a main-branch concern.
+There is no workspace-local copy of the spec. Work agents read the canonical spec directly from main's `.pan/specs/` via `findPlan()`. Item/subItem status updates are tracked in the workspace `continue.json`'s `statusOverrides` flat map. `readWorkspacePlan()` returns a merged view (main spec + overlay) so callers see a complete document with up-to-date statuses.
 
 ### Concurrency Model
 
 | Resource | Writer | Readers | Contention |
 |----------|--------|---------|------------|
-| `.pan/specs/<file>` on main | Pipeline only | Dashboard, agents (via prompt injection) | None — single writer |
-| `.pan/spec.vbrief.json` on branch | Work agent (one per issue) | Pipeline, dashboard | None — one agent per workspace |
-| `.pan/continue.json` on branch | Pipeline only | Agent (injected into prompt at session start) | None — single writer |
+| `.pan/specs/<file>` on main | Pipeline only | Dashboard, agents (via `findPlan()`) | None — single writer, immutable after planning |
+| `.pan/continue.json` on branch | Pipeline + `updateItemStatus()` | Agent (injected into prompt at session start) | None — one agent per workspace |
 | `.pan/sessions.jsonl` on branch | Pipeline appends | Dashboard, post-mortems | Minimal — append-only |
 | `.pan/feedback/*.md` on branch | Pipeline only | Agent (injected into prompt) | None — single writer |
 | Beads (`.beads/`) | Each agent via `bd update` | Pipeline, dashboard | Serialized by Dolt mutex |
@@ -278,7 +276,7 @@ The `plan.status` field drives lifecycle transitions:
 |--------|----------|---------|
 | `draft` | `.pan/drafts/` (PRD stage) | Planning in progress |
 | `proposed` | `.pan/specs/` | Planning done, awaiting approval |
-| `approved` | `.pan/specs/` + workspace `.pan/spec.vbrief.json` | User approved, ready to start |
+| `approved` | `.pan/specs/` | User approved, ready to start |
 | `pending` | `.pan/specs/` | Queued, waiting for resources |
 | `running` | `.pan/specs/` | Agent is executing |
 | `completed` | `.pan/specs/` | Work done, merged |
@@ -377,30 +375,27 @@ Manual lifecycle transition overrides for vBRIEFs. All commands resolve the proj
 1. **PRD authored** — human or planning agent writes a PRD to `.pan/drafts/` on main.
 2. **Planning agent** converts the PRD into a vBRIEF spec during the discovery session. Creates `plan.vbrief.json` in the workspace `.pan/` directory.
 3. **`complete-planning`** promotes the vBRIEF to `.pan/specs/` on main with an issue-keyed filename and sets `plan.status` to `proposed`.
-4. **`pan start`** updates `plan.status` to `active` on main and copies the spec to the workspace as `.pan/spec.vbrief.json`.
-5. **Work agent** works through beads in DAG dependency order (`bd ready -l <issue>`). Updates item/subItem statuses in `.pan/spec.vbrief.json` as beads are completed. Each write increments `plan.sequence` and updates timestamps.
+4. **`pan start`** updates `plan.status` to `active` on main. Work agents read the spec from main via `findPlan()`.
+5. **Work agent** works through beads in DAG dependency order (`bd ready -l <issue>`). Item/subItem status updates are written to workspace `continue.json`'s `statusOverrides` map. `readWorkspacePlan()` returns a merged view with current statuses.
 6. **Verification gate** checks all subItems with `metadata.kind: "acceptance_criterion"` are `completed` before allowing review.
 7. **`postMergeLifecycle`** updates `plan.status` to `completed` in `.pan/specs/` on main.
 8. **Dashboard** renders the plan via the Directive Flow (DAG visualization) and vBRIEF viewer (List/DAG/Raw JSON tabs).
 
-### Plan Resolution
+### Plan Resolution (PAN-1124: single-spec-on-main)
 
-Two functions, two surfaces — do not conflate them (PAN-946):
+`findPlan(workspacePath)` in `src/lib/vbrief/io.ts` now resolves the main-side spec first via `findSpecByIssue(projectRoot, issueId)`. It derives the issue ID from the workspace directory name (`feature-<id>`) and the project root (two levels up). Falls back to workspace-local `.pan/spec.vbrief.json` for migration compat with in-flight workspaces.
 
-| Function | Module | Returns | Side effects |
-| --- | --- | --- | --- |
-| `findPlan(workspacePath)` | `src/lib/vbrief/io.ts` | The workspace-local `.pan/spec.vbrief.json` path or `null` | None. Workspace-only. Used by every workspace mutation helper. |
-| `findVBriefByIssue(projectRoot, issueId)` | `src/lib/vbrief/lifecycle-io.ts` | The canonical spec from `.pan/specs/` (with legacy `vbrief/<lifecycle>/` fallback) | Read-only. Used by dashboard, start-agent's PRD-import path, and any cross-issue lookup. |
+`readWorkspacePlan(workspacePath)` returns a merged view: main-side spec + `statusOverrides` from workspace `continue.json`. This is transparent to all callers.
 
-Workspace progress writes that "fall through" to the lifecycle directories are a bug we already paid the high-sev tax to fix — keep the two surfaces separated.
+`findVBriefByIssue(projectRoot, issueId)` in `lifecycle-io.ts` remains the canonical read-only lifecycle lookup for cross-issue queries.
 
 ### Backward Compatibility
 
-`.planning/plan.vbrief.json` was retired in PAN-967 and is no longer read or written anywhere — workspaces created against current `main` use `.pan/spec.vbrief.json` exclusively.
+`.planning/plan.vbrief.json` was retired in PAN-967. Workspace-local `.pan/spec.vbrief.json` was retired in PAN-1124 — existing workspace copies are still read as a fallback, but new workspaces do not receive a copy.
 
 The legacy `vbrief/{proposed,active,completed,cancelled}/` lifecycle directories at the project root are still read by `findLegacyVBriefByIssue` so in-flight work from before the cutover keeps resolving. All writes target `.pan/specs/` only, and lifecycle status changes are atomic field flips on a single file — files do NOT move between directories.
 
-Continue files on the main side have migrated to `<projectRoot>/.pan/continues/<issue-lowercase>.vbrief.json`. Workspace-side continue state lives at `<workspace>/.pan/continue.json`.
+Continue files on the main side live at `<projectRoot>/.pan/continues/<issue-lowercase>.vbrief.json`. Workspace-side continue state lives at `<workspace>/.pan/continue.json` and includes `statusOverrides` for item/subItem status tracking.
 
 ---
 

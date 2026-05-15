@@ -10,11 +10,12 @@ For the broader mental model — what a Role is, how it relates to Claude Code s
 
 ## Invariants
 
-1. **Review is a role, not a server-owned promise.** Lifecycle dispatch starts `spawnRun(issueId, 'review')`; the dashboard observes state and artifacts.
-2. **Synthesis is the review role.** There is no separate synthesis pipeline stage. The `review` role reads the manifest, waits on convoy reviewer output files, synthesizes their findings, and emits the verdict.
-3. **Review never merges.** Approved review transitions the issue toward `test`; branch preparation and push work belongs to `ship`, and final merge remains human-gated.
-4. **Convoy outputs are evidence, not votes.** Security/correctness/performance/requirements findings inform synthesis; the review role decides what blocks.
-5. **Convoy prompts are harness-agnostic templates.** The orchestrator reads each `roles/review-<subRole>.md` template at spawn time and inlines its body into the convoy reviewer's first user message. The convoy never relies on Claude Code's `--agent` flag, never reads a file from the agent's workspace, and never appears as an ambient subagent that a work agent could auto-discover.
+1. **Review is a role, not a server-owned verdict.** Lifecycle dispatch starts `spawnRun(issueId, 'review')`; the dashboard observes state and artifacts.
+2. **The server owns convoy lifecycle.** `spawnReviewRoleForIssue()` spawns the synthesis role and all four convoy reviewers directly, then Deacon monitors reviewer crash/timeout cases.
+3. **Synthesis is the review decision.** The `review` role waits for `REVIEWER_READY` / `REVIEWER_FAILED` / `REVIEWER_TIMEOUT` messages delivered through `pan tell`, reads ready reviewer outputs, synthesizes their findings, and emits the verdict. Those messages are sent by each reviewer's **launcher** on process exit (PAN-977) — not by the reviewer agent itself, and not by Deacon on the happy path.
+4. **Review never merges.** Approved review transitions the issue toward `test`; branch preparation and push work belongs to `ship`, and final merge remains human-gated.
+5. **Convoy outputs are evidence, not votes.** Security/correctness/performance/requirements findings inform synthesis; the review role decides what blocks.
+6. **Convoy prompts are harness-agnostic templates.** The orchestrator reads each `roles/review-<subRole>.md` template at spawn time and inlines its body into the convoy reviewer's first user message. The convoy never relies on Claude Code's `--agent` flag, never reads a file from the agent's workspace, and never appears as an ambient subagent that a work agent could auto-discover.
 
 ---
 
@@ -25,20 +26,26 @@ work role completes beads and signals done
   │
   │  Cloister quality gate passes
   ▼
-spawnRun(issueId, 'review')
+spawnReviewRoleForIssue(issueId)
   │
-  ▼
-review role (roles/review.md, Claude --agent on Claude Code harness)
+  ├─ spawnRun(issueId, 'review')
+  │    └─ synthesis role (roles/review.md, Claude --agent on Claude Code harness)
   │
-  ├─ reads the shared context manifest at .pan/review/<runId>/context.json
-  ├─ orchestrator (review-agent.ts) launches four convoy sub-role sessions in parallel:
-  │    • review.security      ← roles/review-security.md (inlined)
-  │    • review.correctness   ← roles/review-correctness.md (inlined)
-  │    • review.performance   ← roles/review-performance.md (inlined)
-  │    • review.requirements  ← roles/review-requirements.md (inlined)
-  ├─ polls .pan/review/<runId>/<subRole>.md for each reviewer's report
-  ├─ synthesizes the findings into one verdict
-  └─ signals via Panopticon's CLI
+  ├─ spawnRun(issueId, 'review', { subRole: 'security' })      ← roles/review-security.md (inlined)
+  ├─ spawnRun(issueId, 'review', { subRole: 'correctness' })   ← roles/review-correctness.md (inlined)
+  ├─ spawnRun(issueId, 'review', { subRole: 'performance' })   ← roles/review-performance.md (inlined)
+  ├─ spawnRun(issueId, 'review', { subRole: 'requirements' })  ← roles/review-requirements.md (inlined)
+  │
+  ├─ each reviewer writes ~/.panopticon/agents/<reviewer>/review-<subRole>.md
+  ├─ each reviewer's LAUNCHER signals synthesis on process exit (PAN-977):
+  │    REVIEWER_READY   <subRole> <outputPath>   (report file written)
+  │    REVIEWER_FAILED  <subRole> <reason>       (exited, no report)
+  │    REVIEWER_TIMEOUT <subRole> <reason>       (timeout 1200s killed it)
+  │    then touches ~/.panopticon/agents/<reviewer>/reviewer-signaled
+  ├─ Deacon is the rare backup: only signals when the launcher's own bash
+  │    process was SIGKILLed before it could (no reviewer-signaled marker)
+  ├─ synthesis reads ready output files and synthesizes one verdict
+  └─ synthesis signals via Panopticon's CLI
         │
         ├─ pan specialists done review <id> --status passed  → review.approved → test role
         └─ pan specialists done review <id> --status blocked → notify `work` with blockers
@@ -107,9 +114,19 @@ Synthesis uses tier as a tiebreaker when the same finding is raised at different
 
 ---
 
-## Output contract
+## Output and signal contract
 
-Each convoy reviewer writes exactly one report to its assigned output file at `.pan/review/<runId>/<subRole>.md`. The synthesis role polls those files, then writes its own report to `.pan/review/<runId>/synthesis.md` and signals the verdict via `pan specialists done review`.
+Each convoy reviewer writes exactly one report to its assigned output file under `~/.panopticon/agents/<reviewerAgentId>/review-<subRole>.md`, then stops. The reviewer **does not** signal synthesis itself — it does not run `pan tell` and does not need to `exit` cleanly.
+
+**The launcher owns the signal (PAN-977).** For a Claude Code review sub-role, `spawnRun` generates a launcher that runs `timeout 1200 claude --print ... < initial-prompt.md` as a *child* process (not `exec`). When `claude` exits, the launcher's own bash process inspects the outcome and signals synthesis exactly once:
+
+- exit code `124` → `REVIEWER_TIMEOUT <subRole> ...`
+- report file is non-empty → `REVIEWER_READY <subRole> <outputPath>`
+- otherwise (crash, early exit, empty file) → `REVIEWER_FAILED <subRole> ...`
+
+It then `touch`es `~/.panopticon/agents/<reviewerAgentId>/reviewer-signaled`. This makes the happy path *and* the failure path self-contained in the launcher's bash process: the agent cannot forget to signal, cannot double-signal, and a crash still produces `REVIEWER_FAILED`. The synthesis role never spawns reviewers and never polls files or tmux; it waits for one terminal signal per sub-role, reads the output paths from `REVIEWER_READY`, then writes `.pan/review/<runId>/synthesis.md` and signals the verdict via `pan specialists done review`.
+
+**Deacon is the rare backup, not the happy path.** `monitorReviewConvoySignals` skips any reviewer whose `reviewer-signaled` marker is newer than the run's `startedAt` — the launcher already signaled. Deacon only signals `REVIEWER_FAILED` / `REVIEWER_TIMEOUT` itself when that marker is absent, i.e. the launcher's bash process was SIGKILLed before it could run its contract block. Synthesis treats either failure signal as a blocking infrastructure failure.
 
 Human-readable review output should include:
 

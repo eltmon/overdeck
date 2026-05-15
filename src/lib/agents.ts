@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
-import { mkdir, readFile, readdir, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync } from 'fs/promises';
-import { Agent as HttpAgent, request as httpRequest } from 'node:http';
+import { mkdir, readFile, readdir, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
+import { request as httpRequest } from 'node:http';
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
@@ -12,7 +12,7 @@ import { createSession, createSessionAsync, killSession, killSessionAsync, sendK
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
-import type { ModelId } from './settings.js';
+import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
 import { loadConfig as loadYamlConfig, isClaudeCodeChannelsEnabled, resolveModel } from './config-yaml.js';
@@ -40,6 +40,19 @@ import { assertIssueHasBeads } from './beads-query.js';
 const execAsync = promisify(exec);
 
 export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship';
+
+/**
+ * Write an agent launcher script atomically. Every agent shares a fixed
+ * `launcher.sh` path inside its agent dir, and spawn/resume/restart paths can
+ * overlap (e.g. a Deacon recovery racing a manual restart). Writing in place
+ * lets one path read a half-written script; write to a unique temp file then
+ * rename (atomic on the same filesystem).
+ */
+async function writeLauncherScriptAtomic(launcherScript: string, content: string): Promise<void> {
+  const tmp = `${launcherScript}.${randomUUID()}.tmp`;
+  await writeFile(tmp, content, { mode: 0o755 });
+  await renameAsync(tmp, launcherScript);
+}
 
 /**
  * BFS-walk a process subtree rooted at `rootPid` looking for the Claude Code
@@ -296,16 +309,18 @@ export async function getRoleRuntimeBaseCommand(
   const permissionFlags = definitionPath ? '' : ` ${getClaudePermissionFlagsString()}`;
   const bypassWithAgent = definitionPath ? bypassPrefixForAgentFlag() : '';
 
+  const printFlag = role === 'review' && subRole ? ' --print' : '';
+
   if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
-    return `claude${bypassWithAgent}${agentFlag}${permissionFlags} --model ${resolvedModel}${nameFlag}`;
+    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  return `claude${bypassWithAgent}${agentFlag}${permissionFlags} --model ${model}${nameFlag}`;
+  return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${model}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
-const AGENT_PREFIXES = ['agent-', 'planning-'];
+const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-'];
 
 /** Normalize agent ID: preserve known prefixes, add 'agent-' for bare issue IDs */
 export function normalizeAgentId(agentId: string): string {
@@ -524,6 +539,9 @@ export interface AgentState {
   costSoFar?: number;
   sessionId?: string; // For resuming sessions after handoff
 
+  // Work type system (PAN-118)
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
+  workType?: string; // Current work type ID
   preSpawnStashRef?: string;
   preSpawnStashMessage?: string;
   preSpawnBaselineHead?: string;
@@ -536,6 +554,29 @@ export interface AgentState {
    * sendKeysAsync. Absent or false means tmux-only delivery (current default).
    */
   channelsEnabled?: boolean;
+  /**
+   * Delivery method for agent messages. 'auto' tries channels then falls back
+   * to tmux; 'channels' is strict (throws on failure); 'tmux' bypasses
+   * channels entirely. When absent, resolved from global settings.
+   */
+  deliveryMethod?: 'auto' | 'channels' | 'tmux';
+
+  /**
+   * Short HEAD sha (8 chars) of the workspace at the moment this role run was
+   * spawned. Used by the reactive scheduler's activeRoleRunExists() to detect a
+   * stale/zombie role session: if the workspace HEAD has advanced past this
+   * marker, the existing session ran against old code and must not block a
+   * fresh re-dispatch for the new HEAD. Set for non-work roles in spawnRun.
+   */
+  roleRunHead?: string;
+
+  /** Review-convoy metadata for server-side reviewer lifecycle monitoring. */
+  reviewSubRole?: string;
+  reviewRunId?: string;
+  reviewOutputPath?: string;
+  reviewSynthesisAgentId?: string;
+  reviewDeadlineAt?: string;
+  reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
 }
 
 export function getAgentDir(agentId: string): string {
@@ -565,14 +606,26 @@ function cleanAgentState(raw: AgentState): AgentState {
     preSpawnStashRef: raw.preSpawnStashRef,
     preSpawnStashMessage: raw.preSpawnStashMessage,
     preSpawnBaselineHead: raw.preSpawnBaselineHead,
+    roleRunHead: raw.roleRunHead,
     channelsEnabled: raw.channelsEnabled,
+    deliveryMethod: raw.deliveryMethod,
+    reviewSubRole: raw.reviewSubRole,
+    reviewRunId: raw.reviewRunId,
+    reviewOutputPath: raw.reviewOutputPath,
+    reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
+    reviewDeadlineAt: raw.reviewDeadlineAt,
+    reviewMonitorSignaled: raw.reviewMonitorSignaled,
   };
 }
 
 function parseAgentState(content: string, normalizedId: string): AgentState | null {
   try {
     const state = JSON.parse(content) as Partial<AgentState>;
-    if (!isRole(state.role)) return null;
+    if (!isRole(state.role)) {
+      // Roleless states are invisible to getAgentState; cleanup is handled
+      // by warnOnBareNumericIssueIds / dropLegacyAgentStatesMissingRoleAsync.
+      return null;
+    }
     if (!state.id) state.id = normalizedId;
     return cleanAgentState(state as AgentState);
   } catch {
@@ -654,34 +707,22 @@ export async function saveAgentStateAsync(state: AgentState): Promise<void> {
   }
 }
 
+/** Update just the delivery method on an agent's state file. */
+export async function setAgentDeliveryMethod(
+  agentId: string,
+  deliveryMethod: 'auto' | 'channels' | 'tmux',
+): Promise<void> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return;
+  state.deliveryMethod = deliveryMethod;
+  await saveAgentStateAsync(state);
+}
+
 /**
  * Resolve PANOPTICON_HOME — same fallback semantics as panopticon-bridge.
  */
 function panopticonHomeForChannels(): string {
   return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
-}
-
-const bridgeHttpAgents = new Map<string, HttpAgent>();
-
-function getBridgeHttpAgent(socketPath: string): HttpAgent {
-  const existing = bridgeHttpAgents.get(socketPath);
-  if (existing) {
-    return existing;
-  }
-  const agent = new HttpAgent({
-    keepAlive: true,
-    maxSockets: 1,
-    maxFreeSockets: 1,
-  });
-  bridgeHttpAgents.set(socketPath, agent);
-  return agent;
-}
-
-function destroyBridgeHttpAgent(socketPath: string): void {
-  const agent = bridgeHttpAgents.get(socketPath);
-  if (!agent) return;
-  bridgeHttpAgents.delete(socketPath);
-  agent.destroy();
 }
 
 /**
@@ -725,15 +766,33 @@ async function postUnixSocketJson(
   bridgeToken: string,
 ): Promise<{ status: number; body: string }> {
   const payload = JSON.stringify(body);
-  const agent = getBridgeHttpAgent(socketPath);
 
   return new Promise((resolveCall, reject) => {
+    // Settle exactly once. Without this guard a late idle-timeout or
+    // post-response socket error could reject after the response already
+    // resolved the promise.
+    let settled = false;
+    const finishOk = (value: { status: number; body: string }) => {
+      if (settled) return;
+      settled = true;
+      req.setTimeout(0); // cancel the idle timer
+      req.removeAllListeners('timeout');
+      resolveCall(value);
+    };
+    const finishErr = (err: Error) => {
+      if (settled) return;
+      settled = true;
+      req.setTimeout(0);
+      req.removeAllListeners('timeout');
+      reject(err);
+    };
+
     const req = httpRequest(
       {
         socketPath,
         path: '/',
         method: 'POST',
-        agent,
+        agent: false,
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload),
@@ -749,10 +808,10 @@ async function postUnixSocketJson(
         res.on('end', () => {
           const status = res.statusCode ?? 0;
           if (status >= 200 && status < 300) {
-            resolveCall({ status, body: responseBody });
+            finishOk({ status, body: responseBody });
             return;
           }
-          reject(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
+          finishErr(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
         });
       },
     );
@@ -761,8 +820,7 @@ async function postUnixSocketJson(
       req.destroy(new Error('socket POST timeout'));
     });
     req.on('error', (err: Error) => {
-      destroyBridgeHttpAgent(socketPath);
-      reject(err);
+      finishErr(err);
     });
     req.write(payload);
     req.end();
@@ -784,24 +842,37 @@ export async function deliverAgentMessage(
   agentId: string,
   message: string,
   caller: string = 'unknown',
+  deliveryMethod?: 'auto' | 'channels' | 'tmux',
 ): Promise<void> {
   const normalizedId = normalizeAgentId(agentId);
 
-  let channelsEnabled = false;
-  try {
-    const state = await getAgentStateAsync(normalizedId);
-    channelsEnabled = Boolean(state?.channelsEnabled);
-  } catch {
-    channelsEnabled = false;
+  // Resolve delivery method.
+  let resolvedMethod = deliveryMethod;
+  if (!resolvedMethod) {
+    let channelsEnabled = false;
+    try {
+      const state = await getAgentStateAsync(normalizedId);
+      channelsEnabled = Boolean(state?.channelsEnabled);
+      resolvedMethod = state?.deliveryMethod ?? (channelsEnabled ? 'auto' : 'tmux');
+    } catch {
+      resolvedMethod = 'tmux';
+    }
   }
 
-  if (!channelsEnabled) {
+  if (resolvedMethod === 'tmux') {
     await sendKeysAsync(normalizedId, message);
     return;
   }
 
+  // resolvedMethod is 'auto' or 'channels' — attempt channels delivery.
   const socketPath = join(panopticonHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
   if (!existsSync(socketPath)) {
+    const errMsg = `Channels socket missing for ${normalizedId} (${caller})`;
+    if (resolvedMethod === 'channels') {
+      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
+    }
+    // auto mode: log visibly and fallback
+    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
     await appendChannelDeliveryLog(normalizedId, {
       path: 'tmux',
       reason: 'socket-missing',
@@ -813,6 +884,11 @@ export async function deliverAgentMessage(
 
   const bridgeToken = readBridgeToken(normalizedId);
   if (!bridgeToken) {
+    const errMsg = `Channels bridge token missing for ${normalizedId} (${caller})`;
+    if (resolvedMethod === 'channels') {
+      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
+    }
+    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
     await appendChannelDeliveryLog(normalizedId, {
       path: 'tmux',
       reason: 'bridge-token-missing',
@@ -833,6 +909,11 @@ export async function deliverAgentMessage(
     return;
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
+    const errMsg = `Channels socket post failed for ${normalizedId} (${caller}): ${reason}`;
+    if (resolvedMethod === 'channels') {
+      throw new Error(`MessageDeliveryFailed: ${errMsg}`);
+    }
+    console.error(`[CHANNELS-DELIVERY-FAILED] ${errMsg}`);
     await appendChannelDeliveryLog(normalizedId, {
       path: 'tmux',
       reason: `socket-post-failed: ${reason}`,
@@ -977,21 +1058,20 @@ export function decideChannelsForWorkAgent(
  * stdio server. The path is the workspace-local <workspace>/.pan/agent-mcp.json
  * — one config per agent, never shared, never reused.
  */
-async function writeChannelsBridgeMcpConfig(
+export async function writeChannelsBridgeMcpConfig(
   configPath: string,
   agentId: string,
 ): Promise<void> {
   const fsp = await import('fs/promises');
   await fsp.mkdir(dirname(configPath), { recursive: true });
-  // Resolve the bridge entrypoint relative to this module so the config is
-  // valid no matter where the workspace lives. We write the path of the
-  // checked-in bridge script — the launcher invokes it with `bun run`.
-  const repoBridgePath = join(
-    // src/lib/agents.ts → src/lib/channels/panopticon-bridge.ts
-    dirname(import.meta.url.replace('file://', '')),
-    'channels',
-    'panopticon-bridge.ts',
-  );
+  // Resolve the bridge entrypoint from the project root. The source file
+  // lives in src/lib/channels/ and is executed directly via `bun run`
+  // (Bun runs TypeScript without pre-compilation). We must point at the
+  // source, not a dist copy, because the build does not copy the bridge
+  // script into the bundle output.
+  const here = dirname(import.meta.url.replace('file://', ''));
+  const projectRoot = join(here, '..', '..');
+  const repoBridgePath = join(projectRoot, 'src', 'lib', 'channels', 'panopticon-bridge.ts');
   const mcpConfig = {
     mcpServers: {
       'panopticon-bridge': {
@@ -1025,18 +1105,34 @@ async function writeChannelsBridgeMcpConfig(
  * paste-buffer machinery is for typing message bodies, not for a single
  * Enter on a TUI prompt where mistimed paste can fire before the dialog
  * accepts input.
+ *
+ * Once the dialog is detected we send Enter and KEEP checking — a single
+ * keystroke can be dropped if the TUI is still mid-render, which left the
+ * dialog on screen with the helper already returned. We re-send Enter every
+ * RESEND_INTERVAL_MS until the needle is gone (bounded by DISMISS_BUDGET_MS).
  */
 export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
   const TIMEOUT_MS = 20_000;
   const POLL_INTERVAL_MS = 200;
+  const RESEND_INTERVAL_MS = 150;
+  const DISMISS_BUDGET_MS = 5_000;
   const NEEDLE = 'WARNING: Loading development channels';
   const start = Date.now();
   while (Date.now() - start < TIMEOUT_MS) {
     try {
       const pane = await capturePaneAsync(agentId, 50);
       if (pane.includes(NEEDLE)) {
-        await sendRawKeystrokeAsync(agentId, 'C-m', 'channels:dismiss-dev-dialog');
-        await new Promise((r) => setTimeout(r, 500));
+        // Dialog is up. Send Enter, then keep re-sending until the needle
+        // clears — the first keystroke can land before the TUI is ready to
+        // accept it, leaving the dialog stuck on screen.
+        const dismissStart = Date.now();
+        while (Date.now() - dismissStart < DISMISS_BUDGET_MS) {
+          await sendRawKeystrokeAsync(agentId, 'C-m', 'channels:dismiss-dev-dialog');
+          await new Promise((r) => setTimeout(r, RESEND_INTERVAL_MS));
+          const after = await capturePaneAsync(agentId, 50).catch(() => '');
+          if (!after.includes(NEEDLE)) return;
+        }
+        console.log(`[${agentId}] channels:dismiss:dialog-still-present-after-budget`);
         return;
       }
     } catch {
@@ -1346,6 +1442,12 @@ export interface SpawnOptions {
   model?: string;
   prompt?: string;
   role?: 'work';
+  difficulty?: ComplexityLevel;
+  agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
+
+  // Work type system (PAN-118)
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
+  workType?: string; // Explicit work type ID (overrides phase-based detection)
 
   // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
   // and the one-agent-per-issue uniqueness check is scoped to the slot.
@@ -1366,6 +1468,14 @@ export interface SpawnRunOptions {
    * Values: 'security' | 'correctness' | 'performance' | 'requirements'
    */
   subRole?: string;
+  /**
+   * Review convoy wiring (PAN-977). When spawning a review sub-role, the
+   * synthesis agent id and the reviewer's output path are passed in up front
+   * so the generated launcher can own the REVIEWER_READY/FAILED/TIMEOUT signal
+   * deterministically on process exit. Persisted onto AgentState too.
+   */
+  reviewSynthesisAgentId?: string;
+  reviewOutputPath?: string;
 }
 
 /**
@@ -1679,6 +1789,13 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  * Spawn a role-based Panopticon run. Work delegates to the existing work-agent
  * path; review/test/ship use the role definition files under roles/.
  */
+/**
+ * Review sub-role wall-clock budget (PAN-977). Mirrors REVIEWER_TIMEOUT_MS in
+ * cloister/review-agent.ts (20 minutes). Kept as a local constant rather than
+ * an import to avoid an agents.ts ↔ review-agent.ts module cycle.
+ */
+const REVIEW_SUBROLE_TIMEOUT_SECONDS = 20 * 60;
+
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
 
@@ -1806,6 +1923,33 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
+  // PAN-977: for a Claude Code review sub-role, hand the launcher the synthesis
+  // wiring so the launcher's own bash process — not the agent's good behavior,
+  // not Deacon's patrol — owns the REVIEWER_READY/FAILED/TIMEOUT signal. The
+  // launcher signals deterministically on process exit and touches a marker
+  // file; Deacon only steps in if that bash process was SIGKILLed.
+  const isClaudeCodeReviewSubRole = role === 'review' && !!options.subRole && resolvedHarness === 'claude-code';
+  const reviewSignal = isClaudeCodeReviewSubRole && options.reviewSynthesisAgentId && options.reviewOutputPath
+    ? {
+        synthesisAgentId: options.reviewSynthesisAgentId,
+        subRole: options.subRole as string,
+        outputPath: options.reviewOutputPath,
+        signalMarkerPath: join(getAgentDir(agentId), 'reviewer-signaled'),
+        launcherPidPath: join(getAgentDir(agentId), 'reviewer-launcher.pid'),
+        timeoutSeconds: REVIEW_SUBROLE_TIMEOUT_SECONDS,
+      }
+    : undefined;
+  if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
+  if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
+
+  // PAN-1059 / PAN-977: specialist roles (review sub-roles, test, ship) must not
+  // pass the prompt as a positional argument to Claude Code. Inside a detached
+  // tmux session, `--session-id` combined with a large positional prompt causes
+  // Claude Code to exit immediately (session-env directory created, then silent
+  // death). Work agents avoid this by delivering the prompt via tmux send-keys
+  // after Claude boots. Specialist roles now use the same delivery path.
+  const shouldDeliverPromptViaTmux = isSpecialistRole;
+
   const launcherContent = generateLauncherScript({
     role,
     workingDir: workspace,
@@ -1813,15 +1957,21 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setCi: true,
     setTerminalEnv: true,
     providerExports,
-    promptFile,
+    promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
     sessionId,
+    reviewSignal,
+    // PAN-977: review sub-role launchers must outlive their tmux session. The
+    // session gets reaped quickly (orphan-recovery / cleanup / restart churn)
+    // which SIGHUPs the launcher; `trap '' HUP` keeps the launcher's bash
+    // process alive so it always runs its signal block when claude exits.
+    trapHup: reviewSignal ? true : undefined,
     ...piLauncherFields,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-  await writeFileAsync(launcherScript, launcherContent, { mode: 0o755 });
+  await writeLauncherScriptAtomic(launcherScript, launcherContent);
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=role-run | role=${role} | model=${state.model} | source=agents.ts:spawnRun | session=${agentId} | command="${claudeCmd}"`);
 
@@ -1845,8 +1995,45 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   await setOptionAsync(agentId, 'destroy-unattached', 'off');
   await setOptionAsync(agentId, 'remain-on-exit', 'on');
 
+  // Deliver prompt via tmux for specialist roles after Claude boots.
+  if (shouldDeliverPromptViaTmux && options.prompt) {
+    let ready = false;
+    for (let i = 0; i < 30; i++) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      if (!(await sessionExistsAsync(agentId))) {
+        console.error(`[${agentId}] Tmux session died before becoming ready`);
+        break;
+      }
+      try {
+        const pane = await capturePaneAsync(agentId, 200);
+        if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
+          ready = true;
+          break;
+        }
+      } catch { /* non-fatal */ }
+    }
+    if (ready) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+      await deliverAgentMessage(agentId, options.prompt, 'spawnRun:initial-prompt');
+    } else {
+      console.error(`[${agentId}] Claude did not become ready within 30s`);
+    }
+  }
+
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
+
+  // Stamp the workspace HEAD this role run was launched against. The reactive
+  // scheduler uses this to tell a still-relevant run from a zombie session
+  // left behind by an agent that finished work but never exited (the ship/test
+  // stall class of bug). A non-fatal git probe — if it fails the marker is
+  // simply absent and activeRoleRunExists falls back to status-only checks.
+  try {
+    const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: workspace });
+    const head = stdout.trim();
+    if (head) state.roleRunHead = head;
+  } catch { /* non-fatal — marker stays absent */ }
+
   await saveAgentStateAsync(state);
 
   emitActivityEntry({
@@ -2022,7 +2209,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-  await writeFile(launcherScript, launcherContent, { mode: 0o755 });
+  await writeLauncherScriptAtomic(launcherScript, launcherContent);
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=work-agent | model=${state.model} | source=agents.ts:spawnAgent | session=${agentId} | command="${claudeCmd}"`);
 
@@ -2102,7 +2289,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     if (ready) {
       // Small delay after ready to ensure Claude is fully rendered and accepting input
       await new Promise(r => setTimeout(r, 500));
-      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt');
+      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt', state.deliveryMethod);
     } else {
       console.error(`[${agentId}] Claude did not become ready within 30s`);
     }
@@ -2504,7 +2691,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     const ready = await waitForReadySignal(normalizedId, 30);
     const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
     if (ready) {
-      await deliverAgentMessage(normalizedId, resumePrompt, 'resumeAgent:resume-prompt');
+      await deliverAgentMessage(normalizedId, resumePrompt, 'resumeAgent:resume-prompt', agentState.deliveryMethod);
       console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
     } else {
       console.warn(`[agents] Fallback-restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
@@ -2559,7 +2746,8 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     console.warn(`[agents] ${normalizedId} not at ready prompt after 5s — sending message anyway`);
   }
 
-  await deliverAgentMessage(normalizedId, message, 'messageAgent:pan-tell');
+  const deliveryMethod = agentState?.deliveryMethod;
+  await deliverAgentMessage(normalizedId, message, 'messageAgent:pan-tell', deliveryMethod);
 
   // Also save to mail queue
   const mailDir = join(getAgentDir(normalizedId), 'mail');
@@ -2683,7 +2871,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
+    await writeLauncherScriptAtomic(launcherScript, launcherContent);
     const claudeCmd = `bash ${launcherScript}`;
 
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
@@ -2722,7 +2910,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
       const ready = await waitForReadySignal(normalizedId, 30);
       if (ready) {
-        await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue');
+        await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue', agentState.deliveryMethod);
         messageDelivered = true;
       } else {
         console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
@@ -2821,7 +3009,7 @@ export async function restartAgent(
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
+    await writeLauncherScriptAtomic(launcherScript, launcherContent);
     const claudeCmd = `bash ${launcherScript}`;
 
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
@@ -2993,7 +3181,7 @@ export async function recoverAgent(
       harness: 'pi',
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    await writeFile(launcherScript, launcherContent, { mode: 0o755 });
+    await writeLauncherScriptAtomic(launcherScript, launcherContent);
     await createSessionAsync(normalizedId, state.workspace, `bash ${launcherScript}`, {
       env: {
         ...BLANKED_PROVIDER_ENV,

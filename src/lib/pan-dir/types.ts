@@ -46,7 +46,9 @@ export interface PanSpecEntry {
 
 export interface PanSessionEntry extends ContinueSessionEntry {}
 
-export interface WorkspaceContinueState extends ContinueState {}
+export interface WorkspaceContinueState extends ContinueState {
+  statusOverrides?: Record<string, string>;
+}
 
 export interface PanFeedbackFile {
   path: string

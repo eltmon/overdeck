@@ -337,9 +337,42 @@ export async function getWindowDimensionsAsync(sessionName: string): Promise<{ c
   }
 }
 
+/**
+ * tmux target-session syntax: a bare name is matched as a *prefix* against
+ * existing session names. That means `has-session -t agent-pan-977` returns
+ * true when only `agent-pan-977-review` exists, `kill-session -t agent-pan-977`
+ * kills `agent-pan-977-review`, and `capture-pane -t agent-pan-977` captures the
+ * wrong pane. Prefixing the name with `=` forces an exact-name match. Every
+ * call site that targets a *whole session by its exact name* must route through
+ * this helper. (PAN-977 fallout: recoverAgent saw the lingering review session
+ * as the work agent and silently no-op'd.)
+ */
+export function exactSession(name: string): string {
+  return name.startsWith('=') ? name : `=${name}`;
+}
+
+/**
+ * Exact-match target for *pane*-scoped commands (`capture-pane`, `list-panes`).
+ *
+ * The `=name` session-exact form that works for `has-session`/`kill-session`
+ * is NOT a valid pane target — `capture-pane -t '=name'` fails outright with
+ * "can't find pane". A pane target needs a window/pane component, so the
+ * correct exact form is `=name:` (session named exactly <name>, active window,
+ * active pane).
+ *
+ * Regression history: PAN-977's exact-match commit routed capture-pane and
+ * list-panes through exactSession() (`=name`), which silently broke every
+ * capturePaneAsync() call — they all started returning '' — taking down
+ * dialog dismissal, waitForClaudeReady, paste verification, and health checks.
+ */
+export function exactPaneTarget(name: string): string {
+  if (name.startsWith('=')) return name.endsWith(':') ? name : `${name}:`;
+  return `=${name}:`;
+}
+
 export function sessionExists(name: string): boolean {
   try {
-    tmuxExecSync(['has-session', '-t', name], { stdio: 'ignore' });
+    tmuxExecSync(['has-session', '-t', exactSession(name)], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -348,7 +381,7 @@ export function sessionExists(name: string): boolean {
 
 export async function sessionExistsAsync(name: string): Promise<boolean> {
   try {
-    await tmuxExecAsync(['has-session', '-t', name], { encoding: 'utf-8' });
+    await tmuxExecAsync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8' });
     return true;
   } catch {
     return false;
@@ -396,11 +429,13 @@ export async function createSessionAsync(
 }
 
 export function killSession(name: string): void {
-  tmuxExecSync(['kill-session', '-t', name]);
+  // Exact-match target — a bare name prefix-matches and would kill e.g.
+  // `agent-pan-977-review` when asked to kill `agent-pan-977`.
+  tmuxExecSync(['kill-session', '-t', exactSession(name)]);
 }
 
 export async function killSessionAsync(name: string): Promise<void> {
-  await tmuxExecAsync(['kill-session', '-t', name], { encoding: 'utf-8' });
+  await tmuxExecAsync(['kill-session', '-t', exactSession(name)], { encoding: 'utf-8' });
 }
 
 export async function setOptionAsync(target: string, option: string, value: string): Promise<void> {
@@ -494,6 +529,17 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
         }
 
         if (attempt < PASTE_MAX_ATTEMPTS) {
+          // Before re-pasting, do one final check with a much larger capture
+          // window. The poll above uses a 10-line window; a long pasted message
+          // can scroll verifyLine out of it, false-negativing a paste that
+          // actually landed. Re-pasting on a false negative DUPLICATES the text
+          // in the input box — the root cause of "PI Harness sends messages
+          // twice" (the doubled text shows up inside a single message).
+          const wideCheck = await capturePaneAsync(sessionName, 200);
+          if (wideCheck.includes(verifyLine.slice(0, 40))) {
+            pasteVerified = true;
+            break attemptLoop;
+          }
           console.warn(`[tmux] Paste not visible on ${sessionName} after ${VERIFY_TIMEOUT_MS}ms (attempt ${attempt}/${PASTE_MAX_ATTEMPTS}) — re-pasting buffer.`);
           await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
         }
@@ -561,7 +607,7 @@ export function sendKeys(sessionName: string, keys: string, caller?: string): vo
 
 export function capturePane(sessionName: string, lines: number = 50): string {
   try {
-    return tmuxExecSync(['capture-pane', '-t', sessionName, '-p', '-S', `-${lines}`], {
+    return tmuxExecSync(['capture-pane', '-t', exactPaneTarget(sessionName), '-p', '-S', `-${lines}`], {
       encoding: 'utf8',
     }) as string;
   } catch {
@@ -579,7 +625,7 @@ export async function capturePaneAsync(
   options?: { escapeSequences?: boolean }
 ): Promise<string> {
   try {
-    const args = ['capture-pane', '-t', sessionName, '-p'];
+    const args = ['capture-pane', '-t', exactPaneTarget(sessionName), '-p'];
     if (options?.escapeSequences) {
       args.push('-e');
     }
@@ -593,7 +639,7 @@ export async function capturePaneAsync(
 
 export function listPaneValues(target: string, format: string): string[] {
   try {
-    const output = tmuxExecSync(['list-panes', '-t', target, '-F', format], { encoding: 'utf8' }) as string;
+    const output = tmuxExecSync(['list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf8' }) as string;
     return output.split('\n').map((line) => line.trim()).filter(Boolean);
   } catch {
     return [];
@@ -602,7 +648,7 @@ export function listPaneValues(target: string, format: string): string[] {
 
 export async function listPaneValuesAsync(target: string, format: string): Promise<string[]> {
   try {
-    const { stdout } = await tmuxExecAsync(['list-panes', '-t', target, '-F', format], { encoding: 'utf-8' });
+    const { stdout } = await tmuxExecAsync(['list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf-8' });
     return String(stdout).split('\n').map((line: string) => line.trim()).filter(Boolean);
   } catch {
     return [];

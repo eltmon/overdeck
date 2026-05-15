@@ -16,9 +16,30 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { mkdir, rename, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { randomBytes } from 'crypto';
 
 import { getContinuesDir } from '../pan-dir/continues.js';
+
+function uniqueTmpPath(path: string): string {
+  return `${path}.${process.pid}.${Date.now()}.${randomBytes(4).toString('hex')}.tmp`;
+}
+
+const activeContinueWriters = new Map<string, string>();
+const pendingContinueWrites = new Map<string, Promise<void>>();
+
+function assertContinueWriter(path: string, writerId: string): void {
+  const owner = activeContinueWriters.get(path);
+  if (owner && owner !== writerId) {
+    throw new Error(`Continue-state writer conflict for ${path}: ${owner} already owns the write`);
+  }
+  activeContinueWriters.set(path, writerId);
+}
+
+function releaseContinueWriter(path: string, writerId: string): void {
+  if (activeContinueWriters.get(path) === writerId) activeContinueWriters.delete(path);
+}
 
 export const CONTINUE_FILENAME_SUFFIX = '.vbrief.json';
 
@@ -132,7 +153,65 @@ export interface ContinueState {
   sessionHistory: ContinueSessionEntry[];
   /** Pending specialist feedback for the work agent. Cleared at the start of each review cycle. */
   feedback?: ContinueFeedbackEntry[];
+  /** Swarm dispatch runtime state. Present only for swarm-mode issues. */
+  swarmRuntime?: SwarmRuntime;
 }
+
+// ─── Swarm runtime types ─────────────────────────────────────────────────────
+
+/** Runtime state for a single swarm slot. */
+export interface SwarmSlotRuntime {
+  slotId: number;
+  itemId: string;
+  itemTitle: string;
+  sessionName: string;
+  workspace: string;
+  status: 'pending' | 'running' | 'merged' | 'failed';
+  /** ISO 8601 datetime, set when the slot agent is dispatched. */
+  dispatchedAt?: string;
+  /** ISO 8601 datetime, set when the slot branch is merged into the feature branch. */
+  mergedAt?: string;
+}
+
+/** Context update written by a synthesis agent before a convergence-point item is dispatched. */
+export interface SynthesisOutput {
+  /** Item ID this output targets (the downstream convergence item). */
+  targetItemId: string;
+  /** ISO 8601 datetime when synthesis was written. */
+  writtenAt: string;
+  /** Markdown context update the downstream work agent should read before starting. */
+  contextUpdate: string;
+}
+
+/**
+ * Swarm runtime state stored in the continue vBRIEF. Replaces the
+ * `~/.panopticon/swarms/{issueId}.json` sidecar from PAN-970.
+ */
+export interface SwarmRuntime {
+  /** Model used for slot agents. */
+  model: string;
+  /** Current dependency wave being dispatched. */
+  currentWave?: number;
+  /** Total dependency waves in the plan at dispatch time. */
+  totalWaves?: number;
+  /** Whether event/polling auto-advance is enabled. */
+  autoAdvance?: boolean;
+  autoAdvanceFailureCount?: number;
+  autoAdvanceRetryAfter?: string;
+  lastAutoAdvanceError?: string;
+  /** Ready items intentionally held for a later dispatch cycle. */
+  deferred?: Array<{ itemId: string; itemTitle: string }>;
+  /** All slots dispatched across all dispatch cycles. */
+  slots: SwarmSlotRuntime[];
+  /** Synthesis agent output keyed by target item ID. */
+  synthesisOutputs: Record<string, SynthesisOutput>;
+  /** ISO 8601 datetime of first dispatch. */
+  createdAt: string;
+  /** ISO 8601 datetime of most recent update. */
+  updatedAt: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /** Build the continue filename for a given issue ID (lowercase, no prefix).
  *
@@ -156,18 +235,24 @@ export function continueFilePath(projectRoot: string, issueId: string): string {
 export function writeContinueState(projectRoot: string, issueId: string, state: ContinueState): void {
   const canonicalIssueId = issueId.toUpperCase();
   const path = continueFilePath(projectRoot, canonicalIssueId);
-  mkdirSync(getContinuesDir(projectRoot), { recursive: true });
-  const now = new Date().toISOString();
-  const next: ContinueState = {
-    ...state,
-    issueId: canonicalIssueId,
-    version: '1',
-    created: state.created || now,
-    updated: now,
-  };
-  const tmp = path + '.tmp';
-  writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf-8');
-  renameSync(tmp, path);
+  const writerId = `continue-sync-${process.pid}`;
+  assertContinueWriter(path, writerId);
+  try {
+    mkdirSync(getContinuesDir(projectRoot), { recursive: true });
+    const now = new Date().toISOString();
+    const next: ContinueState = {
+      ...state,
+      issueId: issueId.toUpperCase(),
+      version: '1',
+      created: state.created || now,
+      updated: now,
+    };
+    const tmp = uniqueTmpPath(path);
+    writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf-8');
+    renameSync(tmp, path);
+  } finally {
+    releaseContinueWriter(path, writerId);
+  }
 }
 
 /**
@@ -209,7 +294,7 @@ export function appendSessionEntry(
     ? { ...existing, sessionHistory: [...existing.sessionHistory, fullEntry] }
     : {
         version: '1',
-        issueId,
+        issueId: issueId.toUpperCase(),
         created: now,
         updated: now,
         gitState: {},
@@ -239,7 +324,7 @@ export function appendFeedbackEntry(
     ? { ...existing, feedback: [...(existing.feedback ?? []), entry] }
     : {
         version: '1',
-        issueId,
+        issueId: issueId.toUpperCase(),
         created: now,
         updated: now,
         gitState: {},
@@ -264,6 +349,89 @@ export function clearFeedback(projectRoot: string, issueId: string): ContinueSta
   const next: ContinueState = { ...existing, feedback: [] };
   writeContinueState(projectRoot, issueId, next);
   return next;
+}
+
+/**
+ * Async variant of `writeContinueState`. Use this from dashboard server routes
+ * (sync FS calls block the event loop).
+ */
+async function assertContinueWriterAsync(path: string, writerId: string): Promise<void> {
+  const owner = activeContinueWriters.get(path);
+  if (owner && owner !== writerId) {
+    throw new Error(`Continue-state writer conflict for ${path}: ${owner} already owns the write`);
+  }
+  activeContinueWriters.set(path, writerId);
+}
+
+export async function writeContinueStateAsync(
+  dir: string,
+  issueId: string,
+  stateOrUpdater: ContinueState | ((current: ContinueState | null) => ContinueState),
+): Promise<void> {
+  const path = continueFilePath(dir, issueId);
+
+  // Serialize concurrent writes for the same path so read-modify-write sequences
+  // in the same process don't race and drop mutations (PAN-977 review blocker).
+  // When an updater callback is passed, we read the latest on-disk state AFTER
+  // awaiting any prior pending write so the mutation merges against the most
+  // recently committed document rather than a stale snapshot.
+  const previous = pendingContinueWrites.get(path);
+  const current = (async () => {
+    if (previous) {
+      await previous.catch(() => {});
+    }
+    const writerId = `continue-async-${process.pid}-${Date.now()}-${randomBytes(4).toString('hex')}`;
+    await assertContinueWriterAsync(path, writerId);
+    try {
+      const now = new Date().toISOString();
+      let state: ContinueState;
+      if (typeof stateOrUpdater === 'function') {
+        const existing = await readContinueStateAsync(dir, issueId);
+        state = stateOrUpdater(existing);
+      } else {
+        state = stateOrUpdater;
+      }
+      const next: ContinueState = {
+        ...state,
+        issueId: issueId.toUpperCase(),
+        version: '1',
+        created: state.created || now,
+        updated: now,
+      };
+      await mkdir(getContinuesDir(dir), { recursive: true });
+      const tmp = uniqueTmpPath(path);
+      await writeFile(tmp, JSON.stringify(next, null, 2), 'utf-8');
+      await rename(tmp, path);
+    } finally {
+      releaseContinueWriter(path, writerId);
+    }
+  })();
+
+  pendingContinueWrites.set(path, current);
+  try {
+    await current;
+  } finally {
+    if (pendingContinueWrites.get(path) === current) {
+      pendingContinueWrites.delete(path);
+    }
+  }
+}
+
+/**
+ * Async variant of `readContinueState`. Use this from dashboard server routes.
+ */
+export async function readContinueStateAsync(dir: string, issueId: string): Promise<ContinueState | null> {
+  const path = continueFilePath(dir, issueId);
+  if (!existsSync(path)) return null;
+  const raw = await readFile(path, 'utf-8');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Invalid JSON in continue file ${path}: ${(err as Error).message}`);
+  }
+  validateContinueState(parsed, path);
+  return parsed as ContinueState;
 }
 
 function validateContinueState(value: unknown, path: string): asserts value is ContinueState {
@@ -292,4 +460,47 @@ function validateContinueState(value: unknown, path: string): asserts value is C
   } else if (!Array.isArray(v.feedback)) {
     throw new Error(`Continue file ${path} has malformed feedback array`);
   }
+
+  if (v.swarmRuntime !== undefined) {
+    validateSwarmRuntime(v.swarmRuntime, path);
+  }
 }
+
+function validateSwarmRuntime(value: unknown, path: string): asserts value is SwarmRuntime {
+  if (!value || typeof value !== 'object') {
+    throw new Error(`Continue file ${path} has malformed swarmRuntime`);
+  }
+  const runtime = value as Record<string, unknown>;
+  if (typeof runtime.model !== 'string') {
+    throw new Error(`Continue file ${path} has malformed swarmRuntime.model`);
+  }
+  if (!Array.isArray(runtime.slots)) {
+    throw new Error(`Continue file ${path} has malformed swarmRuntime.slots`);
+  }
+  if (!runtime.synthesisOutputs || typeof runtime.synthesisOutputs !== 'object' || Array.isArray(runtime.synthesisOutputs)) {
+    throw new Error(`Continue file ${path} has malformed swarmRuntime.synthesisOutputs`);
+  }
+  if (typeof runtime.createdAt !== 'string' || typeof runtime.updatedAt !== 'string') {
+    throw new Error(`Continue file ${path} has malformed swarmRuntime timestamps`);
+  }
+  for (const slot of runtime.slots) {
+    if (!slot || typeof slot !== 'object') {
+      throw new Error(`Continue file ${path} has malformed swarmRuntime slot`);
+    }
+    const s = slot as Record<string, unknown>;
+    if (typeof s.slotId !== 'number' || typeof s.itemId !== 'string' || typeof s.itemTitle !== 'string' ||
+        typeof s.sessionName !== 'string' || typeof s.workspace !== 'string' || typeof s.status !== 'string') {
+      throw new Error(`Continue file ${path} has malformed swarmRuntime slot fields`);
+    }
+  }
+  for (const output of Object.values(runtime.synthesisOutputs as Record<string, unknown>)) {
+    if (!output || typeof output !== 'object') {
+      throw new Error(`Continue file ${path} has malformed swarmRuntime synthesis output`);
+    }
+    const o = output as Record<string, unknown>;
+    if (typeof o.targetItemId !== 'string' || typeof o.writtenAt !== 'string' || typeof o.contextUpdate !== 'string') {
+      throw new Error(`Continue file ${path} has malformed swarmRuntime synthesis output fields`);
+    }
+  }
+}
+

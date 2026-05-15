@@ -1,0 +1,358 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-05T18:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-470: Rewrite route handlers to idiomatic Effect — eliminate runSync, try/catch, sync I/O"
+  },
+  "plan": {
+    "id": "pan-470",
+    "title": "Rewrite route handlers to idiomatic Effect — eliminate runSync, try/catch, sync I/O",
+    "status": "completed",
+    "uid": "6b133a22-8001-4a98-970d-918f6eda7f4d",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 2,
+    "created": "2026-04-05T18:00:00Z",
+    "updated": "2026-04-05T23:15:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/470",
+        "label": "PAN-470",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "effect",
+      "refactor",
+      "dashboard-server",
+      "routes",
+      "async"
+    ],
+    "narratives": {
+      "Problem": "Route handlers wrap imperative code in Effect.promise(async () => { try/catch }) and call Effect.runSync — 48 runSync calls, 376 try/catch blocks, 335 sync FS calls across 13 files (15K lines). This defeats Effect's error channels, blocks the event loop, and duplicates error-handling boilerplate.",
+      "Proposal": "Create a typed httpHandler wrapper that maps TaggedErrors to HTTP status codes, then rewrite all 13 route files to compose effects idiomatically with yield*, replace sync FS with fs/promises, fix 5 service-layer issues, and add proper Effect-level tests."
+    },
+    "items": [
+      {
+        "id": "http-handler",
+        "title": "Create httpHandler wrapper with typed error-to-HTTP mapping",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-05T18:00:00Z",
+        "completed": "2026-04-05T23:15:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-470"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/http-handler.ts. Implement httpHandler<R>(effect) that uses Effect.catchTags to map each TaggedError to the correct HTTP status (IssueNotFound→404, RateLimited→429, TrackerNotConfigured→503, AgentAlreadyRunning→409, BeadsNotInitialized/PlanEmpty→422, TrackerApiError→502, WorkspaceCreateError/AgentStartError→500) with a catchAll fallback to 500. Export a RouteError union type."
+        },
+        "subItems": [
+          {
+            "id": "http-handler.ac1",
+            "title": "httpHandler maps all 10 TaggedError types to correct HTTP status codes",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "http-handler.ac2",
+            "title": "Unknown errors produce 500 with error message in response body",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "http-handler.ac3",
+            "title": "Unit test covers each error type → status code mapping",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rewrite-large-routes",
+        "title": "Rewrite large route files: workspaces, specialists, issues, agents",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-05T18:00:00Z",
+        "completed": "2026-04-05T23:15:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-470"
+        },
+        "narrative": {
+          "Action": "Rewrite workspaces.ts (3675 lines, 7 runSync, 72 sync FS, 85 try/catch), specialists.ts (2131 lines, 6 runSync, 21 sync FS, 45 try/catch), issues.ts (2031 lines, 13 runSync, 36 sync FS, 61 try/catch), and agents.ts (1661 lines, 7 runSync, 69 sync FS, 57 try/catch). For each: replace Effect.promise(async) with yield*, eliminate runSync with yield*, replace sync FS with fs/promises, wrap in httpHandler, remove unused service injections."
+        },
+        "subItems": [
+          {
+            "id": "rewrite-large-routes.ac1",
+            "title": "Zero Effect.runSync calls remain in these 4 files",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-large-routes.ac2",
+            "title": "Zero try/catch blocks remain (all error handling via Effect channels)",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-large-routes.ac3",
+            "title": "Zero sync FS calls (readFileSync, writeFileSync, readdirSync, statSync, existsSync) remain",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-large-routes.ac4",
+            "title": "All routes use httpHandler wrapper for error handling",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rewrite-medium-routes",
+        "title": "Rewrite medium route files: misc, mission-control, settings, remote, conversations, costs",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-05T18:00:00Z",
+        "completed": "2026-04-05T23:15:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-470"
+        },
+        "narrative": {
+          "Action": "Rewrite misc.ts (1691 lines), mission-control.ts (1197 lines), settings.ts (487 lines), remote.ts (455 lines), conversations.ts (393 lines), and costs.ts (412 lines). Same transformation: eliminate runSync, try/catch, sync FS; apply httpHandler wrapper."
+        },
+        "subItems": [
+          {
+            "id": "rewrite-medium-routes.ac1",
+            "title": "Zero Effect.runSync, try/catch, or sync FS calls remain in these 6 files",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-medium-routes.ac2",
+            "title": "All routes use httpHandler wrapper",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rewrite-small-routes",
+        "title": "Rewrite small route files: resources, cloister, metrics",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-05T18:00:00Z",
+        "completed": "2026-04-05T23:15:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-470"
+        },
+        "narrative": {
+          "Action": "Rewrite resources.ts (312 lines, 5 runSync), cloister.ts (229 lines, 1 runSync), and metrics.ts (382 lines, 1 runSync). Same transformation pattern."
+        },
+        "subItems": [
+          {
+            "id": "rewrite-small-routes.ac1",
+            "title": "Zero Effect.runSync, try/catch, or sync FS calls remain in these 3 files",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rewrite-small-routes.ac2",
+            "title": "All routes use httpHandler wrapper",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "service-fixes",
+        "title": "Fix 5 minor service-layer issues from PAN-449 review",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-05T18:00:00Z",
+        "completed": "2026-04-05T23:15:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-470"
+        },
+        "narrative": {
+          "Action": "1) linear-client.ts: change (err as any)?._tag === 'RateLimited' to err instanceof RateLimited. 2) github-client.ts: removeLabel and ensureLabel must use ghFetch() instead of raw fetch(). 3) issue-lifecycle.ts: non-fatal patchIssue use Effect.try().pipe(Effect.ignore) instead of try/catch. 4) workspace-service.ts: containerize must check createWorkspace result. 5) agent-spawner.ts: remove typeof normalizeAgentId === 'function' defensive guard."
+        },
+        "subItems": [
+          {
+            "id": "service-fixes.ac1",
+            "title": "linear-client retry predicate uses instanceof RateLimited",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-fixes.ac2",
+            "title": "github-client removeLabel/ensureLabel use ghFetch() helper",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-fixes.ac3",
+            "title": "issue-lifecycle non-fatal patchIssue uses Effect.try + Effect.ignore",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-fixes.ac4",
+            "title": "workspace-service containerize checks createWorkspace result",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-fixes.ac5",
+            "title": "agent-spawner has no typeof normalizeAgentId guard",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-improvements",
+        "title": "Add proper Effect-level tests and rename mislabeled integration tests",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-05T18:00:00Z",
+        "completed": "2026-04-05T23:15:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-470"
+        },
+        "narrative": {
+          "Action": "1) Add httpHandler unit tests covering all error→status mappings. 2) Add integration tests using *Live layers with only external APIs (Linear, GitHub, filesystem) mocked — test that Effect composition actually works end-to-end. 3) Test error channel propagation through composed layers. 4) Rename current 'integration' test files to 'unit' since they use full vi.mock. 5) Verify existing tests still pass after route rewrites."
+        },
+        "subItems": [
+          {
+            "id": "test-improvements.ac1",
+            "title": "httpHandler wrapper has full test coverage for all 10 error types",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-improvements.ac2",
+            "title": "At least one route has a test using *Live layers (not fully mocked)",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-improvements.ac3",
+            "title": "Mislabeled 'integration' test files renamed to 'unit'",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-improvements.ac4",
+            "title": "npm run typecheck, npm run lint, and npm test all pass",
+            "status": "completed",
+            "completed": "2026-04-05T23:15:00Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "http-handler",
+        "to": "rewrite-large-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "http-handler",
+        "to": "rewrite-medium-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "http-handler",
+        "to": "rewrite-small-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "rewrite-large-routes",
+        "to": "test-improvements",
+        "type": "blocks"
+      },
+      {
+        "from": "rewrite-medium-routes",
+        "to": "test-improvements",
+        "type": "blocks"
+      },
+      {
+        "from": "rewrite-small-routes",
+        "to": "test-improvements",
+        "type": "blocks"
+      },
+      {
+        "from": "service-fixes",
+        "to": "test-improvements",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "completed"
+}

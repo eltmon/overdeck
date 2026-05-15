@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, rmSync, existsSync } from 'fs';
+import { mkdirSync, rmSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
@@ -39,6 +39,8 @@ vi.mock('../../src/lib/tmux.js', () => ({
   getAgentSessions: vi.fn().mockResolvedValue([]),
   listPaneValuesAsync: vi.fn().mockResolvedValue([]),
   setOptionAsync: vi.fn().mockResolvedValue(undefined),
+  capturePane: vi.fn().mockResolvedValue('Claude Code'),
+  capturePaneAsync: vi.fn().mockResolvedValue('Claude Code'),
 }));
 
 vi.mock('../../src/lib/hooks.js', () => ({
@@ -237,6 +239,65 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const { setOptionAsync } = await import('../../src/lib/tmux.js');
       expect(setOptionAsync).toHaveBeenCalledWith(state.id, 'destroy-unattached', 'off');
       expect(setOptionAsync).toHaveBeenCalledWith(state.id, 'remain-on-exit', 'on');
+    });
+
+    it('launches review sub-roles in headless print mode and delivers prompt via tmux', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      vi.mocked(tmux.sessionExistsAsync)
+        .mockResolvedValueOnce(false)
+        .mockResolvedValue(true);
+      vi.mocked(tmux.capturePaneAsync).mockResolvedValue('Claude Code');
+
+      await spawnRun('PAN-SUBREVIEW-1', 'review', {
+        workspace: '/tmp/test-workspace',
+        subRole: 'security',
+        prompt: 'review this diff',
+      });
+
+      const launcher = readFileSync(join(getAgentDir('agent-pan-subreview-1-review-security'), 'launcher.sh'), 'utf8');
+
+      expect(launcher).toContain('exec claude --print');
+      expect(launcher).toContain("--name agent-pan-subreview-1-review-security --session-id '");
+      expect(launcher).not.toContain("< '");
+      expect(launcher).not.toContain("initial-prompt.md'");
+      expect(launcher).not.toContain('prompt=$(cat');
+      expect(launcher).not.toContain('"$prompt"');
+      expect(tmux.sendKeysAsync).toHaveBeenCalledWith(
+        'agent-pan-subreview-1-review-security',
+        'review this diff',
+      );
+    });
+
+    it('review sub-role launcher owns the REVIEWER_READY/FAILED/TIMEOUT signal (PAN-977)', async () => {
+      await spawnRun('PAN-SUBSIGNAL-1', 'review', {
+        workspace: '/tmp/test-workspace',
+        subRole: 'correctness',
+        prompt: 'review this diff',
+        reviewSynthesisAgentId: 'agent-pan-subsignal-1-review',
+        reviewOutputPath: '/tmp/out/review-correctness.md',
+      });
+
+      const agentDir = getAgentDir('agent-pan-subsignal-1-review-correctness');
+      const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
+
+      // The launcher — not the agent, not Deacon — owns the signal: it runs
+      // claude as a child (no exec) so the contract block runs on exit, and is
+      // HUP-immune so it outlives the (short-lived) tmux session.
+      expect(launcher).not.toContain('exec claude');
+      expect(launcher).toContain("trap '' HUP");
+      expect(launcher).toContain('timeout 1200 claude --print');
+      expect(launcher).toContain('CLAUDE_EXIT=$?');
+      expect(launcher).toContain(`echo $$ > '${join(agentDir, 'reviewer-launcher.pid')}'`);
+      expect(launcher).toContain('"REVIEWER_READY correctness /tmp/out/review-correctness.md"');
+      expect(launcher).toContain('"REVIEWER_FAILED correctness reviewer exited (code $CLAUDE_EXIT) without writing report"');
+      expect(launcher).toContain('"REVIEWER_TIMEOUT correctness reviewer exceeded 1200s deadline"');
+      expect(launcher).toContain(`touch '${join(agentDir, 'reviewer-signaled')}'`);
+      expect(launcher).toContain(`rm -f '${join(agentDir, 'reviewer-launcher.pid')}'`);
+
+      // Synthesis wiring is persisted on AgentState too (Deacon backup path).
+      const state = getAgentState('agent-pan-subsignal-1-review-correctness');
+      expect(state?.reviewSynthesisAgentId).toBe('agent-pan-subsignal-1-review');
+      expect(state?.reviewOutputPath).toBe('/tmp/out/review-correctness.md');
     });
 
     it('refuses to spawn when a role session is already in tmux', async () => {

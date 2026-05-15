@@ -1,5 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { mkdir, readFile, rename, writeFile } from 'fs/promises'
 import { join } from 'path'
+import { randomBytes } from 'crypto'
 
 import type { WorkspaceContinueState, WorkspacePanPaths } from './types.js'
 import {
@@ -10,6 +12,10 @@ import {
   PAN_SPEC_FILENAME,
   PAN_CONTEXT_FILENAME,
 } from './types.js'
+
+function uniqueTmpPath(path: string): string {
+  return `${path}.${process.pid}.${Date.now()}.${randomBytes(4).toString('hex')}.tmp`
+}
 
 function workspacePanPaths(workspacePath: string): WorkspacePanPaths {
   const panDir = join(workspacePath, PAN_DIRNAME)
@@ -84,8 +90,39 @@ export function writeWorkspaceContinue(workspacePath: string, state: WorkspaceCo
     created: state.created || now,
     updated: now,
   }
-  const tmp = `${continuePath}.tmp`
+  const tmp = uniqueTmpPath(continuePath)
   writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf-8')
   renameSync(tmp, continuePath)
+  return next
+}
+
+export async function readWorkspaceContinueAsync(workspacePath: string): Promise<WorkspaceContinueState | null> {
+  const { continuePath } = workspacePanPaths(workspacePath)
+  if (!existsSync(continuePath)) return null
+  const raw = await readFile(continuePath, 'utf-8')
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    throw new Error(`Invalid JSON in continue file ${continuePath}: ${(error as Error).message}`)
+  }
+  validateWorkspaceContinueState(parsed, continuePath)
+  return parsed
+}
+
+export async function writeWorkspaceContinueAsync(workspacePath: string, state: WorkspaceContinueState): Promise<WorkspaceContinueState> {
+  const { continuePath, panDir, feedbackDir } = workspacePanPaths(workspacePath)
+  await mkdir(panDir, { recursive: true })
+  await mkdir(feedbackDir, { recursive: true })
+  const now = new Date().toISOString()
+  const next: WorkspaceContinueState = {
+    ...state,
+    version: '1',
+    created: state.created || now,
+    updated: now,
+  }
+  const tmp = uniqueTmpPath(continuePath)
+  await writeFile(tmp, JSON.stringify(next, null, 2), 'utf-8')
+  await rename(tmp, continuePath)
   return next
 }

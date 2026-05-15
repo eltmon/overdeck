@@ -45,7 +45,6 @@ import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
-import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
 import { getAgentCommand } from '../../../lib/settings.js';
 import { getReviewStatus } from '../review-status.js';
@@ -62,7 +61,7 @@ import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
-import { findPlan } from '../../../lib/vbrief/io.js';
+import { readWorkspacePlanAsync } from '../../../lib/vbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -441,8 +440,22 @@ export async function fetchActivityDataWithContext(
     // and persist across review rounds, so we emit exactly four convoy reviewer
     // nodes anchored to the *most recent* review section in history.
     // Earlier review sections are skipped to avoid duplicate role nodes.
+    //
+    // Same for test and merge/ship: each role has one canonical session reused
+    // across rounds, so emit exactly one node anchored to the latest section.
+    // Without this, an issue with N test/merge history entries produced N
+    // same-sessionId nodes — the frontend collapsed them and the agent
+    // effectively vanished from the tree.
     const lastReviewIndex = specialistSections.reduce(
       (idx, s, i) => (s.type === 'review' ? i : idx),
+      -1,
+    );
+    const lastTestIndex = specialistSections.reduce(
+      (idx, s, i) => (s.type === 'test' ? i : idx),
+      -1,
+    );
+    const lastMergeIndex = specialistSections.reduce(
+      (idx, s, i) => (s.type === 'merge' ? i : idx),
       -1,
     );
     const resolvedProject = resolveProjectFromIssue(issueId);
@@ -495,10 +508,12 @@ export async function fetchActivityDataWithContext(
       if (ss.type === 'review') {
         if (i !== lastReviewIndex) continue;
         const synthesisRoundMetadata = await readSynthesisRounds(issueId, reviewerProjectKey);
-        const orchestratorSessionName = getTmuxSessionName('review-agent', reviewerProjectKey);
+        // PAN-1048: review orchestrator uses spawnRun naming — agent-<issue>-review
+        const orchestratorSessionName = `agent-${issueLower}-review`;
         const orchestratorPresence: SessionNodePresence = tmuxSessionNames.has(orchestratorSessionName)
           ? (ss.status === 'running' ? 'active' : 'idle')
           : 'ended';
+        const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
         sections.push({
           type: 'review',
           sessionId: orchestratorSessionName,
@@ -514,6 +529,8 @@ export async function fetchActivityDataWithContext(
           status: ss.status,
           presence: orchestratorPresence,
           roundMetadata: synthesisRoundMetadata,
+          hasJsonl: !!orchestratorJsonlPath,
+          tmuxSession: orchestratorSessionName,
         });
         const reviewerNodes = await buildReviewerNodes({
           issueId,
@@ -529,11 +546,29 @@ export async function fetchActivityDataWithContext(
         continue;
       }
 
-      // Normal handling for non-review types
+      // Normal handling for non-review types — test and merge/ship.
+      // Emit exactly one node per role, anchored to the latest section, the
+      // same way review does. Earlier sections are skipped (their history is
+      // still in the DB and surfaced via status history elsewhere).
+      if (ss.type === 'test' && i !== lastTestIndex) continue;
+      if (ss.type === 'merge' && i !== lastMergeIndex) continue;
+
+      // The pipeline's final stage is the `ship` role, spawned via
+      // spawnRun(issueId, 'ship') as tmux session `agent-<issue>-ship`. The
+      // `merge` history type tracks its status; surface it as a `ship` node
+      // pointed at the real session instead of the legacy `merge-agent` name.
+      // Both the test and ship roles are spawned via spawnRun(issueId, role),
+      // which names the tmux session `agent-<issue>-<role>` — not the legacy
+      // `specialist-<project>-<issue>-<role>-agent` form.
+      const isShipStage = ss.type === 'merge';
+      const nodeType: 'ship' | 'test' = isShipStage ? 'ship' : 'test';
+      const specialistSessionId = isShipStage
+        ? `agent-${issueLower}-ship`
+        : `agent-${issueLower}-test`;
+
       if (includeTranscripts && ss.status === 'running') {
-        const tmuxName = `specialist-${ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
         try {
-          const output = (await capturePaneAsync(tmuxName, 100)).trim();
+          const output = (await capturePaneAsync(specialistSessionId, 100)).trim();
           if (output && (output.includes(issueId.toUpperCase()) || output.includes(issueId) || output.includes(issueLower))) {
             transcriptParts.push(`\n--- Live Output ---\n${output}`);
           } else if (output) {
@@ -542,16 +577,7 @@ export async function fetchActivityDataWithContext(
         } catch { /* specialist may not be running */ }
       }
 
-      const specialistType = ss.type === 'test' ? 'test-agent' : 'merge-agent';
-      const specialistProjectKey = resolveProjectFromIssue(issueId)?.projectKey;
-      const specialistSessionId = getTmuxSessionName(
-        specialistType as never,
-        specialistProjectKey,
-        issueId,
-      );
-      const tmuxSessionName = specialistSessionId;
-
-      const specialistIsLive = tmuxSessionNames.has(tmuxSessionName);
+      const specialistIsLive = tmuxSessionNames.has(specialistSessionId);
       const specialistIsZombie = specialistIsLive && (ss.status === 'completed' || ss.status === 'failed');
       const specialistPresence: SessionNodePresence = specialistIsLive && !specialistIsZombie
         ? (ss.status === 'running' ? 'active' : 'idle')
@@ -559,7 +585,7 @@ export async function fetchActivityDataWithContext(
       const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
 
       sections.push({
-        type: ss.type,
+        type: nodeType,
         sessionId: specialistSessionId,
         model: 'specialist',
         startedAt: ss.startedAt,
@@ -670,6 +696,7 @@ async function fetchPlanningData(
     notes: Array<{ filename: string; content: string; uploadedAt: string }>;
     acceptanceProgress?: { completed: number; total: number; percent: number };
     stashCount?: number;
+    pipelineMirror?: unknown;
   } = { hasPrd: false, hasState: false, transcripts: [], discussions: [], notes: [] };
 
   // Helper: read PRD content from a location, handling both flat and subdir formats.
@@ -693,6 +720,24 @@ async function fetchPlanningData(
 
   const hasPlanningDir = await pathExists(planningDir);
   const hasPanContinue = await pathExists(panContinuePath);
+
+  // Acceptance criteria progress from vBRIEF plan (PAN-847)
+  // Pipeline mirror corroboration (PAN-977)
+  try {
+    const doc = await readWorkspacePlanAsync(workspacePath);
+    if (doc) {
+      const items = doc.plan.items;
+      if (items.length > 0) {
+        const completed = items.filter((i) => i.status === 'completed').length;
+        result.acceptanceProgress = {
+          completed,
+          total: items.length,
+          percent: Math.round((completed / items.length) * 100),
+        };
+      }
+      result.pipelineMirror = doc.plan.metadata?.pipeline;
+    }
+  } catch { /* no vBRIEF plan */ }
 
   if (!hasPlanningDir && !hasPanContinue) {
     const prd = await readPrdContent(findPrdAtStatus(projectPath, issueId, 'active'));
@@ -771,24 +816,6 @@ async function fetchPlanningData(
     return entries;
   };
 
-  // Acceptance criteria progress from vBRIEF plan (PAN-847)
-  try {
-    const planPath = findPlan(workspacePath);
-    if (planPath && await pathExists(planPath)) {
-      const raw = await readFile(planPath, 'utf-8');
-      const doc = JSON.parse(raw);
-      const items: Array<{ status?: string }> = doc?.plan?.items ?? [];
-      if (items.length > 0) {
-        const completed = items.filter((i) => i.status === 'completed').length;
-        result.acceptanceProgress = {
-          completed,
-          total: items.length,
-          percent: Math.round((completed / items.length) * 100),
-        };
-      }
-    }
-  } catch { /* no vBRIEF plan */ }
-
   if (summaryOnly) {
     const [transcriptFiles, discussionFiles, noteFiles] = await Promise.all([
       listArtifactFiles('transcripts'),
@@ -801,6 +828,7 @@ async function fetchPlanningData(
       hasState: result.hasState,
       hasInference: Boolean(result.inference && result.inference.trim() !== ''),
       acceptanceProgress: result.acceptanceProgress,
+      pipelineMirror: result.pipelineMirror,
       stashCount: result.stashCount,
       statusReviewedAt: result.statusReviewedAt,
       transcriptCount: transcriptFiles.length,

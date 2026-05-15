@@ -421,6 +421,10 @@ program
   .option('--max-slots <n>', 'Max concurrent agents')
   .option('--auto-advance', 'Automatically dispatch the next wave when the current one completes')
   .option('--no-auto-advance', 'Disable automatic next-wave dispatching for this swarm')
+  .option('--task <op>', 'vBRIEF task operation: next | show | claim | done | block | unblock | cancel')
+  .option('--item <id>', 'vBRIEF item ID for show/claim/done/block operations')
+  .option('--reason <text>', 'Reason for task status mutation')
+  .option('--sequence <n>', 'Expected vBRIEF plan.sequence for CAS-protected task mutations')
   .action(swarmCommand);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)

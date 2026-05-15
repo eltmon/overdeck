@@ -316,6 +316,7 @@ function isWorkOrSpecialistSession(session: SessionNodeType): boolean {
     || session.type === 'review'
     || session.type === 'reviewer'
     || session.type === 'test'
+    || session.type === 'ship'
     || session.type === 'merge';
 }
 
@@ -558,8 +559,9 @@ const TYPE_PRIORITY: Record<string, number> = {
   test: 2,
   reviewer: 3,
   planning: 4,
-  merge: 5,
-  legacy: 6,
+  ship: 5,
+  merge: 6,
+  legacy: 7,
 };
 
 const PRESENCE_PRIORITY: Record<string, number> = {
@@ -737,6 +739,7 @@ function FeatureContextMenu({
       const res = await fetch(`/api/review/${encodeURIComponent(feature.issueId)}/trigger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true }),
       });
       const data = await res.json().catch(() => ({})) as { error?: string; success?: boolean; message?: string };
       if (!res.ok) throw new Error(data.error || 'Failed to start review');

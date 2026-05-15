@@ -15,6 +15,7 @@ import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
 import { isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
+import { findPlan } from '../../lib/vbrief/io.js';
 import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 
@@ -532,14 +533,13 @@ export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean 
 }
 
 /**
- * Validate that the workspace vBRIEF belongs to the current issue.
- * If the spec is for a different issue, the workspace contains stale planning
- * artifacts and should not be used for work until planning is re-run.
+ * Validate that the resolved vBRIEF belongs to the current issue.
+ * Uses findPlan (resolves main-side spec first, then workspace fallback).
  */
 function validatePlanMatchesIssue(workspacePath: string, issueId: string): { valid: boolean; wrongIssue?: string } {
-  const planPath = getWorkspacePanPaths(workspacePath).specPath;
+  const planPath = findPlan(workspacePath);
 
-  if (!existsSync(planPath)) {
+  if (!planPath) {
     return { valid: true };
   }
 
@@ -839,7 +839,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       });
     }
 
-    if (options.auto && !existsSync(getWorkspacePanPaths(workspace).specPath)) {
+    if (options.auto && !findPlan(workspace)) {
       spinner.text = `Synthesizing minimal vBRIEF for ${id}...`;
       const issue = await fetchIssueForAutoStart(id);
       await writeAutoStartVBrief(projectRoot, workspace, issue);
@@ -861,7 +861,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
     if (!hasBeadsTasks(workspace, id)) {
       // If no planning was done, this is a simple issue — auto-create a bead so the agent can start
-      const hasPlanningState = existsSync(getWorkspacePanPaths(workspace).specPath);
+      const hasPlanningState = findPlan(workspace) !== null;
       if (!hasPlanningState) {
         spinner.text = `Auto-creating bead for simple issue ${id}...`;
         try {

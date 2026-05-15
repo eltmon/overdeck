@@ -29,7 +29,8 @@ import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatus } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
-import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../../lib/pan-dir/index.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
+import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -185,7 +186,7 @@ async function collectSessionTreeNodes(
     if (!stateText) continue;
 
     try {
-      const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string };
+      const state = JSON.parse(stateText) as { model?: string; startedAt?: string; createdAt?: string; status?: string; deliveryMethod?: 'auto' | 'channels' | 'tmux' };
       const isPlanning = checkId.startsWith('planning-');
       const sectionType = isPlanning ? 'planning' : 'work';
       if (isPlanning) hasPlanningSection = true;
@@ -224,6 +225,7 @@ async function collectSessionTreeNodes(
         awaitingInputPrompt: awaitingInput?.prompt,
         awaitingInputReason: awaitingInput?.reason,
         hasJsonl: !!jsonlPath,
+        deliveryMethod: state.deliveryMethod,
       });
     } catch {
       // skip malformed state
@@ -232,12 +234,9 @@ async function collectSessionTreeNodes(
 
   if (!hasPlanningSection) {
     const panContinuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
-    const panSpecPath = join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
     const planningPathForTimestamp = await pathExists(panContinuePath)
       ? panContinuePath
-      : await pathExists(panSpecPath)
-        ? panSpecPath
-        : null;
+      : null;
     if (planningPathForTimestamp) {
       const planningStat = await stat(planningPathForTimestamp).catch(() => null);
       const sessionId = `planning-${issueLower}-state`;
@@ -263,10 +262,12 @@ async function collectSessionTreeNodes(
       const resolvedProject = resolveProjectFromIssue(issueId);
       const reviewerProjectKey = resolvedProject?.projectKey ?? issuePrefix.toLowerCase();
       const synthesisRoundMetadata = await readSynthesisRounds(issueId, reviewerProjectKey);
-      const orchestratorSessionName = getTmuxSessionName('review-agent', reviewerProjectKey);
+      // PAN-1048: review orchestrator uses spawnRun naming — agent-<issue>-review
+      const orchestratorSessionName = `agent-${issueLower}-review`;
       const orchestratorPresence: SessionNodePresence = context.tmuxSessionNames.has(orchestratorSessionName)
         ? (latestReview.status === 'reviewing' ? 'active' : 'idle')
         : 'ended';
+      const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
       sections.push({
         type: 'review',
         sessionId: orchestratorSessionName,
@@ -277,6 +278,8 @@ async function collectSessionTreeNodes(
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
         presence: orchestratorPresence,
         roundMetadata: synthesisRoundMetadata,
+        hasJsonl: !!orchestratorJsonlPath,
+        tmuxSession: orchestratorSessionName,
       });
       const reviewerNodes = await buildReviewerNodes({
         issueId,
@@ -289,6 +292,51 @@ async function collectSessionTreeNodes(
         status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
       });
       sections.push(...reviewerNodes);
+    }
+
+    // Test role — one canonical session (`agent-<issue>-test`) reused across
+    // rounds, so emit a single node anchored to the latest `test` history
+    // entry, the same way review uses latestReview.
+    const testEntries = centralStatus.history.filter((entry) => entry.type === 'test');
+    const latestTest = testEntries[testEntries.length - 1];
+    if (latestTest) {
+      const testSessionName = `agent-${issueLower}-test`;
+      const testIsLive = context.tmuxSessionNames.has(testSessionName);
+      const testJsonlPath = await resolveJsonlPath(testSessionName, workspacePath);
+      sections.push({
+        type: 'test',
+        sessionId: testSessionName,
+        model: 'specialist',
+        startedAt: latestTest.timestamp,
+        endedAt: undefined,
+        duration: 0,
+        status: normalizeAgentStatus(latestTest.status === 'testing' ? 'running' : latestTest.status),
+        presence: testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended',
+        hasJsonl: !!testJsonlPath,
+        tmuxSession: testIsLive ? testSessionName : undefined,
+      });
+    }
+
+    // Ship role — final pipeline stage, spawnRun(issueId,'ship') →
+    // `agent-<issue>-ship`. The `merge` history type tracks its status.
+    const mergeEntries = centralStatus.history.filter((entry) => entry.type === 'merge');
+    const latestMerge = mergeEntries[mergeEntries.length - 1];
+    if (latestMerge) {
+      const shipSessionName = `agent-${issueLower}-ship`;
+      const shipIsLive = context.tmuxSessionNames.has(shipSessionName);
+      const shipJsonlPath = await resolveJsonlPath(shipSessionName, workspacePath);
+      sections.push({
+        type: 'ship',
+        sessionId: shipSessionName,
+        model: 'specialist',
+        startedAt: latestMerge.timestamp,
+        endedAt: undefined,
+        duration: 0,
+        status: normalizeAgentStatus(latestMerge.status === 'merging' ? 'running' : latestMerge.status),
+        presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
+        hasJsonl: !!shipJsonlPath,
+        tmuxSession: shipIsLive ? shipSessionName : undefined,
+      });
     }
   }
 
@@ -309,15 +357,14 @@ async function resolveFeatureTitle(
   if (project) {
     try {
       const projectPath = (project.config as { path: string }).path;
-      const workspaceConfig = (project.config as { workspace?: { workspaces_dir?: string } }).workspace;
-      const workspacesDir = join(projectPath, workspaceConfig?.workspaces_dir || 'workspaces');
-      const specContent = await readOptional(
-        join(workspacesDir, `feature-${issueLower}`, PAN_DIRNAME, PAN_SPEC_FILENAME),
-      );
-      if (specContent) {
-        const parsed = JSON.parse(specContent) as { plan?: { title?: string } };
-        const title = sanitizeDisplayTitle(parsed.plan?.title ?? '');
-        if (title) return title;
+      const entry = findSpecByIssue(projectPath, issueId);
+      if (entry) {
+        const specContent = await readOptional(entry.path);
+        if (specContent) {
+          const parsed = JSON.parse(specContent) as { plan?: { title?: string } };
+          const title = sanitizeDisplayTitle(parsed.plan?.title ?? '');
+          if (title) return title;
+        }
       }
     } catch { /* non-fatal */ }
   }

@@ -65,7 +65,11 @@ import { rm } from 'fs/promises';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
-import { sessionExistsAsync } from '../tmux.js';
+import { sessionExistsAsync, killSessionAsync } from '../tmux.js';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
 import { emitActivityEntry } from '../activity-logger.js';
 
 // State file for cross-process communication
@@ -181,7 +185,7 @@ function roleFromAgentId(agentId: string, issueId: string): Role | null {
  * with status:'starting' before the tmux session attaches, so filtering on
  * tmuxActive would race-spawn a second run.
  */
-async function activeRoleRunExists(issueId: string, role: Role): Promise<boolean> {
+async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: string): Promise<boolean> {
   const issueLower = issueId.toLowerCase();
 
   // C1: For 'plan', also check the legacy planning-pan-X session format
@@ -214,7 +218,30 @@ async function activeRoleRunExists(issueId: string, role: Role): Promise<boolean
     return false;
   }
 
-  return stateRole === role && state.status !== 'stopped' && state.status !== 'error';
+  const aliveByStatus = stateRole === role && state.status !== 'stopped' && state.status !== 'error';
+  if (!aliveByStatus) return false;
+
+  // Zombie detection: an agent that finished its work but never exited keeps
+  // status:'running' forever, which would block every future re-dispatch for
+  // this role (the ship/test stall bug). When we know the workspace and the
+  // run stamped a roleRunHead, compare it against the current workspace HEAD —
+  // a HEAD that has advanced past the marker means this session ran against
+  // stale code and must not be treated as the active run for the new HEAD.
+  if (workspacePath && state.roleRunHead) {
+    try {
+      const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: workspacePath });
+      const currentHead = stdout.trim();
+      if (currentHead && currentHead !== state.roleRunHead) {
+        console.log(
+          `[cloister] ${issueId}: ${role} session ${candidateId} is stale `
+          + `(ran against ${state.roleRunHead}, HEAD is now ${currentHead}) — not active`,
+        );
+        return false;
+      }
+    } catch { /* non-fatal — fall through to the status-only result */ }
+  }
+
+  return true;
 }
 
 function buildReactiveRolePrompt(issueId: string, state: string, role: Role): string {
@@ -263,16 +290,37 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
     return;
   }
 
-  if (await activeRoleRunExists(normalizedIssueId, role)) {
+  // Resolve the workspace up front so activeRoleRunExists can probe the
+  // workspace HEAD for stale-session (zombie) detection.
+  const workspace = await resolveWorkspaceForIssue(normalizedIssueId);
+
+  if (await activeRoleRunExists(normalizedIssueId, role, workspace ?? undefined)) {
     const message = `${normalizedIssueId}: ${role} role already active; skipping lifecycle spawn`;
     console.log(`[cloister] ${message}`);
     emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
     return;
   }
 
+  // activeRoleRunExists returned false. If a tmux session for this role still
+  // physically exists, it's a zombie (agent finished work but never exited,
+  // and the workspace HEAD has since advanced). Kill it before re-dispatch so
+  // the fresh run gets a clean session name instead of colliding with the
+  // dead one.
+  const issueLower = normalizedIssueId.toLowerCase();
+  const roleSessionId = role === 'work' ? `agent-${issueLower}` : `agent-${issueLower}-${role}`;
+  if (await sessionExistsAsync(roleSessionId)) {
+    const message = `${normalizedIssueId}: killing stale ${role} session ${roleSessionId} before re-dispatch`;
+    console.log(`[cloister] ${message}`);
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    try {
+      await killSessionAsync(roleSessionId);
+    } catch (err) {
+      console.error(`[cloister] failed to kill stale session ${roleSessionId}:`, err instanceof Error ? err.message : String(err));
+    }
+  }
+
   try {
     if (role === 'review') {
-      const workspace = await resolveWorkspaceForIssue(normalizedIssueId);
       if (!workspace) {
         const failure = `${normalizedIssueId}: cannot dispatch review role — no workspace or project resolved`;
         console.error(`[cloister] ${failure}`);
@@ -289,10 +337,9 @@ export async function onIssueStateChange(issueId: string, newState: string): Pro
     }
 
     if (role === 'test') {
-      const workspace = (await resolveWorkspaceForIssue(normalizedIssueId)) ?? undefined;
       const branch = `feature/${normalizedIssueId.toLowerCase()}`;
       const { dispatchTestAgentAndNotify } = await import('./test-agent-queue.js');
-      await dispatchTestAgentAndNotify(normalizedIssueId, workspace, branch);
+      await dispatchTestAgentAndNotify(normalizedIssueId, workspace ?? undefined, branch);
       const message = `${normalizedIssueId}: test role dispatched from lifecycle state '${newState}'`;
       console.log(`[cloister] ${message}`);
       emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });

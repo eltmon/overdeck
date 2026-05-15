@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1014",
   "created": "2026-05-07T18:21:58.947Z",
-  "updated": "2026-05-12T20:06:25.334Z",
+  "updated": "2026-05-13T03:40:18.771Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -239,6 +239,16 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-4-6",
       "timestamp": "2026-05-12T20:06:25.334Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-05-13T03:35:18.603Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-4-6",
+      "timestamp": "2026-05-13T03:40:18.771Z"
     }
   ]
 }

@@ -1,0 +1,278 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-14T21:33:26Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-697: Reorganize root-level artifacts into professional top-level structure"
+  },
+  "plan": {
+    "id": "pan-697",
+    "title": "Reorganize root-level artifacts into professional top-level structure",
+    "status": "approved",
+    "uid": "d6ab1462-abe5-4176-8998-07b411eb4a96",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-14T21:33:26Z",
+    "updated": "2026-04-14T21:33:26Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/697",
+        "label": "PAN-697",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-697/docs/prds/active/pan-697-root-artifact-cleanup-spec.md",
+        "label": "pan-697-root-artifact-cleanup-spec.md",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/panopticon-cli/docs/prds/active/pan-697-root-artifact-cleanup-spec.md",
+        "label": "pan-697-root-artifact-cleanup-spec.md",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cleanup",
+      "docs",
+      "repo-hygiene"
+    ],
+    "narratives": {
+      "Problem": "The repo root mixes canonical entrypoint files with stray audit reports, historical writeups, and unused screenshots. The top level looks improvised rather than intentional — a poor first impression for anyone opening the repo.",
+      "Proposal": "Move the 14 listed artifacts into purpose-specific homes under docs/ using git mv (audits -> docs/audits/, historical writeups -> docs/history/, screenshots -> docs/screenshots/root-cleanup/). Update the one internal reference in docs/AGENT_TYPES_INDEX.md. Document the root-directory policy in docs/REPO-ARTIFACTS.md. No source-code reorg, no content rewrites."
+    },
+    "items": [
+      {
+        "id": "move-audits",
+        "title": "Move root audit artifacts to docs/audits/",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T21:33:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-697"
+        },
+        "narrative": {
+          "Action": "Create docs/audits/ and git mv the three audit/investigation artifacts (AGENT_AUDIT_REPORT.md, BUGS_FOUND.md, gemini-gaps-found.md) from the repo root into it. Use git mv to preserve history. Do not modify file contents."
+        },
+        "subItems": [
+          {
+            "id": "move-audits.ac1",
+            "title": "docs/audits/ directory exists and contains AGENT_AUDIT_REPORT.md, BUGS_FOUND.md, and gemini-gaps-found.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-audits.ac2",
+            "title": "None of AGENT_AUDIT_REPORT.md, BUGS_FOUND.md, or gemini-gaps-found.md exist at the repo root anymore",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-audits.ac3",
+            "title": "git log --follow docs/audits/AGENT_AUDIT_REPORT.md shows pre-move history (git mv was used, not delete+add)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-audits.ac4",
+            "title": "File contents are byte-identical to the pre-move versions (no edits during the move)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-history",
+        "title": "Move historical writeups to docs/history/",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T21:33:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-697"
+        },
+        "narrative": {
+          "Action": "Create docs/history/ and git mv the two historical writeups (IMPLEMENTATION_SUMMARY.md, PAN-428-CODEX-FEEDBACK.md) from the repo root into it. Use git mv to preserve history. Do not modify file contents."
+        },
+        "subItems": [
+          {
+            "id": "move-history.ac1",
+            "title": "docs/history/ directory exists and contains IMPLEMENTATION_SUMMARY.md and PAN-428-CODEX-FEEDBACK.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-history.ac2",
+            "title": "Neither IMPLEMENTATION_SUMMARY.md nor PAN-428-CODEX-FEEDBACK.md exists at the repo root anymore",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-history.ac3",
+            "title": "git log --follow on each moved file shows pre-move history (git mv was used)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-history.ac4",
+            "title": "File contents are byte-identical to the pre-move versions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-screenshots",
+        "title": "Move root screenshots to docs/screenshots/root-cleanup/",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T21:33:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-697"
+        },
+        "narrative": {
+          "Action": "Create docs/screenshots/root-cleanup/ and git mv all nine root-level PNG screenshots (command-deck-full.png, command-deck.png, composer-fullpage.png, composer-visible.png, dashboard-home.png, dropdown-narrow.png, dropdown-open.png, final-dropdown-test.png, normal-viewport.png) into it. Discovery confirmed zero inbound references, so no link updates are required — but verify again after the move with a grep sweep."
+        },
+        "subItems": [
+          {
+            "id": "move-screenshots.ac1",
+            "title": "docs/screenshots/root-cleanup/ directory exists and contains all nine named PNG files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-screenshots.ac2",
+            "title": "None of the nine PNG basenames exists at the repo root anymore",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-screenshots.ac3",
+            "title": "Each moved PNG retains its git history via git mv (not delete+add)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-screenshots.ac4",
+            "title": "Post-move grep for the nine basenames across the repo (excluding node_modules, .venv, .git, .planning, and the PAN-697 spec/plan files) returns no results pointing at the old root paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-refs",
+        "title": "Update the AGENT_AUDIT_REPORT.md reference in docs/AGENT_TYPES_INDEX.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T21:33:26Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-697"
+        },
+        "narrative": {
+          "Action": "Update the one known internal reference to AGENT_AUDIT_REPORT.md in docs/AGENT_TYPES_INDEX.md (line 109 at planning time) so it points at the new path under docs/audits/. Then run a final grep sweep across the repo for the five moved markdown basenames (AGENT_AUDIT_REPORT.md, BUGS_FOUND.md, IMPLEMENTATION_SUMMARY.md, PAN-428-CODEX-FEEDBACK.md, gemini-gaps-found.md) to confirm no other stale references remain outside planning/spec artifacts."
+        },
+        "subItems": [
+          {
+            "id": "update-refs.ac1",
+            "title": "docs/AGENT_TYPES_INDEX.md references AGENT_AUDIT_REPORT.md at its new docs/audits/ path (or as a plain filename reference that is unambiguously correct post-move)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-refs.ac2",
+            "title": "A repo-wide grep for each of the five moved markdown basenames (excluding node_modules, .venv, .git, .planning, docs/prds/active/pan-697/, and the moved files themselves) reveals no references still pointing at the old root location",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "document-policy",
+        "title": "Document the repo-root policy in docs/REPO-ARTIFACTS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T21:33:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-697"
+        },
+        "narrative": {
+          "Action": "Extend docs/REPO-ARTIFACTS.md with a new 'Repo root policy' section that states the repo root is reserved for canonical entrypoint docs, standard project metadata, and first-class project directories; that audit artifacts belong under docs/audits/; historical writeups under docs/history/; and screenshots under docs/screenshots/ (with a named subdirectory per batch, e.g. root-cleanup/). Include the explicit allowlist of files that stay at root as documented in the spec."
+        },
+        "subItems": [
+          {
+            "id": "document-policy.ac1",
+            "title": "docs/REPO-ARTIFACTS.md contains a new section titled 'Repo root policy' (or equivalent heading) describing what belongs at the repo root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-policy.ac2",
+            "title": "The new section lists the canonical root-allowed files from the spec (README.md, CLAUDE.md, AGENTS.md, CONTRIBUTING.md, LICENSE, package.json, bun.lock, bunfig.toml, tsconfig.json, tsdown.config.ts, vitest.config.ts, vitest.workspace.ts, typedoc.json, commitlint.config.js, .gitignore, .gitattributes, .eslintrc.json, .env.remote, introduction.mdx, quickstart.mdx, concepts.mdx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-policy.ac3",
+            "title": "The new section names the destinations for non-root artifacts: docs/audits/ for audits/investigations, docs/history/ for historical writeups, docs/screenshots/<batch>/ for screenshots",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-policy.ac4",
+            "title": "The section includes the rule: 'The repo root is reserved for canonical entrypoint docs, standard project metadata, and first-class project directories. Audit artifacts, screenshots, exploratory writeups, and historical notes must live under a purpose-specific subdirectory.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "move-audits",
+        "to": "update-refs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

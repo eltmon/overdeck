@@ -17,7 +17,7 @@ import { cleanupLegacyRuntimeSymlinks, migrateSyncTargets } from '../../lib/conf
 import { cleanupAgentDirectories } from '../../lib/agent-directory-cleanup.js';
 import { migratePanopticonToPan } from '../../lib/workspace-manager.js';
 import { runMultiToolSync, resolveAlsoSyncTools } from '../../lib/multi-tool-sync.js';
-import { ensurePlaywrightIsolation } from '../../lib/claude-mcp.js';
+import { ensurePlaywrightIsolation, ensureExcalidrawMcp } from '../../lib/claude-mcp.js';
 
 // Get path to bundled git hooks
 const __filename = fileURLToPath(import.meta.url);
@@ -333,14 +333,24 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-  // Enforce Playwright MCP --isolated flag to prevent stale zoom/profile state
+  // Enforce Panopticon-managed MCP server defaults: Playwright --isolated
+  // flag (prevents stale zoom/profile state) and the off-the-shelf Excalidraw
+  // MCP server (backs the /excalidraw skill). Both helpers are idempotent and
+  // mutate the parsed config in place; we only write back if anything changed.
   const mcpPath = join(homedir(), '.claude', 'mcp.json');
   try {
     if (existsSync(mcpPath)) {
       const mcpConfig = JSON.parse(readFileSync(mcpPath, 'utf-8'));
-      if (ensurePlaywrightIsolation(mcpConfig)) {
+      const playwrightChanged = ensurePlaywrightIsolation(mcpConfig);
+      const excalidrawChanged = ensureExcalidrawMcp(mcpConfig);
+      if (playwrightChanged || excalidrawChanged) {
         writeFileSync(mcpPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+      }
+      if (playwrightChanged) {
         console.log(chalk.green('✓ Added --isolated to Playwright MCP (prevents stale zoom/profile state)'));
+      }
+      if (excalidrawChanged) {
+        console.log(chalk.green('✓ Registered Excalidraw MCP server (backs the /excalidraw skill)'));
       }
     }
   } catch {

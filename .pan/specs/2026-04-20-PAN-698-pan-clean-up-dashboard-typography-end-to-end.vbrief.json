@@ -1,0 +1,727 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-20T22:50:32Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-698: clean up dashboard typography end-to-end",
+    "updated": "2026-04-25T10:51:44.851Z"
+  },
+  "plan": {
+    "id": "pan-698",
+    "title": "PAN: clean up dashboard typography end-to-end",
+    "status": "approved",
+    "uid": "906eb245-3d32-4f13-99aa-04d35fb0530e",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 159,
+    "created": "2026-04-20T22:50:32Z",
+    "updated": "2026-04-25T10:51:44.851Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/698",
+        "label": "PAN-698",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/pan-dashboard-typography-cleanup.md",
+        "label": "Committed PRD",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "typography",
+      "cleanup",
+      "design-system"
+    ],
+    "narratives": {
+      "Problem": "Dashboard typography has drifted into three competing systems: the intended canonical Tailwind tokens (DM Sans body, SF Mono, Space Grotesk display), a Mission Control island (Inter/SF Pro/Segoe UI hardcoded stacks, mono conversation titles), and ad hoc display-font and mono usage across non–God-View components. The style guide is ambiguous, so drift keeps returning.",
+      "Proposal": "Establish one enforceable policy: DM Sans for all non–God-View UI; SF Mono only for code and technical identifiers; Space Grotesk only for the sidebar Panopticon wordmark; God View untouched. Normalize canonical stacks in the typography foundation, eliminate the Mission Control island, convert non-wordmark display-font usage to DM Sans, replace ad hoc mono stacks, normalize conversation prose vs code, sweep the rest of the non–God-View dashboard, rewrite STYLE-GUIDE.md with crisp boundaries, align related PRDs/docs, and verify with static grep + isolated Playwright + quality gates."
+    },
+    "items": [
+      {
+        "id": "foundation",
+        "title": "Normalize typography foundation stacks",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "Confirm tailwind.config.js fontFamily.body/mono/display map to DM Sans, SF Mono stack, Space Grotesk. Ensure index.css body default is DM Sans and .terminal-output (and any global mono rules) use the canonical SF Mono stack. Ensure index.html loads DM Sans and Space Grotesk. This bead only touches the foundation files so downstream beads can reference canonical tokens."
+        },
+        "subItems": [
+          {
+            "id": "foundation.ac1",
+            "title": "tailwind.config.js fontFamily.body = DM Sans stack, fontFamily.mono = canonical SF Mono stack, fontFamily.display = Space Grotesk",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.909Z"
+          },
+          {
+            "id": "foundation.ac2",
+            "title": "index.css body rule uses font-body (DM Sans); .terminal-output and any global mono rules use the canonical SF Mono stack",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.909Z"
+          },
+          {
+            "id": "foundation.ac3",
+            "title": "index.html font loading covers DM Sans and Space Grotesk; no dead font links",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.909Z"
+          },
+          {
+            "id": "foundation.ac4",
+            "title": "No foundation file hardcodes Inter, SF Pro, Segoe UI, Menlo, Monaco, or Courier New outside the canonical mono fallback chain",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.909Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.851Z"
+      },
+      {
+        "id": "mc-css-island",
+        "title": "Eliminate Mission Control typography island",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "Rewrite mission-control.module.css so --mc-font-family points to the canonical DM Sans stack and --mc-font-mono to the canonical SF Mono stack. Remove the hardcoded Segoe UI / -apple-system / SF Pro / Inter stacks in .chatMarkdown, .conversationName, .userMessageText, message metadata, controls, headers, and inputs. Keep mono only where content is genuinely technical (code elements, identifier sub-elements)."
+        },
+        "subItems": [
+          {
+            "id": "mc-css-island.ac1",
+            "title": "--mc-font-family resolves to DM Sans canonical stack; --mc-font-mono resolves to canonical SF Mono stack",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.903Z"
+          },
+          {
+            "id": "mc-css-island.ac2",
+            "title": "No raw Inter, SF Pro, Segoe UI, or -apple-system sans stacks remain anywhere in mission-control.module.css",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.904Z"
+          },
+          {
+            "id": "mc-css-island.ac3",
+            "title": ".chatMarkdown, .userMessageText, message metadata/controls/headers/inputs all inherit DM Sans (no local font-family sans override)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.904Z"
+          },
+          {
+            "id": "mc-css-island.ac4",
+            "title": "Mono preserved in mission-control.module.css only on code/pre elements and identifier sub-elements (explicit comment explains why for each remaining mono rule)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.904Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.849Z"
+      },
+      {
+        "id": "conv-list-titles",
+        "title": "Convert conversation list titles to DM Sans prose",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "Remove mono styling from .conversationName and any ConversationList.tsx className overrides. Titles render as DM Sans human-readable prose. Session IDs shown as metadata remain mono."
+        },
+        "subItems": [
+          {
+            "id": "conv-list-titles.ac1",
+            "title": ".conversationName renders in DM Sans (no font-mono / SF Mono)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.904Z"
+          },
+          {
+            "id": "conv-list-titles.ac2",
+            "title": "ConversationList.tsx has no className or inline style forcing mono on title text",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.904Z"
+          },
+          {
+            "id": "conv-list-titles.ac3",
+            "title": "Technical identifiers (session IDs, run IDs) shown as metadata beneath titles remain in SF Mono",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.904Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.849Z"
+      },
+      {
+        "id": "chat-prose",
+        "title": "Normalize chat message prose to DM Sans, mono for code only",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "Sweep chat components (ConversationPanel, MessagesTimeline, ChatMarkdown, ComposerFooter, ComposerPromptEditor, DraftConversationPanel). User and assistant prose, headings, lists, tables, blockquotes render DM Sans. Inline code, fenced code blocks, and technical identifiers (paths, hashes, model IDs, issue IDs when shown as identifiers) render SF Mono. No ad hoc font-family stacks in these files."
+        },
+        "subItems": [
+          {
+            "id": "chat-prose.ac1",
+            "title": "User message text and assistant markdown prose render DM Sans in rendered output (verified in browser)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.902Z"
+          },
+          {
+            "id": "chat-prose.ac2",
+            "title": "Markdown headings, lists, tables, and blockquotes render DM Sans",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.902Z"
+          },
+          {
+            "id": "chat-prose.ac3",
+            "title": "Inline code (<code>) and fenced code blocks (<pre><code>) render in canonical SF Mono stack",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.902Z"
+          },
+          {
+            "id": "chat-prose.ac4",
+            "title": "Composer and prompt editor input fields render DM Sans for prose and SF Mono only for embedded technical tokens",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.903Z"
+          },
+          {
+            "id": "chat-prose.ac5",
+            "title": "No chat/* file contains hardcoded Inter, SF Pro, Segoe UI, -apple-system, Menlo, Monaco, or Courier New font stacks",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.903Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.848Z"
+      },
+      {
+        "id": "sidebar-wordmark",
+        "title": "Restrict Sidebar font-display to Panopticon wordmark only",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "Sidebar.tsx: keep font-display on the upper-left Panopticon wordmark only. All nav labels, section headings, badges, counts, and any other sidebar text use DM Sans. Document the wordmark carve-out with an inline comment referencing this issue."
+        },
+        "subItems": [
+          {
+            "id": "sidebar-wordmark.ac1",
+            "title": "Only the Panopticon wordmark element uses font-display in Sidebar.tsx",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.908Z"
+          },
+          {
+            "id": "sidebar-wordmark.ac2",
+            "title": "All other sidebar text nodes render DM Sans",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.909Z"
+          },
+          {
+            "id": "sidebar-wordmark.ac3",
+            "title": "Inline comment at the wordmark element documents the carve-out and cites PAN-698",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.909Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.851Z"
+      },
+      {
+        "id": "awaiting-merge",
+        "title": "Convert AwaitingMergePage title from font-display to DM Sans",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "AwaitingMergePage.tsx: remove font-display on the page title; title renders DM Sans."
+        },
+        "subItems": [
+          {
+            "id": "awaiting-merge.ac1",
+            "title": "AwaitingMergePage page title renders DM Sans; no font-display usage remains in the file",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.907Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.850Z"
+      },
+      {
+        "id": "metrics-row",
+        "title": "Convert MetricsSummaryRow values from font-display to DM Sans",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "MetricsSummaryRow.tsx: metric values render DM Sans; no font-display usage remains."
+        },
+        "subItems": [
+          {
+            "id": "metrics-row.ac1",
+            "title": "All metric values in MetricsSummaryRow render DM Sans; no font-display utility remains in the file",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.908Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.850Z"
+      },
+      {
+        "id": "xterminal-mono",
+        "title": "Replace XTerminal ad hoc mono stack with canonical SF Mono",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "XTerminal.tsx: replace 'Menlo, Monaco, \"Courier New\", monospace' with the canonical SF Mono stack used elsewhere. If xterm.js requires a direct string, source it from a shared constant or the canonical stack literal."
+        },
+        "subItems": [
+          {
+            "id": "xterminal-mono.ac1",
+            "title": "XTerminal font option resolves to the canonical SF Mono stack; no Menlo/Monaco/Courier New literal remains",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.903Z"
+          },
+          {
+            "id": "xterminal-mono.ac2",
+            "title": "Terminal panel still renders correctly after the swap (verified in browser; characters legible, cursor sized correctly)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.903Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.849Z"
+      },
+      {
+        "id": "sweep-audit",
+        "title": "Repo-wide sweep: remove remaining non–God-View font drift",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "Grep src/dashboard/frontend (excluding components/GodView/**) for: font-family declarations, font-display utility usage, raw Inter/SF Pro/Segoe UI/-apple-system/Menlo/Monaco/Courier New strings, and decorative font-mono on non-technical content. Convert each hit to the canonical stack per policy. Audit specifically: App.tsx, KanbanBoard.tsx, InspectorPanel.tsx, ActivityPanel.tsx, AgentList.tsx, AgentDetailView.tsx, CostsPage.tsx, MetricsPage.tsx, HealthDashboard.tsx, PlanDialog.tsx, Settings/SettingsPage.tsx, vbrief/VBriefHeader.tsx, vbrief/VBriefViewer.tsx, pages/SpecialistDetail.tsx."
+        },
+        "subItems": [
+          {
+            "id": "sweep-audit.ac1",
+            "title": "grep -r 'font-display' src/dashboard/frontend --exclude-dir=GodView returns exactly one hit: the Sidebar.tsx Panopticon wordmark",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.905Z"
+          },
+          {
+            "id": "sweep-audit.ac2",
+            "title": "grep for 'Inter'|'SF Pro'|'Segoe UI'|'Menlo'|'Monaco'|'Courier New' in src/dashboard/frontend (excluding GodView and the canonical mono fallback chain in the foundation files) returns zero hits",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.905Z"
+          },
+          {
+            "id": "sweep-audit.ac3",
+            "title": "Every remaining font-mono usage in non–God-View components is on code, terminal, command, or identifier content (documented in the PR description)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.906Z"
+          },
+          {
+            "id": "sweep-audit.ac4",
+            "title": "No GodView/* file is modified by this bead",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.906Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.849Z"
+      },
+      {
+        "id": "style-guide",
+        "title": "Rewrite STYLE-GUIDE.md typography section with crisp boundaries",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "design/style-guide/STYLE-GUIDE.md: rewrite the typography section to encode the final policy exactly. Default non–God-View UI = DM Sans. Technical strings/code = SF Mono (enumerate the categories). Sidebar Panopticon wordmark = only approved non–God-View display-font exception. Conversations = DM Sans prose, SF Mono for code and technical strings only. God View uses its own scoped system. Remove all ambiguous heuristics (e.g. 'use judgment if the heading has a g')."
+        },
+        "subItems": [
+          {
+            "id": "style-guide.ac1",
+            "title": "Typography section states the four canonical rules explicitly (DM Sans default, SF Mono for technical, Space Grotesk only for sidebar wordmark, God View scoped exception)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.906Z"
+          },
+          {
+            "id": "style-guide.ac2",
+            "title": "Conversation typography rule is explicit: prose DM Sans, code/identifier SF Mono",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.906Z"
+          },
+          {
+            "id": "style-guide.ac3",
+            "title": "No ambiguous judgment-based heuristics remain in the typography section",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.906Z"
+          },
+          {
+            "id": "style-guide.ac4",
+            "title": "Section enumerates the technical-string categories that warrant mono (session IDs, run IDs, paths, env vars, hashes, model IDs, branch names, tool names, vBRIEF IDs)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.906Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.850Z"
+      },
+      {
+        "id": "docs-align",
+        "title": "Align related PRDs/docs with final typography policy",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "Update docs/prds/active/pan-460/STATE.md to match the final boundary. Review design/prd/PRD-REBRAND.md, docs/MISSION-CONTROL.md, docs/SETTINGS-UI-DESIGN.md and correct any statement that conflicts with the final policy. If a doc is untouched, note that in the PR description with a one-line justification."
+        },
+        "subItems": [
+          {
+            "id": "docs-align.ac1",
+            "title": "docs/prds/active/pan-460/STATE.md typography statements match the final policy (no conflicts)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.905Z"
+          },
+          {
+            "id": "docs-align.ac2",
+            "title": "PRD-REBRAND.md, MISSION-CONTROL.md, SETTINGS-UI-DESIGN.md either updated to match the final policy or explicitly confirmed non-conflicting in the PR description",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.905Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.849Z"
+      },
+      {
+        "id": "playwright-verify",
+        "title": "Playwright visual verification of non–God-View typography surfaces",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "Using an ISOLATED Playwright browser instance/profile (not shared with any other agent's session), navigate the running dashboard and verify: sidebar wordmark (Space Grotesk) vs nav labels (DM Sans); conversation list titles (DM Sans) vs session ID metadata (SF Mono); user message prose (DM Sans), assistant markdown prose (DM Sans), inline code (SF Mono), fenced code (SF Mono); metrics row (DM Sans); awaiting-merge page title (DM Sans); both light and dark modes. Capture screenshots into the PR description. Verification must not depend on another agent's browser state."
+        },
+        "subItems": [
+          {
+            "id": "playwright-verify.ac1",
+            "title": "Verification runs in an isolated Playwright browser instance/profile; session setup is self-contained and reproducible",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.901Z"
+          },
+          {
+            "id": "playwright-verify.ac2",
+            "title": "Sidebar wordmark renders Space Grotesk while adjacent nav labels render DM Sans (screenshot attached)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.901Z"
+          },
+          {
+            "id": "playwright-verify.ac3",
+            "title": "Conversation list titles render DM Sans; a conversation panel shows DM Sans prose with SF Mono inline+fenced code (screenshots attached)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.901Z"
+          },
+          {
+            "id": "playwright-verify.ac4",
+            "title": "MetricsSummaryRow values and AwaitingMergePage title render DM Sans (screenshots attached)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.901Z"
+          },
+          {
+            "id": "playwright-verify.ac5",
+            "title": "Both light and dark modes verified; no font regression between themes",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.901Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.848Z"
+      },
+      {
+        "id": "quality-gates",
+        "title": "Pass typecheck, lint, and test gates",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-20T22:50:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-698"
+        },
+        "narrative": {
+          "Action": "Run npm run typecheck, npm run lint, npm test from workspace root. Fix any breakage caused by this cleanup (e.g., snapshot tests, className assertions). No suppressions or skipped tests."
+        },
+        "subItems": [
+          {
+            "id": "quality-gates.ac1",
+            "title": "npm run typecheck passes with no new errors",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.907Z"
+          },
+          {
+            "id": "quality-gates.ac2",
+            "title": "npm run lint passes with no new errors or warnings",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.907Z"
+          },
+          {
+            "id": "quality-gates.ac3",
+            "title": "npm test passes; any snapshot or assertion updates are justified by the policy change (not suppressions)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-25T07:41:40.907Z"
+          }
+        ],
+        "completed": "2026-04-25T10:51:44.850Z"
+      }
+    ],
+    "edges": [
+      {
+        "from": "foundation",
+        "to": "mc-css-island",
+        "type": "blocks"
+      },
+      {
+        "from": "foundation",
+        "to": "xterminal-mono",
+        "type": "blocks"
+      },
+      {
+        "from": "mc-css-island",
+        "to": "conv-list-titles",
+        "type": "blocks"
+      },
+      {
+        "from": "mc-css-island",
+        "to": "chat-prose",
+        "type": "blocks"
+      },
+      {
+        "from": "foundation",
+        "to": "sidebar-wordmark",
+        "type": "informs"
+      },
+      {
+        "from": "foundation",
+        "to": "awaiting-merge",
+        "type": "informs"
+      },
+      {
+        "from": "foundation",
+        "to": "metrics-row",
+        "type": "informs"
+      },
+      {
+        "from": "mc-css-island",
+        "to": "sweep-audit",
+        "type": "informs"
+      },
+      {
+        "from": "chat-prose",
+        "to": "sweep-audit",
+        "type": "informs"
+      },
+      {
+        "from": "sidebar-wordmark",
+        "to": "sweep-audit",
+        "type": "informs"
+      },
+      {
+        "from": "awaiting-merge",
+        "to": "sweep-audit",
+        "type": "informs"
+      },
+      {
+        "from": "metrics-row",
+        "to": "sweep-audit",
+        "type": "informs"
+      },
+      {
+        "from": "xterminal-mono",
+        "to": "sweep-audit",
+        "type": "informs"
+      },
+      {
+        "from": "sweep-audit",
+        "to": "style-guide",
+        "type": "informs"
+      },
+      {
+        "from": "style-guide",
+        "to": "docs-align",
+        "type": "informs"
+      },
+      {
+        "from": "sweep-audit",
+        "to": "playwright-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "chat-prose",
+        "to": "playwright-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "playwright-verify",
+        "to": "quality-gates",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}

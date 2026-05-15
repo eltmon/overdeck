@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1053",
   "created": "2026-05-12T18:58:01.177Z",
-  "updated": "2026-05-12T21:37:38.077Z",
+  "updated": "2026-05-13T03:38:18.432Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -309,15 +309,42 @@
       "reason": "feedback",
       "note": "[2026-05-12T21:37Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-12T21:37:38.077Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-12T21:51Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-12T21:51:25.319Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-12T21:54Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-12T21:54:27.782Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T21:54:27.878Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-12T22:09Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-05-12T22:09:31.696Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-12T22:09:32.011Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-13T02:43Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-13T02:43:10.776Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-13T02:43:10.807Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-05-12T21:37:38Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1053\n\n# Review Synthesis — PAN-1053 — 2026-05-12\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: `.pan/review/agent-pan-1053-review-a7ef2b88/context.json`\n- Branch: `feature/pan-1053`\n- Workspace: `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053`\n\n## Convoy Status\n| Sub-role | Status | Blocking findings |\n| --- | --- | --- |\n| security | done | 2 |\n| correctness | done | 2 |\n| performance | done | 0 |\n| requirements | done | 1 (+ 1 partial linked to same gap) |\n\n## Blocking Findings\n\n### [security] Cross-Site WebSocket Hijacking on `/ws/voice` and `/ws/autopreso` — `src/dashboard/server/ws-voice.ts:41-47`, `src/dashboard/server/ws-autopreso.ts:27-33`\nUpgrade handlers accept any request matching the path with no origin allowlist, token, or session check. Any web page the user visits can open `ws://pan.localhost/ws/autopreso` (exfiltrating live whiteboard snapshots/updates) or `ws://pan.localhost/ws/voice` (spawning a moonshine sidecar per connection; streaming mic PCM if the page has prior mic permission). Fix: validate `request.headers.origin` against an explicit allowlist before `wss.handleUpgrade`; consider a short-lived token query param. Apply the same origin gate to the autopreso REST mutation routes.\n\n### [security] Plaintext Google Cloud STT API key returned by unauthenticated GET — `src/dashboard/server/routes/voice.ts:91-95`\n`GET /api/voice/settings` returns the entire `stt.googleCloud.apiKey` in JSON; `PUT` writes the file with default umask. Any same-origin context (stale tab, service worker, future stored-XSS via user-controlled inputs rendered in the dashboard) can exfiltrate Google Cloud credentials. Fix: return only `hasApiKey: boolean` over HTTP, accept writes only; `chmod 0600` after write; gate the routes.\n\n### [correctness] `MoonshineTranscription.stop()` resets the `stopping` guard synchronously — `src/voice/transcription.ts:88-92`\n`this.stopping = true; writeJson({type:'stop'}); this.stopping = false;` runs on a single tick; sidecar exits later, so the `exit` handler fires `emitError(\"Moonshine sidecar exited unexpectedly\")` on every intentional stop, propagating a spurious `transcript:error` to the client on every mic stop. Fix: leave `stopping` true after sending stop (or use `closed` as the suppression flag and set it here too).\n\n### [correctness + requirements] `ws-voice.ts` hardcodes Moonshine — Google Cloud STT provider switch is non-functional — `src/dashboard/server/ws-voice.ts:29-34`\n`ws-voice.ts` calls `createMoonshineTranscription(parseModel(request))` directly. It never reads `VoiceSettings` and never uses `createTranscriptionManager` / `applyCurrent()`. The acceptance criteria \"applyCurrent() … based on settings.stt.provider\", \"Hot-swap: Moonshine→Google Cloud tears down old ITurnEmitter, creates new one\", and \"WebSocket connection remains open across provider swap\" are unreachable; users who select Google Cloud STT in Settings still get Moonshine at runtime. The Google Cloud implementation is correct but dead at the WebSocket boundary. Fix: in `ws-voice.ts`, load voice settings at connection time, instantiate `createTranscriptionManager(settings)`, call `manager.applyCurrent()` on connect, and `manager.close()` on WebSocket close. Hot-swap may be implemented via a settings-change signal or via reconnect on provider change.\n\n## Non-blocking Findings\n\n### Security\n- `~` CSRF on autopreso mutation routes (`POST /api/autopreso/start`, `/back-to-staging`, `/session/reset`) — `readJsonBody` tolerates any content-type, so simple `no-cors` POSTs reach the handler. The origin allowlist above largely covers this once added.\n- `~` Codex bearer token used as `apiKey` in `createOpenAI({ apiKey })` without scoping `baseURL` when `provider === 'codex'` — misconfigured model sends the token to `api.openai.com`. — `src/autopreso/agent.ts:33-48`.\n- `~` Sidecar binary resolution falls back to `process.cwd()` — low risk given dashboard cwd discipline. — `src/voice/transcription.ts:23-35`.\n- `?` No `maxPayload` cap on `/ws/voice` binary frames — pair with the origin fix to prevent unauth memory/disk exhaustion. — `ws-voice.ts:63-66`.\n- `?` Moonshine stderr is wrapped verbatim into `Error` and emitted to the client — sanitize before forwarding. — `transcription.ts:58`.\n\n### Correctness\n- `~` `GoogleCloudTranscription` constructor fires `this.start(...)` without `void`/`.catch` — internal try/catch handles current errors but is brittle. — `src/voice/google-cloud-transcription.ts:28`.\n- `~` `applyWhiteboardEditOperations` mutates `next` in place; sequential ops reference post-mutation indices — needs explicit documentation or pre-snapshot semantics. — `src/autopreso/whiteboard-tools.ts:24`.\n- `?` `runWhiteboardWarmupOnce` does not verify the model actually replied \"UNDERSTOOD\" — hardcoded into `session.warmupStatus`/`agentHistory` regardless. — `src/autopreso/agent.ts:122`.\n\n### Performance\n- `~` Unbounded `stdoutBuffer` growth in `MoonshineTranscription` when the sidecar emits a long line without a newline — add a max-buffer guard (~1 MB), kill child + reset on overflow. — `src/voice/transcription.ts`.\n- `~` `ScriptProcessorNode` runs PCM conversion on the browser main thread (~171 ms intervals) — risks audio glitches during heavy React renders. Migrate to `AudioWorkletProcessor`. — `src/dashboard/frontend/src/hooks/useVoiceTranscription.ts:51`, `useAutoPresoWebSocket.ts`.\n- `≉` Redundant `normalizeElements(session.elements)` in `systemPrompt` — elements already normalized on every write path. — `src/autopreso/agent.ts:121`.\n\n### Requirements\n- `~` \"TranscriptionManager torn down on WebSocket close\" — partial; cleanup currently runs on the underlying `ITurnEmitter` directly. Resolved as a consequence of fixing the hot-swap blocker.\n- `≉` `.pan/spec.vbrief.json` and `.pan/continue.json` appear in the changed-files list — per CLAUDE.md these workspace-only files must never be tracked in main. Confirm they are not staged for commit before merge.\n\n## Clean Sub-roles\n- performance (no MUST findings)\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/.pan/review/agent-pan-1053-review-a7ef2b88/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1053 -m \"Fixed review issues\"`"
-    }
-  ]
+  "feedback": []
 }

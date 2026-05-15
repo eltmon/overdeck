@@ -33,6 +33,6 @@ export function resolveWorkTypeKey(session: Pick<SessionNode, 'type' | 'role'>):
     : session.type === 'work' ? 'role:work'
     : session.type === 'planning' ? 'role:plan'
     : session.type === 'test' ? 'role:test'
-    : session.type === 'merge' ? 'role:ship'
+    : session.type === 'ship' || session.type === 'merge' ? 'role:ship'
     : null;
 }

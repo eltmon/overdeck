@@ -119,6 +119,33 @@ describe('parseConversationMessages', () => {
     expect(result.workLog).toEqual([]);
   });
 
+  it('renders Claude Code channel user messages without the XML wrapper', async () => {
+    const lines = [
+      {
+        type: 'user',
+        uuid: 'u-channel',
+        timestamp: '2026-05-13T12:51:04.775Z',
+        isMeta: true,
+        origin: { kind: 'channel', server: 'panopticon-bridge' },
+        message: {
+          role: 'user',
+          content: '<channel source="panopticon-bridge" caller="conversation-message">\nCheck the vBRIEF spec\n</channel>',
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl');
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      id: 'u-channel',
+      role: 'user',
+      text: 'Check the vBRIEF spec',
+    });
+  });
+
   it('parses an assistant text message', async () => {
     const lines = [
       {

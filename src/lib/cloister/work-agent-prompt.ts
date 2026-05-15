@@ -1,10 +1,13 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
-import type { ContinueFeedbackEntry } from '../vbrief/continue-state.js';
+import { PAN_DIRNAME } from '../pan-dir/types.js';
+import { readContinueStateAsync, type ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
-import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
-import { findPlan, readWorkspacePlan, readPlan } from '../vbrief/io.js';
+import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, readWorkspaceContinueAsync, writeWorkspaceContext } from '../pan-dir/index.js';
+import { findPlan, readWorkspacePlan, readPlan, readPlanAsync, applyStatusOverrides } from '../vbrief/io.js';
+import { createActiveSlice, getDispatchableItems } from '../vbrief/dag.js';
 import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
 import { loadConfig } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
@@ -44,7 +47,10 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       stitchDesignsStr = stitchDesigns;
     }
 
-    if (featureContext) {
+    const activeSliceContext = await buildActiveSliceContext(ctx.workspacePath, ctx.issueId);
+    if (activeSliceContext) {
+      featureContextStr = activeSliceContext;
+    } else if (featureContext) {
       featureContextStr = featureContext;
     }
 
@@ -69,6 +75,55 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
     },
   });
+}
+
+
+async function readWorkspacePlanAsync(workspacePath: string): Promise<ReturnType<typeof readWorkspacePlan>> {
+  const planPath = findPlan(workspacePath);
+  if (!planPath) return null;
+  const raw = await readFile(planPath, 'utf-8');
+  if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
+    return null;
+  }
+  const doc = JSON.parse(raw) as NonNullable<ReturnType<typeof readWorkspacePlan>>;
+  const continueState = await readWorkspaceContinueAsync(workspacePath);
+  if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
+    return applyStatusOverrides(doc, continueState.statusOverrides);
+  }
+  return doc;
+}
+
+async function buildActiveSliceContext(workspacePath: string, issueId: string): Promise<string> {
+  try {
+    const doc = await readWorkspacePlanAsync(workspacePath);
+    if (!doc) return '';
+    const nextItem = getDispatchableItems(doc, new Set())[0]
+      ?? doc.plan.items.find(item => item.status === 'running')
+      ?? doc.plan.items.find(item => item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'blocked');
+    if (!nextItem) return '';
+    // PAN-977: `readContinueStateAsync` internally calls `getContinuesDir(projectRoot)`
+    // which appends `.pan/continues/`. Callers must pass the workspace root, NOT the
+    // `.pan` subdirectory, to avoid the double-`.pan` path bug.
+    const cont = await readContinueStateAsync(workspacePath, issueId.toUpperCase());
+    const currentItemIds = doc.plan.items
+      .filter(item => item.status === 'running' || item.id === nextItem.id)
+      .map(item => item.id);
+    const slice = createActiveSlice(doc, {
+      issueId: issueId.toUpperCase(),
+      itemId: nextItem.id,
+      currentItemIds,
+      synthesisOutputs: cont?.swarmRuntime?.synthesisOutputs,
+    });
+    return [
+      '## Active vBRIEF Slice (Canonical Task Graph)',
+      '',
+      slice.prompt,
+      '',
+      '_vBRIEF is the canonical task authority during PAN-977 migration; Beads remain a compatibility mirror._',
+    ].join('\n');
+  } catch {
+    return '';
+  }
 }
 
 /**

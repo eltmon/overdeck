@@ -1,0 +1,135 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-06T20:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-496: gh issue view fails in workspace due to projects classic deprecation warning"
+  },
+  "plan": {
+    "id": "pan-496",
+    "title": "gh issue view fails in workspace due to projects classic deprecation warning",
+    "status": "approved",
+    "uid": "d5aa7760-f4d9-4796-969c-65d25191c323",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-06T20:00:00Z",
+    "updated": "2026-04-06T20:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/496",
+        "label": "PAN-496",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "bug",
+      "gh-cli",
+      "skills",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "gh issue view without --json exits non-zero due to GitHub Projects (classic) deprecation warning, breaking agent workflows that rely on the exit code",
+      "Proposal": "Update all skill files to use --json with gh issue view, and add a CLAUDE.md note to prevent future regressions"
+    },
+    "items": [
+      {
+        "id": "update-plan-skill",
+        "title": "Update plan skill to use --json with gh issue view",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-496"
+        },
+        "narrative": {
+          "Action": "In skills/plan/SKILL.md line ~63, change `gh issue view <number>` to `gh issue view <number> --json title,body,state,labels,assignees`. Update .claude/skills/plan/SKILL.md mirror to match."
+        },
+        "subItems": [
+          {
+            "id": "update-plan-skill.ac1",
+            "title": "skills/plan/SKILL.md no longer contains bare `gh issue view` without --json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-plan-skill.ac2",
+            "title": ".claude/skills/plan/SKILL.md mirror is updated to match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-ghcli-skill",
+        "title": "Update github-cli skill to use --json and document deprecation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-496"
+        },
+        "narrative": {
+          "Action": "In skills/github-cli/SKILL.md lines ~47-51, update examples to prefer --json. Add a note about the Projects (classic) deprecation causing non-zero exits without --json. Update .claude/skills/github-cli/SKILL.md mirror."
+        },
+        "subItems": [
+          {
+            "id": "update-ghcli-skill.ac1",
+            "title": "github-cli SKILL.md examples use --json for gh issue view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-ghcli-skill.ac2",
+            "title": "Deprecation warning is documented in the skill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-ghcli-skill.ac3",
+            "title": ".claude/skills/github-cli/SKILL.md mirror is updated to match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-claude-md-note",
+        "title": "Add CLAUDE.md note about gh issue view --json requirement",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-06T20:00:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-496"
+        },
+        "narrative": {
+          "Action": "Add a brief section to root CLAUDE.md noting that `gh issue view` must always use `--json` to avoid the Projects (classic) deprecation warning causing non-zero exit codes."
+        },
+        "subItems": [
+          {
+            "id": "add-claude-md-note.ac1",
+            "title": "CLAUDE.md contains a note about always using --json with gh issue view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}

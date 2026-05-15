@@ -1,0 +1,472 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "author": "agent:claude-opus-4-6",
+    "description": "Panopticon CLI — product-level specification. Multi-agent orchestration for AI coding assistants.",
+    "created": "2026-05-03T00:00:00Z"
+  },
+  "plan": {
+    "title": "Panopticon CLI — Product Specification",
+    "status": "draft",
+    "narratives": {
+      "Overview": "Panopticon is an opinionated multi-agent orchestration system for AI coding assistants. It manages projects, agents, and provides a unified set of skills, commands, and integrations. It sits above individual projects (MYN, OpenClaw, Auricle, etc.) and orchestrates parallel AI agents working on issues across those projects. The system is local-first: source code never leaves the developer's machine, with optional remote workspaces for heavy workloads.",
+      "Architecture": "Five-layer architecture: (1) UI layer — React dashboard with Zustand store, WebSocket RPC for real-time updates, xterm.js terminal streaming; (2) Core layer — CLI commands (pan *), Effect.js HTTP server, domain event store (SQLite + append-only log); (3) Agent layer — Cloister lifecycle manager, Deacon health monitor, specialist chain (review → test → merge), work agents in tmux sessions; (4) Infrastructure layer — git worktree workspaces, Docker isolation, Traefik routing, tmux session management; (5) Integration layer — Linear, GitHub, GitLab trackers, claude-code-router for multi-model, beads for task tracking, skills sync.",
+      "DeploymentModel": "Three-phase vision: Phase 1 (current) — single-developer local Electron app; Phase 2 — shared team instance on a server; Phase 3 — multi-tenant SaaS. Design for local today, don't paint into corners for shared/SaaS future.",
+      "CoreInsight": "Panopticon is a context orchestration system, not just an agent monitor. The real power lies in intelligently managing what context agents have access to, when they get it, and how work state persists across sessions.",
+      "Naming": "Named after the Panopticon from Doctor Who — the Time Lords' parliament on Gallifrey, seat of central oversight with the Eye of Harmony hidden beneath it. Greek etymology: pan (all) + opticon (view) = all-seeing."
+    },
+    "items": [
+      {
+        "id": "cli",
+        "title": "CLI — pan command interface",
+        "status": "completed",
+        "narrative": {
+          "Description": "The pan CLI is the primary user interface. All orchestration actions are available as CLI commands. Commands are organized into buckets: lifecycle (start, stop, kill, done, resume, restart), observation (status, show, inspect, logs), nouns (workspace, project, skills, issues), system (up, down, sync, doctor), and admin (config, tracker, cloister, hooks)."
+        },
+        "subItems": [
+          {
+            "id": "cli.lifecycle",
+            "title": "Agent lifecycle commands",
+            "status": "completed",
+            "narrative": {
+              "Description": "pan start, pan stop, pan kill, pan done, pan resume, pan restart, pan recover, pan reopen, pan close, pan wipe. Full lifecycle from issue creation through workspace teardown."
+            }
+          },
+          {
+            "id": "cli.observation",
+            "title": "Observation commands",
+            "status": "completed",
+            "narrative": {
+              "Description": "pan status, pan show, pan inspect, pan logs, pan context, pan cost, pan health. Real-time and historical views of agent state, resource usage, and system health."
+            }
+          },
+          {
+            "id": "cli.workspace",
+            "title": "Workspace management",
+            "status": "completed",
+            "narrative": {
+              "Description": "pan workspace create/list/delete, pan sync-main. Git worktree-based isolation with per-workspace node_modules, Docker containers, and Traefik routing."
+            }
+          },
+          {
+            "id": "cli.system",
+            "title": "System commands",
+            "status": "completed",
+            "narrative": {
+              "Description": "pan up (start dashboard), pan down (stop dashboard), pan sync (sync skills, configs), pan doctor (health checks), pan install (initial setup)."
+            }
+          },
+          {
+            "id": "cli.planning",
+            "title": "Planning commands",
+            "status": "completed",
+            "narrative": {
+              "Description": "pan plan (create planning agent for issue), pan plan finalize (lock plan, create beads tasks). Planning agents run in tmux with remain-on-exit, producing plan.vbrief.json and STATE.md."
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard",
+        "title": "Dashboard — React web UI",
+        "status": "completed",
+        "narrative": {
+          "Description": "Single-page React application served by the dashboard server. Provides real-time visibility into all agents, issues, and specialist pipeline status. Runs in Electron (desktop) or browser (localhost:3011)."
+        },
+        "subItems": [
+          {
+            "id": "dashboard.kanban",
+            "title": "Kanban board",
+            "status": "completed",
+            "narrative": {
+              "Description": "Issue cards organized by status columns (To Do, In Progress, In Review, Done). Cards show agent status, model, cost, specialist pipeline progress. Inline actions: Start Agent, Plan, vBRIEF viewer, beads tasks, stop/recover/reset."
+            }
+          },
+          {
+            "id": "dashboard.command-deck",
+            "title": "Command Deck",
+            "status": "completed",
+            "narrative": {
+              "Description": "Project-centric view with live terminal streaming, issue workbench, session tree, and inline agent interaction. Fallback rendering via projectsWithSessions for tmux-derived state."
+            }
+          },
+          {
+            "id": "dashboard.terminal",
+            "title": "Terminal streaming",
+            "status": "completed",
+            "narrative": {
+              "Description": "Live terminal output via raw WebSocket (/ws/terminal) + node-pty + tmux attach-session. Deferred PTY spawn waits for client resize dimensions. Must run under Node 22 (not Bun) due to native addon compatibility."
+            }
+          },
+          {
+            "id": "dashboard.inspector",
+            "title": "Inspector panel",
+            "status": "completed",
+            "narrative": {
+              "Description": "Detail view for selected issue/agent: actions (switch model, stop, recover, reset), specialist pipeline status, vBRIEF viewer (list/DAG/raw tabs), beads tasks, diff panel, artifact links."
+            }
+          },
+          {
+            "id": "dashboard.awaiting-merge",
+            "title": "Awaiting Merge page",
+            "status": "completed",
+            "narrative": {
+              "Description": "Dedicated view for issues that have passed review and are ready for human merge approval. Humans click merge — agents never auto-merge."
+            }
+          },
+          {
+            "id": "dashboard.god-view",
+            "title": "God View",
+            "status": "completed",
+            "narrative": {
+              "Description": "System-wide observability: all agents, all specialists, resource usage, health status, activity feed, metrics, costs."
+            }
+          },
+          {
+            "id": "dashboard.realtime",
+            "title": "Real-time data architecture",
+            "status": "completed",
+            "narrative": {
+              "Description": "EventRouter bootstraps via getSnapshot RPC, then subscribes to domain event stream. Zustand store with shared reducers from @panctl/contracts. Snapshot cache (SQLite projection) for instant startup. WS reconnection with automatic re-bootstrap."
+            }
+          }
+        ]
+      },
+      {
+        "id": "server",
+        "title": "Dashboard server — Effect.js HTTP + WebSocket",
+        "status": "completed",
+        "narrative": {
+          "Description": "Node.js 22 server using Effect.js for typed HTTP routes and RPC. 25+ route modules, domain event store (SQLite + append-only), read model with projection cache, background polling for tracker and agent state. Two WebSocket endpoints: /ws/rpc (Effect RPC for domain events) and /ws/terminal (raw PTY streaming)."
+        },
+        "subItems": [
+          {
+            "id": "server.event-store",
+            "title": "Domain event store",
+            "status": "completed",
+            "narrative": {
+              "Description": "SQLite-backed append-only event log. Events: agent.created, agent.started, agent.stopped, agent.health_updated, agent.turn_diff_completed, issues.snapshot, specialist.*, review_status.*. Projection cache for fast startup."
+            }
+          },
+          {
+            "id": "server.read-model",
+            "title": "Read model",
+            "status": "completed",
+            "narrative": {
+              "Description": "In-memory projection of dashboard state. Bootstrapped from lib modules, maintained by domain events via shared applyEvent reducer. getSnapshot() returns clean data for WS RPC clients."
+            }
+          },
+          {
+            "id": "server.routes",
+            "title": "HTTP API routes",
+            "status": "completed",
+            "narrative": {
+              "Description": "25+ route modules: agents, issues, workspaces, specialists, projects, costs, metrics, resources, diffs, conversations, settings, cloister, webhooks, remote, admin, misc. All use Effect.js — no execSync allowed."
+            }
+          }
+        ]
+      },
+      {
+        "id": "cloister",
+        "title": "Cloister — Agent lifecycle manager",
+        "status": "completed",
+        "narrative": {
+          "Description": "Central orchestration engine. Handles model routing (capability-based selection), agent spawning, stuck detection (Deacon), specialist handoffs, session rotation, and the full pipeline from planning through merge."
+        },
+        "subItems": [
+          {
+            "id": "cloister.deacon",
+            "title": "Deacon — Health monitoring",
+            "status": "completed",
+            "narrative": {
+              "Description": "10 stuck detection mechanisms with configurable thresholds. Monitors agent health, context usage, idle time, consecutive failures. Escalation path: warning → feedback → kill → restart. Pause/resume via dashboard toggle."
+            }
+          },
+          {
+            "id": "cloister.router",
+            "title": "Model router",
+            "status": "completed",
+            "narrative": {
+              "Description": "Capability-based model selection per work type (implementation, review, planning, test, merge). Routes through claude-code-router for multi-model support (Claude, GPT, Kimi, Gemini, Minimax). Configurable per-project overrides."
+            }
+          },
+          {
+            "id": "cloister.specialists",
+            "title": "Specialist pipeline",
+            "status": "completed",
+            "narrative": {
+              "Description": "Automated pipeline after work agent signals completion: verification gate (typecheck/lint/test) → review agent → test agent → merge agent. Each specialist runs in its own tmux session. Review uses multi-agent parallel review with synthesis. Merge requires human approval — agents never auto-merge."
+            }
+          },
+          {
+            "id": "cloister.verification",
+            "title": "Verification gate",
+            "status": "completed",
+            "narrative": {
+              "Description": "Quality gates from projects.yaml run before review. Typecheck, lint, test must pass. On failure, feedback sent to work agent tmux session. After 3 consecutive failures, verification bypassed to prevent permanent blocking."
+            }
+          },
+          {
+            "id": "cloister.handoff",
+            "title": "Specialist handoffs",
+            "status": "completed",
+            "narrative": {
+              "Description": "Context-preserving handoffs between pipeline stages. Handoff logger captures structured context (what was done, what to verify, known risks). Review feedback flows back to work agent for review-response cycle."
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspaces",
+        "title": "Workspace management",
+        "status": "completed",
+        "narrative": {
+          "Description": "Git worktree-based isolation. Each issue gets workspaces/feature-<issue-id>/ with its own branch, node_modules, and optional Docker container. Supports monorepo (single worktree) and polyrepo (umbrella directory with sub-repo checkouts). Workspace lifecycle: create → plan → work → review → merge → cleanup."
+        },
+        "subItems": [
+          {
+            "id": "workspaces.monorepo",
+            "title": "Monorepo workspaces",
+            "status": "completed",
+            "narrative": {
+              "Description": "Standard git worktree at workspaces/feature-<issue>/. Branch naming follows project config (e.g., feature/pan-123). bun install for workspace-aware dependency resolution."
+            }
+          },
+          {
+            "id": "workspaces.polyrepo",
+            "title": "Polyrepo workspaces",
+            "status": "completed",
+            "narrative": {
+              "Description": "Umbrella directory containing sub-repo checkouts. Defined in projects.yaml with type: polyrepo and repos list. Each sub-repo gets its own branch. Progressive polyrepo mode for 10+ repos (on-demand checkout)."
+            }
+          },
+          {
+            "id": "workspaces.docker",
+            "title": "Docker isolation",
+            "status": "completed",
+            "narrative": {
+              "Description": "Optional per-workspace Docker containers for build/test isolation. Traefik dynamic routing for workspace-specific domains. Container cleanup on workspace deletion to prevent Docker network pool exhaustion."
+            }
+          },
+          {
+            "id": "workspaces.remote",
+            "title": "Remote workspaces",
+            "status": "running",
+            "narrative": {
+              "Description": "Fly.io-based remote workspaces for offloading heavy workloads. SSH-based agent execution. Workspace provisioning, snapshotting, and teardown via Fly API."
+            }
+          }
+        ]
+      },
+      {
+        "id": "planning",
+        "title": "Planning system",
+        "status": "completed",
+        "narrative": {
+          "Description": "Agent-driven planning produces structured vBRIEF plans from PRDs. Planning agent runs in tmux with remain-on-exit. Outputs plan.vbrief.json (structured tasks with acceptance criteria, edges, narratives) and STATE.md (narrative context). Plan finalization creates beads tasks from vBRIEF items."
+        },
+        "subItems": [
+          {
+            "id": "planning.vbrief",
+            "title": "vBRIEF plan format",
+            "status": "completed",
+            "narrative": {
+              "Description": "vBRIEF v0.5 format: vBRIEFInfo envelope + plan object with items, subItems, edges (blocks dependencies), narratives, tags, references. Auto-increments sequence and timestamps on every write. Dashboard viewer with list/DAG/raw tabs."
+            }
+          },
+          {
+            "id": "planning.beads",
+            "title": "Beads task integration",
+            "status": "completed",
+            "narrative": {
+              "Description": "Plan finalization creates beads tasks from vBRIEF items via bd create. 1:1 mapping from vBRIEF items to beads tasks. Workspace cannot start without beads (422 gate). Beads provide git-backed local-first issue tracking."
+            }
+          },
+          {
+            "id": "planning.prd",
+            "title": "PRD discovery",
+            "status": "completed",
+            "narrative": {
+              "Description": "Planning discovers PRDs from docs/prds/planned/ and docs/prds/active/ matching the issue ID. Copies to .planning/prd.md for agent context. PRDs are the human-readable agreement; vBRIEFs are the machine-readable spec derived from them."
+            }
+          }
+        ]
+      },
+      {
+        "id": "trackers",
+        "title": "Issue tracker integration",
+        "status": "completed",
+        "narrative": {
+          "Description": "Bidirectional sync with external issue trackers. Issue IDs resolved to projects via linear_team field or project key prefix. Background polling for issue state changes."
+        },
+        "subItems": [
+          {
+            "id": "trackers.linear",
+            "title": "Linear integration",
+            "status": "completed",
+            "narrative": {
+              "Description": "Full Linear API integration: issues, cycles, projects, labels, comments. Issue state sync, webhook support. Used by MYN (MIN-*) and Auricle (AUR-*)."
+            }
+          },
+          {
+            "id": "trackers.github",
+            "title": "GitHub Issues integration",
+            "status": "completed",
+            "narrative": {
+              "Description": "GitHub Issues as tracker: create, update, label, comment. Used by Panopticon itself (PAN-*) and other GitHub-hosted projects."
+            }
+          },
+          {
+            "id": "trackers.rally",
+            "title": "Rally integration",
+            "status": "running",
+            "narrative": {
+              "Description": "Rally integration for enterprise customers. Hierarchical planning support: Rally features decompose into Linear/GitHub issues."
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills",
+        "title": "Skills system",
+        "status": "completed",
+        "narrative": {
+          "Description": "Markdown-based skills (SKILL.md format) synced to Claude Code's ~/.claude/skills/ directory. 60+ skills covering workflow automation, project-specific knowledge, and operational patterns. Skills are the standardized way to give agents domain-specific behavior."
+        }
+      },
+      {
+        "id": "costs",
+        "title": "Cost tracking",
+        "status": "completed",
+        "narrative": {
+          "Description": "Live cost recording from agent sessions. Session-to-agent mapping via SQLite. Cost reconciler for accuracy. Per-agent, per-issue, and per-project cost breakdowns in dashboard. Budget alerts and limits."
+        }
+      },
+      {
+        "id": "config",
+        "title": "Configuration system",
+        "status": "completed",
+        "narrative": {
+          "Description": "Layered configuration: ~/.panopticon/config.yaml (global), .panopticon.yaml (per-project), ~/.panopticon.env (secrets), projects.yaml (project registry). Projects define: repo URLs, tracker bindings, branch prefixes, quality gates, workspace type, Docker templates, model overrides."
+        }
+      },
+      {
+        "id": "contracts",
+        "title": "Shared contracts package (@panctl/contracts)",
+        "status": "completed",
+        "narrative": {
+          "Description": "TypeScript package shared between frontend and server. Defines: domain event types, dashboard snapshot schema (Effect Schema), event reducers (shared between server read model and client Zustand store), RPC protocol types, agent/specialist/review status types."
+        }
+      },
+      {
+        "id": "desktop",
+        "title": "Electron desktop app",
+        "status": "running",
+        "narrative": {
+          "Description": "Electron wrapper for the dashboard. Embeds the Node.js dashboard server, manages server lifecycle (start/stop/restart), native notifications per event type. Ships as installable desktop app alongside npx-launchable CLI."
+        }
+      },
+      {
+        "id": "external-events",
+        "title": "External event stream",
+        "status": "completed",
+        "narrative": {
+          "Description": "Public SSE endpoint at /events/stream for external consumers. Event catalog includes agent lifecycle, specialist pipeline, review status changes. Stability policy with versioned event schemas. Reference sidecar: pan-tts for text-to-speech announcements."
+        }
+      },
+      {
+        "id": "conversations",
+        "title": "Conversation management",
+        "status": "completed",
+        "narrative": {
+          "Description": "JSONL session parsing and viewing. Conversation forking (summary fork vs plain fork) for model switching or context recovery. Session archiving and restoration. JSONL files are sacred — never deleted."
+        }
+      },
+      {
+        "id": "checkpoints",
+        "title": "Checkpoint system",
+        "status": "completed",
+        "narrative": {
+          "Description": "Git-based turn-level checkpoints for agent work. Captures diff snapshots at each agent turn. Enables turn-by-turn diff viewing in dashboard, full-thread diffs, and diff-vs-main comparison. Checkpoint refs stored at refs/pan/turn/<turnId>."
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "server",
+        "to": "dashboard",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts",
+        "to": "server",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts",
+        "to": "dashboard",
+        "type": "blocks"
+      },
+      {
+        "from": "cloister",
+        "to": "server",
+        "type": "blocks"
+      },
+      {
+        "from": "workspaces",
+        "to": "cloister",
+        "type": "blocks"
+      },
+      {
+        "from": "planning",
+        "to": "cloister",
+        "type": "blocks"
+      },
+      {
+        "from": "trackers",
+        "to": "planning",
+        "type": "blocks"
+      },
+      {
+        "from": "config",
+        "to": "cloister",
+        "type": "blocks"
+      },
+      {
+        "from": "skills",
+        "to": "cli",
+        "type": "blocks"
+      }
+    ],
+    "tags": [
+      "orchestration",
+      "multi-agent",
+      "cli",
+      "dashboard",
+      "local-first"
+    ],
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli",
+        "label": "GitHub repo",
+        "type": "repository"
+      },
+      {
+        "uri": "docs/PRD.md",
+        "label": "Product Requirements Document",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/VISION.md",
+        "label": "Product Vision",
+        "type": "reference"
+      },
+      {
+        "uri": "docs/INDEX.md",
+        "label": "Documentation Index",
+        "type": "reference"
+      }
+    ]
+  },
+  "status": "proposed"
+}

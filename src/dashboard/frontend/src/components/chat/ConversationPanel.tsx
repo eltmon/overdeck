@@ -60,6 +60,21 @@ interface ConversationPanelProps {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
+async function updateConversationDeliveryMethod(
+  name: string,
+  deliveryMethod: 'auto' | 'channels' | 'tmux',
+): Promise<void> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/delivery-method`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deliveryMethod }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Failed to update delivery method (${res.status})${body ? `: ${body}` : ''}`);
+  }
+}
+
 async function resumeConversation(name: string, model?: string, effort?: string, harness?: Harness): Promise<Conversation> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/resume`, {
     method: 'POST',
@@ -96,6 +111,8 @@ export function ConversationPanel({
   const draftTitleRef = useRef('');
   const committingRef = useRef(false);
   const queryClient = useQueryClient();
+  const [deliveryMethod, setDeliveryMethod] = useState(conversation.deliveryMethod ?? 'auto');
+  const [deliveryMethodSaving, setDeliveryMethodSaving] = useState(false);
 
   // Sync the picker when the backing conversation's model changes (e.g. after a
   // resume/switch-model that persisted a new model). useState's lazy initializer
@@ -113,6 +130,13 @@ export function ConversationPanel({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.harness]);
+
+  useEffect(() => {
+    if (conversation.deliveryMethod && conversation.deliveryMethod !== deliveryMethod) {
+      setDeliveryMethod(conversation.deliveryMethod);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation.deliveryMethod]);
 
   // Query messages at this level so we can drive the header working-spinner
   const { data: messagesData } = useQuery({
@@ -314,6 +338,18 @@ export function ConversationPanel({
     onViewModeChange?.(mode);
   }, [onViewModeChange]);
 
+  const handleDeliveryMethodChange = useCallback(async (method: 'auto' | 'channels' | 'tmux') => {
+    setDeliveryMethodSaving(true);
+    try {
+      await updateConversationDeliveryMethod(conversation.name, method);
+      setDeliveryMethod(method);
+    } catch (err) {
+      console.error('[ConversationPanel] Failed to update delivery method:', err);
+    } finally {
+      setDeliveryMethodSaving(false);
+    }
+  }, [conversation.name]);
+
   // Per-conversation UI state (client-only, localStorage)
   const { hideToolCalls, toggleHideToolCalls } = useConversationUiState(conversation.name);
 
@@ -473,6 +509,22 @@ export function ConversationPanel({
                 Terminal
               </button>
             </div>
+          )}
+
+          {/* Delivery method toggle */}
+          {conversation.harness === 'claude-code' && (
+            <select
+              className={styles.deliveryMethodSelect}
+              value={deliveryMethod}
+              onChange={(e) => handleDeliveryMethodChange(e.target.value as 'auto' | 'channels' | 'tmux')}
+              disabled={deliveryMethodSaving}
+              title="Message delivery method"
+              aria-label="Message delivery method"
+            >
+              <option value="auto">Auto</option>
+              <option value="channels">Channels</option>
+              <option value="tmux">Tmux</option>
+            </select>
           )}
         </div>
       )}

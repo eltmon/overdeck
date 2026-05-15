@@ -63,6 +63,34 @@ export async function doneCommand(
       update.reviewStatus = options.status as ReviewStatus['reviewStatus'];
       if (options.notes) update.reviewNotes = options.notes;
       if (options.status === 'passed') {
+        // Snapshot the workspace HEAD into reviewedAtCommit — the same way the
+        // /api/specialists/done HTTP route does. The synthesis agent signals
+        // via this CLI path, so without this the snapshot never happens:
+        // canSkipTests can't fire and the deacon's post-review-commit drift
+        // detection goes blind, jamming the issue at passed-but-no-anchor.
+        // Included in `update` so it lands atomically before setReviewStatus
+        // evaluates canSkipTests.
+        try {
+          const { resolveProjectFromIssue } = await import('../../../lib/projects.js');
+          const { existsSync } = await import('node:fs');
+          const { join } = await import('node:path');
+          const project = resolveProjectFromIssue(normalizedIssueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${normalizedIssueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              const { getWorkspaceGitInfo } = await import('../../../lib/git-utils.js');
+              const { HEAD } = await getWorkspaceGitInfo(workspacePath);
+              if (HEAD) update.reviewedAtCommit = HEAD;
+            }
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(chalk.yellow(`  ⚠ Could not snapshot reviewedAtCommit: ${message}`));
+        }
         console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
         console.log(chalk.dim('  Test agent can now proceed'));
       } else if (options.status === 'blocked') {

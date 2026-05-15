@@ -1,0 +1,547 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-28T18:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-913: Auto-detect expired Codex auth and spawn re-authentication flow",
+    "updated": "2026-04-29T01:13:23.141Z"
+  },
+  "plan": {
+    "id": "pan-913",
+    "title": "Auto-detect expired Codex auth and spawn re-authentication flow",
+    "status": "approved",
+    "uid": "40c9183c-d3c9-4f28-ba43-2eb1ae4b4287",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 50,
+    "created": "2026-04-28T18:00:00Z",
+    "updated": "2026-04-29T01:13:23.141Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/913",
+        "label": "PAN-913",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auth",
+      "codex",
+      "cliproxy",
+      "dashboard",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "When Codex OAuth tokens expire or refresh tokens get burned, all gpt-5.4 agents fail with 503 auth_unavailable. Users have no visibility until agents start dying — the real cause is buried in cliproxy logs.",
+      "Proposal": "Add proactive auth detection (JWT expiry + log monitoring), a dashboard banner with one-click re-auth via terminal panel (supporting both browser and device-auth for headless), spawn guardrails that block before wasting API credits, and auto-retry after successful re-authentication."
+    },
+    "items": [
+      {
+        "id": "codex-auth-check",
+        "title": "Create async checkCodexAuthStatus() utility",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-913"
+        },
+        "narrative": {
+          "Action": "Create src/lib/codex-auth.ts with an async checkCodexAuthStatus() function. It reads ~/.panopticon/cliproxy/auth/codex-primary.json, decodes the JWT access_token exp claim (reuse the existing decodeJwtPayload from cliproxy.ts — export it), and returns a status object. Extract the JWT decode helper from cliproxy.ts into an exported function so both modules can use it."
+        },
+        "subItems": [
+          {
+            "id": "codex-auth-check.ac1",
+            "title": "checkCodexAuthStatus() returns {status: 'valid', email, expiresAt} when token exp > now",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-auth-check.ac2",
+            "title": "checkCodexAuthStatus() returns {status: 'expired'} when token exp <= now",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-auth-check.ac3",
+            "title": "checkCodexAuthStatus() returns {status: 'missing'} when codex-primary.json doesn't exist",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-auth-check.ac4",
+            "title": "decodeJwtPayload is exported from cliproxy.ts and reused in codex-auth.ts (no duplication)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-04-29T01:13:23.141Z"
+      },
+      {
+        "id": "cliproxy-log-monitor",
+        "title": "Add burned refresh token detection from CLIProxy logs",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-913"
+        },
+        "narrative": {
+          "Action": "Extend checkCodexAuthStatus() to also read the last ~50 lines of ~/.panopticon/cliproxy/cliproxy.log and search for the pattern 'refresh token has already been used'. If found (and the log line is recent — within last hour), override status to 'burned'. This is best-effort: if the log file doesn't exist or the pattern format changes, fall back gracefully to JWT-only detection."
+        },
+        "subItems": [
+          {
+            "id": "cliproxy-log-monitor.ac1",
+            "title": "Returns {status: 'burned'} when cliproxy.log contains 'refresh token has already been used' in last ~50 lines within the last hour",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cliproxy-log-monitor.ac2",
+            "title": "Falls back gracefully to JWT-only status when log file is missing or unreadable",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-04-29T01:13:23.141Z"
+      },
+      {
+        "id": "codex-auth-endpoint",
+        "title": "Add GET /api/settings/codex-auth endpoint",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-913"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/codex-auth.ts with a GET /api/settings/codex-auth endpoint that calls checkCodexAuthStatus() and returns the result as JSON. Mount it in server.ts. All I/O must be async (fs/promises). Response shape: {status, email?, expiresAt?, message?}."
+        },
+        "subItems": [
+          {
+            "id": "codex-auth-endpoint.ac1",
+            "title": "GET /api/settings/codex-auth returns JSON with status field ('valid'|'expired'|'burned'|'missing')",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-auth-endpoint.ac2",
+            "title": "Route is mounted in server.ts and accessible from the dashboard",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-auth-endpoint.ac3",
+            "title": "No sync I/O (readFileSync, execSync) in the route handler",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-04-29T01:13:23.140Z"
+      },
+      {
+        "id": "spawn-guardrail-codex",
+        "title": "Add Codex auth check to spawn guardrails",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-913"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/agents.ts, extend evaluateSpawnGuardrails() to check Codex auth status when the requested model routes to the codex provider. If expired/burned, block the spawn (429) with an actionable error message pointing to the re-auth flow. Also replace the sync isCliproxyRunning() call in the spawn path (agents.ts:948) with isCliproxyRunningAsync() which already exists at cliproxy.ts:401."
+        },
+        "subItems": [
+          {
+            "id": "spawn-guardrail-codex.ac1",
+            "title": "Agent spawn returns 429 with descriptive error when Codex auth is expired/burned and the model requires codex provider",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-guardrail-codex.ac2",
+            "title": "Spawn proceeds normally for non-codex models regardless of codex auth state",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-guardrail-codex.ac3",
+            "title": "isCliproxyRunning() sync call in spawn path replaced with isCliproxyRunningAsync()",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-04-29T01:13:23.140Z"
+      },
+      {
+        "id": "reauth-endpoint",
+        "title": "Add POST /api/settings/codex-reauth endpoint",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-913"
+        },
+        "narrative": {
+          "Action": "Add POST /api/settings/codex-reauth to codex-auth.ts. It spawns a tmux session named 'codex-reauth' running 'codex login' (or 'codex login --device-auth' if headless — detect via !DISPLAY && !WAYLAND_DISPLAY on server). Returns {sessionName, headless: boolean}. If a reauth session already exists and is alive, return it rather than spawning a duplicate."
+        },
+        "subItems": [
+          {
+            "id": "reauth-endpoint.ac1",
+            "title": "POST /api/settings/codex-reauth spawns a tmux session running 'codex login'",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reauth-endpoint.ac2",
+            "title": "Uses --device-auth flag when server has no DISPLAY or WAYLAND_DISPLAY",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reauth-endpoint.ac3",
+            "title": "Returns existing session if codex-reauth tmux session is already alive (idempotent)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-04-29T01:13:23.140Z"
+      },
+      {
+        "id": "reauth-completion",
+        "title": "Add re-auth completion detection and token re-bridging",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-913"
+        },
+        "narrative": {
+          "Action": "Add POST /api/settings/codex-reauth/status that accepts the generated re-auth session name and status token in a JSON body, then checks if the codex-reauth tmux session has exited. When it has, call bridgeCodexAuthToCliproxy() to re-bridge the fresh tokens, then return {completed: true, authStatus: <fresh check>}. The frontend polls this endpoint after spawning the reauth session. bridgeCodexAuthToCliproxy() currently uses sync FS — create an async wrapper or use fs/promises for the server-reachable path."
+        },
+        "subItems": [
+          {
+            "id": "reauth-completion.ac1",
+            "title": "POST /api/settings/codex-reauth/status returns {completed: false} while tmux session is alive",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reauth-completion.ac2",
+            "title": "Returns {completed: true, authStatus} after session exits, with tokens re-bridged",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reauth-completion.ac3",
+            "title": "No sync I/O in the completion check or re-bridge path",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-04-29T01:13:23.139Z"
+      },
+      {
+        "id": "codex-auth-banner",
+        "title": "Create CodexAuthBanner frontend component",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-913"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/CodexAuthBanner.tsx — a warning banner (similar pattern to StoppedAgentsBanner) that shows when Codex auth is expired/burned. Displays a message ('Codex authentication expired — gpt-5.4 agents will fail') with a 'Re-authenticate' button. The button calls POST /api/settings/codex-reauth, then opens the terminal panel for the returned session. Render it in App.tsx alongside existing banners."
+        },
+        "subItems": [
+          {
+            "id": "codex-auth-banner.ac1",
+            "title": "Banner appears when codex auth status is 'expired' or 'burned'",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-auth-banner.ac2",
+            "title": "Banner hides when codex auth status is 'valid' or 'missing'",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-auth-banner.ac3",
+            "title": "Re-authenticate button spawns reauth session and opens terminal panel",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-04-29T01:13:23.139Z"
+      },
+      {
+        "id": "codex-auth-polling",
+        "title": "Create useCodexAuthStatus polling hook",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-913"
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/hooks/useCodexAuthStatus.ts — a React Query hook that polls GET /api/settings/codex-auth every ~120 seconds. Returns the auth status for consumption by CodexAuthBanner and SettingsPage. Use refetchInterval with a reasonable default (~120s)."
+        },
+        "subItems": [
+          {
+            "id": "codex-auth-polling.ac1",
+            "title": "Hook polls GET /api/settings/codex-auth every ~120 seconds",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-auth-polling.ac2",
+            "title": "Hook is consumed by both CodexAuthBanner and SettingsPage",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-04-29T01:13:23.139Z"
+      },
+      {
+        "id": "settings-codex-status",
+        "title": "Show Codex auth type and status in Settings page",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-913"
+        },
+        "narrative": {
+          "Action": "In SettingsPage.tsx, add a Codex/OpenAI Subscription section (or enhance the existing OpenAI ProviderCard) that shows: auth type is 'Subscription OAuth' (not API key), current status (Valid/Expired/Burned), email, expiry time, and a Re-authenticate button when expired. This makes it explicit that gpt-5.4 uses OAuth, not the API key."
+        },
+        "subItems": [
+          {
+            "id": "settings-codex-status.ac1",
+            "title": "Settings page shows 'Subscription OAuth' auth type for the Codex provider",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-codex-status.ac2",
+            "title": "Settings page shows live status (Valid/Expired) with email and expiry time",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-codex-status.ac3",
+            "title": "Re-authenticate button in settings triggers the same reauth flow as the banner",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-04-29T01:13:23.139Z"
+      },
+      {
+        "id": "auto-retry-spawn",
+        "title": "Auto-retry blocked spawn after successful re-auth",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-913"
+        },
+        "narrative": {
+          "Action": "In the frontend spawn flow: when a spawn is blocked by codex auth (429 with codex-auth error), hold the spawn parameters in component state. After the re-auth terminal completes (polling reauth/status returns completed with valid auth), automatically re-fire the POST /api/agents request with the same parameters. Show a toast: 'Codex re-authenticated — retrying agent spawn'. No server-side queue needed — the frontend holds the retry state."
+        },
+        "subItems": [
+          {
+            "id": "auto-retry-spawn.ac1",
+            "title": "When spawn fails due to codex auth, the original spawn parameters are retained in frontend state",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-29T00:00:03.403Z"
+          },
+          {
+            "id": "auto-retry-spawn.ac2",
+            "title": "After successful re-auth, the blocked spawn is automatically retried",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-29T00:00:03.403Z"
+          },
+          {
+            "id": "auto-retry-spawn.ac3",
+            "title": "User sees a toast notification about the automatic retry",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-29T00:00:03.403Z"
+          }
+        ],
+        "completed": "2026-04-29T01:13:23.138Z"
+      },
+      {
+        "id": "documentation",
+        "title": "Document Codex auth requirements and re-auth flow",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-913"
+        },
+        "narrative": {
+          "Action": "Update relevant documentation to explain that Codex subscription OAuth is required for gpt-5.4 model access, that tokens expire periodically requiring re-authentication, and how the dashboard re-auth flow works (including headless/device-auth). Update the cliproxy SKILL.md with the new dashboard-based re-auth flow as the primary path instead of manual codex login."
+        },
+        "subItems": [
+          {
+            "id": "documentation.ac1",
+            "title": "Documentation explains Codex is required for subscription (not API-key) mode",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-29T00:00:03.406Z"
+          },
+          {
+            "id": "documentation.ac2",
+            "title": "cliproxy SKILL.md updated with dashboard re-auth flow",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-04-29T00:00:03.406Z"
+          }
+        ],
+        "completed": "2026-04-29T01:13:23.140Z"
+      }
+    ],
+    "edges": [
+      {
+        "from": "codex-auth-check",
+        "to": "cliproxy-log-monitor",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-check",
+        "to": "codex-auth-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "cliproxy-log-monitor",
+        "to": "codex-auth-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-endpoint",
+        "to": "spawn-guardrail-codex",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-endpoint",
+        "to": "reauth-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-endpoint",
+        "to": "codex-auth-polling",
+        "type": "blocks"
+      },
+      {
+        "from": "reauth-endpoint",
+        "to": "reauth-completion",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-polling",
+        "to": "codex-auth-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "reauth-endpoint",
+        "to": "codex-auth-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-polling",
+        "to": "settings-codex-status",
+        "type": "blocks"
+      },
+      {
+        "from": "reauth-completion",
+        "to": "auto-retry-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-guardrail-codex",
+        "to": "auto-retry-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-banner",
+        "to": "documentation",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}

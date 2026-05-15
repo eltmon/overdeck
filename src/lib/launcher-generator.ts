@@ -47,7 +47,36 @@ export interface LauncherConfig {
    */
   baseCommand?: string;
   promptFile?: string;
+  promptFileMode?: 'argument' | 'stdin';
   promptInline?: string;
+
+  /**
+   * Review sub-role launcher contract (PAN-977). When set, the launcher does
+   * NOT `exec` claude — it runs `timeout <N> claude --print ... < prompt` as a
+   * child process, then deterministically signals the synthesis agent based on
+   * the outcome:
+   *   - exit 124            → REVIEWER_TIMEOUT  (timeout killed the reviewer)
+   *   - report file present → REVIEWER_READY
+   *   - otherwise           → REVIEWER_FAILED   (crashed/exited with no report)
+   * After signaling it touches `signalMarkerPath` so Deacon's convoy watchdog
+   * knows the launcher already owned the signal and stays a rare backup rather
+   * than the happy path. This makes the happy path self-contained in the
+   * launcher's own bash process — it only fails to signal if SIGKILLed.
+   */
+  reviewSignal?: {
+    synthesisAgentId: string;
+    subRole: string;
+    outputPath: string;
+    signalMarkerPath: string;
+    /**
+     * Absolute path the launcher writes its own bash pid into at startup and
+     * removes once it has signaled. Deacon's convoy watchdog checks this pid
+     * for liveness instead of the (intentionally short-lived) tmux session.
+     */
+    launcherPidPath: string;
+    timeoutSeconds: number;
+  };
+
   resumeSessionId?: string;
   sessionId?: string;
   model?: string;
@@ -243,7 +272,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   }
 
   // Prompt file read
-  if (config.promptFile) {
+  if (config.promptFile && config.promptFileMode !== 'stdin') {
     lines.push(`prompt=$(cat ${shellQuote(config.promptFile)})`);
   }
 
@@ -328,6 +357,8 @@ function buildCommand(config: LauncherConfig): string[] {
 
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
+      let cmd = config.baseCommand;
+      cmd += buildChannelsArgs(config);
       const args: string[] = [];
       if (config.resumeSessionId) {
         args.push(`--resume ${shellQuote(config.resumeSessionId)}`);
@@ -337,7 +368,7 @@ function buildCommand(config: LauncherConfig): string[] {
       if (config.extraArgs) {
         args.push(config.extraArgs);
       }
-      parts.push(`${config.baseCommand} ${args.join(' ')}`.trim());
+      parts.push(`${cmd} ${args.join(' ')}`.trim());
     }
     return parts;
   }
@@ -346,8 +377,53 @@ function buildCommand(config: LauncherConfig): string[] {
     return buildNonConversationCommand(config, false);
   }
 
+  // Review sub-roles (PAN-977): the launcher owns the synthesis signal. It runs
+  // claude as a child (not exec) so the post-run contract block can inspect the
+  // outcome and signal exactly once.
+  if (config.reviewSignal) {
+    return buildReviewSubRoleCommand(config);
+  }
+
   // All other launchers use exec
   return buildNonConversationCommand(config, true);
+}
+
+/**
+ * Build the review sub-role command sequence (PAN-977).
+ *
+ * The reviewer runs under `timeout` as a child process; once it exits, the
+ * launcher itself signals the synthesis agent deterministically — the agent
+ * never has to remember to run `pan tell`, and the signal is tied to process
+ * exit rather than agent good behavior or Deacon patrol timing.
+ */
+function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
+  const sig = config.reviewSignal!;
+  const inner = buildNonConversationCommand(config, false);
+  if (inner.length === 0) return inner;
+
+  const claudeCmd = `timeout ${sig.timeoutSeconds} ${inner[0]}`;
+  const synth = shellQuote(sig.synthesisAgentId);
+  const out = sig.outputPath;
+  const role = sig.subRole;
+  const pidFile = shellQuote(sig.launcherPidPath);
+
+  return [
+    // Record this launcher's pid so Deacon's convoy watchdog can check the
+    // launcher process itself for liveness — the tmux session is short-lived
+    // and `trap '' HUP` keeps this bash alive after the session is reaped.
+    `echo $$ > ${pidFile}`,
+    claudeCmd,
+    'CLAUDE_EXIT=$?',
+    `if [ "$CLAUDE_EXIT" = "124" ]; then`,
+    `  pan tell ${synth} "REVIEWER_TIMEOUT ${role} reviewer exceeded ${sig.timeoutSeconds}s deadline" || true`,
+    `elif [ -s ${shellQuote(out)} ]; then`,
+    `  pan tell ${synth} "REVIEWER_READY ${role} ${out}" || true`,
+    `else`,
+    `  pan tell ${synth} "REVIEWER_FAILED ${role} reviewer exited (code $CLAUDE_EXIT) without writing report" || true`,
+    `fi`,
+    `touch ${shellQuote(sig.signalMarkerPath)}`,
+    `rm -f ${pidFile}`,
+  ];
 }
 
 /**
@@ -398,7 +474,11 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
 
   // Append prompt reference
   if (config.promptFile) {
-    cmd += ' "$prompt"';
+    if (config.promptFileMode === 'stdin') {
+      cmd += ` < ${shellQuote(config.promptFile)}`;
+    } else {
+      cmd += ' "$prompt"';
+    }
   }
   if (config.promptInline) {
     cmd += ` ${shellQuote(config.promptInline)}`;

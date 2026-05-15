@@ -72,6 +72,13 @@ afterEach(() => {
 describe('startSmeeProcess', () => {
   it('spawns smee CLI when smee-url is configured', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    // The mocked pidfile returns PID 12345; without mocking process.kill,
+    // isProcessAlive() probes the real host process table and the test
+    // becomes flaky (passes only when PID 12345 happens to be dead).
+    // Force "not alive" so startSmeeProcess proceeds to spawn.
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw new Error('ESRCH');
+    });
 
     startSmeeProcess();
 
@@ -96,6 +103,7 @@ describe('startSmeeProcess', () => {
       expect.stringContaining('Started process (PID 12345)'),
     );
     logSpy.mockRestore();
+    killSpy.mockRestore();
   });
 
   it('skips when smee-url file is missing', () => {
@@ -127,6 +135,11 @@ describe('startSmeeProcess', () => {
   it('handles spawn failure gracefully', () => {
     mockSpawnReturn.pid = undefined;
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    // See note above: force isProcessAlive() to report "not alive" so the
+    // mocked-12345 pidfile doesn't make this test flaky against the host.
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      throw new Error('ESRCH');
+    });
 
     startSmeeProcess();
 
@@ -136,6 +149,7 @@ describe('startSmeeProcess', () => {
       '[smee] Failed to spawn smee process',
     );
     errorSpy.mockRestore();
+    killSpy.mockRestore();
   });
 });
 

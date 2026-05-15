@@ -798,6 +798,18 @@ export const ConversationCompactingChangedEvent = Schema.Struct({
 })
 export type ConversationCompactingChangedEvent = typeof ConversationCompactingChangedEvent.Type
 
+/** Emitted (in-memory only) when a new conversation row is created, so the
+ * sidebar list can refresh immediately instead of waiting for its poll tick. */
+export const ConversationCreatedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.created"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+  }),
+})
+export type ConversationCreatedEvent = typeof ConversationCreatedEvent.Type
+
 /** Emitted (in-memory only) when a PermissionRequest hook fires or resolves for a conversation. */
 export const ConversationPermissionChangedEvent = Schema.Struct({
   type: Schema.Literal("conversation.permission_changed"),
@@ -881,6 +893,7 @@ export const DomainEvent = Schema.Union([
   DashboardLifecycleCompletedEvent,
   DashboardLifecycleFailedEvent,
   ConversationCompactingChangedEvent,
+  ConversationCreatedEvent,
   ConversationPermissionChangedEvent,
 ])
 export type DomainEvent = typeof DomainEvent.Type

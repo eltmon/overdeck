@@ -1,0 +1,323 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-12T22:40:35Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-509: Inspector panel should show contextually relevant terminal based on pipeline phase"
+  },
+  "plan": {
+    "id": "pan-509",
+    "title": "Inspector panel should show contextually relevant terminal based on pipeline phase",
+    "status": "approved",
+    "uid": "0d71c277-a011-423d-a773-0f82a026a90d",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-12T22:40:35Z",
+    "updated": "2026-04-12T22:40:35Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/509",
+        "label": "PAN-509",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "inspector",
+      "terminal",
+      "pipeline"
+    ],
+    "narratives": {
+      "Problem": "The Inspector panel's terminal pane is hardwired to the work-agent tmux session (agent.id). When review/test/merge specialists are running, or post-completion verification is executing, the Inspector still shows an idle or stopped work agent — users have to leave the Inspector to find the currently-active terminal.",
+      "Proposal": "Add a client-side pipeline-phase derivation (usePipelinePhase hook) driven by the already-fetched reviewStatus/testStatus/mergeStatus plus agent state. Render a tab strip above the terminal pane with Planning / Work / Review / Test / Merge tabs; the tab strip auto-follows the current phase and supports a per-issue manual pin persisted to localStorage. Session names are resolved client-side using the existing specialist-<projectKey>-<role> naming convention; the existing /ws/terminal endpoint already streams any tmux session by name, so no backend changes are needed. Merged issues get a summary card instead of a live stream. Verification output reuses the work-agent terminal (verification feedback is already routed into the work-agent tmux via sendKeysAsync) — a dedicated verification log stream is explicitly out of scope."
+    },
+    "items": [
+      {
+        "id": "phase-hook",
+        "title": "Create usePipelinePhase hook with precedence-based phase derivation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-12T22:40:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-509"
+        },
+        "narrative": {
+          "Action": "Add src/dashboard/frontend/src/components/inspector/usePipelinePhase.ts. Pure function signature: usePipelinePhase({ issueId, agent, reviewStatus, projectKey }) returns { phase, activeSession, availableTerminals }. Phase precedence (first match wins): merging → testing → reviewing → verifying → working → planning → merged. Map each phase to a tmux session name: work → agent.id; review/test/merge → specialist-<projectKey>-<role>-agent; planning → planning-<issueId>; merged → null (summary card). availableTerminals is the full list of tabs to render (regardless of which is active) with a disabled flag for phases whose session doesn't exist yet. Export a plain TypeScript function alongside the hook for unit testing without React."
+        },
+        "subItems": [
+          {
+            "id": "phase-hook.ac1",
+            "title": "usePipelinePhase returns phase='reviewing' and activeSession='specialist-<projectKey>-review-agent' when reviewStatus.reviewStatus === 'reviewing'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-hook.ac2",
+            "title": "usePipelinePhase returns phase='merging' and activeSession='specialist-<projectKey>-merge-agent' when reviewStatus.mergeStatus is one of {'queued','merging','verifying'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-hook.ac3",
+            "title": "usePipelinePhase returns phase='working' and activeSession=agent.id when agent.status === 'running' and no specialist phase is active (including review-feedback loops where reviewStatus.reviewStatus === 'failed' and agent is running again)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-hook.ac4",
+            "title": "usePipelinePhase returns phase='merged' and activeSession=null when reviewStatus.mergeStatus === 'merged'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-hook.ac5",
+            "title": "Vitest unit test file usePipelinePhase.test.ts covers every row of the precedence table in STATE.md (Files to change § Phase → session mapping) with at least one positive and one negative case per phase; tests pass under npm test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "terminal-panel-session-prop",
+        "title": "Parameterize TerminalPanel / DetailPanelLayout on sessionName instead of hardcoding agent.id",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-12T22:40:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-509"
+        },
+        "narrative": {
+          "Action": "Update src/dashboard/frontend/src/components/TerminalPanel.tsx to accept an optional sessionName?: string and title?: string prop, falling back to agent.id and the current title when unset (back-compat for any other callers). Pass the value through to <XTerminal sessionName={...}/>. Update DetailPanelLayout.tsx to compute activeSession via usePipelinePhase and pass it to <TerminalPanel sessionName={activeSession} …/>. Keep the key tied to the session so the XTerminal remounts cleanly on switch."
+        },
+        "subItems": [
+          {
+            "id": "terminal-panel-session-prop.ac1",
+            "title": "TerminalPanel accepts optional sessionName prop; when omitted, still renders with agent.id (existing callers are unaffected)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-panel-session-prop.ac2",
+            "title": "DetailPanelLayout uses usePipelinePhase to derive activeSession and passes it to TerminalPanel; the XTerminal websocket connects to /ws/terminal?session=<activeSession> (verifiable via network inspector or a jsdom WebSocket mock in the existing XTerminal.test.tsx harness)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-panel-session-prop.ac3",
+            "title": "Switching phase (e.g., work → review) causes the XTerminal component to remount with the new sessionName (React key includes sessionName); no stale data from the previous session leaks into the new terminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "terminal-tabs",
+        "title": "Render TerminalTabs strip with auto-follow + manual pin",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-12T22:40:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-509"
+        },
+        "narrative": {
+          "Action": "Add src/dashboard/frontend/src/components/inspector/TerminalTabs.tsx. Renders a horizontal tab strip above TerminalPanel showing the five phase tabs (Planning, Work, Review, Test, Merge). The tab matching the current phase gets a pulsing dot indicator. Clicking any tab pins it (overrides auto-follow); pinned state is persisted to localStorage as pan-terminal-pin-<issueId> with value { sessionName, phase }. An 'Auto' chip next to the tabs shows pin status and releases the pin when clicked. Debounce auto-switching by 1s to avoid churn during rapid phase flips. Disabled tabs (session doesn't exist) are visible but not clickable, with tooltip 'session not running'. Mount this in DetailPanelLayout directly above <TerminalPanel>."
+        },
+        "subItems": [
+          {
+            "id": "terminal-tabs.ac1",
+            "title": "Tab strip auto-switches to the active phase tab when the derived phase changes (e.g., work → reviewing), after a 1s debounce",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-tabs.ac2",
+            "title": "Clicking a tab pins that terminal; subsequent phase changes do NOT switch the active session until the 'Auto' chip is clicked to release the pin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-tabs.ac3",
+            "title": "Pin state survives page reload (persisted to localStorage under key pan-terminal-pin-<issueId>)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-tabs.ac4",
+            "title": "Disabled tabs (for phases whose tmux session does not exist) are rendered but not clickable, with a tooltip explaining why; enabling happens automatically when the session comes up without a page reload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-tabs.ac5",
+            "title": "Render tests (TerminalTabs.test.tsx) cover: auto-follow, pinning via click, unpinning via 'Auto' chip, localStorage persistence (mocked), and disabled tab behavior; all pass under npm test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phase-badge-inspector",
+        "title": "Add phase badge to Inspector header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-12T22:40:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-509"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/InspectorPanel.tsx, add a small badge next to the issueId in the header showing the current phase label (Planning / Working / Verifying / Reviewing / Testing / Merging / Merged). Reuse the existing reviewStatus query already on the component — do NOT add a second network fetch. Drive the label from the same usePipelinePhase hook so the Inspector header and the tab strip stay in sync."
+        },
+        "subItems": [
+          {
+            "id": "phase-badge-inspector.ac1",
+            "title": "Inspector header shows a phase badge whose label matches the currently active tab in TerminalTabs at all times (shared source of truth: usePipelinePhase)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phase-badge-inspector.ac2",
+            "title": "The phase badge does NOT add a new network request — it reuses the already-fetched reviewStatus query (confirmed by no new useQuery in the component diff)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merged-summary-card",
+        "title": "Show summary card instead of live terminal for merged issues",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-12T22:40:35Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-509"
+        },
+        "narrative": {
+          "Action": "Add src/dashboard/frontend/src/components/inspector/MergedSummaryCard.tsx. When usePipelinePhase returns phase='merged', DetailPanelLayout renders this card in place of the XTerminal. Card content: merge timestamp (from reviewStatus.updatedAt), link to the PR, total cost (already available via the costData query in InspectorPanel), and a 'View last specialist log' affordance that switches to the most recent specialist tab if its session still exists."
+        },
+        "subItems": [
+          {
+            "id": "merged-summary-card.ac1",
+            "title": "When reviewStatus.mergeStatus === 'merged', the terminal pane renders MergedSummaryCard instead of XTerminal (verifiable by rendering the issue in the test harness with a mocked 'merged' reviewStatus)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-summary-card.ac2",
+            "title": "Summary card displays merge timestamp, PR link (if available), and total cost; the 'View last specialist log' button switches to the most recent specialist tab when clicked and its session still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stale-session-fallback",
+        "title": "Handle stale / ended specialist sessions gracefully",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-12T22:40:35Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-509"
+        },
+        "narrative": {
+          "Action": "When the tab strip's active session websocket fails to connect after 2 reconnect attempts (~3s), show an inline 'Session ended' empty state in the terminal pane with a button to 'Show last output' that fetches the most recent buffered output from the existing agent activity endpoint (or falls back to nothing if unavailable). Do NOT modify XTerminal's reconnect loop itself — wrap it in a small status-aware container component. The tab stays visible but gets a 'dimmed' style to indicate the session is gone."
+        },
+        "subItems": [
+          {
+            "id": "stale-session-fallback.ac1",
+            "title": "When the active tmux session does not exist (websocket connect fails twice), the terminal pane shows a 'Session ended' empty state instead of an infinite reconnection spinner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-session-fallback.ac2",
+            "title": "Auto-switching skips over phases whose session is dead — e.g., if review passed and the review-agent tmux was killed, phase=reviewing will NOT be auto-selected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "phase-hook",
+        "to": "terminal-panel-session-prop",
+        "type": "blocks"
+      },
+      {
+        "from": "phase-hook",
+        "to": "terminal-tabs",
+        "type": "blocks"
+      },
+      {
+        "from": "phase-hook",
+        "to": "phase-badge-inspector",
+        "type": "blocks"
+      },
+      {
+        "from": "phase-hook",
+        "to": "merged-summary-card",
+        "type": "blocks"
+      },
+      {
+        "from": "terminal-panel-session-prop",
+        "to": "terminal-tabs",
+        "type": "blocks"
+      },
+      {
+        "from": "terminal-tabs",
+        "to": "stale-session-fallback",
+        "type": "informs"
+      },
+      {
+        "from": "terminal-panel-session-prop",
+        "to": "merged-summary-card",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

@@ -1,0 +1,126 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-11T12:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-619: Cost tracking: comma-format total cost, add day/week ticks to 30-day trend"
+  },
+  "plan": {
+    "id": "pan-619",
+    "title": "Cost tracking: comma-format total cost, add day/week ticks to 30-day trend",
+    "status": "approved",
+    "uid": "a437bc7a-0454-43d2-8ae3-6536f018fe82",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-11T12:00:00Z",
+    "updated": "2026-04-11T12:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/619",
+        "label": "PAN-619",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "ui-polish",
+      "cost-tracking"
+    ],
+    "narratives": {
+      "Problem": "Large dollar values display without thousands separators (e.g. $1234.56), and the 30-day trend chart lacks time-axis ticks making it hard to identify when cost spikes occurred.",
+      "Proposal": "Add a formatCost helper using toLocaleString for comma-separated dollar values across all displays, and configure Chart.js x-axis with daily tick marks and weekly date labels."
+    },
+    "items": [
+      {
+        "id": "comma-format-costs",
+        "title": "Comma-format all dollar values in CostsPage",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-11T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-619"
+        },
+        "narrative": {
+          "Action": "Add a formatCost(value, decimals) helper that uses toLocaleString('en-US', { minimumFractionDigits, maximumFractionDigits }) and replace all .toFixed() dollar displays in CostsPage.tsx with it. Use 2 decimals for summary/list values and 4 decimals for sub-cent precision values."
+        },
+        "subItems": [
+          {
+            "id": "comma-format-costs.ac1",
+            "title": "Total cost card displays with comma separators (e.g. $1,234.56)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "comma-format-costs.ac2",
+            "title": "Per-issue costs and budget values in the issues list display with comma separators",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "comma-format-costs.ac3",
+            "title": "Sub-cent precision values (.toFixed(4)) also use locale formatting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "comma-format-costs.ac4",
+            "title": "Chart Y-axis and tooltip values use locale formatting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "trend-chart-ticks",
+        "title": "Add day/week tick marks to 30-day trend chart x-axis",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-11T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-619"
+        },
+        "narrative": {
+          "Action": "Configure the Chart.js x-axis in TrendChart to show tick marks for every day with date labels only on week boundaries (every 7th day from the end). Set autoSkip: false and use a ticks.callback that returns the MM-DD label for week boundaries and empty string otherwise."
+        },
+        "subItems": [
+          {
+            "id": "trend-chart-ticks.ac1",
+            "title": "X-axis shows tick marks for all 30 days",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trend-chart-ticks.ac2",
+            "title": "Date labels appear at week boundaries (every 7 days) for readability",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trend-chart-ticks.ac3",
+            "title": "No regression to chart rendering or other cost displays",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}

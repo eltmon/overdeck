@@ -1,0 +1,449 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-10T00:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-598: Support latest ChatGPT/OpenAI models with subscription tier awareness"
+  },
+  "plan": {
+    "id": "pan-598",
+    "title": "Support latest ChatGPT/OpenAI models with subscription tier awareness",
+    "status": "approved",
+    "uid": "28a73744-aef7-48e9-b372-e4f30ad21d4d",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-10T00:00:00.000Z",
+    "updated": "2026-04-10T00:00:00.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/598",
+        "label": "PAN-598",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "openai",
+      "claudish",
+      "multi-model",
+      "oauth",
+      "subscription-tiers"
+    ],
+    "narratives": {
+      "Problem": "Panopticon uses claude-code-router for multi-model routing, but CCR lacks OAuth support for ChatGPT Plus/Pro subscriptions. Users must pay per-token via API keys even when they have existing subscriptions. Additionally, the OpenAI model registry is incomplete and lacks subscription tier awareness.",
+      "Proposal": "Replace claude-code-router with claudish (v6.12.2) as the multi-model router. claudish supports OAuth-based subscriptions via provider prefixes (e.g., oai@ for API key, go@ for Google OAuth). Add subscription tier configuration to config.yaml, extend the OpenAI model registry with latest models and tier metadata, update the smart model selector to filter by tier, and integrate claudish prefix mapping into agent spawning. Dashboard displays full claudish prefix + backing model."
+    },
+    "items": [
+      {
+        "id": "pan-598.config-schema",
+        "title": "Add subscription tier config schema",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "Extend config-yaml.ts provider config schema with auth mode (subscription/api-key) and plan tier (free/plus/pro). Add getProviderAuthMode() utility that checks config.yaml first, then environment variables. Update NormalizedConfig type."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.config-schema.ac1",
+            "title": "auth and plan fields added to provider config in config-yaml.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-598.config-schema.ac2",
+            "title": "getProviderAuthMode(model) returns auth mode and plan from config or env",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-598.config-schema.ac3",
+            "title": "Config schema includes auth: subscription|api-key and plan: free|plus|pro",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-598.model-registry",
+        "title": "Extend OpenAI model registry with new models and tier metadata",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "Add new OpenAI models confirmed in claudish catalog (o4-mini, gpt-4.1 family if released). Add minTier field to ModelCapability interface to enable tier-aware filtering. Add tier information for each model (free, plus, pro tiers). Update DEFAULT_PRICING in cost.ts for any new models."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.model-registry.ac1",
+            "title": "All current OpenAI models (gpt-5.4, gpt-5.4-mini, gpt-5.4-nano, o3) have tier metadata",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-598.model-registry.ac2",
+            "title": "ModelCapability interface includes minTier or tierAccess field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-598.model-registry.ac3",
+            "title": "New confirmed OpenAI models added to MODEL_CAPABILITIES",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-598.provider-prefix-mapping",
+        "title": "Add claudish provider prefix mapping",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "Add getClaudishPrefix(model, authMode) function to providers.ts or agents.ts. Maps model + auth mode to claudish prefix: subscription → cx@ (or verified ChatGPT OAuth prefix), api-key → oai@. Verify correct ChatGPT OAuth prefix from claudish source/docs."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.provider-prefix-mapping.ac1",
+            "title": "getClaudishPrefix(model, authMode) returns correct prefix (e.g., oai@gpt-5.4, cx@o3)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-598.provider-prefix-mapping.ac2",
+            "title": "OpenAI API key auth maps to oai@ prefix, subscription auth maps to OAuth prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-598.tier-aware-selector",
+        "title": "Add tier-aware filtering to smart model selector",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "Extend smart-model-selector.ts to filter available models by the user's subscription tier. If user has Plus tier, exclude models requiring Pro. Pass tier info from config through work-type-router.ts to selectModel(). Update SelectionOptions to accept maxTier."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.tier-aware-selector.ac1",
+            "title": "selectModel() only considers models available at user's configured tier",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-598.tier-aware-selector.ac2",
+            "title": "Smart selector falls back to highest-tier model user has access to",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-598.tier-aware-fallback",
+        "title": "Add tier-aware model fallback",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "Extend model-fallback.ts to prefer within-provider downgrade (e.g., gpt-5.4 Pro unavailable → gpt-5.4-mini Plus) before switching to Anthropic. Update FALLBACK_MAP and applyFallback() to check tier availability."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.tier-aware-fallback.ac1",
+            "title": "Fallback prefers cheaper OpenAI model before switching providers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-598.claudish-install",
+        "title": "Replace CCR install with claudish binary download",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "Update install.ts to download claudish binary from GitHub releases (v6.12.2). Detect OS: Linux uses direct download (claudish-linux-x64 or claudish-linux-arm64), macOS uses Homebrew. Install to ~/.local/bin or ~/bin. Add version check after install."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.claudish-install.ac1",
+            "title": "pan install downloads correct claudish binary for Linux x64/arm64",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-598.claudish-install.ac2",
+            "title": "pan install downloads claudish v6.12.2 (latest) from GitHub releases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-598.claudish-sync",
+        "title": "Replace CCR sync check with claudish version check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "Update sync.ts to check for claudish instead of claude-code-router. Run claudish --version to verify installation. Auto-update claudish if outdated."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.claudish-sync.ac1",
+            "title": "pan sync detects claudish installation and version",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-598.ccr-removal",
+        "title": "Remove CCR command and documentation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "Delete src/cli/commands/ccr/ directory. Remove ccr command registration from CLI. Update any docs referencing pan ccr."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.ccr-removal.ac1",
+            "title": "pan ccr command no longer exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-598.agent-spawn-with-prefix",
+        "title": "Integrate claudish prefix into agent spawning",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "Update agents.ts spawnAgent() and related functions to apply claudish prefix when spawning for non-Anthropic models. When model is openai and auth is subscription, spawn with cx@ prefix. When model is openai and auth is api-key, spawn with oai@ prefix. For Google: go@ for OAuth, g@ for API key. The prefix replaces the bare model name in Claude Code's --model flag."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.agent-spawn-with-prefix.ac1",
+            "title": "Agents spawned for OpenAI models use claudish prefix (oai@ or cx@)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-598.agent-spawn-with-prefix.ac2",
+            "title": "All agent types (planning, implementation, reviewer, etc.) support OpenAI routing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-598.agent-spawn-with-prefix.ac3",
+            "title": "Anthropic models continue to work without prefix (no change needed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-598.dashboard-display",
+        "title": "Update dashboard to display full claudish prefix + backing model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "Update workspaces.ts tmux pane parser to recognize OpenAI model names (gpt-*, o3, o4*). Add display helper that formats claudish prefix + display name for inspector panel (e.g., 'oai@gpt-5.4 (OpenAI API)' or 'cx@o3 (ChatGPT Plus)'). Update InspectorPanel component to show the formatted model display. Store agentModelFull in read model."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.dashboard-display.ac1",
+            "title": "Dashboard inspector shows full claudish prefix for OpenAI-routed agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-598.dashboard-display.ac2",
+            "title": "tmux pane parser recognizes OpenAI model names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-598.cost-tracking",
+        "title": "Verify token usage tracking for OpenAI models via JSONL",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "Verify that costs/reconciler.ts correctly maps claudish-routed model names to OpenAI pricing. Claude Code JSONL reports API model name in responses (without claudish prefix). Verify getPricing() handles prefix-stripped names. Add prefix stripping if needed. Test with real OpenAI model usage."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.cost-tracking.ac1",
+            "title": "Token usage and cost tracking reflects actual OpenAI model usage from JSONL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-598.research-oauth",
+        "title": "Research ChatGPT OAuth prefix in claudish",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-10T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-598"
+        },
+        "narrative": {
+          "Action": "The planning prompt mentions cx@ for ChatGPT OAuth but this prefix is not in claudish v6.12.2 README. Research claudish source code or run claudish --help to find the correct ChatGPT subscription OAuth prefix. v6.10.0 introduced 'Codex subscription OAuth' which is likely the feature."
+        },
+        "subItems": [
+          {
+            "id": "pan-598.research-oauth.ac1",
+            "title": "ChatGPT OAuth prefix confirmed (cx@ or equivalent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pan-598.config-schema",
+        "to": "pan-598.provider-prefix-mapping",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-598.config-schema",
+        "to": "pan-598.tier-aware-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-598.model-registry",
+        "to": "pan-598.tier-aware-selector",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-598.tier-aware-selector",
+        "to": "pan-598.agent-spawn-with-prefix",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-598.provider-prefix-mapping",
+        "to": "pan-598.agent-spawn-with-prefix",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-598.claudish-install",
+        "to": "pan-598.agent-spawn-with-prefix",
+        "type": "informs"
+      },
+      {
+        "from": "pan-598.agent-spawn-with-prefix",
+        "to": "pan-598.dashboard-display",
+        "type": "informs"
+      },
+      {
+        "from": "pan-598.agent-spawn-with-prefix",
+        "to": "pan-598.cost-tracking",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}

@@ -1,0 +1,312 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-13T21:33:31.081Z"
+  },
+  "plan": {
+    "id": "PAN-444",
+    "title": "Auto-deploy: rebuild + restart dashboard server after merge to main",
+    "status": "completed",
+    "items": [
+      {
+        "id": "deploy-script",
+        "title": "Create post-merge deploy script",
+        "status": "completed",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "simple",
+          "files": [
+            "scripts/post-merge-deploy.sh"
+          ]
+        },
+        "narrative": {
+          "Action": "New script at scripts/post-merge-deploy.sh that: (1) runs npm run build && npm link from repo root, (2) kills server processes on ports 3010/3011/3012, (3) detects runtime mode (bun dev vs node prod) and starts new server, (4) polls /api/health with 30s timeout. Accepts args: REPO_ROOT, ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH. Logs to /tmp/panopticon-deploy.log."
+        },
+        "subItems": [
+          {
+            "id": "deploy-script.ac1",
+            "title": "Script builds project and links globally",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-script.ac2",
+            "title": "Script kills old server and starts new one in correct mode",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-script.ac3",
+            "title": "Script waits for health check before exiting",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-script.ac4",
+            "title": "Script is executable (chmod +x)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-script.ac1",
+            "title": "Script builds project and links globally",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-script.ac2",
+            "title": "Script kills old server and starts new one in correct mode",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-script.ac3",
+            "title": "Script waits for health check before exiting",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-script.ac4",
+            "title": "Script is executable (chmod +x)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lifecycle-step0",
+        "title": "Add deploy step 0 to postMergeLifecycle",
+        "status": "completed",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "files": [
+            "src/lib/cloister/merge-agent.ts"
+          ],
+          "depends": [
+            "deploy-script"
+          ]
+        },
+        "narrative": {
+          "Action": "Modify postMergeLifecycle() in src/lib/cloister/merge-agent.ts to: (1) write {issueId, projectPath, sourceBranch, timestamp} to ~/.panopticon/pending-post-merge.json, (2) spawn scripts/post-merge-deploy.sh as detached process, (3) return immediately. If spawn fails, log warning and fall through to existing lifecycle (best-effort). Must use execAsync/spawn (no execSync per CLAUDE.md rules)."
+        },
+        "subItems": [
+          {
+            "id": "lifecycle-step0.ac1",
+            "title": "Pending file written before deploy script spawned",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-step0.ac2",
+            "title": "Deploy script spawned detached with unref()",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-step0.ac3",
+            "title": "Function returns immediately after spawn",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-step0.ac4",
+            "title": "Graceful fallback if spawn fails",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-step0.ac5",
+            "title": "No execSync used",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-step0.ac1",
+            "title": "Pending file written before deploy script spawned",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-step0.ac2",
+            "title": "Deploy script spawned detached with unref()",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-step0.ac3",
+            "title": "Function returns immediately after spawn",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-step0.ac4",
+            "title": "Graceful fallback if spawn fails",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-step0.ac5",
+            "title": "No execSync used",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "startup-hook",
+        "title": "Add pending lifecycle startup hook to server",
+        "status": "completed",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "files": [
+            "src/dashboard/server/main.ts"
+          ],
+          "depends": [
+            "lifecycle-step0"
+          ]
+        },
+        "narrative": {
+          "Action": "Modify src/dashboard/server/main.ts to check for ~/.panopticon/pending-post-merge.json after server is ready. If found: read contents, delete file, validate timestamp (ignore if > 1 hour old), then schedule postMergeLifecycle(issueId, projectPath) after 3s delay. Also call notifyTldrDaemon if sourceBranch is present. Use fs/promises (no sync FS calls per CLAUDE.md rules)."
+        },
+        "subItems": [
+          {
+            "id": "startup-hook.ac1",
+            "title": "Pending file detected and processed on startup",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-hook.ac2",
+            "title": "Stale files (> 1h) logged and deleted without running lifecycle",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-hook.ac3",
+            "title": "postMergeLifecycle runs successfully in fresh process",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-hook.ac4",
+            "title": "TLDR daemon notified if sourceBranch present",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-hook.ac5",
+            "title": "No sync FS calls used",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-hook.ac6",
+            "title": "Missing pending file is a silent no-op",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-hook.ac1",
+            "title": "Pending file detected and processed on startup",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-hook.ac2",
+            "title": "Stale files (> 1h) logged and deleted without running lifecycle",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-hook.ac3",
+            "title": "postMergeLifecycle runs successfully in fresh process",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-hook.ac4",
+            "title": "TLDR daemon notified if sourceBranch present",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-hook.ac5",
+            "title": "No sync FS calls used",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "startup-hook.ac6",
+            "title": "Missing pending file is a silent no-op",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "completed"
+}

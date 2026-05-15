@@ -1,35 +1,61 @@
 /**
  * vBRIEF File I/O Utilities
  *
- * Read and write workspace vBRIEF plans from `.pan/spec.vbrief.json`.
+ * Single-spec-on-main model (PAN-1124): the canonical vBRIEF spec lives at
+ * `<projectRoot>/.pan/specs/<canonical>.vbrief.json` and is immutable after
+ * planning writes it. The only legal spec mutation is `plan.status` via
+ * `updateSpecStatus()` in `pan-dir/specs.ts`.
  *
- * IMPORTANT (PAN-946): Workspace mutations MUST NEVER reach into project-level
- * lifecycle directories. `findPlan`, `readWorkspacePlan`, `updateItemStatus`,
- * and `updateSubItemStatus` resolve only the workspace-local spec file.
- * Lifecycle (proposed/active/completed/cancelled) lookups go through
- * `findVBriefByIssue` in `lifecycle-io.ts` (read-only) or
- * `findVBriefByIssueAsync` in `vbrief-index.ts` (read-only, indexed).
+ * Runtime item/subItem status is tracked as a flat `statusOverrides` map in
+ * the workspace continue file (`<workspace>/.pan/continue.json`).
+ * `readWorkspacePlan()` returns a merged view (main spec + overlay) so
+ * callers never need to know about the overlay.
  *
- * Conflating the two surfaces caused a high-severity correctness bug where
- * routine workspace progress updates (item status writes, beads sync) could
- * mutate `vbrief/active`, `vbrief/completed`, or `vbrief/cancelled` files
- * after lifecycle promotion — corrupting the archived plan.
+ * `updateItemStatus` and `updateSubItemStatus` write ONLY to the workspace
+ * continue file — they cannot mutate the spec on main.
  */
 
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
-import { join } from 'path';
-import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
+import { basename, join, resolve } from 'path';
+import { findSpecByIssue, findSpecByIssueAsync } from '../pan-dir/specs.js';
+import { readWorkspaceContinue, readWorkspaceContinueAsync, writeWorkspaceContinue } from '../pan-dir/continue.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
 
 /**
- * Returns the path to the workspace-local spec file if it exists, or null.
- * **Workspace-only.** Does NOT scan lifecycle directories — lifecycle/discovery
- * lookups belong in `findVBriefByIssue` / `findVBriefByIssueAsync`.
+ * Extract issue ID from a workspace directory path.
+ * Workspace paths follow `<projectRoot>/workspaces/feature-<issue-id>/`.
+ */
+export function issueIdFromWorkspacePath(workspacePath: string): string | null {
+  const base = basename(workspacePath);
+  const match = base.match(/^feature-([a-z]+-\d+)$/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+/** Derive the project root from a workspace path (two levels up). */
+function projectRootFromWorkspace(workspacePath: string): string {
+  return resolve(workspacePath, '..', '..');
+}
+
+/**
+ * Returns the path to the canonical vBRIEF spec on main for this workspace's issue.
+ * Returns null if no spec exists — callers must handle the missing-spec case.
  */
 export function findPlan(workspacePath: string): string | null {
-  const panPlanPath = join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
-  return existsSync(panPlanPath) ? panPlanPath : null;
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return null;
+  const projectRoot = projectRootFromWorkspace(workspacePath);
+  const entry = findSpecByIssue(projectRoot, issueId);
+  return entry ? entry.path : null;
+}
+
+/** Async variant of findPlan — safe to call from dashboard server code. */
+export async function findPlanAsync(workspacePath: string): Promise<string | null> {
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return null;
+  const projectRoot = projectRootFromWorkspace(workspacePath);
+  const entry = await findSpecByIssueAsync(projectRoot, issueId);
+  return entry ? entry.path : null;
 }
 
 /**
@@ -86,13 +112,65 @@ export async function readPlanAsync(planPath: string): Promise<VBriefDocument> {
 }
 
 /**
- * Reads plan.vbrief.json from a workspace directory.
- * Returns null if no plan exists.
+ * Apply statusOverrides from workspace continue.json onto a deep-cloned spec.
+ * Keys are either `"item-id"` (item status) or `"item-id.sub-id"` (subItem status).
+ */
+export function applyStatusOverrides(doc: VBriefDocument, overrides: Record<string, string>): VBriefDocument {
+  const merged = JSON.parse(JSON.stringify(doc)) as VBriefDocument;
+  for (const [key, status] of Object.entries(overrides)) {
+    const dotIndex = key.indexOf('.');
+    if (dotIndex === -1) {
+      const item = merged.plan.items.find(i => i.id === key);
+      if (item) {
+        item.status = status as VBriefItemStatus;
+        if (status === 'completed' && !item.completed) {
+          item.completed = new Date().toISOString();
+        }
+      }
+    } else {
+      const itemId = key.slice(0, dotIndex);
+      const subId = key.slice(dotIndex + 1);
+      const item = merged.plan.items.find(i => i.id === itemId);
+      const sub = item?.subItems?.find(s => s.id === subId);
+      if (sub) {
+        sub.status = status as VBriefItemStatus;
+        if (status === 'completed' && !sub.completed) {
+          sub.completed = new Date().toISOString();
+        }
+      }
+    }
+  }
+  return merged;
+}
+
+/**
+ * Reads the vBRIEF plan for a workspace, returning a merged view with
+ * statusOverrides applied from the workspace continue file.
+ * Returns null if no plan exists on main or locally.
  */
 export function readWorkspacePlan(workspacePath: string): VBriefDocument | null {
   const planPath = findPlan(workspacePath);
   if (!planPath) return null;
-  return readPlan(planPath);
+  const doc = readPlan(planPath);
+
+  const continueState = readWorkspaceContinue(workspacePath);
+  if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
+    return applyStatusOverrides(doc, continueState.statusOverrides);
+  }
+  return doc;
+}
+
+/** Async variant of readWorkspacePlan — safe for dashboard server code. */
+export async function readWorkspacePlanAsync(workspacePath: string): Promise<VBriefDocument | null> {
+  const planPath = await findPlanAsync(workspacePath);
+  if (!planPath) return null;
+  const doc = await readPlanAsync(planPath);
+
+  const continueState = await readWorkspaceContinueAsync(workspacePath);
+  if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
+    return applyStatusOverrides(doc, continueState.statusOverrides);
+  }
+  return doc;
 }
 
 /**
@@ -108,9 +186,6 @@ const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', '
  * Returns true ONLY when `plan.status === 'proposed'`. Used to gate the
  * dashboard Done button which should hide once the user has approved the plan
  * (status moves out of 'proposed').
- *
- * Pass either a workspace root (helper looks in `<root>/.pan/`) or a direct
- * `.pan/` directory path via `planningDir`.
  */
 export function isPlanningProposed(workspacePath: string, planningDir?: string): boolean {
   return checkPlanStatus(workspacePath, planningDir, status => status === 'proposed');
@@ -122,9 +197,6 @@ export function isPlanningProposed(workspacePath: string, planningDir?: string):
  *
  * Returns true when `plan.status` is any of: 'proposed', 'approved', 'pending',
  * 'running', 'completed', or 'blocked'.
- *
- * Pass either a workspace root (helper looks in `<root>/.pan/`) or a direct
- * `.pan/` directory path via `planningDir`.
  */
 export function isPlanningComplete(workspacePath: string, planningDir?: string): boolean {
   return checkPlanStatus(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
@@ -132,33 +204,27 @@ export function isPlanningComplete(workspacePath: string, planningDir?: string):
 
 function checkPlanStatus(
   workspacePath: string,
-  planningDir: string | undefined,
+  _planningDir: string | undefined,
   matchStatus: (status: string) => boolean,
 ): boolean {
-  const candidatePlanPaths = planningDir
-    ? [join(planningDir, PAN_SPEC_FILENAME)]
-    : [join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME)];
-
-  for (const planPath of candidatePlanPaths) {
-    if (!existsSync(planPath)) continue;
-    try {
-      const doc = readPlan(planPath);
-      const status = doc.plan?.status;
-      if (status && matchStatus(status)) return true;
-      if (status) return false;
-    } catch {
-      // Corrupt / unreadable plan — keep checking fallbacks.
-    }
+  const planPath = findPlan(workspacePath);
+  if (!planPath) return false;
+  try {
+    const doc = readPlan(planPath);
+    const status = doc.plan?.status;
+    if (status && matchStatus(status)) return true;
+    if (status) return false;
+  } catch {
+    // Corrupt / unreadable plan
   }
-
   return false;
 }
 
 
 /**
- * Updates the status of a specific item in plan.vbrief.json.
- * Uses a write-to-temp-then-rename pattern to minimize race conditions.
- * No-ops gracefully if the file or item doesn't exist.
+ * Updates the status of a specific item by writing to the workspace
+ * continue file's `statusOverrides` map. Does NOT mutate the spec on main.
+ * No-ops gracefully if no plan exists for this workspace.
  */
 export function updateItemStatus(workspacePath: string, itemId: string, status: VBriefItemStatus): void {
   const planPath = findPlan(workspacePath);
@@ -168,26 +234,30 @@ export function updateItemStatus(workspacePath: string, itemId: string, status: 
   const item = doc.plan.items.find(i => i.id === itemId);
   if (!item) return;
 
-  const now = new Date().toISOString();
-  item.status = status;
-  if (status === 'completed') {
-    item.completed = now;
-  }
+  const continueState = readWorkspaceContinue(workspacePath) ?? {
+    version: '1' as const,
+    issueId: issueIdFromWorkspacePath(workspacePath) ?? 'UNKNOWN',
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    gitState: {},
+    decisions: [],
+    hazards: [],
+    resumePoint: null,
+    beadsMapping: {},
+    sessionHistory: [],
+  };
 
-  // Update timestamps and increment sequence counter
-  doc.vBRIEFInfo.updated = now;
-  doc.plan.updated = now;
-  doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
+  const overrides = { ...continueState.statusOverrides };
+  overrides[itemId] = status;
+  continueState.statusOverrides = overrides;
 
-  // Atomic rename: write to .tmp then rename to avoid partial reads
-  const tempPath = planPath + '.tmp';
-  writeFileSync(tempPath, JSON.stringify(doc, null, 2), 'utf-8');
-  renameSync(tempPath, planPath);
+  writeWorkspaceContinue(workspacePath, continueState);
 }
 
 /**
- * Updates the status of a specific subItem within an item in plan.vbrief.json.
- * Uses write-to-temp-then-rename pattern for atomicity.
+ * Updates the status of a specific subItem by writing to the workspace
+ * continue file's `statusOverrides` map. Uses `itemId.subItemId` as the key.
+ * Does NOT mutate the spec on main.
  * No-ops gracefully if the file, item, or subItem doesn't exist.
  */
 export function updateSubItemStatus(
@@ -206,18 +276,22 @@ export function updateSubItemStatus(
   const subItem = item.subItems.find(s => s.id === subItemId);
   if (!subItem) return;
 
-  const now = new Date().toISOString();
-  subItem.status = status;
-  if (status === 'completed') {
-    subItem.completed = now;
-  }
+  const continueState = readWorkspaceContinue(workspacePath) ?? {
+    version: '1' as const,
+    issueId: issueIdFromWorkspacePath(workspacePath) ?? 'UNKNOWN',
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+    gitState: {},
+    decisions: [],
+    hazards: [],
+    resumePoint: null,
+    beadsMapping: {},
+    sessionHistory: [],
+  };
 
-  // Update timestamps and increment sequence counter
-  doc.vBRIEFInfo.updated = now;
-  doc.plan.updated = now;
-  doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
+  const overrides = { ...continueState.statusOverrides };
+  overrides[`${itemId}.${subItemId}`] = status;
+  continueState.statusOverrides = overrides;
 
-  const tempPath = planPath + '.tmp';
-  writeFileSync(tempPath, JSON.stringify(doc, null, 2), 'utf-8');
-  renameSync(tempPath, planPath);
+  writeWorkspaceContinue(workspacePath, continueState);
 }

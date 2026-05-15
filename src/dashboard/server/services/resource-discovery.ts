@@ -7,8 +7,8 @@ import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
 import {
   PAN_CONTINUE_FILENAME,
   PAN_DIRNAME,
-  PAN_SPEC_FILENAME,
 } from '../../../lib/pan-dir/index.js';
+import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { listProjects, resolveProjectFromIssue, type ResolvedProject } from '../../../lib/projects.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { getReviewStatus } from '../review-status.js';
@@ -341,6 +341,7 @@ interface WorkspaceScanResult {
 
 async function scanWorkspace(workspacesDir: string, workspaceName: string): Promise<WorkspaceScanResult> {
   const workspacePath = join(workspacesDir, workspaceName);
+  const projectRoot = join(workspacesDir, '..');
   const workspaceEntries = new Set(await readdir(workspacePath).catch(() => [] as string[]));
   const panEntries = workspaceEntries.has(PAN_DIRNAME)
     ? new Set(await readdir(join(workspacePath, PAN_DIRNAME)).catch(() => [] as string[]))
@@ -348,9 +349,10 @@ async function scanWorkspace(workspacesDir: string, workspaceName: string): Prom
   const beadsEntries = workspaceEntries.has('.beads')
     ? new Set(await readdir(join(workspacePath, '.beads')).catch(() => [] as string[]))
     : new Set<string>();
-  const vbriefPath = panEntries.has(PAN_SPEC_FILENAME)
-    ? join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME)
-    : null;
+  const issueMatch = workspaceName.match(/^feature-([a-z]+-\d+)$/i);
+  const issueId = issueMatch ? issueMatch[1].toUpperCase() : null;
+  const specEntry = issueId ? findSpecByIssue(projectRoot, issueId) : null;
+  const vbriefPath = specEntry ? specEntry.path : null;
 
   return {
     workspacePath,

@@ -95,7 +95,7 @@ import { findPlan, readPlan, readPlanAsync, readWorkspacePlan, isPlanningComplet
 import { VBRIEF_INSPECTION_POLICIES } from '../../../lib/vbrief/types.js';
 import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief/types.js';
 import { findVBriefByIssueAsync, readVBriefDocumentAsync } from '../../../lib/vbrief/vbrief-index.js';
-import { criticalPath } from '../../../lib/vbrief/dag.js';
+import { criticalPath, actionableDoc } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
 import { capturePaneAsync, killSessionAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { queryBeadsForIssue } from '../../../lib/beads-query.js';
@@ -555,6 +555,29 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
   if (existsSync(workspacePath)) return { exists: true, isRemote: false, localPath: workspacePath };
 
   return { exists: false, isRemote: false };
+}
+
+async function getDirtyWorkspaceErrorForReviewRequest(
+  workspacePath: string,
+  workspaceInfo: WorkspaceInfo,
+): Promise<string | null> {
+  try {
+    const statusCmd = 'git status --porcelain -uno';
+    const status = workspaceInfo.isRemote && workspaceInfo.vmName
+      ? (await execAsync(
+          flyExecCmd(workspaceInfo.vmName, `cd ${workspacePath} && ${statusCmd}`),
+          { encoding: 'utf-8', timeout: 30000 },
+        )).stdout
+      : (await execAsync(statusCmd, { cwd: workspacePath, encoding: 'utf-8' })).stdout;
+
+    if (!status.trim()) {
+      return null;
+    }
+
+    return `Workspace has uncommitted changes. Commit or stash them before requesting review:\ncd ${workspacePath}\ngit status`;
+  } catch {
+    return null;
+  }
 }
 
 function isGitHubIssue(issueId: string): {
@@ -1658,7 +1681,7 @@ const getWorkspacePlanRoute = HttpRouter.add(
       );
     }
 
-    const cp = criticalPath(location.doc);
+    const cp = criticalPath(actionableDoc(location.doc));
     return jsonResponse({ ...location.doc, criticalPath: cp, lifecycleDir: location.lifecycleDir });
   }))
 );
@@ -2960,15 +2983,14 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     const update: Partial<ReviewStatus> = {};
     if (reviewStatus === 'passed') {
       const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-      if (workspaceInfo.exists) {
+      if (workspaceInfo.exists && workspaceInfo.localPath) {
         const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
         try {
-          const gitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(workspaceInfo.path));
+          const gitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(workspaceInfo.localPath));
           if (gitInfo.HEAD) {
             update.reviewedAtCommit = gitInfo.HEAD;
-            console.log(`[review-status] Will snapshot reviewedAtCommit=${gitInfo.HEAD.substring(0, 8)} for ${issueId}`);
           }
-        } catch {}
+        } catch { /* non-fatal */ }
       }
     }
     if (reviewStatus) update.reviewStatus = reviewStatus as any;
@@ -2980,7 +3002,6 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     if (readyForMerge !== undefined) update.readyForMerge = readyForMerge;
 
     const status = setReviewStatus(issueId, update);
-    console.log(`[review-status] Updated ${issueId}:`, status);
 
     const { getTmuxSessionName } =
       yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
@@ -3383,6 +3404,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               branch: branchName,
               workspace: workspacePath,
               prUrl,
+              force: forceReview,
             });
 
             if (!reviewResult.success) {
@@ -3452,6 +3474,19 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
     if (existingStatus?.reviewStatus === 'passed') {
       if (shouldTreatAsRerun(existingStatus)) {
+        const issueLowerRerun = issueId.toLowerCase();
+        const issuePrefixRerun = extractPrefix(issueId) ?? issueId.split('-')[0];
+        const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
+        const wsInfoRerun = getWorkspaceInfoForIssue(issueId);
+        const workspacePathRerun = wsInfoRerun.isRemote
+          ? wsInfoRerun.remotePath!
+          : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
+        const dirtyError = yield* Effect.promise(() => getDirtyWorkspaceErrorForReviewRequest(workspacePathRerun, wsInfoRerun));
+        if (dirtyError) {
+          console.log(`[request-review] Rejecting ${issueId}: dirty workspace on rerun path`);
+          return jsonResponse({ success: false, error: dirtyError }, { status: 400 });
+        }
+
         console.log(`[request-review] ${issueId}: forcing full review/test rerun from passed state`);
         setPendingOperation(issueId, 'review');
         setReviewStatus(issueId, {
@@ -3472,14 +3507,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           try {
             // Resolve workspace info locally — outer scope vars (workspacePath, branchName)
             // are declared after the early return below and must not be relied on here.
-            const issueLowerRerun = issueId.toLowerCase();
-            const issuePrefixRerun = extractPrefix(issueId) ?? issueId.split('-')[0];
-            const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
             const branchNameRerun = `feature/${issueLowerRerun}`;
-            const wsInfoRerun = getWorkspaceInfoForIssue(issueId);
-            const workspacePathRerun = wsInfoRerun.isRemote
-              ? wsInfoRerun.remotePath!
-              : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
 
             transitionIssueToInReview(issueId, workspacePathRerun).catch((err: any) => {
               console.warn(`[request-review] Could not transition ${issueId} to in_review: ${err.message}`);
@@ -3511,6 +3539,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               workspace: workspacePathRerun,
               branch: branchNameRerun,
               prUrl,
+              force: true,
             });
 
             if (result.success) {
@@ -3640,6 +3669,14 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       );
     }
 
+    const dirtyWorkspaceError = yield* Effect.promise(() => getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo));
+    if (dirtyWorkspaceError) {
+      return jsonResponse(
+        { success: false, error: dirtyWorkspaceError },
+        { status: 400 }
+      );
+    }
+
     transitionIssueToInReview(issueId, workspacePath).catch((err: any) => {
       console.warn(
         `[request-review] Could not transition ${issueId} to in_review: ${err.message}`
@@ -3720,6 +3757,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           issueId,
           workspace: workspacePath,
           branch: branchName,
+          force: true,
         });
       });
 
@@ -3841,6 +3879,19 @@ export function processResetReviewPipeline(
     verificationStatus: 'pending',
     verificationNotes: undefined,
     verificationCycleCount: 0,
+    // A human-initiated reset is an explicit circuit-breaker override: clear
+    // the stuck marker and the review/test retry counters too. Without this,
+    // a workspace stuck on review_infrastructure_failure (or with exhausted
+    // retry budgets) is reset to `pending` but immediately re-skipped by the
+    // deacon's stuck guard / retry-budget checks — the "override" is a no-op.
+    stuck: false,
+    stuckReason: undefined,
+    stuckAt: undefined,
+    stuckDetails: undefined,
+    reviewRetryCount: 0,
+    testRetryCount: 0,
+    mergeRetryCount: 0,
+    recoveryStartedAt: undefined,
   });
 
   return {

@@ -1,0 +1,199 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-08T00:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-486: Detachable terminal — popout workspace terminal into OS window"
+  },
+  "plan": {
+    "id": "pan-486",
+    "title": "Detachable terminal — popout workspace terminal into OS window",
+    "status": "approved",
+    "uid": "9d74e4e3-fc34-4939-a32f-5569300f015a",
+    "author": "agent:minimax-m2.7-highspeed",
+    "sequence": 1,
+    "created": "2026-04-08T00:00:00.000Z",
+    "updated": "2026-04-08T00:00:00.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/486",
+        "label": "PAN-486",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/pan-486-detachable-terminal.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "feature",
+      "terminal",
+      "electron",
+      "ui"
+    ],
+    "narratives": {
+      "Problem": "The terminal is the primary interaction surface for Panopticon agents. Users cannot easily monitor a running agent while working in another workspace, give the terminal more screen real estate, or switch to it via Alt+Tab without the full dashboard in the taskbar.",
+      "Proposal": "Add a popout button to the terminal panel header that opens the terminal in a dedicated OS-managed window. In browser mode, use window.open() with a named popup. In Electron, create a native BrowserWindow with IPC for title and always-on-top control. The underlying tmux session is shared — no new PTY is spawned."
+    },
+    "items": [
+      {
+        "id": "frontend-detach-button",
+        "title": "Add detach button to TerminalPanel header",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-486"
+        },
+        "narrative": {
+          "Action": "Add an ExternalLink (popout) icon button to the TerminalPanel header, to the right of the close button. Wire it to a popoutTerminal(agent.id, title) function."
+        },
+        "subItems": [
+          {
+            "id": "frontend-detach-button.ac1",
+            "title": "Detach button visible in terminal panel header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "popout-terminal-helper",
+        "title": "Implement popoutTerminal() helper with browser/electron runtime detection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-486"
+        },
+        "narrative": {
+          "Action": "Implement popoutTerminal(sessionName, title) in TerminalPanel.tsx. Detects window.panopticonBridge for Electron, falls back to window.open() for browser. Uses window name terminal-{sessionName} to prevent duplicate popouts."
+        },
+        "subItems": [
+          {
+            "id": "popout-terminal-helper.ac1",
+            "title": "Re-clicking detach re-focuses existing popup (no duplicates)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "standalone-terminal-route",
+        "title": "Create StandaloneTerminal component and /terminal/:sessionName route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-486"
+        },
+        "narrative": {
+          "Action": "Create StandaloneTerminal.tsx with: (1) header showing title + always-on-top toggle, (2) XTerminal component for the tmux session. Add /terminal/:sessionName path to App.tsx routing that renders this component with no sidebar/header."
+        },
+        "subItems": [
+          {
+            "id": "standalone-terminal-route.ac1",
+            "title": "Popped-out terminal connects to the same tmux session (no new session spawned)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "standalone-terminal-route.ac2",
+            "title": "Window title reflects agent ID + issue ID (e.g. agent-PAN-486 · PAN-486)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "electron-preload",
+        "title": "Extend panopticonBridge with openTerminalWindow IPC",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-486"
+        },
+        "narrative": {
+          "Action": "Add OPEN_TERMINAL_WINDOW IPC channel and openTerminalWindow(sessionName, title) method to preload.ts PanopticonBridge type and implementation."
+        },
+        "subItems": []
+      },
+      {
+        "id": "electron-browser-window",
+        "title": "Add Electron BrowserWindow creation for terminal popout",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-486"
+        },
+        "narrative": {
+          "Action": "Add IPC.OPEN_TERMINAL_WINDOW handler in main.ts that creates a frameless BrowserWindow loading /terminal/{sessionName}. Add SET_ALWAYS_ON_TOP IPC to control window.setAlwaysOnTop(). Track terminal windows in a Map by sessionName for re-focus on subsequent calls."
+        },
+        "subItems": [
+          {
+            "id": "electron-browser-window.ac1",
+            "title": "Closing popup does not kill the tmux session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "always-on-top-toggle",
+        "title": "Add always-on-top toggle to standalone terminal header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-08T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-486"
+        },
+        "narrative": {
+          "Action": "Add Pin/PinOff toggle button in StandaloneTerminal header. In Electron, sends SET_ALWAYS_ON_TOP IPC. In browser popup, calls popupWindow.focus() as fallback (browser cannot control always-on-top)."
+        },
+        "subItems": []
+      }
+    ],
+    "edges": [
+      {
+        "from": "frontend-detach-button",
+        "to": "popout-terminal-helper",
+        "type": "blocks"
+      },
+      {
+        "from": "popout-terminal-helper",
+        "to": "standalone-terminal-route",
+        "type": "blocks"
+      },
+      {
+        "from": "electron-preload",
+        "to": "electron-browser-window",
+        "type": "blocks"
+      },
+      {
+        "from": "standalone-terminal-route",
+        "to": "always-on-top-toggle",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

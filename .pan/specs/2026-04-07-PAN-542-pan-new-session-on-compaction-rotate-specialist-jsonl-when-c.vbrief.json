@@ -1,0 +1,180 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-07T00:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-542: Session compaction rotation via JSONL truncation"
+  },
+  "plan": {
+    "id": "pan-542",
+    "title": "PAN: New session on compaction — rotate specialist JSONL when Claude compacts",
+    "status": "approved",
+    "uid": "ffbb6b17-59b7-466d-8483-31499b0d0bc3",
+    "author": "agent:minimax-m2.7-highspeed",
+    "sequence": 1,
+    "created": "2026-04-07T00:00:00.000Z",
+    "updated": "2026-04-07T00:00:00.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/542",
+        "label": "PAN-542",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/541",
+        "label": "PAN-541 (SQLite prerequisite)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "specialists",
+      "session-management",
+      "compaction",
+      "jsonl"
+    ],
+    "narratives": {
+      "Problem": "Specialist sessions grow unboundedly as JSONL accumulates. After compaction, the dashboard display is correct (parseFromLastCompactBoundary), but the file itself never shrinks, causing unnecessary I/O and eventual 30-day Claude deletion.",
+      "Proposal": "Truncate JSONL to just the compact_boundary + isCompactSummary after each compaction. Keep same UUID (no new session), record rotation in SQLite (session_compact_offsets). Original rotation-via-seed approach is not feasible: --session-id creates blank sessions ignoring seed files, and --resume requires pre-registration in Claude's internal storage."
+    },
+    "items": [
+      {
+        "id": "pan-542.sqlite-migration",
+        "title": "Add SQLite session_compact_offsets table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-07T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-542"
+        },
+        "narrative": {
+          "Action": "Add session_compact_offsets table to database.ts with columns: session_id (TEXT), boundary_byte_offset (INTEGER), rotated_at (TEXT). Add upsertBoundaryRotated(sessionId, byteOffset) helper."
+        },
+        "subItems": [
+          {
+            "id": "pan-542.sqlite-migration.ac1",
+            "title": "session_compact_offsets table created and queryable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-542.jsonl-truncation",
+        "title": "Implement JSONL truncation on compaction",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-07T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-542"
+        },
+        "narrative": {
+          "Action": "Add truncateToCompactBoundary(sessionFile, boundaryByteOffset) to conversation-service.ts. Scans from boundary forward to find the isCompactSummary user entry, then truncates file to keep only compact_boundary + isCompactSummary lines. Uses fs/promises (async). Handles byte-accurate truncation."
+        },
+        "subItems": [
+          {
+            "id": "pan-542.jsonl-truncation.ac1",
+            "title": "Truncation preserves exactly compact_boundary + isCompactSummary entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-542.jsonl-truncation.ac2",
+            "title": "Truncation is idempotent (re-running finds no un-rotated boundary)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-542.integration",
+        "title": "Integrate rotation check into spawnEphemeralSpecialist pre-launch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-07T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-542"
+        },
+        "narrative": {
+          "Action": "Before writing the launcher script in spawnEphemeralSpecialist: (1) resolve JSONL path from sessionId + cwd using encodeCwdToProjectDir; (2) call findLastCompactBoundary; (3) check session_compact_offsets SQLite for this boundary; (4) if boundary not rotated yet, call truncateToCompactBoundary and upsertBoundaryRotated; (5) proceed with existing launcher as normal."
+        },
+        "subItems": [
+          {
+            "id": "pan-542.integration.ac1",
+            "title": "spawnEphemeralSpecialist calls rotation check before writing launcher script",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-542.integration.ac2",
+            "title": "test-agent is excluded from rotation check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-542.integration.ac3",
+            "title": "Sessions with no compact_boundary are unchanged (normal --resume)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-542.testing",
+        "title": "Add unit tests for rotation and truncation logic",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-07T00:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-542"
+        },
+        "narrative": {
+          "Action": "Add tests in src/lib/cloister/__tests__/: (1) truncateToCompactBoundary preserves correct entries; (2) session_compact_offsets upsert/lookup; (3) rotation check is skipped for test-agent; (4) rotation check is skipped when no compact boundary exists."
+        },
+        "subItems": [
+          {
+            "id": "pan-542.testing.ac1",
+            "title": "All new tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pan-542.sqlite-migration",
+        "to": "pan-542.integration",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-542.jsonl-truncation",
+        "to": "pan-542.integration",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-542.integration",
+        "to": "pan-542.testing",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}

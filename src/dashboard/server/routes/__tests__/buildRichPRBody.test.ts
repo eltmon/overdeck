@@ -2,7 +2,8 @@
  * Tests for buildRichPRBody — rich PR description generator (PAN-475)
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
+import { rm, mkdir, writeFile } from 'node:fs/promises';
+import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { buildRichPRBody } from '../workspaces.js';
@@ -14,16 +15,28 @@ vi.mock('../../../../lib/beads-query.js', () => ({
 import { queryBeadsForIssue } from '../../../../lib/beads-query.js';
 
 describe('buildRichPRBody', () => {
+  let projectRoot: string;
   let workspacePath: string;
 
   beforeEach(async () => {
-    workspacePath = await mkdtemp(join(tmpdir(), 'pan-test-workspace-'));
+    projectRoot = join(tmpdir(), `pan-test-project-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    workspacePath = join(projectRoot, 'workspaces', 'feature-pan-42');
+    mkdirSync(workspacePath, { recursive: true });
     vi.mocked(queryBeadsForIssue).mockReset().mockResolvedValue([]);
   });
 
   afterEach(async () => {
-    await rm(workspacePath, { recursive: true, force: true });
+    await rm(projectRoot, { recursive: true, force: true });
   });
+
+  function writeMainSpec(issueId: string, plan: Record<string, unknown>): Promise<void> {
+    const specsDir = join(projectRoot, '.pan', 'specs');
+    mkdirSync(specsDir, { recursive: true });
+    const slug = String(plan.title || 'test').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const filename = `2026-01-01-${issueId}-${slug}.vbrief.json`;
+    const specDoc = { ...plan, status: 'active' };
+    return writeFile(join(specsDir, filename), JSON.stringify(specDoc));
+  }
 
   it('includes closes reference from issue number even with no plan', async () => {
     const body = await buildRichPRBody('PAN-42', workspacePath);
@@ -31,7 +44,10 @@ describe('buildRichPRBody', () => {
   });
 
   it('includes closes reference for a different issue number', async () => {
-    const body = await buildRichPRBody('PAN-123', workspacePath);
+    // Different issue ID → different workspace path
+    const ws123 = join(projectRoot, 'workspaces', 'feature-pan-123');
+    mkdirSync(ws123, { recursive: true });
+    const body = await buildRichPRBody('PAN-123', ws123);
     expect(body).toContain('Closes #123');
   });
 
@@ -41,13 +57,12 @@ describe('buildRichPRBody', () => {
   });
 
   it('includes AC checklist from vBRIEF plan items', async () => {
-    await mkdir(join(workspacePath, '.pan'), { recursive: true });
     const plan = {
       vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
       plan: {
-        id: 'test-plan',
+        id: 'PAN-42',
         title: 'Test',
-        status: 'in_progress',
+        status: 'active',
         items: [
           { id: 'item-1', title: 'Do the thing', status: 'completed' },
           { id: 'item-2', title: 'Do another thing', status: 'pending' },
@@ -55,7 +70,7 @@ describe('buildRichPRBody', () => {
         edges: [],
       },
     };
-    await writeFile(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(plan));
+    await writeMainSpec('PAN-42', plan);
 
     const body = await buildRichPRBody('PAN-42', workspacePath);
     expect(body).toContain('## Acceptance Criteria');
@@ -77,22 +92,22 @@ describe('buildRichPRBody', () => {
   });
 
   it('includes both AC checklist and beads when both exist', async () => {
-    await mkdir(join(workspacePath, '.pan'), { recursive: true });
-
     const plan = {
       vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
       plan: {
-        id: 'p', title: 'T', status: 'in_progress',
+        id: 'PAN-42',
+        title: 'Test',
+        status: 'active',
         items: [{ id: 'i1', title: 'AC One', status: 'completed' }],
         edges: [],
       },
     };
-    await writeFile(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(plan));
+    await writeMainSpec('PAN-42', plan);
 
-    const bead = { id: 'b1', title: 'pan-5: Task one', status: 'closed', labels: ['pan-5'] };
+    const bead = { id: 'b1', title: 'pan-42: Task one', status: 'closed', labels: ['pan-42'] };
     vi.mocked(queryBeadsForIssue).mockResolvedValue([bead]);
 
-    const body = await buildRichPRBody('PAN-5', workspacePath);
+    const body = await buildRichPRBody('PAN-42', workspacePath);
     expect(body).toContain('## Acceptance Criteria');
     expect(body).toContain('- [x] AC One');
     expect(body).toContain('## Implementation Tasks');
@@ -100,8 +115,10 @@ describe('buildRichPRBody', () => {
   });
 
   it('handles malformed plan JSON gracefully (omits AC section, keeps issue ref)', async () => {
-    await mkdir(join(workspacePath, '.pan'), { recursive: true });
-    await writeFile(join(workspacePath, '.pan', 'spec.vbrief.json'), '{invalid json}');
+    // Write invalid JSON directly to specs dir with a valid filename
+    const specsDir = join(projectRoot, '.pan', 'specs');
+    mkdirSync(specsDir, { recursive: true });
+    await writeFile(join(specsDir, '2026-01-01-PAN-42-test.vbrief.json'), '{invalid json}');
 
     const body = await buildRichPRBody('PAN-42', workspacePath);
     expect(body).toContain('Closes #42');

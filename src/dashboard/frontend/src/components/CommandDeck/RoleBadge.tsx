@@ -10,6 +10,7 @@ import {
   ListChecks,
   Sparkles,
   HelpCircle,
+  Rocket,
   type LucideIcon,
 } from 'lucide-react';
 import type { SessionNodeType } from '@panctl/contracts';
@@ -55,6 +56,7 @@ const SESSION_STYLE: Record<SessionNodeType, RoleStyle> = {
   review: { Icon: ShieldCheck, ring: 'var(--signal-review)', fg: 'var(--signal-review)' },
   reviewer: { Icon: ShieldCheck, ring: 'var(--signal-review)', fg: 'var(--signal-review)' },
   test: { Icon: CheckCircle2, ring: 'var(--success)', fg: 'var(--success)' },
+  ship: { Icon: Rocket, ring: 'var(--success)', fg: 'var(--success)' },
   merge: { Icon: GitMerge, ring: 'var(--success)', fg: 'var(--success)' },
   legacy: { Icon: HelpCircle, ring: 'var(--muted-foreground)', fg: 'var(--muted-foreground)' },
 };

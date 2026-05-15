@@ -13,9 +13,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { readPlan, updateItemStatus, updateSubItemStatus } from '../../src/lib/vbrief/io.js';
+import { readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../../src/lib/vbrief/io.js';
+import { readWorkspaceContinue } from '../../src/lib/pan-dir/continue.js';
 import type { VBriefDocument } from '../../src/lib/vbrief/types.js';
 
+let PROJECT_ROOT: string;
 let TEST_DIR: string;
 
 function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBriefDocument {
@@ -29,7 +31,7 @@ function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBrie
     plan: {
       id: 'pan-453',
       title: 'Full vBRIEF v0.5 Spec Support',
-      status: 'approved',
+      status: 'active',
       uid: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       sequence: 1,
       created: '2026-01-01T00:00:00Z',
@@ -62,12 +64,21 @@ function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBrie
   };
 }
 
+/**
+ * Write the spec to the main-side `.pan/specs/` directory (canonical location)
+ * AND to the workspace `.pan/spec.vbrief.json` for tests that read directly.
+ */
 function writePlanDoc(workspacePath: string, doc: VBriefDocument): string {
+  const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
+  mkdirSync(specsDir, { recursive: true });
+  const specPath = join(specsDir, '2026-01-01-PAN-453-full-vbrief-spec-support.vbrief.json');
+  writeFileSync(specPath, JSON.stringify(doc, null, 2));
+
   const panDir = join(workspacePath, '.pan');
   mkdirSync(panDir, { recursive: true });
-  const planPath = join(panDir, 'spec.vbrief.json');
-  writeFileSync(planPath, JSON.stringify(doc, null, 2));
-  return planPath;
+  const localPath = join(panDir, 'spec.vbrief.json');
+  writeFileSync(localPath, JSON.stringify(doc, null, 2));
+  return localPath;
 }
 
 function readPlanFromWorkspace(workspacePath: string): VBriefDocument {
@@ -75,12 +86,13 @@ function readPlanFromWorkspace(workspacePath: string): VBriefDocument {
 }
 
 beforeEach(() => {
-  TEST_DIR = join(tmpdir(), `vbrief-spec-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  PROJECT_ROOT = join(tmpdir(), `vbrief-project-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  TEST_DIR = join(PROJECT_ROOT, 'workspaces', 'feature-pan-453');
   mkdirSync(TEST_DIR, { recursive: true });
 });
 
 afterEach(() => {
-  rmSync(TEST_DIR, { recursive: true, force: true });
+  rmSync(PROJECT_ROOT, { recursive: true, force: true });
 });
 
 // ─── vBRIEFInfo fields ────────────────────────────────────────────────────────
@@ -161,62 +173,46 @@ describe('VBriefItem created/completed fields', () => {
   });
 });
 
-// ─── updateItemStatus: timestamps and sequence ────────────────────────────────
+// ─── updateItemStatus: statusOverrides in continue.json ─────────────────────
 
-describe('updateItemStatus: v0.5 timestamp + sequence behavior', () => {
-  it('increments plan.sequence on each call', () => {
+describe('updateItemStatus: writes to continue.json statusOverrides', () => {
+  it('writes status to continue.json statusOverrides', () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
 
     updateItemStatus(TEST_DIR, 'update-types', 'running');
-    const after = readPlanFromWorkspace(TEST_DIR);
-    expect(after.plan.sequence).toBe(2);
+    const cont = readWorkspaceContinue(TEST_DIR);
+    expect(cont?.statusOverrides?.['update-types']).toBe('running');
   });
 
-  it('starts sequence at 1 if missing', () => {
-    const doc = makeFullSpecDoc({ sequence: undefined });
-    writePlanDoc(TEST_DIR, doc);
+  it('does not mutate the spec file on disk', () => {
+    const doc = makeFullSpecDoc();
+    const planPath = writePlanDoc(TEST_DIR, doc);
 
     updateItemStatus(TEST_DIR, 'update-types', 'running');
-    const after = readPlanFromWorkspace(TEST_DIR);
-    expect(after.plan.sequence).toBe(1);
+    const raw = readPlan(planPath);
+    expect(raw.plan.sequence).toBe(1);
+    expect(raw.plan.items[0].status).toBe('pending');
   });
 
-  it('sets plan.updated to a current ISO timestamp', () => {
+  it('merged view reflects updated status via readWorkspacePlan', () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
-    const before = Date.now();
 
     updateItemStatus(TEST_DIR, 'update-types', 'running');
-    const after = readPlanFromWorkspace(TEST_DIR);
-
-    expect(after.plan.updated).toBeDefined();
-    const updatedTime = new Date(after.plan.updated!).getTime();
-    expect(updatedTime).toBeGreaterThanOrEqual(before);
-    expect(updatedTime).toBeLessThanOrEqual(Date.now() + 1000);
+    const merged = readWorkspacePlan(TEST_DIR);
+    const item = merged!.plan.items.find(i => i.id === 'update-types');
+    expect(item?.status).toBe('running');
   });
 
-  it('sets vBRIEFInfo.updated to a current ISO timestamp', () => {
-    const doc = makeFullSpecDoc();
-    writePlanDoc(TEST_DIR, doc);
-    const before = Date.now();
-
-    updateItemStatus(TEST_DIR, 'update-types', 'running');
-    const after = readPlanFromWorkspace(TEST_DIR);
-
-    expect(after.vBRIEFInfo.updated).toBeDefined();
-    const updatedTime = new Date(after.vBRIEFInfo.updated!).getTime();
-    expect(updatedTime).toBeGreaterThanOrEqual(before);
-  });
-
-  it('sets item.completed when status → completed', () => {
+  it('sets item.completed in merged view when status → completed', () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
     const before = Date.now();
 
     updateItemStatus(TEST_DIR, 'update-types', 'completed');
-    const after = readPlanFromWorkspace(TEST_DIR);
-    const item = after.plan.items.find(i => i.id === 'update-types');
+    const merged = readWorkspacePlan(TEST_DIR);
+    const item = merged!.plan.items.find(i => i.id === 'update-types');
 
     expect(item?.completed).toBeDefined();
     const completedTime = new Date(item!.completed!).getTime();
@@ -228,46 +224,43 @@ describe('updateItemStatus: v0.5 timestamp + sequence behavior', () => {
     writePlanDoc(TEST_DIR, doc);
 
     updateItemStatus(TEST_DIR, 'update-types', 'running');
-    const after = readPlanFromWorkspace(TEST_DIR);
-    const item = after.plan.items.find(i => i.id === 'update-types');
+    const merged = readWorkspacePlan(TEST_DIR);
+    const item = merged!.plan.items.find(i => i.id === 'update-types');
 
     expect(item?.completed).toBeUndefined();
   });
 });
 
-// ─── updateSubItemStatus: timestamps and sequence ─────────────────────────────
+// ─── updateSubItemStatus: statusOverrides in continue.json ──────────────────
 
-describe('updateSubItemStatus: v0.5 timestamp + sequence behavior', () => {
-  it('increments plan.sequence on each call', () => {
+describe('updateSubItemStatus: writes to continue.json statusOverrides', () => {
+  it('writes status to continue.json with dotted key', () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
 
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const after = readPlanFromWorkspace(TEST_DIR);
-    expect(after.plan.sequence).toBe(2);
+    const cont = readWorkspaceContinue(TEST_DIR);
+    expect(cont?.statusOverrides?.['update-types.update-types.ac1']).toBe('completed');
   });
 
-  it('sets plan.updated after subItem status change', () => {
+  it('merged view reflects updated subItem status', () => {
+    const doc = makeFullSpecDoc();
+    writePlanDoc(TEST_DIR, doc);
+
+    updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
+    const merged = readWorkspacePlan(TEST_DIR);
+    const subItem = merged!.plan.items[0].subItems?.find(s => s.id === 'update-types.ac1');
+    expect(subItem?.status).toBe('completed');
+  });
+
+  it('sets subItem.completed in merged view when status → completed', () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
     const before = Date.now();
 
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const after = readPlanFromWorkspace(TEST_DIR);
-
-    expect(after.plan.updated).toBeDefined();
-    const updatedTime = new Date(after.plan.updated!).getTime();
-    expect(updatedTime).toBeGreaterThanOrEqual(before);
-  });
-
-  it('sets subItem.completed when status → completed', () => {
-    const doc = makeFullSpecDoc();
-    writePlanDoc(TEST_DIR, doc);
-    const before = Date.now();
-
-    updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const after = readPlanFromWorkspace(TEST_DIR);
-    const subItem = after.plan.items[0].subItems?.find(s => s.id === 'update-types.ac1');
+    const merged = readWorkspacePlan(TEST_DIR);
+    const subItem = merged!.plan.items[0].subItems?.find(s => s.id === 'update-types.ac1');
 
     expect(subItem?.completed).toBeDefined();
     const completedTime = new Date(subItem!.completed!).getTime();
@@ -279,23 +272,21 @@ describe('updateSubItemStatus: v0.5 timestamp + sequence behavior', () => {
     writePlanDoc(TEST_DIR, doc);
 
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'running');
-    const after = readPlanFromWorkspace(TEST_DIR);
-    const subItem = after.plan.items[0].subItems?.find(s => s.id === 'update-types.ac1');
+    const merged = readWorkspacePlan(TEST_DIR);
+    const subItem = merged!.plan.items[0].subItems?.find(s => s.id === 'update-types.ac1');
 
     expect(subItem?.completed).toBeUndefined();
   });
 
-  it('increments sequence independently from updateItemStatus', () => {
+  it('accumulates both item and subItem overrides', () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
 
     updateItemStatus(TEST_DIR, 'update-types', 'completed');
-    const afterItem = readPlanFromWorkspace(TEST_DIR);
-    expect(afterItem.plan.sequence).toBe(2);
-
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const afterSub = readPlanFromWorkspace(TEST_DIR);
-    expect(afterSub.plan.sequence).toBe(3);
+    const cont = readWorkspaceContinue(TEST_DIR);
+    expect(cont?.statusOverrides?.['update-types']).toBe('completed');
+    expect(cont?.statusOverrides?.['update-types.update-types.ac1']).toBe('completed');
   });
 });
 

@@ -1,0 +1,171 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "author": "agent:claude-code",
+    "description": "PAN-977: Durable vBRIEF task graph control plane",
+    "created": "2026-05-09T00:00:00Z",
+    "updated": "2026-05-09T19:15:00Z"
+  },
+  "plan": {
+    "id": "PAN-977",
+    "title": "Durable vBRIEF task graph control plane",
+    "status": "active",
+    "uid": "pan-977-durable-vbrief-task-graph",
+    "author": "agent:claude-code",
+    "sequence": 1,
+    "created": "2026-05-09T00:00:00Z",
+    "updated": "2026-05-09T19:15:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/977",
+        "label": "PAN-977",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "PAN-977",
+      "vbrief",
+      "swarm",
+      "task-graph"
+    ],
+    "metadata": {
+      "pipeline": {
+        "phase": "phase-1-sqlite-authoritative",
+        "issueId": "PAN-977",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-09T19:15:00Z"
+      }
+    },
+    "narratives": {
+      "Problem": "Panopticon swarm execution needs a durable task graph rooted in vBRIEF so agents can answer next/show/claim/done/block without relying on Beads as the canonical source of truth.",
+      "Proposal": "Add vBRIEF-native dispatch helpers, bounded active slices, persisted task operations with CAS and atomic writes, continue-state swarm runtime persistence, and pipeline mirror metadata while keeping SQLite authoritative for Phase 1 live runtime state."
+    },
+    "items": [
+      {
+        "id": "pan-977-task-graph",
+        "title": "Add vBRIEF-native task graph and persisted task operations",
+        "status": "completed",
+        "priority": "critical",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "PAN-977",
+          "files_scope": [
+            "src/lib/vbrief/**"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement next/show/claim/done/block semantics on vBRIEF items, including CAS, single-writer ownership, atomic write-back to .pan/spec.vbrief.json, and blocked-item dispatch exclusion."
+        },
+        "subItems": [
+          {
+            "id": "pan-977-task-graph.ac1",
+            "title": "getDispatchableItems and task graph views exclude running, completed, cancelled, and blocked items",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-977-task-graph.ac2",
+            "title": "Task operations mutate plan item and subItem status durably with expected sequence checks",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-977-task-graph.ac3",
+            "title": "Plan writes use temp-file then rename and enforce one writer per worktree",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-977-active-slice",
+        "title": "Wire bounded active slices into work-agent prompts",
+        "status": "completed",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "PAN-977",
+          "files_scope": [
+            "src/lib/cloister/work-agent-prompt.ts",
+            "src/lib/vbrief/**"
+          ]
+        },
+        "narrative": {
+          "Action": "Generate work-agent prompt context from active vBRIEF slices by default and verify large-plan prompt-size reduction."
+        },
+        "subItems": [
+          {
+            "id": "pan-977-active-slice.ac1",
+            "title": "Prompt generation includes bounded target item, dependency, acceptance criteria, and synthesis context instead of full-plan payloads",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-977-active-slice.ac2",
+            "title": "Large outlier plan verification proves active slice payloads stay substantially smaller than full plan JSON",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-977-pipeline-mirror",
+        "title": "Mirror pipeline state into vBRIEF metadata with SQLite authority boundary",
+        "status": "completed",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "PAN-977",
+          "files_scope": [
+            "src/lib/review-status.ts",
+            "src/lib/vbrief/**"
+          ]
+        },
+        "narrative": {
+          "Action": "Write schema-conforming plan.metadata.pipeline mirrors on Cloister status transitions while documenting SQLite remains authoritative for live Phase 1 state."
+        },
+        "subItems": [
+          {
+            "id": "pan-977-pipeline-mirror.ac1",
+            "title": "Nested pipeline mirror records verification, review, test, uat, merge, readyForMerge, and PR URL fields",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-977-pipeline-mirror.ac2",
+            "title": "pan-oversee and dashboard readers can use the mirror as corroborating input without replacing SQLite",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pan-977-task-graph",
+        "to": "pan-977-active-slice",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-977-task-graph",
+        "to": "pan-977-pipeline-mirror",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

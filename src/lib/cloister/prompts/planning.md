@@ -39,7 +39,7 @@ optional:
 - Explore the codebase to understand context (read files, grep)
 - Generate planning artifacts:
   - **continue.json** at `.pan/continue.json` — structured decisions, hazards, and approach context (see format below). Replaces the old STATE.md.
-  - **vBRIEF plan** at `.pan/spec.vbrief.json` (see format below)
+  - **vBRIEF plan** at `.pan/spec.vbrief.json` (workspace working copy — `plan-finalize` promotes it to main's `.pan/specs/`)
 - Present options and tradeoffs for the user to decide
 
 **Finalizing the session:** When your vBRIEF is written and you're ready to hand off, run:

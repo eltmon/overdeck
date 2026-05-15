@@ -67,6 +67,10 @@ export interface VBriefItem {
     difficulty?: VBriefDifficulty;
     issueLabel?: string;
     phase?: number;
+    /** Files/globs this item touches. Used for file-overlap enforcement during parallel dispatch. */
+    files_scope?: string[];
+    /** True when this item has >1 blocking parent (DAG convergence point). Auto-derived by planner. */
+    requiresSynthesis?: boolean;
     [key: string]: unknown;
   };
   narrative?: {

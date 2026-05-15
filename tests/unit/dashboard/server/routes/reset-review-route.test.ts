@@ -125,6 +125,37 @@ describe('processResetReviewPipeline — POST /api/review/:issueId/reset route c
     expect(after?.verificationCycleCount).toBe(0);
   });
 
+  it('200: clears the stuck marker and circuit-breaker retry counters', () => {
+    // A human-initiated reset is an explicit circuit-breaker override. If the
+    // stuck marker / retry budgets survive, the deacon immediately re-skips the
+    // workspace and the "override" is a no-op (root cause of the PAN-977 jam).
+    setReviewStatus('PAN-2', {
+      reviewStatus: 'passed',
+      testStatus: 'pending',
+      stuck: true,
+      stuckReason: 'review_infrastructure_failure',
+      stuckAt: new Date().toISOString(),
+      stuckDetails: '{"reviewRetryCount":3}',
+      reviewRetryCount: 3,
+      testRetryCount: 3,
+      mergeRetryCount: 2,
+      recoveryStartedAt: new Date().toISOString(),
+    });
+
+    const result = processResetReviewPipeline('PAN-2', true);
+    expect(result.httpStatus).toBe(200);
+
+    const after = getReviewStatus('PAN-2');
+    expect(after?.stuck).toBeFalsy();
+    expect(after?.stuckReason).toBeUndefined();
+    expect(after?.stuckAt).toBeUndefined();
+    expect(after?.stuckDetails).toBeUndefined();
+    expect(after?.reviewRetryCount).toBe(0);
+    expect(after?.testRetryCount).toBe(0);
+    expect(after?.mergeRetryCount).toBe(0);
+    expect(after?.recoveryStartedAt).toBeUndefined();
+  });
+
   // ─── THE REGRESSION TEST — locks down PAN-805 fix ──────────────────────────
 
   it('PAN-805 regression: does NOT call saveAgentRuntimeState (resolution stays untouched)', () => {

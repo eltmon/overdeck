@@ -203,6 +203,17 @@ function isSystemInjection(text: string): boolean {
   return false;
 }
 
+function unwrapChannelMessage(text: string): string | null {
+  const match = text.match(/^<channel\b[^>]*>\n?([\s\S]*?)\n?<\/channel>$/);
+  return match ? match[1] : null;
+}
+
+function renderableUserText(text: string): string | null {
+  const channelText = unwrapChannelMessage(text);
+  if (channelText !== null) return channelText;
+  return isSystemInjection(text) ? null : text;
+}
+
 /**
  * Parse JSONL session file from a byte offset.
  *
@@ -342,14 +353,14 @@ export async function parseConversationMessages(
 
       // Content can be a string (plain text) or array of content blocks
       if (typeof rawContent === 'string' && rawContent.trim()) {
-        // Skip XML system messages and Claude Code skill/context injections
-        if (!isSystemInjection(rawContent)) {
+        const text = renderableUserText(rawContent);
+        if (text !== null) {
           const ts = entry.timestamp ?? new Date().toISOString();
           lastUserTimestamp = ts;
           messages.push({
             id: entry.uuid ?? `user-${messages.length}`,
             role: 'user',
-            text: rawContent,
+            text,
             createdAt: ts,
             sequence: lineSequence,
           });
@@ -404,8 +415,9 @@ export async function parseConversationMessages(
         // Collect all text blocks, joining with newlines to preserve multiline input
         const textBlocks: string[] = [];
         for (const block of rawContent as ContentBlock[]) {
-          if (block.type === 'text' && block.text && !isSystemInjection(block.text)) {
-            textBlocks.push(block.text);
+          if (block.type === 'text' && block.text) {
+            const text = renderableUserText(block.text);
+            if (text !== null) textBlocks.push(text);
           }
         }
         if (textBlocks.length > 0) {
@@ -663,7 +675,8 @@ export async function parseConversationMessages(
             .map((b) => b.text)
             .join('\n');
         }
-        if (text && !isSystemInjection(text)) {
+        const renderableText = text ? renderableUserText(text) : null;
+        if (renderableText !== null) {
           if (pendingAssistant) {
             messages.push(pendingAssistant);
             pendingAssistant = null;
@@ -673,7 +686,7 @@ export async function parseConversationMessages(
           messages.push({
             id: ((entry as Record<string, unknown>).uuid as string | undefined) ?? `queued-${lineSequence}`,
             role: 'user',
-            text,
+            text: renderableText,
             createdAt: ts,
             sequence: lineSequence,
           });

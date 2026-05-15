@@ -28,6 +28,7 @@
 | [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | Deeper workflow guide for how the work agent and specialist agents interact |
 | [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md) | End-to-end code review architecture: synthesis-as-review, convoy reviewers as harness-agnostic prompt templates inlined by the orchestrator, output-file contract, and verdict signaling |
 | [SKILL-DISTRIBUTION-ANALYSIS.md](./SKILL-DISTRIBUTION-ANALYSIS.md) | Skill distribution architecture: Claude Code precedence, symlink issues, proposed changes |
+| [SKILLS-INVENTORY.md](./SKILLS-INVENTORY.md) | Installed Claude Code skills inventory, including scope and one-line purpose for each skill |
 | [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo: `.pan/`, skills hierarchy, `vbrief/` lifecycle dirs, PRD vs vBRIEF, multi-tool sync |
 | [VISION.md](./VISION.md) | Product vision and deployment model roadmap (local → shared → SaaS) |
 | [PRD.md](./PRD.md) | Product requirements document for Panopticon |
@@ -36,6 +37,7 @@
 | [PRD-REMOTE-WORKSPACES.md](./PRD-REMOTE-WORKSPACES.md) | Remote workspace requirements |
 | [VBRIEF.md](./VBRIEF.md) | vBRIEF plan format, lifecycle directories, continue state, `pan scope` commands |
 | [HIERARCHICAL-PLANNING.md](./HIERARCHICAL-PLANNING.md) | vBRIEF planning, DAG scheduling, acceptance criteria pipeline |
+| [SWARM.md](./SWARM.md) | Per-item DAG dispatch, synthesis agents at convergence points, file-overlap serialization, slot-merge auto-advance, `pan swarm` CLI + `--task` operations, HTTP routes, `SwarmRuntime` continue-state shape, DAG library API |
 | [FIX-ALL-PRD.md](./FIX-ALL-PRD.md) | Fix-All Flywheel PRD: continuous, self-improving mass pan-oversee with `main` always clean |
 | [OPERATION-FIX-ALL.md](./OPERATION-FIX-ALL.md) | Operational manual for mass pan-oversee: phases, classification, bug log template |
 
@@ -155,6 +157,7 @@
 - **"deterministic UUID"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"merge"** / **"merge validation"** → PRD-CLOISTER.md (Merge Validation Pipeline section)
 - **"vBRIEF"** / **"DAG"** / **"acceptance criteria"** / **"planning"** → VBRIEF.md, HIERARCHICAL-PLANNING.md, SPECIALIST_WORKFLOW.md
+- **"swarm"** / **"pan swarm"** / **"per-item dispatch"** / **"synthesis agent"** / **"files_scope"** / **"slot-merged"** / **"SwarmRuntime"** → SWARM.md
 - **"beads conversion"** / **"createBeadsFromVBrief"** → HIERARCHICAL-PLANNING.md
 - **"sync with main"** / **"sync-main"** → SPECIALIST_WORKFLOW.md (Sync with Main section)
 - **"deacon"** / **"health monitor"** / **"health"** / **"patrol"** → DEACON-HEALTH-MONITORING.md

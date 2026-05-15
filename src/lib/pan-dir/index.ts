@@ -39,7 +39,9 @@ export {
   ensureWorkspacePanDir,
   getWorkspacePanPaths,
   readWorkspaceContinue,
+  readWorkspaceContinueAsync,
   writeWorkspaceContinue,
+  writeWorkspaceContinueAsync,
 } from './continue.js'
 
 export { appendSession, readSessions } from './sessions.js'

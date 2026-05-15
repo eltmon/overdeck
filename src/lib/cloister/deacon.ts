@@ -1386,6 +1386,33 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
             reviewStatus: latestTerminalReview.status,
             reviewNotes: latestTerminalReview.notes,
           };
+          // Snapshot the workspace HEAD when restoring a passed review from
+          // history. Without reviewedAtCommit the canSkipTests fast-path and
+          // checkPostReviewCommits both go blind, and the issue can jam at
+          // passed-but-no-commit-anchor (PAN-977).
+          try {
+            const { resolveProjectFromIssue } = await import('../projects.js');
+            const project = resolveProjectFromIssue(issueId);
+            if (project) {
+              const workspacePath = join(
+                project.projectPath,
+                'workspaces',
+                `feature-${issueId.toLowerCase()}`,
+              );
+              if (existsSync(workspacePath)) {
+                const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
+                reviewUpdate['reviewedAtCommit'] = stdout.trim();
+              }
+            }
+          } catch { /* non-fatal — leave reviewedAtCommit unchanged */ }
+          // A restored terminal-passed review resolves any review-infra stuck
+          // marker — clear it so the deacon stops skipping the issue.
+          if (status.stuckReason === 'review_infrastructure_failure') {
+            reviewUpdate['stuck'] = false;
+            reviewUpdate['stuckReason'] = undefined;
+            reviewUpdate['stuckAt'] = undefined;
+            reviewUpdate['stuckDetails'] = undefined;
+          }
           if (latestTerminalTest) {
             reviewUpdate['testStatus'] = latestTerminalTest.status;
             reviewUpdate['testNotes'] = latestTerminalTest.notes;
@@ -1919,8 +1946,21 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
       const paneDead = sessionAlive ? await isPaneDeadAsync(reviewSession).catch(() => true) : true;
 
       if (sessionAlive && !paneDead) {
+        // If we already nudged once and 30+ min have passed with no signal,
+        // the agent is unresponsive — auto-complete so the pipeline isn't blocked.
+        if (lastNudged) {
+          setReviewStatus(issueId, {
+            reviewStatus: verdict,
+            reviewNotes: topBlocker || `Review auto-completed by deacon: ${verdict} (agent alive but unresponsive after nudge, synthesis exists)`,
+          });
+          actions.push(`Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge, synthesis written ${Math.round((now - latestMtime) / 60000)}min ago)`);
+          console.log(`[deacon] Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge)`);
+          continue;
+        }
+
         // Agent is alive but idle — nudge it to signal completion
-        const nudge = `You have already written the synthesis report for ${issueId} (verdict: ${verdict.toUpperCase()}). You MUST now signal completion with:\n\n  pan admin specialists done review ${issueId} --status ${verdict}${verdict === 'blocked' || verdict === 'failed' ? ` --notes "${topBlocker || 'See synthesis.md'}"` : ''}\n\nDo NOT wait for further instructions — run the command now.`;
+        const cmd = `pan admin specialists done review ${issueId} --status ${verdict}${verdict === 'blocked' || verdict === 'failed' ? ` --notes "${topBlocker || 'See synthesis.md'}"` : ''}`;
+        const nudge = `Your review synthesis is already written and saved. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
         try {
           const { messageAgent } = await import('../agents.js');
           await messageAgent(reviewSession, nudge);
@@ -1956,6 +1996,7 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
   const actions: string[] = [];
   try {
     const { loadReviewStatuses, setReviewStatus } = await import('../review-status.js');
+    const { resolveProjectFromIssue } = await import('../projects.js');
     const statuses = loadReviewStatuses();
 
     for (const [issueId, status] of Object.entries(statuses)) {
@@ -1964,9 +2005,37 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
         status.reviewStatus === 'reviewing' &&
         status.stuckReason === 'review_infrastructure_failure'
       ) {
+        // Snapshot the workspace HEAD so reviewedAtCommit is populated — without
+        // it, checkPostReviewCommits can never confirm the review is current and
+        // the canSkipTests fast-path in setReviewStatus never fires, leaving the
+        // issue jammed at passed-but-stuck forever (PAN-977).
+        let reviewedAtCommit: string | undefined;
+        try {
+          const project = resolveProjectFromIssue(issueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${issueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath });
+              reviewedAtCommit = stdout.trim();
+            }
+          }
+        } catch { /* non-fatal — leave reviewedAtCommit undefined */ }
+
+        // Clearing the stuck marker is mandatory: the bypass *resolves* the
+        // review-infra failure, so the issue must no longer be skipped by the
+        // deacon's stuck-issue guards or it deadlocks at passed+stuck.
         setReviewStatus(issueId, {
           reviewStatus: 'passed',
           reviewNotes: 'Review bypassed: verification passed but review infrastructure repeatedly failed.',
+          ...(reviewedAtCommit ? { reviewedAtCommit } : {}),
+          stuck: false,
+          stuckReason: undefined,
+          stuckAt: undefined,
+          stuckDetails: undefined,
         });
         const msg = `Bypassed review for ${issueId}: verification passed, review infra failed`;
         actions.push(msg);
@@ -2192,6 +2261,90 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error('[deacon] Error in checkReadyForMergeStuck:', msg);
+  }
+
+  return actions;
+}
+
+// ============================================================================
+// Undispatched-ship safety-net
+// ============================================================================
+
+// Wait this long after the review/test status last changed before the patrol
+// steps in — long enough that the reactive scheduler's primary
+// onIssueStateChange('shipping') trigger has had every chance to fire first.
+const SHIP_DISPATCH_STALENESS_MS = 2 * 60 * 1000; // 2 min
+// Per-issue cooldown between successive re-dispatch attempts. onIssueStateChange
+// is already idempotent (activeRoleRunExists skips a live, current ship run),
+// so this is purely to keep the patrol log quiet while a ship run is in flight.
+const SHIP_DISPATCH_COOLDOWN_MS = 5 * 60 * 1000; // 5 min
+const shipDispatchCooldowns = new Map<string, number>();
+
+/**
+ * Safety-net patrol: re-dispatch the ship role for issues where review and
+ * test both passed but the issue never reached readyForMerge.
+ *
+ * The only thing that normally dispatches ship is the reactive scheduler's
+ * onIssueStateChange('shipping') event. If that event is swallowed — e.g. a
+ * stale/zombie ship session made activeRoleRunExists() return true — the issue
+ * jams forever: review and test are green, but ship never runs, readyForMerge
+ * stays false, and the dashboard Merge button never lights up. This patrol is
+ * the backstop so a single missed event can't strand an issue.
+ *
+ * onIssueStateChange() owns the actual safety: it resolves the workspace,
+ * detects a stale ship session via roleRunHead vs current HEAD, kills the
+ * zombie, and only then spawns a fresh ship run. A genuinely in-flight ship
+ * run is left alone (activeRoleRunExists returns true), so this patrol is
+ * idempotent.
+ *
+ * Guards:
+ *   - review + test both 'passed', not yet readyForMerge
+ *   - skip merging/merged/failed (checkFailedMergeRetry owns the failed path)
+ *   - staleness: status at least 2 min old (don't race the primary trigger)
+ *   - per-issue cooldown: 5 min between re-dispatch attempts
+ */
+export async function checkUndispatchedShip(): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    const statuses = loadReviewStatuses();
+    const now = Date.now();
+
+    for (const [key, status] of Object.entries(statuses)) {
+      if (status.reviewStatus !== 'passed') continue;
+      if (status.testStatus !== 'passed') continue;
+      if (status.readyForMerge) continue;
+      if (status.mergeStatus === 'merging' || status.mergeStatus === 'merged' || status.mergeStatus === 'failed') continue;
+
+      // Give the reactive scheduler's primary trigger time to land first.
+      if (!status.updatedAt) continue;
+      if (now - new Date(status.updatedAt).getTime() < SHIP_DISPATCH_STALENESS_MS) continue;
+
+      // Per-issue cooldown — keeps the log quiet while a ship run is in flight.
+      const lastAttempt = shipDispatchCooldowns.get(key);
+      if (lastAttempt && (now - lastAttempt) < SHIP_DISPATCH_COOLDOWN_MS) continue;
+
+      const issueId = status.issueId ?? key;
+      console.log(
+        `[deacon] Ship never dispatched for ${issueId} (review+test passed, `
+        + `readyForMerge=false) — re-triggering shipping lifecycle`,
+      );
+      shipDispatchCooldowns.set(key, now);
+
+      try {
+        const { onIssueStateChange } = await import('./service.js');
+        await onIssueStateChange(issueId, 'shipping');
+        actions.push(`Re-dispatched ship for ${issueId} (review+test passed but never reached readyForMerge)`);
+      } catch (err) {
+        console.error(
+          `[deacon] failed to re-dispatch ship for ${issueId}:`,
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[deacon] Error in checkUndispatchedShip:', msg);
   }
 
   return actions;
@@ -3717,6 +3870,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...planningCleanupActions);
   for (const a of planningCleanupActions) addLog('action', a, state.patrolCycle);
 
+  // Notify review synthesis when server-owned convoy reviewers crash or time out.
+  const reviewerMonitorActions = await monitorReviewConvoySignals();
+  actions.push(...reviewerMonitorActions);
+  for (const a of reviewerMonitorActions) addLog('action', a, state.patrolCycle);
+
   // Kill orphaned review sessions whose work agent is no longer running.
   // Review sessions are named review-<issueId>-<timestamp>-<role> and are
   // never killed by teardown because the exact-match pattern doesn't catch them.
@@ -3738,6 +3896,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   // draining AI token credits by sending unnecessary prompts to agents.
   // If an agent is stuck, the human operator can nudge it manually via the
   // dashboard's Tell action.
+
+  // Safety-net: re-dispatch ship for issues where review+test passed but the
+  // reactive shipping trigger was swallowed (e.g. by a stale ship session).
+  const undispatchedShipActions = await checkUndispatchedShip();
+  actions.push(...undispatchedShipActions);
+  for (const a of undispatchedShipActions) addLog('action', a, state.patrolCycle);
 
   // Safety-net: trigger merge for issues stuck in readyForMerge state (PAN-344)
   const mergeStuckActions = await checkReadyForMergeStuck();
@@ -4111,7 +4275,38 @@ async function recoverOrphanedAgents(context?: string): Promise<string[]> {
     try {
       const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
       if (state.status !== 'running' && state.status !== 'starting') continue;
-      if (sessionExists(dir)) {
+
+      // PAN-977: headless review sub-role agents run via `claude --print` in a
+      // detached, HUP-immune launcher with NO tmux session. "No tmux session"
+      // is their normal steady state, not orphanhood — gating their liveness on
+      // sessionExists() resets them to stopped on every patrol and thrashes the
+      // convoy. Their lifecycle is owned by monitorReviewConvoySignals via the
+      // launcher pid. Here we only orphan-recover them once that launcher pid is
+      // actually gone (the launcher removes the pid file after it signals).
+      if (state.reviewSubRole) {
+        const reviewerLauncherPid = join(AGENTS_DIR, dir, 'reviewer-launcher.pid');
+        if (existsSync(reviewerLauncherPid)) {
+          let launcherAlive = false;
+          try {
+            const pid = Number.parseInt(readFileSync(reviewerLauncherPid, 'utf-8').trim(), 10);
+            if (Number.isInteger(pid) && pid > 0) {
+              try { process.kill(pid, 0); launcherAlive = true; } catch { launcherAlive = false; }
+            }
+          } catch { launcherAlive = false; }
+          if (launcherAlive) continue; // launcher still working — not orphaned
+        } else {
+          // No pid file yet: the launcher either hasn't written it (startup
+          // race) or already finished and cleaned up. Give it a startup grace
+          // window keyed off startedAt before declaring the agent orphaned.
+          const startedMs = Date.parse(state.startedAt ?? '');
+          const REVIEWER_LAUNCHER_GRACE_MS = 90_000;
+          if (Number.isFinite(startedMs) && Date.now() - startedMs < REVIEWER_LAUNCHER_GRACE_MS) {
+            continue;
+          }
+        }
+        // Launcher pid is gone (or never appeared past the grace window) — the
+        // headless reviewer process has exited. Fall through to mark stopped.
+      } else if (sessionExists(dir)) {
         // Planning sessions use remain-on-exit, so the tmux session persists after
         // Claude exits. Check if the pane's process is actually dead.
         if (dir.startsWith('planning-')) {
@@ -4222,6 +4417,149 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
   return actions;
 }
 
+export async function monitorReviewConvoySignals(): Promise<string[]> {
+  const actions: string[] = [];
+  if (!existsSync(AGENTS_DIR)) return actions;
+
+  let agentDirs: string[];
+  try {
+    agentDirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
+  } catch {
+    return actions;
+  }
+
+  for (const agentId of agentDirs) {
+    const state = getAgentState(agentId);
+    if (!state) continue;
+    if (state.role !== 'review') continue;
+    if (!state.reviewSubRole || !state.reviewSynthesisAgentId) continue;
+    if (state.reviewMonitorSignaled) continue;
+
+    const startedMs = Date.parse(state.startedAt);
+
+    // PAN-977: the review sub-role launcher now owns the convoy signal — it
+    // signals synthesis on process exit (REVIEWER_READY/FAILED/TIMEOUT) and
+    // touches `reviewer-signaled`. When that marker is newer than this run's
+    // start, the launcher already signaled and Deacon must not double-signal.
+    // Deacon stays the rare backup for the case where the launcher's bash
+    // process was SIGKILLed before it could signal.
+    const signalMarker = join(AGENTS_DIR, agentId, 'reviewer-signaled');
+    if (existsSync(signalMarker)) {
+      try {
+        if (Number.isFinite(startedMs) && statSync(signalMarker).mtimeMs >= startedMs) continue;
+      } catch { /* unreadable marker — fall through to backup signaling */ }
+    }
+
+    const outputPath = state.reviewOutputPath;
+    let outputWrittenForThisRun = false;
+    if (outputPath && existsSync(outputPath)) {
+      try {
+        const outputMtimeMs = statSync(outputPath).mtimeMs;
+        outputWrittenForThisRun = Number.isFinite(startedMs) && outputMtimeMs >= startedMs;
+      } catch {
+        outputWrittenForThisRun = false;
+      }
+    }
+    const deadlineMs = state.reviewDeadlineAt ? Date.parse(state.reviewDeadlineAt) : Number.NaN;
+
+    // The synthesis agent must be alive to receive any signal.
+    const synthesisAlive = await sessionExistsAsync(state.reviewSynthesisAgentId);
+    if (!synthesisAlive) continue;
+
+    // PAN-977: the review sub-role launcher is HUP-immune and intentionally
+    // outlives its tmux session, so "tmux session missing" is NOT a failure.
+    // The launcher writes its pid to reviewer-launcher.pid and removes it once
+    // it has signaled. Deacon checks the launcher process itself: while that
+    // pid is alive the launcher is still working (or about to signal) and
+    // Deacon stays out of the way. Deacon only steps in once the launcher pid
+    // is gone with no signal marker — the rare SIGKILL-before-signal case.
+    const launcherPidPath = join(AGENTS_DIR, agentId, 'reviewer-launcher.pid');
+    let launcherAlive = false;
+    if (existsSync(launcherPidPath)) {
+      try {
+        const pid = Number.parseInt(readFileSync(launcherPidPath, 'utf-8').trim(), 10);
+        if (Number.isInteger(pid) && pid > 0) {
+          try { process.kill(pid, 0); launcherAlive = true; } catch { launcherAlive = false; }
+        }
+      } catch { launcherAlive = false; }
+    }
+
+    // Startup grace: give the launcher time to write its pid file before a
+    // missing pid is read as death (avoids racing the bash env setup).
+    const REVIEWER_LAUNCHER_GRACE_MS = 90_000;
+    const withinStartupGrace = Number.isFinite(startedMs) && (Date.now() - startedMs) < REVIEWER_LAUNCHER_GRACE_MS;
+
+    let signal: 'ready' | 'failed' | 'timeout' | null = null;
+    let reason = '';
+    if (launcherAlive) {
+      // Launcher still running — only intervene if it has blown well past its
+      // deadline (genuinely wedged, e.g. a hung `pan tell`).
+      if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs + REVIEWER_LAUNCHER_GRACE_MS) {
+        signal = 'timeout';
+        reason = `reviewer launcher still running past deadline ${state.reviewDeadlineAt}`;
+      } else {
+        continue;
+      }
+    } else if (withinStartupGrace) {
+      // Launcher pid not written yet — too early to call it dead.
+      continue;
+    } else if (outputWrittenForThisRun) {
+      // Launcher died after writing the report but before signaling READY.
+      signal = 'ready';
+    } else if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs) {
+      signal = 'timeout';
+      reason = `reviewer exceeded deadline ${state.reviewDeadlineAt}`;
+    } else {
+      // Launcher pid is gone, no report, before deadline → the launcher bash
+      // process was SIGKILLed before it could run its signal block.
+      signal = 'failed';
+      reason = 'reviewer launcher process died before signaling synthesis';
+    }
+
+    if (!signal) continue;
+
+    const message = signal === 'ready'
+      ? `REVIEWER_READY ${state.reviewSubRole} ${outputPath}`
+      : signal === 'timeout'
+        ? `REVIEWER_TIMEOUT ${state.reviewSubRole} ${reason}`
+        : `REVIEWER_FAILED ${state.reviewSubRole} ${reason}`;
+
+    try {
+      const { messageAgent } = await import('../agents.js');
+      await messageAgent(state.reviewSynthesisAgentId, message);
+      state.reviewMonitorSignaled = signal;
+      saveAgentState(state);
+      const action = `Signaled ${message} to ${state.reviewSynthesisAgentId}`;
+      actions.push(action);
+      logDeaconEvent(`monitorReviewConvoySignals: ${action}`);
+      if (signal === 'ready') {
+        try {
+          const { notifyPipeline } = await import('../pipeline-notifier.js');
+          notifyPipeline({ type: 'reviewer_completed', issueId: state.issueId, role: state.reviewSubRole });
+        } catch { /* non-fatal */ }
+      } else if (signal === 'timeout') {
+        try {
+          const { notifyPipeline } = await import('../pipeline-notifier.js');
+          notifyPipeline({
+            type: 'reviewer_timed_out',
+            issueId: state.issueId,
+            role: state.reviewSubRole,
+            sessionName: agentId,
+            attempt: 1,
+            maxRetries: 1,
+            willRetry: false,
+          });
+        } catch { /* non-fatal */ }
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logDeaconEvent(`monitorReviewConvoySignals: failed to signal ${state.reviewSynthesisAgentId} for ${agentId}: ${errMsg}`);
+    }
+  }
+
+  return actions;
+}
+
 /**
  * Kill orphaned review sessions whose work agent is no longer running.
  *
@@ -4274,7 +4612,15 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
       continue;
     }
 
+    // PAN-1059 convoy sub-reviewers are owned by the synthesis agent
+    // (agent-<id>-review), not the work agent. Check synthesis first,
+    // then fall back to work agent for legacy review sessions.
+    const synthesisAgentSession = `agent-${issueId.toLowerCase()}-review`;
     const workAgentSession = `agent-${issueId.toLowerCase()}`;
+    if (sessionExists(synthesisAgentSession)) {
+      logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} kept — synthesis agent ${synthesisAgentSession} exists`);
+      continue;
+    }
     if (sessionExists(workAgentSession)) {
       logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} kept — work agent ${workAgentSession} exists`);
       continue;
@@ -4287,7 +4633,7 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
       logDeaconEvent(`cleanupOrphanedReviewSessions: error killing ${reviewSession}: ${reason}`);
     }
 
-    const msg = `Killed orphaned ${reviewSession} (work agent ${workAgentSession} not running)`;
+    const msg = `Killed orphaned ${reviewSession} (synthesis ${synthesisAgentSession} and work ${workAgentSession} not running)`;
     actions.push(msg);
     console.log(`[deacon] ${msg}`);
     logDeaconEvent(`cleanupOrphanedReviewSessions: ${msg}`);

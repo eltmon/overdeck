@@ -1,0 +1,2523 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-14T13:00:56Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-705: Command taxonomy reorganization: clean up pan's command surface"
+  },
+  "plan": {
+    "id": "pan-705",
+    "title": "Command taxonomy reorganization: clean up pan's command surface",
+    "status": "approved",
+    "uid": "e02b0fb7-f844-480d-9d3c-0275c0b34e4c",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-14T13:00:56Z",
+    "updated": "2026-04-14T13:00:56Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/705",
+        "label": "PAN-705",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/pan-command-taxonomy-reorg.md",
+        "label": "PRD: pan-command-taxonomy-reorg",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/QUICK-REFERENCE.md",
+        "label": "Quick Reference (target surface)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "cli",
+      "dx",
+      "refactor",
+      "skills",
+      "dashboard",
+      "breaking-change"
+    ],
+    "narratives": {
+      "Problem": "pan's command surface grew organically: pan work is a junk drawer mixing lifecycle/runtime/review/state/hooks; plumbing (cloister, specialists, db, beads, remote) crowds the happy path; the Claude Code skill set drifted from CLI verbs with no umbrella /pan. New users can't guess commands; rename churn is constant.",
+      "Proposal": "Adopt a five-bucket taxonomy (lifecycle verbs, observation, managed nouns, system/first-run, pan admin) per PRD. Clean break, no aliases. Dashboard routes rename in lockstep. Skill surface aligns 1:1 with CLI verbs; umbrella /pan skill dispatches subcommands via Bash. Lock the output with plain-text fixture tests. Decompose aggressively: one bead per collapsed command, renamed verb, moved admin group, renamed route, and skill-alignment substep."
+    },
+    "items": [
+      {
+        "id": "p1-commit-prd",
+        "title": "Commit PRD and quick-reference docs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-705",
+          "phase": "1"
+        },
+        "narrative": {
+          "Action": "git add docs/prds/planned/pan-command-taxonomy-reorg.md and docs/QUICK-REFERENCE.md on the first commit of the feature branch. Link the quick-ref from docs/INDEX.md so it is discoverable from the top."
+        },
+        "subItems": [
+          {
+            "id": "p1-commit-prd.ac1",
+            "title": "docs/prds/planned/pan-command-taxonomy-reorg.md is tracked in git",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p1-commit-prd.ac2",
+            "title": "docs/QUICK-REFERENCE.md is tracked in git",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p1-commit-prd.ac3",
+            "title": "docs/INDEX.md links to docs/QUICK-REFERENCE.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p1-resolve-issue-id",
+        "title": "Shared resolveIssueId() helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "1"
+        },
+        "narrative": {
+          "Action": "Create src/cli/lib/resolve-issue-id.ts exporting resolveIssueId(arg: string): string. Centralizes the parsing/normalization (e.g. 'pan-705' vs 'PAN-705') currently duplicated across work/* handlers. Every lifecycle verb rewritten in later beads imports from this helper."
+        },
+        "subItems": [
+          {
+            "id": "p1-resolve-issue-id.ac1",
+            "title": "Helper exported from src/cli/lib/resolve-issue-id.ts with unit tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p1-resolve-issue-id.ac2",
+            "title": "Helper handles lowercase, uppercase, and numeric-only forms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p1-resolve-issue-id.ac3",
+            "title": "Errors with a clear message when the input cannot be resolved to a known tracker prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p2-show",
+        "title": "pan show <id> — unified observation command",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-705",
+          "phase": "2"
+        },
+        "narrative": {
+          "Action": "New src/cli/commands/show.ts. Default view: compact summary (shadow state line, current specialist + last heartbeat, top-3 cv entries, health summary). Flags --cv / --context / --health / --shadow / --json scope the output. Handlers delegate to the existing shadow/cv/context/health code — no logic duplication. Registered at top level from src/cli/index.ts."
+        },
+        "subItems": [
+          {
+            "id": "p2-show.ac1",
+            "title": "'pan show <id>' default view is ≤ 25 lines and covers shadow, specialist, heartbeat, and cv",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-show.ac2",
+            "title": "Each of --cv, --context, --health, --shadow scopes the output to that subsection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-show.ac3",
+            "title": "--json emits stable machine-readable output for scripting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-show.ac4",
+            "title": "Delegates to existing shadow/cv/context/health handlers (no copy-pasted logic)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-show.ac5",
+            "title": "Unit/integration test covers default view and each flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p2-review",
+        "title": "pan review — pending/request/reset subcommands",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "2"
+        },
+        "narrative": {
+          "Action": "New src/cli/commands/review.ts. Subcommands: 'pending' (from work pending), 'request <id>' (from work request-review), 'reset <id>' with --session and --cycles flags (collapses work reset-review + work reset-session). Delegate to existing handlers."
+        },
+        "subItems": [
+          {
+            "id": "p2-review.ac1",
+            "title": "'pan review pending' matches 'pan work pending' output 1:1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-review.ac2",
+            "title": "'pan review request <id>' triggers the same re-review flow as 'pan work request-review'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-review.ac3",
+            "title": "'pan review reset <id>' resets review cycles; --session also clears Claude session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-review.ac4",
+            "title": "Integration test covers each subcommand and the --session flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p2-issues",
+        "title": "pan issues — merged list + triage",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "2"
+        },
+        "narrative": {
+          "Action": "New src/cli/commands/issues.ts. Merge 'pan work list' and 'pan work triage' into one top-level command. Use either --triage flag or 'issues triage' subcommand (decide during implementation based on ergonomic feel — document the choice in the bead's PR description)."
+        },
+        "subItems": [
+          {
+            "id": "p2-issues.ac1",
+            "title": "'pan issues' lists work across configured trackers (matches 'pan work list')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-issues.ac2",
+            "title": "Triage mode is reachable via a single documented invocation (flag or subcommand)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-issues.ac3",
+            "title": "Integration test covers both modes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p2-plan",
+        "title": "pan plan / pan plan finalize",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "2"
+        },
+        "narrative": {
+          "Action": "Promote 'pan work plan' and 'pan plan-finalize' into a top-level 'plan' command group. 'pan plan <id>' creates the plan (delegates to existing work-plan handler). 'pan plan finalize <id>' is the subcommand (delegates to plan-finalize.ts). Keep the legacy 'pan plan-finalize' path alive ONLY until this bead lands, then remove in the same commit."
+        },
+        "subItems": [
+          {
+            "id": "p2-plan.ac1",
+            "title": "'pan plan <id>' creates a plan identical to the legacy 'pan work plan <id>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-plan.ac2",
+            "title": "'pan plan finalize <id>' finalizes identical to legacy 'pan plan-finalize <id>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p2-plan.ac3",
+            "title": "Legacy top-level 'pan plan-finalize' is removed in the same commit that adds 'plan finalize'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-start",
+        "title": "pan start <id> (promoted from 'pan work issue')",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Move handler from src/cli/commands/work/issue.ts to src/cli/commands/start.ts. Register at top level. Delete the work/issue.ts file and its import."
+        },
+        "subItems": [
+          {
+            "id": "p3-start.ac1",
+            "title": "'pan start <id>' creates workspace and spawns agent identical to legacy 'pan work issue'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-start.ac2",
+            "title": "src/cli/commands/work/issue.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-tell",
+        "title": "pan tell <id> <msg>",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/tell.ts to src/cli/commands/tell.ts. Register at top level. Delete the work file."
+        },
+        "subItems": [
+          {
+            "id": "p3-tell.ac1",
+            "title": "'pan tell <id> <msg>' sends a message to a running agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-tell.ac2",
+            "title": "src/cli/commands/work/tell.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-resume",
+        "title": "pan resume <id>",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/resume.ts to src/cli/commands/resume.ts. Register at top level. Delete the work file."
+        },
+        "subItems": [
+          {
+            "id": "p3-resume.ac1",
+            "title": "'pan resume <id>' resumes from a saved Claude session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-resume.ac2",
+            "title": "src/cli/commands/work/resume.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-recover",
+        "title": "pan recover <id>",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/recover.ts to src/cli/commands/recover.ts. Register at top level. Delete the work file."
+        },
+        "subItems": [
+          {
+            "id": "p3-recover.ac1",
+            "title": "'pan recover <id>' recovers a crashed agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-recover.ac2",
+            "title": "src/cli/commands/work/recover.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-kill",
+        "title": "pan kill <id>",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/kill.ts to src/cli/commands/kill.ts. Register at top level. Delete the work file. Preserves confirmation prompt."
+        },
+        "subItems": [
+          {
+            "id": "p3-kill.ac1",
+            "title": "'pan kill <id>' stops the agent with workspace preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-kill.ac2",
+            "title": "Confirmation prompt preserved from legacy behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-kill.ac3",
+            "title": "src/cli/commands/work/kill.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-sync-main",
+        "title": "pan sync-main <id>",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/sync-main.ts to src/cli/commands/sync-main.ts. Register at top level. Delete the work file."
+        },
+        "subItems": [
+          {
+            "id": "p3-sync-main.ac1",
+            "title": "'pan sync-main <id>' merges main into the workspace branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-sync-main.ac2",
+            "title": "src/cli/commands/work/sync-main.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-done",
+        "title": "pan done <id>",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/done.ts to src/cli/commands/done.ts. Register at top level. Delete the work file."
+        },
+        "subItems": [
+          {
+            "id": "p3-done.ac1",
+            "title": "'pan done <id>' marks work complete identical to 'pan work done'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-done.ac2",
+            "title": "src/cli/commands/work/done.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-approve",
+        "title": "pan approve <id>",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/approve.ts to src/cli/commands/approve.ts. Register at top level. Delete the work file. Confirmation prompt preserved."
+        },
+        "subItems": [
+          {
+            "id": "p3-approve.ac1",
+            "title": "'pan approve <id>' approves and merges identical to 'pan work approve'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-approve.ac2",
+            "title": "Confirmation prompt preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-approve.ac3",
+            "title": "src/cli/commands/work/approve.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-reopen",
+        "title": "pan reopen <id>",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/reopen.ts to src/cli/commands/reopen.ts. Register at top level. Delete the work file."
+        },
+        "subItems": [
+          {
+            "id": "p3-reopen.ac1",
+            "title": "'pan reopen <id>' resets specialist state and re-opens the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-reopen.ac2",
+            "title": "src/cli/commands/work/reopen.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-wipe",
+        "title": "pan wipe <id>",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/wipe.ts to src/cli/commands/wipe.ts. Register at top level. Delete the work file. Destructive — confirmation prompt preserved."
+        },
+        "subItems": [
+          {
+            "id": "p3-wipe.ac1",
+            "title": "'pan wipe <id>' resets all state identical to 'pan work wipe'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-wipe.ac2",
+            "title": "Destructive confirmation prompt preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-wipe.ac3",
+            "title": "src/cli/commands/work/wipe.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-close",
+        "title": "pan close <id> (from 'pan work close-out')",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/close-out.ts to src/cli/commands/close.ts. Register at top level as 'close'. Delete the work file."
+        },
+        "subItems": [
+          {
+            "id": "p3-close.ac1",
+            "title": "'pan close <id>' closes the issue identical to 'pan work close-out'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-close.ac2",
+            "title": "src/cli/commands/work/close-out.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p3-delete-work-group",
+        "title": "Delete 'pan work' command group entirely",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Remove src/cli/commands/work/index.ts and any remaining work/*.ts files (only internal hooks like hook.ts and tldr.ts should remain at this point — they move to pan admin in Phase 4). Remove registerWorkCommands() call from src/cli/index.ts. Running 'pan work <anything>' must fail with commander's default 'unknown command' error; do NOT add a stub handler. Acceptance test: 'git ls-files src/cli/commands/work/' is empty."
+        },
+        "subItems": [
+          {
+            "id": "p3-delete-work-group.ac1",
+            "title": "'pan work' is not a registered command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-delete-work-group.ac2",
+            "title": "'git grep -n 'pan work '' in src/ returns no hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p3-delete-work-group.ac3",
+            "title": "src/cli/commands/work/ directory is deleted (except files that moved to admin in Phase 4, which are handled there)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-group",
+        "title": "Create 'pan admin' top-level command group",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "New src/cli/commands/admin/index.ts exporting registerAdminCommands(program). Registers an empty 'admin' command group with help text describing the namespace. Subsequent beads in this phase register subgroups under it."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-group.ac1",
+            "title": "'pan admin --help' lists the admin namespace and its eventual subgroups",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-group.ac2",
+            "title": "registerAdminCommands() is called from src/cli/index.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-cloister",
+        "title": "pan admin cloister",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/cloister/ to src/cli/commands/admin/cloister/ (or re-register under the admin group). Delete the top-level 'pan cloister' registration from src/cli/index.ts."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-cloister.ac1",
+            "title": "'pan admin cloister {status,start,stop,emergency-stop}' work identical to legacy top-level",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-cloister.ac2",
+            "title": "'pan cloister' is no longer a registered top-level command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-specialists",
+        "title": "pan admin specialists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/specialists/ under the admin group. Delete the top-level 'pan specialists' registration."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-specialists.ac1",
+            "title": "'pan admin specialists {list,wake,queue,reset,clear-queue,done,logs,cleanup-logs}' all work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-specialists.ac2",
+            "title": "'pan specialists' is no longer a registered top-level command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-remote",
+        "title": "pan admin remote",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/remote/ under the admin group. Delete the top-level 'pan remote' registration."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-remote.ac1",
+            "title": "'pan admin remote {status,init,resources,setup}' all work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-remote.ac2",
+            "title": "'pan remote' is no longer a registered top-level command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-db",
+        "title": "pan admin db",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/db.ts under the admin group. Delete the top-level 'pan db' registration."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-db.ac1",
+            "title": "'pan admin db {snapshot,seed,status,clean,config}' all work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-db.ac2",
+            "title": "'pan db' is no longer a registered top-level command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-beads",
+        "title": "pan admin beads",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/beads.ts under the admin group. Delete the top-level 'pan beads' registration."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-beads.ac1",
+            "title": "'pan admin beads {compact,stats,upgrade}' all work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-beads.ac2",
+            "title": "'pan beads' is no longer a registered top-level command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-tracker",
+        "title": "pan admin tracker (linear-states, linear-cleanup)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/admin/tracker/ subgroup. Move handlers from src/cli/commands/work/linear-states.ts (listStatesCommand, cleanupStatesCommand) under 'pan admin tracker linear-states' and 'pan admin tracker linear-cleanup'. Delete the source file after move."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-tracker.ac1",
+            "title": "'pan admin tracker linear-states' lists and manages Linear workflow states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-tracker.ac2",
+            "title": "'pan admin tracker linear-cleanup' archives old Linear custom states",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-tracker.ac3",
+            "title": "src/cli/commands/work/linear-states.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-config",
+        "title": "pan admin config",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/config.ts under the admin group. Per QUICK-REFERENCE.md, add 'admin config edit' (opens config.yaml in $EDITOR) and 'admin config show' (prints resolved config) alongside the existing 'shadow' subcommand. Delete the top-level 'pan config' registration."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-config.ac1",
+            "title": "'pan admin config shadow' works identical to legacy 'pan config shadow'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-config.ac2",
+            "title": "'pan admin config edit' opens ~/.panopticon/config.yaml in $EDITOR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-config.ac3",
+            "title": "'pan admin config show' prints the resolved config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-config.ac4",
+            "title": "'pan config' is no longer a registered top-level command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-hooks",
+        "title": "pan admin hooks (from 'pan setup hooks')",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/setup/hooks.ts to src/cli/commands/admin/hooks.ts. Register as 'pan admin hooks install' and 'pan admin hooks status'. Remove the 'hooks' subcommand from 'pan setup'."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-hooks.ac1",
+            "title": "'pan admin hooks install' configures heartbeat hooks in settings.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-hooks.ac2",
+            "title": "'pan admin hooks status' reports hook installation state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-hooks.ac3",
+            "title": "'pan setup hooks' no longer exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-tldr",
+        "title": "pan admin tldr (from 'pan work tldr')",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/tldr.ts to src/cli/commands/admin/tldr.ts. Register under 'pan admin tldr' with subcommands {status, start, stop, warm}. Delete the work file."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-tldr.ac1",
+            "title": "'pan admin tldr {status,start,stop,warm}' all work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-tldr.ac2",
+            "title": "src/cli/commands/work/tldr.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-fpp",
+        "title": "pan admin fpp (from 'pan work hook')",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/work/hook.ts to src/cli/commands/admin/fpp.ts. Register as 'pan admin fpp {check, push, pop, clear, mail}'. Delete the work file."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-fpp.ac1",
+            "title": "'pan admin fpp {check,push,pop,clear,mail}' all work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-fpp.ac2",
+            "title": "src/cli/commands/work/hook.ts is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p4-admin-migrate-config",
+        "title": "pan admin migrate-config",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-705",
+          "phase": "4"
+        },
+        "narrative": {
+          "Action": "Move src/cli/commands/migrate-config.ts under the admin group as 'pan admin migrate-config'. Delete the top-level registration."
+        },
+        "subItems": [
+          {
+            "id": "p4-admin-migrate-config.ac1",
+            "title": "'pan admin migrate-config' works with all existing flags (--force, --preview, --no-backup, --delete-legacy)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p4-admin-migrate-config.ac2",
+            "title": "'pan migrate-config' is no longer a registered top-level command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p45-contracts",
+        "title": "Update packages/contracts RPC types for new routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-705",
+          "phase": "4.5"
+        },
+        "narrative": {
+          "Action": "Update RPC type definitions in packages/contracts/ and the Effect RPC group in src/dashboard/server/ws-rpc.ts to rename verbs: work/* procedures split into issues/*, review/*, show/*, admin/*. Rebuild packages/contracts ('cd packages/contracts && npm run build'). This is the type-propagation bead — it must land before routes and frontend client beads."
+        },
+        "subItems": [
+          {
+            "id": "p45-contracts.ac1",
+            "title": "packages/contracts/ exports new procedure names matching the CLI taxonomy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-contracts.ac2",
+            "title": "Effect RPC group in ws-rpc.ts matches new names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-contracts.ac3",
+            "title": "'npm run typecheck' passes at workspace root after contracts rebuild",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p45-route-issues",
+        "title": "Rename /api/work/* lifecycle routes to /api/issues/*",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4.5"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/, rename all lifecycle verb routes (start/done/approve/close/reopen/wipe/tell/kill/resume/recover/sync-main/inspect) from /api/work/* to /api/issues/*. Router wiring only — handlers unchanged. Update the integration tests that hit these paths in the same commit."
+        },
+        "subItems": [
+          {
+            "id": "p45-route-issues.ac1",
+            "title": "All lifecycle routes respond at /api/issues/*",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-route-issues.ac2",
+            "title": "No handler code was duplicated — pure routing rename",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-route-issues.ac3",
+            "title": "Corresponding integration tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p45-route-review",
+        "title": "Create /api/review/* routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4.5"
+        },
+        "narrative": {
+          "Action": "Rename review-loop routes (pending, request, reset) from /api/work/* to /api/review/*. Integration tests updated in the same commit."
+        },
+        "subItems": [
+          {
+            "id": "p45-route-review.ac1",
+            "title": "Review routes respond at /api/review/{pending,request,reset}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-route-review.ac2",
+            "title": "Integration tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p45-route-show",
+        "title": "Create /api/show/* observation routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4.5"
+        },
+        "narrative": {
+          "Action": "Rename the legacy shadow/cv/context/health endpoints from /api/work/* to /api/show/*. Integration tests updated in the same commit."
+        },
+        "subItems": [
+          {
+            "id": "p45-route-show.ac1",
+            "title": "Show routes respond at /api/show/* with the same payloads as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-route-show.ac2",
+            "title": "Integration tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p45-route-admin",
+        "title": "Create /api/admin/* plumbing routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4.5"
+        },
+        "narrative": {
+          "Action": "Move plumbing routes (cloister, specialists, remote, db, beads, tracker) to /api/admin/*. Integration tests updated in the same commit."
+        },
+        "subItems": [
+          {
+            "id": "p45-route-admin.ac1",
+            "title": "Admin routes respond under /api/admin/*",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-route-admin.ac2",
+            "title": "All /api/work/* routes are fully removed from the router (verified by grep)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-route-admin.ac3",
+            "title": "Integration tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p45-frontend-client",
+        "title": "Update frontend RPC client and Zustand store",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-705",
+          "phase": "4.5"
+        },
+        "narrative": {
+          "Action": "Update WsTransport.ts, EventRouter.tsx, and the Zustand store in src/dashboard/frontend/src/ to call renamed routes and subscribe to renamed RPC events. Typecheck must pass after packages/contracts rebuild."
+        },
+        "subItems": [
+          {
+            "id": "p45-frontend-client.ac1",
+            "title": "Frontend calls /api/issues/*, /api/review/*, /api/show/*, /api/admin/* — no /api/work/* hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-frontend-client.ac2",
+            "title": "'npm run typecheck' passes in src/dashboard/frontend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-frontend-client.ac3",
+            "title": "Frontend unit tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p45-frontend-strings",
+        "title": "Replace hardcoded legacy command strings in frontend",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4.5"
+        },
+        "narrative": {
+          "Action": "Grep src/dashboard/frontend/src/ for 'pan work', 'pan cloister', 'pan plan-finalize', 'pan specialists', etc. in shell hint components, copy-to-clipboard snippets, empty-state help text, onboarding flows, inspector panel. Replace with new verbs."
+        },
+        "subItems": [
+          {
+            "id": "p45-frontend-strings.ac1",
+            "title": "'git grep -n 'pan work ' src/dashboard/frontend/' returns no hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-frontend-strings.ac2",
+            "title": "'git grep -n 'pan plan-finalize' src/dashboard/frontend/' returns no hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-frontend-strings.ac3",
+            "title": "'git grep -n 'pan cloister\\|pan specialists\\|pan beads\\|pan db \\|pan remote \\|pan config ' src/dashboard/frontend/' returns no hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p45-kanban-inspector",
+        "title": "Update kanban card + inspector panel action labels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "4.5"
+        },
+        "narrative": {
+          "Action": "Kanban card action buttons and inspector panel actions that call backend routes must show the new verb names in their UI copy and tooltips. E.g. 'Mark done', 'Approve & merge', 'Wipe' — with hover-tooltip showing the equivalent 'pan <verb> <id>' invocation."
+        },
+        "subItems": [
+          {
+            "id": "p45-kanban-inspector.ac1",
+            "title": "Kanban action buttons use new verb labels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-kanban-inspector.ac2",
+            "title": "Inspector panel action labels and tooltips reference new verbs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p45-announcement",
+        "title": "First-launch upgrade announcement banner",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-705",
+          "phase": "4.5"
+        },
+        "narrative": {
+          "Action": "New component at src/dashboard/frontend/src/components/upgrade-announcement/. Renders the migration table from docs/QUICK-REFERENCE.md inline (embedded as a constant; do not fetch at runtime). Shows on first dashboard visit after upgrade. Dismissible. Persist dismissal in localStorage under a versioned key like 'panopticon:upgrade-banner:v0.x-taxonomy-reorg'. Renders at the top of the dashboard, above the kanban board."
+        },
+        "subItems": [
+          {
+            "id": "p45-announcement.ac1",
+            "title": "Banner renders the full migration table from QUICK-REFERENCE.md on first visit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-announcement.ac2",
+            "title": "Dismiss button hides the banner and writes a dismissal key to localStorage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-announcement.ac3",
+            "title": "After dismissal, the banner does not reappear on page reload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p45-announcement.ac4",
+            "title": "Component has frontend unit tests covering render + dismiss",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p5-docs-usage",
+        "title": "Update docs/USAGE.md and docs/INDEX.md for new taxonomy",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "5"
+        },
+        "narrative": {
+          "Action": "Rewrite docs/USAGE.md and docs/INDEX.md around the new command surface. Reference QUICK-REFERENCE.md for the migration table instead of duplicating it."
+        },
+        "subItems": [
+          {
+            "id": "p5-docs-usage.ac1",
+            "title": "docs/USAGE.md uses only new verbs; no legacy paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p5-docs-usage.ac2",
+            "title": "docs/INDEX.md lists pan admin and links to QUICK-REFERENCE.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p5-docs-prds",
+        "title": "Update doc references in all PRDs and active plans",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "5"
+        },
+        "narrative": {
+          "Action": "Grep docs/ for legacy command invocations (pan work, pan cloister, pan specialists, pan plan-finalize, pan beads, pan db, pan remote, pan migrate-config, pan sync-costs, pan config shadow, pan setup hooks). Replace with new verbs in all doc files EXCEPT the PRD file itself (which describes the rename)."
+        },
+        "subItems": [
+          {
+            "id": "p5-docs-prds.ac1",
+            "title": "'rg -n 'pan work |pan cloister |pan specialists |pan plan-finalize|pan beads |pan db |pan remote |pan migrate-config|pan sync-costs|pan config shadow|pan setup hooks' docs/ --glob '!docs/prds/planned/pan-command-taxonomy-reorg.md' --glob '!docs/QUICK-REFERENCE.md'' returns zero hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p5-hook-scripts",
+        "title": "Update hook scripts and installed shell aliases",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "5"
+        },
+        "narrative": {
+          "Action": "Update scripts/git-hooks/ and any Panopticon-installed shell aliases (shipped via 'pan sync') so they invoke the new verbs. Grep scripts/ for legacy invocations."
+        },
+        "subItems": [
+          {
+            "id": "p5-hook-scripts.ac1",
+            "title": "No legacy 'pan work' / 'pan cloister' / 'pan plan-finalize' invocations remain in scripts/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p5-snapshot-help",
+        "title": "Plain-text fixture test for 'pan --help'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "5"
+        },
+        "narrative": {
+          "Action": "Commit tests/fixtures/pan-help.txt with the full 'pan --help' output. Write a Vitest test tests/fixtures/pan-help.test.ts that spawns the CLI, captures --help, and asserts byte-for-byte equality against the fixture. Support UPDATE_FIXTURES=1 env var to rewrite the fixture in place (single update path). Establishes the repo convention for locking user-facing text surfaces — see STATE.md for rationale. DO NOT use Vitest '.snap' files."
+        },
+        "subItems": [
+          {
+            "id": "p5-snapshot-help.ac1",
+            "title": "tests/fixtures/pan-help.txt exists and matches current 'pan --help' byte-for-byte",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p5-snapshot-help.ac2",
+            "title": "Vitest test asserts equality; UPDATE_FIXTURES=1 rewrites the fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p5-snapshot-help.ac3",
+            "title": "No '.snap' files added; test uses plain-text fixture only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p5-snapshot-help.ac4",
+            "title": "Test file comment documents the UPDATE_FIXTURES workflow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p5-doctor-legacy",
+        "title": "pan doctor: flag legacy invocations in user shell rc",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "5"
+        },
+        "narrative": {
+          "Action": "Extend src/cli/commands/doctor.ts to grep the user's shell rc files (~/.bashrc, ~/.zshrc, ~/.config/fish/config.fish) for 'pan work ', 'pan plan-finalize', 'pan cloister', 'pan specialists', 'pan sync-costs', etc. Print a warning with the replacement when found. Do not auto-rewrite — inform only."
+        },
+        "subItems": [
+          {
+            "id": "p5-doctor-legacy.ac1",
+            "title": "'pan doctor' warns on legacy invocations in shell rc files and shows the replacement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p5-doctor-legacy.ac2",
+            "title": "Doctor does NOT modify rc files — warning only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p5-doctor-legacy.ac3",
+            "title": "Test covers rc file scanning with fixture rc files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p55-verb-template",
+        "title": "Skill template at .claude/skills/_template/pan-verb-skill.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-705",
+          "phase": "5.5"
+        },
+        "narrative": {
+          "Action": "Create .claude/skills/_template/pan-verb-skill.md — the shared template that the 8–10 flat shortcut skills extend. Template includes frontmatter slots for name/description, a standard body structure, and a pointer to the umbrella skill for users who want the taxonomy. 'pan sync' must NOT distribute _template/ to user skill dirs — extend the sync code to ignore paths starting with '_'."
+        },
+        "subItems": [
+          {
+            "id": "p55-verb-template.ac1",
+            "title": ".claude/skills/_template/pan-verb-skill.md exists with name/description placeholders and standard body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-verb-template.ac2",
+            "title": "'pan sync' does not distribute files under .claude/skills/_template/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-verb-template.ac3",
+            "title": "Template is referenced from STATE.md / CONTRIBUTING for future skill authors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p55-umbrella",
+        "title": "Umbrella /pan skill with dispatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-705",
+          "phase": "5.5"
+        },
+        "narrative": {
+          "Action": "Create .claude/skills/pan/SKILL.md. Bare invocation: print the embedded six-bucket taxonomy cheat sheet (not fetched at runtime — inlined in the SKILL body). With args: instruct Claude to run 'pan <args>' as a single Bash invocation and report stdout/stderr. Destructive verbs (wipe, kill, close, approve, admin cloister emergency-stop) require chat-layer confirmation before the Bash call. Shell metacharacters in user args are refused with a message asking the user to run the command directly. Unknown top-level verb: print the cheat sheet and suggest the nearest match (prefix match, no Levenshtein required). Description field leads with 'pan <verb> <args> — Umbrella for all pan commands'."
+        },
+        "subItems": [
+          {
+            "id": "p55-umbrella.ac1",
+            "title": "'/pan' (bare) prints the embedded six-bucket taxonomy cheat sheet without any Bash tool invocation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-umbrella.ac2",
+            "title": "'/pan start PAN-415' results in 'pan start PAN-415' being executed via the Bash tool and its output returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-umbrella.ac3",
+            "title": "'/pan admin cloister status' dispatches the nested subcommand correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-umbrella.ac4",
+            "title": "Destructive verbs (wipe/kill/close/approve) echo the intended command and require confirmation before Bash call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-umbrella.ac5",
+            "title": "Shell metacharacters (;, |, &&, $ (), backticks) in args are refused — skill instructs user to run directly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-umbrella.ac6",
+            "title": "Unknown verb prints the cheat sheet plus nearest-match suggestion — no blind 'pan <gibberish>' invocation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-umbrella.ac7",
+            "title": "Taxonomy cheat sheet is embedded in SKILL.md, not fetched from filesystem at runtime",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p55-rename-skills",
+        "title": "Rename skills to match new CLI verbs 1:1",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "5.5"
+        },
+        "narrative": {
+          "Action": "Rename the distributed skills under .claude/skills/ so their directory names match the new CLI verbs. Drop pan-work-* prefix; collapse pan-plan + pan-plan-finalize into one pan-plan skill that takes a 'finalize' subcommand; move plumbing under pan-admin-* prefix (pan-cloister → pan-admin-cloister, pan-tldr → pan-admin-tldr, pan-rescue → pan-admin-rescue, etc.). Delete skills whose commands are being dropped (sync-costs, etc.). Update each skill's frontmatter 'name:' field to match the new directory name."
+        },
+        "subItems": [
+          {
+            "id": "p55-rename-skills.ac1",
+            "title": "No skill directory is named pan-work-*",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-rename-skills.ac2",
+            "title": "pan-plan-finalize directory no longer exists; pan-plan skill handles finalize subcommand",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-rename-skills.ac3",
+            "title": "All plumbing skills are named pan-admin-* (cloister, tldr, rescue, beads, db, remote, specialists, etc.)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-rename-skills.ac4",
+            "title": "Each skill's frontmatter name: field matches its new directory name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p55-flat-shortcuts",
+        "title": "Curate 8–10 flat shortcut skills",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "5.5"
+        },
+        "narrative": {
+          "Action": "The flat top-level skills in the slash menu are exactly: pan, pan-status, pan-plan, pan-start, pan-show, pan-review, pan-done, pan-approve, pan-close, pan-issues. All other skills live under pan-admin-* and are surfaced only via the umbrella '/pan admin …'. The shortcut skills reuse the template from p55-verb-template for consistent maintenance. Each shortcut is tailored with verb-specific examples and flag guidance in its body."
+        },
+        "subItems": [
+          {
+            "id": "p55-flat-shortcuts.ac1",
+            "title": "Exactly these skill dirs are at the top level: pan, pan-status, pan-plan, pan-start, pan-show, pan-review, pan-done, pan-approve, pan-close, pan-issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-flat-shortcuts.ac2",
+            "title": "All other pan-* skills have the pan-admin-* prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-flat-shortcuts.ac3",
+            "title": "Each shortcut skill extends the template and includes verb-specific examples",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p55-descriptions",
+        "title": "Rewrite every skill description CLI-first",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "5.5"
+        },
+        "narrative": {
+          "Action": "Every distributed skill's frontmatter description MUST follow the format: 'pan <verb> <args> — one-line what it does'. The literal CLI invocation is always first so fuzzy search matches from both ends. Example: 'pan kill <id> — stop a running agent (workspace preserved)'."
+        },
+        "subItems": [
+          {
+            "id": "p55-descriptions.ac1",
+            "title": "Every skill frontmatter description begins with 'pan <verb>' followed by ' — ' and a short explanation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-descriptions.ac2",
+            "title": "Lint/test script validates the description format for all pan-* skills",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p55-sync-cleanup",
+        "title": "pan sync deletes legacy skill files on upgrade",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "5.5"
+        },
+        "narrative": {
+          "Action": "Update src/cli/commands/sync.ts and src/lib/sync.ts so that on next run, pan sync removes any legacy skill directories from ~/.claude/skills/ that are no longer in the distributed set. Use an explicit list of legacy names (pan-work-*, pan-plan-finalize, pan-rescue, pan-tldr, pan-cloister, pan-specialists, etc.) so removal is deterministic and auditable. Log what was deleted to stdout."
+        },
+        "subItems": [
+          {
+            "id": "p55-sync-cleanup.ac1",
+            "title": "pan sync removes legacy skill directories from ~/.claude/skills/ on next run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-sync-cleanup.ac2",
+            "title": "Deletion uses an explicit allow/deny list (not 'anything not in current set'), logged to stdout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-sync-cleanup.ac3",
+            "title": "Unit test covers the cleanup path with a fixture skill dir containing legacy + new",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p55-snapshot-skills",
+        "title": "Plain-text fixture test for synced skill set",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-705",
+          "phase": "5.5"
+        },
+        "narrative": {
+          "Action": "Commit tests/fixtures/synced-skills.txt listing the exact skill directory names that pan sync distributes (sorted, one per line). Write a Vitest test that enumerates the skill source dir and asserts equality against the fixture. UPDATE_FIXTURES=1 rewrites the fixture. Uses the same plain-text-fixture pattern as p5-snapshot-help. DO NOT use .snap files."
+        },
+        "subItems": [
+          {
+            "id": "p55-snapshot-skills.ac1",
+            "title": "tests/fixtures/synced-skills.txt lists all distributed skill dir names sorted one per line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-snapshot-skills.ac2",
+            "title": "Vitest test asserts equality; UPDATE_FIXTURES=1 rewrites the fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p55-snapshot-skills.ac3",
+            "title": "Fixture contains no pan-work-*, pan-plan-finalize, or any legacy name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p6-changelog",
+        "title": "CHANGELOG entry with full migration table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-705",
+          "phase": "6"
+        },
+        "narrative": {
+          "Action": "Add a CHANGELOG entry for the next minor version. Embed the full legacy→new migration table from docs/QUICK-REFERENCE.md. Call out that this is a breaking change (pre-1.0 clean break) and point users at QUICK-REFERENCE.md and 'pan doctor'."
+        },
+        "subItems": [
+          {
+            "id": "p6-changelog.ac1",
+            "title": "CHANGELOG.md has an entry for the next minor version describing the reorg as a breaking change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p6-changelog.ac2",
+            "title": "Entry embeds the full migration table (not just a link)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p6-changelog.ac3",
+            "title": "Entry mentions 'pan doctor' for detecting legacy invocations in shell rc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p6-version-bump",
+        "title": "Bump minor version in package.json",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-705",
+          "phase": "6"
+        },
+        "narrative": {
+          "Action": "Bump minor version in root package.json and packages/contracts/package.json. Pre-1.0 so minor is correct for a breaking CLI surface change."
+        },
+        "subItems": [
+          {
+            "id": "p6-version-bump.ac1",
+            "title": "Root package.json minor version is bumped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p6-version-bump.ac2",
+            "title": "packages/contracts/package.json version matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "p6-move-prd",
+        "title": "Move PRD from planned/ to active/",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-14T13:00:56Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-705",
+          "phase": "6"
+        },
+        "narrative": {
+          "Action": "At the very end of the work, move docs/prds/planned/pan-command-taxonomy-reorg.md → docs/prds/active/pan-705/pan-command-taxonomy-reorg.md. This signals the PRD has shipped. Update any incoming links (QUICK-REFERENCE.md uses a relative link to the planned path)."
+        },
+        "subItems": [
+          {
+            "id": "p6-move-prd.ac1",
+            "title": "PRD file lives under docs/prds/active/pan-705/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p6-move-prd.ac2",
+            "title": "docs/QUICK-REFERENCE.md link to the PRD is updated to the active path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "p6-move-prd.ac3",
+            "title": "'rg -n 'prds/planned/pan-command-taxonomy-reorg' docs/' returns zero hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "p1-commit-prd",
+        "to": "p1-resolve-issue-id",
+        "type": "informs"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p2-show",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p2-review",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p2-issues",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p2-plan",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p3-start",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p3-tell",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p3-resume",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p3-recover",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p3-kill",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p3-sync-main",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p3-done",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p3-approve",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p3-reopen",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p3-wipe",
+        "type": "blocks"
+      },
+      {
+        "from": "p1-resolve-issue-id",
+        "to": "p3-close",
+        "type": "blocks"
+      },
+      {
+        "from": "p3-start",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p3-tell",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p3-resume",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p3-recover",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p3-kill",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p3-sync-main",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p3-done",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p3-approve",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p3-reopen",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p3-wipe",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p3-close",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p2-show",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p2-review",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p2-issues",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p2-plan",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-tracker",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-tldr",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-fpp",
+        "to": "p3-delete-work-group",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-group",
+        "to": "p4-admin-cloister",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-group",
+        "to": "p4-admin-specialists",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-group",
+        "to": "p4-admin-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-group",
+        "to": "p4-admin-db",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-group",
+        "to": "p4-admin-beads",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-group",
+        "to": "p4-admin-tracker",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-group",
+        "to": "p4-admin-config",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-group",
+        "to": "p4-admin-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-group",
+        "to": "p4-admin-tldr",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-group",
+        "to": "p4-admin-fpp",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-group",
+        "to": "p4-admin-migrate-config",
+        "type": "blocks"
+      },
+      {
+        "from": "p45-contracts",
+        "to": "p45-route-issues",
+        "type": "blocks"
+      },
+      {
+        "from": "p45-contracts",
+        "to": "p45-route-review",
+        "type": "blocks"
+      },
+      {
+        "from": "p45-contracts",
+        "to": "p45-route-show",
+        "type": "blocks"
+      },
+      {
+        "from": "p45-contracts",
+        "to": "p45-route-admin",
+        "type": "blocks"
+      },
+      {
+        "from": "p45-contracts",
+        "to": "p45-frontend-client",
+        "type": "blocks"
+      },
+      {
+        "from": "p45-route-issues",
+        "to": "p45-frontend-client",
+        "type": "blocks"
+      },
+      {
+        "from": "p45-route-review",
+        "to": "p45-frontend-client",
+        "type": "blocks"
+      },
+      {
+        "from": "p45-route-show",
+        "to": "p45-frontend-client",
+        "type": "blocks"
+      },
+      {
+        "from": "p45-route-admin",
+        "to": "p45-frontend-client",
+        "type": "blocks"
+      },
+      {
+        "from": "p45-frontend-client",
+        "to": "p45-frontend-strings",
+        "type": "informs"
+      },
+      {
+        "from": "p45-frontend-client",
+        "to": "p45-kanban-inspector",
+        "type": "informs"
+      },
+      {
+        "from": "p45-frontend-client",
+        "to": "p45-announcement",
+        "type": "informs"
+      },
+      {
+        "from": "p3-delete-work-group",
+        "to": "p5-docs-usage",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-migrate-config",
+        "to": "p5-docs-usage",
+        "type": "blocks"
+      },
+      {
+        "from": "p5-docs-usage",
+        "to": "p5-docs-prds",
+        "type": "informs"
+      },
+      {
+        "from": "p5-docs-usage",
+        "to": "p5-hook-scripts",
+        "type": "informs"
+      },
+      {
+        "from": "p3-delete-work-group",
+        "to": "p5-snapshot-help",
+        "type": "blocks"
+      },
+      {
+        "from": "p4-admin-migrate-config",
+        "to": "p5-snapshot-help",
+        "type": "blocks"
+      },
+      {
+        "from": "p5-snapshot-help",
+        "to": "p5-doctor-legacy",
+        "type": "informs"
+      },
+      {
+        "from": "p55-verb-template",
+        "to": "p55-flat-shortcuts",
+        "type": "blocks"
+      },
+      {
+        "from": "p55-rename-skills",
+        "to": "p55-flat-shortcuts",
+        "type": "blocks"
+      },
+      {
+        "from": "p55-rename-skills",
+        "to": "p55-descriptions",
+        "type": "blocks"
+      },
+      {
+        "from": "p55-flat-shortcuts",
+        "to": "p55-umbrella",
+        "type": "informs"
+      },
+      {
+        "from": "p55-rename-skills",
+        "to": "p55-sync-cleanup",
+        "type": "blocks"
+      },
+      {
+        "from": "p55-rename-skills",
+        "to": "p55-snapshot-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "p55-descriptions",
+        "to": "p55-snapshot-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "p55-sync-cleanup",
+        "to": "p55-snapshot-skills",
+        "type": "blocks"
+      },
+      {
+        "from": "p5-snapshot-help",
+        "to": "p6-changelog",
+        "type": "blocks"
+      },
+      {
+        "from": "p55-snapshot-skills",
+        "to": "p6-changelog",
+        "type": "blocks"
+      },
+      {
+        "from": "p45-announcement",
+        "to": "p6-changelog",
+        "type": "blocks"
+      },
+      {
+        "from": "p6-changelog",
+        "to": "p6-version-bump",
+        "type": "informs"
+      },
+      {
+        "from": "p6-version-bump",
+        "to": "p6-move-prd",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
