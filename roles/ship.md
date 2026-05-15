@@ -57,6 +57,22 @@ The ship role prepares an approved, tested pull request for a human merge. It do
 8. Transition the issue/PR state to the workflow state that means **ready-to-merge** so the dashboard renders the Merge button for a human.
 9. Exit after reporting the pushed commit, verification results, and ready-to-merge state transition.
 
+## Terminate When Done — Do Not Idle
+
+The ship role is a one-shot task, not a standing service. The moment you have
+either (a) reported the ready-to-merge transition, or (b) reported `SHIP
+BLOCKED`, your job is over.
+
+- Print the final status line and **stop immediately**. Do not wait for
+  follow-up instructions, do not poll for new work, do not "monitor" the PR.
+- Never leave the session sitting at an idle prompt after the terminal status
+  is reported. An idle ship session that never exits is a zombie: it keeps the
+  `agent-<issue>-ship` session alive and blocks the orchestrator from
+  dispatching a fresh ship run when the branch changes (e.g. after a re-review
+  or a new test pass).
+- If you finish the workflow, exit. If you are blocked, report `SHIP BLOCKED`
+  and exit. There is no third state where you keep the session open.
+
 ## Human-Merge Invariant
 
 Ship NEVER merges. Merge authority stays with the human-controlled dashboard Merge button and the server-side merge HTTP path that owns `postMergeLifecycle` cleanup.

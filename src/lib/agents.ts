@@ -558,6 +558,15 @@ export interface AgentState {
    */
   deliveryMethod?: 'auto' | 'channels' | 'tmux';
 
+  /**
+   * Short HEAD sha (8 chars) of the workspace at the moment this role run was
+   * spawned. Used by the reactive scheduler's activeRoleRunExists() to detect a
+   * stale/zombie role session: if the workspace HEAD has advanced past this
+   * marker, the existing session ran against old code and must not block a
+   * fresh re-dispatch for the new HEAD. Set for non-work roles in spawnRun.
+   */
+  roleRunHead?: string;
+
   /** Review-convoy metadata for server-side reviewer lifecycle monitoring. */
   reviewSubRole?: string;
   reviewRunId?: string;
@@ -594,6 +603,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     preSpawnStashRef: raw.preSpawnStashRef,
     preSpawnStashMessage: raw.preSpawnStashMessage,
     preSpawnBaselineHead: raw.preSpawnBaselineHead,
+    roleRunHead: raw.roleRunHead,
     channelsEnabled: raw.channelsEnabled,
     deliveryMethod: raw.deliveryMethod,
     reviewSubRole: raw.reviewSubRole,
@@ -1990,6 +2000,18 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
+
+  // Stamp the workspace HEAD this role run was launched against. The reactive
+  // scheduler uses this to tell a still-relevant run from a zombie session
+  // left behind by an agent that finished work but never exited (the ship/test
+  // stall class of bug). A non-fatal git probe — if it fails the marker is
+  // simply absent and activeRoleRunExists falls back to status-only checks.
+  try {
+    const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: workspace });
+    const head = stdout.trim();
+    if (head) state.roleRunHead = head;
+  } catch { /* non-fatal — marker stays absent */ }
+
   await saveAgentStateAsync(state);
 
   emitActivityEntry({
