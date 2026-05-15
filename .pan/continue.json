@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-1111",
   "created": "2026-05-15T05:33:19.125Z",
-  "updated": "2026-05-15T06:28:00.000Z",
-  "gitState": { "branch": "feature/pan-1111", "sha": "59a2ea3c8", "dirty": true },
+  "updated": "2026-05-15T06:35:00.000Z",
+  "gitState": { "branch": "feature/pan-1111", "sha": "c75c7b2bf", "dirty": true },
   "decisions": [
     { "id": "D1", "summary": "Re-do the upgrade from scratch — PR #1114 closed without merging the actual version bump or scaffolding removal. Trust nothing from that branch.", "recordedAt": "2026-05-15T05:40:00.000Z" },
     { "id": "D2", "summary": "Bump install pin to v1.0.4 in src/cli/commands/install.ts:411 (`recommendedVersion = 1 * 10000 + 0 * 100 + 4`) and update surrounding message text.", "recordedAt": "2026-05-15T05:40:00.000Z" },
@@ -22,7 +22,7 @@
     { "id": "H5", "summary": "Skill docs are linted against `bd --help` output (`scripts/lint-skills.sh`). Skill linter may reject documented flags that don't exist on the installed bd binary.", "mitigation": "`bump-install-pin` runs first and verifies the local bd is 1.0.4 — that's the version the lint will run against. If the linter still complains, that means the documented flag isn't in 1.0.4 — read `bd <subcommand> --help` and adjust the doc to match." }
   ],
   "resumePoint": {
-    "description": "Completed all PAN-1111 beads. Next: run final quality gates, push the branch, and call pan done PAN-1111.",
+    "description": "Completed all PAN-1111 beads and removed stale bd sync call sites discovered during final verification. Next: run final quality gates, push the branch, and call pan done PAN-1111.",
     "beadId": "workspace-82ea",
     "filesToRead": [".pan/spec.vbrief.json"]
   },
@@ -86,6 +86,12 @@
       "timestamp": "2026-05-15T06:28:00.000Z",
       "reason": "bead-complete",
       "note": "Completed workspace-82ea: skills/beads-panopticon-guide/SKILL.md now explains beads v1.0.4 auto-import, Panopticon's redirect-managed worktree flow, and the never-bd-init invariant; npm run lint passed.",
+      "agentModel": "agent:gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-15T06:35:00.000Z",
+      "reason": "verification-fix",
+      "note": "Final verification exposed stale bd sync call sites; replaced active code and skill references with bd dolt commit/export flows and typecheck/lint passed.",
       "agentModel": "agent:gpt-5.5"
     }
   ],

@@ -1263,13 +1263,13 @@ async function migrateCommand(issueId: string, options: MigrateOptions): Promise
       return;
     }
 
-    // Sync beads before migrating
-    spinner.text = 'Syncing beads...';
+    // Persist beads before migrating
+    spinner.text = 'Persisting beads...';
     try {
-      await execAsync('bd sync', { encoding: 'utf-8' });
+      await execAsync('bd dolt commit -m "Sync beads before migration"', { encoding: 'utf-8' });
       await execAsync('git add .beads/ && git commit -m "Sync beads before migration" && git push', { encoding: 'utf-8' });
     } catch {
-      // Non-fatal - beads sync might not be needed
+      // Non-fatal - beads persistence might not be needed
     }
 
     // Create remote workspace

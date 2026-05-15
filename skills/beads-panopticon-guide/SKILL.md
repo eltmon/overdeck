@@ -162,7 +162,7 @@ For complete beads documentation, see the main `beads` skill:
 1. **No `--issue` flag exists** - Use `--title-contains` instead
 2. **`--id` expects bead IDs** (panopticon-abc), not Linear IDs (PAN-116)
 3. **Always add comments** - They survive compaction and help the next agent
-4. **Sync at session end** - `bd sync` commits to git
+4. **Persist at session end** - `bd dolt commit -m "session update"` commits pending local Dolt changes
 5. **NEVER use `bd claim`** - Use `bd update <id> --claim` instead
 6. **Check blockers before closing** - Run `bd dep tree <id>` first; close blockers before using `--force`
 7. **NEVER run `bd init` in redirect-managed worktrees** - Use the existing `.beads/redirect` plus `bd ping --json` / `bd doctor --fix`
@@ -191,6 +191,6 @@ bd comments add panopticon-abc "Implemented per-message costing logic"
 # 6. Complete
 bd close panopticon-abc --reason "Refactored parseClaudeSession to calculate cost per-message"
 
-# 7. Sync to git
-bd sync
+# 7. Persist pending Dolt changes
+bd dolt commit -m "PAN-116 session update"
 ```

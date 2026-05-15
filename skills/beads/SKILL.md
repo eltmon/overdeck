@@ -81,7 +81,7 @@ bd --version  # Requires v1.0.4+
 **Run `bd prime`** for AI-optimized workflow context (auto-loaded by hooks).
 **Run `bd <command> --help`** for specific command usage.
 
-Essential commands: `bd ready`, `bd create`, `bd show`, `bd update`, `bd close`, `bd sync`
+Essential commands: `bd ready`, `bd create`, `bd show`, `bd update`, `bd close`, `bd dolt commit`
 
 ## Health and Recovery
 
@@ -109,7 +109,7 @@ bd dolt push --remote origin       # Push Dolt commits to a named remote
 3. `bd update <id> --status in_progress` — Start work
 4. Add notes as you work (critical for compaction survival)
 5. `bd close <id> --reason "..."` — Complete task
-6. `bd sync` — Persist to git (always run at session end)
+6. `bd dolt commit -m "session update"` — Persist pending Dolt changes at session end
 
 ## Invalid Commands (NEVER use these)
 
@@ -216,9 +216,10 @@ bd dep tree <id>        # See what's blocking this issue
 # Close blockers first, or use --force (not recommended)
 ```
 
-### Sync (End of Session)
+### Persist (End of Session)
 ```bash
-bd sync                          # Commit and push to git (ALWAYS run at session end)
+bd dolt commit -m "session update"     # Commit pending local Dolt changes
+bd dolt push --remote origin            # Push to a configured Dolt remote when one exists
 ```
 
 ## Advanced Features
