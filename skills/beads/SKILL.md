@@ -69,7 +69,7 @@ bd create "Add feature" --external-ref MIN-123 --json
 ## Prerequisites
 
 ```bash
-bd --version  # Requires v0.62.0+
+bd --version  # Requires v1.0.4+
 ```
 
 - **bd CLI** installed and in PATH
@@ -82,6 +82,25 @@ bd --version  # Requires v0.62.0+
 **Run `bd <command> --help`** for specific command usage.
 
 Essential commands: `bd ready`, `bd create`, `bd show`, `bd update`, `bd close`, `bd sync`
+
+## Health and Recovery
+
+Use `bd ping --json` as the canonical non-mutating connectivity probe for automation. It resolves the `.beads` workspace, opens the store, runs a trivial query, and exits non-zero if the database is unreachable.
+
+Use `bd doctor --fix` for repair instead of hand-cleaning local artifacts. It checks schema compatibility, migrations, permissions, dependency cycles, hooks, metadata versioning, and can repair fixable issues. Add `--yes` only when non-interactive confirmation is required and you are sure the fixes are safe.
+
+```bash
+bd ping --json              # Structured health check for scripts
+bd doctor --fix             # Repair fixable local database/setup issues
+bd doctor --agent --json    # Rich diagnostics for AI agents
+bd prune --older-than 30d   # Preview closed regular beads older than 30 days
+bd prune --older-than 30d --force  # Delete matching closed regular beads
+bd dolt push --remote origin       # Push Dolt commits to a named remote
+```
+
+`bd prune` permanently deletes closed non-ephemeral beads and their comments, labels, dependencies, and events. It requires `--older-than` or `--pattern`; without `--force` it previews instead of deleting.
+
+`bd dolt push --remote <name>` pushes local Dolt commits to a configured named remote. The remote must already exist, and hosted Dolt remotes require `DOLT_REMOTE_USER` and `DOLT_REMOTE_PASSWORD`.
 
 ## Session Protocol
 
