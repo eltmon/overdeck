@@ -159,7 +159,9 @@ describe('createBeadsFromVBrief', () => {
     const dbError = new Error('Error 1146 (HY000): table not found: issues');
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
-      .mockRejectedValueOnce(dbError);                                 // bd ping --json (probe)
+      .mockRejectedValueOnce(dbError)                                  // bd ping --json (probe)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd doctor --fix
+      .mockRejectedValueOnce(dbError);                                 // bd ping --json (retry)
 
     const result = await createBeadsFromVBrief(ws2.workspacePath);
 
@@ -172,7 +174,7 @@ describe('createBeadsFromVBrief', () => {
 
     expect(result.success).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors[0]).toMatch(/redirect|main beads/i);
+    expect(result.errors[0]).toMatch(/failed after recovery/i);
 
     rmSync(ws2.projectRoot, { recursive: true, force: true });
   });
