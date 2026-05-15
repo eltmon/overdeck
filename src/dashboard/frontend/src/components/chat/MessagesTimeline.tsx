@@ -47,10 +47,19 @@ const MAX_VISIBLE_WORK_LOG_ENTRIES = 6;
 const ALWAYS_UNVIRTUALIZED_TAIL_ROWS = 8;
 const AUTO_SCROLL_THRESHOLD_PX = 64;
 
-/** Format an ISO timestamp as a short time string (e.g., "3:42 PM"). */
+/** Format an ISO timestamp as a short time string (e.g., "3:42 PM" or "May 14, 3:42 PM"). */
 function formatTimestamp(iso: string): string {
   try {
-    return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const date = new Date(iso);
+    const now = new Date();
+    const isSameDay =
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate();
+    if (isSameDay) {
+      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+    return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   } catch {
     return '';
   }
