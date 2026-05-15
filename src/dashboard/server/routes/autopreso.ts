@@ -4,6 +4,7 @@ import { autoPresoSession, type ExcalidrawElementLike } from '../../../autopreso
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
+import { loadVoiceSettings } from './voice.js';
 
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -34,7 +35,8 @@ const startRoute = HttpRouter.add(
     const originError = requireTrustedOrigin(request);
     if (originError) return originError;
     const body = yield* readJsonBody;
-    return jsonResponse(autoPresoSession.start(readElements(body)));
+    const settings = yield* Effect.promise(loadVoiceSettings);
+    return jsonResponse(autoPresoSession.start(readElements(body), settings));
   })),
 );
 

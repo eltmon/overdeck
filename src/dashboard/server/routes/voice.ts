@@ -13,6 +13,10 @@ export interface VoiceSettings {
     moonshine: { model: string };
     googleCloud: { apiKey: string; model: string };
   };
+  autopreso: {
+    provider: 'openai' | 'codex' | 'ollama';
+    model: string;
+  };
 }
 
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
@@ -20,6 +24,10 @@ const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
     provider: 'moonshine',
     moonshine: { model: 'base' },
     googleCloud: { apiKey: '', model: 'latest_long' },
+  },
+  autopreso: {
+    provider: 'openai',
+    model: 'gpt-4.1-mini',
   },
 };
 
@@ -44,6 +52,13 @@ function isVoiceSettings(value: unknown): value is VoiceSettings {
   if (!stt || typeof stt !== 'object') return false;
   const provider = stt.provider;
   if (provider !== 'moonshine' && provider !== 'google-cloud') return false;
+  const autopreso = settings.autopreso;
+  if (autopreso !== undefined) {
+    if (!autopreso || typeof autopreso !== 'object') return false;
+    const autopresoProvider = autopreso.provider;
+    if (autopresoProvider !== 'openai' && autopresoProvider !== 'codex' && autopresoProvider !== 'ollama') return false;
+    if (typeof autopreso.model !== 'string') return false;
+  }
   return (
     !!stt.moonshine &&
     typeof stt.moonshine === 'object' &&
@@ -64,6 +79,10 @@ function normalizeVoiceSettings(value: VoiceSettings): VoiceSettings {
         apiKey: value.stt.googleCloud.apiKey,
         model: value.stt.googleCloud.model || DEFAULT_VOICE_SETTINGS.stt.googleCloud.model,
       },
+    },
+    autopreso: {
+      provider: value.autopreso?.provider ?? DEFAULT_VOICE_SETTINGS.autopreso.provider,
+      model: value.autopreso?.model || DEFAULT_VOICE_SETTINGS.autopreso.model,
     },
   };
 }

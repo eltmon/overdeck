@@ -142,6 +142,10 @@ interface VoiceSettings {
     moonshine: { model: string };
     googleCloud: { apiKey: string; model: string };
   };
+  autopreso: {
+    provider: 'openai' | 'codex' | 'ollama';
+    model: string;
+  };
 }
 
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
@@ -149,6 +153,10 @@ const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
     provider: 'moonshine',
     moonshine: { model: 'base' },
     googleCloud: { apiKey: '', model: 'latest_long' },
+  },
+  autopreso: {
+    provider: 'openai',
+    model: 'gpt-4.1-mini',
   },
 };
 
@@ -181,10 +189,17 @@ function loadVoiceHardwareSettings(): VoiceHardwareSettings {
   }
 }
 
+function normalizeVoiceSettings(settings: Partial<VoiceSettings>): VoiceSettings {
+  return {
+    stt: settings.stt ?? DEFAULT_VOICE_SETTINGS.stt,
+    autopreso: settings.autopreso ?? DEFAULT_VOICE_SETTINGS.autopreso,
+  };
+}
+
 async function fetchVoiceSettings(): Promise<VoiceSettings> {
   const res = await fetch('/api/voice/settings');
   if (!res.ok) throw new Error('Failed to fetch voice settings');
-  return res.json();
+  return normalizeVoiceSettings(await res.json() as Partial<VoiceSettings>);
 }
 
 async function saveVoiceSettings(settings: VoiceSettings): Promise<VoiceSettings> {
@@ -518,6 +533,26 @@ export function SettingsPage() {
           ...voiceFormData.stt.googleCloud,
           model,
         },
+      },
+    });
+  };
+
+  const handleAutoPresoProviderChange = (provider: VoiceSettings['autopreso']['provider']) => {
+    setVoiceFormData({
+      ...voiceFormData,
+      autopreso: {
+        ...voiceFormData.autopreso,
+        provider,
+      },
+    });
+  };
+
+  const handleAutoPresoModelChange = (model: string) => {
+    setVoiceFormData({
+      ...voiceFormData,
+      autopreso: {
+        ...voiceFormData.autopreso,
+        model,
       },
     });
   };
@@ -1107,6 +1142,40 @@ export function SettingsPage() {
               <option value="moonshine">Moonshine</option>
               <option value="google-cloud">Google Cloud STT</option>
             </select>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">AutoPreso provider</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Whiteboard agent backend used for live diagram updates
+              </p>
+            </div>
+            <select
+              value={voiceFormData.autopreso.provider}
+              onChange={(e) => handleAutoPresoProviderChange(e.target.value as VoiceSettings['autopreso']['provider'])}
+              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+            >
+              <option value="openai">OpenAI</option>
+              <option value="codex">Codex</option>
+              <option value="ollama">Ollama</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">AutoPreso model</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Model passed to the whiteboard agent
+              </p>
+            </div>
+            <input
+              type="text"
+              value={voiceFormData.autopreso.model}
+              onChange={(e) => handleAutoPresoModelChange(e.target.value)}
+              placeholder="gpt-4.1-mini"
+              className="w-[260px] bg-background border border-border rounded-md px-2.5 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+            />
           </div>
 
           {voiceFormData.stt.provider === 'moonshine' ? (

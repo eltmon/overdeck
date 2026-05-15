@@ -1,4 +1,4 @@
-import { runWhiteboardAgent, runWhiteboardWarmupOnce } from './agent.js';
+import { runWhiteboardAgent, runWhiteboardWarmupOnce, type AutoPresoAgentSettings } from './agent.js';
 import { normalizeElements, type ExcalidrawElement } from './whiteboard-elements.js';
 import { extractKeywordsFromElements } from './whiteboard-keywords.js';
 
@@ -24,10 +24,10 @@ export interface AutoPresoSession {
   agentHistory: AutoPresoAgentMessage[];
   canvasDirtyForAgent: boolean;
   snapshot(): AutoPresoSnapshot;
-  start(elements: readonly ExcalidrawElementLike[]): AutoPresoSnapshot;
+  start(elements: readonly ExcalidrawElementLike[], settings: AutoPresoAgentSettings): AutoPresoSnapshot;
   backToStaging(): AutoPresoSnapshot;
   reset(): AutoPresoSnapshot;
-  processTranscript(transcript: string): Promise<AutoPresoSnapshot>;
+  processTranscript(transcript: string, settings: AutoPresoAgentSettings): Promise<AutoPresoSnapshot>;
   subscribe(listener: AutoPresoListener): () => void;
 }
 
@@ -51,6 +51,7 @@ function createWarmupUserMessage(elements: readonly ExcalidrawElementLike[]): Au
 export function createWhiteboardSession(): AutoPresoSession {
   const listeners = new Set<AutoPresoListener>();
   let warmupGeneration = 0;
+  let transcriptQueue: Promise<void> = Promise.resolve();
 
   const session: AutoPresoSession = {
     mode: 'staging',
@@ -67,7 +68,7 @@ export function createWhiteboardSession(): AutoPresoSession {
         canvasDirtyForAgent: session.canvasDirtyForAgent,
       };
     },
-    start(nextElements) {
+    start(nextElements, settings) {
       const generation = ++warmupGeneration;
       const warmupUserMessage = createWarmupUserMessage(nextElements);
       session.mode = 'live';
@@ -75,8 +76,9 @@ export function createWhiteboardSession(): AutoPresoSession {
       session.elements = normalizeElements(nextElements);
       session.agentHistory = [];
       session.canvasDirtyForAgent = true;
+      transcriptQueue = Promise.resolve();
       const current = notify();
-      void runWarmupLoop(generation, warmupUserMessage);
+      void runWarmupLoop(generation, warmupUserMessage, settings);
       return current;
     },
     backToStaging() {
@@ -95,10 +97,14 @@ export function createWhiteboardSession(): AutoPresoSession {
       session.canvasDirtyForAgent = false;
       return notify();
     },
-    async processTranscript(transcript) {
-      if (session.mode !== 'live') return session.snapshot();
-      await runWhiteboardAgent(transcript, session);
-      return notify();
+    processTranscript(transcript, settings) {
+      const work = transcriptQueue.then(async () => {
+        if (session.mode !== 'live') return session.snapshot();
+        await runWhiteboardAgent(transcript, session, settings);
+        return notify();
+      });
+      transcriptQueue = work.then(() => undefined, () => undefined);
+      return work;
     },
     subscribe(listener) {
       listeners.add(listener);
@@ -114,11 +120,12 @@ export function createWhiteboardSession(): AutoPresoSession {
 
   const runWarmupLoop = async (
     generation: number,
-    warmupUserMessage: AutoPresoAgentMessage
+    warmupUserMessage: AutoPresoAgentMessage,
+    settings: AutoPresoAgentSettings
   ): Promise<void> => {
     for (let attempt = 0; attempt < MAX_WARMUP_ATTEMPTS; attempt += 1) {
       try {
-        await runWhiteboardWarmupOnce(session);
+        await runWhiteboardWarmupOnce(session, settings);
         if (generation !== warmupGeneration) return;
         session.agentHistory = [warmupUserMessage, { role: 'assistant', content: 'UNDERSTOOD' }];
         session.warmupStatus = 'ready';
