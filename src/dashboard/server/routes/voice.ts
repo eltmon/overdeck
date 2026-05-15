@@ -132,6 +132,7 @@ function notifyVoiceSettings(settings: VoiceSettings): void {
 
 function redactVoiceSettings(settings: VoiceSettings): VoiceSettings & { stt: VoiceSettings['stt'] & { googleCloud: VoiceSettings['stt']['googleCloud'] & { hasApiKey: boolean } } } {
   return {
+    ...settings,
     stt: {
       ...settings.stt,
       googleCloud: {

@@ -10,10 +10,12 @@ export function VoiceWidget({
   conversation,
   onInsert,
   onSendDirect,
+  onStateChange,
 }: {
   conversation: Conversation;
   onInsert: (text: string) => void;
   onSendDirect: (text: string) => void;
+  onStateChange?: (state: { isListening: boolean; error: string | null }) => void;
 }) {
   const [mode, setMode] = useState<VoiceMode>('edit');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -30,6 +32,11 @@ export function VoiceWidget({
   useEffect(() => {
     directModeRef.current = mode;
   }, [mode]);
+
+  useEffect(() => {
+    onStateChange?.({ isListening, error });
+    return () => onStateChange?.({ isListening: false, error: null });
+  }, [error, isListening, onStateChange]);
 
   useEffect(() => {
     void navigator.mediaDevices?.enumerateDevices?.().then((items) => {
@@ -106,8 +113,8 @@ export function VoiceWidget({
           Mic
           <select className={styles.voiceSelect} value={deviceId} onChange={(event) => setDeviceId(event.target.value)}>
             <option value="">Default microphone</option>
-            {devices.map((device) => (
-              <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${devices.indexOf(device) + 1}`}</option>
+            {devices.map((device, index) => (
+              <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>
             ))}
           </select>
         </label>

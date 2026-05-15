@@ -18,6 +18,7 @@ type VoiceMessage =
   | { type: 'transcript:committed'; text: string };
 
 const MAX_SOCKET_BUFFERED_AUDIO_BYTES = 250_000;
+const MAX_COMMITTED_TURNS = 200;
 
 function websocketUrl(path: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -107,7 +108,7 @@ export function useAutoPresoWebSocket() {
       if (message.type === 'transcript:partial') setPartialText(message.text);
       if (message.type === 'transcript:committed') {
         setPartialText('');
-        setCommittedTurns((turns) => [...turns, { text: message.text, timestamp: new Date() }]);
+        setCommittedTurns((turns) => [...turns, { text: message.text, timestamp: new Date() }].slice(-MAX_COMMITTED_TURNS));
       }
     };
     socket.onclose = () => {

@@ -17,6 +17,17 @@ interface AutoPresoSnapshot {
 
 type AutoPresoListener = (snapshot: AutoPresoSnapshot) => void;
 
+type QueuedTranscript = {
+  transcript: string;
+  settings: AutoPresoAgentSettings;
+};
+
+export type ProcessTranscriptResult = {
+  accepted: boolean;
+  coalesced: boolean;
+  snapshot: AutoPresoSnapshot;
+};
+
 export interface AutoPresoSession {
   mode: AutoPresoMode;
   warmupStatus: WarmupStatus;
@@ -27,7 +38,7 @@ export interface AutoPresoSession {
   start(elements: readonly ExcalidrawElementLike[], settings: AutoPresoAgentSettings): AutoPresoSnapshot;
   backToStaging(): AutoPresoSnapshot;
   reset(): AutoPresoSnapshot;
-  processTranscript(transcript: string, settings: AutoPresoAgentSettings): Promise<AutoPresoSnapshot>;
+  processTranscript(transcript: string, settings: AutoPresoAgentSettings): ProcessTranscriptResult;
   subscribe(listener: AutoPresoListener): () => void;
 }
 
@@ -51,7 +62,8 @@ function createWarmupUserMessage(elements: readonly ExcalidrawElementLike[]): Au
 export function createWhiteboardSession(): AutoPresoSession {
   const listeners = new Set<AutoPresoListener>();
   let warmupGeneration = 0;
-  let transcriptQueue: Promise<void> = Promise.resolve();
+  let activeTranscriptRun: Promise<void> | null = null;
+  let pendingTranscript: QueuedTranscript | null = null;
 
   const session: AutoPresoSession = {
     mode: 'staging',
@@ -76,7 +88,8 @@ export function createWhiteboardSession(): AutoPresoSession {
       session.elements = normalizeElements(nextElements);
       session.agentHistory = [];
       session.canvasDirtyForAgent = true;
-      transcriptQueue = Promise.resolve();
+      activeTranscriptRun = null;
+      pendingTranscript = null;
       const current = notify();
       void runWarmupLoop(generation, warmupUserMessage, settings);
       return current;
@@ -86,6 +99,7 @@ export function createWhiteboardSession(): AutoPresoSession {
       session.mode = 'staging';
       session.warmupStatus = 'idle';
       session.canvasDirtyForAgent = false;
+      pendingTranscript = null;
       return notify();
     },
     reset() {
@@ -95,16 +109,19 @@ export function createWhiteboardSession(): AutoPresoSession {
       session.elements = [];
       session.agentHistory = [];
       session.canvasDirtyForAgent = false;
+      pendingTranscript = null;
       return notify();
     },
     processTranscript(transcript, settings) {
-      const work = transcriptQueue.then(async () => {
-        if (session.mode !== 'live') return session.snapshot();
-        await runWhiteboardAgent(transcript, session, settings);
-        return notify();
-      });
-      transcriptQueue = work.then(() => undefined, () => undefined);
-      return work;
+      if (session.mode !== 'live') {
+        return { accepted: false, coalesced: false, snapshot: session.snapshot() };
+      }
+      const coalesced = activeTranscriptRun !== null;
+      pendingTranscript = pendingTranscript
+        ? { transcript: `${pendingTranscript.transcript}\n${transcript}`, settings }
+        : { transcript, settings };
+      runNextTranscript(warmupGeneration);
+      return { accepted: true, coalesced, snapshot: session.snapshot() };
     },
     subscribe(listener) {
       listeners.add(listener);
@@ -116,6 +133,23 @@ export function createWhiteboardSession(): AutoPresoSession {
     const current = session.snapshot();
     for (const listener of listeners) listener(current);
     return current;
+  };
+
+  const runNextTranscript = (generation: number): void => {
+    if (activeTranscriptRun || !pendingTranscript) return;
+    const next = pendingTranscript;
+    pendingTranscript = null;
+    activeTranscriptRun = (async () => {
+      if (generation !== warmupGeneration || session.mode !== 'live') return;
+      await runWhiteboardAgent(next.transcript, session, next.settings);
+      if (generation !== warmupGeneration || session.mode !== 'live') return;
+      notify();
+    })().catch((error) => {
+      console.error('[AutoPreso] Transcript processing failed:', error);
+    }).finally(() => {
+      activeTranscriptRun = null;
+      if (generation === warmupGeneration && session.mode === 'live') runNextTranscript(generation);
+    });
   };
 
   const runWarmupLoop = async (

@@ -73,9 +73,12 @@ export function setupVoiceWebSocket(server: http.Server): void {
       transcription.onPartial((text) => sendJson(ws, { type: 'transcript:partial', text }));
       turnQueue = createTurnQueue(transcription, (text) => {
         sendJson(ws, { type: 'transcript:committed', text });
-        void autoPresoSession.processTranscript(text, settings).catch((error) => {
-          sendJson(ws, { type: 'error', error: error instanceof Error ? error.message : String(error) });
-        });
+        const result = autoPresoSession.processTranscript(text, settings);
+        if (!result.accepted) {
+          sendJson(ws, { type: 'error', error: 'AutoPreso transcript processing is not live' });
+        } else if (result.coalesced) {
+          sendJson(ws, { type: 'error', error: 'AutoPreso transcript processing is backpressured' });
+        }
       });
       transcription.onError((error) => sendJson(ws, { type: 'error', error: error.message }));
     };
