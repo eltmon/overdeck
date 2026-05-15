@@ -179,10 +179,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-nrd7",
-    "itemId": "h3-time-bucket",
+    "beadId": "workspace-6nf3",
+    "itemId": "b1-turn-compression",
     "status": "implemented",
-    "note": "Frontend bucketByTime helper added with Just Now, Earlier Today, Yesterday, This Week, This Month, and Older local-time buckets plus boundary tests; focused frontend test, typecheck, and lint passed."
+    "note": "Transcript delta compressor now reads only the claimed byte range, emits compact user/assistant/tool summaries, returns lastFullLineOffset for partial trailing JSONL, categorizes Write/Edit/MultiEdit/NotebookEdit/Bash/unknown tools, truncates long user text, and passes focused tests/typecheck/lint."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -233,6 +233,12 @@
       "timestamp": "2026-05-15T00:00:00.000Z",
       "reason": "work",
       "note": "workspace-nrd7 implemented: added src/dashboard/frontend/src/lib/timeBuckets.ts with local-time buckets and src/dashboard/frontend/src/lib/__tests__/timeBuckets.test.ts boundary coverage; focused frontend test, typecheck, and lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-15T00:00:00.000Z",
+      "reason": "work",
+      "note": "workspace-6nf3 implemented: added src/lib/memory/compress.ts byte-range JSONL compression, partial-line offset handling, tool-call categorization, long-user truncation, and tests/lib/memory/compress.test.ts; focused tests, typecheck, and lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],
