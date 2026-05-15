@@ -38,6 +38,7 @@ Act on an issue. `<id>` is the universal object.
 | `pan recover <id>` | Recover a crashed or stopped agent |
 | `pan kill <id>` | Stop the agent (workspace preserved) |
 | `pan sync-main <id>` | Merge latest `main` into the workspace branch |
+| `pan swarm <id>` | Per-item DAG dispatch across plan items (slot-per-item). See [SWARM.md](./SWARM.md). `--dry-run`, `--max-slots`, `--auto-advance`, `--task <next\|show\|claim\|done\|block\|unblock\|cancel>` |
 | `pan done <id>` | Mark work complete → tracker "In Review". Agent stays on standby for UAT tweaks via `pan tell`. |
 | Dashboard MERGE | Click MERGE button when review passes (handles rebase, verify, merge, cleanup) |
 | `pan inspect <id>` | Request human inspection before proceeding |

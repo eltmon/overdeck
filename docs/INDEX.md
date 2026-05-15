@@ -37,6 +37,7 @@
 | [PRD-REMOTE-WORKSPACES.md](./PRD-REMOTE-WORKSPACES.md) | Remote workspace requirements |
 | [VBRIEF.md](./VBRIEF.md) | vBRIEF plan format, lifecycle directories, continue state, `pan scope` commands |
 | [HIERARCHICAL-PLANNING.md](./HIERARCHICAL-PLANNING.md) | vBRIEF planning, DAG scheduling, acceptance criteria pipeline |
+| [SWARM.md](./SWARM.md) | Per-item DAG dispatch, synthesis agents at convergence points, file-overlap serialization, slot-merge auto-advance, `pan swarm` CLI + `--task` operations, HTTP routes, `SwarmRuntime` continue-state shape, DAG library API |
 | [FIX-ALL-PRD.md](./FIX-ALL-PRD.md) | Fix-All Flywheel PRD: continuous, self-improving mass pan-oversee with `main` always clean |
 | [OPERATION-FIX-ALL.md](./OPERATION-FIX-ALL.md) | Operational manual for mass pan-oversee: phases, classification, bug log template |
 
@@ -156,6 +157,7 @@
 - **"deterministic UUID"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"merge"** / **"merge validation"** → PRD-CLOISTER.md (Merge Validation Pipeline section)
 - **"vBRIEF"** / **"DAG"** / **"acceptance criteria"** / **"planning"** → VBRIEF.md, HIERARCHICAL-PLANNING.md, SPECIALIST_WORKFLOW.md
+- **"swarm"** / **"pan swarm"** / **"per-item dispatch"** / **"synthesis agent"** / **"files_scope"** / **"slot-merged"** / **"SwarmRuntime"** → SWARM.md
 - **"beads conversion"** / **"createBeadsFromVBrief"** → HIERARCHICAL-PLANNING.md
 - **"sync with main"** / **"sync-main"** → SPECIALIST_WORKFLOW.md (Sync with Main section)
 - **"deacon"** / **"health monitor"** / **"health"** / **"patrol"** → DEACON-HEALTH-MONITORING.md
