@@ -2,44 +2,87 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-12T17:57:53.652Z",
-    "updated": "2026-05-12T17:57:53.652Z",
-    "author": "panopticon-cli/auto-start",
-    "description": "Auto-synthesized minimal plan for PAN-1111: Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding (createBeadsFromVBrief, withBdMutex, manual redirect setup)",
-    "inspectionPolicy": "never"
+    "updated": "2026-05-15T05:41:18.016Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1111: Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding",
+    "inspectionPolicy": "auto"
   },
   "plan": {
     "id": "pan-1111",
-    "title": "Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding (createBeadsFromVBrief, withBdMutex, manual redirect setup)",
+    "title": "Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding",
     "status": "proposed",
-    "uid": "eaa18f7c-f7f0-454e-8c21-8f30fdab5f90",
-    "author": "panopticon-cli/auto-start",
-    "sequence": 1,
+    "uid": "bb7041db-13db-488a-9429-70382b646a68",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 4,
     "created": "2026-05-12T17:57:53.652Z",
-    "updated": "2026-05-12T17:57:53.652Z",
+    "updated": "2026-05-15T05:41:18.016Z",
+    "metadata": {
+      "canonicalFilename": "2026-05-12-PAN-1111-upgrade-beads-to-v1-0-4-and-remove-redundant-wrapper-scaffolding-createbeadsfromvbrief-withbdmutex-manual-redirect-setup.vbrief.json"
+    },
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1111",
         "label": "PAN-1111",
         "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/pull/1114",
+        "label": "PR #1114 (closed, did not deliver)",
+        "type": "pr"
+      },
+      {
+        "uri": "https://github.com/gastownhall/beads",
+        "label": "beads repo",
+        "type": "repo"
       }
     ],
     "tags": [
-      "auto-start"
+      "dependencies",
+      "beads",
+      "tooling",
+      "refactor"
     ],
-    "metadata": {
-      "canonicalFilename": "2026-05-12-PAN-1111-upgrade-beads-to-v1-0-4-and-remove-redundant-wrapper-scaffolding-createbeadsfromvbrief-withbdmutex-manual-redirect-setup.vbrief.json"
-    },
     "narratives": {
-      "Problem": "## Summary\n\nWe are on **beads v1.0.2** (released 2026-04-15). Latest is **v1.0.4** (released 2026-05-09). Both v1.0.3 and v1.0.4 ship fixes that directly address recurring failures we have been working around in our own code — and our wrapper code is now fighting against features beads provides natively. Upgrade, then incrementally remove the scaffolding.\n\nMirrors the structure of PAN-812 (v0.62.0 → v1.0.2 upgrade).\n\n## Why this matters\n\nRecent beads-related incidents this user keeps hitting:\n\n- PAN-457 \\\"table not found: issues\\\" after a partial init left a schema-less local dolt DB shadowing the redirect.\n- PAN-1105 (convoy reviewers silent-exit) and PAN-457 review error both fire when the workspace beads DB is in an unexpected state.\n- The \\\"permissions 0775 (recommended: 0700)\\\" warning on every bd call.\n- Concurrent \\`bd list\\` invocations producing torn audit-log lines and the \\\"Command failed: bd list\\\" error class.\n- Our \\`createBeadsFromVBrief\\` recovery historically ran \\`bd init --prefix\\` inside a redirect-managed worktree — clobbered the redirect, half-initialized a server-mode DB, permanently broke the worktree (fixed in commit \\`7d0e50cf3\\`).\n\nEach one is a symptom of the same root cause: **beads has been growing native support for the things we hand-roll, and our wrapper code interferes with the cleaner native paths.**\n\n## Direct mapping: their fix → our pain\n\n### v1.0.3 (2026-04-24)\n\n| beads commit | what it fixes for us |\n| --- | --- |\n| \\`fix(dolt): auto-recover from corrupt manifest on startup (GH#3290)\\` | The \\\"table not found: issues\\\" shape we hit on PAN-457. |\n| \\`fix(audit): atomic write to prevent torn lines under concurrent O_APPEND\\` | Class of races our \\`withBdMutex\\` works around at the application layer. |\n| \\`fix(config): default Dolt database name when metadata.json is missing\\` | Resilience when committed \\`metadata.json\\` is stale or absent. |\n| \\`fix(dolt): pre-push integrity check via dolt fsck\\` | Catch corruption before it propagates to remote. |\n| \\`feat: support Unix domain sockets for Dolt server connections\\` | Avoids TCP-port contention between worktrees. |\n| \\`feat: bd ping, structured errors, JSON schema contract\\` | Drop-in replacement for our hand-rolled \\`bd list --json --limit 0\\` connectivity probe. |\n| \\`feat(prune): add bd prune for deleting closed non-ephemeral beads\\` | DB hygiene we have no current strategy for. |\n\n### v1.0.4 (2026-05-09)\n\n| beads commit | what it fixes for us |\n| --- | --- |\n| \\`fix(init): repair existing .beads permissions to 0700\\` | No more \\\"permissions 0775 (recommended: 0700)\\\" warning. |\n| \\`fix(hooks): use BeadsDirPerm (0700) for .beads/hooks directory\\` | Same. |\n| \\`fix(hooks): auto-import .beads/issues.jsonl after pull/checkout (GH#3729)\\` | After git pull/checkout the worktree's jsonl is auto-imported into the DB. Lets us simplify the redirect story (workers running in worktrees no longer need our manual sync). |\n| \\`feat: add -C <path> flag\\` | Cleaner CLI invocation patterns. |\n| \\`fix(export): scrub git hook env and skip cross-worktree git-add (GH#3311)\\` | Cross-worktree git-add edge case. |\n\n## Gap in our approach (the simplification piece)\n\n| What we do today | Why it can be simplified after upgrade |\n| --- | --- |\n| \\`src/lib/workspace-manager.ts\\` writes \\`.beads/redirect\\` manually on every worktree create | beads has worktree-native support; with v1.0.4 \\`fix(hooks): auto-import .beads/issues.jsonl after pull/checkout\\` we can lean on bd to hydrate the worktree DB from the committed jsonl instead of redirecting. |\n| \\`src/lib/vbrief/beads.ts::createBeadsFromVBrief\\` does its own connectivity probe + recovery (with stale-artifact heuristics) | Replace probe with \\`bd ping\\`. Replace recovery with \\`bd doctor --fix\\` (already wrapped by \\`pan admin beads doctor\\`). |\n| \\`withBdMutex\\` serializes \\`bd list\\` calls across the dashboard server | v1.0.3 \\`fix(audit)\\` removes one whole class of races inside beads — keep the mutex for now but treat it as a workaround we can re-evaluate. |\n| Hand-roll \\`bd init --prefix\\` recovery in createBeadsFromVBrief | beads now repairs perms + metadata defaults on init. Recovery surface should shrink to a single \\`bd init || bd doctor --fix\\` rather than the multi-branch logic we have today. |\n| Committed \\`.beads/metadata.json\\` + \\`.beads/hooks/\\` in main as ambient noise | v1.0.4 \\`fix(hooks): use BeadsDirPerm (0700)\\` writes hooks with correct perms; we can choose whether they stay committed or get \\`.gitignore\\`d (commit \\`5fb7e0bcd\\` is when hooks were originally added — worth re-evaluating). |\n\n## Work items\n\n### 1. Upgrade beads CLI\n- [ ] Install beads **v1.0.4** locally and on all dev machines\n- [ ] Verify backward compatibility with existing \\`.beads/\\` databases (run \\`bd doctor\\` post-upgrade)\n- [ ] Update \\`src/cli/commands/install.ts\\` version check to v1.0.4\n- [ ] Update \\`pan install\\` install URL/script\n\n### 2. Update Panopticon beads skill + docs\n- [ ] Bump \\`skills/beads/SKILL.md\\` version metadata\n- [ ] Document \\`bd ping\\` and \\`bd doctor --fix\\` as the canonical health/repair calls\n- [ ] Document \\`bd prune\\` for DB hygiene\n- [ ] Document \\`bd dolt push --remote <name>\\` flag\n- [ ] Update \\`skills/beads-panopticon-guide/SKILL.md\\` with the worktree story (redirect vs auto-import)\n\n### 3. Lean on native support (incremental — do NOT do all at once)\n- [ ] **Replace** our \\`bd list --json --limit 0\\` connectivity probe in \\`src/lib/vbrief/beads.ts\\` with \\`bd ping --json\\`\n- [ ] **Simplify** \\`createBeadsFromVBrief\\` recovery: on \\`bd ping\\` failure, try \\`bd doctor --fix\\` once; otherwise return a clear error and stop. Remove the stale-artifact heuristic.\n- [ ] **Evaluate** removing the \\`.beads/redirect\\` setup in workspace-manager.ts in favor of the v1.0.4 \\`auto-import after pull/checkout\\` hook flow. (May not be a free swap — verify behavior with a manual test before deleting code.)\n- [ ] **Decide** whether \\`.beads/hooks/\\` and \\`.beads/metadata.json\\` should remain committed. v1.0.4 writes them with correct perms; if we keep them, add a comment to \\`.beads/.gitignore\\` explaining why; if we drop them, \\`git rm\\` and add to \\`.gitignore\\`.\n\n### 4. Framework integration (carry-overs from PAN-812 that should now actually land)\n- [ ] Wire \\`bd doctor --fix\\` into \\`pan admin beads doctor\\` (PAN-812 marked this done — verify it survived)\n- [ ] Add \\`bd batch\\` usage to \\`done-preflight.ts\\` bulk-close path\n\n## Acceptance Criteria\n\n1. \\`bd --version\\` reports \\`1.0.4\\` (or later patch on the \\`1.0.x\\` line)\n2. \\`pan install\\` installs v1.0.4 and the version check accepts only v1.0.4+\n3. Creating a fresh worktree no longer produces the \\\"permissions 0775\\\" warning on any bd call\n4. \\`createBeadsFromVBrief\\` uses \\`bd ping\\` for connectivity (verified by reading the source); the stale-artifact heuristic is gone\n5. The PAN-457 recurring symptom (probe → \\\"table not found: issues\\\" → workspace permanently broken) does not reproduce: simulating a corrupted local dolt manifest in a worktree, \\`bd ping\\` recovers via v1.0.3's auto-recovery rather than requiring our wrapper to intervene\n6. Tests in \\`src/lib/vbrief/__tests__/create-beads.test.ts\\` updated to reflect the simplified recovery surface\n7. No regression in PAN-457-style symptoms across 5 consecutive \\`pan start\\` / sync-main cycles\n\n## Out of scope\n- Federation/multi-repo features (\\`feat(linear): per-workspace concurrency lock\\`, OAuth flows, etc.) — file separately if we want them\n- Replacing \\`withBdMutex\\` outright — keep it for now, revisit after the rest of this lands\n- Migrating committed \\`.beads/issues.jsonl\\` semantics (the auto-import hook changes how it's consumed; verify behavior before changing committed state)\n\n## References\n- PAN-812: previous upgrade (v0.62.0 → v1.0.2)\n- PAN-939: \\\"Beads embedded dolt lock contention from concurrent bd list calls\\\" — context for \\`withBdMutex\\`\n- PAN-1034: \\\"review-coordinator dies on specialist timeout\\\" — single-retry mechanism; underlying silent-exit is PAN-1105\n- PAN-1105: \\\"Convoy review specialists exit twice without writing reports\\\" — current open bug; probably benefits from beads-side concurrency/recovery improvements\n- Recent root-cause fix: \\`7d0e50cf3\\` (\\\"fix(beads): never bd init in a redirect-managed worktree\\\")\n- Beads repo: https://github.com/gastownhall/beads",
-      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+      "Problem": "Panopticon ships beads v1.0.2 (released 2026-04-15). Latest is v1.0.4 (2026-05-09). v1.0.3 and v1.0.4 add native fixes for failure modes we currently work around in wrapper code: corrupt-manifest auto-recovery (the PAN-457 symptom), atomic audit-log writes, a `bd ping` connectivity probe, `bd doctor --fix` recovery, and 0700 perms repair. PR #1114 was closed without merge — the actual upgrade was never delivered: `bd --version` still reports 1.0.2, the install pin in src/cli/commands/install.ts is still 1.0.2, and createBeadsFromVBrief still uses a hand-rolled `bd list --json --limit 0` probe with a multi-branch stale-artifact recovery heuristic. The wrapper scaffolding now fights native beads features.",
+      "Proposal": "Re-do the upgrade with discipline. (1) Bump the install version pin from 1.0.2 to 1.0.4 so `pan install` fetches the new binary and the version-guard warns below 1.0.4. (2) Replace the connectivity probe in createBeadsFromVBrief with `bd ping --json`. (3) Simplify the recovery surface: on probe failure, run `bd doctor --fix` once and retry the probe; if it still fails, return a clear error. Delete the stale-artifact heuristic — v1.0.3 auto-recovers from corrupt manifests, and v1.0.4 repairs permissions, so the heuristic is moot. (4) Update create-beads.test.ts to match the new recovery surface. (5) Add an integration test that simulates a corrupted local dolt manifest scenario in a worktree and verifies the wrapper relies on beads' own auto-recovery (acceptance criterion #5). (6) Update the two beads skill docs to document `bd ping`, `bd doctor --fix`, `bd prune`, and `bd dolt push --remote`. Explicitly out of scope per the issue body: removing `withBdMutex`, replacing `.beads/redirect` with auto-import, changing committed `.beads/metadata.json`/`hooks/` state. Those are deferred for a follow-up issue."
     },
+    "autoDecisions": [
+      {
+        "summary": "Keep withBdMutex in place; do not remove in this issue.",
+        "rationale": "The issue body explicitly lists `withBdMutex` removal as out of scope (\"keep it for now, revisit after the rest of this lands\"). v1.0.3's atomic audit-log fix removes one class of races but does not eliminate the dolt-lock contention from concurrent `bd list` calls that withBdMutex serializes against (PAN-939). Removing it requires its own validation pass."
+      },
+      {
+        "summary": "Keep workspace-manager.ts redirect setup; do not switch to v1.0.4 auto-import in this issue.",
+        "rationale": "Work item is labeled \"Evaluate\", not \"Replace\". Auto-import-after-pull/checkout is a behavioral change that affects every worktree's DB hydration; it needs a manual test pass before deleting the redirect-write path. Out-of-scope per issue (\"Migrating committed .beads/issues.jsonl semantics ... verify behavior before changing committed state\")."
+      },
+      {
+        "summary": "Keep committed .beads/metadata.json and .beads/hooks/; do not gitignore or remove in this issue.",
+        "rationale": "Work item is labeled \"Decide\". Changing committed state requires a separate verification cycle and a clear migration path. v1.0.4 writes them with 0700 perms, so the noise is gone regardless of commit status. Defer the commit-vs-ignore decision."
+      },
+      {
+        "summary": "Do not add `bd batch` usage in done-preflight.ts.",
+        "rationale": "done-preflight.ts contains no bulk-close path — only `bd list --status open` diagnostics. There is no existing call site to convert. File a follow-up issue if a bulk-close path is introduced."
+      },
+      {
+        "summary": "Acceptance test for v1.0.3 corruption-recovery (AC #5) lives in src/lib/vbrief/__tests__/create-beads.test.ts as a mocked-execFile test, not a live `bd` subprocess test.",
+        "rationale": "The repo's existing create-beads tests mock execFile/execFileAsync rather than shelling out to the real `bd`. Matching the established pattern keeps the test fast and deterministic on CI. The behavior under test is the wrapper's reaction (probe → doctor --fix → retry) to a corrupted-DB error, not beads' internal recovery — that is validated by beads' own test suite."
+      },
+      {
+        "summary": "Work-role model is gpt-5.5 (per issue update).",
+        "rationale": "Issue body explicitly states \"Work agent will run on gpt-5.5.\" Plan beads are sized accordingly — small, mechanical changes with one bead carrying a foundation inspection gate so a less-context-rich harness has a checkpoint after the recovery rewrite."
+      },
+      {
+        "summary": "Overwrote the existing 1-item auto-synthesized canonical spec on main to materialize the real 7-bead plan.",
+        "rationale": "The prior `pan start --auto` flow wrote a placeholder canonical spec at .pan/specs/2026-05-12-PAN-1111-...vbrief.json with a single auto-start: \"Implement issue\" item. `pan plan --auto` was invoked specifically to re-plan, and per PAN-1124 the pipeline only reads the main canonical spec. The canonicalFilename is preserved; only plan content is updated. This is consistent with the issue body's explicit re-plan request."
+      }
+    ],
     "items": [
       {
-        "id": "auto-start",
-        "title": "Implement issue",
+        "id": "bump-install-pin",
+        "title": "Bump bd install version pin from 1.0.2 to 1.0.4",
         "status": "pending",
-        "priority": "medium",
-        "created": "2026-05-12T17:57:53.652Z",
+        "priority": "high",
+        "created": "2026-05-15T05:42:00.000Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1111",
@@ -47,77 +90,345 @@
           "inspectionDepth": "fast"
         },
         "narrative": {
-          "Action": "## Summary\n\nWe are on **beads v1.0.2** (released 2026-04-15). Latest is **v1.0.4** (released 2026-05-09). Both v1.0.3 and v1.0.4 ship fixes that directly address recurring failures we have been working around in our own code — and our wrapper code is now fighting against features beads provides natively. Upgrade, then incrementally remove the scaffolding.\n\nMirrors the structure of PAN-812 (v0.62.0 → v1.0.2 upgrade).\n\n## Why this matters\n\nRecent beads-related incidents this user keeps hitting:\n\n- PAN-457 \\\"table not found: issues\\\" after a partial init left a schema-less local dolt DB shadowing the redirect.\n- PAN-1105 (convoy reviewers silent-exit) and PAN-457 review error both fire when the workspace beads DB is in an unexpected state.\n- The \\\"permissions 0775 (recommended: 0700)\\\" warning on every bd call.\n- Concurrent \\`bd list\\` invocations producing torn audit-log lines and the \\\"Command failed: bd list\\\" error class.\n- Our \\`createBeadsFromVBrief\\` recovery historically ran \\`bd init --prefix\\` inside a redirect-managed worktree — clobbered the redirect, half-initialized a server-mode DB, permanently broke the worktree (fixed in commit \\`7d0e50cf3\\`).\n\nEach one is a symptom of the same root cause: **beads has been growing native support for the things we hand-roll, and our wrapper code interferes with the cleaner native paths.**\n\n## Direct mapping: their fix → our pain\n\n### v1.0.3 (2026-04-24)\n\n| beads commit | what it fixes for us |\n| --- | --- |\n| \\`fix(dolt): auto-recover from corrupt manifest on startup (GH#3290)\\` | The \\\"table not found: issues\\\" shape we hit on PAN-457. |\n| \\`fix(audit): atomic write to prevent torn lines under concurrent O_APPEND\\` | Class of races our \\`withBdMutex\\` works around at the application layer. |\n| \\`fix(config): default Dolt database name when metadata.json is missing\\` | Resilience when committed \\`metadata.json\\` is stale or absent. |\n| \\`fix(dolt): pre-push integrity check via dolt fsck\\` | Catch corruption before it propagates to remote. |\n| \\`feat: support Unix domain sockets for Dolt server connections\\` | Avoids TCP-port contention between worktrees. |\n| \\`feat: bd ping, structured errors, JSON schema contract\\` | Drop-in replacement for our hand-rolled \\`bd list --json --limit 0\\` connectivity probe. |\n| \\`feat(prune): add bd prune for deleting closed non-ephemeral beads\\` | DB hygiene we have no current strategy for. |\n\n### v1.0.4 (2026-05-09)\n\n| beads commit | what it fixes for us |\n| --- | --- |\n| \\`fix(init): repair existing .beads permissions to 0700\\` | No more \\\"permissions 0775 (recommended: 0700)\\\" warning. |\n| \\`fix(hooks): use BeadsDirPerm (0700) for .beads/hooks directory\\` | Same. |\n| \\`fix(hooks): auto-import .beads/issues.jsonl after pull/checkout (GH#3729)\\` | After git pull/checkout the worktree's jsonl is auto-imported into the DB. Lets us simplify the redirect story (workers running in worktrees no longer need our manual sync). |\n| \\`feat: add -C <path> flag\\` | Cleaner CLI invocation patterns. |\n| \\`fix(export): scrub git hook env and skip cross-worktree git-add (GH#3311)\\` | Cross-worktree git-add edge case. |\n\n## Gap in our approach (the simplification piece)\n\n| What we do today | Why it can be simplified after upgrade |\n| --- | --- |\n| \\`src/lib/workspace-manager.ts\\` writes \\`.beads/redirect\\` manually on every worktree create | beads has worktree-native support; with v1.0.4 \\`fix(hooks): auto-import .beads/issues.jsonl after pull/checkout\\` we can lean on bd to hydrate the worktree DB from the committed jsonl instead of redirecting. |\n| \\`src/lib/vbrief/beads.ts::createBeadsFromVBrief\\` does its own connectivity probe + recovery (with stale-artifact heuristics) | Replace probe with \\`bd ping\\`. Replace recovery with \\`bd doctor --fix\\` (already wrapped by \\`pan admin beads doctor\\`). |\n| \\`withBdMutex\\` serializes \\`bd list\\` calls across the dashboard server | v1.0.3 \\`fix(audit)\\` removes one whole class of races inside beads — keep the mutex for now but treat it as a workaround we can re-evaluate. |\n| Hand-roll \\`bd init --prefix\\` recovery in createBeadsFromVBrief | beads now repairs perms + metadata defaults on init. Recovery surface should shrink to a single \\`bd init || bd doctor --fix\\` rather than the multi-branch logic we have today. |\n| Committed \\`.beads/metadata.json\\` + \\`.beads/hooks/\\` in main as ambient noise | v1.0.4 \\`fix(hooks): use BeadsDirPerm (0700)\\` writes hooks with correct perms; we can choose whether they stay committed or get \\`.gitignore\\`d (commit \\`5fb7e0bcd\\` is when hooks were originally added — worth re-evaluating). |\n\n## Work items\n\n### 1. Upgrade beads CLI\n- [ ] Install beads **v1.0.4** locally and on all dev machines\n- [ ] Verify backward compatibility with existing \\`.beads/\\` databases (run \\`bd doctor\\` post-upgrade)\n- [ ] Update \\`src/cli/commands/install.ts\\` version check to v1.0.4\n- [ ] Update \\`pan install\\` install URL/script\n\n### 2. Update Panopticon beads skill + docs\n- [ ] Bump \\`skills/beads/SKILL.md\\` version metadata\n- [ ] Document \\`bd ping\\` and \\`bd doctor --fix\\` as the canonical health/repair calls\n- [ ] Document \\`bd prune\\` for DB hygiene\n- [ ] Document \\`bd dolt push --remote <name>\\` flag\n- [ ] Update \\`skills/beads-panopticon-guide/SKILL.md\\` with the worktree story (redirect vs auto-import)\n\n### 3. Lean on native support (incremental — do NOT do all at once)\n- [ ] **Replace** our \\`bd list --json --limit 0\\` connectivity probe in \\`src/lib/vbrief/beads.ts\\` with \\`bd ping --json\\`\n- [ ] **Simplify** \\`createBeadsFromVBrief\\` recovery: on \\`bd ping\\` failure, try \\`bd doctor --fix\\` once; otherwise return a clear error and stop. Remove the stale-artifact heuristic.\n- [ ] **Evaluate** removing the \\`.beads/redirect\\` setup in workspace-manager.ts in favor of the v1.0.4 \\`auto-import after pull/checkout\\` hook flow. (May not be a free swap — verify behavior with a manual test before deleting code.)\n- [ ] **Decide** whether \\`.beads/hooks/\\` and \\`.beads/metadata.json\\` should remain committed. v1.0.4 writes them with correct perms; if we keep them, add a comment to \\`.beads/.gitignore\\` explaining why; if we drop them, \\`git rm\\` and add to \\`.gitignore\\`.\n\n### 4. Framework integration (carry-overs from PAN-812 that should now actually land)\n- [ ] Wire \\`bd doctor --fix\\` into \\`pan admin beads doctor\\` (PAN-812 marked this done — verify it survived)\n- [ ] Add \\`bd batch\\` usage to \\`done-preflight.ts\\` bulk-close path\n\n## Acceptance Criteria\n\n1. \\`bd --version\\` reports \\`1.0.4\\` (or later patch on the \\`1.0.x\\` line)\n2. \\`pan install\\` installs v1.0.4 and the version check accepts only v1.0.4+\n3. Creating a fresh worktree no longer produces the \\\"permissions 0775\\\" warning on any bd call\n4. \\`createBeadsFromVBrief\\` uses \\`bd ping\\` for connectivity (verified by reading the source); the stale-artifact heuristic is gone\n5. The PAN-457 recurring symptom (probe → \\\"table not found: issues\\\" → workspace permanently broken) does not reproduce: simulating a corrupted local dolt manifest in a worktree, \\`bd ping\\` recovers via v1.0.3's auto-recovery rather than requiring our wrapper to intervene\n6. Tests in \\`src/lib/vbrief/__tests__/create-beads.test.ts\\` updated to reflect the simplified recovery surface\n7. No regression in PAN-457-style symptoms across 5 consecutive \\`pan start\\` / sync-main cycles\n\n## Out of scope\n- Federation/multi-repo features (\\`feat(linear): per-workspace concurrency lock\\`, OAuth flows, etc.) — file separately if we want them\n- Replacing \\`withBdMutex\\` outright — keep it for now, revisit after the rest of this lands\n- Migrating committed \\`.beads/issues.jsonl\\` semantics (the auto-import hook changes how it's consumed; verify behavior before changing committed state)\n\n## References\n- PAN-812: previous upgrade (v0.62.0 → v1.0.2)\n- PAN-939: \\\"Beads embedded dolt lock contention from concurrent bd list calls\\\" — context for \\`withBdMutex\\`\n- PAN-1034: \\\"review-coordinator dies on specialist timeout\\\" — single-retry mechanism; underlying silent-exit is PAN-1105\n- PAN-1105: \\\"Convoy review specialists exit twice without writing reports\\\" — current open bug; probably benefits from beads-side concurrency/recovery improvements\n- Recent root-cause fix: \\`7d0e50cf3\\` (\\\"fix(beads): never bd init in a redirect-managed worktree\\\")\n- Beads repo: https://github.com/gastownhall/beads"
+          "Action": "Edit src/cli/commands/install.ts (current pin at line 411: `recommendedVersion = 1 * 10000 + 0 * 100 + 2`). Change the trailing `+ 2` to `+ 4`, update the surrounding human-readable message from `v1.0.2+ recommended` to `v1.0.4+ recommended`, and grep the file for any other `1.0.2` literal that needs to be bumped (download URLs, comment references). After editing, run `pan install` locally so the developer machine moves to bd 1.0.4 before downstream beads execute."
         },
         "subItems": [
           {
-            "id": "auto-start.ac1",
-            "title": "Federation/multi-repo features (\\feat(linear): per-workspace concurrency lock\\, OAuth flows, etc.) — file separately if we want them",
+            "id": "bump-install-pin.ac1",
+            "title": "src/cli/commands/install.ts recommendedVersion encodes 1.0.4 (10004)",
             "status": "pending",
-            "created": "2026-05-12T17:57:53.652Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "auto-start.ac2",
-            "title": "Replacing \\withBdMutex\\ outright — keep it for now, revisit after the rest of this lands",
+            "id": "bump-install-pin.ac2",
+            "title": "No surviving 1.0.2 literals in install.ts (URLs, comments, error strings)",
             "status": "pending",
-            "created": "2026-05-12T17:57:53.652Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "auto-start.ac3",
-            "title": "Migrating committed \\.beads/issues.jsonl\\ semantics (the auto-import hook changes how it's consumed; verify behavior before changing committed state)",
+            "id": "bump-install-pin.ac3",
+            "title": "`bd --version` on the developer machine reports 1.0.4 (or later patch on 1.0.x) after running pan install",
             "status": "pending",
-            "created": "2026-05-12T17:57:53.652Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "auto-start.ac4",
-            "title": "PAN-812: previous upgrade (v0.62.0 → v1.0.2)",
+            "id": "bump-install-pin.ac4",
+            "title": "`npm run typecheck` and `npm run lint` pass",
             "status": "pending",
-            "created": "2026-05-12T17:57:53.652Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ping-probe",
+        "title": "Replace `bd list --json --limit 0` connectivity probe with `bd ping --json`",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-15T05:42:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/lib/vbrief/beads.ts createBeadsFromVBrief (current probe at line ~131: `execFileAsync('bd', ['list', '--json', '--limit', '0'], ...)`), swap the argv to `['ping', '--json']`. Same 8s timeout, same cwd. This bead is intent-only; recovery logic stays unchanged here (the next bead simplifies it). Update any test mocks that assert on the probe argv so the test suite still passes."
+        },
+        "subItems": [
+          {
+            "id": "ping-probe.ac1",
+            "title": "The connectivity probe in createBeadsFromVBrief uses `bd ping --json` (not `bd list`)",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "auto-start.ac5",
-            "title": "PAN-939: \\\"Beads embedded dolt lock contention from concurrent bd list calls\\\" — context for \\withBdMutex\\",
+            "id": "ping-probe.ac2",
+            "title": "Probe timeout remains 8s; cwd remains workspacePath",
             "status": "pending",
-            "created": "2026-05-12T17:57:53.652Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "auto-start.ac6",
-            "title": "PAN-1034: \\\"review-coordinator dies on specialist timeout\\\" — single-retry mechanism; underlying silent-exit is PAN-1105",
+            "id": "ping-probe.ac3",
+            "title": "Mocks in src/lib/vbrief/__tests__/create-beads.test.ts updated; `vitest run src/lib/vbrief/__tests__/create-beads.test.ts` passes",
             "status": "pending",
-            "created": "2026-05-12T17:57:53.652Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "simplify-recovery",
+        "title": "Simplify createBeadsFromVBrief recovery: on probe failure, run `bd doctor --fix` once then retry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-15T05:42:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1111",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Rewrite the catch block in createBeadsFromVBrief (currently src/lib/vbrief/beads.ts:134-192). New shape: on `bd ping` failure, log a one-line diagnostic, invoke `bd doctor --fix` (timeout ~30s, cwd workspacePath, errors swallowed but logged), then re-attempt `bd ping --json`. If the retry succeeds, fall through and proceed with bead creation. If the retry still fails, return `{ success: false, created: [], errors: [<one-line>], beadIds }`. DELETE: the `staleArtifacts` array, the `presentStale` filter, the dolt-residue diagnostic, and the redirect-exists vs. main-beads-exists branch logic. KEEP: the fresh-install fallback — if neither a `.beads/redirect` nor a project-root `.beads/` exists, run `bd init --prefix <derived>` followed by `git config beads.role contributor` and `bd config set export.git-add false`, with identical argv to today. Add a 3-5 line comment above the catch block explaining why the heuristic is gone (refs beads v1.0.3 dolt auto-recovery + v1.0.4 perms repair). The work.inspect gate runs here because every subsequent bead (tests, integration test) builds on this exact control flow — a wrong rewrite cascades."
+        },
+        "subItems": [
+          {
+            "id": "simplify-recovery.ac1",
+            "title": "On `bd ping` failure, the code invokes `bd doctor --fix` exactly once before retrying the probe",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "auto-start.ac7",
-            "title": "PAN-1105: \\\"Convoy review specialists exit twice without writing reports\\\" — current open bug; probably benefits from beads-side concurrency/recovery improvements",
+            "id": "simplify-recovery.ac2",
+            "title": "The stale-artifact heuristic (staleArtifacts array, presentStale check, dolt-residue diagnostic) is deleted from src/lib/vbrief/beads.ts",
             "status": "pending",
-            "created": "2026-05-12T17:57:53.652Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           },
           {
-            "id": "auto-start.ac8",
-            "title": "Recent root-cause fix: \\7d0e50cf3\\ (\\\"fix(beads): never bd init in a redirect-managed worktree\\\")",
+            "id": "simplify-recovery.ac3",
+            "title": "The redirect-vs-main-beads branch logic in the catch block is collapsed into a single retry/error-return path",
             "status": "pending",
-            "created": "2026-05-12T17:57:53.652Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simplify-recovery.ac4",
+            "title": "The fresh-install bd-init fallback (no redirect, no main .beads/) is preserved with identical argv and follow-on `git config` / `bd config set` calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simplify-recovery.ac5",
+            "title": "A code comment near createBeadsFromVBrief explains why the heuristic was removed (refs beads v1.0.3 dolt auto-recovery)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simplify-recovery.ac6",
+            "title": "`npm run typecheck` and `npm run lint` pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-tests",
+        "title": "Update create-beads.test.ts to match the simplified recovery surface",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-15T05:42:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Edit src/lib/vbrief/__tests__/create-beads.test.ts. Remove tests that exercise the deleted stale-artifact heuristic (any case asserting on `metadata.json` / `embeddeddolt` / `presentStale` diagnostics). Add a positive test: probe fails on first call, `bd doctor --fix` is invoked, probe succeeds on retry, function proceeds and returns `success: true`. Add a negative test: probe fails, `bd doctor --fix` runs, probe still fails on retry → function returns `success: false` with a non-empty `errors` array. Verify the test file no longer references the old `['list', '--json', '--limit', '0']` argv anywhere."
+        },
+        "subItems": [
+          {
+            "id": "update-tests.ac1",
+            "title": "All mocks reference `bd ping` (with `--json`), not the old `bd list --json --limit 0` probe",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-tests.ac2",
+            "title": "Tests for the stale-artifact heuristic are removed (no remaining references to `metadata.json` / `embeddeddolt` / `presentStale`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-tests.ac3",
+            "title": "There is a test asserting `bd doctor --fix` is called once between a failed probe and a successful retry, and the function returns `success: true`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-tests.ac4",
+            "title": "There is a test asserting `success: false` with non-empty `errors` when both probe attempts fail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-tests.ac5",
+            "title": "`vitest run src/lib/vbrief/__tests__/create-beads.test.ts` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "corruption-recovery-test",
+        "title": "Add corruption-recovery integration test (issue AC #5)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-15T05:42:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a test case to src/lib/vbrief/__tests__/create-beads.test.ts that models the PAN-457 recurrence scenario. Setup: a temp workspace containing a `.beads/redirect` file and a valid spec.vbrief.json; mock `bd ping --json` to throw with stderr `table not found: issues` on first call; mock `bd doctor --fix` to resolve; mock `bd ping --json` to resolve on second call; mock subsequent `bd create` calls. Assert: createBeadsFromVBrief returns `success: true`, the per-item `bd create` mock was invoked once per plan item, and the returned `errors` array contains nothing mentioning 'stale local-DB artifacts'. The test locks in the wrapper's reliance on beads-native auto-recovery rather than ever reintroducing the heuristic."
+        },
+        "subItems": [
+          {
+            "id": "corruption-recovery-test.ac1",
+            "title": "Test simulates a `table not found: issues` probe failure followed by `bd doctor --fix` and a successful retry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "corruption-recovery-test.ac2",
+            "title": "Test asserts createBeadsFromVBrief returns `success: true` and per-item create mocks were invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "corruption-recovery-test.ac3",
+            "title": "Returned errors array contains no message referencing 'stale local-DB artifacts'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "corruption-recovery-test.ac4",
+            "title": "Test passes under `vitest run`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-beads-docs",
+        "title": "Update skills/beads/SKILL.md: document `bd ping`, `bd doctor --fix`, `bd prune`, `bd dolt push --remote`",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-15T05:42:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Edit skills/beads/SKILL.md to (a) bump any version metadata header that references 1.0.2 to 1.0.4, (b) add a 'Health and recovery' section documenting `bd ping --json` as the canonical connectivity probe and `bd doctor --fix` as the canonical repair, (c) document `bd prune` for closed-bead hygiene, (d) document the `bd dolt push --remote <name>` flag. Keep the rest of the skill unchanged. Run `npm run lint` afterwards — the skills linter cross-checks documented flags against `bd --help` output."
+        },
+        "subItems": [
+          {
+            "id": "skills-beads-docs.ac1",
+            "title": "skills/beads/SKILL.md mentions `bd ping --json` and `bd doctor --fix` with usage examples",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-beads-docs.ac2",
+            "title": "skills/beads/SKILL.md mentions `bd prune` and `bd dolt push --remote`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-beads-docs.ac3",
+            "title": "No surviving references to v1.0.2 in the skill front matter or body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-beads-docs.ac4",
+            "title": "`npm run lint` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-pan-guide",
+        "title": "Update skills/beads-panopticon-guide/SKILL.md with the worktree redirect story for v1.0.4",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-15T05:42:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Update skills/beads-panopticon-guide/SKILL.md to: (a) note that v1.0.4 adds a post-pull/checkout auto-import hook that hydrates the worktree DB from committed issues.jsonl; (b) explain that Panopticon still uses the manual `.beads/redirect` mechanism (rationale: deferred to a follow-up issue per PAN-1111 autoDecisions); (c) restate the rule — never `bd init` inside a redirect-managed worktree (referenced from commit 7d0e50cf3)."
+        },
+        "subItems": [
+          {
+            "id": "skills-pan-guide.ac1",
+            "title": "Doc explains both the redirect-based hydration path Panopticon uses and the auto-import path beads v1.0.4 supports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-pan-guide.ac2",
+            "title": "Doc reiterates the `never bd init in a redirect-managed worktree` rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-pan-guide.ac3",
+            "title": "`npm run lint` passes",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -125,7 +436,33 @@
         ]
       }
     ],
-    "edges": []
+    "edges": [
+      {
+        "from": "bump-install-pin",
+        "to": "ping-probe",
+        "type": "informs"
+      },
+      {
+        "from": "ping-probe",
+        "to": "simplify-recovery",
+        "type": "blocks"
+      },
+      {
+        "from": "simplify-recovery",
+        "to": "update-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "update-tests",
+        "to": "corruption-recovery-test",
+        "type": "blocks"
+      },
+      {
+        "from": "simplify-recovery",
+        "to": "skills-beads-docs",
+        "type": "informs"
+      }
+    ]
   },
   "status": "proposed"
 }
