@@ -1,8 +1,10 @@
 import http from 'node:http';
 import { Buffer } from 'node:buffer';
 import { WebSocket, WebSocketServer } from 'ws';
+import { autoPresoSession } from '../../autopreso/session.js';
 import { createTranscriptionManager, type TranscriptionManager } from '../../voice/transcription-manager.js';
-import { loadVoiceSettings } from './routes/voice.js';
+import { createTurnQueue, type TurnQueue } from '../../voice/turn-queue.js';
+import { loadVoiceSettings, subscribeVoiceSettings } from './routes/voice.js';
 import { isTrustedOriginForHost } from './routes/origin-validation.js';
 
 function sendJson(ws: WebSocket, payload: unknown): void {
@@ -17,6 +19,8 @@ function rawDataToBuffer(data: WebSocket.RawData): Buffer {
   if (Array.isArray(data)) return Buffer.concat(data);
   return Buffer.from(data);
 }
+
+const MAX_AUDIO_FRAME_BYTES = 64_000;
 
 function isTrustedWebSocketOrigin(request: http.IncomingMessage): boolean {
   const origin = request.headers.origin;
@@ -55,17 +59,34 @@ export function setupVoiceWebSocket(server: http.Server): void {
 
   wss.on('connection', (ws: WebSocket) => {
     let manager: TranscriptionManager | null = null;
-    void loadVoiceSettings()
-      .then((settings) => {
-        if (ws.readyState !== WebSocket.OPEN) return;
-        manager = createTranscriptionManager(settings);
-        manager.applyCurrent();
-        const transcription = manager.getActive();
-        if (!transcription) throw new Error('Voice transcription unavailable');
-        transcription.onPartial((text) => sendJson(ws, { type: 'transcript:partial', text }));
-        transcription.onCommitted((text) => sendJson(ws, { type: 'transcript:committed', text }));
-        transcription.onError((error) => sendJson(ws, { type: 'error', error: error.message }));
-      })
+    let turnQueue: TurnQueue | null = null;
+
+    const configureTranscription = async (nextSettings?: Awaited<ReturnType<typeof loadVoiceSettings>>) => {
+      const settings = nextSettings ?? await loadVoiceSettings();
+      if (ws.readyState !== WebSocket.OPEN) return;
+      turnQueue?.close();
+      manager?.close();
+      manager = createTranscriptionManager(settings);
+      manager.applyCurrent();
+      const transcription = manager.getActive();
+      if (!transcription) throw new Error('Voice transcription unavailable');
+      transcription.onPartial((text) => sendJson(ws, { type: 'transcript:partial', text }));
+      turnQueue = createTurnQueue(transcription, (text) => {
+        sendJson(ws, { type: 'transcript:committed', text });
+        void autoPresoSession.processTranscript(text).catch((error) => {
+          sendJson(ws, { type: 'error', error: error instanceof Error ? error.message : String(error) });
+        });
+      });
+      transcription.onError((error) => sendJson(ws, { type: 'error', error: error.message }));
+    };
+
+    const unsubscribeSettings = subscribeVoiceSettings((settings) => {
+      void configureTranscription(settings).catch((error) => {
+        sendJson(ws, { type: 'error', error: error instanceof Error ? error.message : String(error) });
+      });
+    });
+
+    void configureTranscription()
       .catch((error) => {
         sendJson(ws, { type: 'error', error: error instanceof Error ? error.message : String(error) });
         ws.close(1011, 'Voice transcription unavailable');
@@ -78,7 +99,15 @@ export function setupVoiceWebSocket(server: http.Server): void {
         return;
       }
       if (isBinary) {
-        transcription.sendAudio(rawDataToBuffer(data));
+        const audio = rawDataToBuffer(data);
+        if (audio.byteLength > MAX_AUDIO_FRAME_BYTES) {
+          sendJson(ws, { type: 'error', error: 'Voice audio frame is too large' });
+          ws.close(1009, 'Voice audio frame is too large');
+          return;
+        }
+        if (!transcription.sendAudio(audio)) {
+          sendJson(ws, { type: 'error', error: 'Voice transcription is backpressured' });
+        }
         return;
       }
 
@@ -95,7 +124,15 @@ export function setupVoiceWebSocket(server: http.Server): void {
       }
     });
 
-    ws.on('close', () => manager?.close());
-    ws.on('error', () => manager?.close());
+    const closeTranscription = () => {
+      unsubscribeSettings();
+      turnQueue?.close();
+      turnQueue = null;
+      manager?.close();
+      manager = null;
+    };
+
+    ws.on('close', closeTranscription);
+    ws.on('error', closeTranscription);
   });
 }

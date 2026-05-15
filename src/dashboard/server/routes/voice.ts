@@ -100,6 +100,17 @@ async function saveVoiceSettings(settings: VoiceSettings): Promise<VoiceSettings
   return normalized;
 }
 
+const voiceSettingsListeners = new Set<(settings: VoiceSettings) => void>();
+
+export function subscribeVoiceSettings(listener: (settings: VoiceSettings) => void): () => void {
+  voiceSettingsListeners.add(listener);
+  return () => voiceSettingsListeners.delete(listener);
+}
+
+function notifyVoiceSettings(settings: VoiceSettings): void {
+  for (const listener of voiceSettingsListeners) listener(settings);
+}
+
 function redactVoiceSettings(settings: VoiceSettings): VoiceSettings & { stt: VoiceSettings['stt'] & { googleCloud: VoiceSettings['stt']['googleCloud'] & { hasApiKey: boolean } } } {
   return {
     stt: {
@@ -140,7 +151,11 @@ const putVoiceSettingsRoute = HttpRouter.add(
     if (!isVoiceSettings(body)) {
       return jsonResponse({ error: 'Invalid voice settings payload' }, { status: 400 });
     }
-    return yield* Effect.promise(async () => jsonResponse(redactVoiceSettings(await saveVoiceSettings(body))));
+    return yield* Effect.promise(async () => {
+      const settings = await saveVoiceSettings(body);
+      notifyVoiceSettings(settings);
+      return jsonResponse(redactVoiceSettings(settings));
+    });
   })),
 );
 

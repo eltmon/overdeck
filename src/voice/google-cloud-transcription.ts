@@ -2,6 +2,7 @@ import { PassThrough } from 'node:stream';
 import type { ITurnEmitter } from './transcription.js';
 
 const SAMPLE_RATE = 24000;
+const MAX_BACKEND_AUDIO_BUFFER_BYTES = 1_000_000;
 
 type GoogleStreamingRecognizeResponse = {
   results?: Array<{
@@ -37,9 +38,10 @@ class GoogleCloudTranscription implements ITurnEmitter {
     this.errorCallbacks.add(cb);
   }
 
-  sendAudio(pcm: Buffer): void {
-    if (this.closed) return;
-    this.audio.write(pcm);
+  sendAudio(pcm: Buffer): boolean {
+    if (this.closed) return false;
+    if (this.audio.writableLength + pcm.byteLength > MAX_BACKEND_AUDIO_BUFFER_BYTES) return false;
+    return this.audio.write(pcm);
   }
 
   stop(): void {

@@ -1,4 +1,4 @@
-import { runWhiteboardWarmupOnce } from './agent.js';
+import { runWhiteboardAgent, runWhiteboardWarmupOnce } from './agent.js';
 import { normalizeElements, type ExcalidrawElement } from './whiteboard-elements.js';
 import { extractKeywordsFromElements } from './whiteboard-keywords.js';
 
@@ -27,6 +27,7 @@ export interface AutoPresoSession {
   start(elements: readonly ExcalidrawElementLike[]): AutoPresoSnapshot;
   backToStaging(): AutoPresoSnapshot;
   reset(): AutoPresoSnapshot;
+  processTranscript(transcript: string): Promise<AutoPresoSnapshot>;
   subscribe(listener: AutoPresoListener): () => void;
 }
 
@@ -92,6 +93,11 @@ export function createWhiteboardSession(): AutoPresoSession {
       session.elements = [];
       session.agentHistory = [];
       session.canvasDirtyForAgent = false;
+      return notify();
+    },
+    async processTranscript(transcript) {
+      if (session.mode !== 'live') return session.snapshot();
+      await runWhiteboardAgent(transcript, session);
       return notify();
     },
     subscribe(listener) {

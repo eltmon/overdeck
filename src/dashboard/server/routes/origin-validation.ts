@@ -38,19 +38,9 @@ function getHeader(
   return value;
 }
 
-export function isTrustedOriginForHost(origin: string, host: string | undefined): boolean {
+export function isTrustedOriginForHost(origin: string, _host: string | undefined): boolean {
   const normalized = normalizeOrigin(origin);
-  if (!normalized) return false;
-  if (getTrustedOrigins().includes(normalized)) return true;
-  if (!host) return false;
-  try {
-    const originHost = new URL(normalized).host;
-    const requestHost = host.split(',')[0]?.trim();
-    if (!requestHost) return false;
-    return originHost === requestHost || `api-${originHost}` === requestHost;
-  } catch {
-    return false;
-  }
+  return normalized !== null && getTrustedOrigins().includes(normalized);
 }
 
 export function validateOrigin(

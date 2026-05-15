@@ -2,7 +2,10 @@ import { useCallback, useRef, useState } from 'react';
 
 type VoiceMessage =
   | { type: 'transcript:partial'; text: string }
-  | { type: 'transcript:committed'; text: string };
+  | { type: 'transcript:committed'; text: string }
+  | { type: 'error'; error: string };
+
+const MAX_SOCKET_BUFFERED_AUDIO_BYTES = 250_000;
 
 function websocketUrl(path: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -61,6 +64,7 @@ export function useVoiceTranscription({ onCommitted }: { onCommitted?: (text: st
           setCommittedText((existing) => [existing, message.text].filter(Boolean).join(' '));
           onCommitted?.(message.text);
         }
+        if (message.type === 'error') setError(message.error);
       };
       socket.onerror = () => setError('Voice connection failed');
       socket.onclose = () => {
@@ -69,6 +73,7 @@ export function useVoiceTranscription({ onCommitted }: { onCommitted?: (text: st
 
       processor.onaudioprocess = (event) => {
         if (socket.readyState !== WebSocket.OPEN) return;
+        if (socket.bufferedAmount > MAX_SOCKET_BUFFERED_AUDIO_BYTES) return;
         const input = event.inputBuffer.getChannelData(0);
         const pcm = new Int16Array(input.length);
         for (let i = 0; i < input.length; i += 1) {

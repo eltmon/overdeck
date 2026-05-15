@@ -7,7 +7,7 @@ export interface ITurnEmitter {
   onPartial(cb: (text: string) => void): void;
   onCommitted(cb: (text: string) => void): void;
   onError(cb: (error: Error) => void): void;
-  sendAudio(pcm: Buffer): void;
+  sendAudio(pcm: Buffer): boolean;
   stop(): void;
   close(): void;
 }
@@ -19,6 +19,7 @@ type SidecarMessage =
   | { type: 'error'; error: string };
 
 const SAMPLE_RATE = 24000;
+const MAX_BACKEND_AUDIO_BUFFER_BYTES = 1_000_000;
 
 function resolveSidecarBinary(): string {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -76,8 +77,8 @@ class MoonshineTranscription implements ITurnEmitter {
     this.errorCallbacks.add(cb);
   }
 
-  sendAudio(pcm: Buffer): void {
-    this.writeJson({
+  sendAudio(pcm: Buffer): boolean {
+    return this.writeJson({
       type: 'audio',
       encoding: 'pcm16le',
       sampleRate: SAMPLE_RATE,
@@ -129,9 +130,13 @@ class MoonshineTranscription implements ITurnEmitter {
     }
   }
 
-  private writeJson(message: Record<string, unknown>): void {
-    if (this.closed || this.child.stdin.destroyed) return;
-    this.child.stdin.write(`${JSON.stringify(message)}\n`);
+  private writeJson(message: Record<string, unknown>): boolean {
+    if (this.closed || this.child.stdin.destroyed) return false;
+    const payload = `${JSON.stringify(message)}\n`;
+    if (this.child.stdin.writableLength + Buffer.byteLength(payload) > MAX_BACKEND_AUDIO_BUFFER_BYTES) {
+      return false;
+    }
+    return this.child.stdin.write(payload);
   }
 
   private emitError(error: Error): void {
