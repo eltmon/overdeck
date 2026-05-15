@@ -75,6 +75,14 @@ bd list --no-assignee             # Unassigned
 bd list --title-contains "PAN-116" --status open --priority 1
 ```
 
+## Worktree Hydration in Panopticon
+
+beads v1.0.4 can hydrate a worktree database from committed `issues.jsonl` through its post-pull/checkout auto-import hook.
+
+Panopticon workspaces still use a manual `.beads/redirect` file that points at the main repository's shared `.beads` database. That follow-up was deliberately deferred in PAN-1111, so agents must preserve the redirect-managed flow for now.
+
+Never run `bd init` inside a redirect-managed worktree. If `.beads/redirect` exists, use `bd ping --json` to probe it and `bd doctor --fix` to repair it; initializing a second local database splits bead state away from the shared workspace.
+
 ## Working With Beads
 
 ```bash
@@ -157,6 +165,7 @@ For complete beads documentation, see the main `beads` skill:
 4. **Sync at session end** - `bd sync` commits to git
 5. **NEVER use `bd claim`** - Use `bd update <id> --claim` instead
 6. **Check blockers before closing** - Run `bd dep tree <id>` first; close blockers before using `--force`
+7. **NEVER run `bd init` in redirect-managed worktrees** - Use the existing `.beads/redirect` plus `bd ping --json` / `bd doctor --fix`
 
 ## Example: Complete Workflow for PAN-116
 
