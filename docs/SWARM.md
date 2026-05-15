@@ -21,6 +21,10 @@ An item is **dispatchable** when every parent in its `blocks` edges is either me
 
 When a slot branch merges into the feature branch, the merge-agent fires a loopback `POST /api/swarm/slot-merged` and dispatchable items re-evaluate.
 
+![Per-item DAG dispatch with synthesis](./swarm-diagrams/dag-dispatch.png)
+
+*Item A has merged; B and D are running in parallel slots; C is ready but its `files_scope` overlaps B's, so it is deferred. E has two blocking parents (B and D), so a synthesis agent runs at the convergence point and writes a `SynthesisOutput` that the E work-agent reads from its active-slice prompt.*
+
 ---
 
 ## CLI
@@ -72,6 +76,10 @@ Operation → status mapping (`statusForOperation` in `dag.ts`):
 ## HTTP Routes
 
 All three routes live in `src/dashboard/server/routes/swarm.ts`.
+
+![Swarm HTTP surface and trust boundary](./swarm-diagrams/http-surface.png)
+
+*The two mutating routes require `INTERNAL_TOKEN_HEADER`; `POST /api/swarm` additionally accepts same-origin dashboard requests. `POST /api/swarm/slot-merged` is token-only — the merge-agent is the only legitimate caller. All writes flow into the canonical spec on main and the per-issue continue file.*
 
 ### `POST /api/swarm`
 
@@ -245,6 +253,10 @@ These use sync FS calls and **must not** be imported by dashboard server code (P
 ---
 
 ## Slot Lifecycle
+
+![Slot lifecycle and auto-advance loopback](./swarm-diagrams/slot-lifecycle.png)
+
+*Each slot-branch merge fires `/api/swarm/slot-merged`, which marks the slot `merged` and re-runs `getDispatchableItems`. The per-issue `postMergeLifecycle` only fires when `feature/<issue>` itself merges to main — slot merges return early.*
 
 ```
 plan dispatch

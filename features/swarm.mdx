@@ -1,0 +1,113 @@
+---
+title: Swarm
+description: Per-item DAG dispatch — many work agents on one issue, in parallel
+---
+
+# Swarm: Per-Item DAG Dispatch
+
+A swarm runs one work agent per plan item, in parallel, on the same issue. Each agent gets its own git worktree and slot branch. The dispatcher uses the plan's `blocks` edges as a DAG: an item becomes dispatchable the moment every blocking parent has merged or completed, not when its wave does.
+
+## When to Use a Swarm
+
+A swarm fits when an issue's vBRIEF plan splits into several items that can be implemented independently. If the plan is one linear sequence, a single work agent is faster — there is nothing to parallelize.
+
+Use a swarm when:
+
+- The plan has 3+ items with parallel branches in the DAG.
+- Items touch disjoint files (or you have planned `files_scope` so the dispatcher can serialize the overlapping ones).
+- You want a synthesis step at convergence points to brief the downstream work agent.
+
+## Mental Model
+
+![Per-item DAG dispatch with synthesis](/images/swarm/dag-dispatch.png)
+
+Items A, B, C, D, E are vBRIEF items wired by `blocks` edges. A has merged into the feature branch. B and D are running in slots 1 and 2. C is ready, but its `files_scope` overlaps B's, so the dispatcher defers it. E has two blocking parents (B and D) — a **synthesis agent** runs at the convergence point, writes a `SynthesisOutput`, and the E work-agent reads that context block from its prompt.
+
+| Surface | Single-agent (default) | Swarm slot |
+|---|---|---|
+| Branch | `feature/<issue>` | `feature/<issue>/slot-<N>` |
+| Worktree | `workspaces/feature-<issue>/` | per-slot worktree |
+| tmux session | `agent-<issue>` | per-slot session |
+| Plan visibility | Full plan | Active-slice (bounded) prompt |
+
+## Slot Lifecycle
+
+![Slot lifecycle and auto-advance loopback](/images/swarm/slot-lifecycle.png)
+
+Every slot-branch merge fires `/api/swarm/slot-merged`. The route marks the slot `merged`, re-runs `getDispatchableItems`, and dispatches any newly-ready items (subject to capacity and file-overlap rules). The per-issue `postMergeLifecycle` only fires when `feature/<issue>` itself merges into `main` — slot merges return early.
+
+A slot whose status is `'failed'` does **not** unblock its dependents.
+
+## CLI
+
+```bash
+pan swarm <id>                       # Spawn dispatchable items now
+pan swarm <id> --dry-run             # Print dispatch plan; no spawns
+pan swarm <id> --max-slots <n>       # Cap concurrency
+pan swarm <id> --model <model>       # Override slot-agent model
+pan swarm <id> --auto-advance        # Auto-dispatch as slots merge
+pan swarm <id> --no-auto-advance     # Manual mode; explicit per wave
+```
+
+### Inspect and Mutate Items
+
+The plan document is the single mutation authority for item status. Every mutation bumps `plan.sequence` (compare-and-set).
+
+```bash
+pan swarm <id> --task next                              # List dispatchable items
+pan swarm <id> --task show   --item <itemId>            # Show one item
+pan swarm <id> --task claim  --item <itemId>            # Mark running
+pan swarm <id> --task done   --item <itemId>            # Mark completed
+pan swarm <id> --task block  --item <itemId> --reason "<text>"
+pan swarm <id> --task unblock --item <itemId>
+pan swarm <id> --task cancel --item <itemId>
+```
+
+Pass `--sequence <n>` to enforce CAS. A mismatch raises `vBRIEF sequence conflict` and the write is rejected.
+
+## HTTP Surface
+
+![Swarm HTTP surface and trust boundary](/images/swarm/http-surface.png)
+
+The two mutating routes require `INTERNAL_TOKEN_HEADER`. `POST /api/swarm` additionally accepts same-origin dashboard requests. `POST /api/swarm/slot-merged` is token-only — the merge-agent is the only legitimate caller.
+
+| Route | Auth | Purpose |
+|---|---|---|
+| `POST /api/swarm` | token **or** same-origin | Dispatch one or more slots |
+| `POST /api/swarm/slot-merged` | token only | Loopback when a slot branch merges |
+| `GET /api/swarm/:issueId` | none (read-only) | Dashboard swarm view |
+
+## Plan Authoring: `files_scope` and Synthesis
+
+Two fields on `VBriefItem.metadata` control swarm behavior.
+
+| Field | Purpose |
+|---|---|
+| `files_scope: string[]` | Globs (`**`, `*`, `?`) of files this item touches. Used by `hasFileOverlap()` to serialize file-conflicting items. Items without a scope are treated as non-overlapping. |
+| `requiresSynthesis: boolean` | Auto-derived during planning by `deriveSynthesisMetadata()`. Set on any item with >1 blocking parent. Do not hand-edit. |
+
+Plans that omit `files_scope` will still run — but every parallel pair is treated as non-overlapping, so two slots could race the same file. Author `files_scope` whenever items can plausibly touch the same code.
+
+## Runtime State
+
+Swarm runtime state lives in `<projectRoot>/.pan/continues/<issue>.vbrief.json` under `ContinueState.swarmRuntime`. The old PAN-970 sidecar (`~/.panopticon/swarms/<id>.json`) is gone.
+
+```ts
+interface SwarmRuntime {
+  model: string;
+  currentWave?: number;
+  totalWaves?: number;
+  autoAdvance?: boolean;
+  deferred?: { itemId: string; itemTitle: string }[];
+  slots: SwarmSlotRuntime[];
+  synthesisOutputs: Record<string, SynthesisOutput>;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## Related
+
+- [Convoys](/features/convoys) — multi-agent code review (different orchestration pattern).
+- [Cloister](/features/cloister) — model routing, stuck detection, specialist handoffs.
+- Engineering reference: [`docs/SWARM.md`](https://github.com/eltmon/panopticon-cli/blob/main/docs/SWARM.md) — full library API, route bodies, sequence-number rules.

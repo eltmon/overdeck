@@ -64,7 +64,8 @@
               "features/cloister",
               "features/skills",
               "features/workspaces",
-              "features/convoys"
+              "features/convoys",
+              "features/swarm"
             ]
           }
         ]
