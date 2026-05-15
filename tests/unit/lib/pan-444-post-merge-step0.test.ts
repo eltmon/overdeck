@@ -188,6 +188,11 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     expect(mockSpawn).toHaveBeenCalledOnce();
   });
 
+  // The in-process fallback path exercises several real dynamic imports and
+  // unmocked side-effects (review-status writes, git-activity append, etc.)
+  // that can cumulatively run past the default 10s vitest timeout on a busy
+  // CI host. The 30s timeout below is well over the observed ~13s real-clock
+  // duration and matches what the verification gate retry budget allows.
   it('falls through to in-process lifecycle when writeFile throws', async () => {
     mockWriteFile.mockRejectedValue(new Error('disk full'));
 
@@ -196,14 +201,14 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
 
     // Spawn should not be called since writeFile threw
     expect(mockSpawn).not.toHaveBeenCalled();
-  });
+  }, 30_000);
 
   it('falls through to in-process lifecycle when spawn throws', async () => {
     mockSpawn.mockImplementation(() => { throw new Error('spawn ENOENT'); });
 
     // Should not throw — catches and falls through
     await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH)).resolves.not.toThrow();
-  });
+  }, 30_000);
 
   it('step 0 does not run when idempotency guard is set', async () => {
     // Guard is set externally (simulating a second invocation after in-process lifecycle ran).
@@ -218,7 +223,7 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
     expect(mockWriteFile).not.toHaveBeenCalled();
     expect(mockSpawn).not.toHaveBeenCalled();
-  });
+  }, 30_000);
 });
 
 describe('postMergeLifecycle — repoRoot derivation', () => {

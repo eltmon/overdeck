@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync, rmSync } from 'fs';
 import { mkdir, readFile, readdir, writeFile, writeFile as writeFileAsync, mkdir as mkdirAsync, rename as renameAsync } from 'fs/promises';
-import { Agent as HttpAgent, request as httpRequest } from 'node:http';
+import { request as httpRequest } from 'node:http';
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
@@ -12,7 +12,7 @@ import { createSession, createSessionAsync, killSession, killSessionAsync, sendK
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
-import type { ModelId } from './settings.js';
+import type { ModelId, ComplexityLevel } from './settings.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
 import { loadConfig as loadYamlConfig, isClaudeCodeChannelsEnabled, resolveModel } from './config-yaml.js';
@@ -539,6 +539,9 @@ export interface AgentState {
   costSoFar?: number;
   sessionId?: string; // For resuming sessions after handoff
 
+  // Work type system (PAN-118)
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
+  workType?: string; // Current work type ID
   preSpawnStashRef?: string;
   preSpawnStashMessage?: string;
   preSpawnBaselineHead?: string;
@@ -722,29 +725,6 @@ function panopticonHomeForChannels(): string {
   return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
 }
 
-const bridgeHttpAgents = new Map<string, HttpAgent>();
-
-function getBridgeHttpAgent(socketPath: string): HttpAgent {
-  const existing = bridgeHttpAgents.get(socketPath);
-  if (existing) {
-    return existing;
-  }
-  const agent = new HttpAgent({
-    keepAlive: true,
-    maxSockets: 1,
-    maxFreeSockets: 1,
-  });
-  bridgeHttpAgents.set(socketPath, agent);
-  return agent;
-}
-
-function destroyBridgeHttpAgent(socketPath: string): void {
-  const agent = bridgeHttpAgents.get(socketPath);
-  if (!agent) return;
-  bridgeHttpAgents.delete(socketPath);
-  agent.destroy();
-}
-
 /**
  * Append a delivery-event log line to the per-agent bridge log. Best-effort.
  */
@@ -786,13 +766,11 @@ async function postUnixSocketJson(
   bridgeToken: string,
 ): Promise<{ status: number; body: string }> {
   const payload = JSON.stringify(body);
-  const agent = getBridgeHttpAgent(socketPath);
 
   return new Promise((resolveCall, reject) => {
-    // Settle exactly once. Without this guard a late idle-timeout (or a
-    // post-response socket error) could fire `reject` after the response
-    // already resolved the promise — and still run destroyBridgeHttpAgent,
-    // tearing down the shared keep-alive agent under a healthy connection.
+    // Settle exactly once. Without this guard a late idle-timeout or
+    // post-response socket error could reject after the response already
+    // resolved the promise.
     let settled = false;
     const finishOk = (value: { status: number; body: string }) => {
       if (settled) return;
@@ -801,12 +779,11 @@ async function postUnixSocketJson(
       req.removeAllListeners('timeout');
       resolveCall(value);
     };
-    const finishErr = (err: Error, destroyAgent: boolean) => {
+    const finishErr = (err: Error) => {
       if (settled) return;
       settled = true;
       req.setTimeout(0);
       req.removeAllListeners('timeout');
-      if (destroyAgent) destroyBridgeHttpAgent(socketPath);
       reject(err);
     };
 
@@ -815,7 +792,7 @@ async function postUnixSocketJson(
         socketPath,
         path: '/',
         method: 'POST',
-        agent,
+        agent: false,
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(payload),
@@ -834,7 +811,7 @@ async function postUnixSocketJson(
             finishOk({ status, body: responseBody });
             return;
           }
-          finishErr(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`), false);
+          finishErr(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
         });
       },
     );
@@ -843,7 +820,7 @@ async function postUnixSocketJson(
       req.destroy(new Error('socket POST timeout'));
     });
     req.on('error', (err: Error) => {
-      finishErr(err, true);
+      finishErr(err);
     });
     req.write(payload);
     req.end();
@@ -1465,6 +1442,12 @@ export interface SpawnOptions {
   model?: string;
   prompt?: string;
   role?: 'work';
+  difficulty?: ComplexityLevel;
+  agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
+
+  // Work type system (PAN-118)
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
+  workType?: string; // Explicit work type ID (overrides phase-based detection)
 
   // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
   // and the one-agent-per-issue uniqueness check is scoped to the slot.
@@ -1954,6 +1937,14 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
+  // PAN-1059 / PAN-977: specialist roles (review sub-roles, test, ship) must not
+  // pass the prompt as a positional argument to Claude Code. Inside a detached
+  // tmux session, `--session-id` combined with a large positional prompt causes
+  // Claude Code to exit immediately (session-env directory created, then silent
+  // death). Work agents avoid this by delivering the prompt via tmux send-keys
+  // after Claude boots. Specialist roles now use the same delivery path.
+  const shouldDeliverPromptViaTmux = isSpecialistRole;
+
   const launcherContent = generateLauncherScript({
     role,
     workingDir: workspace,
@@ -1961,8 +1952,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setCi: true,
     setTerminalEnv: true,
     providerExports,
-    promptFile,
-    promptFileMode: role === 'review' && options.subRole && resolvedHarness === 'claude-code' ? 'stdin' : undefined,
+    promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
     sessionId,
@@ -1997,6 +1987,31 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       ...providerEnv,
     },
   });
+
+  // Deliver prompt via tmux for specialist roles after Claude boots.
+  if (shouldDeliverPromptViaTmux && options.prompt) {
+    let ready = false;
+    for (let i = 0; i < 30; i++) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      if (!(await sessionExistsAsync(agentId))) {
+        console.error(`[${agentId}] Tmux session died before becoming ready`);
+        break;
+      }
+      try {
+        const pane = await capturePaneAsync(agentId, 200);
+        if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
+          ready = true;
+          break;
+        }
+      } catch { /* non-fatal */ }
+    }
+    if (ready) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+      await deliverAgentMessage(agentId, options.prompt, 'spawnRun:initial-prompt');
+    } else {
+      console.error(`[${agentId}] Claude did not become ready within 30s`);
+    }
+  }
 
   state.status = 'running';
   state.lastActivity = new Date().toISOString();

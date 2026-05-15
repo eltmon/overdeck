@@ -18,8 +18,8 @@
 import { readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { basename, join, resolve } from 'path';
-import { findSpecByIssue } from '../pan-dir/specs.js';
-import { readWorkspaceContinue, writeWorkspaceContinue } from '../pan-dir/continue.js';
+import { findSpecByIssue, findSpecByIssueAsync } from '../pan-dir/specs.js';
+import { readWorkspaceContinue, readWorkspaceContinueAsync, writeWorkspaceContinue } from '../pan-dir/continue.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
 
 /**
@@ -46,6 +46,15 @@ export function findPlan(workspacePath: string): string | null {
   if (!issueId) return null;
   const projectRoot = projectRootFromWorkspace(workspacePath);
   const entry = findSpecByIssue(projectRoot, issueId);
+  return entry ? entry.path : null;
+}
+
+/** Async variant of findPlan — safe to call from dashboard server code. */
+export async function findPlanAsync(workspacePath: string): Promise<string | null> {
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return null;
+  const projectRoot = projectRootFromWorkspace(workspacePath);
+  const entry = await findSpecByIssueAsync(projectRoot, issueId);
   return entry ? entry.path : null;
 }
 
@@ -106,7 +115,7 @@ export async function readPlanAsync(planPath: string): Promise<VBriefDocument> {
  * Apply statusOverrides from workspace continue.json onto a deep-cloned spec.
  * Keys are either `"item-id"` (item status) or `"item-id.sub-id"` (subItem status).
  */
-function applyStatusOverrides(doc: VBriefDocument, overrides: Record<string, string>): VBriefDocument {
+export function applyStatusOverrides(doc: VBriefDocument, overrides: Record<string, string>): VBriefDocument {
   const merged = JSON.parse(JSON.stringify(doc)) as VBriefDocument;
   for (const [key, status] of Object.entries(overrides)) {
     const dotIndex = key.indexOf('.');
@@ -145,6 +154,19 @@ export function readWorkspacePlan(workspacePath: string): VBriefDocument | null 
   const doc = readPlan(planPath);
 
   const continueState = readWorkspaceContinue(workspacePath);
+  if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
+    return applyStatusOverrides(doc, continueState.statusOverrides);
+  }
+  return doc;
+}
+
+/** Async variant of readWorkspacePlan — safe for dashboard server code. */
+export async function readWorkspacePlanAsync(workspacePath: string): Promise<VBriefDocument | null> {
+  const planPath = await findPlanAsync(workspacePath);
+  if (!planPath) return null;
+  const doc = await readPlanAsync(planPath);
+
+  const continueState = await readWorkspaceContinueAsync(workspacePath);
   if (continueState?.statusOverrides && Object.keys(continueState.statusOverrides).length > 0) {
     return applyStatusOverrides(doc, continueState.statusOverrides);
   }

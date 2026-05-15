@@ -245,6 +245,9 @@ describe('ReadModel checkpoint reconciliation', () => {
   it('caps checkpoint reconciliation before diffing old history while preserving absolute turn counts', async () => {
     const checkpoints = Array.from({ length: 205 }, (_, index) => `turn-${index + 1}`)
     const listCheckpoints = vi.fn().mockResolvedValue(checkpoints)
+    // Real signatures (PAN-checkpoint-namespacing): both helpers take agentId as the
+    // second argument so refs can be scoped per-agent. Mocks must mirror that or the
+    // production read-model loop never produces summaries and the test hangs.
     const diffCheckpointFiles = vi.fn().mockImplementation(async (_workspace: string, _agentId: string, prevTurnId: string, turnId: string) => ([
       { path: `${prevTurnId}-to-${turnId}.ts`, additions: 1, deletions: 0 },
     ]))

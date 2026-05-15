@@ -23,11 +23,45 @@ vi.mock('../../services/system-health-service.js', () => ({
 
 vi.mock('../../../../lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(),
+  // PAN-977: pollSwarmAutoAdvance enumerates active swarms via listProjects;
+  // the tests stub it to an empty list and rely on the legacy sidecar fallback.
+  listProjects: vi.fn(() => []),
 }));
+
+// PAN-977: createSlotWorktree shells out to `git fetch`/`git worktree add`. The
+// test temp directories are not git repos, so stub child_process.execFile to
+// resolve successfully — the alternative (running real git) was never the
+// behavior under test.
+vi.mock('node:child_process', async () => {
+  const actual = await vi.importActual<typeof import('node:child_process')>('node:child_process');
+  return {
+    ...actual,
+    execFile: ((...args: any[]) => {
+      const commandArgs = Array.isArray(args[1]) ? args[1] : [];
+      const cb = args[args.length - 1] as (err: null, out: { stdout: string; stderr: string }) => void;
+      let stdout = '';
+      if (args[0] === 'git' && commandArgs[0] === 'branch' && commandArgs[1] === '--show-current') {
+        stdout = 'feature/971\n';
+      } else if (args[0] === 'git' && commandArgs[0] === 'branch' && commandArgs[1] === '--list') {
+        stdout = 'feature/971\n';
+      } else if (args[0] === 'git' && commandArgs[0] === 'branch' && commandArgs[1] === '-r') {
+        stdout = 'origin/feature/971\n';
+      }
+      if (typeof cb === 'function') {
+        cb(null, { stdout, stderr: '' });
+      }
+      return undefined;
+    }) as any,
+  };
+});
 
 vi.mock('../../../../lib/vbrief/io.js', () => ({
   findPlan: vi.fn(),
+  findPlanAsync: vi.fn(),
   readWorkspacePlan: vi.fn(),
+  readPlanAsync: vi.fn(),
+  applyStatusOverrides: vi.fn((doc: any) => doc),
+  VBriefMergeConflictError: class VBriefMergeConflictError extends Error {},
 }));
 
 vi.mock('../../../../lib/agents.js', () => ({
@@ -103,7 +137,8 @@ describe('swarm route helpers', () => {
 
     testHome = mkdtempSync(join(tmpdir(), 'pan-971-swarm-test-'));
     projectPath = join(testHome, 'repo');
-    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-971'), { recursive: true });
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan'), { recursive: true });
+    writeFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), JSON.stringify(PLAN_DOC, null, 2));
     mkdirSync(join(testHome, '.panopticon', 'swarms'), { recursive: true });
 
     process.env.HOME = testHome;
@@ -116,7 +151,9 @@ describe('swarm route helpers', () => {
       tracker: 'github',
     } as any);
     vi.mocked(vbriefIo.readWorkspacePlan).mockReturnValue(PLAN_DOC);
-    vi.mocked(vbriefIo.findPlan).mockReturnValue(null);
+    vi.mocked(vbriefIo.readPlanAsync).mockResolvedValue(PLAN_DOC);
+    vi.mocked(vbriefIo.findPlan).mockReturnValue(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'));
+    vi.mocked(vbriefIo.findPlanAsync).mockResolvedValue(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'));
     vi.mocked(systemHealthService.getSystemHealthSnapshot).mockResolvedValue({
       summary: { workAgentCount: 0 },
     } as any);
@@ -141,6 +178,53 @@ describe('swarm route helpers', () => {
     rmSync(testHome, { recursive: true, force: true });
   });
 
+  // PAN-977 review-round-18 regression: `continueDirForWorkspace` must return
+  // the workspace root, not `${workspacePath}/.pan`. Internally
+  // `writeContinueStateAsync` appends `.pan/continues/` via getContinuesDir, so
+  // a `.pan/`-suffixed argument produced `${workspace}/.pan/.pan/continues/`
+  // that `work-agent-prompt.ts:99` (which reads from the correct path) could
+  // never see — silently dropping synthesisOutputs delivery for every
+  // convergence-item work agent after its initial spawn.
+  it('persists swarm runtime to the canonical .pan/continues/ path (not the double-.pan bug)', async () => {
+    const { existsSync } = await import('node:fs');
+    const cont = await import('../../../../lib/vbrief/continue-state.js');
+    const { __testInternals } = await import('../swarm.js');
+
+    const featureWorkspace = join(projectPath, 'workspaces', 'feature-pan-971');
+    const runtimeState = {
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 1,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-0-item',
+          itemTitle: 'First',
+          sessionName: 'agent-pan-971-1',
+          workspace: join(featureWorkspace, 'slot-1'),
+          status: 'running' as const,
+          phase: 'implementation' as const,
+          startedAt: '2026-05-12T00:00:00Z',
+        },
+      ],
+      createdAt: '2026-05-12T00:00:00Z',
+      updatedAt: '2026-05-12T00:00:00Z',
+    };
+    await __testInternals.persistSwarmRuntime(featureWorkspace, runtimeState as any);
+
+    // Canonical path — what work-agent-prompt.ts:99 reads.
+    expect(existsSync(join(featureWorkspace, '.pan', 'continues', 'pan-971.vbrief.json'))).toBe(true);
+    // The double-.pan path must NEVER be created.
+    expect(existsSync(join(featureWorkspace, '.pan', '.pan', 'continues', 'pan-971.vbrief.json'))).toBe(false);
+
+    // Round-trip via the public reader using the workspace-root argument.
+    const persisted = await cont.readContinueStateAsync(featureWorkspace, 'PAN-971');
+    expect(persisted).not.toBeNull();
+    expect(persisted?.swarmRuntime?.slots?.[0]?.itemId).toBe('wave-0-item');
+  });
+
   it('builds structured AgentTaskInput with dependencies and acceptance criteria', async () => {
     const { __testInternals } = await import('../swarm.js');
 
@@ -154,8 +238,8 @@ describe('swarm route helpers', () => {
       },
       1,
       2,
-      'feature/pan-971/slot-2',
-      'feature/pan-971',
+      'feature/971/slot-2',
+      'feature/971',
     );
 
     expect(taskInput).toEqual({
@@ -167,8 +251,8 @@ describe('swarm route helpers', () => {
       title: 'Dispatch next wave',
       wave_index: 1,
       slot: 2,
-      branch: 'feature/pan-971/slot-2',
-      pr_target: 'feature/pan-971',
+      branch: 'feature/971/slot-2',
+      pr_target: 'feature/971',
       workspace_plan_path: '.pan/spec.vbrief.json',
       dependencies: [
         { item_id: 'wave-0-item', title: 'Prepare slot input' },
@@ -193,8 +277,8 @@ describe('swarm route helpers', () => {
       },
       1,
       2,
-      'feature/pan-971/slot-2',
-      'feature/pan-971',
+      'feature/971/slot-2',
+      'feature/971',
     );
 
     const jsonBlock = prompt.match(/```json\n([\s\S]*?)\n```/);
@@ -208,12 +292,12 @@ describe('swarm route helpers', () => {
     };
 
     expect(parsed.schema).toBe('AgentTaskInput');
-    expect(parsed.branch).toBe('feature/pan-971/slot-2');
-    expect(parsed.pr_target).toBe('feature/pan-971');
+    expect(parsed.branch).toBe('feature/971/slot-2');
+    expect(parsed.pr_target).toBe('feature/971');
     expect(parsed.dependencies).toEqual([{ item_id: 'wave-0-item', title: 'Prepare slot input' }]);
     expect(prompt).toContain('The plan is in .pan/spec.vbrief.json');
     expect(prompt).toContain('Do NOT run `pan done`');
-    expect(prompt).toContain('Create a PR targeting `feature/pan-971` — do NOT target main');
+    expect(prompt).toContain('Create a PR targeting `feature/971` — do NOT target main');
   });
 
   it('auto-advances completed swarms to next wave and persists new slot state', async () => {
@@ -231,7 +315,12 @@ describe('swarm route helpers', () => {
           itemTitle: 'Prepare slot input',
           sessionName: 'agent-pan-971-1',
           workspace: '/tmp/feature-pan-971-slot-1',
-          status: 'completed',
+          // PAN-977 round-14 blocker: a 'completed' slot is one whose tmux
+          // pane exited but whose branch is NOT yet merged into the parent
+          // feature branch. Auto-advance MUST wait for 'merged' (the
+          // /api/swarm/slot-merged callback) before dispatching downstream
+          // slots; otherwise dependents see stale parent-branch files.
+          status: 'merged',
           startedAt: '2026-05-07T00:00:00Z',
           completedAt: '2026-05-07T00:05:00Z',
         },
@@ -240,28 +329,360 @@ describe('swarm route helpers', () => {
       updatedAt: '2026-05-07T00:05:00Z',
     }, null, 2));
 
+    // The previous wave's slot agent has exited — pane is dead — so the slot-1
+    // tmux session can be reaped and re-spawned for the next wave's item. PAN-977
+    // forbids silently aliasing a *live* session for a different item.
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(true);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['0']);
+
     const { __testInternals } = await import('../swarm.js');
     await __testInternals.pollSwarmAutoAdvance();
 
-    const nextState = JSON.parse(readFileSync(swarmStatePath, 'utf-8')) as {
-      currentWave: number;
-      autoAdvance: boolean;
-      slots: Array<{ itemId: string; itemTitle: string; sessionName: string; status: string }>;
-    };
+    // Round 10 blocker #4: durable runtime now lives in the continue vBRIEF;
+    // the sidecar file is no longer written. Read state via the canonical
+    // authority instead.
+    const nextState = (await __testInternals.loadSwarmState('PAN-971'))!;
 
-    expect(nextState.currentWave).toBe(1);
+    // PAN-977 blocker #3: auto-advance is per-DAG-readiness now, not by wave
+    // index. We assert the new ready item dispatched, regardless of currentWave.
+    // PAN-977 blocker #4: prior slots are persisted cumulatively, so the new
+    // dispatch appears alongside the prior completed slot.
     expect(nextState.autoAdvance).toBe(true);
-    expect(nextState.slots).toEqual([
-      {
-        slot: 1,
-        itemId: 'wave-1-item',
-        itemTitle: 'Dispatch next wave',
-        sessionName: 'agent-pan-971-1',
-        workspace: '',
-        status: 'running',
-      },
-    ]);
+    const newSlot = nextState.slots.find((s) => s.itemId === 'wave-1-item');
+    expect(newSlot).toBeTruthy();
+    expect(newSlot?.itemTitle).toBe('Dispatch next wave');
+    expect(newSlot?.status).toBe('running');
+    expect(agents.spawnAgent).toHaveBeenCalledTimes(1);
+  });
+
+  // PAN-977 round-12 blocker #1: regression — onSlotMergeComplete must not
+  // remove the swarm from the active-poll registry when its dispatch step
+  // just spawned the next DAG-ready slot. Pre-fix, registry cleanup ran
+  // against the stale pre-dispatch slots set (no running entries) and
+  // deleted the issue, stranding the freshly-dispatched slot without an
+  // auto-advance poller.
+  it('keeps the swarm in the active registry when slot-merge dispatches the next DAG item', async () => {
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    const initial = {
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-0-item',
+          itemTitle: 'Prepare slot input',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'running',
+          startedAt: '2026-05-07T00:00:00Z',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    };
+    writeFileSync(swarmStatePath, JSON.stringify(initial, null, 2));
+
+    const { __testInternals } = await import('../swarm.js');
+    // Seed runtime authority so subsequent loadSwarmState() reads the
+    // continue vBRIEF rather than re-importing from the legacy sidecar.
+    await __testInternals.persistSwarmRuntime(
+      join(projectPath, 'workspaces', 'feature-pan-971'),
+      initial as any,
+    );
+
+    // The slot-1 tmux pane has exited (the merged agent went away), so a
+    // fresh dispatch on slot 1 for the next DAG item is allowed.
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue([]);
+
+    // Simulate the steady-state where the initial dispatchSwarmWave already
+    // registered this issue with the auto-advance poll loop.
+    __testInternals.addActiveSwarmIssueId('PAN-971');
+
+    const result = await __testInternals.onSlotMergeComplete('PAN-971', 'wave-0-item', 1);
+    expect(result.ok).toBe(true);
+
+    // The merged slot must be marked merged on the canonical record (not
+    // every historical sibling sharing the slot/itemId).
+    const after = (await __testInternals.loadSwarmState('PAN-971'))!;
+    const mergedSlot = after.slots.find((s) => s.slot === 1 && s.itemId === 'wave-0-item');
+    expect(mergedSlot?.status).toBe('merged');
+
+    // Pre-fix this would be false: the cleanup branch ran on the stale
+    // pre-dispatch snapshot, saw no running/pending slots, and deleted the
+    // issue from the registry — even though dispatchSwarmWave had just been
+    // invoked for the next DAG item. Post-fix, registry membership is decided
+    // from observed post-dispatch state (or short-circuited entirely when a
+    // dispatch succeeded), so the issue stays pollable.
+    const registry = __testInternals.getActiveSwarmIssueIds();
+    expect(registry.has('PAN-971'), 'issue must remain in active poll registry after slot merge').toBe(true);
+  });
+
+  // PAN-977 round-13 blocker #1: when the poller observes a final-wave slot
+  // transition to a terminal status, the refreshed status MUST be persisted
+  // to the canonical continue-vBRIEF runtime BEFORE the issue leaves the
+  // active poll registry. Pre-fix the final-wave `continue` short-circuited
+  // above saveSwarmState() and lost the just-observed completed/failed
+  // status, so a dashboard restart could not see the slot finished.
+  it('persists refreshed final-wave slot status before clearing the active registry', async () => {
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    writeFileSync(swarmStatePath, JSON.stringify({
+      issueId: 'PAN-971',
+      // currentWave === totalWaves - 1 — the final wave.
+      currentWave: 1,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-1-item',
+          itemTitle: 'Dispatch next wave',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'running',
+          startedAt: '2026-05-07T00:00:00Z',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    }, null, 2));
+
+    // The slot's tmux pane has exited cleanly (exit 0) so refreshSwarmSlotStatuses
+    // will flip the slot from 'running' to 'completed'.
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue(['agent-pan-971-1']);
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(true);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['0']);
+
+    const { __testInternals } = await import('../swarm.js');
+    __testInternals.addActiveSwarmIssueId('PAN-971');
+    await __testInternals.pollSwarmAutoAdvance();
+
+    const persisted = (await __testInternals.loadSwarmState('PAN-971'))!;
+    const slot = persisted.slots.find((s) => s.slot === 1);
+    expect(slot?.status, 'final-wave terminal status must be persisted to continue-vBRIEF').toBe('completed');
+
+    // And only AFTER persistence does the issue leave the active registry.
+    expect(__testInternals.getActiveSwarmIssueIds().has('PAN-971')).toBe(false);
+  });
+
+  // PAN-977 round-14 blocker: a slot whose tmux pane exited cleanly is
+  // 'completed' — its commits are NOT yet on the parent feature branch.
+  // Auto-advance MUST NOT dispatch downstream slots until the slot
+  // transitions to 'merged' via /api/swarm/slot-merged. Otherwise the
+  // downstream slot is created against stale parent-branch files and the
+  // DAG dependency order is silently broken.
+  it('does not auto-advance while a non-synthesis slot is only completed (not yet merged)', async () => {
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    writeFileSync(swarmStatePath, JSON.stringify({
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-0-item',
+          itemTitle: 'Prepare slot input',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          // Pane exited but branch not merged → must NOT trigger dispatch.
+          status: 'completed',
+          phase: 'implementation',
+          startedAt: '2026-05-07T00:00:00Z',
+          completedAt: '2026-05-07T00:05:00Z',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    }, null, 2));
+
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(true);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['0']);
+
+    const { __testInternals } = await import('../swarm.js');
+    await __testInternals.pollSwarmAutoAdvance();
+
+    // wave-1-item must NOT have been dispatched — the upstream slot is
+    // only locally completed, the merge callback has not landed.
     expect(agents.spawnAgent).not.toHaveBeenCalled();
+    const nextState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(nextState.slots.some((s) => s.itemId === 'wave-1-item')).toBe(false);
+  });
+
+  // PAN-977 round-15 blocker: when a synthesis slot for itemX has completed
+  // but its tmux session is still alive (pane teardown lagging), a dispatch
+  // for itemX as an implementation slot MUST NOT silently alias the
+  // completed synthesis session — that would skip the implementation work
+  // entirely. The reuse guard now requires same-item AND same-phase AND
+  // status='running' before keeping an existing assignment.
+  it('does not alias a completed synthesis slot whose tmux session is still alive as the implementation dispatch', async () => {
+    // Build a plan where wave-1-item is a DAG convergence point requiring
+    // synthesis: two parents block it, so blockingParentCount > 1 and the
+    // dispatcher picks the synthesis-first phase by default.
+    const synthesisDoc: VBriefDocument = {
+      ...PLAN_DOC,
+      plan: {
+        ...PLAN_DOC.plan,
+        items: [
+          // Parents already finished — marking them 'completed' in the plan
+          // makes wave-1-item DAG-ready via getDispatchableItems().
+          { id: 'wave-0-a', title: 'Parent A', status: 'completed' },
+          { id: 'wave-0-b', title: 'Parent B', status: 'completed' },
+          { id: 'wave-1-item', title: 'Convergence work', status: 'pending' },
+        ],
+        edges: [
+          { from: 'wave-0-a', to: 'wave-1-item', type: 'blocks' },
+          { from: 'wave-0-b', to: 'wave-1-item', type: 'blocks' },
+        ],
+      },
+    };
+    writeFileSync(
+      join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'),
+      JSON.stringify(synthesisDoc, null, 2),
+    );
+    vi.mocked(vbriefIo.readWorkspacePlan).mockReturnValue(synthesisDoc);
+
+    // Both parents are merged so wave-1-item is DAG-ready, AND the synthesis
+    // slot for wave-1-item has already completed (output persisted) but its
+    // tmux session is still alive — pane teardown lagging.
+    const initialState = {
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 1,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-1-item',
+          itemTitle: 'Convergence work',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'completed' as const,
+          phase: 'synthesis' as const,
+          startedAt: '2026-05-07T00:00:00Z',
+          completedAt: '2026-05-07T00:05:00Z',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    };
+    const featureWorkspace = join(projectPath, 'workspaces', 'feature-pan-971');
+
+    const { __testInternals } = await import('../swarm.js');
+    // persistSwarmRuntime writes via runtimeFromState which uses the canonical
+    // slotId/itemId/sessionName/workspace shape — no manual continue-state
+    // surgery needed for the slot list. Then patch synthesisOutputs in-place.
+    await __testInternals.persistSwarmRuntime(featureWorkspace, initialState as any);
+
+    // PAN-977 review-round-18: pass the workspace root, NOT `.pan/`.
+    // `writeContinueStateAsync` appends `.pan/continues/` internally via
+    // `getContinuesDir(projectRoot)`.
+    const continueDir = featureWorkspace;
+    const cont = await import('../../../../lib/vbrief/continue-state.js');
+    const existingCont = (await cont.readContinueStateAsync(continueDir, 'PAN-971'))!;
+    await cont.writeContinueStateAsync(continueDir, 'PAN-971', {
+      ...existingCont,
+      swarmRuntime: {
+        ...(existingCont.swarmRuntime!),
+        synthesisOutputs: {
+          'wave-1-item': {
+            targetItemId: 'wave-1-item',
+            writtenAt: '2026-05-07T00:05:00Z',
+            contextUpdate: 'synthesis context for downstream implementation',
+          },
+        },
+      },
+    });
+
+    // The slot-1 tmux session is still alive — pane has not yet torn down.
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue(['agent-pan-971-1']);
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(false);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['12345']);
+
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      autoAdvance: true,
+    });
+
+    // Dispatch must NOT alias the live completed-synthesis session in slot
+    // 1. Round-15 + round-16 fix together: the phase-aware reuse guard
+    // refuses to alias, and the new free-slot allocator hands out the
+    // lowest unoccupied slot id (slot 2 here, since slot 1 is alive) so
+    // the implementation work still dispatches on a fresh slot rather than
+    // stalling.
+    expect(result.status).toBe(200);
+    const after = (await __testInternals.loadSwarmState('PAN-971'))!;
+    const implSlot = after.slots.find(
+      (s) => s.itemId === 'wave-1-item' && s.phase === 'implementation',
+    );
+    expect(implSlot, 'implementation slot must be dispatched on a fresh slot id').toBeTruthy();
+    expect(implSlot?.slot, 'must NOT alias the live synthesis slot 1').not.toBe(1);
+
+    // The original synthesis slot record stays in the cumulative history
+    // untouched — its status remains 'completed' (it was the synthesis-phase
+    // dispatch, never aliased).
+    const synthSlot = after.slots.find(
+      (s) => s.itemId === 'wave-1-item' && s.phase === 'synthesis',
+    );
+    expect(synthSlot?.status).toBe('completed');
+  });
+
+  // PAN-977 round-16 blocker #1: slot allocation must hand out the LOWEST
+  // FREE slot id, not the positional batch index. Pre-fix, dispatch reused
+  // `index + 1` and stalled whenever slot-1 was already occupied even though
+  // higher slot ids were free — auto-advance would silently fail to dispatch
+  // valid ready work.
+  it('allocates the lowest free slot when slot-1 is occupied by a running prior dispatch', async () => {
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    writeFileSync(swarmStatePath, JSON.stringify({
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      // Slot 1 is still running from a prior dispatch (an unrelated parallel
+      // item working on its own scope). The new ready item MUST be assigned
+      // slot 2, not stall on slot 1.
+      slots: [
+        {
+          slot: 1,
+          itemId: 'unrelated-running',
+          itemTitle: 'Unrelated running work',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'running',
+          phase: 'implementation',
+          startedAt: '2026-05-07T00:00:00Z',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    }, null, 2));
+
+    // The slot-1 tmux session is alive; slot-2 is free.
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue(['agent-pan-971-1']);
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(false);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['12345']);
+
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 0,
+      autoAdvance: true,
+    });
+
+    expect(result.status).toBe(200);
+    const after = (await __testInternals.loadSwarmState('PAN-971'))!;
+    const newDispatch = after.slots.find((s) => s.itemId === 'wave-0-item');
+    expect(newDispatch, 'wave-0-item must be dispatched even though slot 1 is occupied').toBeTruthy();
+    expect(newDispatch?.slot, 'must allocate slot 2 (lowest free) instead of stalling on slot 1').toBe(2);
+    expect(newDispatch?.sessionName).toBe('agent-pan-971-2');
+    expect(newDispatch?.status).toBe('running');
   });
 
   it('does not advance while current wave still has running slots', async () => {
@@ -433,13 +854,17 @@ describe('swarm route helpers', () => {
           itemTitle: 'Prepare slot input',
           sessionName: 'agent-pan-971-1',
           workspace: '/tmp/feature-pan-971-slot-1',
-          status: 'completed',
+          // PAN-977 round-14: 'merged' (not 'completed') is what triggers
+          // downstream auto-advance, since 'completed' means pane exited
+          // but branch is not yet on the parent feature branch.
+          status: 'merged',
         },
       ],
       createdAt: '2026-05-07T00:00:00Z',
       updatedAt: '2026-05-07T00:05:00Z',
     }, null, 2));
 
+    rmSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), { force: true });
     vi.mocked(vbriefIo.readWorkspacePlan).mockReturnValue(null);
 
     const { __testInternals } = await import('../swarm.js');
@@ -447,10 +872,7 @@ describe('swarm route helpers', () => {
     await __testInternals.pollSwarmAutoAdvance();
     await __testInternals.pollSwarmAutoAdvance();
 
-    const failedState = JSON.parse(readFileSync(swarmStatePath, 'utf-8')) as {
-      autoAdvanceFailureCount?: number;
-      autoAdvanceRetryAfter?: string;
-    };
+    const failedState = (await __testInternals.loadSwarmState('PAN-971'))!;
     expect(failedState.autoAdvanceFailureCount).toBe(3);
     expect(failedState.autoAdvanceRetryAfter).toBeTruthy();
 
@@ -488,6 +910,11 @@ describe('swarm route helpers', () => {
       },
     };
     vi.mocked(vbriefIo.readWorkspacePlan).mockReturnValue(sameWaveDoc);
+    writeFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), JSON.stringify(sameWaveDoc, null, 2));
+    // Default mock has slot-1 session present; mark it dead so the dispatcher
+    // reaps it and reuses the slot id (PAN-977 no-alias-onto-live-session rule).
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(true);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['0']);
 
     const { __testInternals } = await import('../swarm.js');
     const initialDispatch = await __testInternals.dispatchSwarmWave({
@@ -502,40 +929,38 @@ describe('swarm route helpers', () => {
       { itemId: 'wave-0-item-b', itemTitle: 'Deferred slot item' },
     ]);
 
-    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
-    const initialState = JSON.parse(readFileSync(swarmStatePath, 'utf-8')) as {
-      deferred?: Array<{ itemId: string; itemTitle: string }>;
-      slots: Array<Record<string, unknown>>;
+    // PAN-977 round-14: only 'merged' slots satisfy DAG dependencies and
+    // gate auto-advance — a slot that merely 'completed' (pane exited)
+    // has not yet landed on the parent feature branch, so dispatching
+    // dependents would race against stale upstream files.
+    const initialState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    const completedState = {
+      ...initialState,
+      slots: [{
+        slot: 1,
+        itemId: 'wave-0-item-a',
+        itemTitle: 'First slot item',
+        sessionName: 'agent-pan-971-1',
+        workspace: '',
+        status: 'merged' as const,
+      }],
     };
-    initialState.slots = [{
-      slot: 1,
-      itemId: 'wave-0-item-a',
-      itemTitle: 'First slot item',
-      sessionName: 'agent-pan-971-1',
-      workspace: '',
-      status: 'completed',
-    }];
-    writeFileSync(swarmStatePath, JSON.stringify(initialState, null, 2));
+    await __testInternals.persistSwarmRuntime(
+      join(projectPath, 'workspaces', 'feature-pan-971'),
+      completedState,
+    );
 
     await __testInternals.pollSwarmAutoAdvance();
 
-    const nextState = JSON.parse(readFileSync(swarmStatePath, 'utf-8')) as {
-      currentWave: number;
-      deferred?: Array<{ itemId: string; itemTitle: string }>;
-      slots: Array<{ itemId: string; itemTitle: string; status: string }>;
-    };
-    expect(nextState.currentWave).toBe(0);
+    const nextState = (await __testInternals.loadSwarmState('PAN-971'))!;
     expect(nextState.deferred).toBeUndefined();
-    expect(nextState.slots).toEqual([
-      {
-        slot: 1,
-        itemId: 'wave-0-item-b',
-        itemTitle: 'Deferred slot item',
-        sessionName: 'agent-pan-971-1',
-        workspace: '',
-        status: 'running',
-      },
-    ]);
+    // Cumulative slot history (PAN-977 #4) keeps the prior 'completed' record
+    // alongside the new dispatch. Locate the new dispatch by item id.
+    const dispatched = nextState.slots.find((s) => s.itemId === 'wave-0-item-b');
+    expect(dispatched).toBeTruthy();
+    expect(dispatched?.itemTitle).toBe('Deferred slot item');
+    expect(dispatched?.sessionName).toBe('agent-pan-971-1');
+    expect(dispatched?.status).toBe('running');
   });
 
   it('records failed slots and blocks auto-advance when tmux exits non-zero', async () => {
@@ -568,12 +993,7 @@ describe('swarm route helpers', () => {
     const { __testInternals } = await import('../swarm.js');
     await __testInternals.pollSwarmAutoAdvance();
 
-    const failedState = JSON.parse(readFileSync(swarmStatePath, 'utf-8')) as {
-      currentWave: number;
-      autoAdvanceFailureCount?: number;
-      lastAutoAdvanceError?: string;
-      slots: Array<{ status: string; failureReason?: string }>;
-    };
+    const failedState = (await __testInternals.loadSwarmState('PAN-971'))!;
     expect(failedState.currentWave).toBe(0);
     expect(failedState.autoAdvanceFailureCount).toBe(1);
     expect(failedState.lastAutoAdvanceError).toBe('One or more swarm slots failed before completion was confirmed.');
@@ -634,6 +1054,64 @@ describe('swarm route helpers', () => {
 
     expect(result.status).toBe(500);
     expect(result.body.error).toContain('Failed to dispatch any slots');
+  });
+
+  it('rejects an explicit future wave while earlier dependencies remain pending', async () => {
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 1,
+      maxSlots: 1,
+    });
+
+    expect(result.status).toBe(422);
+    expect(result.body.error).toContain('No dispatchable items');
+    expect(agents.spawnAgent).not.toHaveBeenCalled();
+  });
+
+  it('claims dispatched items in the workspace vBRIEF plan', async () => {
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-971-slot-1'), { recursive: true });
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue([]);
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 0,
+      maxSlots: 1,
+    });
+
+    expect(result.status).toBe(200);
+    const writtenPlan = JSON.parse(readFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), 'utf-8')) as VBriefDocument;
+    expect(writtenPlan.plan.items.find(item => item.id === 'wave-0-item')?.status).toBe('running');
+  });
+
+  it('defers same-batch candidates whose file scopes overlap selected items', async () => {
+    const overlapDoc: VBriefDocument = {
+      ...PLAN_DOC,
+      plan: {
+        ...PLAN_DOC.plan,
+        items: [
+          { id: 'item-a', title: 'Touch shared file first', status: 'pending', metadata: { files_scope: ['src/shared.ts'] } },
+          { id: 'item-b', title: 'Touch shared file second', status: 'pending', metadata: { files_scope: ['src/shared.ts'] } },
+        ],
+        edges: [],
+      },
+    };
+    writeFileSync(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'), JSON.stringify(overlapDoc, null, 2));
+    // Pre-existing slot session is dead, so the dispatcher reaps it and re-uses
+    // the slot id without violating PAN-977's no-alias-onto-live-session rule.
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(true);
+    vi.mocked(tmux.listPaneValuesAsync).mockResolvedValue(['0']);
+
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 0,
+      maxSlots: 2,
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.body.slots?.map(slot => slot.itemId)).toEqual(['item-a']);
+    expect(result.body.deferred).toEqual([{ itemId: 'item-b', itemTitle: 'Touch shared file second' }]);
   });
 
   it('honors PAN_AGENT_BLOCK_COUNT=0 as an explicit hard stop', async () => {

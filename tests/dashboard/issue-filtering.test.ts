@@ -362,12 +362,21 @@ describe('getOneDayAgo helper', () => {
   });
 
   it('should return a new Date object each time', () => {
-    const date1 = getOneDayAgo();
-    const date2 = getOneDayAgo();
+    // Freeze the clock so two consecutive new Date() calls observe the same
+    // epoch ms — without this, real-timer drift of >=1ms between the two
+    // getOneDayAgo() invocations flakes the equality assertion.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-15T12:00:00Z'));
+    try {
+      const date1 = getOneDayAgo();
+      const date2 = getOneDayAgo();
 
-    // Should be different objects
-    expect(date1).not.toBe(date2);
-    // With frozen clocks they have the same value
-    expect(date1.getTime()).toBe(date2.getTime());
+      // Should be different objects
+      expect(date1).not.toBe(date2);
+      // With frozen clocks they have the same value
+      expect(date1.getTime()).toBe(date2.getTime());
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

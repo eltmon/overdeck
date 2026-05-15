@@ -61,7 +61,7 @@ import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
-import { findPlan } from '../../../lib/vbrief/io.js';
+import { readWorkspacePlanAsync } from '../../../lib/vbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -696,6 +696,7 @@ async function fetchPlanningData(
     notes: Array<{ filename: string; content: string; uploadedAt: string }>;
     acceptanceProgress?: { completed: number; total: number; percent: number };
     stashCount?: number;
+    pipelineMirror?: unknown;
   } = { hasPrd: false, hasState: false, transcripts: [], discussions: [], notes: [] };
 
   // Helper: read PRD content from a location, handling both flat and subdir formats.
@@ -719,6 +720,24 @@ async function fetchPlanningData(
 
   const hasPlanningDir = await pathExists(planningDir);
   const hasPanContinue = await pathExists(panContinuePath);
+
+  // Acceptance criteria progress from vBRIEF plan (PAN-847)
+  // Pipeline mirror corroboration (PAN-977)
+  try {
+    const doc = await readWorkspacePlanAsync(workspacePath);
+    if (doc) {
+      const items = doc.plan.items;
+      if (items.length > 0) {
+        const completed = items.filter((i) => i.status === 'completed').length;
+        result.acceptanceProgress = {
+          completed,
+          total: items.length,
+          percent: Math.round((completed / items.length) * 100),
+        };
+      }
+      result.pipelineMirror = doc.plan.metadata?.pipeline;
+    }
+  } catch { /* no vBRIEF plan */ }
 
   if (!hasPlanningDir && !hasPanContinue) {
     const prd = await readPrdContent(findPrdAtStatus(projectPath, issueId, 'active'));
@@ -797,24 +816,6 @@ async function fetchPlanningData(
     return entries;
   };
 
-  // Acceptance criteria progress from vBRIEF plan (PAN-847)
-  try {
-    const planPath = findPlan(workspacePath);
-    if (planPath && await pathExists(planPath)) {
-      const raw = await readFile(planPath, 'utf-8');
-      const doc = JSON.parse(raw);
-      const items: Array<{ status?: string }> = doc?.plan?.items ?? [];
-      if (items.length > 0) {
-        const completed = items.filter((i) => i.status === 'completed').length;
-        result.acceptanceProgress = {
-          completed,
-          total: items.length,
-          percent: Math.round((completed / items.length) * 100),
-        };
-      }
-    }
-  } catch { /* no vBRIEF plan */ }
-
   if (summaryOnly) {
     const [transcriptFiles, discussionFiles, noteFiles] = await Promise.all([
       listArtifactFiles('transcripts'),
@@ -827,6 +828,7 @@ async function fetchPlanningData(
       hasState: result.hasState,
       hasInference: Boolean(result.inference && result.inference.trim() !== ''),
       acceptanceProgress: result.acceptanceProgress,
+      pipelineMirror: result.pipelineMirror,
       stashCount: result.stashCount,
       statusReviewedAt: result.statusReviewedAt,
       transcriptCount: transcriptFiles.length,
