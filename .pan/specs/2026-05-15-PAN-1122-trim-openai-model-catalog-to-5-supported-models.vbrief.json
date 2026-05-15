@@ -1,0 +1,291 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-15T05:40:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1122: Trim OpenAI model catalog to 5 supported models",
+    "updated": "2026-05-15T05:38:59.140Z"
+  },
+  "plan": {
+    "id": "pan-1122",
+    "title": "Trim OpenAI model catalog to 5 supported models",
+    "status": "proposed",
+    "uid": "29d41cbb-7a62-4e17-873d-4ffb4db4ad35",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-15T05:40:00.000Z",
+    "updated": "2026-05-15T05:38:59.140Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1122",
+        "label": "PAN-1122",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "openai",
+      "model-catalog",
+      "settings",
+      "cleanup"
+    ],
+    "narratives": {
+      "Problem": "The OpenAI model dropdown and backend allowed-models list contain 12 entries — a mix of legacy chat models (gpt-4o, gpt-4o-mini), reasoning models out of scope for standard chat (o3, o4-mini), speculative IDs that never shipped (gpt-5.5-mini, gpt-5.5-nano), and redundant flagships (gpt-5.4-pro vs gpt-5.5-pro). Users see noise; the backend accepts requests for IDs that may not route correctly. The OpenAIModel union type carries the same legacy entries.",
+      "Proposal": "Settle on exactly five supported OpenAI models — gpt-5.4-nano (cheap), gpt-5.4-mini (fast), gpt-5.4 (balanced), gpt-5.5 (best), gpt-5.5-pro (max). Trim the frontend dropdown, the backend router allowed-models lists, the OpenAIModel TypeScript union, and stale references in cost/priority/alias tables. Add graceful migration redirects so existing user configs that pin a dropped ID resolve to gpt-5.4 (the balanced default) with a warning rather than failing."
+    },
+    "autoDecisions": [
+      {
+        "summary": "gpt-5.4-nano is added to the backend router allowed-models list (currently absent there, present in frontend catalog).",
+        "rationale": "Issue lists it as the cheap-slot supported model; missing from backend would mean dropdown offers it but backend rejects it."
+      },
+      {
+        "summary": "All dropped IDs (gpt-5.5-mini, gpt-5.5-nano, gpt-5.4-pro, o3, o4-mini, gpt-4o, gpt-4o-mini, o3-deep-research, gpt-5.3-codex, gpt-5.2) redirect to gpt-5.4 via the existing LEGACY_MODEL_REDIRECTS mechanism in src/lib/model-capabilities.ts.",
+        "rationale": "Issue acceptance criterion says configs should fall back gracefully to gpt-5.4. The redirect map already exists for two of these IDs; extending it is the lowest-risk migration path and emits the standard warning."
+      },
+      {
+        "summary": "OpenAIModel union type is narrowed to the five supported IDs only — dropped IDs are removed from the type, not retained as deprecated aliases.",
+        "rationale": "Migration is handled at the redirect layer; keeping dropped IDs in the type would defeat the trim and let new code pin models we no longer support."
+      },
+      {
+        "summary": "Inspector backing-model display labels for gpt-4o and gpt-5.4-pro are removed alongside the type narrowing.",
+        "rationale": "These labels become dead code once the type rejects the IDs."
+      },
+      {
+        "summary": "src/lib/model-research/research-prompt.md is left untouched.",
+        "rationale": "It is a prompt asset describing historical OpenAI lineup for a research agent, not a runtime catalog. Out of scope for this trim."
+      }
+    ],
+    "items": [
+      {
+        "id": "openai-model-type",
+        "title": "Narrow OpenAIModel type to the five supported IDs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-15T05:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1122",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Edit src/lib/settings.ts: replace the OpenAIModel union with exactly 'gpt-5.4-nano' | 'gpt-5.4-mini' | 'gpt-5.4' | 'gpt-5.5' | 'gpt-5.5-pro'. Also update the OpenAI default-models array at settings.ts:223 to the same five IDs. This is the type foundation other beads encode against."
+        },
+        "subItems": [
+          {
+            "id": "openai-model-type.ac1",
+            "title": "OpenAIModel type lists exactly the five supported IDs and no others",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-model-type.ac2",
+            "title": "settings.ts:223 default OpenAI models array matches the five supported IDs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-model-type.ac3",
+            "title": "npm run typecheck passes (surfacing every downstream reference that needs updating)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migration-fallback",
+        "title": "Add legacy redirects so dropped IDs fall back to gpt-5.4",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-15T05:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1122",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Extend LEGACY_MODEL_REDIRECTS in src/lib/model-capabilities.ts so every dropped OpenAI ID (gpt-5.5-mini, gpt-5.5-nano, gpt-5.4-pro, o3, o4-mini, gpt-4o, gpt-4o-mini, o3-deep-research, gpt-5.3-codex, gpt-5.2) maps to 'gpt-5.4'. The redirect emits the existing warning when a saved config references a dropped ID."
+        },
+        "subItems": [
+          {
+            "id": "migration-fallback.ac1",
+            "title": "All ten dropped OpenAI IDs are present in LEGACY_MODEL_REDIRECTS and map to gpt-5.4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migration-fallback.ac2",
+            "title": "Loading a user config that references a dropped ID resolves to gpt-5.4 and logs the existing redirect warning rather than erroring",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "backend-router-allowed",
+        "title": "Sync backend router allowed-models to the five supported IDs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-15T05:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1122",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Update the OpenAI `models` arrays at src/lib/router-config.ts:67 and :134, and src/lib/providers.ts:81 and :180, to exactly ['gpt-5.4-nano', 'gpt-5.4-mini', 'gpt-5.4', 'gpt-5.5', 'gpt-5.5-pro']. Also update the OpenAI include-check at providers.ts:180 so that any model ID outside the supported set falls through to the unknown-provider error path."
+        },
+        "subItems": [
+          {
+            "id": "backend-router-allowed.ac1",
+            "title": "All four backend allowed-models sites list exactly the five supported IDs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "backend-router-allowed.ac2",
+            "title": "Requesting a dropped OpenAI ID through the router (bypassing the redirect layer) produces a clear error naming the unsupported model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-catalog",
+        "title": "Trim frontend OpenAI dropdown to the five supported models",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-15T05:40:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1122",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/frontend/src/components/Settings/modelCatalog.ts: remove gpt-5.5-mini, gpt-5.5-nano, gpt-5.4-pro, o3, o4-mini, gpt-4o, gpt-4o-mini from MODELS_BY_PROVIDER.openai. The remaining five entries (gpt-5.5-pro, gpt-5.5, gpt-5.4, gpt-5.4-mini, gpt-5.4-nano) keep their existing tier/cost/capability metadata."
+        },
+        "subItems": [
+          {
+            "id": "frontend-catalog.ac1",
+            "title": "MODELS_BY_PROVIDER.openai contains exactly five entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-catalog.ac2",
+            "title": "The Settings OpenAI provider dropdown shows exactly five models when rendered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup-stale-refs",
+        "title": "Remove stale references to dropped OpenAI IDs across cost, priority, and alias tables",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-15T05:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1122",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Remove dropped-ID entries from: src/lib/cost.ts (gpt-5.4-pro pricing row); src/lib/settings-api.ts (priority map at :718 and :722 — drop gpt-5.4-pro, gpt-4o, gpt-4o-mini); src/dashboard/server/routes/settings.ts (apiModel alias map — drop gpt-5.4-pro, o3-deep-research, gpt-4o, gpt-4o-mini, o1); src/dashboard/frontend/src/components/inspector/utils.ts (backing-model labels at :121, :129); src/lib/model-fallback.ts (dropped-ID entries in PROVIDER_HINTS, CROSS_PROVIDER_FALLBACK, MODEL_PRIORITY); src/lib/model-capabilities.ts (dedicated gpt-5.4-pro capabilities entry at :328). The CLIProxy registry alias in src/lib/agents.ts (gpt-5.4-pro → gpt-5.4) can be removed since the redirect layer now covers it. Add a gpt-5.4-nano capabilities entry if missing for parity with the other four supported IDs."
+        },
+        "subItems": [
+          {
+            "id": "cleanup-stale-refs.ac1",
+            "title": "No source file under src/ references dropped OpenAI IDs except via the LEGACY_MODEL_REDIRECTS map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cleanup-stale-refs.ac2",
+            "title": "gpt-5.4-nano has a capabilities entry in src/lib/model-capabilities.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cleanup-stale-refs.ac3",
+            "title": "npm run typecheck and npm run lint both pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cleanup-stale-refs.ac4",
+            "title": "npm test passes (catches any test snapshot/fixture that referenced a dropped ID)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "openai-model-type",
+        "to": "migration-fallback",
+        "type": "informs"
+      },
+      {
+        "from": "openai-model-type",
+        "to": "backend-router-allowed",
+        "type": "informs"
+      },
+      {
+        "from": "openai-model-type",
+        "to": "frontend-catalog",
+        "type": "informs"
+      },
+      {
+        "from": "openai-model-type",
+        "to": "cleanup-stale-refs",
+        "type": "blocks"
+      },
+      {
+        "from": "migration-fallback",
+        "to": "cleanup-stale-refs",
+        "type": "informs"
+      },
+      {
+        "from": "backend-router-allowed",
+        "to": "cleanup-stale-refs",
+        "type": "informs"
+      },
+      {
+        "from": "frontend-catalog",
+        "to": "cleanup-stale-refs",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-15-PAN-1122-trim-openai-model-catalog-to-5-supported-models.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
