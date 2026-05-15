@@ -128,7 +128,7 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
   const issueLabel = plan.id.toLowerCase();
   const redirectExists = existsSync(redirectPath);
   try {
-    await execFileAsync('bd', ['list', '--json', '--limit', '0'], {
+    await execFileAsync('bd', ['ping', '--json'], {
       encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
     });
   } catch (connectErr: any) {
