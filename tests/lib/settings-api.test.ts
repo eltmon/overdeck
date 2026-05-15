@@ -215,6 +215,7 @@ describe('settings-api', () => {
       expect(models.minimax).toBeDefined();
       expect(models.zai).toBeDefined();
       expect(models.kimi).toBeDefined();
+      expect(models.nous).toBeDefined();
 
       // Each model should have id and name properties
       if (models.anthropic.length > 0) {
@@ -230,6 +231,13 @@ describe('settings-api', () => {
       expect(anthropicIds).toContain('claude-opus-4-6');
       expect(anthropicIds).toContain('claude-sonnet-4-5');
       expect(anthropicIds).toContain('claude-haiku-4-5');
+    });
+
+    it('should include Nous Portal models as objects', () => {
+      const models = getAvailableModelsApi();
+
+      const nousIds = models.nous.map(m => m.id);
+      expect(nousIds).toContain('qwen/qwen3.6-plus');
     });
 
     it('should include openai models as objects', () => {
@@ -311,6 +319,7 @@ describe('settings-api', () => {
             kimi: false,
             minimax: false,
             openrouter: false,
+            nous: false,
           },
         },
       };
@@ -333,6 +342,7 @@ describe('settings-api', () => {
             zai: false,
             kimi: false,
             openrouter: false,
+            nous: false,
           },
           overrides: {},
           default_conversation_model: 'gpt-5.4',
@@ -377,6 +387,7 @@ describe('settings-api', () => {
             zai: true,
             kimi: false,
             openrouter: false,
+            nous: false,
           },
           overrides: {},
           gemini_thinking_level: 4,

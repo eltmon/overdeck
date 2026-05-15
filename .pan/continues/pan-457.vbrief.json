@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-457",
   "created": "2026-05-06T02:00:42.665Z",
-  "updated": "2026-05-12T22:17:34.228Z",
+  "updated": "2026-05-15T05:29:42.545Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -109,6 +109,11 @@
       "reason": "resume",
       "agentModel": "minimax-m2.7-highspeed",
       "timestamp": "2026-05-12T22:17:34.228Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "minimax-m2.7-highspeed",
+      "timestamp": "2026-05-15T05:29:42.545Z"
     }
   ],
   "feedback": [

@@ -87,6 +87,8 @@ const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   // MiMo models
   'mimo-v2.5-pro': { apiModel: 'mimo-v2.5-pro' },
   'mimo-v2.5': { apiModel: 'mimo-v2.5' },
+  // Nous Portal models
+  'qwen/qwen3.6-plus': { apiModel: 'qwen/qwen3.6-plus' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────
@@ -381,6 +383,38 @@ const postTestApiKeyRoute = HttpRouter.add(
           break;
         }
 
+        case 'nous': {
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'qwen/qwen3.6-plus') : 'qwen/qwen3.6-plus';
+          try {
+            const resp = await fetch('https://inference-api.nousresearch.com/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
+            });
+            latencyMs = Date.now() - startTime;
+            const responseText = await resp.text();
+            if (resp.ok) {
+              try {
+                const data = JSON.parse(responseText) as { choices?: Array<{ message?: { content?: string | null } }> };
+                response = data.choices?.[0]?.message?.content?.trim() || '';
+                success = response.includes(expectedAnswer);
+                if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+              } catch {
+                error = `Nous Portal returned non-JSON response: ${responseText.slice(0, 100)}`;
+              }
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 404) {
+              error = `Model not found: ${apiModel}`;
+            } else {
+              error = `HTTP ${resp.status}: ${responseText.slice(0, 100)}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
+        }
+
         default:
           error = `Unknown provider: ${provider}`;
       }
@@ -403,7 +437,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
       return jsonResponse({ error: 'Provider and apiKey are required' }, { status: 400 });
     }
 
-    if (!['openai', 'google', 'kimi', 'minimax', 'zai', 'mimo'].includes(provider)) {
+    if (!['openai', 'google', 'kimi', 'minimax', 'zai', 'mimo', 'nous'].includes(provider)) {
       return jsonResponse({ error: `Unsupported provider: ${provider}` }, { status: 400 });
     }
 
@@ -539,6 +573,28 @@ const postValidateApiKeyRoute = HttpRouter.add(
             if (resp.ok) {
               valid = true;
               models = ['mimo-v2.5-pro', 'mimo-v2.5'];
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 429) {
+              error = 'Rate limit exceeded';
+            } else {
+              error = `HTTP error: ${resp.status}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
+        }
+
+        case 'nous': {
+          try {
+            const resp = await fetch('https://inference-api.nousresearch.com/v1/models', {
+              headers: { 'Authorization': `Bearer ${apiKey}` },
+            });
+            if (resp.ok) {
+              const data = await resp.json() as { data?: Array<{ id: string }> };
+              valid = true;
+              models = data.data?.map(m => m.id) || ['qwen/qwen3.6-plus'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {

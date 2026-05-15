@@ -27,6 +27,7 @@ export const PROVIDER_COLORS: Record<string, string> = {
   zai:       '#ec4899',
   kimi:      '#f59e0b',
   mimo:      '#14b8a6',
+  nous:      '#8b5cf6',
   openrouter:'#8b5cf6',
 };
 

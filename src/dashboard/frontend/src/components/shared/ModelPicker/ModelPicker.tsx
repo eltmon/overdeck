@@ -62,6 +62,7 @@ export const PROVIDER_LABELS: Record<string, string> = {
   minimax: 'MiniMax',
   zai: 'Z.AI',
   kimi: 'Kimi',
+  nous: 'Nous Portal',
   openrouter: 'OpenRouter',
 };
 

@@ -13,7 +13,7 @@ import type { SubscriptionPlan } from './subscription-types.js';
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous';
 
 /**
  * Map of model ID to provider
@@ -70,6 +70,9 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // MiMo models
   'mimo-v2.5-pro': 'mimo',
   'mimo-v2.5': 'mimo',
+
+  // Nous Portal models
+  'qwen/qwen3.6-plus': 'nous',
 } as Record<ModelId | string, ModelProvider>;
 
 /**
@@ -131,6 +134,9 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // MiMo → Anthropic
   'mimo-v2.5-pro': 'claude-sonnet-4-6', // Flagship reasoning → Sonnet
   'mimo-v2.5': 'claude-sonnet-4-6', // Multimodal → Sonnet
+
+  // Nous Portal → Anthropic
+  'qwen/qwen3.6-plus': 'claude-sonnet-4-6',
 };
 
 /**
@@ -171,7 +177,7 @@ const TIER_RANK: Record<SubscriptionPlan, number> = {
  * This is distinct from all other providers which use simple identifiers without slashes.
  */
 export function isOpenRouterModel(modelId: string): boolean {
-  return modelId.includes('/');
+  return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus';
 }
 
 /**
@@ -372,6 +378,11 @@ export function detectEnabledProviders(apiKeys: {
   openai?: string;
   google?: string;
   kimi?: string;
+  minimax?: string;
+  openrouter?: string;
+  zai?: string;
+  mimo?: string;
+  nous?: string;
 }): Set<ModelProvider> {
   const enabled = new Set<ModelProvider>(['anthropic']); // Always enabled
 
@@ -384,6 +395,21 @@ export function detectEnabledProviders(apiKeys: {
   }
   if (apiKeys.kimi && apiKeys.kimi.trim()) {
     enabled.add('kimi');
+  }
+  if (apiKeys.minimax && apiKeys.minimax.trim()) {
+    enabled.add('minimax');
+  }
+  if (apiKeys.openrouter && apiKeys.openrouter.trim()) {
+    enabled.add('openrouter');
+  }
+  if (apiKeys.zai && apiKeys.zai.trim()) {
+    enabled.add('zai');
+  }
+  if (apiKeys.mimo && apiKeys.mimo.trim()) {
+    enabled.add('mimo');
+  }
+  if (apiKeys.nous && apiKeys.nous.trim()) {
+    enabled.add('nous');
   }
 
   return enabled;

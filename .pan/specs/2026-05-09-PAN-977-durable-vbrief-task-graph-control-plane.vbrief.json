@@ -4,17 +4,17 @@
     "author": "agent:claude-code",
     "description": "PAN-977: Durable vBRIEF task graph control plane",
     "created": "2026-05-09T00:00:00Z",
-    "updated": "2026-05-09T19:15:00Z"
+    "updated": "2026-05-15T02:39:32.223Z"
   },
   "plan": {
     "id": "PAN-977",
     "title": "Durable vBRIEF task graph control plane",
-    "status": "active",
+    "status": "completed",
     "uid": "pan-977-durable-vbrief-task-graph",
     "author": "agent:claude-code",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-05-09T00:00:00Z",
-    "updated": "2026-05-09T19:15:00Z",
+    "updated": "2026-05-15T02:39:32.223Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/977",
@@ -167,5 +167,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }

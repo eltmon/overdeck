@@ -8,8 +8,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel, MimoModel } from './settings.js';
+import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous';
 
 /**
  * Provider configuration
@@ -142,13 +143,30 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     tested: true,
     description: 'Route directly to OpenRouter Anthropic-compatible endpoint; slash-containing model IDs pass through unchanged.',
   },
+
+  nous: {
+    name: 'nous',
+    displayName: 'Nous Portal',
+    compatibility: 'direct',
+    baseUrl: getOpenAICompatibleProxyBaseUrl('nous'),
+    authType: 'static',
+    models: ['qwen/qwen3.6-plus'],
+    haikuModel: 'qwen/qwen3.6-plus',
+    tierModels: { opus: 'qwen/qwen3.6-plus', sonnet: 'qwen/qwen3.6-plus', haiku: 'qwen/qwen3.6-plus' },
+    tested: true,
+    description: 'Route Nous Portal OpenAI-compatible models through Panopticon’s local Anthropic-compatible adapter using NOUS_API_KEY.',
+  },
 };
 
 /**
  * Get provider for a given model ID
  */
 export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
-  // OpenRouter model IDs always contain '/' (e.g. 'qwen/qwen3.6-plus:free')
+  // OpenRouter model IDs always contain '/' (e.g. 'qwen/qwen3.6-plus:free'),
+  // except for explicitly supported slash-delimited providers such as Nous Portal.
+  if (['qwen/qwen3.6-plus'].includes(modelId)) {
+    return PROVIDERS.nous;
+  }
   if (modelId.includes('/')) {
     return PROVIDERS.openrouter;
   }

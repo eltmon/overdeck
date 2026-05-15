@@ -51,6 +51,7 @@ export interface ApiSettingsConfig {
       kimi: boolean;
       mimo: boolean;
       openrouter: boolean;
+      nous: boolean;
     };
     /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
     overrides?: Partial<Record<string, ModelId>>;
@@ -71,6 +72,7 @@ export interface ApiSettingsConfig {
     kimi?: string;
     mimo?: string;
     openrouter?: string;
+    nous?: string;
   };
   openrouter?: {
     favorites?: string[];
@@ -119,6 +121,7 @@ export function getDefaultConversationModelApi(): ModelId {
   if (config.enabledProviders.has('kimi')) return resolveModelId('kimi-k2.5');
   if (config.enabledProviders.has('zai')) return resolveModelId('glm-5.1');
   if (config.enabledProviders.has('mimo')) return resolveModelId('mimo-v2.5-pro');
+  if (config.enabledProviders.has('nous')) return resolveModelId('qwen/qwen3.6-plus');
   if (config.enabledProviders.has('openrouter')) {
     const fav = config.openrouterFavorites[0];
     if (fav) return resolveModelId(fav);
@@ -338,6 +341,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         kimi: config.enabledProviders.has('kimi'),
         mimo: config.enabledProviders.has('mimo'),
         openrouter: config.enabledProviders.has('openrouter'),
+        nous: config.enabledProviders.has('nous'),
       },
       gemini_thinking_level: config.geminiThinkingLevel,
       default_conversation_model: getDefaultConversationModelApi(),
@@ -458,6 +462,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
         kimi: settings.models.providers.kimi,
         mimo: settings.models.providers.mimo,
         openrouter: settings.models.providers.openrouter,
+        nous: settings.models.providers.nous,
       },
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
       default_conversation_model: settings.models.default_conversation_model,
@@ -470,6 +475,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
       kimi: settings.api_keys.kimi,
       mimo: settings.api_keys.mimo,
       openrouter: settings.api_keys.openrouter,
+      nous: settings.api_keys.nous,
     },
     openrouter: settings.openrouter,
     tmux: settings.tmux,
@@ -548,7 +554,7 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
 }
 
 export async function updateProviderApiKey(
-  provider: 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter',
+  provider: 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous',
   apiKey?: string
 ): Promise<ApiSettingsConfig> {
   return updateSettingsApi({
@@ -647,6 +653,7 @@ export function getAvailableModelsApi(): {
   kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  nous: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
 } {
   const result: {
     anthropic: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
@@ -657,6 +664,7 @@ export function getAvailableModelsApi(): {
     kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    nous: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   } = {
     anthropic: [],
     openai: [],
@@ -666,6 +674,7 @@ export function getAvailableModelsApi(): {
     kimi: [],
     mimo: [],
     openrouter: [],
+    nous: [],
   };
 
   for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
@@ -696,6 +705,9 @@ export function getAvailableModelsApi(): {
         break;
       case 'openrouter':
         result.openrouter.push(entry);
+        break;
+      case 'nous':
+        result.nous.push(entry);
         break;
     }
   }
@@ -731,6 +743,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         kimi: true, // Kimi K2.6 (K2.6-code-preview) used for exploration, testing, and documentation
         mimo: false,
         openrouter: false,
+        nous: false,
       },
       gemini_thinking_level: 3,
     },
@@ -760,6 +773,7 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
         minimax: true,
         mimo: false,
         openrouter: false,
+        nous: false,
       },
       gemini_thinking_level: 3,
     },

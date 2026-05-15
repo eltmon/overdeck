@@ -9,7 +9,8 @@ export type KimiModel = 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
 export type ZAIModel = 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
 export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
-export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel;
+export type NousModel = 'qwen/qwen3.6-plus';
+export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel;
 
 // Task complexity levels
 export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
@@ -40,6 +41,7 @@ export interface ApiKeysConfig {
   kimi?: string;
   minimax?: string;
   mimo?: string;
+  nous?: string;
 }
 
 // Complete settings structure
@@ -132,6 +134,7 @@ export function loadSettings(): SettingsConfig {
   if (process.env.KIMI_CODING_API_KEY) envApiKeys.kimi = process.env.KIMI_CODING_API_KEY;
   else if (process.env.KIMI_API_KEY) envApiKeys.kimi = process.env.KIMI_API_KEY;
   if (process.env.MIMO_API_KEY) envApiKeys.mimo = process.env.MIMO_API_KEY;
+  if (process.env.NOUS_API_KEY) envApiKeys.nous = process.env.NOUS_API_KEY;
 
   // Merge env vars as fallback (settings.json takes precedence)
   settings.api_keys = {
@@ -208,6 +211,7 @@ export function getAvailableModels(settings: SettingsConfig): {
   kimi: KimiModel[];
   minimax: MiniMaxModel[];
   mimo: MimoModel[];
+  nous: NousModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
     'claude-opus-4-6',
@@ -235,6 +239,10 @@ export function getAvailableModels(settings: SettingsConfig): {
     ? ['mimo-v2.5-pro', 'mimo-v2.5']
     : [];
 
+  const nousModels: NousModel[] = settings.api_keys.nous
+    ? ['qwen/qwen3.6-plus']
+    : [];
+
   return {
     anthropic: anthropicModels,
     openai: openaiModels,
@@ -242,6 +250,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     kimi: kimiModels,
     minimax: minimaxModels,
     mimo: mimoModels,
+    nous: nousModels,
   };
 }
 

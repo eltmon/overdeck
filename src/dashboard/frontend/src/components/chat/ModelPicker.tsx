@@ -111,6 +111,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   zai: 'Z.AI',
   kimi: 'Kimi',
   mimo: 'Xiaomi MiMo',
+  nous: 'Nous Portal',
   openrouter: 'OpenRouter',
 };
 

@@ -23,6 +23,7 @@ import { loadConfig } from './config.js';
 import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
 import { getClaudeAuthStatus } from './claude-auth.js';
 import { bridgeGeminiAuthToCliproxyAsync, getCliproxyClientEnv } from './cliproxy.js';
+import { ensureOpenAICompatibleProxyRunning } from './openai-compatible-proxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
@@ -382,6 +383,9 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
   }
 
   if (apiKey) {
+    if (provider.name === 'nous') {
+      await ensureOpenAICompatibleProxyRunning();
+    }
     await validateProviderHealth(model, apiKey);
     return getProviderEnv(provider, apiKey);
   }

@@ -89,6 +89,12 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'mimo-v2.5' as ModelId, name: 'MiMo V2.5', icon: Zap, tier: 'balanced', costPer1MTokens: 1, capabilities: ['code', 'agentic', 'fast'], description: 'Multimodal model, 262K context, strong agentic coding' },
     ],
   },
+  nous: {
+    name: 'Nous Portal',
+    models: [
+      { id: 'qwen/qwen3.6-plus' as ModelId, name: 'Qwen 3.6 Plus', icon: Network, tier: 'premium', costPer1MTokens: 0, capabilities: ['reasoning', 'code', 'agentic', 'large-context', 'cost-efficient'], description: 'Qwen 3.6 Plus via Nous Portal, currently free with 1M context.' },
+    ],
+  },
 };
 
 export type OpenRouterFavoriteModel = {
