@@ -64,6 +64,16 @@ The test role verifies that a feature branch is ready to leave review. It owns b
    - `TESTS PASSED` when the configured test suite passes and required UAT passes or is not required.
    - `TESTS FAILED` when any test-suite command fails, the app cannot start, Playwright cannot verify required behavior, or an acceptance criterion remains unproven.
 
+## TLDR: prefer code summaries over full reads
+
+When reading test fixtures, helpers, or app source to diagnose a failure, use TLDR MCP tools instead of full `Read` if `<workspace>/.venv` exists:
+
+- `tldr_context <file>` — exports, imports, key functions (~1k tokens vs 10–25k)
+- `tldr_calls <fn> <file>` / `tldr_impact <fn> <file>` — trace what a failing function touches
+- `tldr_semantic <query>` — find where a behavior is implemented when an acceptance criterion fails
+
+Test logs, error output, and stack traces are still read directly. The PreToolUse hook will auto-substitute summaries for large source-file `Read`s. See the `pan-tldr` skill for details.
+
 ## Browser UAT Contract
 
 Playwright is part of the test role. Use it only for requirement verification, not exploratory browsing unrelated to the issue.

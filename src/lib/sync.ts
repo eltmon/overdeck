@@ -138,15 +138,18 @@ export function removeLegacySkills070(): string[] {
   // pan-plan-finalize → deleted (subcommand of pan plan)
   // pan-setup → pan-admin-hooks
   // pan-rescue → pan-admin-cloister
-  // pan-tldr → pan-admin-tldr
   // pan-config → pan-admin-config
   // pan-tracker → pan-admin-tracker
+  //
+  // pan-tldr was previously listed here when admin moved to pan-admin-tldr,
+  // but pan-tldr is now a separate work-agent-facing skill (different scope
+  // from the admin skill — it teaches agents to USE the TLDR MCP tools).
+  // PAN-1132.
   const LEGACY_SKILL_NAMES = [
     'pan-issue',
     'pan-plan-finalize',
     'pan-setup',
     'pan-rescue',
-    'pan-tldr',
     'pan-config',
     'pan-tracker',
   ];
