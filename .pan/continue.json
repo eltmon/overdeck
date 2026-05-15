@@ -1,0 +1,41 @@
+{
+  "version": "1",
+  "issueId": "PAN-1111",
+  "created": "2026-05-15T05:33:19.125Z",
+  "updated": "2026-05-15T05:40:00.000Z",
+  "gitState": { "branch": "feature/pan-1111", "sha": "ec22d9cea", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "Re-do the upgrade from scratch — PR #1114 closed without merging the actual version bump or scaffolding removal. Trust nothing from that branch.", "recordedAt": "2026-05-15T05:40:00.000Z" },
+    { "id": "D2", "summary": "Bump install pin to v1.0.4 in src/cli/commands/install.ts:411 (`recommendedVersion = 1 * 10000 + 0 * 100 + 4`) and update surrounding message text.", "recordedAt": "2026-05-15T05:40:00.000Z" },
+    { "id": "D3", "summary": "Replace probe `bd list --json --limit 0` with `bd ping --json` in createBeadsFromVBrief (src/lib/vbrief/beads.ts ~line 131). Keep 8s timeout and cwd.", "recordedAt": "2026-05-15T05:40:00.000Z" },
+    { "id": "D4", "summary": "Simplified recovery flow: probe fails → `bd doctor --fix` once → retry probe → succeed-and-continue OR error-out. Delete staleArtifacts heuristic and redirect-vs-main-beads branch logic. Preserve fresh-install bd-init fallback only when both `.beads/redirect` and project-root `.beads/` are absent.", "recordedAt": "2026-05-15T05:40:00.000Z" },
+    { "id": "D5", "summary": "Keep withBdMutex, the workspace-manager.ts redirect setup, and committed `.beads/metadata.json` + `.beads/hooks/` — all explicitly out of scope per issue body. File follow-up issues if we want to revisit any of them.", "recordedAt": "2026-05-15T05:40:00.000Z" },
+    { "id": "D6", "summary": "`bd batch` work item dropped — done-preflight.ts has no bulk-close path to convert. Reopen as a separate issue if/when one is introduced.", "recordedAt": "2026-05-15T05:40:00.000Z" },
+    { "id": "D7", "summary": "`pan admin beads doctor` is already wired in src/cli/commands/beads.ts:254 — no work needed for that PAN-812 carry-over.", "recordedAt": "2026-05-15T05:40:00.000Z" },
+    { "id": "D8", "summary": "Acceptance test for PAN-457-style corruption recovery (issue AC #5) lives in src/lib/vbrief/__tests__/create-beads.test.ts as a mocked-execFile test, matching the existing pattern in that file. No live `bd` subprocess.", "recordedAt": "2026-05-15T05:40:00.000Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "createBeadsFromVBrief is the entry point for every `pan plan-finalize` invocation. A broken rewrite breaks the whole pipeline.", "mitigation": "`simplify-recovery` bead has `requiresInspection: true`. After the rewrite, manually run `pan plan-finalize` once in a scratch worktree (or rely on the work-role verification gate) before downstream beads start." },
+    { "id": "H2", "summary": "Developer machine still on bd 1.0.2 — the version-guard in install.ts will warn but won't auto-upgrade.", "mitigation": "`bump-install-pin` bead explicitly requires running `pan install` and confirming `bd --version` reports 1.0.4 before downstream beads execute. Add this to the bead's AC." },
+    { "id": "H3", "summary": "The previous PR #1114 introduced unrelated changes (legacy-agent role inference / `maybeInferRole`) that masked the absence of the real deliverable. Reviewer must verify the diff scope matches the bead description and does not include drive-by changes.", "mitigation": "Acceptance criteria are framed as concrete file edits with specific identifiers (line numbers, function names, argv shape). Review.requirements should reject any diff that exceeds the named edit surface." },
+    { "id": "H4", "summary": "v1.0.4 ships an auto-import-after-pull/checkout hook that may surface on a freshly-bumped developer machine before our redirect setup is reviewed. If the hook contends with the redirect, agents may see unexpected behavior.", "mitigation": "Documented as a known follow-up in autoDecisions; skills-pan-guide bead explicitly re-states `never bd init in a redirect-managed worktree`. Watch for new failure modes in the verification gate and surface them in the PR rather than band-aiding in this issue." },
+    { "id": "H5", "summary": "Skill docs are linted against `bd --help` output (`scripts/lint-skills.sh`). Skill linter may reject documented flags that don't exist on the installed bd binary.", "mitigation": "`bump-install-pin` runs first and verifies the local bd is 1.0.4 — that's the version the lint will run against. If the linter still complains, that means the documented flag isn't in 1.0.4 — read `bd <subcommand> --help` and adjust the doc to match." }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:gpt-5.5",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1111: Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding (createBeadsFromVBrief, withBdMutex, manual redirect setup)",
+      "timestamp": "2026-05-15T05:33:19.125Z"
+    },
+    {
+      "reason": "planning",
+      "note": "Planning complete (pan plan --auto). 7 beads: bump install pin, swap probe to bd ping, simplify recovery (foundation gate), update tests, add corruption-recovery test, update skills/beads/SKILL.md, update skills/beads-panopticon-guide/SKILL.md. Three work items from issue body deferred via autoDecisions: removing withBdMutex, replacing redirect with auto-import, gitignoring committed .beads/metadata|hooks — all out of scope per issue. `bd batch` work item dropped (no bulk-close call site to convert).",
+      "timestamp": "2026-05-15T05:40:00.000Z",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
