@@ -16,6 +16,7 @@ const MINIMAX_DEFAULTS: SettingsConfig = {
       zai: false,
       kimi: false,
       openrouter: false,
+      nous: false,
     },
     overrides: {
       'legacy.route': 'minimax-m2.7-highspeed',

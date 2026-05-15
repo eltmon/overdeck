@@ -47,6 +47,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   glm: 'Z.AI',
   kimi: 'Kimi',
   mimo: 'MiMo',
+  nous: 'Nous Portal',
   openrouter: 'OpenRouter',
 };
 

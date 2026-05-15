@@ -157,6 +157,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     minimax: 'MiniMax',
     zai: 'Z.AI',
     kimi: 'Kimi',
+    nous: 'Nous Portal',
     openrouter: 'OpenRouter',
   };
 

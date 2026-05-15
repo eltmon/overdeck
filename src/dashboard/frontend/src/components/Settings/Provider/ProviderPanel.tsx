@@ -23,6 +23,7 @@ const PROVIDER_INFO: Record<
   kimi: { displayName: 'Kimi (Moonshot)', icon: 'rocket_launch', iconColor: '#6366f1', compatibility: 'router' },
   mimo: { displayName: 'Xiaomi MiMo', icon: 'smart_toy', iconColor: '#FF6900', compatibility: 'router' },
   openrouter: { displayName: 'OpenRouter', icon: 'hub', iconColor: '#6B7F8E', compatibility: 'router' },
+  nous: { displayName: 'Nous Portal', icon: 'hub', iconColor: '#8b5cf6', compatibility: 'router' },
 };
 
 export function ProviderPanel({
@@ -34,7 +35,7 @@ export function ProviderPanel({
   onThinkingLevelChange,
   onTestConnection,
 }: ProviderPanelProps) {
-  const providerList: Provider[] = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter'];
+  const providerList: Provider[] = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'nous', 'openrouter'];
 
   const getApiKey = (provider: Provider): string | undefined => {
     if (provider === 'anthropic') {

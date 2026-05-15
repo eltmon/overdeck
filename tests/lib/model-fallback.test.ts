@@ -43,6 +43,10 @@ describe('model-fallback', () => {
       expect(getModelProvider('gemini-3-pro-preview')).toBe('google');
       expect(getModelProvider('gemini-3-flash-preview')).toBe('google');
     });
+
+    it('should return nous for Nous Portal models', () => {
+      expect(getModelProvider('qwen/qwen3.6-plus')).toBe('nous');
+    });
   });
 
   describe('requiresExternalKey', () => {
@@ -60,6 +64,10 @@ describe('model-fallback', () => {
     it('should return true for Google models', () => {
       expect(requiresExternalKey('gemini-3-pro-preview')).toBe(true);
       expect(requiresExternalKey('gemini-3-flash-preview')).toBe(true);
+    });
+
+    it('should return true for Nous Portal models', () => {
+      expect(requiresExternalKey('qwen/qwen3.6-plus')).toBe(true);
     });
   });
 
@@ -100,6 +108,11 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-2.5-pro'); // legacy
       expect(models).toContain('gemini-2.5-flash'); // legacy
       expect(models).toHaveLength(6);
+    });
+
+    it('should return all Nous Portal models', () => {
+      const models = getModelsByProvider('nous');
+      expect(models).toEqual(['qwen/qwen3.6-plus']);
     });
   });
 
@@ -243,6 +256,10 @@ describe('model-fallback', () => {
       expect(getFallbackModel('gemini-3-pro-preview')).toBe('claude-sonnet-4-6');
       expect(getFallbackModel('gemini-3-flash-preview')).toBe('claude-haiku-4-5');
     });
+
+    it('should return fallback for Nous Portal models', () => {
+      expect(getFallbackModel('qwen/qwen3.6-plus')).toBe('claude-sonnet-4-6');
+    });
   });
 
   describe('detectEnabledProviders', () => {
@@ -259,6 +276,11 @@ describe('model-fallback', () => {
     it('should detect Google when key present', () => {
       const enabled = detectEnabledProviders({ google: 'test-key' });
       expect(enabled.has('google')).toBe(true);
+    });
+
+    it('should detect Nous Portal when key present', () => {
+      const enabled = detectEnabledProviders({ nous: 'nous-key' });
+      expect(enabled.has('nous')).toBe(true);
     });
 
     it('should detect multiple providers', () => {

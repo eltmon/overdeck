@@ -89,7 +89,7 @@ export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo';
+  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */
@@ -754,6 +754,32 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       'context-length': 96,
     },
     notes: 'Xiaomi MiMo multimodal model. 262K context, strong agentic and coding capabilities.',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NOUS PORTAL MODELS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  'qwen/qwen3.6-plus': {
+    model: 'qwen/qwen3.6-plus',
+    provider: 'nous',
+    displayName: 'Qwen 3.6 Plus (Nous Portal)',
+    costPer1MTokens: 0,
+    contextWindow: 1048576,
+    skills: {
+      'code-generation': 94,
+      'code-review': 92,
+      debugging: 92,
+      planning: 92,
+      documentation: 90,
+      testing: 90,
+      security: 88,
+      performance: 88,
+      synthesis: 92,
+      speed: 74,
+      'context-length': 100,
+    },
+    notes: 'Qwen 3.6 Plus via Nous Portal. Free for a limited time; 1M-token context according to public launch material.',
   },
 };
 

@@ -180,6 +180,7 @@ export interface YamlConfig {
       kimi?: ProviderConfig | boolean;
       mimo?: ProviderConfig | boolean;
       openrouter?: ProviderConfig | boolean;
+      nous?: ProviderConfig | boolean;
     };
 
     /** Per-work-type overrides (explicit model for specific tasks) */
@@ -207,6 +208,7 @@ export interface YamlConfig {
     kimi?: string;
     mimo?: string;
     openrouter?: string;
+    nous?: string;
   };
 
   /** Tracker API keys (override environment variables) */
@@ -366,6 +368,7 @@ export interface NormalizedConfig {
     kimi?: string;
     mimo?: string;
     openrouter?: string;
+    nous?: string;
   };
 
   /** Provider auth mode (subscription vs api-key) by provider */
@@ -974,6 +977,17 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       } else if (providers.mimo !== undefined) {
         explicitlyDisabled.add('mimo');
       }
+
+      // Nous Portal
+      const nous = normalizeProviderConfig(providers.nous, legacyKeys.nous);
+      if (nous.enabled) {
+        result.enabledProviders.add('nous');
+        if (nous.api_key) {
+          result.apiKeys.nous = resolveEnvVar(nous.api_key);
+        }
+      } else if (providers.nous !== undefined) {
+        explicitlyDisabled.add('nous');
+      }
     }
 
     // Merge tmux configuration
@@ -1046,6 +1060,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         result.apiKeys.mimo = resolveEnvVar(config.api_keys.mimo);
         if (!explicitlyDisabled.has('mimo')) {
           result.enabledProviders.add('mimo');
+        }
+      }
+      if (config.api_keys.nous) {
+        result.apiKeys.nous = resolveEnvVar(config.api_keys.nous);
+        if (!explicitlyDisabled.has('nous')) {
+          result.enabledProviders.add('nous');
         }
       }
     }
@@ -1351,6 +1371,12 @@ export function loadConfig(): ConfigLoadResult {
     config.apiKeys.mimo = process.env.MIMO_API_KEY;
     if (!explicitlyDisabled.has('mimo')) {
       config.enabledProviders.add('mimo');
+    }
+  }
+  if (process.env.NOUS_API_KEY && !config.apiKeys.nous) {
+    config.apiKeys.nous = process.env.NOUS_API_KEY;
+    if (!explicitlyDisabled.has('nous')) {
+      config.enabledProviders.add('nous');
     }
   }
 
