@@ -3,7 +3,11 @@
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
   "updated": "2026-05-15T00:00:00.000Z",
-  "gitState": { "branch": "feature/pan-1052", "sha": "be3e598b4", "dirty": true },
+  "gitState": {
+    "branch": "feature/pan-1052",
+    "sha": "be3e598b4",
+    "dirty": true
+  },
   "decisions": [
     {
       "id": "D1",
@@ -179,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-cedr",
-    "itemId": "b1-observation-writer",
+    "beadId": "workspace-9ok7",
+    "itemId": "b1-memory-rpc-events",
     "status": "implemented",
-    "note": "Observation writer now appends date-scoped JSONL with O_APPEND and updates an idempotent markdown mirror by observation ID using async same-directory temp writes and rename."
+    "note": "Memory events now project into shared read-model state, flow through DashboardSnapshot, hydrate via syncSnapshot, and persist through the server projection cache for RPC subscribers."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -263,6 +267,12 @@
       "timestamp": "2026-05-16T20:33:00.000Z",
       "reason": "work",
       "note": "workspace-cedr implemented: added src/lib/memory/observations.ts with O_APPEND JSONL writes, idempotent markdown mirror upserts, and tests/lib/memory/observations.test.ts; focused tests, typecheck, and lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T20:41:53.812Z",
+      "reason": "work",
+      "note": "workspace-9ok7 implemented: memory.observation_created, memory.status_updated, memory.rollup_triggered, memory.reset_marker_created, and memory.health_changed now update shared reducer state; snapshots include memory state for server RPC and frontend bootstrap; focused tests, lint, and typecheck passed.",
       "agentModel": "gpt-5.5"
     }
   ],

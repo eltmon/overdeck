@@ -100,8 +100,28 @@ describe('memory DomainEvent contracts', () => {
     }
   })
 
-  it('accepts all memory events in the shared reducer', () => {
+  it('projects all memory events in the shared reducer', () => {
     const next = events.reduce(applyEvent, INITIAL_READ_MODEL_STATE)
+
     expect(next.sequence).toBe(5)
+    expect(next.memory.observationsByIssueId['PAN-1052']).toEqual([observation])
+    expect(next.memory.statusByIssueId['PAN-1052']).toEqual(status)
+    expect(next.memory.rollupsByIssueId['PAN-1052']).toEqual([{
+      projectId: identity.projectId,
+      workspaceId: identity.workspaceId,
+      issueId: identity.issueId,
+      pendingTurns: [pendingTurn],
+      threshold: 4,
+      triggeredAt: TS,
+    }])
+    expect(next.memory.resetMarkersByScopeId['workspace:feature-pan-1052']).toEqual([marker])
+    expect(next.memory.healthByIssueId['PAN-1052']).toEqual({
+      projectId: identity.projectId,
+      issueId: identity.issueId,
+      status: 'degraded',
+      reason: 'provider timeout',
+      ragDecision: undefined,
+      updatedAt: TS,
+    })
   })
 })

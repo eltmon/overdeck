@@ -15,6 +15,11 @@ import type {
   ChannelPermissionRequestSnapshot,
   DashboardSnapshot,
   DomainEvent,
+  MemoryObservation,
+  MemoryStatus,
+  PendingTurn,
+  RagDecision,
+  ResetMarker,
   ResourceStats,
   ReviewStatusSnapshot,
   TurnDiffSummary,
@@ -27,6 +32,32 @@ export interface ResolvedChannelPermissionDecision {
   agentId: string
   issueId?: string
   behavior: 'allow' | 'deny'
+}
+
+export interface MemoryHealthSnapshot {
+  projectId: string
+  issueId: string
+  status: 'healthy' | 'degraded' | 'failing'
+  reason: string | null
+  ragDecision?: RagDecision
+  updatedAt: string
+}
+
+export interface MemoryRollupTriggerSnapshot {
+  projectId: string
+  workspaceId: string
+  issueId: string
+  pendingTurns: PendingTurn[]
+  threshold: number
+  triggeredAt: string
+}
+
+export interface MemoryReadModelState {
+  observationsByIssueId: Record<string, MemoryObservation[]>
+  statusByIssueId: Record<string, MemoryStatus>
+  rollupsByIssueId: Record<string, MemoryRollupTriggerSnapshot[]>
+  resetMarkersByScopeId: Record<string, ResetMarker[]>
+  healthByIssueId: Record<string, MemoryHealthSnapshot>
 }
 
 export interface ReadModelState {
@@ -59,6 +90,7 @@ export interface ReadModelState {
   /** Bumped whenever a conversation is created, so the sidebar list can refresh
    * immediately instead of waiting for its poll tick. */
   conversationsListRevision: number
+  memory: MemoryReadModelState
   /** PAN-457 — active scan progress snapshot */
   scanProgress: ScanProgressSnapshot | null
   /** PAN-457 — latest enrichment stats */
@@ -140,6 +172,13 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   conversationsCompactingByName: {},
   conversationsAwaitingPermissionByName: {},
   conversationsListRevision: 0,
+  memory: {
+    observationsByIssueId: {},
+    statusByIssueId: {},
+    rollupsByIssueId: {},
+    resetMarkersByScopeId: {},
+    healthByIssueId: {},
+  },
   scanProgress: null,
   enrichStats: null,
   enrichProgressBySessionId: {},
@@ -253,6 +292,8 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     channelPermissionRequestIdsByAgentId[request.agentId] = [...existing, request.requestId]
   }
 
+  const memory = snapshot.memory as Partial<MemoryReadModelState> | undefined
+
   return {
     ...state,
     sequence: snapshot.sequence,
@@ -265,6 +306,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     resolvedChannelPermissionDecisionIdsByAgentId: {},
     resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
+    memory: memory ? { ...state.memory, ...memory } : state.memory,
     scanProgress: snapshot.scanProgress ?? null,
     enrichStats: snapshot.enrichStats ?? null,
     enrichProgressBySessionId: snapshot.enrichProgressBySessionId ?? {},
@@ -683,13 +725,109 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'plan.item_status_changed':
     case 'plan.subitem_status_changed':
     case 'plan.items_unblocked':
-    case 'memory.observation_created':
-    case 'memory.status_updated':
-    case 'memory.rollup_triggered':
-    case 'memory.reset_marker_created':
-    case 'memory.health_changed':
     case 'cost.event_recorded':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
+    case 'memory.observation_created': {
+      const observation = event.payload.observation
+      const existing = state.memory.observationsByIssueId[observation.issueId] ?? []
+      const index = existing.findIndex(entry => entry.id === observation.id)
+      const updated = index === -1
+        ? [...existing, observation]
+        : existing.map((entry, entryIndex) => entryIndex === index ? observation : entry)
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        memory: {
+          ...state.memory,
+          observationsByIssueId: {
+            ...state.memory.observationsByIssueId,
+            [observation.issueId]: updated,
+          },
+        },
+      }
+    }
+
+    case 'memory.status_updated': {
+      const { identity, status } = event.payload
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        memory: {
+          ...state.memory,
+          statusByIssueId: {
+            ...state.memory.statusByIssueId,
+            [identity.issueId]: status,
+          },
+        },
+      }
+    }
+
+    case 'memory.rollup_triggered': {
+      const trigger: MemoryRollupTriggerSnapshot = {
+        projectId: event.payload.projectId,
+        workspaceId: event.payload.workspaceId,
+        issueId: event.payload.issueId,
+        pendingTurns: [...event.payload.pendingTurns],
+        threshold: event.payload.threshold,
+        triggeredAt: event.timestamp,
+      }
+      const existing = state.memory.rollupsByIssueId[event.payload.issueId] ?? []
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        memory: {
+          ...state.memory,
+          rollupsByIssueId: {
+            ...state.memory.rollupsByIssueId,
+            [event.payload.issueId]: [...existing, trigger],
+          },
+        },
+      }
+    }
+
+    case 'memory.reset_marker_created': {
+      const { marker } = event.payload
+      const key = `${marker.scope}:${marker.scopeId}`
+      const existing = state.memory.resetMarkersByScopeId[key] ?? []
+      const index = existing.findIndex(entry => entry.id === marker.id)
+      const updated = index === -1
+        ? [...existing, marker]
+        : existing.map((entry, entryIndex) => entryIndex === index ? marker : entry)
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        memory: {
+          ...state.memory,
+          resetMarkersByScopeId: {
+            ...state.memory.resetMarkersByScopeId,
+            [key]: updated,
+          },
+        },
+      }
+    }
+
+    case 'memory.health_changed': {
+      const health: MemoryHealthSnapshot = {
+        projectId: event.payload.projectId,
+        issueId: event.payload.issueId,
+        status: event.payload.status,
+        reason: event.payload.reason,
+        ragDecision: event.payload.ragDecision,
+        updatedAt: event.timestamp,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        memory: {
+          ...state.memory,
+          healthByIssueId: {
+            ...state.memory.healthByIssueId,
+            [event.payload.issueId]: health,
+          },
+        },
+      }
+    }
 
     // ─── PAN-800 Agent Runtime Events ──────────────────────────────────────
     case 'agent.activity_changed': {

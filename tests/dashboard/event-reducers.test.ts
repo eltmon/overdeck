@@ -50,6 +50,13 @@ describe('INITIAL_READ_MODEL_STATE', () => {
     expect(INITIAL_READ_MODEL_STATE.issuesRaw).toEqual([])
     expect(INITIAL_READ_MODEL_STATE.recentActivity).toEqual([])
     expect(INITIAL_READ_MODEL_STATE.shadowInferenceByIssueId).toEqual({})
+    expect(INITIAL_READ_MODEL_STATE.memory).toEqual({
+      observationsByIssueId: {},
+      statusByIssueId: {},
+      rollupsByIssueId: {},
+      resetMarkersByScopeId: {},
+      healthByIssueId: {},
+    })
     expect(INITIAL_READ_MODEL_STATE.resources).toBeNull()
   })
 })
@@ -128,6 +135,27 @@ describe('syncSnapshot', () => {
     const state = syncSnapshot(existing, snapshot)
     expect(state.issuesRaw).toHaveLength(1)
     expect((state.issuesRaw[0] as any).id).toBe('OLD')
+  })
+
+  it('hydrates memory state from snapshot', () => {
+    const state = syncSnapshot(makeState(), {
+      ...snapshot,
+      memory: {
+        observationsByIssueId: { 'PAN-1': [] },
+        healthByIssueId: {
+          'PAN-1': {
+            projectId: 'panopticon-cli',
+            issueId: 'PAN-1',
+            status: 'healthy',
+            reason: null,
+            updatedAt: ts(),
+          },
+        },
+      },
+    })
+
+    expect(state.memory.observationsByIssueId['PAN-1']).toEqual([])
+    expect(state.memory.healthByIssueId['PAN-1']?.status).toBe('healthy')
   })
 })
 

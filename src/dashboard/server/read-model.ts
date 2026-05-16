@@ -234,6 +234,7 @@ export const ReadModelServiceLive = Layer.effect(
         channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
         issues: state.issuesRaw,
         resources: state.resources ?? undefined,
+        memory: state.memory,
         scanProgress: state.scanProgress,
         enrichStats: state.enrichStats,
         enrichProgressBySessionId: state.enrichProgressBySessionId,
@@ -415,6 +416,7 @@ export const ReadModelServiceLive = Layer.effect(
             ),
             issuesRaw: cached.issues ? [...cached.issues] : [],
             resources: cached.resources as ReadModelState['resources'],
+            memory: (cached.memory as ReadModelState['memory'] | undefined) ?? INITIAL_READ_MODEL_STATE.memory,
           };
           usedProjectionCache = true;
           console.log(
