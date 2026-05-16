@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 34;
+export const SCHEMA_VERSION = 35;
 
 /**
  * Initialize the complete database schema.
@@ -228,7 +228,8 @@ export function initSchema(db: Database.Database): void {
       fork_status      TEXT,                               -- async fork provisioning: summarizing, spawning, injecting, failed (null = not a fork or done)
       fork_error       TEXT,                               -- error message when fork_status='failed'
       harness          TEXT,                                -- coding harness used for conversation runtime
-      delivery_method  TEXT                                -- 'auto', 'channels', or 'tmux'
+      delivery_method  TEXT,                               -- 'auto', 'channels', or 'tmux'
+      spawn_error      TEXT                                -- error message when background spawn failed (quota, auth, etc.)
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_status
@@ -782,6 +783,11 @@ export function runMigrations(db: Database.Database): void {
   // v33 → v34: add delivery_method to conversations for channels/tmux toggle
   if (currentVersion < 34) {
     try { db.exec(`ALTER TABLE conversations ADD COLUMN delivery_method TEXT`); } catch { /* already exists */ }
+  }
+
+  // v34 → v35: add spawn_error column for background spawn failures (quota, auth, etc.)
+  if (currentVersion < 35) {
+    try { db.exec(`ALTER TABLE conversations ADD COLUMN spawn_error TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

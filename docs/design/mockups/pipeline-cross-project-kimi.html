@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panopticon — Pipeline Overview</title>
+  <style>
+    :root {
+      --bg-primary: #0f1115;
+      --bg-secondary: #161922;
+      --bg-hover: #1c1f2a;
+      --border: #2a2e3b;
+      --text-primary: #e4e6eb;
+      --text-secondary: #8b8f9a;
+      --accent-purple: #7c3aed;
+      --accent-purple-hover: #8b5cf6;
+      --status-backlog: #6b7280;
+      --status-todo: #f59e0b;
+      --status-inprogress: #3b82f6;
+      --status-done: #10b981;
+      --tag-bg: rgba(255,255,255,0.06);
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-full: 9999px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.5;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 240px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 16px 0;
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+
+    .logo {
+      width: 28px;
+      height: 28px;
+      background: var(--accent-purple);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .sidebar-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .sidebar-subtitle {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: -2px;
+    }
+
+    .new-issue-btn {
+      margin: 0 16px 16px;
+      background: var(--accent-purple);
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .new-issue-btn:hover { background: var(--accent-purple-hover); }
+
+    .nav-section { padding: 8px 0; }
+
+    .nav-label {
+      padding: 0 20px 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 16px;
+      margin: 0 8px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-secondary);
+    }
+
+    .nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .nav-item.active { background: var(--bg-hover); color: var(--text-primary); }
+
+    .nav-icon { font-size: 14px; width: 16px; text-align: center; }
+
+    .nav-badge {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-secondary);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .breadcrumb {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .view-tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .view-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 13px;
+      border: 1px solid transparent;
+    }
+
+    .view-tab:hover { background: var(--bg-hover); }
+    .view-tab.active { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border); }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+    .btn-primary {
+      background: var(--accent-purple);
+      color: white;
+      border: none;
+    }
+
+    .btn-primary:hover { background: var(--accent-purple-hover); }
+
+    /* List View */
+    .list-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 20px 40px;
+    }
+
+    .section {
+      margin-top: 24px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 8px 8px;
+      position: sticky;
+      top: 0;
+      background: var(--bg-primary);
+      z-index: 10;
+    }
+
+    .section-toggle {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    .section-title {
+      font-weight: 600;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-count {
+      color: var(--text-secondary);
+      font-weight: 400;
+    }
+
+    .section-divider {
+      height: 1px;
+      background: var(--border);
+      margin-bottom: 2px;
+    }
+
+    /* Rows */
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      margin: 1px 0;
+    }
+
+    .row:hover { background: var(--bg-hover); }
+
+    .row-checkbox {
+      width: 16px;
+      height: 16px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+    }
+
+    .status-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: var(--radius-full);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .status-dot.backlog { background: rgba(107, 114, 128, 0.15); color: var(--status-backlog); }
+    .status-dot.todo { background: rgba(245, 158, 11, 0.15); color: var(--status-todo); }
+    .status-dot.inprogress { background: rgba(59, 130, 246, 0.15); color: var(--status-inprogress); }
+    .status-dot.done { background: rgba(16, 185, 129, 0.15); color: var(--status-done); }
+
+    .issue-id {
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-family: "SF Mono", Monaco, monospace;
+      width: 54px;
+      flex-shrink: 0;
+    }
+
+    .issue-title {
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 500;
+    }
+
+    .tags {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .tag {
+      padding: 1px 8px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      background: var(--tag-bg);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .tag.type { color: #60a5fa; border-color: rgba(96, 165, 250, 0.25); }
+    .tag.priority { color: #f87171; border-color: rgba(248, 113, 113, 0.25); }
+    .tag.area { color: #34d399; border-color: rgba(52, 211, 153, 0.25); }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
+    .team { min-width: 110px; text-align: right; }
+
+    .date { min-width: 50px; text-align: right; }
+
+    .avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: var(--radius-full);
+      background: var(--accent-purple);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .avatar.red { background: #dc2626; }
+    .avatar.blue { background: #2563eb; }
+    .avatar.green { background: #059669; }
+    .avatar.orange { background: #ea580c; }
+    .avatar.pink { background: #db2777; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #374151; border-radius: var(--radius-full); }
+    ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">P</div>
+        <div>
+          <div class="sidebar-title">Panopticon</div>
+          <div class="sidebar-subtitle">CLI v0.5.0</div>
+        </div>
+      </div>
+
+      <button class="new-issue-btn">+ New issue</button>
+
+      <div class="nav-section">
+        <div class="nav-item active">
+          <span class="nav-icon">&#9776;</span>
+          <span>All Issues</span>
+          <span class="nav-badge">17</span>
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">&#9638;</span>
+          <span>Kanban Board</span>
+        </div>
+        <div class="nav-item">
+          <span class="nav-icon">&#9733;</span>
+          <span>Analytics</span>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Filter Status</div>
+        <div class="nav-item">
+          <span class="status-dot todo" style="width:8px;height:8px;"></span>
+          <span>Todo</span>
+          <span class="nav-badge">4</span>
+        </div>
+        <div class="nav-item">
+          <span class="status-dot inprogress" style="width:8px;height:8px;"></span>
+          <span>In Progress</span>
+          <span class="nav-badge">6</span>
+        </div>
+        <div class="nav-item">
+          <span class="status-dot done" style="width:8px;height:8px;"></span>
+          <span>Done</span>
+          <span class="nav-badge">3</span>
+        </div>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Projects</div>
+        <div class="nav-item">
+          <span style="color:#7c3aed;">&#9679;</span>
+          <span>Core Platform</span>
+          <span class="nav-badge">8</span>
+        </div>
+        <div class="nav-item">
+          <span style="color:#f59e0b;">&#9679;</span>
+          <span>Dashboard</span>
+          <span class="nav-badge">5</span>
+        </div>
+        <div class="nav-item">
+          <span style="color:#10b981;">&#9679;</span>
+          <span>Cloister</span>
+          <span class="nav-badge">4</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <header class="header">
+        <div class="header-left">
+          <div class="breadcrumb">Panopticon / All Issues <span style="color:var(--text-secondary);font-weight:400;">17 issues</span></div>
+        </div>
+        <div class="view-tabs">
+          <div class="view-tab active"><span>&#9776;</span> List</div>
+          <div class="view-tab"><span>&#9638;</span> Board</div>
+          <div class="view-tab"><span>&#9733;</span> Analytics</div>
+          <div class="view-tab"><span>&#9670;</span> Group <span style="font-size:10px;">&#9660;</span></div>
+        </div>
+        <div class="header-right">
+          <div class="btn">&#128269; Filter issues...</div>
+          <button class="btn btn-primary">+</button>
+        </div>
+      </header>
+
+      <div class="list-container">
+        <!-- Backlog -->
+        <div class="section">
+          <div class="section-header">
+            <span class="section-toggle">&#9660;</span>
+            <span class="section-title">Backlog <span class="section-count">4</span></span>
+          </div>
+          <div class="section-divider"></div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot backlog">&#9899;</div>
+            <div class="issue-id">PAN-70</div>
+            <div class="issue-title">Replace execSync with async spawn in dashboard server</div>
+            <div class="tags">
+              <span class="tag type">bug</span>
+              <span class="tag area">dashboard</span>
+            </div>
+            <div class="meta">
+              <span class="team">Core Platform</span>
+              <span class="date">May 12</span>
+              <div class="avatar">EB</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot backlog">&#9899;</div>
+            <div class="issue-id">PAN-71</div>
+            <div class="issue-title">Electron wrapper for panopticon dashboard</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag area">desktop</span>
+            </div>
+            <div class="meta">
+              <span class="team">Dashboard</span>
+              <span class="date">May 10</span>
+              <div class="avatar red">AI</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot backlog">&#9899;</div>
+            <div class="issue-id">PAN-72</div>
+            <div class="issue-title">SQLite WAL mode for concurrent agent writes</div>
+            <div class="tags">
+              <span class="tag type">perf</span>
+              <span class="tag area">database</span>
+            </div>
+            <div class="meta">
+              <span class="team">Core Platform</span>
+              <span class="date">May 8</span>
+              <div class="avatar blue">JD</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot backlog">&#9899;</div>
+            <div class="issue-id">PAN-73</div>
+            <div class="issue-title">npx launchable binary without global install</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag area">cli</span>
+            </div>
+            <div class="meta">
+              <span class="team">Core Platform</span>
+              <span class="date">May 5</span>
+              <div class="avatar">EB</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Todo -->
+        <div class="section">
+          <div class="section-header">
+            <span class="section-toggle">&#9660;</span>
+            <span class="section-title">Todo <span class="section-count">4</span></span>
+          </div>
+          <div class="section-divider"></div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot todo">&#9209;</div>
+            <div class="issue-id">PAN-65</div>
+            <div class="issue-title">Cloister stuck-agent detection with heartbeat timeout</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag priority">high</span>
+              <span class="tag area">cloister</span>
+            </div>
+            <div class="meta">
+              <span class="team">Cloister</span>
+              <span class="date">May 14</span>
+              <div class="avatar green">MK</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot todo">&#9209;</div>
+            <div class="issue-id">PAN-66</div>
+            <div class="issue-title">Review agent auto-assignment by file ownership</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag area">agents</span>
+            </div>
+            <div class="meta">
+              <span class="team">Core Platform</span>
+              <span class="date">May 13</span>
+              <div class="avatar orange">SW</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot todo">&#9209;</div>
+            <div class="issue-id">PAN-67</div>
+            <div class="issue-title">Merge agent squash-and-rebase flow</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag priority">high</span>
+              <span class="tag area">agents</span>
+            </div>
+            <div class="meta">
+              <span class="team">Core Platform</span>
+              <span class="date">May 11</span>
+              <div class="avatar pink">AL</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot todo">&#9209;</div>
+            <div class="issue-id">PAN-68</div>
+            <div class="issue-title">Traefik dynamic config reload on workspace add</div>
+            <div class="tags">
+              <span class="tag type">bug</span>
+              <span class="tag area">infra</span>
+            </div>
+            <div class="meta">
+              <span class="team">Dashboard</span>
+              <span class="date">May 9</span>
+              <div class="avatar blue">JD</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- In Progress -->
+        <div class="section">
+          <div class="section-header">
+            <span class="section-toggle">&#9660;</span>
+            <span class="section-title">In Progress <span class="section-count">6</span></span>
+          </div>
+          <div class="section-divider"></div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot inprogress">&#9654;</div>
+            <div class="issue-id">PAN-55</div>
+            <div class="issue-title">Dogfooding all-up command for Panopticon self-development</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag priority">urgent</span>
+              <span class="tag area">pipeline</span>
+            </div>
+            <div class="meta">
+              <span class="team">Core Platform</span>
+              <span class="date">May 16</span>
+              <div class="avatar">EB</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot inprogress">&#9654;</div>
+            <div class="issue-id">PAN-56</div>
+            <div class="issue-title">Beads git-backed issue tracker integration</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag area">cli</span>
+            </div>
+            <div class="meta">
+              <span class="team">Core Platform</span>
+              <span class="date">May 15</span>
+              <div class="avatar red">AI</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot inprogress">&#9654;</div>
+            <div class="issue-id">PAN-57</div>
+            <div class="issue-title">Socket.io event streaming for agent logs</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag area">dashboard</span>
+            </div>
+            <div class="meta">
+              <span class="team">Dashboard</span>
+              <span class="date">May 14</span>
+              <div class="avatar green">MK</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot inprogress">&#9654;</div>
+            <div class="issue-id">PAN-58</div>
+            <div class="issue-title">Workspace Docker isolation with compose profiles</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag area">infra</span>
+            </div>
+            <div class="meta">
+              <span class="team">Core Platform</span>
+              <span class="date">May 13</span>
+              <div class="avatar orange">SW</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot inprogress">&#9654;</div>
+            <div class="issue-id">PAN-59</div>
+            <div class="issue-title">Specialist agent model routing via config</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag area">cloister</span>
+            </div>
+            <div class="meta">
+              <span class="team">Cloister</span>
+              <span class="date">May 12</span>
+              <div class="avatar pink">AL</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot inprogress">&#9654;</div>
+            <div class="issue-id">PAN-60</div>
+            <div class="issue-title">Vitest test suite runner with maxForks: 4</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag area">agents</span>
+            </div>
+            <div class="meta">
+              <span class="team">Core Platform</span>
+              <span class="date">May 11</span>
+              <div class="avatar blue">JD</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Done -->
+        <div class="section">
+          <div class="section-header">
+            <span class="section-toggle">&#9660;</span>
+            <span class="section-title">Done <span class="section-count">3</span></span>
+          </div>
+          <div class="section-divider"></div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot done">&#10003;</div>
+            <div class="issue-id">PAN-48</div>
+            <div class="issue-title">Git worktree-based workspace creation</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag area">workspace</span>
+            </div>
+            <div class="meta">
+              <span class="team">Core Platform</span>
+              <span class="date">May 8</span>
+              <div class="avatar">EB</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot done">&#10003;</div>
+            <div class="issue-id">PAN-49</div>
+            <div class="issue-title">React dashboard with real-time status</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag area">dashboard</span>
+            </div>
+            <div class="meta">
+              <span class="team">Dashboard</span>
+              <span class="date">May 6</span>
+              <div class="avatar green">MK</div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-checkbox"></div>
+            <div class="status-dot done">&#10003;</div>
+            <div class="issue-id">PAN-50</div>
+            <div class="issue-title">SQLite schema for issues, agents, workspaces</div>
+            <div class="tags">
+              <span class="tag type">feature</span>
+              <span class="tag area">database</span>
+            </div>
+            <div class="meta">
+              <span class="team">Core Platform</span>
+              <span class="date">May 4</span>
+              <div class="avatar orange">SW</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

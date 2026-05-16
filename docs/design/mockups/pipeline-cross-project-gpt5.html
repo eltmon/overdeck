@@ -1,0 +1,1026 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Panopticon Project Pipeline Overview Mock</title>
+  <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --background: color-mix(in srgb, rgb(10 10 10) 95%, white);
+      --foreground: rgb(245 245 245);
+      --card: color-mix(in srgb, var(--background) 98%, white);
+      --card-foreground: rgb(245 245 245);
+      --popover: color-mix(in srgb, var(--background) 96%, white);
+      --muted: color-mix(in srgb, white 4%, transparent);
+      --muted-foreground: color-mix(in srgb, rgb(115 115 115) 84%, white);
+      --border: color-mix(in srgb, white 7%, transparent);
+      --border-strong: color-mix(in srgb, white 12%, transparent);
+      --input: color-mix(in srgb, white 8%, transparent);
+      --accent: color-mix(in srgb, white 5%, transparent);
+      --primary: oklch(0.588 0.217 264);
+      --primary-foreground: white;
+      --success: rgb(16 185 129);
+      --success-foreground: rgb(52 211 153);
+      --warning: rgb(245 158 11);
+      --warning-foreground: rgb(251 191 36);
+      --destructive: color-mix(in srgb, rgb(239 68 68) 90%, white);
+      --destructive-foreground: rgb(248 113 113);
+      --signal-review: rgb(168 85 247);
+      --signal-review-foreground: rgb(192 132 252);
+      --signal-cost: rgb(6 182 212);
+      --signal-cost-foreground: rgb(34 211 238);
+      --radius: 10px;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 10px;
+      --radius-xl: 14px;
+      --radius-2xl: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--background);
+      color: var(--foreground);
+      font-family: "DM Sans", system-ui, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      overflow: hidden;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.035;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 256px 256px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 256px 1fr;
+      height: 100vh;
+    }
+
+    .sidebar {
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .brand {
+      height: 64px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .eye {
+      width: 34px;
+      height: 34px;
+      border-radius: var(--radius-xl);
+      display: grid;
+      place-items: center;
+      background: color-mix(in srgb, var(--primary) 14%, transparent);
+      border: 1px solid color-mix(in srgb, var(--primary) 36%, transparent);
+      color: var(--primary);
+    }
+
+    .eye::before {
+      content: "";
+      width: 17px;
+      height: 10px;
+      border: 2px solid currentColor;
+      border-radius: 999px;
+      box-shadow: inset 0 0 0 3px transparent;
+    }
+
+    .wordmark {
+      font-family: "Space Grotesk", system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+
+    .workspace {
+      color: var(--muted-foreground);
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    .nav-search {
+      margin: 14px 12px 10px;
+      height: 34px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--input);
+      background: color-mix(in srgb, var(--background) 72%, white);
+      color: var(--muted-foreground);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      font-size: 13px;
+    }
+
+    .nav-group {
+      padding: 10px 12px 0;
+    }
+
+    .nav-label {
+      color: var(--muted-foreground);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin: 8px 0 6px;
+    }
+
+    .nav-item {
+      height: 32px;
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 10px;
+      color: var(--muted-foreground);
+      margin-bottom: 2px;
+    }
+
+    .nav-item.active {
+      color: var(--foreground);
+      background: var(--accent);
+      box-shadow: inset 2px 0 0 var(--primary);
+    }
+
+    .nav-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      display: inline-block;
+      position: relative;
+    }
+
+    .nav-icon.grid::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-top: 1px solid currentColor;
+      border-bottom: 1px solid currentColor;
+      opacity: 0.65;
+    }
+
+    .nav-icon.pipe::after {
+      content: "";
+      position: absolute;
+      left: 4px;
+      top: 3px;
+      bottom: 3px;
+      width: 6px;
+      border-left: 1px solid currentColor;
+      border-right: 1px solid currentColor;
+      opacity: 0.65;
+    }
+
+    .nav-count {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--muted-foreground);
+    }
+
+    .project-list {
+      margin-top: auto;
+      padding-bottom: 14px;
+    }
+
+    .project-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--muted-foreground);
+    }
+
+    .project-dot.pan { background: var(--primary); }
+    .project-dot.myn { background: var(--success); }
+    .project-dot.aur { background: var(--warning); }
+    .project-dot.open { background: var(--signal-review); }
+
+    main {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      height: 100vh;
+    }
+
+    .topbar {
+      height: 64px;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) minmax(260px, 420px) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 0 20px;
+      background: color-mix(in srgb, var(--background) 92%, white);
+    }
+
+    .crumbs {
+      min-width: 0;
+    }
+
+    .kicker {
+      color: var(--muted-foreground);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    h1 {
+      font: inherit;
+      font-size: 18px;
+      line-height: 1.2;
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    .summary-pill {
+      height: 22px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      color: var(--muted-foreground);
+      background: var(--muted);
+      padding: 2px 7px;
+      font-size: 12px;
+    }
+
+    .search {
+      height: 36px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--input);
+      background: color-mix(in srgb, var(--card) 88%, white);
+      color: var(--muted-foreground);
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      gap: 8px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .button {
+      height: 34px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      background: var(--muted);
+      color: var(--foreground);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 11px;
+      font: inherit;
+      font-size: 13px;
+    }
+
+    .button.primary {
+      background: var(--primary);
+      color: var(--primary-foreground);
+      border-color: color-mix(in srgb, var(--primary) 72%, white);
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      min-height: 0;
+      flex: 1;
+    }
+
+    .pipeline {
+      min-width: 0;
+      overflow: auto;
+      padding: 18px 20px 32px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-2xl);
+      min-height: 74px;
+      padding: 13px 14px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric::before, .side-card::before, .section::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      box-shadow: inset 0 -1px 0 color-mix(in srgb, white 6%, transparent);
+      border-radius: inherit;
+    }
+
+    .metric-label {
+      color: var(--muted-foreground);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 22px;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    .metric-note {
+      margin-top: 6px;
+      color: var(--muted-foreground);
+      font-size: 11px;
+    }
+
+    .metric.primary .metric-value { color: var(--primary); }
+    .metric.review .metric-value { color: var(--warning-foreground); }
+    .metric.success .metric-value { color: var(--success-foreground); }
+    .metric.cost .metric-value { color: var(--signal-cost-foreground); }
+
+    .section {
+      background: color-mix(in srgb, var(--card) 98%, white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-2xl);
+      margin-bottom: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .section-header {
+      min-height: 42px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 14px;
+      padding: 0 14px;
+      border-top: 4px solid var(--border-strong);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section.active .section-header { border-top-color: var(--primary); }
+    .section.review .section-header { border-top-color: var(--warning); }
+    .section.ship .section-header { border-top-color: var(--success); }
+    .section.planning .section-header { border-top-color: var(--signal-review); }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .section-title span:first-child {
+      font-size: 15px;
+    }
+
+    .section-subtitle {
+      color: var(--muted-foreground);
+      font-size: 12px;
+    }
+
+    .section-meta {
+      display: flex;
+      gap: 8px;
+      color: var(--muted-foreground);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .row {
+      min-height: 56px;
+      display: grid;
+      grid-template-columns: 92px minmax(280px, 1fr) 210px 96px 120px 34px;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .row:last-child { border-bottom: 0; }
+    .row:hover { background: var(--accent); }
+
+    .issue {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      color: var(--muted-foreground);
+      font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .status-glyph {
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border);
+      color: var(--muted-foreground);
+      flex: 0 0 auto;
+    }
+
+    .status-glyph::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .status-glyph.active {
+      color: var(--primary);
+      border-color: color-mix(in srgb, var(--primary) 32%, transparent);
+      background: color-mix(in srgb, var(--primary) 8%, transparent);
+    }
+
+    .status-glyph.review {
+      color: var(--warning-foreground);
+      border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+      background: color-mix(in srgb, var(--warning) 8%, transparent);
+    }
+
+    .status-glyph.ship {
+      color: var(--success-foreground);
+      border-color: color-mix(in srgb, var(--success) 32%, transparent);
+      background: color-mix(in srgb, var(--success) 8%, transparent);
+    }
+
+    .status-glyph.planning {
+      color: var(--signal-review-foreground);
+      border-color: color-mix(in srgb, var(--signal-review) 32%, transparent);
+      background: color-mix(in srgb, var(--signal-review) 8%, transparent);
+    }
+
+    .row-main {
+      min-width: 0;
+    }
+
+    .row-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--foreground);
+      margin-bottom: 5px;
+    }
+
+    .tags {
+      display: flex;
+      gap: 5px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .tag, .badge {
+      min-height: 20px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--muted);
+      color: var(--muted-foreground);
+      padding: 2px 6px;
+      font-size: 11px;
+      line-height: 15px;
+      white-space: nowrap;
+    }
+
+    .badge.primary {
+      color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 8%, transparent);
+      border-color: color-mix(in srgb, var(--primary) 32%, transparent);
+    }
+
+    .badge.review {
+      color: var(--warning-foreground);
+      background: color-mix(in srgb, var(--warning) 8%, transparent);
+      border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+    }
+
+    .badge.ship {
+      color: var(--success-foreground);
+      background: color-mix(in srgb, var(--success) 8%, transparent);
+      border-color: color-mix(in srgb, var(--success) 32%, transparent);
+    }
+
+    .agent-cell {
+      min-width: 0;
+      color: var(--muted-foreground);
+      font-size: 12px;
+    }
+
+    .agent-name {
+      color: var(--foreground);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-bottom: 4px;
+      font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 11px;
+    }
+
+    .agent-sub {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .duration, .updated {
+      color: var(--muted-foreground);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .avatars {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      color: var(--foreground);
+      background: color-mix(in srgb, var(--card) 84%, white);
+      font-size: 10px;
+    }
+
+    aside {
+      border-left: 1px solid var(--border);
+      background: color-mix(in srgb, var(--background) 94%, white);
+      padding: 18px 16px;
+      overflow: auto;
+    }
+
+    .side-card {
+      position: relative;
+      border-radius: var(--radius-2xl);
+      border: 1px solid var(--border);
+      background: var(--card);
+      padding: 15px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .side-title {
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+
+    .health-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .health-row:last-child { border-bottom: 0; }
+
+    .health-label {
+      color: var(--muted-foreground);
+      font-size: 12px;
+    }
+
+    .health-value {
+      color: var(--foreground);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .event {
+      display: grid;
+      grid-template-columns: 14px 1fr;
+      gap: 9px;
+    }
+
+    .event-marker {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      margin-top: 5px;
+      background: var(--muted-foreground);
+    }
+
+    .event-marker.primary { background: var(--primary); }
+    .event-marker.review { background: var(--warning); }
+    .event-marker.ship { background: var(--success); }
+
+    .event-title {
+      font-size: 12px;
+      line-height: 1.35;
+      color: var(--foreground);
+    }
+
+    .event-time {
+      color: var(--muted-foreground);
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: color-mix(in srgb, white 12%, transparent); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, white 18%, transparent); }
+
+    @media (max-width: 1120px) {
+      .app { grid-template-columns: 56px 1fr; }
+      .wordmark, .workspace, .nav-search, .nav-label, .nav-text, .nav-count, .project-list { display: none; }
+      .brand { justify-content: center; padding: 0; }
+      .nav-group { padding: 10px 8px; }
+      .nav-item { justify-content: center; padding: 0; }
+      .content { grid-template-columns: 1fr; }
+      aside { display: none; }
+      .topbar { grid-template-columns: 1fr; height: auto; padding: 14px; }
+      .toolbar, .search { display: none; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .row { grid-template-columns: 82px minmax(180px, 1fr) 34px; }
+      .agent-cell, .duration, .updated { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Navigation">
+      <div class="brand">
+        <div class="eye" aria-hidden="true"></div>
+        <div>
+          <div class="wordmark">Panopticon</div>
+          <div class="workspace">Project pipeline</div>
+        </div>
+      </div>
+      <div class="nav-search">/ Filter projects</div>
+      <div class="nav-group">
+        <div class="nav-label">Operations</div>
+        <div class="nav-item"><span class="nav-icon grid"></span><span class="nav-text">Command Deck</span></div>
+        <div class="nav-item active"><span class="nav-icon pipe"></span><span class="nav-text">Pipeline Overview</span><span class="nav-count">24</span></div>
+        <div class="nav-item"><span class="nav-icon"></span><span class="nav-text">Agents</span><span class="nav-count">7</span></div>
+        <div class="nav-item"><span class="nav-icon"></span><span class="nav-text">Awaiting Merge</span><span class="nav-count">2</span></div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">Filter status</div>
+        <div class="nav-item active"><span class="status-glyph active"></span><span class="nav-text">All statuses</span></div>
+        <div class="nav-item"><span class="status-glyph planning"></span><span class="nav-text">Planning</span></div>
+        <div class="nav-item"><span class="status-glyph active"></span><span class="nav-text">In Progress</span></div>
+        <div class="nav-item"><span class="status-glyph review"></span><span class="nav-text">In Review</span></div>
+        <div class="nav-item"><span class="status-glyph ship"></span><span class="nav-text">Ready to Ship</span></div>
+      </div>
+      <div class="project-list nav-group">
+        <div class="nav-label">Projects</div>
+        <div class="nav-item active"><span class="project-dot pan"></span><span class="nav-text">Panopticon CLI</span><span class="nav-count">PAN</span></div>
+        <div class="nav-item"><span class="project-dot myn"></span><span class="nav-text">Mind Your Now</span><span class="nav-count">MIN</span></div>
+        <div class="nav-item"><span class="project-dot aur"></span><span class="nav-text">Auricle</span><span class="nav-count">AUR</span></div>
+        <div class="nav-item"><span class="project-dot open"></span><span class="nav-text">OpenClaw</span></div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div class="crumbs">
+          <div class="kicker">Panopticon CLI / Project Pipeline</div>
+          <div class="title-row">
+            <h1>Pipeline Overview</h1>
+            <span class="summary-pill">40 open GitHub issues</span>
+            <span class="summary-pill">7 running agents</span>
+          </div>
+        </div>
+        <div class="search">Search issues, agents, labels, workspaces</div>
+        <div class="toolbar">
+          <button class="button">List</button>
+          <button class="button">Board</button>
+          <button class="button">Analytics</button>
+          <button class="button primary">Start</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="pipeline" aria-label="Pipeline list">
+          <div class="metrics">
+            <div class="metric primary">
+              <div class="metric-label">Machine working</div>
+              <div class="metric-value">4</div>
+              <div class="metric-note">work agents active</div>
+            </div>
+            <div class="metric review">
+              <div class="metric-label">Human review</div>
+              <div class="metric-value">5</div>
+              <div class="metric-note">review loop items</div>
+            </div>
+            <div class="metric success">
+              <div class="metric-label">Ship validation</div>
+              <div class="metric-value">2</div>
+              <div class="metric-note">ship agents running</div>
+            </div>
+            <div class="metric cost">
+              <div class="metric-label">TLDR savings</div>
+              <div class="metric-value">28K</div>
+              <div class="metric-note">tokens saved per active run</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Backlog signal</div>
+              <div class="metric-value">18</div>
+              <div class="metric-note">visible queued issues</div>
+            </div>
+          </div>
+
+          <div class="section ship">
+            <div class="section-header">
+              <div class="section-title"><span>Ready to Ship</span><span class="section-subtitle">Merge gate and final validation</span></div>
+              <div class="section-meta"><span>2 items</span><span>ship agents running</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph ship"></span>PAN-1111</div>
+              <div class="row-main">
+                <div class="row-title">Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding</div>
+                <div class="tags"><span class="tag">bug</span><span class="tag">in-review</span><span class="badge ship">SHIP RUNNING</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">agent-pan-1111-ship</div><div class="agent-sub">gpt-5.5 · ship</div></div>
+              <div class="duration">19 min</div>
+              <div class="updated">updated today</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph ship"></span>PAN-829</div>
+              <div class="row-main">
+                <div class="row-title">TTS: Built-in settings, lifecycle management, and coverage</div>
+                <div class="tags"><span class="tag">in-review</span><span class="badge ship">SHIP RUNNING</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">agent-pan-829-ship</div><div class="agent-sub">gpt-5.5 · ship</div></div>
+              <div class="duration">115 min</div>
+              <div class="updated">updated today</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+          </div>
+
+          <div class="section review">
+            <div class="section-header">
+              <div class="section-title"><span>In Review</span><span class="section-subtitle">Review synthesis, specialist verdicts, or user approval</span></div>
+              <div class="section-meta"><span>5 items</span><span>amber = human attention</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph review"></span>PAN-1111</div>
+              <div class="row-main">
+                <div class="row-title">Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding</div>
+                <div class="tags"><span class="tag">bug</span><span class="tag">in-review</span><span class="badge review">REVIEW RUNNING</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">agent-pan-1111-review</div><div class="agent-sub">minimax-m2.7-highspeed · review</div></div>
+              <div class="duration">24 min</div>
+              <div class="updated">updated today</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph review"></span>PAN-829</div>
+              <div class="row-main">
+                <div class="row-title">TTS: Built-in settings, lifecycle management, and coverage</div>
+                <div class="tags"><span class="tag">in-review</span><span class="badge review">REVIEW RUNNING</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">agent-pan-829-review</div><div class="agent-sub">minimax-m2.7-highspeed · review</div></div>
+              <div class="duration">127 min</div>
+              <div class="updated">updated today</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph review"></span>PAN-1053</div>
+              <div class="row-main">
+                <div class="row-title">feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback</div>
+                <div class="tags"><span class="tag">enhancement</span><span class="tag">in-review</span><span class="badge review">REVIEW HISTORY</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">agent-pan-1053-review</div><div class="agent-sub">specialists stopped · prior cycle</div></div>
+              <div class="duration">1,789 min</div>
+              <div class="updated">May 15</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph review"></span>PAN-1104</div>
+              <div class="row-main">
+                <div class="row-title">pan reopen &lt;github-issue&gt; mis-routes to Linear for projects that have both trackers</div>
+                <div class="tags"><span class="tag">bug</span><span class="tag">in-review</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">agent-pan-1104-review</div><div class="agent-sub">review specialists stopped</div></div>
+              <div class="duration">5,189 min</div>
+              <div class="updated">May 12</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph review"></span>PAN-457</div>
+              <div class="row-main">
+                <div class="row-title">Archived Conversations page — unified view of archived and system JSONL sessions</div>
+                <div class="tags"><span class="tag">enhancement</span><span class="tag">in-review</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">agent-pan-457-review</div><div class="agent-sub">review specialists stopped</div></div>
+              <div class="duration">5,184 min</div>
+              <div class="updated">May 12</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+          </div>
+
+          <div class="section active">
+            <div class="section-header">
+              <div class="section-title"><span>In Progress</span><span class="section-subtitle">Machine work currently underway</span></div>
+              <div class="section-meta"><span>4 items</span><span>blue = machine working</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph active"></span>PAN-1052</div>
+              <div class="row-main">
+                <div class="row-title">Activity feed: per-turn observations with time-bucketed sidebar</div>
+                <div class="tags"><span class="tag">in-progress</span><span class="badge primary">WORK RUNNING</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">agent-pan-1052</div><div class="agent-sub">gpt-5.5 · work</div></div>
+              <div class="duration">1,856 min</div>
+              <div class="updated">May 15</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph active"></span>PAN-1053</div>
+              <div class="row-main">
+                <div class="row-title">feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback</div>
+                <div class="tags"><span class="tag">enhancement</span><span class="tag">in-review</span><span class="badge primary">WORK RUNNING</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">agent-pan-1053</div><div class="agent-sub">gpt-5.5 · work</div></div>
+              <div class="duration">5,406 min</div>
+              <div class="updated">May 15</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph active"></span>PAN-1111</div>
+              <div class="row-main">
+                <div class="row-title">Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding</div>
+                <div class="tags"><span class="tag">bug</span><span class="tag">in-review</span><span class="badge primary">WORK RUNNING</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">agent-pan-1111</div><div class="agent-sub">gpt-5.5 · work</div></div>
+              <div class="duration">1,817 min</div>
+              <div class="updated">today</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph active"></span>PAN-457</div>
+              <div class="row-main">
+                <div class="row-title">Archived Conversations page — unified view of archived and system JSONL sessions</div>
+                <div class="tags"><span class="tag">enhancement</span><span class="tag">in-review</span><span class="badge primary">WORK RUNNING</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">agent-pan-457</div><div class="agent-sub">gpt-5.5 · work</div></div>
+              <div class="duration">5,451 min</div>
+              <div class="updated">May 12</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+          </div>
+
+          <div class="section planning">
+            <div class="section-header">
+              <div class="section-title"><span>Planning</span><span class="section-subtitle">Discovery, scope, and vBRIEF candidates</span></div>
+              <div class="section-meta"><span>3 items</span><span>queued for plan</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph planning"></span>PAN-1103</div>
+              <div class="row-main">
+                <div class="row-title">feat(dashboard): surface AskUserQuestion choice options in conversation view</div>
+                <div class="tags"><span class="tag">enhancement</span><span class="tag">planning</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">no active agent</div><div class="agent-sub">GitHub issue open</div></div>
+              <div class="duration">queued</div>
+              <div class="updated">May 12</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph planning"></span>PAN-1102</div>
+              <div class="row-main">
+                <div class="row-title">feat(dashboard): yellow warning indicator when agent awaits user input</div>
+                <div class="tags"><span class="tag">enhancement</span><span class="tag">planning</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">no active agent</div><div class="agent-sub">GitHub issue open</div></div>
+              <div class="duration">queued</div>
+              <div class="updated">May 12</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph planning"></span>PAN-1122</div>
+              <div class="row-main">
+                <div class="row-title">Trim OpenAI model catalog to 5 supported models</div>
+                <div class="tags"><span class="tag">planned</span></div>
+              </div>
+              <div class="agent-cell"><div class="agent-name">no active agent</div><div class="agent-sub">GitHub issue open</div></div>
+              <div class="duration">queued</div>
+              <div class="updated">May 15</div>
+              <div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-header">
+              <div class="section-title"><span>Backlog</span><span class="section-subtitle">Open Panopticon GitHub issues without active pipeline state</span></div>
+              <div class="section-meta"><span>6 shown</span><span>neutral signal</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph"></span>PAN-1136</div>
+              <div class="row-main"><div class="row-title">Hook system cleanup: dead inspect-on-bead-close, pan-review-agent inconsistency</div><div class="tags"><span class="tag">open</span></div></div>
+              <div class="agent-cell"><div class="agent-name">no active agent</div><div class="agent-sub">GitHub issue open</div></div>
+              <div class="duration">queued</div><div class="updated">today</div><div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph"></span>PAN-1135</div>
+              <div class="row-main"><div class="row-title">Document the hook system in docs/HOOKS.md</div><div class="tags"><span class="tag">open</span></div></div>
+              <div class="agent-cell"><div class="agent-name">no active agent</div><div class="agent-sub">GitHub issue open</div></div>
+              <div class="duration">queued</div><div class="updated">today</div><div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph"></span>PAN-1134</div>
+              <div class="row-main"><div class="row-title">Pi harness has no hook-equivalent event channel</div><div class="tags"><span class="tag">open</span></div></div>
+              <div class="agent-cell"><div class="agent-name">no active agent</div><div class="agent-sub">GitHub issue open</div></div>
+              <div class="duration">queued</div><div class="updated">today</div><div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph"></span>PAN-1133</div>
+              <div class="row-main"><div class="row-title">TLDR: deacon supervision + pan doctor check + GC</div><div class="tags"><span class="tag">open</span></div></div>
+              <div class="agent-cell"><div class="agent-name">no active agent</div><div class="agent-sub">GitHub issue open</div></div>
+              <div class="duration">queued</div><div class="updated">May 15</div><div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph"></span>PAN-1132</div>
+              <div class="row-main"><div class="row-title">TLDR: fix broken status reporting + expose to work agents</div><div class="tags"><span class="tag">open</span></div></div>
+              <div class="agent-cell"><div class="agent-name">no active agent</div><div class="agent-sub">GitHub issue open</div></div>
+              <div class="duration">queued</div><div class="updated">May 15</div><div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+            <div class="row">
+              <div class="issue"><span class="status-glyph"></span>PAN-1131</div>
+              <div class="row-main"><div class="row-title">Stale idle synthesis session blocks review re-dispatch</div><div class="tags"><span class="tag">bug</span></div></div>
+              <div class="agent-cell"><div class="agent-name">no active agent</div><div class="agent-sub">GitHub issue open</div></div>
+              <div class="duration">queued</div><div class="updated">May 14</div><div class="avatars"><span class="avatar">EB</span></div>
+            </div>
+          </div>
+        </section>
+
+        <aside aria-label="Pipeline details">
+          <div class="side-card">
+            <div class="side-title">Live pipeline health</div>
+            <div class="health-row"><span class="health-label">Running agents</span><span class="health-value">1052, 1053, 1111, 457, 829</span></div>
+            <div class="health-row"><span class="health-label">Review specialists</span><span class="health-value">1111, 829 active</span></div>
+            <div class="health-row"><span class="health-label">Ship validation</span><span class="health-value">1111, 829 active</span></div>
+            <div class="health-row"><span class="health-label">Harness mix</span><span class="health-value">claude-code</span></div>
+          </div>
+
+          <div class="side-card">
+            <div class="side-title">Recent signal</div>
+            <div class="timeline">
+              <div class="event"><span class="event-marker ship"></span><div><div class="event-title">PAN-1111 ship agent entered final validation</div><div class="event-time">19 minutes ago</div></div></div>
+              <div class="event"><span class="event-marker review"></span><div><div class="event-title">PAN-829 review loop remains active</div><div class="event-time">127 minutes ago</div></div></div>
+              <div class="event"><span class="event-marker primary"></span><div><div class="event-title">PAN-1052 work agent running activity feed implementation</div><div class="event-time">1,856 minutes</div></div></div>
+              <div class="event"><span class="event-marker"></span><div><div class="event-title">Latest open issue: hook system cleanup</div><div class="event-time">today</div></div></div>
+            </div>
+          </div>
+
+          <div class="side-card">
+            <div class="side-title">Layout notes</div>
+            <div class="health-row"><span class="health-label">View type</span><span class="health-value">compact grouped list</span></div>
+            <div class="health-row"><span class="health-label">Primary grouping</span><span class="health-value">pipeline state</span></div>
+            <div class="health-row"><span class="health-label">Row density</span><span class="health-value">56px target</span></div>
+            <div class="health-row"><span class="health-label">Color rule</span><span class="health-value">one signal per row</span></div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

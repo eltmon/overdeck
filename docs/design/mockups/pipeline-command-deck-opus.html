@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Command Deck · Panopticon CLI · Panopticon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --color-white:#fff; --color-black:#000;
+      --color-neutral-100:#f5f5f4; --color-neutral-400:#a3a3a3; --color-neutral-500:#737373;
+      --color-neutral-800:#292524; --color-neutral-950:#0c0a09;
+      --color-red-400:#f87171; --color-red-500:#ef4444;
+      --color-amber-400:#fbbf24; --color-amber-500:#f59e0b;
+      --color-emerald-400:#34d399; --color-emerald-500:#10b981;
+      --color-blue-400:#60a5fa; --color-blue-500:#3b82f6;
+      --color-purple-400:#c084fc; --color-purple-500:#a855f7;
+      --color-cyan-400:#22d3ee; --color-cyan-500:#06b6d4;
+
+      --background: color-mix(in srgb, var(--color-neutral-950) 95%, var(--color-white));
+      --foreground: var(--color-neutral-100);
+      --card: color-mix(in srgb, var(--background) 98%, var(--color-white));
+      --muted-foreground: color-mix(in srgb, var(--color-neutral-500) 90%, var(--color-white));
+      --accent: rgb(255 255 255 / 4%);
+      --border: rgb(255 255 255 / 6%);
+      --input: rgb(255 255 255 / 8%);
+
+      --primary: oklch(0.588 0.217 264);
+      --primary-foreground: var(--color-white);
+      --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
+      --destructive-foreground: var(--color-red-400);
+      --info: var(--color-blue-500); --info-foreground: var(--color-blue-400);
+      --success: var(--color-emerald-500); --success-foreground: var(--color-emerald-400);
+      --warning: var(--color-amber-500); --warning-foreground: var(--color-amber-400);
+      --signal-review: var(--color-purple-500); --signal-review-foreground: var(--color-purple-400);
+      --signal-cost: var(--color-cyan-500); --signal-cost-foreground: var(--color-cyan-400);
+
+      --radius: 0.625rem;
+      --radius-sm: calc(var(--radius) - 4px);
+      --radius-md: calc(var(--radius) - 2px);
+      --radius-lg: var(--radius);
+      --radius-xl: calc(var(--radius) + 4px);
+      --radius-2xl: calc(var(--radius) + 8px);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;height:100%;background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+    body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:256px 256px;z-index:9999}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.18)}
+    .mono{font-family:"SF Mono",SFMono-Regular,Consolas,"Liberation Mono",monospace}
+
+    /* Three-pane: app-sidebar | project-tree | feature-detail */
+    .app{display:grid;grid-template-columns:48px 280px 1fr;height:100vh;overflow:hidden}
+
+    /* App rail (collapsed sidebar) */
+    .rail{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px}
+    .rail .mark{width:30px;height:30px;display:grid;place-items:center;color:var(--foreground)}
+    .rail .mark svg{width:20px;height:20px}
+    .rail .nav{width:32px;height:32px;display:grid;place-items:center;border-radius:var(--radius-lg);color:var(--muted-foreground);cursor:pointer;transition:background-color 200ms,color 200ms;position:relative;margin-top:4px}
+    .rail .nav:hover{background:var(--accent);color:var(--foreground)}
+    .rail .nav.active{background:var(--accent);color:var(--foreground)}
+    .rail .nav.active::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--primary)}
+    .rail .nav svg{width:16px;height:16px}
+    .rail .spacer{flex:1}
+    .rail .avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#a855f7,#06b6d4);display:grid;place-items:center;color:#fff;font-size:10px;font-weight:600;border:1px solid var(--border)}
+
+    /* Project tree pane */
+    .tree{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+    .tree-head{display:flex;align-items:center;gap:8px;padding:14px 14px 10px}
+    .tree-head .title{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:14px;letter-spacing:-.01em}
+    .tree-head .sub{font-size:10px;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.12em}
+    .tree-search{margin:0 12px 8px;display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:rgb(255 255 255 / 3%);border:1px solid var(--input);color:var(--muted-foreground);font-size:12px}
+    .tree-scroll{flex:1;overflow-y:auto;padding:4px 8px 12px}
+    .tree-section{margin-top:8px}
+    .tree-section-label{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:var(--muted-foreground);padding:6px 6px 4px}
+
+    .proj-item{display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:13px;border-radius:var(--radius-lg);cursor:pointer;color:var(--muted-foreground);transition:background-color 200ms,color 200ms;position:relative}
+    .proj-item:hover{background:var(--accent);color:var(--foreground)}
+    .proj-item .chev{width:12px;height:12px;color:var(--muted-foreground);transition:transform 200ms}
+    .proj-item .mark{width:14px;height:14px;border-radius:3px;display:inline-block}
+    .proj-item.active{background:var(--accent);color:var(--foreground)}
+    .proj-item.active::before{content:"";position:absolute;left:-4px;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--primary)}
+    .proj-item.active .chev{transform:rotate(90deg)}
+    .proj-item .pill{margin-left:auto;font-family:"SF Mono",monospace;font-size:10px;color:var(--muted-foreground);background:var(--accent);padding:1px 5px;border-radius:var(--radius-sm)}
+
+    .feature-list{margin:4px 0 4px 22px;display:flex;flex-direction:column;gap:2px}
+    .feature-item{display:flex;align-items:center;gap:8px;padding:5px 8px;font-size:12px;border-radius:var(--radius-md);cursor:pointer;color:var(--muted-foreground);transition:background-color 200ms,color 200ms;position:relative}
+    .feature-item:hover{background:var(--accent);color:var(--foreground)}
+    .feature-item.selected{background:var(--accent);color:var(--foreground)}
+    .feature-item.selected::before{content:"";position:absolute;left:-2px;top:5px;bottom:5px;width:2px;border-radius:2px;background:var(--primary)}
+    .feature-item .id{font-family:"SF Mono",monospace;font-size:10px;color:var(--muted-foreground);min-width:54px}
+    .feature-item .text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .feature-item .ind{width:6px;height:6px;border-radius:50%}
+    .feature-item .ind.progress{background:var(--info)}
+    .feature-item .ind.review{background:var(--warning)}
+    .feature-item .ind.ship{background:var(--signal-review)}
+    .feature-item .ind.todo{background:rgb(255 255 255 / 25%)}
+    .feature-item .ind.done{background:var(--success)}
+
+    /* Detail pane */
+    .detail{display:flex;flex-direction:column;min-width:0;background:var(--background)}
+    .detail-head{padding:18px 22px 0;border-bottom:1px solid var(--border)}
+    .crumbs{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted-foreground);margin-bottom:6px}
+    .crumbs .sep{opacity:.5}
+    .detail-h1{display:flex;align-items:center;gap:12px;margin:0 0 4px;font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:22px;letter-spacing:-.01em;color:var(--foreground)}
+    .detail-h1 .mark{width:18px;height:18px;border-radius:4px;background:var(--signal-review)}
+    .detail-sub{font-size:13px;color:var(--muted-foreground);max-width:640px}
+
+    .detail-stats{display:flex;gap:24px;margin-top:18px;padding-bottom:14px}
+    .stat{display:flex;flex-direction:column;gap:2px;min-width:0}
+    .stat .label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);display:flex;align-items:center;gap:6px}
+    .stat .label svg{width:11px;height:11px}
+    .stat .value{font-size:16px;font-weight:500;font-variant-numeric:tabular-nums;color:var(--foreground)}
+    .stat .delta{font-size:11px;color:var(--success-foreground)}
+    .stat .lbl-machine{color:var(--info-foreground)}
+    .stat .lbl-review{color:var(--warning-foreground)}
+    .stat .lbl-ship{color:var(--signal-review-foreground)}
+    .stat .lbl-cost{color:var(--signal-cost-foreground)}
+    .stat .lbl-stuck{color:var(--destructive-foreground)}
+
+    .tabs{display:flex;gap:0;border-top:1px solid var(--border);margin-top:8px}
+    .tab{padding:10px 14px;font-size:13px;font-weight:500;color:var(--muted-foreground);cursor:pointer;position:relative;transition:color 200ms;display:flex;align-items:center;gap:6px}
+    .tab:hover{color:var(--foreground)}
+    .tab.active{color:var(--foreground)}
+    .tab.active::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;background:var(--primary);border-radius:2px}
+    .tab .count{font-family:"SF Mono",monospace;font-size:10px;padding:1px 5px;border-radius:var(--radius-sm);background:var(--accent);color:var(--muted-foreground)}
+
+    .detail-toolbar{display:flex;align-items:center;gap:10px;padding:10px 22px;border-bottom:1px solid var(--border)}
+    .search-mini{flex:1;display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:var(--radius-lg);background:var(--card);border:1px solid var(--input);color:var(--muted-foreground);font-size:12px;max-width:340px}
+    .pill-mini{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;background:var(--card);border:1px solid var(--input);border-radius:var(--radius-lg);color:var(--muted-foreground);font-size:12px;font-family:inherit;cursor:pointer}
+    .pill-mini b{color:var(--foreground);font-weight:500}
+    .btn-primary{height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;background:var(--primary);color:var(--primary-foreground);border:none;border-radius:var(--radius-lg);font:inherit;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;box-shadow:0 1px 0 rgb(255 255 255 / 6%) inset}
+    .btn-ghost{height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;background:transparent;color:var(--muted-foreground);border:1px solid var(--input);border-radius:var(--radius-lg);font:inherit;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit}
+
+    .detail-scroll{flex:1;overflow-y:auto}
+
+    /* Phase groups — same as cross-project but tighter */
+    .phase{border-bottom:1px solid var(--border)}
+    .phase-head{display:flex;align-items:center;gap:12px;padding:10px 22px 8px;background:color-mix(in srgb, var(--background) 92%, var(--color-white));backdrop-filter:blur(6px);border-bottom:1px solid var(--border);border-top:2px solid transparent;position:sticky;top:0;z-index:2}
+    .phase.ship   .phase-head{border-top-color:var(--success)}
+    .phase.review .phase-head{border-top-color:var(--warning)}
+    .phase.work   .phase-head{border-top-color:var(--info)}
+    .phase.plan   .phase-head{border-top-color:var(--signal-review)}
+    .phase.todo   .phase-head{border-top-color:rgb(255 255 255 / 15%)}
+    .phase-title{font-size:13px;font-weight:500;color:var(--foreground)}
+    .phase-count{font-size:11px;color:var(--muted-foreground);padding:1px 6px;border-radius:var(--radius-sm);background:var(--accent)}
+    .phase-sub{font-size:11px;color:var(--muted-foreground);margin-left:4px}
+    .phase-right{margin-left:auto;font-size:11px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+
+    .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+    .dot.todo{background:rgb(255 255 255 / 25%)}
+    .dot.progress{background:var(--info)}
+    .dot.review{background:var(--warning)}
+    .dot.ship{background:var(--signal-review)}
+    .dot.done{background:var(--success)}
+
+    /* Row — narrower since no project column */
+    .row{display:grid;grid-template-columns:14px 78px 14px 1fr 220px 84px 26px;align-items:center;gap:12px;padding:9px 22px 9px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background-color 200ms;position:relative}
+    .row:hover{background:var(--accent)}
+    .row:last-child{border-bottom:none}
+    .row::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;background:transparent}
+    .row.p-urgent::before{background:var(--destructive)}
+    .row.p-high::before{background:var(--warning)}
+    .row.p-medium::before{background:rgb(255 255 255 / 22%)}
+    .row.p-low::before{background:transparent}
+
+    .prio{width:12px;height:12px}
+    .prio.urgent{color:var(--destructive-foreground)}
+    .prio.high{color:var(--warning-foreground)}
+    .prio.medium{color:var(--muted-foreground)}
+    .prio.low{color:var(--muted-foreground);opacity:.5}
+
+    .issue-id{font-family:"SF Mono",monospace;font-size:11px;color:var(--muted-foreground)}
+
+    .sglyph{width:14px;height:14px}
+    .sglyph.todo    {color:var(--muted-foreground)}
+    .sglyph.progress{color:var(--info-foreground)}
+    .sglyph.review  {color:var(--warning-foreground)}
+    .sglyph.ship    {color:var(--signal-review-foreground)}
+    .sglyph.done    {color:var(--success-foreground)}
+
+    .title-cell{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .title-row1{display:flex;align-items:center;gap:8px;min-width:0}
+    .title-text{font-size:13px;color:var(--foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .title-row2{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted-foreground);min-width:0}
+    .title-row2 .label{font-size:10px;font-weight:500;padding:1px 6px;border-radius:var(--radius-sm);background:rgb(255 255 255 / 5%);color:var(--muted-foreground);border:1px solid var(--border);white-space:nowrap}
+    .title-row2 .branch{font-family:"SF Mono",monospace;color:var(--muted-foreground)}
+    .title-row2 .div-dot{width:3px;height:3px;border-radius:50%;background:var(--muted-foreground);opacity:.5}
+
+    .agent-cell{display:flex;flex-direction:column;gap:3px;min-width:0}
+    .agent-name{font-family:"SF Mono",monospace;font-size:11px;color:var(--foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .agent-sub{font-family:"SF Mono",monospace;font-size:10px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .agent-cell.empty .agent-name{color:var(--muted-foreground);font-style:italic;font-family:"DM Sans",sans-serif;font-size:11px}
+
+    .runtime{font-family:"SF Mono",monospace;font-size:11px;color:var(--muted-foreground);text-align:right;font-variant-numeric:tabular-nums}
+
+    .avatar-sm{width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#a855f7,#06b6d4);display:grid;place-items:center;color:#fff;font-size:9px;font-weight:600;border:1px solid var(--border)}
+    .avatar-sm.b{background:linear-gradient(135deg,#f59e0b,#ef4444)}
+    .avatar-sm.c{background:linear-gradient(135deg,#10b981,#06b6d4)}
+    .avatar-sm.d{background:linear-gradient(135deg,#60a5fa,#a855f7)}
+    .avatar-sm.e{background:linear-gradient(135deg,#ef4444,#f59e0b)}
+
+    .verb{font-size:10px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:var(--radius-sm);border:1px solid;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+    .verb .pulse{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1.6s ease-out infinite}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 currentColor;opacity:1}80%{box-shadow:0 0 0 6px transparent;opacity:.5}100%{box-shadow:0 0 0 0 transparent;opacity:1}}
+    .verb.work{background:color-mix(in srgb,var(--info) 8%,transparent);border-color:color-mix(in srgb,var(--info) 32%,transparent);color:var(--info-foreground)}
+    .verb.review{background:color-mix(in srgb,var(--warning) 8%,transparent);border-color:color-mix(in srgb,var(--warning) 32%,transparent);color:var(--warning-foreground)}
+    .verb.ship{background:color-mix(in srgb,var(--signal-review) 8%,transparent);border-color:color-mix(in srgb,var(--signal-review) 32%,transparent);color:var(--signal-review-foreground)}
+    .verb.merge{background:color-mix(in srgb,var(--success) 8%,transparent);border-color:color-mix(in srgb,var(--success) 32%,transparent);color:var(--success-foreground)}
+    .verb.queued{background:transparent;border-color:var(--border);color:var(--muted-foreground)}
+    .verb.queued .pulse{display:none}
+
+    /* Mock-navigator footer */
+    .mock-chrome{position:fixed;bottom:14px;right:14px;z-index:100;display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--background) 96%,var(--color-white));border:1px solid var(--border);border-radius:var(--radius-2xl);padding:8px 14px;font-size:11px;color:var(--muted-foreground);box-shadow:0 8px 24px rgb(0 0 0 / 32%)}
+    .mock-chrome a{color:var(--muted-foreground);text-decoration:none;font-weight:500;padding:4px 8px;border-radius:var(--radius-md);transition:background-color 200ms,color 200ms}
+    .mock-chrome a:hover{background:var(--accent);color:var(--foreground)}
+    .mock-chrome a.current{color:var(--foreground);background:var(--accent)}
+    .mock-chrome .mock-label{color:var(--muted-foreground);font-size:10px;text-transform:uppercase;letter-spacing:.1em}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- App rail -->
+    <aside class="rail">
+      <div class="mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+      </div>
+      <div class="nav active" title="Command Deck">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m14.5 9.5-2.5 5-5 2.5 2.5-5z" fill="currentColor"/></svg>
+      </div>
+      <div class="nav" title="Pipeline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
+      </div>
+      <div class="nav" title="Board">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="11" rx="1"/></svg>
+      </div>
+      <div class="nav" title="Agents">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>
+      </div>
+      <div class="nav" title="Activity">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 12 7 12 9 6 13 18 15 12 21 12"/></svg>
+      </div>
+      <div class="nav" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1A2 2 0 1 1 4.5 17l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8L4.2 7A2 2 0 1 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1A2 2 0 1 1 19.7 7l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </div>
+      <div class="spacer"></div>
+      <div class="avatar">EB</div>
+    </aside>
+
+    <!-- Project tree -->
+    <nav class="tree">
+      <div class="tree-head">
+        <div>
+          <div class="title">Command Deck</div>
+          <div class="sub">Project explorer</div>
+        </div>
+      </div>
+      <div class="tree-search">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Find project, issue, branch…
+      </div>
+
+      <div class="tree-scroll">
+        <div class="tree-section">
+          <div class="tree-section-label"><span>Projects</span><span>5</span></div>
+
+          <div class="proj-item active">
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>
+            <span class="mark" style="background:var(--signal-review)"></span>
+            Panopticon CLI
+            <span class="pill mono">PAN</span>
+          </div>
+          <div class="feature-list">
+            <div class="feature-item">
+              <span class="ind ship"></span>
+              <span class="id">PAN-1052</span>
+              <span class="text">Activity feed: per-turn observations…</span>
+            </div>
+            <div class="feature-item selected">
+              <span class="ind ship"></span>
+              <span class="id">PAN-1111</span>
+              <span class="text">Upgrade beads to v1.0.4 + scaffolding</span>
+            </div>
+            <div class="feature-item">
+              <span class="ind review"></span>
+              <span class="id">PAN-1053</span>
+              <span class="text">Voice STT + AutoPreso whiteboard</span>
+            </div>
+            <div class="feature-item">
+              <span class="ind progress"></span>
+              <span class="id">PAN-1124</span>
+              <span class="text">Decouple specs and PRDs from workspaces</span>
+            </div>
+            <div class="feature-item">
+              <span class="ind todo"></span>
+              <span class="id">PAN-1129</span>
+              <span class="text">Review-request pushes wrong branch name</span>
+            </div>
+            <div class="feature-item">
+              <span class="ind todo"></span>
+              <span class="id">PAN-1130</span>
+              <span class="text">Headless review sub-reviewer normal exit…</span>
+            </div>
+            <div class="feature-item">
+              <span class="ind todo"></span>
+              <span class="id">PAN-1131</span>
+              <span class="text">Stale idle synthesis session blocks dispatch</span>
+            </div>
+            <div class="feature-item">
+              <span class="ind todo"></span>
+              <span class="id">PAN-1132</span>
+              <span class="text">TLDR: fix broken status reporting</span>
+            </div>
+            <div class="feature-item">
+              <span class="ind todo"></span>
+              <span class="id">PAN-1133</span>
+              <span class="text">TLDR: deacon supervision + pan doctor</span>
+            </div>
+          </div>
+
+          <div class="proj-item">
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>
+            <span class="mark" style="background:var(--info)"></span>
+            Mind Your Now
+            <span class="pill mono">MIN</span>
+          </div>
+          <div class="proj-item">
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>
+            <span class="mark" style="background:var(--success)"></span>
+            Auricle
+            <span class="pill mono">AUR</span>
+          </div>
+          <div class="proj-item">
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>
+            <span class="mark" style="background:var(--warning)"></span>
+            Krux
+            <span class="pill mono">KRX</span>
+          </div>
+          <div class="proj-item">
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>
+            <span class="mark" style="background:var(--signal-cost)"></span>
+            OpenClaw
+            <span class="pill mono">OCW</span>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Detail (selected project) -->
+    <section class="detail">
+      <div class="detail-head">
+        <div class="crumbs">
+          <span>Eltmon</span><span class="sep">/</span><span>Command Deck</span><span class="sep">/</span><span style="color:var(--foreground)">Panopticon CLI</span>
+        </div>
+        <h1 class="detail-h1">
+          <span class="mark"></span>
+          Panopticon CLI
+        </h1>
+        <div class="detail-sub mono" style="font-size:11px;color:var(--muted-foreground)">eltmon/panopticon-cli · main · 47 open issues · 14 active in pipeline</div>
+
+        <div class="detail-stats">
+          <div class="stat">
+            <div class="label lbl-machine">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V3M16 6V3"/></svg>
+              Machine working
+            </div>
+            <div class="value">3</div>
+          </div>
+          <div class="stat">
+            <div class="label lbl-review">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>
+              Human attention
+            </div>
+            <div class="value">2</div>
+          </div>
+          <div class="stat">
+            <div class="label lbl-ship">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/></svg>
+              Ship validation
+            </div>
+            <div class="value">2</div>
+          </div>
+          <div class="stat">
+            <div class="label lbl-cost">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              Spend · 24h
+            </div>
+            <div class="value">$9.81</div>
+            <div class="delta">▼ 14%</div>
+          </div>
+          <div class="stat">
+            <div class="label lbl-stuck">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+              Stuck
+            </div>
+            <div class="value">0</div>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab active">Pipeline <span class="count">9</span></div>
+          <div class="tab">Plans <span class="count">2</span></div>
+          <div class="tab">Beads <span class="count">31</span></div>
+          <div class="tab">Conversations <span class="count">14</span></div>
+          <div class="tab">Activity</div>
+          <div class="tab">Settings</div>
+        </div>
+      </div>
+
+      <div class="detail-toolbar">
+        <div class="search-mini">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          Filter issues in Panopticon CLI…
+        </div>
+        <button class="pill-mini">Group: <b>Phase</b>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <button class="pill-mini">Priority
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <button class="btn-ghost">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Export
+        </button>
+        <button class="btn-primary">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 4 19 12 5 20Z" fill="currentColor"/></svg>
+          Start agent
+        </button>
+      </div>
+
+      <div class="detail-scroll">
+        <!-- Ship validation -->
+        <div class="phase ship">
+          <div class="phase-head">
+            <span class="dot ship"></span>
+            <span class="phase-title">Ship validation</span>
+            <span class="phase-count">2</span>
+            <span class="phase-sub">Merge gate · rebase, push, await human merge</span>
+            <span class="phase-right">2 ship agents · $1.42/h</span>
+          </div>
+
+          <div class="row p-high">
+            <svg class="prio high" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg>
+            <span class="issue-id">PAN-1052</span>
+            <svg class="sglyph ship" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Activity feed: per-turn observations with time-bucketed sidebar</span>
+                <span class="verb ship"><span class="pulse"></span>SHIP RUNNING</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">dashboard</span>
+                <span class="label">observability</span>
+                <span class="div-dot"></span>
+                <span class="branch">feature/pan-1052</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">agent-pan-1052-ship</div>
+              <div class="agent-sub">opus-4-7 · ship</div>
+            </div>
+            <div class="runtime">19 min</div>
+            <div class="avatar-sm c">EB</div>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">PAN-1111</span>
+            <svg class="sglyph ship" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding</span>
+                <span class="verb merge">READY TO MERGE</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">refactor</span>
+                <span class="label">beads</span>
+                <span class="div-dot"></span>
+                <span class="branch">feature/pan-1111</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">agent-pan-1111-ship</div>
+              <div class="agent-sub">gpt-5.5 · idle</div>
+            </div>
+            <div class="runtime">2 min</div>
+            <div class="avatar-sm c">EB</div>
+          </div>
+        </div>
+
+        <!-- In Review -->
+        <div class="phase review">
+          <div class="phase-head">
+            <span class="dot review"></span>
+            <span class="phase-title">In Review</span>
+            <span class="phase-count">1</span>
+            <span class="phase-sub">Specialist convoy in flight</span>
+            <span class="phase-right">amber = waiting on human</span>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">PAN-1053</span>
+            <svg class="sglyph review" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback</span>
+                <span class="verb review"><span class="pulse"></span>REVIEW RUNNING</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">stt</span>
+                <span class="label">whiteboard</span>
+                <span class="div-dot"></span>
+                <span class="branch">feature/pan-1053</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">convoy-pan-1053-review</div>
+              <div class="agent-sub">4 specialists · sonnet-4-6</div>
+            </div>
+            <div class="runtime">1h 27m</div>
+            <div class="avatar-sm d">EB</div>
+          </div>
+        </div>
+
+        <!-- In Progress -->
+        <div class="phase work">
+          <div class="phase-head">
+            <span class="dot progress"></span>
+            <span class="phase-title">In Progress</span>
+            <span class="phase-count">1</span>
+            <span class="phase-sub">Work agent writing code in workspace</span>
+            <span class="phase-right">blue = machine working</span>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">PAN-1124</span>
+            <svg class="sglyph progress" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Decouple specs and PRDs from workspaces — write directly to main</span>
+                <span class="verb work"><span class="pulse"></span>WORK RUNNING</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">architecture</span>
+                <span class="label">vbrief</span>
+                <span class="div-dot"></span>
+                <span class="branch">feature/pan-1124</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">agent-pan-1124</div>
+              <div class="agent-sub">opus-4-7 · bead 5/9</div>
+            </div>
+            <div class="runtime">42 min</div>
+            <div class="avatar-sm">EB</div>
+          </div>
+        </div>
+
+        <!-- Todo -->
+        <div class="phase todo">
+          <div class="phase-head">
+            <span class="dot todo"></span>
+            <span class="phase-title">Todo</span>
+            <span class="phase-count">5</span>
+            <span class="phase-sub">Triaged, ready for planning</span>
+            <span class="phase-right">no agent activity</span>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">PAN-1129</span>
+            <svg class="sglyph todo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><circle cx="12" cy="12" r="9"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Review-request route pushes wrong branch name: feature/977 instead of feature/pan-977</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">bug</span>
+                <span class="label">review-pipeline</span>
+              </div>
+            </div>
+            <div class="agent-cell empty"><div class="agent-name">no active agent</div><div class="agent-sub mono">GitHub #1129</div></div>
+            <div class="runtime">—</div>
+            <div class="avatar-sm d">EB</div>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">PAN-1130</span>
+            <svg class="sglyph todo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><circle cx="12" cy="12" r="9"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">bug</span>
+                <span class="label">review-pipeline</span>
+              </div>
+            </div>
+            <div class="agent-cell empty"><div class="agent-name">no active agent</div><div class="agent-sub mono">GitHub #1130</div></div>
+            <div class="runtime">—</div>
+            <div class="avatar-sm">EB</div>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">PAN-1131</span>
+            <svg class="sglyph todo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><circle cx="12" cy="12" r="9"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Stale idle synthesis session blocks review re-dispatch (idempotency guard)</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">bug</span>
+                <span class="label">review-pipeline</span>
+              </div>
+            </div>
+            <div class="agent-cell empty"><div class="agent-name">no active agent</div><div class="agent-sub mono">GitHub #1131</div></div>
+            <div class="runtime">—</div>
+            <div class="avatar-sm">EB</div>
+          </div>
+
+          <div class="row p-low">
+            <svg class="prio low" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1" opacity=".4"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".2"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".1"/></svg>
+            <span class="issue-id">PAN-1132</span>
+            <svg class="sglyph todo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><circle cx="12" cy="12" r="9"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">TLDR: fix broken status reporting + expose to work agents</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">tldr</span>
+                <span class="label">infra</span>
+              </div>
+            </div>
+            <div class="agent-cell empty"><div class="agent-name">no active agent</div><div class="agent-sub mono">GitHub #1132</div></div>
+            <div class="runtime">—</div>
+            <div class="avatar-sm">EB</div>
+          </div>
+
+          <div class="row p-low">
+            <svg class="prio low" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1" opacity=".4"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".2"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".1"/></svg>
+            <span class="issue-id">PAN-1133</span>
+            <svg class="sglyph todo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><circle cx="12" cy="12" r="9"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">TLDR: deacon supervision + pan doctor check + GC</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">tldr</span>
+                <span class="label">infra</span>
+              </div>
+            </div>
+            <div class="agent-cell empty"><div class="agent-name">no active agent</div><div class="agent-sub mono">GitHub #1133</div></div>
+            <div class="runtime">—</div>
+            <div class="avatar-sm">EB</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="mock-chrome">
+    <span class="mock-label">Opus mocks</span>
+    <a href="pipeline-cross-project-opus.html">Pipeline</a>
+    <a href="board-opus.html">Board</a>
+    <a href="pipeline-command-deck-opus.html" class="current">Command Deck</a>
+    <a href="agents-opus.html">Agents</a>
+    <a href="issue-detail-opus.html">Issue Detail</a>
+    <a href="system-map-opus.html">System Map</a>
+  </div>
+</body>
+</html>

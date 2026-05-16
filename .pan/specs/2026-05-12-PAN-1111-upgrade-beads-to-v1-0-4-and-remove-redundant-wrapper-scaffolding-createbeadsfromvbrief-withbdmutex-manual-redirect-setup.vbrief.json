@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-12T17:57:53.652Z",
-    "updated": "2026-05-15T05:41:18.016Z",
+    "updated": "2026-05-15T06:38:15.502Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1111: Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding",
     "inspectionPolicy": "auto"
@@ -13,11 +13,68 @@
     "status": "proposed",
     "uid": "bb7041db-13db-488a-9429-70382b646a68",
     "author": "agent:claude-opus-4-7",
-    "sequence": 4,
+    "sequence": 17,
     "created": "2026-05-12T17:57:53.652Z",
-    "updated": "2026-05-15T05:41:18.016Z",
+    "updated": "2026-05-15T06:38:15.502Z",
     "metadata": {
-      "canonicalFilename": "2026-05-12-PAN-1111-upgrade-beads-to-v1-0-4-and-remove-redundant-wrapper-scaffolding-createbeadsfromvbrief-withbdmutex-manual-redirect-setup.vbrief.json"
+      "canonicalFilename": "2026-05-12-PAN-1111-upgrade-beads-to-v1-0-4-and-remove-redundant-wrapper-scaffolding-createbeadsfromvbrief-withbdmutex-manual-redirect-setup.vbrief.json",
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-1111",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-15T06:38:15.500Z",
+        "work": {
+          "updatedAt": "2026-05-15T06:38:15.500Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-15T06:38:15.500Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-15T06:38:15.500Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "reviewing",
+          "updatedAt": "2026-05-15T06:38:15.500Z",
+          "history": [
+            {
+              "status": "reviewing",
+              "at": "2026-05-15T06:38:15.500Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-15T06:38:15.500Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-15T06:38:15.500Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-15T06:38:15.500Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-15T06:38:15.500Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-15T06:38:15.500Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1114"
+        }
+      }
     },
     "references": [
       {

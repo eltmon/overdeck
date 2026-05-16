@@ -4,17 +4,17 @@
     "created": "2026-05-09T02:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-829: TTS: Built-in settings, lifecycle management, and coverage",
-    "updated": "2026-05-15T05:32:36.200Z"
+    "updated": "2026-05-15T05:32:36.476Z"
   },
   "plan": {
     "id": "pan-829",
     "title": "TTS: Built-in settings, lifecycle management, and coverage",
-    "status": "approved",
+    "status": "running",
     "uid": "4917865d-21a9-46b0-90e8-064edf16721f",
     "author": "agent:claude-sonnet-4-6",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-05-09T02:00:00.000Z",
-    "updated": "2026-05-15T05:32:36.200Z",
+    "updated": "2026-05-15T05:32:36.476Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/829",

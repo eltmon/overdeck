@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -22,6 +22,28 @@ function makeFakeHome(): { home: string; cleanup: () => void } {
 
 const fixedTime = '2026-05-07T05:00:00.000Z'
 const now = () => fixedTime
+
+// Track fetch calls and control responses per test.
+let fetchCalls: { url: string; body: unknown }[] = []
+let fetchResponse: { status: number } = { status: 200 }
+
+beforeEach(() => {
+  fetchCalls = []
+  fetchResponse = { status: 200 }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      const url = _url
+      const body = init?.body ? JSON.parse(init.body as string) : undefined
+      fetchCalls.push({ url, body })
+      return { status: fetchResponse.status } as Response
+    }),
+  )
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('handleSessionStart', () => {
   let h: ReturnType<typeof makeFakeHome>
@@ -63,6 +85,88 @@ describe('handleSessionStart', () => {
     const paths = panopticonPathsFor('agent-pan-636', h.home)
     expect(existsSync(paths.sessionIdPath)).toBe(false)
   })
+
+  it('PAN-1134: POSTs model_set + activity idle to the dashboard', async () => {
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-abc' },
+    )
+    expect(fetchCalls.length).toBe(2)
+    expect(fetchCalls[0]!.url).toBe('http://localhost:3010/api/agents/agent-pan-636/heartbeat')
+    expect(fetchCalls[0]!.body).toEqual({
+      kind: 'model_set',
+      model: 'pi',
+      claudeSessionId: 'sess-abc',
+      timestamp: fixedTime,
+    })
+    expect(fetchCalls[1]!.body).toEqual({
+      kind: 'activity',
+      activity: 'idle',
+      timestamp: fixedTime,
+    })
+  })
+
+  it('buffers to pending-events.jsonl when dashboard returns 503', async () => {
+    fetchResponse = { status: 503 }
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-abc' },
+    )
+    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    expect(existsSync(paths.pendingEventsPath)).toBe(true)
+    const lines = readFileSync(paths.pendingEventsPath, 'utf8').trim().split('\n')
+    expect(lines.length).toBe(2)
+    expect(JSON.parse(lines[0]!).kind).toBe('model_set')
+    expect(JSON.parse(lines[1]!).kind).toBe('activity')
+  })
+
+  it('flushes pending events on the next successful POST', async () => {
+    // First call fails.
+    fetchResponse = { status: 503 }
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-abc' },
+    )
+    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    expect(existsSync(paths.pendingEventsPath)).toBe(true)
+
+    // Second call succeeds — should drain pending first, then POST new events.
+    fetchResponse = { status: 200 }
+    fetchCalls = []
+    await handleToolExecutionEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 99, now },
+      { toolName: 'Bash', isError: false },
+    )
+
+    // 2 buffered + 1 new = 3 POSTs total.
+    expect(fetchCalls.length).toBe(3)
+    expect(fetchCalls[0]!.body).toEqual({ kind: 'model_set', model: 'pi', claudeSessionId: 'sess-abc', timestamp: fixedTime })
+    expect(fetchCalls[1]!.body).toEqual({ kind: 'activity', activity: 'idle', timestamp: fixedTime })
+    expect(fetchCalls[2]!.body).toEqual({ kind: 'activity', activity: 'working', tool: 'Bash', timestamp: fixedTime })
+
+    // Pending file should be gone after successful drain.
+    expect(existsSync(paths.pendingEventsPath)).toBe(false)
+  })
+
+  it('drops events on 4xx (client error) without buffering', async () => {
+    fetchResponse = { status: 422 }
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-abc' },
+    )
+    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    expect(existsSync(paths.pendingEventsPath)).toBe(false)
+  })
+
+  it('respects PANOPTICON_DASHBOARD_URL env var', async () => {
+    vi.stubEnv('PANOPTICON_DASHBOARD_URL', 'http://dashboard.local:9999')
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-abc' },
+    )
+    expect(fetchCalls[0]!.url).toBe('http://dashboard.local:9999/api/agents/agent-pan-636/heartbeat')
+    vi.unstubAllEnvs()
+  })
 })
 
 describe('handleToolExecutionEnd', () => {
@@ -96,6 +200,20 @@ describe('handleToolExecutionEnd', () => {
     )
     expect(body.last_action).toBe('tool_error')
   })
+
+  it('PAN-1134: POSTs activity working with the tool name', async () => {
+    await handleToolExecutionEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 99, now },
+      { toolName: 'Bash', isError: false },
+    )
+    expect(fetchCalls.length).toBe(1)
+    expect(fetchCalls[0]!.body).toEqual({
+      kind: 'activity',
+      activity: 'working',
+      tool: 'Bash',
+      timestamp: fixedTime,
+    })
+  })
 })
 
 describe('handleTurnEnd', () => {
@@ -114,6 +232,19 @@ describe('handleTurnEnd', () => {
     expect(body.last_action).toBe('turn_end')
     expect(body.tool_name).toBe('turn_end')
     expect(body.pid).toBe(7)
+  })
+
+  it('PAN-1134: POSTs activity idle', async () => {
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now },
+      {},
+    )
+    expect(fetchCalls.length).toBe(1)
+    expect(fetchCalls[0]!.body).toEqual({
+      kind: 'activity',
+      activity: 'idle',
+      timestamp: fixedTime,
+    })
   })
 })
 

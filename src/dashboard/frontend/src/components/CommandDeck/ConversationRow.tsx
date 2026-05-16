@@ -238,6 +238,12 @@ export function ConversationRow({
           <span>Failed</span>
         </span>
       )}
+      {conv.spawnError && (
+        <span className={styles.conversationForkFailed} title={conv.spawnError}>
+          <AlertCircle size={10} />
+          <span>Spawn failed</span>
+        </span>
+      )}
 
       {/* Timestamp */}
       {conv.lastAttachedAt && (

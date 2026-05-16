@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>System Map · Panopticon redesign</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="_shared-opus.css" />
+  <style>
+    .page { max-width: 1280px; margin: 0 auto; padding: 48px 32px 96px; }
+
+    .eyebrow {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .14em;
+      color: var(--muted-foreground); margin-bottom: 10px;
+    }
+    .hero-title {
+      font-family: "Space Grotesk", sans-serif;
+      font-size: 40px; font-weight: 600; letter-spacing: -.02em;
+      margin: 0 0 12px;
+    }
+    .hero-sub { font-size: 16px; color: var(--muted-foreground); max-width: 720px; line-height: 1.5; margin-bottom: 48px; }
+
+    .section { margin-bottom: 64px; }
+    .section-eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted-foreground); margin-bottom: 10px; }
+    .section-h2 { font-family: "Space Grotesk", sans-serif; font-size: 24px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 8px; }
+    .section-lead { font-size: 14px; color: var(--muted-foreground); max-width: 640px; line-height: 1.55; margin-bottom: 24px; }
+
+    /* IA tree */
+    .ia-grid {
+      display: grid; grid-template-columns: 240px 1fr; gap: 24px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-2xl); padding: 20px;
+    }
+    .ia-rail {
+      background: color-mix(in srgb, var(--background) 96%, var(--color-white));
+      border: 1px solid var(--border); border-radius: var(--radius-xl);
+      padding: 14px 10px;
+    }
+    .ia-group-label { font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted-foreground); padding: 8px 10px 4px; }
+    .ia-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 13px; color: var(--muted-foreground); border-radius: var(--radius-md); }
+    .ia-item.primary { color: var(--foreground); background: var(--accent); }
+    .ia-item .ico { width: 14px; height: 14px; stroke-width: 2; }
+    .ia-item .badge-new { margin-left: auto; font-size: 9px; padding: 1px 4px; border-radius: 4px; background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary-foreground); text-transform: uppercase; letter-spacing: .06em; }
+
+    .ia-notes { display: flex; flex-direction: column; gap: 14px; font-size: 13px; line-height: 1.55; color: var(--muted-foreground); }
+    .ia-notes h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--foreground); margin: 0 0 4px; font-weight: 500; }
+    .ia-notes p { margin: 0 0 10px; }
+    .ia-notes b { color: var(--foreground); font-weight: 500; }
+
+    /* Surface cards */
+    .surfaces { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .surface-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-2xl);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      text-decoration: none; color: inherit;
+      transition: border-color 200ms, transform 200ms;
+      position: relative;
+    }
+    .surface-card:hover { border-color: rgb(255 255 255 / 14%); transform: translateY(-2px); }
+    .surface-card::before {
+      content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    }
+    .surface-card.pipeline::before { background: var(--info); }
+    .surface-card.board::before    { background: var(--warning); }
+    .surface-card.deck::before     { background: var(--signal-review); }
+    .surface-card.agents::before   { background: var(--success); }
+    .surface-card.detail::before   { background: var(--signal-cost); }
+    .surface-card.map::before      { background: var(--muted-foreground); }
+
+    .surface-preview {
+      height: 130px;
+      background: color-mix(in srgb, var(--background) 90%, var(--color-white));
+      border-bottom: 1px solid var(--border);
+      padding: 12px;
+      display: flex; flex-direction: column; gap: 6px;
+      overflow: hidden;
+    }
+    .preview-row { display: flex; gap: 6px; align-items: center; }
+    .preview-bar { height: 6px; border-radius: 2px; background: var(--accent); }
+    .preview-col-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; height: 100%; }
+    .preview-col { background: var(--accent); border-radius: var(--radius-md); padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+    .preview-card { height: 16px; background: rgb(255 255 255 / 8%); border-radius: 4px; }
+    .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; height: 100%; }
+    .preview-tile { background: var(--accent); border-radius: var(--radius-md); border-left: 2px solid var(--info); }
+    .preview-drawer { display: flex; gap: 6px; height: 100%; }
+    .preview-drawer .behind { flex: 1; background: var(--accent); border-radius: var(--radius-md); opacity: .4; }
+    .preview-drawer .sheet { width: 60%; background: rgb(255 255 255 / 8%); border-radius: var(--radius-md); border-left: 2px solid var(--signal-cost); }
+
+    .surface-body { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .surface-title { font-family: "Space Grotesk", sans-serif; font-size: 16px; font-weight: 600; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; }
+    .surface-q { font-size: 12px; color: var(--muted-foreground); }
+    .surface-tag { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; padding: 1px 5px; border-radius: 3px; color: var(--muted-foreground); border: 1px solid var(--border); }
+    .surface-tag.new { color: var(--primary-foreground); border-color: color-mix(in srgb, var(--primary) 32%, transparent); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+    .surface-link { margin-top: auto; font-size: 11px; color: var(--info-foreground); }
+
+    /* Primitive cards */
+    .primitives { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .primitive {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-2xl); padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .primitive h4 { font-family: "Space Grotesk", sans-serif; font-size: 14px; font-weight: 600; letter-spacing: -.01em; margin: 0; display: flex; align-items: center; gap: 8px; }
+    .primitive .where { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); }
+    .primitive p { margin: 0; font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+    .primitive-demo {
+      background: color-mix(in srgb, var(--background) 92%, var(--color-white));
+      border: 1px solid var(--border); border-radius: var(--radius-md);
+      padding: 10px; font-size: 11px;
+    }
+
+    /* Flow diagram */
+    .flow {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-2xl); padding: 24px;
+      display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0;
+      align-items: center;
+    }
+    .flow-node {
+      background: color-mix(in srgb, var(--background) 92%, var(--color-white));
+      border: 1px solid var(--border); border-radius: var(--radius-xl);
+      padding: 14px; text-align: center;
+      display: flex; flex-direction: column; gap: 6px;
+      position: relative;
+    }
+    .flow-node .label { font-family: "Space Grotesk", sans-serif; font-size: 13px; font-weight: 600; }
+    .flow-node .desc { font-size: 11px; color: var(--muted-foreground); }
+    .flow-arrow { display: flex; align-items: center; justify-content: center; color: var(--muted-foreground); font-family: "SF Mono", monospace; font-size: 18px; opacity: .5; }
+    .flow-row { display: contents; }
+    .flow-node.entry { border-color: color-mix(in srgb, var(--info) 32%, transparent); }
+    .flow-node.detail { border-color: color-mix(in srgb, var(--signal-cost) 32%, transparent); }
+
+    /* Color rules cheatsheet */
+    .colors {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-2xl);
+      overflow: hidden;
+    }
+    .colors-row { display: grid; grid-template-columns: 32px 160px 1fr 1fr; align-items: center; gap: 16px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+    .colors-row:last-child { border-bottom: none; }
+    .colors-row .sw { width: 16px; height: 16px; border-radius: 4px; }
+    .colors-row .token { font-family: "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
+    .colors-row .where { font-size: 12px; color: var(--foreground); }
+    .colors-row .meaning { font-size: 12px; color: var(--muted-foreground); }
+
+    /* Header */
+    .top-bar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 32px; border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--background) 96%, var(--color-white));
+    }
+    .top-bar .brand { display: flex; align-items: center; gap: 10px; }
+    .top-bar .brand .mark { width: 24px; height: 24px; display: grid; place-items: center; color: var(--foreground); }
+    .top-bar .brand .mark svg { width: 18px; height: 18px; }
+    .top-bar .brand .name { font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
+    .top-bar .crumb { color: var(--muted-foreground); font-size: 13px; }
+    .top-bar .crumb .sep { opacity: .5; margin: 0 6px; }
+    .top-bar .spacer { flex: 1; }
+    .top-bar .meta { font-size: 11px; color: var(--muted-foreground); font-family: "SF Mono", monospace; }
+  </style>
+</head>
+<body>
+  <header class="top-bar">
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg></div>
+      <div class="name">Panopticon</div>
+    </div>
+    <div class="crumb">design <span class="sep">/</span> mockups <span class="sep">/</span> <span style="color:var(--foreground)">system map</span></div>
+    <div class="spacer"></div>
+    <div class="meta">v0.10 · opus pass · 2026-05-16</div>
+  </header>
+
+  <main class="page">
+    <div class="eyebrow">Big-bang revamp</div>
+    <h1 class="hero-title">One language for everything Panopticon shows you.</h1>
+    <p class="hero-sub">
+      Today the Board, Command Deck, Agents page, and conversation views speak slightly different
+      dialects — different vocab, different priorities, different mental models. This pass picks one
+      vocabulary (<b style="color:var(--foreground)">pipeline phases · agent verbs · priority heat-map · one signal per element</b>)
+      and uses it everywhere. The result: five surfaces, one row primitive, one drawer.
+    </p>
+
+    <!-- ─── Section 1: IA ─── -->
+    <section class="section">
+      <div class="section-eyebrow">01 · Information architecture</div>
+      <h2 class="section-h2">Sidebar collapses to four lenses on the same data.</h2>
+      <p class="section-lead">
+        Pipeline is the new default landing — answers "what's happening right now?" The other three
+        operations surfaces are lenses: Board for tactile management, Command Deck for project
+        drill-down, Agents for fleet observability. Everything else is observability or system.
+      </p>
+
+      <div class="ia-grid">
+        <div class="ia-rail">
+          <div class="ia-group-label">Operations</div>
+          <div class="ia-item primary">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
+            Pipeline <span class="badge-new">New</span>
+          </div>
+          <div class="ia-item">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="11" rx="1"/></svg>
+            Board
+          </div>
+          <div class="ia-item">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m14.5 9.5-2.5 5-5 2.5 2.5-5z" fill="currentColor"/></svg>
+            Command Deck
+          </div>
+          <div class="ia-item">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>
+            Agents
+          </div>
+          <div class="ia-group-label" style="margin-top:14px">Observability</div>
+          <div class="ia-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 12 7 12 9 6 13 18 15 12 21 12"/></svg> Activity</div>
+          <div class="ia-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Costs</div>
+          <div class="ia-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg> Health</div>
+          <div class="ia-group-label" style="margin-top:14px">System</div>
+          <div class="ia-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg> Skills</div>
+          <div class="ia-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg> Settings</div>
+          <div class="ia-item"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m13 2-3 9h6l-3 11"/></svg> God View</div>
+        </div>
+
+        <div class="ia-notes">
+          <div>
+            <h4>What changed</h4>
+            <p><b>Pipeline</b> is new and takes the default-landing slot. It's the cross-project rollup grouped by lifecycle phase (Ship · Review · Work · Plan · Todo) — answers "what's machine-working, what needs me, what's in flight" in one glance.</p>
+            <p><b>Command Deck</b> stays — your favorite — but is reframed as the per-project drill-down with the project tree on the left. Same row primitive as Pipeline, just filtered to one project + branch info.</p>
+            <p><b>Board</b> is preserved but redesigned. The configuration controls (Harness, Agent model, Start) that today live on every card are pulled into Issue Detail, freeing cards to be dense status only.</p>
+            <p><b>Agents</b> flips perspective from issue-centric to agent-centric. Each running agent is a card with its live stream excerpt and a back-link to its issue.</p>
+            <p><b>Awaiting Merge</b> goes away as a standalone view. <span class="mono" style="font-family:'SF Mono',monospace;font-size:12px">READY&nbsp;TO&nbsp;MERGE</span> becomes a badge that surfaces in Pipeline and Board — no separate destination needed.</p>
+          </div>
+          <div>
+            <h4>What's preserved</h4>
+            <p>The two things you said work today: the <b>project tree</b> in Command Deck and the <b>swarm rollup</b> that nests review specialists under their issue. Both move into the new design unchanged.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Section 2: Surfaces ─── -->
+    <section class="section">
+      <div class="section-eyebrow">02 · The five surfaces</div>
+      <h2 class="section-h2">One product, viewed five ways.</h2>
+      <p class="section-lead">
+        Each surface answers a different operational question, but they share the same primitives,
+        same vocabulary, same color rules. Click any tile to open the mock.
+      </p>
+
+      <div class="surfaces">
+        <a class="surface-card pipeline" href="pipeline-cross-project-opus.html">
+          <div class="surface-preview">
+            <div class="preview-row" style="gap:8px"><div class="preview-bar" style="width:30%; background:var(--info)"></div><div class="preview-bar" style="width:18%; background:var(--warning)"></div><div class="preview-bar" style="width:22%; background:var(--signal-review)"></div><div class="preview-bar" style="width:12%; background:var(--muted-foreground); opacity:.4"></div></div>
+            <div class="preview-bar" style="width:100%; height:1px; background:var(--border); margin: 6px 0"></div>
+            <div class="preview-bar" style="width:60%; height:9px; border-left:2px solid var(--destructive); background:var(--accent)"></div>
+            <div class="preview-bar" style="width:80%; height:9px; border-left:2px solid var(--warning); background:var(--accent)"></div>
+            <div class="preview-bar" style="width:70%; height:9px; border-left:2px solid var(--muted-foreground); background:var(--accent)"></div>
+            <div class="preview-bar" style="width:55%; height:9px; border-left:2px solid var(--warning); background:var(--accent)"></div>
+            <div class="preview-bar" style="width:65%; height:9px; border-left:2px solid var(--muted-foreground); background:var(--accent)"></div>
+          </div>
+          <div class="surface-body">
+            <div class="surface-title">Pipeline <span class="surface-tag new">Default</span></div>
+            <div class="surface-q">"What's the whole machine doing right now, across all projects?"</div>
+            <div class="surface-link">Open mock →</div>
+          </div>
+        </a>
+
+        <a class="surface-card board" href="board-opus.html">
+          <div class="surface-preview">
+            <div class="preview-col-grid">
+              <div class="preview-col"><div class="preview-card"></div><div class="preview-card"></div></div>
+              <div class="preview-col" style="border-top:2px solid var(--info)"><div class="preview-card" style="border-left:2px solid var(--destructive)"></div><div class="preview-card"></div><div class="preview-card"></div></div>
+              <div class="preview-col" style="border-top:2px solid var(--warning)"><div class="preview-card"></div><div class="preview-card" style="border-left:2px solid var(--destructive); border-color: var(--destructive)"></div></div>
+              <div class="preview-col" style="border-top:2px solid var(--signal-review)"><div class="preview-card"></div><div class="preview-card" style="opacity:.6"></div></div>
+            </div>
+          </div>
+          <div class="surface-body">
+            <div class="surface-title">Board</div>
+            <div class="surface-q">"Where are my cards stacked? Let me drag them around."</div>
+            <div class="surface-link">Open mock →</div>
+          </div>
+        </a>
+
+        <a class="surface-card deck" href="pipeline-command-deck-opus.html">
+          <div class="surface-preview">
+            <div class="preview-drawer">
+              <div style="width:35%; background:var(--accent); border-radius:var(--radius-md); padding:6px; display:flex;flex-direction:column;gap:4px">
+                <div class="preview-card" style="height:8px; width:80%"></div>
+                <div class="preview-card" style="height:8px; width:60%; margin-left:8px"></div>
+                <div class="preview-card" style="height:8px; width:70%; margin-left:8px; background:var(--signal-review); opacity:.5"></div>
+                <div class="preview-card" style="height:8px; width:55%; margin-left:8px"></div>
+                <div class="preview-card" style="height:8px; width:65%; margin-left:8px"></div>
+              </div>
+              <div style="flex:1; background:rgb(255 255 255 / 6%); border-radius:var(--radius-md); padding:6px; display:flex;flex-direction:column;gap:4px">
+                <div class="preview-bar" style="width:60%; height:10px"></div>
+                <div style="display:flex;gap:4px; margin: 4px 0"><div class="preview-bar" style="width:25%; height:6px"></div><div class="preview-bar" style="width:25%; height:6px"></div><div class="preview-bar" style="width:25%; height:6px"></div></div>
+                <div class="preview-bar" style="width:90%; height:8px; border-left:2px solid var(--warning)"></div>
+                <div class="preview-bar" style="width:90%; height:8px; border-left:2px solid var(--info)"></div>
+                <div class="preview-bar" style="width:90%; height:8px; border-left:2px solid var(--muted-foreground)"></div>
+              </div>
+            </div>
+          </div>
+          <div class="surface-body">
+            <div class="surface-title">Command Deck</div>
+            <div class="surface-q">"Drill into a single project. What's its full surface area?"</div>
+            <div class="surface-link">Open mock →</div>
+          </div>
+        </a>
+
+        <a class="surface-card agents" href="agents-opus.html">
+          <div class="surface-preview">
+            <div class="preview-grid">
+              <div class="preview-tile" style="border-left-color: var(--info); padding:6px"><div class="preview-bar" style="height:6px; width:80%; background:rgb(255 255 255 / 12%)"></div><div class="preview-bar" style="height:5px; width:60%; background:rgb(255 255 255 / 8%); margin-top:4px"></div><div class="preview-bar" style="height:18px; width:100%; background:rgb(0 0 0 / 30%); margin-top:6px; border-radius:3px"></div></div>
+              <div class="preview-tile" style="border-left-color: var(--warning); padding:6px"><div class="preview-bar" style="height:6px; width:80%; background:rgb(255 255 255 / 12%)"></div><div class="preview-bar" style="height:5px; width:60%; background:rgb(255 255 255 / 8%); margin-top:4px"></div><div class="preview-bar" style="height:18px; width:100%; background:rgb(0 0 0 / 30%); margin-top:6px; border-radius:3px"></div></div>
+              <div class="preview-tile" style="border-left-color: var(--destructive); padding:6px"><div class="preview-bar" style="height:6px; width:80%; background:rgb(255 255 255 / 12%)"></div><div class="preview-bar" style="height:5px; width:60%; background:rgb(255 255 255 / 8%); margin-top:4px"></div><div class="preview-bar" style="height:18px; width:100%; background:rgb(0 0 0 / 30%); margin-top:6px; border-radius:3px"></div></div>
+              <div class="preview-tile" style="border-left-color: var(--signal-review); padding:6px"><div class="preview-bar" style="height:6px; width:80%; background:rgb(255 255 255 / 12%)"></div><div class="preview-bar" style="height:5px; width:60%; background:rgb(255 255 255 / 8%); margin-top:4px"></div><div class="preview-bar" style="height:18px; width:100%; background:rgb(0 0 0 / 30%); margin-top:6px; border-radius:3px"></div></div>
+            </div>
+          </div>
+          <div class="surface-body">
+            <div class="surface-title">Agents</div>
+            <div class="surface-q">"Which agents are running? Are any stuck? Show me their streams."</div>
+            <div class="surface-link">Open mock →</div>
+          </div>
+        </a>
+
+        <a class="surface-card detail" href="issue-detail-opus.html">
+          <div class="surface-preview" style="padding:0">
+            <div style="display:flex; height:100%">
+              <div style="flex:1; background:var(--accent); opacity:.3"></div>
+              <div style="width:65%; background:rgb(255 255 255 / 8%); border-left:2px solid var(--signal-cost); padding:8px;display:flex;flex-direction:column;gap:4px">
+                <div class="preview-bar" style="width:40%; height:10px"></div>
+                <div class="preview-bar" style="width:70%; height:8px; background:var(--accent)"></div>
+                <div style="display:flex;gap:3px; margin:2px 0"><div style="flex:1;height:3px; background:var(--success); border-radius:1px"></div><div style="flex:1;height:3px; background:var(--success); border-radius:1px"></div><div style="flex:1;height:3px; background:var(--success); border-radius:1px"></div><div style="flex:1;height:3px; background:var(--signal-review); border-radius:1px"></div><div style="flex:1;height:3px; background:var(--border); border-radius:1px"></div></div>
+                <div class="preview-bar" style="width:100%; height:30px; background:rgb(0 0 0 / 30%); border-radius:3px; margin-top:2px"></div>
+              </div>
+            </div>
+          </div>
+          <div class="surface-body">
+            <div class="surface-title">Issue Detail <span class="surface-tag new">Shared shell</span></div>
+            <div class="surface-q">"Click any row anywhere → this drawer opens with the full story."</div>
+            <div class="surface-link">Open mock →</div>
+          </div>
+        </a>
+
+        <a class="surface-card map" href="system-map-opus.html">
+          <div class="surface-preview" style="display:flex;align-items:center;justify-content:center;color:var(--muted-foreground)">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.5"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>
+          </div>
+          <div class="surface-body">
+            <div class="surface-title">System map</div>
+            <div class="surface-q">"Show me how it all fits together." (You're here.)</div>
+            <div class="surface-link">Current page</div>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <!-- ─── Section 3: Primitives ─── -->
+    <section class="section">
+      <div class="section-eyebrow">03 · Shared primitives</div>
+      <h2 class="section-h2">Three components do all the heavy lifting.</h2>
+      <p class="section-lead">
+        Every surface composes the same atoms. Build them once, fix them once, change them once.
+      </p>
+
+      <div class="primitives">
+        <div class="primitive">
+          <h4><span class="dot" style="background:var(--info)"></span> Issue Row</h4>
+          <div class="where">used in Pipeline · Command Deck · search results</div>
+          <p>Single-line summary of an issue and the agent acting on it. Priority left border, ID, status glyph, title, agent meta, runtime, avatar.</p>
+          <div class="primitive-demo">
+            <div style="display:grid; grid-template-columns: 12px 50px 12px 1fr 100px auto; gap:8px; align-items:center; border-left:2px solid var(--warning); padding-left:8px">
+              <span style="font-family:'SF Mono',monospace; font-size:10px; color:var(--warning-foreground)">!</span>
+              <span style="font-family:'SF Mono',monospace; font-size:10px; color:var(--muted-foreground)">PAN-1052</span>
+              <span style="width:10px;height:10px;border-radius:50%;background:var(--signal-review)"></span>
+              <span style="font-size:11px">Activity feed: per-turn observations <span class="verb ship" style="font-size:8px; margin-left:4px"><span class="pulse"></span>SHIP</span></span>
+              <span style="font-family:'SF Mono',monospace; font-size:9px; color:var(--muted-foreground)">agent-pan-1052-ship</span>
+              <span style="font-family:'SF Mono',monospace; font-size:9px; color:var(--muted-foreground)">19m</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="primitive">
+          <h4><span class="dot" style="background:var(--warning)"></span> Issue Card</h4>
+          <div class="where">used only in Board</div>
+          <p>Compact stack-friendly variant of the row. Same priority bar, same verb badge, same agent meta — just laid out vertically with a bead progress strip.</p>
+          <div class="primitive-demo">
+            <div style="border-left:2px solid var(--destructive); padding:8px; background:rgb(0 0 0 / 22%); border-radius:var(--radius-md)">
+              <div style="display:flex;align-items:center; gap:6px; margin-bottom:6px"><span style="font-family:'SF Mono',monospace; font-size:9px; color:var(--muted-foreground)">MIN-846</span><span class="verb work" style="font-size:8px; margin-left:auto"><span class="pulse"></span>WORK</span></div>
+              <div style="font-size:11px; margin-bottom:6px">Fizzy Integration (Master): bi-directional sync…</div>
+              <div style="display:flex;align-items:center; gap:6px; font-size:9px; color:var(--muted-foreground)"><span>Beads 7/12</span><div style="flex:1; height:2px; background:var(--accent); border-radius:1px; overflow:hidden"><div style="width:58%; height:100%; background:var(--info)"></div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="primitive">
+          <h4><span class="dot" style="background:var(--signal-cost)"></span> Issue Detail</h4>
+          <div class="where">slide-out · opens from any row or card</div>
+          <p>The single source of deep-dive truth. Phase timeline, active agent card with live stream, beads, verification gates, review verdicts, live activity rail.</p>
+          <div class="primitive-demo" style="display:flex;flex-direction:column;gap:4px">
+            <div style="display:flex;gap:2px"><div style="flex:1; height:3px; background:var(--success); border-radius:1px"></div><div style="flex:1; height:3px; background:var(--success); border-radius:1px"></div><div style="flex:1; height:3px; background:var(--success); border-radius:1px"></div><div style="flex:1; height:3px; background:var(--success); border-radius:1px"></div><div style="flex:1; height:3px; background:var(--signal-review); border-radius:1px"></div><div style="flex:1; height:3px; background:var(--border); border-radius:1px"></div></div>
+            <div style="display:flex;gap:4px;justify-content:space-between;font-size:8px;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.06em"><span>Triaged</span><span>Plan</span><span>Work</span><span>Review</span><span style="color:var(--signal-review-foreground)">Ship</span><span>Merge</span></div>
+            <div style="background:rgb(0 0 0 / 30%); border-radius:3px; padding:5px 7px; font-family:'SF Mono',monospace; font-size:9px; color:var(--muted-foreground); margin-top:4px">→ pushing feature/pan-1052…<br/>✓ push complete</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:var(--muted-foreground);margin-top:18px;line-height:1.55;max-width:720px">
+        Two more primitives carry the same vocabulary at smaller scale: the <b style="color:var(--foreground)">Phase Header</b>
+        (colored top border + title + count + subtitle) is used in Pipeline groups and Board columns. The
+        <b style="color:var(--foreground)">Agent Card</b> (used only in Agents) is essentially the Active-Agent block from
+        Issue Detail extracted as a standalone tile.
+      </div>
+    </section>
+
+    <!-- ─── Section 4: Flow ─── -->
+    <section class="section">
+      <div class="section-eyebrow">04 · The interaction model</div>
+      <h2 class="section-h2">Every entry point lands on the same drawer.</h2>
+      <p class="section-lead">
+        No matter which surface you start from, clicking an issue opens the same Issue Detail drawer
+        with the same state. You're never "stuck" in one view.
+      </p>
+
+      <div class="flow">
+        <div class="flow-node entry">
+          <span class="label">Pipeline row</span>
+          <span class="desc">cross-project list</span>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-node detail">
+          <span class="label">Issue Detail</span>
+          <span class="desc">slide-out drawer</span>
+        </div>
+        <div class="flow-arrow">↺</div>
+        <div class="flow-node entry">
+          <span class="label">Stays in context</span>
+          <span class="desc">parent dims behind</span>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:14px">
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:var(--radius-xl); padding:14px; font-size:12px;">
+          <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; margin-bottom:4px">From Board</div>
+          <div style="color:var(--muted-foreground); line-height:1.5">Click a card → drawer opens. Drag a card to a new column → status update via RPC. Both work without leaving the page.</div>
+        </div>
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:var(--radius-xl); padding:14px; font-size:12px;">
+          <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; margin-bottom:4px">From Command Deck</div>
+          <div style="color:var(--muted-foreground); line-height:1.5">Project tree on left stays fixed. Right pane shows phase-grouped list. Click row → drawer. Tree highlights the active issue.</div>
+        </div>
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:var(--radius-xl); padding:14px; font-size:12px;">
+          <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; margin-bottom:4px">From Agents</div>
+          <div style="color:var(--muted-foreground); line-height:1.5">Each agent card has a "Open issue" link. Click → drawer opens at the issue, with the active-agent section already focused on this agent.</div>
+        </div>
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:var(--radius-xl); padding:14px; font-size:12px;">
+          <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; margin-bottom:4px">From anywhere via ⌘K</div>
+          <div style="color:var(--muted-foreground); line-height:1.5">Type an issue ID, branch name, or fragment of a title. Pick from the list → drawer opens. Works on every page.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Section 5: Color rules ─── -->
+    <section class="section">
+      <div class="section-eyebrow">05 · Color discipline</div>
+      <h2 class="section-h2">Color always means the same thing.</h2>
+      <p class="section-lead">
+        One signal per element. Labels are taxonomy, never status. Phase color, priority color, verb color —
+        each maps to a single token and never decorates.
+      </p>
+
+      <div class="colors">
+        <div class="colors-row">
+          <span class="sw" style="background:var(--destructive)"></span>
+          <span class="token">--destructive</span>
+          <span class="where">Urgent priority · Stuck agents · Failed gates</span>
+          <span class="meaning">Action required — something is broken or critical.</span>
+        </div>
+        <div class="colors-row">
+          <span class="sw" style="background:var(--warning)"></span>
+          <span class="token">--warning</span>
+          <span class="where">High priority · In Review column top border · REVIEW verb · Awaiting human</span>
+          <span class="meaning">A human needs to do something.</span>
+        </div>
+        <div class="colors-row">
+          <span class="sw" style="background:var(--info)"></span>
+          <span class="token">--info / --primary</span>
+          <span class="where">In Progress column · WORK verb · Machine-working metric</span>
+          <span class="meaning">A machine is actively doing something.</span>
+        </div>
+        <div class="colors-row">
+          <span class="sw" style="background:var(--signal-review)"></span>
+          <span class="token">--signal-review</span>
+          <span class="where">Ship column · SHIP / PLANNING verbs · Project mark for Panopticon</span>
+          <span class="meaning">Specialist or planning activity — review pipeline state.</span>
+        </div>
+        <div class="colors-row">
+          <span class="sw" style="background:var(--success)"></span>
+          <span class="token">--success</span>
+          <span class="where">Done column · MERGED / READY TO MERGE badges · Passing gates</span>
+          <span class="meaning">Work complete or verified.</span>
+        </div>
+        <div class="colors-row">
+          <span class="sw" style="background:var(--signal-cost)"></span>
+          <span class="token">--signal-cost</span>
+          <span class="where">Spend metrics · Cost figures · Issue Detail drawer accent</span>
+          <span class="meaning">Money. Always cyan, always tabular numerals.</span>
+        </div>
+        <div class="colors-row">
+          <span class="sw" style="background:var(--muted-foreground); opacity:.5"></span>
+          <span class="token">--muted-foreground</span>
+          <span class="where">Labels · Backlog / Todo column · Idle agents · Medium priority</span>
+          <span class="meaning">Neutral — no live signal. The "rest" state.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── Footer note ─── -->
+    <section class="section" style="margin-bottom:0">
+      <div class="section-eyebrow">06 · What ships</div>
+      <h2 class="section-h2">Migration is non-trivial but bounded.</h2>
+      <p class="section-lead">
+        Every existing route has a one-to-one mapping into the new IA. The shared primitives can be
+        built first (one PR), then each surface migrates independently. Today's kanban code becomes
+        the Board surface; today's Command Deck conversation panel keeps its content but adopts the
+        new shell; today's Agents page is replaced wholesale; Awaiting Merge is retired.
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px">
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:16px;line-height:1.55">
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;margin-bottom:6px">Build order (suggested)</div>
+          <ol style="margin:0;padding-left:18px;color:var(--muted-foreground)">
+            <li>Shared tokens + primitives (Issue Row, Issue Card, verb badges, phase header)</li>
+            <li>Pipeline (greenfield — uses only primitives)</li>
+            <li>Issue Detail drawer (referenced by everything)</li>
+            <li>Board (replaces kanban — same data model, new chrome)</li>
+            <li>Command Deck refresh (keep tree, adopt new row component)</li>
+            <li>Agents (wholesale replacement)</li>
+            <li>Retire Awaiting Merge route</li>
+          </ol>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:16px;line-height:1.55">
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;margin-bottom:6px">Risks worth naming</div>
+          <ul style="margin:0;padding-left:18px;color:var(--muted-foreground)">
+            <li>Drag-and-drop in Board needs a new state-machine for "moved card → phase transition"</li>
+            <li>Issue Detail must subscribe to multiple RPC streams (agent stream, activity feed, beads, verification) — design the subscription contract first</li>
+            <li>The drawer pattern can leak focus / scroll state — use a single store-owned drawer instance, not per-surface</li>
+            <li>Today's Cloister Deacon card on the Agents page needs a new home (probably Health)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="mock-chrome">
+    <span class="label">Opus mocks</span>
+    <a href="pipeline-cross-project-opus.html">Pipeline</a>
+    <a href="board-opus.html">Board</a>
+    <a href="pipeline-command-deck-opus.html">Command Deck</a>
+    <a href="agents-opus.html">Agents</a>
+    <a href="issue-detail-opus.html">Issue Detail</a>
+    <a href="system-map-opus.html" class="current">System Map</a>
+  </div>
+</body>
+</html>

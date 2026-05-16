@@ -4,7 +4,7 @@
     "created": "2026-05-12T19:50:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1052: Activity feed: per-turn observations with time-bucketed sidebar",
-    "updated": "2026-05-15T05:21:13.811Z"
+    "updated": "2026-05-15T05:51:53.879Z"
   },
   "plan": {
     "id": "pan-1052",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "7c4e9a2f-3d18-4b6e-9f2a-8c5d1e4f7a3b",
     "author": "agent:claude-opus-4-7",
-    "sequence": 4,
+    "sequence": 8,
     "created": "2026-05-12T19:50:00.000Z",
-    "updated": "2026-05-15T05:21:13.811Z",
+    "updated": "2026-05-15T05:51:53.879Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1052",
@@ -2274,7 +2274,51 @@
     ],
     "autoDecisions": [],
     "metadata": {
-      "canonicalFilename": "2026-05-12-PAN-1052-activity-feed-per-turn-observations-with-time-bucketed-sidebar.vbrief.json"
+      "canonicalFilename": "2026-05-12-PAN-1052-activity-feed-per-turn-observations-with-time-bucketed-sidebar.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1052",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-15T05:51:53.878Z",
+        "work": {
+          "updatedAt": "2026-05-15T05:51:53.878Z",
+          "history": []
+        },
+        "verification": {
+          "updatedAt": "2026-05-15T05:51:53.878Z",
+          "history": []
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-15T05:51:53.878Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-15T05:51:53.878Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-15T05:51:53.878Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-15T05:51:53.878Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-15T05:51:53.878Z",
+          "history": []
+        },
+        "merge": {
+          "updatedAt": "2026-05-15T05:51:53.878Z",
+          "history": [],
+          "readyForMerge": false
+        }
+      }
     }
   },
   "status": "active"

@@ -335,8 +335,17 @@ export function ConversationPanel({
   }, [conversation.name, queryClient, onArchived]);
 
   const handleViewMode = useCallback((mode: ViewMode) => {
+    if (mode === 'terminal') {
+      const w = window as unknown as { __panTerminalClickAt?: number };
+      w.__panTerminalClickAt = performance.now();
+      try {
+        if (localStorage.getItem('PANOPTICON_TERMINAL_PROFILE') === '1') {
+          console.log(`[xterm-click] conv=${conversation.name} t=${w.__panTerminalClickAt.toFixed(1)}`);
+        }
+      } catch { /* ignore */ }
+    }
     onViewModeChange?.(mode);
-  }, [onViewModeChange]);
+  }, [onViewModeChange, conversation.name]);
 
   const handleDeliveryMethodChange = useCallback(async (method: 'auto' | 'channels' | 'tmux') => {
     setDeliveryMethodSaving(true);
@@ -370,14 +379,16 @@ export function ConversationPanel({
 
   const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailedHeader = conversation.forkStatus === 'failed';
-  const statusColor = isForkingHeader
+  const isSpawnFailed = !!conversation.spawnError;
+  const isSpawningHeader = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed;
+  const statusColor = isForkingHeader || isSpawningHeader
     ? 'var(--warning)'
-    : isForkFailedHeader
+    : isForkFailedHeader || isSpawnFailed
     ? 'var(--destructive)'
     : conversation.sessionAlive
     ? 'var(--success)'
     : 'var(--muted-foreground)';
-  const statusLabel = isForkingHeader ? 'forking' : isForkFailedHeader ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
+  const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
 
   return (
     <div className={styles.conversationTerminal}>
@@ -805,8 +816,12 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   const isForkInProgress = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailed = conversation.forkStatus === 'failed';
   const isForking = isForkInProgress || isForkFailed;
+  const isSpawnFailed = !!conversation.spawnError;
+  // Conversation was created but the tmux session has not started yet — the spawn is running
+  // in the background. Show a "Starting..." placeholder instead of the orphaned empty state.
+  const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking;
   const isFirstMessage = !isLoading && messages.length === 0 && conversation.sessionAlive;
-  const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive;
+  const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
 
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
@@ -831,6 +846,24 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
       {isLoading ? (
         <div className={styles.conversationConnecting}>
           <span>Loading…</span>
+        </div>
+      ) : isSpawning ? (
+        <div className={styles.conversationEmptyState}>
+          <p className={styles.conversationEmptyStateTitle}>
+            <Loader2 size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6, animation: 'spin 1s linear infinite' }} />
+            Starting…
+          </p>
+          <p className={styles.conversationEmptyStateSubtitle}>Waiting for the session to start.</p>
+        </div>
+      ) : isSpawnFailed ? (
+        <div className={styles.conversationEmptyState}>
+          <p className={styles.conversationEmptyStateTitle}>Failed to start</p>
+          <p className={styles.conversationEmptyStateSubtitle}>{conversation.spawnError}</p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()}>
+              Archive
+            </button>
+          </div>
         </div>
       ) : isForking && messages.length === 0 ? (
         <ForkProgressView
