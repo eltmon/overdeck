@@ -63,6 +63,28 @@ describe('handleSessionStart', () => {
     const paths = panopticonPathsFor('agent-pan-636', h.home)
     expect(existsSync(paths.sessionIdPath)).toBe(false)
   })
+
+  it('PAN-1134: writes events.jsonl with model_set + activity idle', async () => {
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-abc' },
+    )
+    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    expect(existsSync(paths.eventsPath)).toBe(true)
+    const lines = readFileSync(paths.eventsPath, 'utf8').trim().split('\n')
+    expect(lines.length).toBe(2)
+    expect(JSON.parse(lines[0]!)).toEqual({
+      kind: 'model_set',
+      model: 'pi',
+      claudeSessionId: 'sess-abc',
+      timestamp: fixedTime,
+    })
+    expect(JSON.parse(lines[1]!)).toEqual({
+      kind: 'activity',
+      activity: 'idle',
+      timestamp: fixedTime,
+    })
+  })
 })
 
 describe('handleToolExecutionEnd', () => {
@@ -95,6 +117,23 @@ describe('handleToolExecutionEnd', () => {
       readFileSync(panopticonPathsFor('agent-pan-636', h.home).heartbeatPath, 'utf8'),
     )
     expect(body.last_action).toBe('tool_error')
+  })
+
+  it('PAN-1134: writes events.jsonl with activity working', async () => {
+    await handleToolExecutionEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 99, now },
+      { toolName: 'Bash', isError: false },
+    )
+    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    expect(existsSync(paths.eventsPath)).toBe(true)
+    const lines = readFileSync(paths.eventsPath, 'utf8').trim().split('\n')
+    expect(lines.length).toBe(1)
+    expect(JSON.parse(lines[0]!)).toEqual({
+      kind: 'activity',
+      activity: 'working',
+      tool: 'Bash',
+      timestamp: fixedTime,
+    })
   })
 })
 

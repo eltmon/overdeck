@@ -12,6 +12,7 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
+import { startPiEventPoller, stopPiEventPoller } from './services/pi-event-poller.js';
 import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
@@ -272,6 +273,9 @@ void startTtsSummarizer().catch(err => console.warn('[tts-summarizer] start fail
 startCliproxyWatchdog();
 console.log('[panopticon] CLIProxy watchdog started (30s interval)');
 
+// Start Pi event poller — consumes events.jsonl from Pi agents (PAN-1134)
+startPiEventPoller();
+
 // Clean up pollers on graceful shutdown
 const emitShutdownActivity = () => {
   try {
@@ -289,6 +293,7 @@ process.once('SIGTERM', () => {
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
+  stopPiEventPoller();
 });
 process.once('SIGINT', () => {
   emitShutdownActivity();
@@ -296,6 +301,7 @@ process.once('SIGINT', () => {
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
+  stopPiEventPoller();
 });
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).

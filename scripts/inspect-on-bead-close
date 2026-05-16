@@ -1,3 +1,0 @@
-#!/bin/bash
-# Deprecated PostToolUse hook. Inspection is explicit and metadata-gated.
-exit 0

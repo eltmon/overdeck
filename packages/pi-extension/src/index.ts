@@ -11,6 +11,8 @@
  *     completed      — touched when the agent invokes `/pan-done`. Acts as
  *                      the "agent says it's finished" marker that Cloister
  *                      polls before waking the review specialist.
+ *     events.jsonl   — append-only domain events emitted from Pi native
+ *                      lifecycle hooks (PAN-1134). Consumed by the dashboard.
  *   ~/.panopticon/heartbeats/<agentId>.json
  *     timestamp/tool/pid — refreshed on every tool_execution_end and
  *                          turn_end so the dashboard health monitor knows
@@ -77,6 +79,11 @@ export interface PanopticonPaths {
    * resume into the same session via `pi --session <id>`.
    */
   sessionIdPath: string
+  /**
+   * Append-only JSONL of domain events emitted by Pi native lifecycle hooks.
+   * Consumed by the dashboard's Pi event poller (PAN-1134).
+   */
+  eventsPath: string
 }
 
 export function panopticonPathsFor(agentId: string, home: string = homedir()): PanopticonPaths {
@@ -89,11 +96,18 @@ export function panopticonPathsFor(agentId: string, home: string = homedir()): P
     completedPath: join(agentDir, 'completed'),
     heartbeatPath: join(heartbeatsDir, `${agentId}.json`),
     sessionIdPath: join(agentDir, 'session.id'),
+    eventsPath: join(agentDir, 'events.jsonl'),
   }
 }
 
 async function writeJson(path: string, body: unknown): Promise<void> {
   await writeFile(path, `${JSON.stringify(body, null, 2)}\n`, 'utf8')
+}
+
+async function writeEvent(paths: PanopticonPaths, body: Record<string, unknown>): Promise<void> {
+  await mkdir(paths.agentDir, { recursive: true })
+  const line = `${JSON.stringify(body)}\n`
+  await writeFile(paths.eventsPath, line, { encoding: 'utf8', flag: 'a' })
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -122,12 +136,13 @@ function envFor(env: HookEnv): {
 
 export async function handleSessionStart(env: HookEnv, event: SessionStartEvent): Promise<void> {
   const { paths, now } = envFor(env)
+  const ts = now()
   await mkdir(paths.agentDir, { recursive: true })
   await writeJson(paths.readyPath, {
     agentId: env.agentId,
     sessionId: event.sessionId ?? null,
     reason: event.reason ?? 'unknown',
-    timestamp: now(),
+    timestamp: ts,
     pid: env.pid ?? process.pid,
   })
   // Persist a plain-text session id so PiRuntime.spawnAgent can resume into
@@ -136,30 +151,39 @@ export async function handleSessionStart(env: HookEnv, event: SessionStartEvent)
   if (event.sessionId) {
     await writeFile(paths.sessionIdPath, `${event.sessionId}\n`, 'utf8')
   }
+  // PAN-1134: emit domain events for dashboard activity tracking
+  await writeEvent(paths, { kind: 'model_set', model: 'pi', claudeSessionId: event.sessionId ?? undefined, timestamp: ts })
+  await writeEvent(paths, { kind: 'activity', activity: 'idle', timestamp: ts })
 }
 
 export async function handleToolExecutionEnd(env: HookEnv, event: ToolExecutionEndEvent): Promise<void> {
   const { paths, pid, now } = envFor(env)
+  const ts = now()
   await mkdir(paths.heartbeatsDir, { recursive: true })
   await writeJson(paths.heartbeatPath, {
     agent_id: env.agentId,
-    timestamp: now(),
+    timestamp: ts,
     tool_name: event.toolName ?? 'unknown',
     last_action: event.isError ? 'tool_error' : 'tool_end',
     pid,
   })
+  // PAN-1134: emit domain event so Pi agents show activity in the dashboard
+  await writeEvent(paths, { kind: 'activity', activity: 'working', tool: event.toolName ?? 'unknown', timestamp: ts })
 }
 
 export async function handleTurnEnd(env: HookEnv, _event: TurnEndEvent): Promise<void> {
   const { paths, pid, now } = envFor(env)
+  const ts = now()
   await mkdir(paths.heartbeatsDir, { recursive: true })
   await writeJson(paths.heartbeatPath, {
     agent_id: env.agentId,
-    timestamp: now(),
+    timestamp: ts,
     tool_name: 'turn_end',
     last_action: 'turn_end',
     pid,
   })
+  // PAN-1134: turn_end approximates the Claude Stop hook (agent back at prompt)
+  await writeEvent(paths, { kind: 'activity', activity: 'idle', timestamp: ts })
 }
 
 export async function handlePanDone(env: HookEnv, args: string): Promise<void> {

@@ -23,7 +23,7 @@
  *   3. tmux pane activity timestamp
  */
 
-import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, chmodSync, unlinkSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, chmodSync, unlinkSync, truncateSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { tmpdir } from 'node:os'
@@ -380,6 +380,41 @@ export class PiRuntime implements AgentRuntime {
 
   async isRunning(agentId: string): Promise<boolean> {
     return await sessionExistsAsync(agentId)
+  }
+
+  /**
+   * Read and clear pending domain events from the Pi extension's events.jsonl
+   * (PAN-1134). Returns the parsed events and truncates the file so the next
+   * poll doesn't double-deliver.
+   */
+  getPendingEvents(agentId: string): Record<string, unknown>[] {
+    const path = join(agentDirFor(agentId), 'events.jsonl')
+    if (!existsSync(path)) return []
+    let raw: string
+    try {
+      raw = readFileSync(path, 'utf8')
+    } catch {
+      return []
+    }
+    if (!raw.trim()) return []
+    const events: Record<string, unknown>[] = []
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed) continue
+      try {
+        events.push(JSON.parse(trimmed) as Record<string, unknown>)
+      } catch {
+        // skip malformed line
+      }
+    }
+    // Truncate atomically after successful read to prevent double-delivery.
+    try {
+      truncateSync(path, 0)
+    } catch {
+      // ignore truncate failure — next poll may re-deliver, which is harmless
+      // because events are folded idempotently by the reducer.
+    }
+    return events
   }
 }
 
