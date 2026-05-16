@@ -6,6 +6,21 @@ import { loadConfig } from '../../src/lib/config-yaml.js';
 import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableModelsApi, getMiniMaxDefaultsApi, getDefaultConversationModelApi, saveOpenRouterFavorites, getOpenRouterFavorites } from '../../src/lib/settings-api.js';
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
 
+const makeTtsConfig = vi.hoisted(() => () => ({
+  enabled: false,
+  voice: '',
+  volume: 1,
+  rate: 1,
+  maxChars: 140,
+  dropInfoWhenFull: true,
+  daemonPort: 8787,
+  daemonHost: '127.0.0.1',
+  voiceMap: {},
+  mutedSources: [],
+  utteranceTemplates: {},
+  mutedIssues: [],
+}));
+
 // Mock the config-yaml module
 vi.mock('../../src/lib/config-yaml.js', async () => {
   const actual = await vi.importActual<typeof import('../../src/lib/config-yaml.js')>('../../src/lib/config-yaml.js');
@@ -29,6 +44,7 @@ vi.mock('../../src/lib/config-yaml.js', async () => {
           richCompaction: false,
         },
         trackerKeys: {},
+        tts: makeTtsConfig(),
       },
       migration: null,
     })),
@@ -89,6 +105,7 @@ describe('settings-api', () => {
           tmux: { configMode: 'managed' },
           conversations: { compactionModel: 'claude-haiku-4-5', manualCompactMode: 'claude-code', richCompaction: false },
           trackerKeys: {},
+          tts: makeTtsConfig(),
         },
         migration: null,
       } as any);
@@ -115,6 +132,7 @@ describe('settings-api', () => {
             richCompaction: false,
           },
           trackerKeys: {},
+          tts: makeTtsConfig(),
         },
         migration: null,
       } as any);
@@ -366,6 +384,7 @@ describe('settings-api', () => {
           tmux: { configMode: 'managed' as const },
           conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
           trackerKeys: {},
+          tts: makeTtsConfig(),
           openrouterFavorites: [],
           defaultConversationModel: 'claude-haiku-4-5',
         } as any,
@@ -433,6 +452,7 @@ describe('settings-api', () => {
           tmux: { configMode: 'managed' as const },
           conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
           trackerKeys: {},
+          tts: makeTtsConfig(),
         } as any,
         migration: null,
       });
@@ -451,6 +471,7 @@ describe('settings-api', () => {
           tmux: { configMode: 'managed' as const },
           conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
           trackerKeys: {},
+          tts: makeTtsConfig(),
           openrouterFavorites: [],
         } as any,
         migration: null,
@@ -470,6 +491,7 @@ describe('settings-api', () => {
           tmux: { configMode: 'managed' as const },
           conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
           trackerKeys: {},
+          tts: makeTtsConfig(),
           openrouterFavorites: [],
         } as any,
         migration: null,
@@ -489,6 +511,7 @@ describe('settings-api', () => {
           tmux: { configMode: 'managed' as const },
           conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
           trackerKeys: {},
+          tts: makeTtsConfig(),
           openrouterFavorites: [],
         } as any,
         migration: null,
@@ -508,6 +531,7 @@ describe('settings-api', () => {
           tmux: { configMode: 'managed' as const },
           conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
           trackerKeys: {},
+          tts: makeTtsConfig(),
           openrouterFavorites: [],
         } as any,
         migration: null,
@@ -527,6 +551,7 @@ describe('settings-api', () => {
           tmux: { configMode: 'managed' as const },
           conversations: { compactionModel: 'claude-haiku-4-5' as any, manualCompactMode: 'claude-code' as const, richCompaction: false },
           trackerKeys: {},
+          tts: makeTtsConfig(),
           openrouterFavorites: [],
         } as any,
         migration: null,
@@ -554,6 +579,7 @@ describe('OpenRouter favorites', () => {
       richCompaction: false,
     },
     trackerKeys: {},
+    tts: makeTtsConfig(),
     openrouterFavorites: [] as string[],
   };
 
