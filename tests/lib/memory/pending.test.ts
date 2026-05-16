@@ -155,7 +155,7 @@ describe('pending turn writer', () => {
     expect((await loadMemorySettings(configPath)).rollupPendingThreshold).toBe(2);
   });
 
-  it('loads memory provider, feature toggles, cost cap, and refresh settings', async () => {
+  it('loads memory provider, feature toggles, cost cap, refresh, and worker settings', async () => {
     const configPath = join(tempDir!, 'config.yaml');
     await writeFile(configPath, [
       'memory:',
@@ -171,6 +171,7 @@ describe('pending turn writer', () => {
       '    prompt_time_injection: false',
       '  rollup_pending_threshold: 6',
       '  sidebar_refresh_interval_ms: 15000',
+      '  worker_concurrency: 8',
       '',
     ].join('\n'), 'utf8');
 
@@ -185,6 +186,7 @@ describe('pending turn writer', () => {
       promptTimeInjectionEnabled: false,
       rollupPendingThreshold: 6,
       sidebarRefreshIntervalMs: 15000,
+      workerConcurrency: 8,
     });
   });
 

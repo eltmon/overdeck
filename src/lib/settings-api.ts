@@ -158,6 +158,7 @@ export interface ApiSettingsConfig {
     prompt_time_injection_enabled?: boolean;
     rollup_pending_threshold?: number;
     sidebar_refresh_interval_ms?: number;
+    worker_concurrency?: number;
   };
   api_keys: {
     openai?: string;
@@ -483,6 +484,15 @@ export function loadSettingsApi(): ApiSettingsConfig {
     }) : undefined,
   });
 
+  const memory = config.memory ?? {
+    extraction: { fallbackChain: [] },
+    observationsEnabled: true,
+    promptTimeInjectionEnabled: true,
+    rollupPendingThreshold: 4,
+    sidebarRefreshIntervalMs: 10_000,
+    workerConcurrency: 4,
+  };
+
   return {
     workhorses: seededWorkhorses(config),
     roles: seededRoles(config),
@@ -511,15 +521,16 @@ export function loadSettingsApi(): ApiSettingsConfig {
     },
     conversations: conversationSettings,
     memory: {
-      provider: config.memory.extraction.provider,
-      model: config.memory.extraction.model,
-      per_day_cost_cap_usd: config.memory.extraction.perDayCostCapUsd,
-      fallback_provider: config.memory.extraction.fallbackChain[0]?.provider ?? '',
-      fallback_model: config.memory.extraction.fallbackChain[0]?.model,
-      observations_enabled: config.memory.observationsEnabled,
-      prompt_time_injection_enabled: config.memory.promptTimeInjectionEnabled,
-      rollup_pending_threshold: config.memory.rollupPendingThreshold,
-      sidebar_refresh_interval_ms: config.memory.sidebarRefreshIntervalMs,
+      provider: memory.extraction.provider,
+      model: memory.extraction.model,
+      per_day_cost_cap_usd: memory.extraction.perDayCostCapUsd,
+      fallback_provider: memory.extraction.fallbackChain[0]?.provider ?? '',
+      fallback_model: memory.extraction.fallbackChain[0]?.model,
+      observations_enabled: memory.observationsEnabled,
+      prompt_time_injection_enabled: memory.promptTimeInjectionEnabled,
+      rollup_pending_threshold: memory.rollupPendingThreshold,
+      sidebar_refresh_interval_ms: memory.sidebarRefreshIntervalMs,
+      worker_concurrency: memory.workerConcurrency,
     },
     tracker_keys: config.trackerKeys,
     experimental: {
@@ -667,6 +678,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
           },
           rollup_pending_threshold: settings.memory.rollup_pending_threshold,
           sidebar_refresh_interval_ms: settings.memory.sidebar_refresh_interval_ms,
+          worker_concurrency: settings.memory.worker_concurrency,
         }
       : undefined,
     tracker_keys: settings.tracker_keys,
@@ -836,6 +848,9 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     }
     if (settings.memory.sidebar_refresh_interval_ms !== undefined && (!Number.isInteger(settings.memory.sidebar_refresh_interval_ms) || settings.memory.sidebar_refresh_interval_ms < 1)) {
       errors.push('memory.sidebar_refresh_interval_ms must be a positive integer');
+    }
+    if (settings.memory.worker_concurrency !== undefined && (!Number.isInteger(settings.memory.worker_concurrency) || settings.memory.worker_concurrency < 1)) {
+      errors.push('memory.worker_concurrency must be a positive integer');
     }
   }
 

@@ -1,0 +1,180 @@
+import { randomUUID } from 'crypto';
+import type { MemoryObservation } from '@panctl/contracts';
+import {
+  extractObservationFromTurn,
+  type ExtractObservationCall,
+  type ExtractObservationInput,
+  type ExtractObservationResult,
+} from './extract.js';
+import { updateMemoryHealth, type MemoryHealthUpdate } from './health.js';
+import { writeObservation, type WriteObservationResult } from './observations.js';
+import { extractWithProviderPolicy, type MemoryExtractionPolicyResult } from './providers/index.js';
+import { getMemoryWorkerConcurrency } from './settings.js';
+
+export const DEFAULT_MEMORY_WORKER_CONCURRENCY = 4;
+
+export interface MemoryExtractionJob extends ExtractObservationInput {
+  jobId?: string;
+}
+
+export type MemoryExtractionJobResult =
+  | { jobId: string; status: 'written'; observation: MemoryObservation; writeResult: WriteObservationResult }
+  | { jobId: string; status: 'skipped'; reason: Extract<ExtractObservationResult, { status: 'skipped' }>['reason'] }
+  | { jobId: string; status: 'dropped'; reason: Extract<ExtractObservationResult, { status: 'dropped' }>['reason'] }
+  | { jobId: string; status: 'failed'; reason: 'write-failed' | 'worker-error'; error: unknown };
+
+export interface MemoryExtractionWorkerPoolOptions {
+  loadConcurrency?: () => number | Promise<number>;
+  writeObservation?: (observation: MemoryObservation) => Promise<WriteObservationResult>;
+  updateHealth?: (identity: MemoryExtractionJob['identity'], update: MemoryHealthUpdate) => Promise<unknown>;
+  onResult?: (result: MemoryExtractionJobResult) => void | Promise<void>;
+}
+
+interface QueuedMemoryExtractionJob {
+  jobId: string;
+  job: MemoryExtractionJob;
+}
+
+export class MemoryExtractionWorkerPool {
+  private readonly queue: QueuedMemoryExtractionJob[] = [];
+  private readonly loadConcurrency: () => number | Promise<number>;
+  private readonly writeObservation: (observation: MemoryObservation) => Promise<WriteObservationResult>;
+  private readonly updateHealth: (identity: MemoryExtractionJob['identity'], update: MemoryHealthUpdate) => Promise<unknown>;
+  private readonly onResult?: (result: MemoryExtractionJobResult) => void | Promise<void>;
+  private active = 0;
+  private pumping = false;
+  private idleResolvers: Array<() => void> = [];
+
+  constructor(options: MemoryExtractionWorkerPoolOptions = {}) {
+    this.loadConcurrency = options.loadConcurrency ?? getMemoryWorkerConcurrency;
+    this.writeObservation = options.writeObservation ?? writeObservation;
+    this.updateHealth = options.updateHealth ?? updateMemoryHealth;
+    this.onResult = options.onResult;
+  }
+
+  enqueue(job: MemoryExtractionJob): string {
+    const jobId = job.jobId ?? randomUUID();
+    this.queue.push({ jobId, job: { ...job, jobId } });
+    void this.pump();
+    return jobId;
+  }
+
+  enqueueReconciliationSweep(jobs: MemoryExtractionJob[]): string[] {
+    return jobs.map((job) => this.enqueue(job));
+  }
+
+  pendingCount(): number {
+    return this.queue.length + this.active;
+  }
+
+  async waitForIdle(): Promise<void> {
+    if (this.pendingCount() === 0) return;
+    await new Promise<void>((resolve) => this.idleResolvers.push(resolve));
+  }
+
+  private async pump(): Promise<void> {
+    if (this.pumping) return;
+    this.pumping = true;
+    try {
+      while (this.queue.length > 0 && this.active < await this.effectiveConcurrency()) {
+        const queued = this.queue.shift();
+        if (!queued) break;
+        this.active += 1;
+        void this.runQueuedJob(queued);
+      }
+    } finally {
+      this.pumping = false;
+      this.resolveIdleIfNeeded();
+    }
+  }
+
+  private async runQueuedJob(queued: QueuedMemoryExtractionJob): Promise<void> {
+    let result: MemoryExtractionJobResult;
+    try {
+      result = await this.processJob(queued.jobId, queued.job);
+    } catch (error) {
+      await this.recordHealth(queued.job.identity, { status: 'failing', reason: 'worker-error', success: false });
+      result = { jobId: queued.jobId, status: 'failed', reason: 'worker-error', error };
+    }
+
+    try {
+      await this.onResult?.(result);
+    } catch {
+      // Result observers must not feed failures back into the extraction path.
+    } finally {
+      this.active -= 1;
+      void this.pump();
+      this.resolveIdleIfNeeded();
+    }
+  }
+
+  private async processJob(jobId: string, job: MemoryExtractionJob): Promise<MemoryExtractionJobResult> {
+    const result = await extractObservationFromTurn({
+      ...job,
+      extract: job.extract ?? this.extractWithoutProviderHealth(job),
+    });
+
+    if (result.status === 'skipped') {
+      await this.recordHealth(job.identity, { status: 'degraded', reason: result.reason, success: false });
+      return { jobId, status: 'skipped', reason: result.reason };
+    }
+
+    if (result.status === 'dropped') {
+      await this.recordHealth(job.identity, { status: 'failing', reason: result.reason, success: false });
+      return { jobId, status: 'dropped', reason: result.reason };
+    }
+
+    try {
+      const writeResult = await this.writeObservation(result.observation);
+      await this.recordHealth(job.identity, { status: 'healthy', success: true });
+      return { jobId, status: 'written', observation: result.observation, writeResult };
+    } catch (error) {
+      await this.recordHealth(job.identity, { status: 'failing', reason: 'write-failed', success: false });
+      return { jobId, status: 'failed', reason: 'write-failed', error };
+    }
+  }
+
+  private extractWithoutProviderHealth(job: MemoryExtractionJob): ExtractObservationCall {
+    return (prompt, jsonSchema): Promise<MemoryExtractionPolicyResult<unknown>> => extractWithProviderPolicy(prompt, jsonSchema, {
+      identity: job.identity,
+      settings: job.settings,
+      perDayCostCapUsd: job.perDayCostCapUsd,
+    }, {
+      recordHealth: async () => undefined,
+    });
+  }
+
+  private async recordHealth(identity: MemoryExtractionJob['identity'], update: MemoryHealthUpdate): Promise<void> {
+    try {
+      await this.updateHealth(identity, update);
+    } catch {
+      // Health telemetry must never block or fail extraction jobs.
+    }
+  }
+
+  private async effectiveConcurrency(): Promise<number> {
+    const concurrency = await this.loadConcurrency();
+    return Number.isInteger(concurrency) && concurrency > 0 ? concurrency : DEFAULT_MEMORY_WORKER_CONCURRENCY;
+  }
+
+  private resolveIdleIfNeeded(): void {
+    if (this.pendingCount() !== 0) return;
+    const resolvers = this.idleResolvers;
+    this.idleResolvers = [];
+    for (const resolve of resolvers) resolve();
+  }
+}
+
+const defaultMemoryExtractionWorkerPool = new MemoryExtractionWorkerPool();
+
+export function getMemoryExtractionWorkerPool(): MemoryExtractionWorkerPool {
+  return defaultMemoryExtractionWorkerPool;
+}
+
+export function enqueueMemoryExtractionJob(job: MemoryExtractionJob): string {
+  return defaultMemoryExtractionWorkerPool.enqueue(job);
+}
+
+export function enqueueReconciledMemoryExtractionJobs(jobs: MemoryExtractionJob[]): string[] {
+  return defaultMemoryExtractionWorkerPool.enqueueReconciliationSweep(jobs);
+}

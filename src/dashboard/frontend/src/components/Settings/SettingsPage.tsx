@@ -971,7 +971,7 @@ export function SettingsPage() {
   };
 
   const handleMemoryNumberChange = (
-    key: 'per_day_cost_cap_usd' | 'rollup_pending_threshold' | 'sidebar_refresh_interval_ms',
+    key: 'per_day_cost_cap_usd' | 'rollup_pending_threshold' | 'sidebar_refresh_interval_ms' | 'worker_concurrency',
     value: string,
   ) => {
     updateMemorySettings({ [key]: value === '' ? undefined : Number(value) });
@@ -2092,6 +2092,21 @@ export function SettingsPage() {
               step="1"
               value={formData.memory?.rollup_pending_threshold ?? 4}
               onChange={(e) => handleMemoryNumberChange('rollup_pending_threshold', e.target.value)}
+              className="w-24 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Extraction workers</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Maximum concurrent memory extractions across all sessions</p>
+            </div>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={formData.memory?.worker_concurrency ?? 4}
+              onChange={(e) => handleMemoryNumberChange('worker_concurrency', e.target.value)}
               className="w-24 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
             />
           </div>

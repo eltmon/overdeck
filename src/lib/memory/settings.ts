@@ -5,6 +5,7 @@ import type { ExtractionProviderTarget, MemoryProviderSettings } from './provide
 
 export const DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD = 4;
 export const DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS = 10_000;
+export const DEFAULT_MEMORY_WORKER_CONCURRENCY = 4;
 
 export interface MemorySettings {
   extraction: MemoryProviderSettings;
@@ -12,6 +13,7 @@ export interface MemorySettings {
   promptTimeInjectionEnabled: boolean;
   rollupPendingThreshold: number;
   sidebarRefreshIntervalMs: number;
+  workerConcurrency: number;
 }
 
 export async function loadMemorySettings(configPath = getGlobalConfigPath()): Promise<MemorySettings> {
@@ -42,11 +44,16 @@ export async function loadMemorySettings(configPath = getGlobalConfigPath()): Pr
     promptTimeInjectionEnabled: booleanOrDefault(features.prompt_time_injection, true),
     rollupPendingThreshold: positiveIntegerOrDefault(memory.rollup_pending_threshold, DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD),
     sidebarRefreshIntervalMs: positiveIntegerOrDefault(memory.sidebar_refresh_interval_ms, DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS),
+    workerConcurrency: positiveIntegerOrDefault(memory.worker_concurrency, DEFAULT_MEMORY_WORKER_CONCURRENCY),
   };
 }
 
 export async function getMemoryRollupPendingThreshold(): Promise<number> {
   return (await loadMemorySettings()).rollupPendingThreshold;
+}
+
+export async function getMemoryWorkerConcurrency(): Promise<number> {
+  return (await loadMemorySettings()).workerConcurrency;
 }
 
 export async function areMemoryObservationsEnabled(): Promise<boolean> {
@@ -64,6 +71,7 @@ function defaultMemorySettings(): MemorySettings {
     promptTimeInjectionEnabled: true,
     rollupPendingThreshold: DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD,
     sidebarRefreshIntervalMs: DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS,
+    workerConcurrency: DEFAULT_MEMORY_WORKER_CONCURRENCY,
   };
 }
 

@@ -20,6 +20,18 @@ export interface MemoryHealthUpdate {
   success?: boolean;
 }
 
+export interface MemoryHealthChangedPayload {
+  projectId: string;
+  issueId: string;
+  status: MemoryHealthStatus;
+  reason: string | null;
+}
+
+export interface MemoryHealthUpdateOptions {
+  now?: Date;
+  emitHealthChanged?: (payload: MemoryHealthChangedPayload, timestamp: string) => void | Promise<void>;
+}
+
 const EMPTY_HEALTH: MemoryHealthSnapshot = {
   status: 'healthy',
   last_success: null,
@@ -29,10 +41,14 @@ const EMPTY_HEALTH: MemoryHealthSnapshot = {
   failed_by_reason: {},
 };
 
-export async function updateMemoryHealth(identity: MemoryIdentity, update: MemoryHealthUpdate): Promise<void> {
+export async function updateMemoryHealth(
+  identity: MemoryIdentity,
+  update: MemoryHealthUpdate,
+  options: MemoryHealthUpdateOptions = {},
+): Promise<MemoryHealthSnapshot> {
   const path = getMemoryHealthPath(identity);
   const current = await readMemoryHealth(path);
-  const now = new Date().toISOString();
+  const now = (options.now ?? new Date()).toISOString();
   const next: MemoryHealthSnapshot = {
     ...current,
     status: update.status,
@@ -50,6 +66,22 @@ export async function updateMemoryHealth(identity: MemoryIdentity, update: Memor
 
   await ensureParentDir(path);
   await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+
+  if (current.status !== next.status) {
+    const payload = {
+      projectId: identity.projectId,
+      issueId: identity.issueId,
+      status: next.status,
+      reason: update.reason ?? null,
+    };
+    await (options.emitHealthChanged ?? emitMemoryHealthChanged)(payload, now);
+  }
+
+  return next;
+}
+
+export async function readMemoryHealthSnapshot(identity: Pick<MemoryIdentity, 'projectId' | 'issueId'>): Promise<MemoryHealthSnapshot> {
+  return readMemoryHealth(getMemoryHealthPath(identity));
 }
 
 export function getMemoryHealthPath(identity: Pick<MemoryIdentity, 'projectId' | 'issueId'>): string {
@@ -67,4 +99,14 @@ async function readMemoryHealth(path: string): Promise<MemoryHealthSnapshot> {
   }
 
   return { ...EMPTY_HEALTH, ...JSON.parse(raw) as Partial<MemoryHealthSnapshot> };
+}
+
+async function emitMemoryHealthChanged(payload: MemoryHealthChangedPayload, timestamp: string): Promise<void> {
+  const { initEventStore } = await import('../../dashboard/server/event-store.js');
+  const store = await initEventStore();
+  await store.appendAsync({
+    type: 'memory.health_changed',
+    timestamp,
+    payload,
+  });
 }

@@ -90,6 +90,7 @@ export interface MemorySettingsConfig {
   prompt_time_injection_enabled?: boolean;
   rollup_pending_threshold?: number;
   sidebar_refresh_interval_ms?: number;
+  worker_concurrency?: number;
 }
 
 export interface SettingsConfig {

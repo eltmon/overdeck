@@ -43,6 +43,7 @@ pan-install
 pan-issues
 pan-kill
 pan-logs
+pan-memory
 pan-network
 pan-new-project
 pan-oversee

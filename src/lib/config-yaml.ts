@@ -74,6 +74,7 @@ export interface MemoryConfig {
   };
   rollup_pending_threshold?: number;
   sidebar_refresh_interval_ms?: number;
+  worker_concurrency?: number;
 }
 
 export type ManualCompactMode = 'claude-code' | 'panopticon-native';
@@ -521,6 +522,7 @@ export interface NormalizedConfig {
     promptTimeInjectionEnabled: boolean;
     rollupPendingThreshold: number;
     sidebarRefreshIntervalMs: number;
+    workerConcurrency: number;
   };
 
   /** Shadow mode configuration */
@@ -711,6 +713,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     promptTimeInjectionEnabled: true,
     rollupPendingThreshold: 4,
     sidebarRefreshIntervalMs: 10_000,
+    workerConcurrency: 4,
   },
   shadow: {
     enabled: false,
@@ -1192,6 +1195,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       promptTimeInjectionEnabled: DEFAULT_CONFIG.memory.promptTimeInjectionEnabled,
       rollupPendingThreshold: DEFAULT_CONFIG.memory.rollupPendingThreshold,
       sidebarRefreshIntervalMs: DEFAULT_CONFIG.memory.sidebarRefreshIntervalMs,
+      workerConcurrency: DEFAULT_CONFIG.memory.workerConcurrency,
     },
     shadow: {
       enabled: DEFAULT_CONFIG.shadow.enabled,
@@ -1425,6 +1429,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
       if (config.memory.sidebar_refresh_interval_ms !== undefined) {
         result.memory.sidebarRefreshIntervalMs = config.memory.sidebar_refresh_interval_ms;
+      }
+      if (config.memory.worker_concurrency !== undefined) {
+        result.memory.workerConcurrency = config.memory.worker_concurrency;
       }
     }
 
