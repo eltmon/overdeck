@@ -2,12 +2,15 @@ import { withMemoryFtsDatabase } from './fts-db.js';
 
 const DEFAULT_LIMIT = 20;
 const OVERFETCH_RATIO = 3;
+const DEFAULT_SIBLING_TOKEN_BUDGET = 1500;
 
 export interface SearchMemoryInput {
   query: string;
   projectId: string;
   workspaceId?: string;
   issueId?: string;
+  sibling?: boolean;
+  siblingTokenBudget?: number;
   limit?: number;
   tags?: string[];
   includeArchived?: boolean;
@@ -34,6 +37,8 @@ export interface MemorySearchHit {
   agentRole: string;
   agentHarness: string;
   bm25: number;
+  provenance: string;
+  tokenBudget: number | null;
 }
 
 interface MemorySearchRow {
@@ -64,6 +69,9 @@ export async function searchMemory(input: SearchMemoryInput): Promise<MemorySear
   if (!matchQuery) return [];
 
   const limit = normalizeLimit(input.limit);
+  const identityPredicate = buildIdentityPredicate(input);
+  if (!identityPredicate) return [];
+
   const rows = await withMemoryFtsDatabase(input.projectId, (db) => db.prepare(`
     SELECT
       rowid,
@@ -89,8 +97,7 @@ export async function searchMemory(input: SearchMemoryInput): Promise<MemorySear
     FROM memory_fts
     WHERE memory_fts MATCH ?
       AND project_id = ?
-      AND (? IS NULL OR workspace_id = ?)
-      AND (? IS NULL OR issue_id = ?)
+      ${identityPredicate.sql}
       AND (? = 1 OR (entry_date || 'T' || entry_time) > COALESCE((
         SELECT MAX(from_timestamp)
         FROM reset_markers
@@ -104,16 +111,14 @@ export async function searchMemory(input: SearchMemoryInput): Promise<MemorySear
   `).all(
     matchQuery,
     input.projectId,
-    input.workspaceId ?? null,
-    input.workspaceId ?? null,
-    input.issueId ?? null,
-    input.issueId ?? null,
+    ...identityPredicate.params,
     input.includeArchived ? 1 : 0,
     limit * OVERFETCH_RATIO,
   ) as MemorySearchRow[]);
 
+  const tokenBudget = input.sibling ? normalizeSiblingTokenBudget(input.siblingTokenBudget) : null;
   return rows
-    .map(rowToHit)
+    .map((row) => rowToHit(row, tokenBudget))
     .filter((hit) => matchesTags(hit, input.tags))
     .slice(0, limit);
 }
@@ -123,13 +128,41 @@ export function buildMatchQuery(query: string): string {
   return terms.map((term) => `"${term.replaceAll('"', '""')}"`).join(' ');
 }
 
+function buildIdentityPredicate(input: SearchMemoryInput): { sql: string; params: string[] } | null {
+  if (input.sibling) {
+    if (!input.workspaceId || !input.issueId) return null;
+    return {
+      sql: 'AND workspace_id != ? AND issue_id != ?',
+      params: [input.workspaceId, input.issueId],
+    };
+  }
+
+  const clauses: string[] = [];
+  const params: string[] = [];
+  if (input.workspaceId) {
+    clauses.push('AND workspace_id = ?');
+    params.push(input.workspaceId);
+  }
+  if (input.issueId) {
+    clauses.push('AND issue_id = ?');
+    params.push(input.issueId);
+  }
+  return { sql: clauses.join('\n      '), params };
+}
+
 function normalizeLimit(limit: number | undefined): number {
   if (limit === undefined) return DEFAULT_LIMIT;
   if (!Number.isInteger(limit) || limit <= 0) return DEFAULT_LIMIT;
   return limit;
 }
 
-function rowToHit(row: MemorySearchRow): MemorySearchHit {
+function normalizeSiblingTokenBudget(tokenBudget: number | undefined): number {
+  if (tokenBudget === undefined) return DEFAULT_SIBLING_TOKEN_BUDGET;
+  if (!Number.isInteger(tokenBudget) || tokenBudget <= 0) return DEFAULT_SIBLING_TOKEN_BUDGET;
+  return tokenBudget;
+}
+
+function rowToHit(row: MemorySearchRow, tokenBudget: number | null): MemorySearchHit {
   return {
     rowid: row.rowid,
     content: row.content,
@@ -151,6 +184,8 @@ function rowToHit(row: MemorySearchRow): MemorySearchHit {
     agentRole: row.agent_role,
     agentHarness: row.agent_harness,
     bm25: row.bm25,
+    provenance: `${row.workspace_id}:${row.issue_id}`,
+    tokenBudget,
   };
 }
 

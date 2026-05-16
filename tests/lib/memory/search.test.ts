@@ -116,4 +116,38 @@ describe('memory FTS search', () => {
     expect((await searchMemory({ query: 'memory search', projectId: 'panopticon-cli', issueId: 'PAN-1052', includeArchived: true })).map((hit) => hit.content).sort())
       .toEqual(['archived memory search', 'current memory search']);
   });
+
+  it('searches same-project siblings by workspace and issue identity without using git branch', async () => {
+    await insertRow({ content: 'sibling memory current workspace', workspace_id: 'feature-pan-1052', issue_id: 'PAN-1052', branch: 'feature/shared' });
+    await insertRow({ content: 'sibling memory same workspace other issue', workspace_id: 'feature-pan-1052', issue_id: 'PAN-999', branch: 'feature/sibling' });
+    await insertRow({ content: 'sibling memory other workspace same issue', workspace_id: 'feature-pan-999', issue_id: 'PAN-1052', branch: 'feature/sibling' });
+    await insertRow({ content: 'sibling memory other workspace other issue', workspace_id: 'feature-pan-999', issue_id: 'PAN-999', branch: 'feature/shared' });
+    await insertRow({ content: 'sibling memory other project', project_id: 'other-project', workspace_id: 'feature-pan-998', issue_id: 'PAN-998', branch: 'feature/shared' });
+
+    const hits = await searchMemory({
+      query: 'sibling memory',
+      projectId: 'panopticon-cli',
+      workspaceId: 'feature-pan-1052',
+      issueId: 'PAN-1052',
+      sibling: true,
+    });
+
+    expect(hits.map((hit) => hit.content)).toEqual(['sibling memory other workspace other issue']);
+    expect(hits[0]).toMatchObject({
+      workspaceId: 'feature-pan-999',
+      issueId: 'PAN-999',
+      branch: 'feature/shared',
+      provenance: 'feature-pan-999:PAN-999',
+      tokenBudget: 1500,
+    });
+
+    expect((await searchMemory({
+      query: 'sibling memory',
+      projectId: 'panopticon-cli',
+      workspaceId: 'feature-pan-1052',
+      issueId: 'PAN-1052',
+      sibling: true,
+      siblingTokenBudget: 750,
+    }))[0]?.tokenBudget).toBe(750);
+  });
 });
