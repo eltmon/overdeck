@@ -251,6 +251,17 @@ export function registerWorkspaceCommands(program: Command): void {
     });
 
   workspace
+    .command('reap')
+    .description('List or remove orphaned unhealthy workspace Docker stacks')
+    .option('--days <days>', 'Minimum age in days', '7')
+    .option('--apply', 'Run docker compose down -v --remove-orphans for candidates')
+    .option('--yes', 'Skip confirmation when using --apply')
+    .action(async (opts: { days?: string; apply?: boolean; yes?: boolean }) => {
+      const { workspaceReapCommand } = await import('./workspace-reap.js');
+      await workspaceReapCommand(opts);
+    });
+
+  workspace
     .command('update <issueId>')
     .description('Update skills/agents/rules in an existing workspace')
     .option('--force', 'Overwrite user-modified files')

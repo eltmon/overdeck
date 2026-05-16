@@ -13,7 +13,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 1,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-16T22:17:35.204Z",
+    "updated": "2026-05-16T22:35:12.000Z",
     "references": [
       { "uri": "https://github.com/eltmon/panopticon-cli/issues/1140", "label": "PAN-1140", "type": "issue" },
       { "uri": "infra/.devcontainer-template/docker-compose.devcontainer.yml.template", "label": "compose template", "type": "code" },
@@ -254,7 +254,7 @@
       {
         "id": "reap-stuck-workspace-stacks",
         "title": "Add `pan workspace reap` to clean up orphaned Created-state workspace stacks",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -270,25 +270,25 @@
           {
             "id": "reap-stuck-workspace-stacks.ac1",
             "title": "`pan workspace reap` lists candidates without modifying anything when run without `--apply`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "reap-stuck-workspace-stacks.ac2",
             "title": "`pan workspace reap --apply` tears down each candidate via `docker compose down -v --remove-orphans` and prints success/failure per stack.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "reap-stuck-workspace-stacks.ac3",
             "title": "Stacks whose `issueId` has an active agent state file are skipped (never reaped automatically); skipped stacks are listed with a reason.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "reap-stuck-workspace-stacks.ac4",
             "title": "`pan workspace reap --help` is self-documenting and `scripts/lint-skills.sh` passes (skill ↔ CLI parity preserved).",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
