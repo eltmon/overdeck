@@ -3,6 +3,22 @@ import { withMemoryFtsDatabase } from './fts-db.js';
 const DEFAULT_LIMIT = 20;
 const OVERFETCH_RATIO = 3;
 const DEFAULT_SIBLING_TOKEN_BUDGET = 1500;
+const RECENCY_DECAY_RATE = 0.02;
+const TAG_BOOST = 0.3;
+const HIGH_SIGNAL_SCORE_FLOOR = 1.0;
+const HIGH_SIGNAL_WINDOW_HOURS = 72;
+const HIGH_SIGNAL_TAGS = new Set([
+  'error',
+  'decision',
+  'blocker',
+  'shipped',
+  'architecture',
+  'review-blocker',
+  'test-failure',
+  'merge-risk',
+  'architecture-decision',
+  'regression',
+]);
 
 export interface SearchMemoryInput {
   query: string;
@@ -11,6 +27,7 @@ export interface SearchMemoryInput {
   issueId?: string;
   sibling?: boolean;
   siblingTokenBudget?: number;
+  now?: Date;
   limit?: number;
   tags?: string[];
   includeArchived?: boolean;
@@ -37,6 +54,7 @@ export interface MemorySearchHit {
   agentRole: string;
   agentHarness: string;
   bm25: number;
+  rankScore: number;
   provenance: string;
   tokenBudget: number | null;
 }
@@ -117,15 +135,21 @@ export async function searchMemory(input: SearchMemoryInput): Promise<MemorySear
   ) as MemorySearchRow[]);
 
   const tokenBudget = input.sibling ? normalizeSiblingTokenBudget(input.siblingTokenBudget) : null;
+  const queryTerms = extractQueryTerms(input.query);
+  const now = input.now ?? new Date();
   return rows
-    .map((row) => rowToHit(row, tokenBudget))
+    .map((row) => rowToHit(row, tokenBudget, rankHit(row, queryTerms, now)))
     .filter((hit) => matchesTags(hit, input.tags))
+    .sort((a, b) => b.rankScore - a.rankScore || b.entryDate.localeCompare(a.entryDate) || b.entryTime.localeCompare(a.entryTime))
     .slice(0, limit);
 }
 
 export function buildMatchQuery(query: string): string {
-  const terms = query.match(/[\p{L}\p{N}_-]+/gu) ?? [];
-  return terms.map((term) => `"${term.replaceAll('"', '""')}"`).join(' ');
+  return extractQueryTerms(query).map((term) => `"${term.replaceAll('"', '""')}"`).join(' ');
+}
+
+function extractQueryTerms(query: string): string[] {
+  return query.match(/[\p{L}\p{N}_-]+/gu) ?? [];
 }
 
 function buildIdentityPredicate(input: SearchMemoryInput): { sql: string; params: string[] } | null {
@@ -162,7 +186,26 @@ function normalizeSiblingTokenBudget(tokenBudget: number | undefined): number {
   return tokenBudget;
 }
 
-function rowToHit(row: MemorySearchRow, tokenBudget: number | null): MemorySearchHit {
+function rankHit(row: MemorySearchRow, queryTerms: string[], now: Date): number {
+  const tags = splitList(row.tags).map((tag) => tag.toLowerCase());
+  const tagSet = new Set(tags);
+  const matchingTagCount = new Set(queryTerms.map((term) => term.toLowerCase()).filter((term) => tagSet.has(term))).size;
+  const ageDays = ageInDays(`${row.entry_date}T${row.entry_time}`, now);
+  const decayedBm25 = Math.abs(row.bm25) * Math.exp(-RECENCY_DECAY_RATE * ageDays);
+  const boostedScore = decayedBm25 + TAG_BOOST * matchingTagCount;
+  if (ageDays < HIGH_SIGNAL_WINDOW_HOURS / 24 && tags.some((tag) => HIGH_SIGNAL_TAGS.has(tag))) {
+    return Math.max(boostedScore, HIGH_SIGNAL_SCORE_FLOOR);
+  }
+  return boostedScore;
+}
+
+function ageInDays(timestamp: string, now: Date): number {
+  const parsed = Date.parse(timestamp);
+  if (Number.isNaN(parsed)) return 0;
+  return Math.max(0, (now.getTime() - parsed) / 86_400_000);
+}
+
+function rowToHit(row: MemorySearchRow, tokenBudget: number | null, rankScore: number): MemorySearchHit {
   return {
     rowid: row.rowid,
     content: row.content,
@@ -184,6 +227,7 @@ function rowToHit(row: MemorySearchRow, tokenBudget: number | null): MemorySearc
     agentRole: row.agent_role,
     agentHarness: row.agent_harness,
     bm25: row.bm25,
+    rankScore,
     provenance: `${row.workspace_id}:${row.issue_id}`,
     tokenBudget,
   };

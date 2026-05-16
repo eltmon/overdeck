@@ -103,6 +103,46 @@ describe('memory FTS search', () => {
     expect(hits.map((hit) => hit.tags)).toEqual([['memory', 'keep'], ['memory', 'keep']]);
   });
 
+  it('re-ranks overfetched rows with tag boost before truncating to the requested limit', async () => {
+    for (let index = 0; index < 6; index += 1) {
+      await insertRow({
+        content: `rerank memory search ${index}`,
+        tags: index === 5 ? 'memory,search' : 'memory',
+      });
+    }
+
+    const hits = await searchMemory({ query: 'rerank memory search', projectId: 'panopticon-cli', limit: 2 });
+
+    expect(hits).toHaveLength(2);
+    expect(hits[0]?.tags).toEqual(['memory', 'search']);
+    expect(hits[0]!.rankScore - hits[1]!.rankScore).toBeGreaterThanOrEqual(0.29);
+  });
+
+  it('gives recent high-signal tags a score floor before decay can bury them', async () => {
+    await insertRow({
+      content: 'signal memory search old regular',
+      tags: 'memory',
+      entry_date: '2026-05-01',
+      entry_time: '20:00:00.000Z',
+    });
+    await insertRow({
+      content: 'signal memory search recent regression',
+      tags: 'memory,regression',
+      entry_date: '2026-05-16',
+      entry_time: '20:00:00.000Z',
+    });
+
+    const hits = await searchMemory({
+      query: 'signal memory search',
+      projectId: 'panopticon-cli',
+      limit: 2,
+      now: new Date('2026-05-16T22:00:00.000Z'),
+    });
+
+    expect(hits[0]).toMatchObject({ content: 'signal memory search recent regression', tags: ['memory', 'regression'] });
+    expect(hits[0]!.rankScore).toBeGreaterThanOrEqual(1);
+  });
+
   it('applies latest reset markers unless includeArchived is set', async () => {
     await insertRow({ content: 'archived memory search', entry_time: '20:00:00.000Z' });
     await insertRow({ content: 'current memory search', entry_time: '22:00:00.000Z' });
