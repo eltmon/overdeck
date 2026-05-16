@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-16T22:45:00.000Z",
+  "updated": "2026-05-16T22:55:00.000Z",
   "gitState": {
     "branch": "feature/pan-1052",
-    "sha": "653f46c8a",
+    "sha": "ff63a48c7",
     "dirty": true
   },
   "decisions": [
@@ -183,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-ye4e",
-    "itemId": "b1-transcript-checkpoints-claim-range",
+    "beadId": "workspace-ib0n",
+    "itemId": "b1-memory-fts-schema",
     "status": "implemented",
-    "note": "Transcript checkpoint storage now has schema v35, transcript_checkpoints table creation/migration, atomic claimTranscriptRange() using UPDATE ... WHERE last_offset = expectedFromOffset RETURNING, mid-turn counter tracking/reset on Stop-hook claims, and 50-way concurrency coverage. Focused tests, full suite, lint, typecheck, and graphify update passed."
+    "note": "Project-scoped memory FTS storage now has a lazily opened cached per-project database at ~/.panopticon/memory/<projectId>/memory-search.db, FTS5 porter unicode61 schema, reset_markers and observation_index tables with lookup indexes, dashboard shutdown close wiring, async SQLite wrapper APIs, and idempotency coverage. Focused tests, full suite, lint, typecheck, and graphify update passed."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -351,6 +351,12 @@
       "timestamp": "2026-05-16T22:45:00.000Z",
       "reason": "work",
       "note": "workspace-ye4e implemented: added schema v35 transcript_checkpoints, src/lib/memory/checkpoints.ts claimTranscriptRange(), atomic offset-mismatch behavior, mid-turn rate-limit fields, Stop-hook reset semantics, and tests/lib/memory/checkpoints.test.ts coverage including 50 simultaneous overlapping claims.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T22:55:00.000Z",
+      "reason": "work",
+      "note": "workspace-ib0n implemented: added src/lib/memory/fts-db.ts with lazy cached project DB handles, FTS5 porter unicode61 memory_fts schema, reset_markers and observation_index tables/indexes, dashboard shutdown close wiring, and tests/lib/memory/fts-db.test.ts coverage for schema, tokenizer, caching, and idempotent reopen.",
       "agentModel": "gpt-5.5"
     }
   ],

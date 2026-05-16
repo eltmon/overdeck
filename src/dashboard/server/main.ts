@@ -36,6 +36,7 @@ import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
 import { resumeSwarmAutoAdvanceLoopOnStartup } from './routes/swarm.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
+import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
 
 declare const Bun: unknown;
 
@@ -355,6 +356,7 @@ const handleShutdownSignal = (signal: NodeJS.Signals) => {
   stopConversationLifecycleService();
   stopTtsSummarizer();
   stopTtsPlayback();
+  closeMemoryFtsDatabases();
   process.exit(0);
 };
 process.once('SIGTERM', () => handleShutdownSignal('SIGTERM'));
