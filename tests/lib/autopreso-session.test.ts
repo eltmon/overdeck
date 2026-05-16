@@ -72,6 +72,20 @@ describe('createWhiteboardSession', () => {
     }
   });
 
+  it('passes a generation guard to transcript agent runs', async () => {
+    const run = vi.spyOn(agent, 'runWhiteboardAgent').mockResolvedValue([]);
+    const session = createWhiteboardSession();
+    session.mode = 'live';
+
+    session.processTranscript('draw a box', { autopreso: { provider: 'openai', model: 'gpt-4.1-mini' } });
+    await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+    const guard = run.mock.calls[0]?.[3];
+    expect(guard?.isCurrent()).toBe(true);
+
+    session.reset();
+    expect(guard?.isCurrent()).toBe(false);
+  });
+
   it('rejects pending transcript turns once the busy-agent queue is full', () => {
     vi.spyOn(agent, 'runWhiteboardAgent').mockImplementation(() => new Promise(() => {}));
     const session = createWhiteboardSession();

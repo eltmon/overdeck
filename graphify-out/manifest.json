@@ -448,8 +448,8 @@
     "hash": "c061700a8269f41d15183a20d597af10"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/autopreso-session.test.ts": {
-    "mtime": 1778966096.4172475,
-    "hash": "10bdd0f469effd4c46ad948dc692fe7b"
+    "mtime": 1778966623.669554,
+    "hash": "f69d0cc7eaf8449b13e0e3c3577b8839"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/workspace-manager.test.ts": {
     "mtime": 1778342940.3768299,
@@ -940,7 +940,7 @@
     "hash": "280d7cdfde5f4b1b47671f08a993c671"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/record-cost-event.d.ts": {
-    "mtime": 1778965689.6241753,
+    "mtime": 1778966279.7342436,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/notify-complete": {
@@ -1152,16 +1152,16 @@
     "hash": "f23cde06107702a599133e9bd6f759ce"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/session.ts": {
-    "mtime": 1778966074.745427,
-    "hash": "f915d7d687dee353e3d814a4c09ee42a"
+    "mtime": 1778966607.7909355,
+    "hash": "8df6f6c76f5ef4a031a8b34e6470f74a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/whiteboard-tools.ts": {
     "mtime": 1778963002.9105659,
     "hash": "45eecbcd1e5a8ca4bb8edac52934f15c"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/agent.ts": {
-    "mtime": 1778966033.9818873,
-    "hash": "653d41a388bca9d13e22462feeb3dae8"
+    "mtime": 1778966602.2057183,
+    "hash": "264094b604173e3020066845433cf052"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/whiteboard-elements.ts": {
     "mtime": 1778963002.9105659,
@@ -1820,8 +1820,8 @@
     "hash": "764014e1da24b7cd7da7b80742de2701"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/lib/cloister/deacon.ts": {
-    "mtime": 1778822418.1204386,
-    "hash": "3f02d2611b383f1d887f23e3d76bf1c7"
+    "mtime": 1778966479.7939634,
+    "hash": "ca2c943b9961ace99b4ef24530a78ac2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/lib/cloister/feedback-writer.ts": {
     "mtime": 1778619749.1757984,
@@ -3692,8 +3692,8 @@
     "hash": "36e2538c25930c9b0aac0a6377f74aa2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/hooks/useAutoPresoWebSocket.ts": {
-    "mtime": 1778963582.0837762,
-    "hash": "15a2db88b3a58f952700b83c38b67793"
+    "mtime": 1778966563.1221979,
+    "hash": "202ca516ff9a0a149c4bc4d66c73cbf9"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/hooks/useBulkSelection.ts": {
     "mtime": 1778342940.3317025,

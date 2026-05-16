@@ -165,7 +165,9 @@ export function createWhiteboardSession(): AutoPresoSession {
     pendingTranscript = null;
     activeTranscriptRun = (async () => {
       if (generation !== warmupGeneration || session.mode !== 'live') return;
-      await runWhiteboardAgent(next.transcripts.join('\n'), session, next.settings);
+      await runWhiteboardAgent(next.transcripts.join('\n'), session, next.settings, {
+        isCurrent: () => generation === warmupGeneration && session.mode === 'live',
+      });
       if (generation !== warmupGeneration || session.mode !== 'live') return;
       notify();
     })().catch((error) => {

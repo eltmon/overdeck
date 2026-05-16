@@ -15,9 +15,11 @@ type AutoPresoMessage =
 
 type VoiceMessage =
   | { type: 'transcript:partial'; text: string }
-  | { type: 'transcript:committed'; text: string };
+  | { type: 'transcript:committed'; text: string }
+  | { type: 'transcript:finalized' };
 
 const MAX_SOCKET_BUFFERED_AUDIO_BYTES = 250_000;
+const VOICE_STOP_TIMEOUT_MS = 1000;
 const MAX_COMMITTED_TURNS = 200;
 
 function websocketUrl(path: string): string {
@@ -43,6 +45,7 @@ export function useAutoPresoWebSocket() {
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const finalizeResolverRef = useRef<(() => void) | null>(null);
 
   const connectWhiteboard = useCallback(() => {
     whiteboardSocketRef.current?.close();
@@ -68,10 +71,10 @@ export function useAutoPresoWebSocket() {
     };
   }, []);
 
-  const stopListening = useCallback(() => {
+  const closeVoiceResources = useCallback((closeSocket: boolean) => {
     setIsListening(false);
-    voiceSocketRef.current?.close();
-    voiceSocketRef.current = null;
+    if (closeSocket) voiceSocketRef.current?.close();
+    if (closeSocket) voiceSocketRef.current = null;
     processorRef.current?.disconnect();
     sourceRef.current?.disconnect();
     analyserRef.current?.disconnect();
@@ -85,6 +88,23 @@ export function useAutoPresoWebSocket() {
     setAnalyserNode(null);
   }, []);
 
+  const stopListening = useCallback(async (finalize = true) => {
+    const socket = voiceSocketRef.current;
+    closeVoiceResources(false);
+    if (finalize && socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'stop' }));
+      await new Promise<void>((resolve) => {
+        const timer = window.setTimeout(resolve, VOICE_STOP_TIMEOUT_MS);
+        finalizeResolverRef.current = () => {
+          window.clearTimeout(timer);
+          resolve();
+        };
+      });
+      finalizeResolverRef.current = null;
+    }
+    closeVoiceResources(true);
+  }, [closeVoiceResources]);
+
   useEffect(() => {
     shouldReconnectRef.current = true;
     connectWhiteboard();
@@ -95,7 +115,7 @@ export function useAutoPresoWebSocket() {
       const socket = whiteboardSocketRef.current;
       whiteboardSocketRef.current = null;
       socket?.close();
-      stopListening();
+      void stopListening(false);
     };
   }, [connectWhiteboard, stopListening]);
 
@@ -117,9 +137,10 @@ export function useAutoPresoWebSocket() {
         setPartialText('');
         setCommittedTurns((turns) => [...turns, { text: message.text, timestamp: new Date() }].slice(-MAX_COMMITTED_TURNS));
       }
+      if (message.type === 'transcript:finalized') finalizeResolverRef.current?.();
     };
     socket.onclose = () => {
-      if (voiceSocketRef.current === socket) stopListening();
+      if (voiceSocketRef.current === socket) void stopListening(false);
     };
 
     processor.onaudioprocess = (event) => {

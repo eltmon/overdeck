@@ -7,6 +7,10 @@ import type { AutoPresoSession } from './session.js';
 import { normalizeElements, type ExcalidrawElement } from './whiteboard-elements.js';
 import { applyWhiteboardEditOperations, formatLineNumberedWhiteboard, type Op } from './whiteboard-tools.js';
 
+export interface WhiteboardAgentGuard {
+  isCurrent(): boolean;
+}
+
 export interface AutoPresoAgentSettings {
   autopreso: {
     provider: 'openai' | 'codex' | 'ollama';
@@ -51,7 +55,7 @@ async function createModel(settings: AutoPresoAgentSettings) {
   return createOpenAI({ apiKey: 'ollama', baseURL: 'http://localhost:11434/v1' })(model);
 }
 
-function createTools(session: AutoPresoSession) {
+function createTools(session: AutoPresoSession, guard?: WhiteboardAgentGuard) {
   return {
     whiteboard_apply: {
       description: 'Apply line-numbered edits to the current Excalidraw whiteboard.',
@@ -86,6 +90,7 @@ function createTools(session: AutoPresoSession) {
         additionalProperties: false,
       },
       execute: async (input: WhiteboardApplyInput) => {
+        if (guard && !guard.isCurrent()) return { elements: session.elements, viewport: input.viewport ?? null };
         session.elements = applyWhiteboardEditOperations(session.elements, input.ops);
         session.canvasDirtyForAgent = false;
         return { elements: session.elements, viewport: input.viewport ?? null };
@@ -105,6 +110,7 @@ function createTools(session: AutoPresoSession) {
         additionalProperties: false,
       },
       execute: async (input: WhiteboardOverwriteInput) => {
+        if (guard && !guard.isCurrent()) return { elements: session.elements };
         session.elements = normalizeElements(input.elements);
         session.canvasDirtyForAgent = false;
         return { elements: session.elements };
@@ -125,15 +131,17 @@ function systemPrompt(session: AutoPresoSession): string {
 export async function runWhiteboardAgent(
   transcript: string,
   session: AutoPresoSession,
-  settings: AutoPresoAgentSettings = DEFAULT_SETTINGS
+  settings: AutoPresoAgentSettings = DEFAULT_SETTINGS,
+  guard?: WhiteboardAgentGuard
 ): Promise<ExcalidrawElement[]> {
   const model = await createModel(settings);
   await generateText({
     model,
     system: systemPrompt(session),
     prompt: transcript,
-    tools: createTools(session) as never,
+    tools: createTools(session, guard) as never,
   });
+  if (guard && !guard.isCurrent()) return session.elements;
   session.elements = normalizeElements(session.elements);
   return session.elements;
 }
