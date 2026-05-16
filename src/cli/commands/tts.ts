@@ -4,18 +4,10 @@ import { mkdir, readFile, writeFile } from 'fs/promises';
 import { dirname } from 'path';
 import { parseDocument } from 'yaml';
 import { clearConfigCache, getGlobalConfigPath, loadConfig, type NormalizedTtsDaemonConfig } from '../../lib/config-yaml.js';
+import { buildTtsSpeakPayload as buildRuntimeTtsSpeakPayload, type TtsSpeakPayload } from '../../lib/tts-speak.js';
 import { deleteVoice, findVoiceById, findVoiceByName, loadVoices, type TtsVoice } from '../../lib/tts-voices.js';
 
 export const DEFAULT_TTS_TEST_TEXT = 'The quick brown fox jumps over the lazy dog. Panopticon dashboard is now online.';
-
-export interface TtsSpeakPayload {
-  text: string;
-  voice: string;
-  instruct: string;
-  volume: number;
-  mode?: string;
-  embedding?: number[];
-}
 
 export interface RunTtsTestDeps {
   config?: NormalizedTtsDaemonConfig;
@@ -129,33 +121,7 @@ export async function updateTtsConfig(updates: TtsConfigUpdate): Promise<void> {
 }
 
 export function buildTtsSpeakPayload(voice: TtsVoice, text: string, config: NormalizedTtsDaemonConfig): TtsSpeakPayload {
-  if (voice.kind === 'design') {
-    return {
-      text,
-      voice: voice.description || voice.name,
-      instruct: voice.instruct || '',
-      volume: config.volume,
-      mode: 'design',
-    };
-  }
-
-  if (voice.kind === 'clone') {
-    return {
-      text,
-      voice: voice.name,
-      instruct: voice.instruct || '',
-      volume: config.volume,
-      mode: 'clone',
-      embedding: voice.embedding,
-    };
-  }
-
-  return {
-    text,
-    voice: voice.presetName || voice.name,
-    instruct: voice.instruct || '',
-    volume: config.volume,
-  };
+  return buildRuntimeTtsSpeakPayload(voice, text, config);
 }
 
 async function postTtsSpeakPayload(

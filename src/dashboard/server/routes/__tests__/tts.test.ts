@@ -5,6 +5,7 @@ import {
   EXTRACT_EMBEDDING_TIMEOUT_MS,
   extractTtsEmbedding,
   listTtsVoices,
+  originErrorResponse,
   parseCreateTtsVoiceInput,
   parseExtractEmbeddingInput,
   parseSpeakTtsInput,
@@ -12,6 +13,13 @@ import {
   speakTts,
 } from '../tts.js';
 import type { TtsVoice } from '../../../../lib/tts-voices.js';
+import { _resetTrustedOriginsForTests } from '../origin-validation.js';
+
+function responseJson(response: { body: unknown }): unknown {
+  const body = response.body as { body?: Uint8Array } | null;
+  const text = body?.body ? new TextDecoder().decode(body.body) : '{}';
+  return JSON.parse(text);
+}
 
 describe('checkTtsHealth', () => {
   it('returns daemon health details when the daemon responds', async () => {
@@ -46,6 +54,38 @@ describe('checkTtsHealth', () => {
       ok: false,
       error: 'daemon unreachable',
     });
+  });
+});
+
+describe('TTS mutation origin guard', () => {
+  it('rejects mutation requests with missing or untrusted origins', async () => {
+    const missingOrigin = originErrorResponse({ method: 'POST', headers: {} } as never);
+    expect(missingOrigin?.status).toBe(403);
+    expect(responseJson(missingOrigin!)).toEqual({ error: 'Missing origin' });
+
+    const invalidOrigin = originErrorResponse({
+      method: 'DELETE',
+      headers: { origin: 'https://evil.example' },
+    } as never);
+    expect(invalidOrigin?.status).toBe(403);
+    expect(responseJson(invalidOrigin!)).toEqual({ error: 'Invalid origin' });
+  });
+
+  it('allows mutation requests from trusted origins', () => {
+    const previousPort = process.env['API_PORT'];
+    process.env['API_PORT'] = '3011';
+    _resetTrustedOriginsForTests();
+
+    try {
+      expect(originErrorResponse({
+        method: 'POST',
+        headers: { origin: 'http://localhost:3011' },
+      } as never)).toBeUndefined();
+    } finally {
+      if (previousPort === undefined) delete process.env['API_PORT'];
+      else process.env['API_PORT'] = previousPort;
+      _resetTrustedOriginsForTests();
+    }
   });
 });
 

@@ -401,6 +401,33 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toContain('Unknown tts setting(s): daemonPort');
   });
 
+  it('rejects invalid tts field types', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      tts: {
+        enabled: 'yes',
+        dropInfoWhenFull: 'no',
+        voice: 1,
+        statusVoice: 2,
+        voiceMap: { good: 'voice-1', bad: 3 },
+        utteranceTemplates: [],
+        mutedSources: {},
+        mutedIssues: [1],
+      } as never,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('tts.enabled must be a boolean');
+    expect(result.errors).toContain('tts.dropInfoWhenFull must be a boolean');
+    expect(result.errors).toContain('tts.voice must be a string');
+    expect(result.errors).toContain('tts.statusVoice must be a string');
+    expect(result.errors).toContain('tts.voiceMap must be a string record');
+    expect(result.errors).toContain('tts.utteranceTemplates must be a string record');
+    expect(result.errors).toContain('tts.mutedSources must be an array of strings');
+    expect(result.errors).toContain('tts.mutedIssues must be an array of strings');
+  });
+
   it('rejects invalid tts numeric settings', async () => {
     const { validateSettingsApi } = await import('../settings-api.js');
     const result = validateSettingsApi({

@@ -30,6 +30,12 @@ const CONFIG: NormalizedTtsDaemonConfig = {
   mutedIssues: [],
 };
 
+const PAYLOAD_CONTROLS = {
+  rate: CONFIG.rate,
+  maxChars: CONFIG.maxChars,
+  dropInfoWhenFull: CONFIG.dropInfoWhenFull,
+};
+
 const PRESET_VOICE: TtsVoice = {
   id: 'voice-1',
   name: 'System Voice',
@@ -137,7 +143,7 @@ describe('pan tts voices', () => {
     expect(result).toEqual({ ok: true, url: 'http://127.0.0.1:8787/speak' });
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
       method: 'POST',
-      body: JSON.stringify({ text: 'custom phrase', voice: 'Vivian', instruct: 'calm', volume: 0.8 }),
+      body: JSON.stringify({ text: 'custom phrase', voice: 'Vivian', instruct: 'calm', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
     }));
   });
 
@@ -188,6 +194,8 @@ describe('pan tts test', () => {
       voice: 'Vivian',
       instruct: 'calm',
       volume: 0.8,
+      ...PAYLOAD_CONTROLS,
+      mode: 'custom',
     });
 
     expect(buildTtsSpeakPayload({ ...PRESET_VOICE, kind: 'design', description: 'warm narrator' }, 'hello', CONFIG)).toEqual({
@@ -195,14 +203,16 @@ describe('pan tts test', () => {
       voice: 'warm narrator',
       instruct: 'calm',
       volume: 0.8,
+      ...PAYLOAD_CONTROLS,
       mode: 'design',
     });
 
     expect(buildTtsSpeakPayload({ ...PRESET_VOICE, kind: 'clone', embedding: [0.1, 0.2] }, 'hello', CONFIG)).toEqual({
       text: 'hello',
-      voice: 'System Voice',
+      voice: 'clone',
       instruct: 'calm',
       volume: 0.8,
+      ...PAYLOAD_CONTROLS,
       mode: 'clone',
       embedding: [0.1, 0.2],
     });
@@ -222,7 +232,7 @@ describe('pan tts test', () => {
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: DEFAULT_TTS_TEST_TEXT, voice: 'Vivian', instruct: 'calm', volume: 0.8 }),
+      body: JSON.stringify({ text: DEFAULT_TTS_TEST_TEXT, voice: 'Vivian', instruct: 'calm', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
     });
   });
 

@@ -58,14 +58,46 @@ function unknownApiTtsKeys(tts: Record<string, unknown>): string[] {
   return Object.keys(tts).filter((key) => !API_TTS_KEY_SET.has(key));
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string');
+}
+
+function validateApiTtsConfigFields(tts: Record<string, unknown>, errors: string[]): void {
+  const unknownKeys = unknownApiTtsKeys(tts);
+  if (unknownKeys.length > 0) {
+    errors.push(`Unknown tts setting(s): ${unknownKeys.join(', ')}`);
+  }
+
+  if (tts.enabled !== undefined && typeof tts.enabled !== 'boolean') errors.push('tts.enabled must be a boolean');
+  if (tts.dropInfoWhenFull !== undefined && typeof tts.dropInfoWhenFull !== 'boolean') errors.push('tts.dropInfoWhenFull must be a boolean');
+  if (tts.voice !== undefined && typeof tts.voice !== 'string') errors.push('tts.voice must be a string');
+  if (tts.statusVoice !== undefined && typeof tts.statusVoice !== 'string') errors.push('tts.statusVoice must be a string');
+  if (tts.volume !== undefined && (typeof tts.volume !== 'number' || tts.volume < 0 || tts.volume > 1)) {
+    errors.push('tts.volume must be between 0 and 1');
+  }
+  if (tts.rate !== undefined && (typeof tts.rate !== 'number' || tts.rate <= 0)) {
+    errors.push('tts.rate must be greater than 0');
+  }
+  if (tts.maxChars !== undefined && (typeof tts.maxChars !== 'number' || tts.maxChars <= 0)) {
+    errors.push('tts.maxChars must be greater than 0');
+  }
+  if (tts.voiceMap !== undefined && !isStringRecord(tts.voiceMap)) errors.push('tts.voiceMap must be a string record');
+  if (tts.utteranceTemplates !== undefined && !isStringRecord(tts.utteranceTemplates)) errors.push('tts.utteranceTemplates must be a string record');
+  if (tts.mutedSources !== undefined && !isStringArray(tts.mutedSources)) errors.push('tts.mutedSources must be an array of strings');
+  if (tts.mutedIssues !== undefined && !isStringArray(tts.mutedIssues)) errors.push('tts.mutedIssues must be an array of strings');
+}
+
 function sanitizeApiTtsConfig(tts: ApiTtsConfig | undefined): ApiTtsConfig | undefined {
   if (tts === undefined) return undefined;
   if (!isRecord(tts)) throw new Error('tts must be an object');
 
-  const unknownKeys = unknownApiTtsKeys(tts);
-  if (unknownKeys.length > 0) {
-    throw new Error(`Unknown tts setting(s): ${unknownKeys.join(', ')}`);
-  }
+  const errors: string[] = [];
+  validateApiTtsConfigFields(tts, errors);
+  if (errors.length > 0) throw new Error(errors.join('; '));
 
   return Object.fromEntries(
     API_TTS_KEYS
@@ -706,21 +738,7 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     if (!isRecord(settings.tts)) {
       errors.push('tts must be an object');
     } else {
-      const unknownKeys = unknownApiTtsKeys(settings.tts);
-      if (unknownKeys.length > 0) {
-        errors.push(`Unknown tts setting(s): ${unknownKeys.join(', ')}`);
-      }
-
-      const { volume, rate, maxChars } = settings.tts;
-      if (volume !== undefined && (typeof volume !== 'number' || volume < 0 || volume > 1)) {
-        errors.push('tts.volume must be between 0 and 1');
-      }
-      if (rate !== undefined && (typeof rate !== 'number' || rate <= 0)) {
-        errors.push('tts.rate must be greater than 0');
-      }
-      if (maxChars !== undefined && (typeof maxChars !== 'number' || maxChars <= 0)) {
-        errors.push('tts.maxChars must be greater than 0');
-      }
+      validateApiTtsConfigFields(settings.tts, errors);
     }
   }
 

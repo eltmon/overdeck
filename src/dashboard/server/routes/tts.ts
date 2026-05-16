@@ -2,6 +2,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { resolveAndSpeak, type ResolveAndSpeakOptions, type TtsSpeakMode, type TtsSpeakResult } from '../../../lib/tts-speak.js';
 import { getTtsRuntimeConfig } from '../services/tts-runtime-config.js';
+import { validateOrigin } from './origin-validation.js';
 import {
   addVoice as addStoredVoice,
   deleteVoice as deleteStoredVoice,
@@ -243,6 +244,12 @@ function parseJsonBody(text: string): unknown | undefined {
   }
 }
 
+export function originErrorResponse(request: HttpServerRequest.HttpServerRequest): Response | undefined {
+  const originCheck = validateOrigin(request);
+  if (originCheck.ok) return undefined;
+  return jsonResponse({ error: originCheck.error }, { status: 403 });
+}
+
 const getTtsHealthRoute = HttpRouter.add(
   'GET',
   '/api/tts/health',
@@ -264,6 +271,9 @@ const postTtsVoiceRoute = HttpRouter.add(
   '/api/tts/voices',
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = originErrorResponse(request);
+    if (originError) return originError;
+
     const body = parseJsonBody(yield* request.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
@@ -279,6 +289,10 @@ const deleteTtsVoiceRoute = HttpRouter.add(
   'DELETE',
   '/api/tts/voices/:id',
   Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = originErrorResponse(request);
+    if (originError) return originError;
+
     const params = yield* HttpRouter.params;
     const deleted = yield* Effect.promise(() => removeTtsVoice(params.id));
     if (!deleted) return jsonResponse({ error: 'voice not found' }, { status: 404 });
@@ -291,6 +305,9 @@ const postTtsSpeakRoute = HttpRouter.add(
   '/api/tts/speak',
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = originErrorResponse(request);
+    if (originError) return originError;
+
     const body = parseJsonBody(yield* request.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
@@ -307,6 +324,9 @@ const postExtractEmbeddingRoute = HttpRouter.add(
   '/api/tts/extract-embedding',
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = originErrorResponse(request);
+    if (originError) return originError;
+
     const body = parseJsonBody(yield* request.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
