@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Board · Panopticon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="_shared-opus.css" />
+  <style>
+    .app { display: flex; height: 100vh; overflow: hidden; }
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+    .filter-bar { display: flex; align-items: center; gap: 10px; padding: 10px 22px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .pill { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; background: var(--card); border: 1px solid var(--input); border-radius: 999px; color: var(--muted-foreground); font-size: 12px; cursor: pointer; }
+    .pill .proj-mark { width: 8px; height: 8px; border-radius: 50%; }
+    .pill.active { background: var(--accent); color: var(--foreground); border-color: rgb(255 255 255 / 16%); }
+    .pill.muted { opacity: .5; }
+    .pill-group { display: flex; gap: 6px; align-items: center; }
+    .pill-group .lbl { font-size: 11px; color: var(--muted-foreground); margin-right: 4px; text-transform: uppercase; letter-spacing: .08em; }
+
+    .cycle { display: flex; background: var(--card); border: 1px solid var(--input); border-radius: var(--radius-lg); overflow: hidden; height: 28px; }
+    .cycle button { background: transparent; border: none; color: var(--muted-foreground); font: inherit; font-size: 11px; font-weight: 500; padding: 0 10px; cursor: pointer; font-family: inherit; }
+    .cycle button.active { background: var(--primary); color: var(--primary-foreground); }
+    .cycle .div { width: 1px; background: var(--border); }
+
+    /* Columns container */
+    .columns { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 14px 22px 22px; overflow: hidden; min-height: 0; }
+    .col {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-2xl);
+      display: flex; flex-direction: column; min-height: 0;
+      position: relative; overflow: hidden;
+    }
+    .col::before {
+      content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+      background: rgb(255 255 255 / 15%);
+    }
+    .col.work::before    { background: var(--info); }
+    .col.review::before  { background: var(--warning); }
+    .col.ship::before    { background: var(--signal-review); }
+    .col.done::before    { background: var(--success); }
+
+    .col-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 14px 10px;
+    }
+    .col-head .title { font-size: 14px; font-weight: 500; color: var(--foreground); }
+    .col-head .count { font-size: 11px; color: var(--muted-foreground); padding: 1px 6px; border-radius: var(--radius-sm); background: var(--accent); font-variant-numeric: tabular-nums; }
+    .col-head .more { margin-left: auto; color: var(--muted-foreground); width: 22px; height: 22px; display: grid; place-items: center; cursor: pointer; border-radius: var(--radius-md); }
+    .col-head .more:hover { background: var(--accent); }
+    .col-sub { padding: 0 14px 10px; font-size: 11px; color: var(--muted-foreground); }
+
+    .col-body {
+      flex: 1; overflow-y: auto;
+      padding: 4px 10px 10px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+
+    /* Card */
+    .card {
+      background: color-mix(in srgb, var(--background) 92%, var(--color-white));
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 12px 12px 10px;
+      cursor: pointer;
+      transition: border-color 200ms, background-color 200ms, transform 200ms;
+      position: relative;
+    }
+    .card:hover { border-color: rgb(255 255 255 / 14%); }
+    .card::before {
+      content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px;
+      border-radius: 2px; background: transparent;
+    }
+    .card.p-urgent::before { background: var(--destructive); }
+    .card.p-high::before   { background: var(--warning); }
+    .card.p-medium::before { background: rgb(255 255 255 / 22%); }
+    .card.p-low::before    { background: transparent; }
+
+    .card-row1 { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .card-id { font-family: "SF Mono", monospace; font-size: 10px; color: var(--muted-foreground); }
+    .card-id-proj { display: flex; align-items: center; gap: 5px; font-family: "SF Mono", monospace; font-size: 10px; color: var(--muted-foreground); }
+    .card-id-proj .proj-mark { width: 8px; height: 8px; border-radius: 2px; }
+    .card-row1-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+    .card-title {
+      font-size: 13px; line-height: 1.35; color: var(--foreground);
+      margin: 0 0 8px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+
+    .card-labels { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
+
+    .card-foot {
+      display: flex; align-items: center; gap: 8px;
+      padding-top: 8px; border-top: 1px solid var(--border);
+    }
+    .card-agent { display: flex; flex-direction: column; min-width: 0; gap: 2px; flex: 1; }
+    .card-agent-name { font-family: "SF Mono", monospace; font-size: 10px; color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .card-agent-sub { font-family: "SF Mono", monospace; font-size: 9px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .card-agent.empty .card-agent-name { color: var(--muted-foreground); font-style: italic; font-family: "DM Sans", sans-serif; }
+    .card-runtime { font-family: "SF Mono", monospace; font-size: 10px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .card-avatar { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; font-weight: 600; color: #fff; background: linear-gradient(135deg,#a855f7,#06b6d4); border: 1px solid var(--border); }
+    .card-avatar.b { background: linear-gradient(135deg,#f59e0b,#ef4444); }
+    .card-avatar.c { background: linear-gradient(135deg,#10b981,#06b6d4); }
+    .card-avatar.d { background: linear-gradient(135deg,#60a5fa,#a855f7); }
+    .card-avatar.e { background: linear-gradient(135deg,#ef4444,#f59e0b); }
+
+    .card-bead-bar {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 10px; color: var(--muted-foreground); margin-top: 8px;
+    }
+    .bead-track {
+      flex: 1; height: 3px; background: var(--accent); border-radius: 2px; overflow: hidden;
+    }
+    .bead-fill {
+      height: 100%; background: var(--info); border-radius: 2px;
+    }
+    .bead-fill.review { background: var(--warning); }
+    .bead-fill.ship   { background: var(--signal-review); }
+    .bead-fill.done   { background: var(--success); }
+
+    /* "Add issue" footer button */
+    .add-btn {
+      margin: 4px 10px 10px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 10px;
+      background: transparent; border: 1px dashed var(--border);
+      border-radius: var(--radius-lg); color: var(--muted-foreground);
+      font-size: 12px; cursor: pointer;
+    }
+    .add-btn:hover { background: var(--accent); color: var(--foreground); border-color: rgb(255 255 255 / 14%); }
+
+    /* Stuck card emphasis */
+    .card.stuck { border-color: color-mix(in srgb, var(--destructive) 32%, transparent); }
+    .card.merge-ready { border-color: color-mix(in srgb, var(--success) 32%, transparent); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- App rail -->
+    <aside class="rail">
+      <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg></div>
+      <div class="nav" title="Pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h12"/></svg></div>
+      <div class="nav active" title="Board"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="11" rx="1"/></svg></div>
+      <div class="nav" title="Command Deck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m14.5 9.5-2.5 5-5 2.5 2.5-5z" fill="currentColor"/></svg></div>
+      <div class="nav" title="Agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></div>
+      <div class="group-label"></div>
+      <div class="nav" title="Activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 12 7 12 9 6 13 18 15 12 21 12"/></svg></div>
+      <div class="nav" title="Costs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+      <div class="nav" title="Health"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></div>
+      <div class="group-label"></div>
+      <div class="nav" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg></div>
+      <div class="spacer"></div>
+      <div class="avatar">EB</div>
+    </aside>
+
+    <section class="main">
+      <header class="topbar">
+        <div class="crumbs">
+          <span class="muted">Eltmon</span>
+          <span class="sep">/</span>
+          <span class="title">Board</span>
+          <span class="meta">9 cards · 5 projects</span>
+        </div>
+        <div class="tb-spacer"></div>
+        <div class="search">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          Search issues, agents, branches…
+        </div>
+        <div class="seg">
+          <button>List</button>
+          <div class="div"></div>
+          <button class="active">Board</button>
+          <div class="div"></div>
+          <button>Analytics</button>
+        </div>
+        <button class="btn-primary">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 4 19 12 5 20Z" fill="currentColor"/></svg>
+          Start agent
+        </button>
+      </header>
+
+      <!-- Filter bar -->
+      <div class="filter-bar">
+        <div class="cycle">
+          <button class="active">Current</button>
+          <div class="div"></div>
+          <button>All</button>
+          <div class="div"></div>
+          <button>Backlog</button>
+          <div class="div"></div>
+          <button>Canceled</button>
+        </div>
+        <div class="pill-group">
+          <span class="lbl">Projects</span>
+          <span class="pill active"><span class="proj-mark" style="background:var(--signal-review)"></span> PAN</span>
+          <span class="pill active"><span class="proj-mark" style="background:var(--info)"></span> MIN</span>
+          <span class="pill active"><span class="proj-mark" style="background:var(--success)"></span> AUR</span>
+          <span class="pill muted"><span class="proj-mark" style="background:var(--warning)"></span> KRX</span>
+          <span class="pill muted"><span class="proj-mark" style="background:var(--signal-cost)"></span> OCW</span>
+        </div>
+        <div class="tb-spacer"></div>
+        <button class="btn-ghost">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+          Filters
+        </button>
+        <button class="btn-ghost">
+          Group: <b style="color:var(--foreground)">Phase</b>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+
+      <!-- Columns -->
+      <div class="columns">
+
+        <!-- ─ Todo ─ -->
+        <div class="col">
+          <div class="col-head">
+            <span class="dot todo"></span>
+            <span class="title">Todo</span>
+            <span class="count">3</span>
+            <span class="more"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+          </div>
+          <div class="col-sub">Triaged · ready for planning</div>
+          <div class="col-body">
+            <div class="card p-urgent">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--info)"></span> MIN-833</span>
+                <div class="card-row1-right">
+                  <svg class="prio urgent" viewBox="0 0 24 24" fill="currentColor"><rect x="11" y="3" width="2" height="11" rx="1"/><circle cx="12" cy="18" r="1.5"/></svg>
+                </div>
+              </div>
+              <div class="card-title">POST /api/v2/debrief/generate returns 500 on concurrent requests (lock contention)</div>
+              <div class="card-labels">
+                <span class="label">bug</span><span class="label">backend</span><span class="label">p0</span>
+              </div>
+              <div class="card-foot">
+                <div class="card-agent empty">
+                  <div class="card-agent-name">no agent</div>
+                  <div class="card-agent-sub">Linear issue open</div>
+                </div>
+                <div class="card-runtime">—</div>
+                <div class="card-avatar e">EB</div>
+              </div>
+            </div>
+
+            <div class="card p-high">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--info)"></span> MIN-816</span>
+                <div class="card-row1-right">
+                  <svg class="prio high" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg>
+                </div>
+              </div>
+              <div class="card-title">Scheduler hangs in late afternoon — Google Calendar API call blocks planning indefinitely</div>
+              <div class="card-labels">
+                <span class="label">bug</span><span class="label">scheduler</span>
+              </div>
+              <div class="card-foot">
+                <div class="card-agent empty">
+                  <div class="card-agent-name">no agent</div>
+                  <div class="card-agent-sub">Linear MIN-816</div>
+                </div>
+                <div class="card-runtime">—</div>
+                <div class="card-avatar c">EB</div>
+              </div>
+            </div>
+
+            <div class="card p-medium">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--signal-review)"></span> PAN-1129</span>
+                <div class="card-row1-right">
+                  <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+                </div>
+              </div>
+              <div class="card-title">Review-request route pushes wrong branch name: feature/977 instead of feature/pan-977</div>
+              <div class="card-labels">
+                <span class="label">bug</span><span class="label">review-pipeline</span>
+              </div>
+              <div class="card-foot">
+                <div class="card-agent empty">
+                  <div class="card-agent-name">no agent</div>
+                  <div class="card-agent-sub">GitHub #1129</div>
+                </div>
+                <div class="card-runtime">—</div>
+                <div class="card-avatar d">EB</div>
+              </div>
+            </div>
+          </div>
+          <button class="add-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            New issue
+          </button>
+        </div>
+
+        <!-- ─ In Progress ─ -->
+        <div class="col work">
+          <div class="col-head">
+            <span class="dot progress"></span>
+            <span class="title">In Progress</span>
+            <span class="count">3</span>
+            <span class="more"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+          </div>
+          <div class="col-sub">Machine working — work agents writing code</div>
+          <div class="col-body">
+            <div class="card p-urgent">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--info)"></span> MIN-846</span>
+                <div class="card-row1-right">
+                  <span class="verb work"><span class="pulse"></span>WORK</span>
+                </div>
+              </div>
+              <div class="card-title">Fizzy Integration (Master): bi-directional sync, @Kaia, SSO pass-through</div>
+              <div class="card-labels">
+                <span class="label">integration</span><span class="label">epic</span>
+              </div>
+              <div class="card-bead-bar">
+                <span>Beads 7/12</span>
+                <div class="bead-track"><div class="bead-fill" style="width:58%"></div></div>
+              </div>
+              <div class="card-foot">
+                <div class="card-agent">
+                  <div class="card-agent-name">agent-min-846</div>
+                  <div class="card-agent-sub">sonnet-4-6 · bead 7/12</div>
+                </div>
+                <div class="card-runtime">2h 41m</div>
+                <div class="card-avatar b">EB</div>
+              </div>
+            </div>
+
+            <div class="card p-high">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--info)"></span> MIN-847</span>
+                <div class="card-row1-right">
+                  <span class="verb work"><span class="pulse"></span>WORK</span>
+                </div>
+              </div>
+              <div class="card-title">Health &amp; Life Journal — daily mood, energy, sleep capture</div>
+              <div class="card-labels">
+                <span class="label">feature</span><span class="label">frontend</span>
+              </div>
+              <div class="card-bead-bar">
+                <span>Beads 3/8</span>
+                <div class="bead-track"><div class="bead-fill" style="width:37%"></div></div>
+              </div>
+              <div class="card-foot">
+                <div class="card-agent">
+                  <div class="card-agent-name">agent-min-847</div>
+                  <div class="card-agent-sub">opus-4-7 · bead 3/8</div>
+                </div>
+                <div class="card-runtime">1h 18m</div>
+                <div class="card-avatar d">EB</div>
+              </div>
+            </div>
+
+            <div class="card p-medium">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--success)"></span> AUR-4</span>
+                <div class="card-row1-right">
+                  <span class="verb work"><span class="pulse"></span>WORK</span>
+                </div>
+              </div>
+              <div class="card-title">Now Playing API endpoint + OBS overlay integration</div>
+              <div class="card-labels">
+                <span class="label">api</span><span class="label">streaming</span>
+              </div>
+              <div class="card-bead-bar">
+                <span>Beads 1/3</span>
+                <div class="bead-track"><div class="bead-fill" style="width:33%"></div></div>
+              </div>
+              <div class="card-foot">
+                <div class="card-agent">
+                  <div class="card-agent-name">agent-aur-4</div>
+                  <div class="card-agent-sub">sonnet-4-6 · bead 1/3</div>
+                </div>
+                <div class="card-runtime">14 min</div>
+                <div class="card-avatar">EB</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─ In Review ─ -->
+        <div class="col review">
+          <div class="col-head">
+            <span class="dot review"></span>
+            <span class="title">In Review</span>
+            <span class="count">2</span>
+            <span class="more"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+          </div>
+          <div class="col-sub">Specialist convoys in flight — awaiting verdict</div>
+          <div class="col-body">
+            <div class="card p-high">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--info)"></span> MIN-794</span>
+                <div class="card-row1-right">
+                  <span class="verb review"><span class="pulse"></span>REVIEW</span>
+                </div>
+              </div>
+              <div class="card-title">Project Rosie: Managed OpenClaw Agent for MYN customers</div>
+              <div class="card-labels">
+                <span class="label">managed</span><span class="label">multi-agent</span>
+              </div>
+              <div class="card-bead-bar">
+                <span>Specialists 3/4</span>
+                <div class="bead-track"><div class="bead-fill review" style="width:75%"></div></div>
+              </div>
+              <div class="card-foot">
+                <div class="card-agent">
+                  <div class="card-agent-name">convoy-min-794</div>
+                  <div class="card-agent-sub">4 reviewers · sonnet-4-6</div>
+                </div>
+                <div class="card-runtime">38 min</div>
+                <div class="card-avatar c">EB</div>
+              </div>
+            </div>
+
+            <div class="card p-medium stuck">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--signal-review)"></span> PAN-1053</span>
+                <div class="card-row1-right">
+                  <span class="verb stuck">CHANGES REQUESTED</span>
+                </div>
+              </div>
+              <div class="card-title">Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback</div>
+              <div class="card-labels">
+                <span class="label">stt</span><span class="label">whiteboard</span>
+              </div>
+              <div class="card-bead-bar">
+                <span>3 findings · awaiting fix</span>
+                <div class="bead-track"><div class="bead-fill review" style="width:100%"></div></div>
+              </div>
+              <div class="card-foot">
+                <div class="card-agent empty">
+                  <div class="card-agent-name">awaiting restart</div>
+                  <div class="card-agent-sub mono">last: convoy-pan-1053</div>
+                </div>
+                <div class="card-runtime">3h 12m</div>
+                <div class="card-avatar d">EB</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─ Ship + Done ─ -->
+        <div class="col ship">
+          <div class="col-head">
+            <span class="dot ship"></span>
+            <span class="title">Ship &amp; Done</span>
+            <span class="count">2 · 3</span>
+            <span class="more"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+          </div>
+          <div class="col-sub">Merge gate · awaiting your click to ship</div>
+          <div class="col-body">
+            <div class="card p-medium merge-ready">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--signal-review)"></span> PAN-1111</span>
+                <div class="card-row1-right">
+                  <span class="verb merge">READY TO MERGE</span>
+                </div>
+              </div>
+              <div class="card-title">Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding</div>
+              <div class="card-labels">
+                <span class="label">refactor</span><span class="label">beads</span>
+              </div>
+              <div class="card-bead-bar">
+                <span>Verification ✓ · branch pushed</span>
+                <div class="bead-track"><div class="bead-fill done" style="width:100%"></div></div>
+              </div>
+              <div class="card-foot">
+                <div class="card-agent">
+                  <div class="card-agent-name">agent-pan-1111-ship</div>
+                  <div class="card-agent-sub">gpt-5.5 · idle</div>
+                </div>
+                <div class="card-runtime">2 min</div>
+                <div class="card-avatar c">EB</div>
+              </div>
+            </div>
+
+            <div class="card p-high">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--signal-review)"></span> PAN-1052</span>
+                <div class="card-row1-right">
+                  <span class="verb ship"><span class="pulse"></span>SHIP</span>
+                </div>
+              </div>
+              <div class="card-title">Activity feed: per-turn observations with time-bucketed sidebar</div>
+              <div class="card-labels">
+                <span class="label">dashboard</span><span class="label">observability</span>
+              </div>
+              <div class="card-bead-bar">
+                <span>Rebasing onto main</span>
+                <div class="bead-track"><div class="bead-fill ship" style="width:70%"></div></div>
+              </div>
+              <div class="card-foot">
+                <div class="card-agent">
+                  <div class="card-agent-name">agent-pan-1052-ship</div>
+                  <div class="card-agent-sub">opus-4-7 · ship</div>
+                </div>
+                <div class="card-runtime">19 min</div>
+                <div class="card-avatar c">EB</div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;padding:14px 6px 6px;font-size:11px;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.08em">
+              <span class="dot done"></span> Recently merged · 7d
+            </div>
+
+            <div class="card p-medium" style="opacity:.78">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--info)"></span> MIN-844</span>
+                <div class="card-row1-right">
+                  <span class="verb merge">MERGED</span>
+                </div>
+              </div>
+              <div class="card-title">Fizzy Integration Phase 3: Fizzy → MYN inbound sync</div>
+              <div class="card-foot">
+                <div class="card-agent">
+                  <div class="card-agent-name">PR #441 · main</div>
+                  <div class="card-agent-sub">3d ago · 28h runtime</div>
+                </div>
+                <div class="card-avatar b">EB</div>
+              </div>
+            </div>
+
+            <div class="card p-medium" style="opacity:.78">
+              <div class="card-row1">
+                <span class="card-id-proj"><span class="proj-mark" style="background:var(--info)"></span> MIN-804</span>
+                <div class="card-row1-right">
+                  <span class="verb merge">MERGED</span>
+                </div>
+              </div>
+              <div class="card-title">Fine-tune Kaia model — bake in system prompts &amp; voice</div>
+              <div class="card-foot">
+                <div class="card-agent">
+                  <div class="card-agent-name">PR #437 · main</div>
+                  <div class="card-agent-sub">5d ago · 56h runtime</div>
+                </div>
+                <div class="card-avatar c">EB</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <!-- Footer mock-navigator -->
+  <div class="mock-chrome">
+    <span class="label">Opus mocks</span>
+    <a href="pipeline-cross-project-opus.html">Pipeline</a>
+    <a href="board-opus.html" class="current">Board</a>
+    <a href="pipeline-command-deck-opus.html">Command Deck</a>
+    <a href="agents-opus.html">Agents</a>
+    <a href="issue-detail-opus.html">Issue Detail</a>
+    <a href="system-map-opus.html">System Map</a>
+  </div>
+</body>
+</html>

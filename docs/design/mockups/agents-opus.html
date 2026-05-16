@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agents · Panopticon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="_shared-opus.css" />
+  <style>
+    .app { display: flex; height: 100vh; overflow: hidden; }
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .scroll { flex: 1; overflow-y: auto; padding: 18px 22px; }
+
+    /* Metric strip */
+    .metrics {
+      display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px;
+      margin-bottom: 18px;
+    }
+    .metric {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-2xl); padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .metric .row1 { display: flex; align-items: center; gap: 8px; color: var(--muted-foreground); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; }
+    .metric .row1 .ico { width: 12px; height: 12px; }
+    .metric .ico.work    { color: var(--info-foreground); }
+    .metric .ico.review  { color: var(--warning-foreground); }
+    .metric .ico.ship    { color: var(--signal-review-foreground); }
+    .metric .ico.plan    { color: var(--signal-review-foreground); }
+    .metric .ico.stuck   { color: var(--destructive-foreground); }
+    .metric .ico.cost    { color: var(--signal-cost-foreground); }
+    .metric .ico.queue   { color: var(--muted-foreground); }
+    .metric .value { font-size: 20px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+    .metric .sub { font-size: 10px; color: var(--muted-foreground); }
+
+    /* Filter row */
+    .filter-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px; flex-wrap: wrap;
+    }
+    .seg-pills { display: flex; background: var(--card); border: 1px solid var(--input); border-radius: var(--radius-lg); overflow: hidden; height: 30px; }
+    .seg-pills button { background: transparent; border: none; color: var(--muted-foreground); font: inherit; font-size: 12px; font-weight: 500; padding: 0 12px; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px; }
+    .seg-pills button.active { background: var(--accent); color: var(--foreground); }
+    .seg-pills .div { width: 1px; background: var(--border); }
+    .seg-pills .ind { width: 6px; height: 6px; border-radius: 50%; }
+    .seg-pills .ind.work { background: var(--info); }
+    .seg-pills .ind.review { background: var(--warning); }
+    .seg-pills .ind.ship { background: var(--signal-review); }
+    .seg-pills .ind.plan { background: var(--signal-review); }
+
+    /* Agent grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 14px;
+    }
+
+    .acard {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-2xl);
+      padding: 14px;
+      display: flex; flex-direction: column; gap: 12px;
+      position: relative;
+      transition: border-color 200ms;
+    }
+    .acard:hover { border-color: rgb(255 255 255 / 12%); }
+    .acard::before {
+      content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px;
+      border-radius: 2px;
+    }
+    .acard.work::before    { background: var(--info); }
+    .acard.review::before  { background: var(--warning); }
+    .acard.ship::before    { background: var(--signal-review); }
+    .acard.plan::before    { background: var(--signal-review); }
+    .acard.stuck::before   { background: var(--destructive); }
+    .acard.stuck { border-color: color-mix(in srgb, var(--destructive) 32%, transparent); }
+
+    .acard-h1 { display: flex; align-items: center; gap: 10px; }
+    .acard-h1 .name { font-family: "SF Mono", monospace; font-size: 13px; font-weight: 500; color: var(--foreground); }
+    .acard-h1 .verb-wrap { margin-left: auto; }
+    .acard-h1 .menu { color: var(--muted-foreground); width: 22px; height: 22px; display: grid; place-items: center; border-radius: var(--radius-md); cursor: pointer; }
+    .acard-h1 .menu:hover { background: var(--accent); color: var(--foreground); }
+
+    .acard-issue {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px;
+      background: rgb(0 0 0 / 20%);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+    .acard-issue .proj-mark { margin-top: 3px; flex-shrink: 0; }
+    .acard-issue .text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .acard-issue .id { font-family: "SF Mono", monospace; font-size: 10px; color: var(--muted-foreground); }
+    .acard-issue .title { font-size: 12px; color: var(--foreground); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+    .acard-meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 2px; }
+    .acard-meta .item { display: flex; flex-direction: column; gap: 2px; }
+    .acard-meta .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); }
+    .acard-meta .val { font-family: "SF Mono", monospace; font-size: 11px; color: var(--foreground); font-variant-numeric: tabular-nums; }
+    .acard-meta .val.cost { color: var(--signal-cost-foreground); }
+    .acard-meta .val.warn { color: var(--warning-foreground); }
+
+    .acard-stream {
+      background: rgb(0 0 0 / 28%); border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-family: "SF Mono", monospace; font-size: 10.5px;
+      color: var(--muted-foreground); padding: 8px 10px;
+      line-height: 1.55;
+      max-height: 84px; overflow: hidden;
+      position: relative;
+    }
+    .acard-stream::after {
+      content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 24px;
+      background: linear-gradient(to bottom, transparent, var(--card));
+      pointer-events: none;
+    }
+    .acard-stream .v { color: var(--info-foreground); }
+    .acard-stream .v.r { color: var(--warning-foreground); }
+    .acard-stream .v.s { color: var(--signal-review-foreground); }
+    .acard-stream .ok { color: var(--success-foreground); }
+    .acard-stream .warn { color: var(--warning-foreground); }
+    .acard-stream .err { color: var(--destructive-foreground); }
+    .acard-stream .fg { color: var(--foreground); }
+
+    .acard-foot { display: flex; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+    .acard-foot .link { font-size: 11px; color: var(--muted-foreground); padding: 4px 8px; border-radius: var(--radius-md); cursor: pointer; transition: background-color 200ms, color 200ms; display: flex; align-items: center; gap: 4px; }
+    .acard-foot .link:hover { background: var(--accent); color: var(--foreground); }
+    .acard-foot .link.primary { color: var(--info-foreground); }
+    .acard-foot .link.danger { color: var(--destructive-foreground); margin-left: auto; }
+
+    /* Stuck banner */
+    .stuck-banner {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px;
+      background: color-mix(in srgb, var(--destructive) 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
+      border-radius: var(--radius-md);
+      font-size: 11px; color: var(--destructive-foreground);
+    }
+    .stuck-banner svg { width: 12px; height: 12px; }
+
+    /* Section dividers */
+    .grid-section { margin-bottom: 24px; }
+    .gs-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .gs-title { font-size: 13px; font-weight: 500; color: var(--foreground); }
+    .gs-count { font-size: 11px; color: var(--muted-foreground); padding: 1px 6px; border-radius: var(--radius-sm); background: var(--accent); }
+    .gs-sub { font-size: 11px; color: var(--muted-foreground); margin-left: auto; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg></div>
+      <div class="nav" title="Pipeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h12"/></svg></div>
+      <div class="nav" title="Board"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="11" rx="1"/></svg></div>
+      <div class="nav" title="Command Deck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m14.5 9.5-2.5 5-5 2.5 2.5-5z" fill="currentColor"/></svg></div>
+      <div class="nav active" title="Agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></div>
+      <div class="group-label"></div>
+      <div class="nav" title="Activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 12 7 12 9 6 13 18 15 12 21 12"/></svg></div>
+      <div class="nav" title="Costs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+      <div class="nav" title="Health"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg></div>
+      <div class="group-label"></div>
+      <div class="nav" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg></div>
+      <div class="spacer"></div>
+      <div class="avatar">EB</div>
+    </aside>
+
+    <section class="main">
+      <header class="topbar">
+        <div class="crumbs">
+          <span class="muted">Eltmon</span>
+          <span class="sep">/</span>
+          <span class="title">Agents</span>
+          <span class="meta">7 active · 1 stuck · 5h cumulative runtime</span>
+        </div>
+        <div class="tb-spacer"></div>
+        <div class="search">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          Search agents by name, issue, model…
+        </div>
+        <div class="seg">
+          <button class="active">Grid</button>
+          <div class="div"></div>
+          <button>Table</button>
+          <div class="div"></div>
+          <button>Timeline</button>
+        </div>
+        <button class="btn-primary">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 4 19 12 5 20Z" fill="currentColor"/></svg>
+          Start agent
+        </button>
+      </header>
+
+      <div class="scroll">
+
+        <!-- Metric strip -->
+        <div class="metrics">
+          <div class="metric">
+            <div class="row1"><svg class="ico work" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l-4 4 4 4M15 13l4-4-4-4"/></svg> Work</div>
+            <div class="value">4</div>
+            <div class="sub">writing code</div>
+          </div>
+          <div class="metric">
+            <div class="row1"><svg class="ico review" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="m20 20-3-3"/></svg> Review</div>
+            <div class="value">1</div>
+            <div class="sub">4 specialists in convoy</div>
+          </div>
+          <div class="metric">
+            <div class="row1"><svg class="ico ship" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/></svg> Ship</div>
+            <div class="value">2</div>
+            <div class="sub">rebase + push</div>
+          </div>
+          <div class="metric">
+            <div class="row1"><svg class="ico plan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11h6M9 15h4M5 21h14a2 2 0 0 0 2-2V7l-5-5H5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2z"/></svg> Plan</div>
+            <div class="value">1</div>
+            <div class="sub">vBRIEF in progress</div>
+          </div>
+          <div class="metric">
+            <div class="row1"><svg class="ico stuck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg> Stuck</div>
+            <div class="value">1</div>
+            <div class="sub">needs attention</div>
+          </div>
+          <div class="metric">
+            <div class="row1"><svg class="ico cost" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Spend · 1h</div>
+            <div class="value">$2.14</div>
+            <div class="sub">$18.42 today</div>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-row">
+          <div class="seg-pills">
+            <button class="active">All <span style="font-family:'SF Mono',monospace;font-size:10px;opacity:.7;margin-left:4px">8</span></button>
+            <div class="div"></div>
+            <button><span class="ind work"></span> Work <span style="font-family:'SF Mono',monospace;font-size:10px;opacity:.7;margin-left:4px">4</span></button>
+            <div class="div"></div>
+            <button><span class="ind review"></span> Review <span style="font-family:'SF Mono',monospace;font-size:10px;opacity:.7;margin-left:4px">1</span></button>
+            <div class="div"></div>
+            <button><span class="ind ship"></span> Ship <span style="font-family:'SF Mono',monospace;font-size:10px;opacity:.7;margin-left:4px">2</span></button>
+            <div class="div"></div>
+            <button><span class="ind plan"></span> Plan <span style="font-family:'SF Mono',monospace;font-size:10px;opacity:.7;margin-left:4px">1</span></button>
+          </div>
+          <button class="btn-ghost" style="height:30px;padding:0 12px">
+            Project: <b style="color:var(--foreground)">All</b>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="btn-ghost" style="height:30px;padding:0 12px">
+            Model: <b style="color:var(--foreground)">All</b>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="tb-spacer"></div>
+          <button class="btn-ghost" style="height:30px;padding:0 12px">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>
+            Auto-refresh
+          </button>
+        </div>
+
+        <!-- Live agents grid -->
+        <div class="grid-section">
+          <div class="gs-head">
+            <span class="dot progress"></span>
+            <span class="gs-title">Live</span>
+            <span class="gs-count">8</span>
+            <span class="gs-sub">streaming · last update just now</span>
+          </div>
+
+          <div class="grid">
+
+            <!-- agent-pan-1052-ship -->
+            <div class="acard ship">
+              <div class="acard-h1">
+                <span class="dot ship"></span>
+                <span class="name">agent-pan-1052-ship</span>
+                <span class="verb-wrap"><span class="verb ship"><span class="pulse"></span>SHIP</span></span>
+                <span class="menu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+              </div>
+              <div class="acard-issue">
+                <span class="proj-mark pan"></span>
+                <div class="text">
+                  <div class="id">PAN-1052 · Panopticon CLI</div>
+                  <div class="title">Activity feed: per-turn observations with time-bucketed sidebar</div>
+                </div>
+              </div>
+              <div class="acard-meta">
+                <div class="item"><span class="lbl">Model</span><span class="val">opus-4-7</span></div>
+                <div class="item"><span class="lbl">Runtime</span><span class="val">19m 04s</span></div>
+                <div class="item"><span class="lbl">Spend</span><span class="val cost">$0.81</span></div>
+              </div>
+              <div class="acard-stream"><span class="v s">→</span> rebasing feature/pan-1052 onto origin/main…
+<span class="ok">✓</span> rebase clean · 0 conflicts
+<span class="v s">→</span> pushing to origin --force-with-lease
+<span class="ok">✓</span> push complete (47 commits)
+<span class="v s">→</span> opening PR via gh CLI…</div>
+              <div class="acard-foot">
+                <span class="link primary">Open PR #1052</span>
+                <span class="link">Tell</span>
+                <span class="link">Terminal</span>
+                <span class="link danger">Stop</span>
+              </div>
+            </div>
+
+            <!-- agent-min-846 -->
+            <div class="acard work">
+              <div class="acard-h1">
+                <span class="dot progress"></span>
+                <span class="name">agent-min-846</span>
+                <span class="verb-wrap"><span class="verb work"><span class="pulse"></span>WORK</span></span>
+                <span class="menu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+              </div>
+              <div class="acard-issue">
+                <span class="proj-mark min"></span>
+                <div class="text">
+                  <div class="id">MIN-846 · Mind Your Now</div>
+                  <div class="title">Fizzy Integration (Master): bi-directional sync, @Kaia, SSO pass-through</div>
+                </div>
+              </div>
+              <div class="acard-meta">
+                <div class="item"><span class="lbl">Model</span><span class="val">sonnet-4-6</span></div>
+                <div class="item"><span class="lbl">Bead</span><span class="val">7 / 12</span></div>
+                <div class="item"><span class="lbl">Runtime</span><span class="val">2h 41m</span></div>
+              </div>
+              <div class="acard-stream"><span class="v">→</span> writing src/lib/fizzy/sync.ts
+<span class="fg">  ↳ implementing bidirectional reconciler</span>
+<span class="v">→</span> running typecheck on src/lib/fizzy/…
+<span class="ok">✓</span> typecheck clean (1.8s)
+<span class="v">→</span> updating fixtures in __tests__/fizzy/…</div>
+              <div class="acard-foot">
+                <span class="link">Open issue</span>
+                <span class="link">Tell</span>
+                <span class="link">Terminal</span>
+                <span class="link danger">Stop</span>
+              </div>
+            </div>
+
+            <!-- convoy-min-794-review (rolls up 4 specialists) -->
+            <div class="acard review">
+              <div class="acard-h1">
+                <span class="dot review"></span>
+                <span class="name">convoy-min-794-review</span>
+                <span class="verb-wrap"><span class="verb review"><span class="pulse"></span>REVIEW</span></span>
+                <span class="menu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+              </div>
+              <div class="acard-issue">
+                <span class="proj-mark min"></span>
+                <div class="text">
+                  <div class="id">MIN-794 · Mind Your Now</div>
+                  <div class="title">Project Rosie: Managed OpenClaw Agent for MYN customers</div>
+                </div>
+              </div>
+              <div class="acard-meta">
+                <div class="item"><span class="lbl">Specialists</span><span class="val">3 / 4 done</span></div>
+                <div class="item"><span class="lbl">Verdict</span><span class="val warn">pending</span></div>
+                <div class="item"><span class="lbl">Runtime</span><span class="val">38m</span></div>
+              </div>
+              <div class="acard-stream"><span class="ok">✓</span> review-correctness · approved (14m)
+<span class="ok">✓</span> review-security · approved · 1 advisory (9m)
+<span class="ok">✓</span> review-performance · approved (12m)
+<span class="v r">→</span> review-requirements · checking acceptance criteria…
+<span class="fg">  ↳ AC 4/7 verified</span></div>
+              <div class="acard-foot">
+                <span class="link primary">View convoy</span>
+                <span class="link">Tell</span>
+                <span class="link">Terminal</span>
+                <span class="link danger">Stop</span>
+              </div>
+            </div>
+
+            <!-- agent-min-847 -->
+            <div class="acard work">
+              <div class="acard-h1">
+                <span class="dot progress"></span>
+                <span class="name">agent-min-847</span>
+                <span class="verb-wrap"><span class="verb work"><span class="pulse"></span>WORK</span></span>
+                <span class="menu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+              </div>
+              <div class="acard-issue">
+                <span class="proj-mark min"></span>
+                <div class="text">
+                  <div class="id">MIN-847 · Mind Your Now</div>
+                  <div class="title">Health &amp; Life Journal — daily mood, energy, sleep capture</div>
+                </div>
+              </div>
+              <div class="acard-meta">
+                <div class="item"><span class="lbl">Model</span><span class="val">opus-4-7</span></div>
+                <div class="item"><span class="lbl">Bead</span><span class="val">3 / 8</span></div>
+                <div class="item"><span class="lbl">Runtime</span><span class="val">1h 18m</span></div>
+              </div>
+              <div class="acard-stream"><span class="v">→</span> scaffolding apps/web/src/routes/journal/
+<span class="fg">  ↳ adding daily-mood form + Zustand store</span>
+<span class="v">→</span> running lint…
+<span class="ok">✓</span> lint clean
+<span class="v">→</span> closing bead bd-3914</div>
+              <div class="acard-foot">
+                <span class="link">Open issue</span>
+                <span class="link">Tell</span>
+                <span class="link">Terminal</span>
+                <span class="link danger">Stop</span>
+              </div>
+            </div>
+
+            <!-- agent-min-848 -->
+            <div class="acard work">
+              <div class="acard-h1">
+                <span class="dot progress"></span>
+                <span class="name">agent-min-848</span>
+                <span class="verb-wrap"><span class="verb work"><span class="pulse"></span>WORK</span></span>
+                <span class="menu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+              </div>
+              <div class="acard-issue">
+                <span class="proj-mark min"></span>
+                <div class="text">
+                  <div class="id">MIN-848 · Mind Your Now</div>
+                  <div class="title">Deprecate infra/new-feature shell template — delegate to pan workspace create</div>
+                </div>
+              </div>
+              <div class="acard-meta">
+                <div class="item"><span class="lbl">Model</span><span class="val">haiku-4-5</span></div>
+                <div class="item"><span class="lbl">Bead</span><span class="val">2 / 4</span></div>
+                <div class="item"><span class="lbl">Runtime</span><span class="val">22m</span></div>
+              </div>
+              <div class="acard-stream"><span class="v">→</span> removing infra/new-feature/render.sh
+<span class="v">→</span> updating CONTRIBUTING.md
+<span class="v">→</span> migrating workspace setup notes…
+<span class="ok">✓</span> bead bd-2204 closed</div>
+              <div class="acard-foot">
+                <span class="link">Open issue</span>
+                <span class="link">Tell</span>
+                <span class="link">Terminal</span>
+                <span class="link danger">Stop</span>
+              </div>
+            </div>
+
+            <!-- agent-aur-4 -->
+            <div class="acard work">
+              <div class="acard-h1">
+                <span class="dot progress"></span>
+                <span class="name">agent-aur-4</span>
+                <span class="verb-wrap"><span class="verb work"><span class="pulse"></span>WORK</span></span>
+                <span class="menu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+              </div>
+              <div class="acard-issue">
+                <span class="proj-mark aur"></span>
+                <div class="text">
+                  <div class="id">AUR-4 · Auricle</div>
+                  <div class="title">Now Playing API endpoint + OBS overlay integration</div>
+                </div>
+              </div>
+              <div class="acard-meta">
+                <div class="item"><span class="lbl">Model</span><span class="val">sonnet-4-6</span></div>
+                <div class="item"><span class="lbl">Bead</span><span class="val">1 / 3</span></div>
+                <div class="item"><span class="lbl">Runtime</span><span class="val">14m</span></div>
+              </div>
+              <div class="acard-stream"><span class="v">→</span> scaffolding /api/now-playing handler
+<span class="v">→</span> wiring OBS websocket client
+<span class="warn">⚠</span> rate-limit headers missing — adding…</div>
+              <div class="acard-foot">
+                <span class="link">Open issue</span>
+                <span class="link">Tell</span>
+                <span class="link">Terminal</span>
+                <span class="link danger">Stop</span>
+              </div>
+            </div>
+
+            <!-- planning-min-845 -->
+            <div class="acard plan">
+              <div class="acard-h1">
+                <span class="dot ship"></span>
+                <span class="name">planning-min-845</span>
+                <span class="verb-wrap"><span class="verb plan"><span class="pulse"></span>PLANNING</span></span>
+                <span class="menu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+              </div>
+              <div class="acard-issue">
+                <span class="proj-mark min"></span>
+                <div class="text">
+                  <div class="id">MIN-845 · Mind Your Now</div>
+                  <div class="title">Fizzy SSO pass-through: auto-login to fizzy.mindyournow.com from MYN</div>
+                </div>
+              </div>
+              <div class="acard-meta">
+                <div class="item"><span class="lbl">Model</span><span class="val">opus-4-7</span></div>
+                <div class="item"><span class="lbl">Questions</span><span class="val">8 answered</span></div>
+                <div class="item"><span class="lbl">Runtime</span><span class="val">12m</span></div>
+              </div>
+              <div class="acard-stream"><span class="v s">→</span> drafting vBRIEF for MIN-845
+<span class="fg">  ↳ Q9: Should we proxy through MYN backend or use OAuth?</span>
+<span class="v s">⊙</span> awaiting answer (8/9 collected)</div>
+              <div class="acard-foot">
+                <span class="link primary">Answer questions</span>
+                <span class="link">Open vBRIEF</span>
+                <span class="link danger">Cancel</span>
+              </div>
+            </div>
+
+            <!-- STUCK: agent-pan-1053-review (needs attention) -->
+            <div class="acard stuck">
+              <div class="acard-h1">
+                <span class="dot review"></span>
+                <span class="name">agent-pan-1053-review</span>
+                <span class="verb-wrap"><span class="verb stuck">STUCK · 3h</span></span>
+                <span class="menu"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+              </div>
+              <div class="acard-issue">
+                <span class="proj-mark pan"></span>
+                <div class="text">
+                  <div class="id">PAN-1053 · Panopticon CLI</div>
+                  <div class="title">Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback</div>
+                </div>
+              </div>
+              <div class="acard-meta">
+                <div class="item"><span class="lbl">Model</span><span class="val">sonnet-4-6</span></div>
+                <div class="item"><span class="lbl">Last activity</span><span class="val warn">3h 12m ago</span></div>
+                <div class="item"><span class="lbl">Spend</span><span class="val cost">$2.04</span></div>
+              </div>
+              <div class="stuck-banner">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+                Review verdict: <b>changes requested</b> · 3 findings · awaiting agent restart
+              </div>
+              <div class="acard-stream"><span class="err">✗</span> review-correctness · 2 blocking findings
+<span class="warn">⚠</span> review-security · 1 advisory (low)
+<span class="ok">✓</span> review-performance · approved
+<span class="ok">✓</span> review-requirements · approved
+<span class="fg">  ↳ Convoy resolved 3h 12m ago — work agent not yet restarted</span></div>
+              <div class="acard-foot">
+                <span class="link primary">View findings</span>
+                <span class="link primary">Restart work agent</span>
+                <span class="link danger">Wipe</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <div class="mock-chrome">
+    <span class="label">Opus mocks</span>
+    <a href="pipeline-cross-project-opus.html">Pipeline</a>
+    <a href="board-opus.html">Board</a>
+    <a href="pipeline-command-deck-opus.html">Command Deck</a>
+    <a href="agents-opus.html" class="current">Agents</a>
+    <a href="issue-detail-opus.html">Issue Detail</a>
+    <a href="system-map-opus.html">System Map</a>
+  </div>
+</body>
+</html>

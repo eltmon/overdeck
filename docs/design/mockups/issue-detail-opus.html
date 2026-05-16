@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PAN-1052 · Issue Detail · Panopticon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="_shared-opus.css" />
+  <style>
+    /* Faded behind */
+    .behind { position: fixed; inset: 0; pointer-events: none; opacity: .25; filter: blur(2px) saturate(.5); }
+    .behind .ghost-rail { position: absolute; left: 0; top: 0; bottom: 0; width: 48px; background: var(--card); border-right: 1px solid var(--border); }
+    .behind .ghost-topbar { position: absolute; left: 48px; right: 0; top: 0; height: 52px; border-bottom: 1px solid var(--border); }
+    .behind .ghost-col { position: absolute; top: 110px; bottom: 22px; width: calc((100% - 48px - 22px - 22px - 14px*3) / 4); background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-2xl); }
+    .behind .ghost-col:nth-child(3) { left: calc(48px + 22px); }
+    .behind .ghost-col:nth-child(4) { left: calc(48px + 22px + (100% - 48px - 22px - 22px - 14px*3) / 4 + 14px); }
+    .behind .ghost-col:nth-child(5) { left: calc(48px + 22px + ((100% - 48px - 22px - 22px - 14px*3) / 4 + 14px) * 2); }
+    .behind .ghost-col:nth-child(6) { left: calc(48px + 22px + ((100% - 48px - 22px - 22px - 14px*3) / 4 + 14px) * 3); }
+
+    .backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 32%); backdrop-filter: blur(2px); z-index: 50; }
+
+    /* Drawer */
+    .drawer {
+      position: fixed; right: 0; top: 0; bottom: 0;
+      width: 980px; max-width: calc(100vw - 48px);
+      background: var(--background);
+      border-left: 1px solid var(--border);
+      box-shadow: -24px 0 64px rgb(0 0 0 / 40%);
+      z-index: 60;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+
+    .drawer-head {
+      padding: 16px 22px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .dh-row1 {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 8px;
+      color: var(--muted-foreground); font-size: 12px;
+    }
+    .dh-row1 .breadcrumb { display: flex; align-items: center; gap: 6px; }
+    .dh-row1 .sep { opacity: .5; }
+    .dh-row1 .spacer { flex: 1; }
+    .dh-actions { display: flex; align-items: center; gap: 6px; }
+    .icon-btn { width: 28px; height: 28px; display: grid; place-items: center; border-radius: var(--radius-md); color: var(--muted-foreground); cursor: pointer; transition: background-color 200ms, color 200ms; border: 1px solid transparent; }
+    .icon-btn:hover { background: var(--accent); color: var(--foreground); }
+    .icon-btn svg { width: 14px; height: 14px; }
+
+    .dh-row2 { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+    .dh-prio {
+      width: 4px; height: 28px; border-radius: 2px;
+    }
+    .dh-prio.high { background: var(--warning); }
+    .dh-id { font-family: "SF Mono", monospace; font-size: 13px; color: var(--muted-foreground); }
+    .dh-title {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 600; font-size: 22px; letter-spacing: -.01em;
+      color: var(--foreground);
+      margin: 0;
+    }
+
+    .dh-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-foreground); margin-bottom: 14px; flex-wrap: wrap; }
+    .dh-meta .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; background: var(--accent); border-radius: var(--radius-md); }
+    .dh-meta .branch { font-family: "SF Mono", monospace; }
+    .dh-meta .div-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--muted-foreground); opacity: .5; }
+
+    /* Phase timeline */
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0;
+      margin: 10px 0 16px;
+    }
+    .tl-step {
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 8px 10px;
+      position: relative;
+    }
+    .tl-step::before {
+      content: ""; position: absolute; left: 0; top: 0; right: 0; height: 2px;
+      background: var(--border);
+    }
+    .tl-step.done::before    { background: var(--success); }
+    .tl-step.current::before { background: var(--signal-review); }
+    .tl-step .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); }
+    .tl-step.done .lbl { color: var(--success-foreground); }
+    .tl-step.current .lbl { color: var(--signal-review-foreground); }
+    .tl-step .when { font-size: 11px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+    .tl-step.current .when { color: var(--foreground); font-weight: 500; }
+    .tl-step .sub { font-size: 10px; color: var(--muted-foreground); }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 0; margin: 0 -22px; padding: 0 22px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .tab { padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--muted-foreground); cursor: pointer; position: relative; transition: color 200ms; display: flex; align-items: center; gap: 6px; }
+    .tab:hover { color: var(--foreground); }
+    .tab.active { color: var(--foreground); }
+    .tab.active::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 2px; background: var(--primary); border-radius: 2px; }
+    .tab .count { font-family: "SF Mono", monospace; font-size: 10px; padding: 1px 5px; border-radius: var(--radius-sm); background: var(--accent); color: var(--muted-foreground); }
+
+    /* Body — two-column: main + right rail */
+    .body { flex: 1; display: grid; grid-template-columns: 1fr 320px; min-height: 0; overflow: hidden; }
+    .main-col { overflow-y: auto; padding: 20px 22px; }
+    .side-col { border-left: 1px solid var(--border); background: color-mix(in srgb, var(--background) 97%, var(--color-white)); overflow-y: auto; padding: 16px 18px; }
+
+    .section { margin-bottom: 24px; }
+    .section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .section-title { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); }
+    .section-action { margin-left: auto; font-size: 11px; color: var(--muted-foreground); cursor: pointer; padding: 2px 6px; border-radius: var(--radius-sm); }
+    .section-action:hover { background: var(--accent); color: var(--foreground); }
+
+    /* Agent card */
+    .agent-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-xl); padding: 14px;
+      display: flex; flex-direction: column; gap: 10px;
+      position: relative;
+    }
+    .agent-card::before {
+      content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px;
+      background: var(--signal-review); border-radius: 2px;
+    }
+    .agent-card .ac-row1 { display: flex; align-items: center; gap: 10px; }
+    .agent-card .ac-name { font-family: "SF Mono", monospace; font-size: 13px; font-weight: 500; color: var(--foreground); }
+    .agent-card .ac-meta { font-family: "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); margin-left: auto; }
+    .agent-card .ac-stream {
+      background: rgb(0 0 0 / 32%); border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-family: "SF Mono", monospace; font-size: 11px;
+      color: var(--muted-foreground); padding: 10px 12px;
+      max-height: 180px; overflow-y: auto;
+      white-space: pre-wrap; line-height: 1.55;
+    }
+    .agent-card .ac-stream .verb-line { color: var(--signal-review-foreground); }
+    .agent-card .ac-stream .ok { color: var(--success-foreground); }
+    .agent-card .ac-stream .warn { color: var(--warning-foreground); }
+    .agent-card .ac-stream .neutral { color: var(--foreground); }
+    .agent-card .ac-input {
+      display: flex; gap: 8px;
+    }
+    .agent-card .ac-input input {
+      flex: 1; height: 32px; padding: 0 12px;
+      background: var(--background); border: 1px solid var(--input);
+      border-radius: var(--radius-lg);
+      color: var(--foreground); font-family: inherit; font-size: 12px;
+    }
+    .agent-card .ac-input input::placeholder { color: var(--muted-foreground); }
+
+    /* Beads list */
+    .beads {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-xl); overflow: hidden;
+    }
+    .bead-row {
+      display: grid; grid-template-columns: 18px 1fr auto auto;
+      gap: 10px; align-items: center;
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .bead-row:last-child { border-bottom: none; }
+    .bead-row .check { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--border); display: grid; place-items: center; }
+    .bead-row.done .check { background: var(--success); border-color: var(--success); color: #000; }
+    .bead-row.done .check svg { width: 9px; height: 9px; }
+    .bead-row.current .check { background: var(--info); border-color: var(--info); position: relative; }
+    .bead-row.current .check::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1.5px solid var(--info); animation: ping 1.6s ease-out infinite; }
+    @keyframes ping { 0%{transform:scale(1);opacity:1} 100%{transform:scale(1.5);opacity:0} }
+    .bead-row.done .title { color: var(--muted-foreground); text-decoration: line-through; text-decoration-color: rgb(255 255 255 / 18%); }
+    .bead-row .id { font-family: "SF Mono", monospace; font-size: 10px; color: var(--muted-foreground); }
+    .bead-row .dur { font-family: "SF Mono", monospace; font-size: 10px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+    .bead-row:hover { background: var(--accent); cursor: pointer; }
+
+    /* Verification gates */
+    .gates { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .gate {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 10px 12px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .gate.pass { border-color: color-mix(in srgb, var(--success) 32%, transparent); }
+    .gate.fail { border-color: color-mix(in srgb, var(--destructive) 32%, transparent); }
+    .gate .label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); }
+    .gate .val { font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .gate.pass .val { color: var(--success-foreground); }
+    .gate.fail .val { color: var(--destructive-foreground); }
+    .gate .sub { font-size: 10px; color: var(--muted-foreground); font-family: "SF Mono", monospace; }
+
+    /* Sub-agents list */
+    .subagent {
+      display: grid; grid-template-columns: 14px 1fr auto auto;
+      gap: 10px; align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .subagent:last-child { border-bottom: none; }
+    .subagent .dot-sm { width: 8px; height: 8px; border-radius: 50%; }
+    .subagent .dot-sm.run { background: var(--info); }
+    .subagent .dot-sm.idle { background: var(--muted-foreground); }
+    .subagent .dot-sm.done { background: var(--success); }
+    .subagent .dot-sm.fail { background: var(--destructive); }
+    .subagent .name { font-family: "SF Mono", monospace; font-size: 11px; color: var(--foreground); }
+    .subagent .meta { font-family: "SF Mono", monospace; font-size: 10px; color: var(--muted-foreground); }
+    .subagent .dur { font-family: "SF Mono", monospace; font-size: 10px; color: var(--muted-foreground); }
+
+    /* Side rail activity stream */
+    .side-stream { display: flex; flex-direction: column; gap: 8px; }
+    .stream-item {
+      display: grid; grid-template-columns: 14px 1fr;
+      gap: 10px; align-items: flex-start;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .stream-item:last-child { border-bottom: none; }
+    .stream-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
+    .stream-dot.work { background: var(--info); }
+    .stream-dot.review { background: var(--warning); }
+    .stream-dot.ship { background: var(--signal-review); }
+    .stream-dot.done { background: var(--success); }
+    .stream-dot.info { background: var(--muted-foreground); }
+    .stream-text { font-size: 12px; color: var(--foreground); line-height: 1.4; }
+    .stream-text .when { font-family: "SF Mono", monospace; font-size: 10px; color: var(--muted-foreground); display: block; margin-top: 2px; }
+    .stream-text .mono { font-family: "SF Mono", monospace; color: var(--muted-foreground); }
+
+    /* Action bar bottom */
+    .action-bar {
+      display: flex; gap: 8px; align-items: center;
+      padding: 12px 22px;
+      border-top: 1px solid var(--border);
+      background: color-mix(in srgb, var(--background) 96%, var(--color-white));
+    }
+    .action-bar .spacer { flex: 1; }
+  </style>
+</head>
+<body>
+  <!-- Faded Board behind -->
+  <div class="behind">
+    <div class="ghost-rail"></div>
+    <div class="ghost-topbar"></div>
+    <div class="ghost-col"></div>
+    <div class="ghost-col"></div>
+    <div class="ghost-col"></div>
+    <div class="ghost-col"></div>
+  </div>
+  <div class="backdrop"></div>
+
+  <!-- Drawer -->
+  <aside class="drawer">
+    <div class="drawer-head">
+      <div class="dh-row1">
+        <div class="breadcrumb">
+          <span>Eltmon</span>
+          <span class="sep">/</span>
+          <span>Board</span>
+          <span class="sep">/</span>
+          <span style="color:var(--foreground)">PAN-1052</span>
+        </div>
+        <div class="spacer"></div>
+        <div class="dh-actions">
+          <div class="icon-btn" title="Copy link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg></div>
+          <div class="icon-btn" title="Open in tracker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg></div>
+          <div class="icon-btn" title="More"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div>
+          <div class="icon-btn" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 6 18 18M18 6 6 18"/></svg></div>
+        </div>
+      </div>
+
+      <div class="dh-row2">
+        <div class="dh-prio high"></div>
+        <span class="dh-id">PAN-1052</span>
+        <span class="verb ship"><span class="pulse"></span>SHIP RUNNING</span>
+      </div>
+      <h1 class="dh-title">Activity feed: per-turn observations with time-bucketed sidebar</h1>
+
+      <div class="dh-meta">
+        <span class="chip"><span class="proj-mark pan"></span> Panopticon CLI</span>
+        <span class="chip"><span class="branch">feature/pan-1052</span></span>
+        <span class="div-dot"></span>
+        <span>Plan approved 3h ago by EB</span>
+        <span class="div-dot"></span>
+        <span>Started by agent-pan-1052 · 2h 18m runtime</span>
+        <span class="div-dot"></span>
+        <span class="mono" style="color:var(--signal-cost-foreground)">$3.42 spent</span>
+      </div>
+
+      <!-- Phase timeline -->
+      <div class="timeline">
+        <div class="tl-step done"><span class="lbl">Triaged</span><span class="when">May 13</span><span class="sub">by EB</span></div>
+        <div class="tl-step done"><span class="lbl">Planned</span><span class="when">May 14</span><span class="sub">vBRIEF · 9 beads</span></div>
+        <div class="tl-step done"><span class="lbl">Implemented</span><span class="when">May 15</span><span class="sub">opus-4-7 · 9/9</span></div>
+        <div class="tl-step done"><span class="lbl">Reviewed</span><span class="when">May 16 11:02</span><span class="sub">4 specialists ✓</span></div>
+        <div class="tl-step current"><span class="lbl">Shipping</span><span class="when">19 min</span><span class="sub">rebasing · pushing PR</span></div>
+        <div class="tl-step"><span class="lbl">Merged</span><span class="when">—</span><span class="sub">awaiting human</span></div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active">Overview</div>
+        <div class="tab">Plan <span class="count">vBRIEF</span></div>
+        <div class="tab">Beads <span class="count">9/9</span></div>
+        <div class="tab">Conversation</div>
+        <div class="tab">Terminal</div>
+        <div class="tab">Activity <span class="count">142</span></div>
+        <div class="tab">Files</div>
+      </div>
+    </div>
+
+    <div class="body">
+      <!-- Main column -->
+      <div class="main-col">
+
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">Active agent</span>
+            <span class="section-action">View terminal →</span>
+          </div>
+          <div class="agent-card">
+            <div class="ac-row1">
+              <span class="dot ship"></span>
+              <span class="ac-name">agent-pan-1052-ship</span>
+              <span class="verb ship" style="font-size:9px"><span class="pulse"></span>SHIP</span>
+              <span class="ac-meta">opus-4-7 · 19m · $0.81</span>
+            </div>
+            <div class="ac-stream"><span class="ok">✓</span> verification gate · typecheck (8.4s) · lint (3.1s) · test 472/472 (1m12s)
+<span class="verb-line">→</span> rebasing feature/pan-1052 onto origin/main…
+<span class="ok">✓</span> rebase clean · 0 conflicts
+<span class="verb-line">→</span> running post-rebase verification…
+<span class="ok">✓</span> typecheck passed
+<span class="verb-line">→</span> pushing feature/pan-1052 to origin --force-with-lease
+<span class="ok">✓</span> push complete (47 commits)
+<span class="verb-line">→</span> opening PR #1052 via gh CLI…
+<span class="neutral">  PR opened: https://github.com/eltmon/panopticon-cli/pull/1052</span>
+<span class="verb-line">→</span> awaiting required checks (2 of 2)…
+<span class="neutral">  • lint &amp; typecheck — queued</span>
+<span class="neutral">  • test-matrix — queued</span></div>
+            <div class="ac-input">
+              <input type="text" placeholder="Tell agent-pan-1052-ship… (e.g. 'wait for checks then ping')" />
+              <button class="btn-primary" style="height:32px">Send</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">Verification gate</span>
+            <span class="section-action">Configure →</span>
+          </div>
+          <div class="gates">
+            <div class="gate pass">
+              <span class="label">Typecheck</span>
+              <span class="val">PASS</span>
+              <span class="sub">8.4s · 0 errors</span>
+            </div>
+            <div class="gate pass">
+              <span class="label">Lint</span>
+              <span class="val">PASS</span>
+              <span class="sub">3.1s · 0 warnings</span>
+            </div>
+            <div class="gate pass">
+              <span class="label">Tests</span>
+              <span class="val">472 / 472</span>
+              <span class="sub">1m12s · 4 workers</span>
+            </div>
+            <div class="gate pass">
+              <span class="label">UAT (Playwright)</span>
+              <span class="val">PASS</span>
+              <span class="sub">7 scenarios · 24s</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">Beads · plan progress</span>
+            <span class="section-action">9 / 9 closed</span>
+          </div>
+          <div class="beads">
+            <div class="bead-row done">
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></div>
+              <div class="title">Wire per-turn observation extractor into agents.ts (opus-4-7)</div>
+              <span class="id">bd-3471</span>
+              <span class="dur">38m</span>
+            </div>
+            <div class="bead-row done">
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></div>
+              <div class="title">Add observation table + drizzle migration</div>
+              <span class="id">bd-3472</span>
+              <span class="dur">14m</span>
+            </div>
+            <div class="bead-row done">
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></div>
+              <div class="title">Implement time-bucket aggregator in read-model.ts</div>
+              <span class="id">bd-3473</span>
+              <span class="dur">22m</span>
+            </div>
+            <div class="bead-row done">
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></div>
+              <div class="title">Add ActivitySidebar React component + Zustand selector</div>
+              <span class="id">bd-3474</span>
+              <span class="dur">52m</span>
+            </div>
+            <div class="bead-row done">
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></div>
+              <div class="title">Expose /api/observations endpoint + RPC stream</div>
+              <span class="id">bd-3475</span>
+              <span class="dur">18m</span>
+            </div>
+            <div class="bead-row done">
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></div>
+              <div class="title">Backfill historical observations from JSONL sessions</div>
+              <span class="id">bd-3476</span>
+              <span class="dur">1h 04m</span>
+            </div>
+            <div class="bead-row done">
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></div>
+              <div class="title">Add filtering by phase, project, agent</div>
+              <span class="id">bd-3477</span>
+              <span class="dur">26m</span>
+            </div>
+            <div class="bead-row done">
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></div>
+              <div class="title">Write integration tests for the observation pipeline</div>
+              <span class="id">bd-3478</span>
+              <span class="dur">42m</span>
+            </div>
+            <div class="bead-row done">
+              <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></div>
+              <div class="title">Wire ActivitySidebar into the dashboard shell</div>
+              <span class="id">bd-3479</span>
+              <span class="dur">11m</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <span class="section-title">Review specialists · all passed</span>
+            <span class="section-action">View full report →</span>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-xl);padding:8px 14px">
+            <div class="subagent">
+              <span class="dot-sm done"></span>
+              <span class="name">review-correctness</span>
+              <span class="meta">sonnet-4-6 · ✓ no blockers · 2 nits noted</span>
+              <span class="dur">14m 22s</span>
+            </div>
+            <div class="subagent">
+              <span class="dot-sm done"></span>
+              <span class="name">review-security</span>
+              <span class="meta">sonnet-4-6 · ✓ no vulnerabilities · 1 advisory</span>
+              <span class="dur">9m 18s</span>
+            </div>
+            <div class="subagent">
+              <span class="dot-sm done"></span>
+              <span class="name">review-performance</span>
+              <span class="meta">sonnet-4-6 · ✓ no regressions · indexes recommended</span>
+              <span class="dur">12m 03s</span>
+            </div>
+            <div class="subagent">
+              <span class="dot-sm done"></span>
+              <span class="name">review-requirements</span>
+              <span class="meta">sonnet-4-6 · ✓ all acceptance criteria met</span>
+              <span class="dur">11m 41s</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Side rail: live activity -->
+      <aside class="side-col">
+        <div class="section-head">
+          <span class="section-title">Live activity</span>
+          <span class="section-action">Pause</span>
+        </div>
+        <div class="side-stream">
+          <div class="stream-item">
+            <div class="stream-dot ship"></div>
+            <div class="stream-text">
+              Ship agent pushed <span class="mono">feature/pan-1052</span> to origin
+              <span class="when">just now</span>
+            </div>
+          </div>
+          <div class="stream-item">
+            <div class="stream-dot ship"></div>
+            <div class="stream-text">
+              Opened PR <span class="mono">#1052</span> with verification report
+              <span class="when">1 min ago</span>
+            </div>
+          </div>
+          <div class="stream-item">
+            <div class="stream-dot done"></div>
+            <div class="stream-text">
+              Rebase onto <span class="mono">main</span> · 0 conflicts
+              <span class="when">3 min ago</span>
+            </div>
+          </div>
+          <div class="stream-item">
+            <div class="stream-dot done"></div>
+            <div class="stream-text">
+              Verification gate · all checks passed
+              <span class="when">5 min ago</span>
+            </div>
+          </div>
+          <div class="stream-item">
+            <div class="stream-dot review"></div>
+            <div class="stream-text">
+              Review convoy resolved with <span class="mono">approved</span> verdict
+              <span class="when">19 min ago</span>
+            </div>
+          </div>
+          <div class="stream-item">
+            <div class="stream-dot review"></div>
+            <div class="stream-text">
+              <span class="mono">review-requirements</span> finished — all acceptance criteria met
+              <span class="when">23 min ago</span>
+            </div>
+          </div>
+          <div class="stream-item">
+            <div class="stream-dot review"></div>
+            <div class="stream-text">
+              <span class="mono">review-performance</span> finished — 1 advisory
+              <span class="when">28 min ago</span>
+            </div>
+          </div>
+          <div class="stream-item">
+            <div class="stream-dot work"></div>
+            <div class="stream-text">
+              Work agent closed bead <span class="mono">bd-3479</span> · ActivitySidebar wired
+              <span class="when">1h ago</span>
+            </div>
+          </div>
+          <div class="stream-item">
+            <div class="stream-dot work"></div>
+            <div class="stream-text">
+              Work agent closed bead <span class="mono">bd-3478</span> · integration tests
+              <span class="when">1h 42m ago</span>
+            </div>
+          </div>
+          <div class="stream-item">
+            <div class="stream-dot info"></div>
+            <div class="stream-text">
+              Plan approved · 9 beads committed
+              <span class="when">3h ago</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn-ghost">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+        Reset issue
+      </button>
+      <button class="btn-ghost">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        Stop agent
+      </button>
+      <div class="spacer"></div>
+      <button class="btn-ghost">View PR #1052</button>
+      <button class="btn-primary" style="background:var(--success);color:#000">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 12 4 4 8-10"/></svg>
+        Merge to main
+      </button>
+    </div>
+  </aside>
+
+  <!-- Footer mock-navigator -->
+  <div class="mock-chrome">
+    <span class="label">Opus mocks</span>
+    <a href="pipeline-cross-project-opus.html">Pipeline</a>
+    <a href="board-opus.html">Board</a>
+    <a href="pipeline-command-deck-opus.html">Command Deck</a>
+    <a href="agents-opus.html">Agents</a>
+    <a href="issue-detail-opus.html" class="current">Issue Detail</a>
+    <a href="system-map-opus.html">System Map</a>
+  </div>
+</body>
+</html>
