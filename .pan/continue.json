@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-15T00:00:00.000Z",
+  "updated": "2026-05-16T21:12:00.000Z",
   "gitState": {
     "branch": "feature/pan-1052",
     "sha": "be3e598b4",
@@ -183,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-ocgu",
-    "itemId": "b1-realtime-memory-sidebar",
+    "beadId": "workspace-jeym",
+    "itemId": "b1-workspace-status-card",
     "status": "implemented",
-    "note": "GodView activity feed now derives memory observations from the event-sourced Zustand store, renders fresh entries with the shared just-now formatter, and uses a bounded 2s/3min snapshot fallback during initial WebSocket bootstrap."
+    "note": "WorkspaceStatusCard renders phase icon/color, headline, 3-line-clamped summary, latest 3 actionStatus observations, stats footer, stale indicator, and overview-tab click behavior; focused frontend tests, lint, and typecheck passed. Full app browser harness was blocked by unrelated shell mock failures before the Command Deck card could render."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -285,6 +285,12 @@
       "timestamp": "2026-05-16T20:56:59.004Z",
       "reason": "work",
       "note": "workspace-ocgu implemented: MemoryObservationCreatedEvent reaches GodView activity through the existing RPC/Zustand path, the initial-load fallback poller is bounded to 2s for 3 minutes, focused frontend/unit tests, lint, typecheck, and a browser check passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T21:12:00.000Z",
+      "reason": "work",
+      "note": "workspace-jeym implemented: added WorkspaceStatusCard, wired it into the Command Deck overview from memory status/observations plus PR/workspace stats, and verified focused frontend tests, lint, and typecheck. Isolated full-app browser mocking failed in the app shell before card render, so no browser pass was claimed.",
       "agentModel": "gpt-5.5"
     }
   ],

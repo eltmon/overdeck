@@ -17,6 +17,8 @@
 import { useMemo, useState } from 'react';
 import { getHarness } from '@panctl/contracts';
 import type { Issue, Agent } from '../../../types';
+import { selectMemoryObservations, selectMemoryStatus, useDashboardStore } from '../../../lib/store';
+import { WorkspaceStatusCard } from '../WorkspaceStatusCard';
 import { LiveCounter } from '../LiveCounter';
 import { ActivitySparkline } from '../ActivitySparkline';
 import { RoundCard, type RoundData, type RoundVerdict } from '../RoundCard';
@@ -307,6 +309,19 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
 
   const isRecoverable = isReviewPipelineStuck(reviewStatus.data ?? undefined);
   const recentEvents = useMemo(() => sections.slice(-10).reverse(), [sections]);
+  const memoryStatus = useDashboardStore(selectMemoryStatus(issueId));
+  const memoryObservations = useDashboardStore(selectMemoryObservations(issueId));
+  const workspaceStatusIssue = issue ?? {
+    identifier: issueId,
+    title: issueId,
+    description: undefined,
+  };
+  const workspaceStatusStats = {
+    additions: pr.data?.pr?.additions ?? 0,
+    deletions: pr.data?.pr?.deletions ?? 0,
+    commits: workspace.data?.git?.ahead ?? 0,
+    prs: pr.data?.pr ? 1 : 0,
+  };
 
   const handleContainerContextMenu = (e: React.MouseEvent, containerName: string, isRunning: boolean) => {
     e.preventDefault();
@@ -325,6 +340,14 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         lineHeight: 1.5,
       }}
     >
+      <WorkspaceStatusCard
+        issue={workspaceStatusIssue}
+        status={memoryStatus}
+        observations={memoryObservations}
+        stats={workspaceStatusStats}
+        onOpenWorkspaceHome={() => onSwitchTab?.('overview')}
+      />
+
       {/* 1. Status billboard */}
       <section
         data-testid="overview-billboard"
