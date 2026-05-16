@@ -159,8 +159,9 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
     queryFn: fetchConversations,
     refetchInterval: (query) => {
       const data = query.state.data ?? [];
-      const pending = data.some((c: Conversation) => c.forkStatus && c.forkStatus !== 'failed');
-      return pending ? 2000 : 10000;
+      const pendingFork = data.some((c: Conversation) => c.forkStatus && c.forkStatus !== 'failed');
+      const pendingSpawn = data.some((c: Conversation) => !c.sessionAlive && !c.endedAt && !c.spawnError);
+      return (pendingFork || pendingSpawn) ? 2000 : 10000;
     },
   });
 

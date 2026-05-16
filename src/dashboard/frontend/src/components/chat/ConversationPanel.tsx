@@ -371,14 +371,15 @@ export function ConversationPanel({
   const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailedHeader = conversation.forkStatus === 'failed';
   const isSpawnFailed = !!conversation.spawnError;
-  const statusColor = isForkingHeader
+  const isSpawningHeader = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed;
+  const statusColor = isForkingHeader || isSpawningHeader
     ? 'var(--warning)'
     : isForkFailedHeader || isSpawnFailed
     ? 'var(--destructive)'
     : conversation.sessionAlive
     ? 'var(--success)'
     : 'var(--muted-foreground)';
-  const statusLabel = isForkingHeader ? 'forking' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
+  const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
 
   return (
     <div className={styles.conversationTerminal}>
@@ -807,8 +808,11 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   const isForkFailed = conversation.forkStatus === 'failed';
   const isForking = isForkInProgress || isForkFailed;
   const isSpawnFailed = !!conversation.spawnError;
+  // Conversation was created but the tmux session has not started yet — the spawn is running
+  // in the background. Show a "Starting..." placeholder instead of the orphaned empty state.
+  const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking;
   const isFirstMessage = !isLoading && messages.length === 0 && conversation.sessionAlive;
-  const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed;
+  const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
 
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
@@ -833,6 +837,14 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
       {isLoading ? (
         <div className={styles.conversationConnecting}>
           <span>Loading…</span>
+        </div>
+      ) : isSpawning ? (
+        <div className={styles.conversationEmptyState}>
+          <p className={styles.conversationEmptyStateTitle}>
+            <Loader2 size={16} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 6, animation: 'spin 1s linear infinite' }} />
+            Starting…
+          </p>
+          <p className={styles.conversationEmptyStateSubtitle}>Waiting for the session to start.</p>
         </div>
       ) : isSpawnFailed ? (
         <div className={styles.conversationEmptyState}>

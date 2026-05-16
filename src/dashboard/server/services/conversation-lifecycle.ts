@@ -11,6 +11,9 @@ import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { cleanupUnreferencedConversationAttachments, runInBatches } from './conversation-attachments.js';
 
 const POLL_INTERVAL_MS = 10_000;
+// New conversations that have not yet had time to start their tmux session should
+// not be marked ended — the session is still spawning in the background.
+const SPAWN_GRACE_PERIOD_MS = 30_000;
 
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -27,8 +30,11 @@ export async function pollConversations(): Promise<void> {
     const aliveSessions = new Set(await listSessionNamesAsync());
 
     const endedConversations: typeof conversations = [];
+    const now = Date.now();
     for (const conv of conversations) {
       if (!aliveSessions.has(conv.tmuxSession)) {
+        const ageMs = now - new Date(conv.createdAt).getTime();
+        if (ageMs < SPAWN_GRACE_PERIOD_MS) continue;
         console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} gone — marking ended`);
         markConversationEnded(conv.name);
         endedConversations.push(conv);
