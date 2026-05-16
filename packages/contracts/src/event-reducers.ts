@@ -203,6 +203,18 @@ const MAX_DETAILED_ENTRIES = 200
 const MAX_TTS_ENTRIES = 50
 const MAX_SESSION_PROGRESS_ENTRIES = 100
 export const DEFAULT_MAX_TURN_DIFF_SUMMARIES_PER_AGENT = 200
+export const DEFAULT_MAX_MEMORY_OBSERVATIONS_PER_ISSUE = 50
+
+export function getMaxMemoryObservationsPerIssue(): number {
+  const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.PANOPTICON_MEMORY_OBSERVATION_LIMIT
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_MEMORY_OBSERVATIONS_PER_ISSUE
+}
+
+export function trimMemoryObservations(observations: MemoryObservation[]): MemoryObservation[] {
+  const max = getMaxMemoryObservationsPerIssue()
+  return observations.length > max ? observations.slice(-max) : observations
+}
 
 export function getMaxTurnDiffSummariesPerAgent(): number {
   const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.PANOPTICON_TURN_DIFF_SUMMARY_LIMIT
@@ -732,9 +744,9 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       const observation = event.payload.observation
       const existing = state.memory.observationsByIssueId[observation.issueId] ?? []
       const index = existing.findIndex(entry => entry.id === observation.id)
-      const updated = index === -1
+      const updated = trimMemoryObservations(index === -1
         ? [...existing, observation]
-        : existing.map((entry, entryIndex) => entryIndex === index ? observation : entry)
+        : existing.map((entry, entryIndex) => entryIndex === index ? observation : entry))
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),

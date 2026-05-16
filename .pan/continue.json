@@ -183,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-9ok7",
-    "itemId": "b1-memory-rpc-events",
+    "beadId": "workspace-gdn4",
+    "itemId": "b1-memory-store-slices",
     "status": "implemented",
-    "note": "Memory events now project into shared read-model state, flow through DashboardSnapshot, hydrate via syncSnapshot, and persist through the server projection cache for RPC subscribers."
+    "note": "Memory observations, status, reset markers, rollups, and health now live as typed shared read-model slices consumed by the Zustand store; observations are capped at the configurable rolling window default of 50 per issue."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -273,6 +273,12 @@
       "timestamp": "2026-05-16T20:41:53.812Z",
       "reason": "work",
       "note": "workspace-9ok7 implemented: memory.observation_created, memory.status_updated, memory.rollup_triggered, memory.reset_marker_created, and memory.health_changed now update shared reducer state; snapshots include memory state for server RPC and frontend bootstrap; focused tests, lint, and typecheck passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T20:46:13.542Z",
+      "reason": "work",
+      "note": "workspace-gdn4 implemented: promoted memory projection to typed shared slices, added frontend selectors, capped observations at PANOPTICON_MEMORY_OBSERVATION_LIMIT/default 50, and verified focused tests, lint, and typecheck.",
       "agentModel": "gpt-5.5"
     }
   ],

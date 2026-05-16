@@ -104,9 +104,9 @@ describe('memory DomainEvent contracts', () => {
     const next = events.reduce(applyEvent, INITIAL_READ_MODEL_STATE)
 
     expect(next.sequence).toBe(5)
-    expect(next.memory.observationsByIssueId['PAN-1052']).toEqual([observation])
-    expect(next.memory.statusByIssueId['PAN-1052']).toEqual(status)
-    expect(next.memory.rollupsByIssueId['PAN-1052']).toEqual([{
+    expect(next.observationsByIssueId['PAN-1052']).toEqual([observation])
+    expect(next.statusByIssueId['PAN-1052']).toEqual(status)
+    expect(next.rollupsByIssueId['PAN-1052']).toEqual([{
       projectId: identity.projectId,
       workspaceId: identity.workspaceId,
       issueId: identity.issueId,
@@ -114,8 +114,8 @@ describe('memory DomainEvent contracts', () => {
       threshold: 4,
       triggeredAt: TS,
     }])
-    expect(next.memory.resetMarkersByScopeId['workspace:feature-pan-1052']).toEqual([marker])
-    expect(next.memory.healthByIssueId['PAN-1052']).toEqual({
+    expect(next.resetMarkersByScopeId['workspace:feature-pan-1052']).toEqual([marker])
+    expect(next.healthByIssueId['PAN-1052']).toEqual({
       projectId: identity.projectId,
       issueId: identity.issueId,
       status: 'degraded',
@@ -123,5 +123,19 @@ describe('memory DomainEvent contracts', () => {
       ragDecision: undefined,
       updatedAt: TS,
     })
+  })
+
+  it('caps observations at the default rolling window per issue', () => {
+    const observationEvents = Array.from({ length: 51 }, (_, index) => event(
+      index + 1,
+      'memory.observation_created',
+      { observation: { ...observation, id: `obs-${index}`, summary: `Observation ${index}` } },
+    ))
+
+    const next = observationEvents.reduce(applyEvent, INITIAL_READ_MODEL_STATE)
+
+    expect(next.observationsByIssueId['PAN-1052']).toHaveLength(50)
+    expect(next.observationsByIssueId['PAN-1052']?.[0]?.id).toBe('obs-1')
+    expect(next.observationsByIssueId['PAN-1052']?.[49]?.id).toBe('obs-50')
   })
 })

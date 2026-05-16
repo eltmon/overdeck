@@ -405,6 +405,7 @@ export const ReadModelServiceLive = Layer.effect(
           }
 
           const statusMap = loadReviewStatuses();
+          const cachedMemory = cached.memory as Partial<ReadModelState> | undefined;
           state = {
             ...INITIAL_READ_MODEL_STATE,
             sequence: cached.sequence,
@@ -416,7 +417,11 @@ export const ReadModelServiceLive = Layer.effect(
             ),
             issuesRaw: cached.issues ? [...cached.issues] : [],
             resources: cached.resources as ReadModelState['resources'],
-            memory: (cached.memory as ReadModelState['memory'] | undefined) ?? INITIAL_READ_MODEL_STATE.memory,
+            observationsByIssueId: cachedMemory?.observationsByIssueId ?? INITIAL_READ_MODEL_STATE.observationsByIssueId,
+            statusByIssueId: cachedMemory?.statusByIssueId ?? INITIAL_READ_MODEL_STATE.statusByIssueId,
+            rollupsByIssueId: cachedMemory?.rollupsByIssueId ?? INITIAL_READ_MODEL_STATE.rollupsByIssueId,
+            resetMarkersByScopeId: cachedMemory?.resetMarkersByScopeId ?? INITIAL_READ_MODEL_STATE.resetMarkersByScopeId,
+            healthByIssueId: cachedMemory?.healthByIssueId ?? INITIAL_READ_MODEL_STATE.healthByIssueId,
           };
           usedProjectionCache = true;
           console.log(

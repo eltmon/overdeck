@@ -12,6 +12,9 @@ import type {
   ChannelPermissionRequestSnapshot,
   DashboardSnapshot,
   DomainEvent,
+  MemoryObservation,
+  MemoryStatus,
+  ResetMarker,
   ResourceStats,
   ReviewStatusSnapshot,
 } from '@panctl/contracts'
@@ -198,6 +201,21 @@ export const selectReviewStatus =
   (issueId: string) =>
   (s: DashboardState): ReviewStatusSnapshot | undefined =>
     s.reviewStatusByIssueId[issueId]
+
+export const selectMemoryObservations =
+  (issueId: string) =>
+  (s: DashboardState): MemoryObservation[] =>
+    s.observationsByIssueId[issueId] ?? []
+
+export const selectMemoryStatus =
+  (issueId: string) =>
+  (s: DashboardState): MemoryStatus | undefined =>
+    s.statusByIssueId[issueId]
+
+export const selectResetMarkersByScope =
+  (scope: string, scopeId: string) =>
+  (s: DashboardState): ResetMarker[] =>
+    s.resetMarkersByScopeId[`${scope}:${scopeId}`] ?? []
 
 export const selectChannelPermissionRequests = memoizeArraySelector<
   DashboardState,

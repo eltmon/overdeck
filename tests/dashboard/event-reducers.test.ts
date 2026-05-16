@@ -50,13 +50,11 @@ describe('INITIAL_READ_MODEL_STATE', () => {
     expect(INITIAL_READ_MODEL_STATE.issuesRaw).toEqual([])
     expect(INITIAL_READ_MODEL_STATE.recentActivity).toEqual([])
     expect(INITIAL_READ_MODEL_STATE.shadowInferenceByIssueId).toEqual({})
-    expect(INITIAL_READ_MODEL_STATE.memory).toEqual({
-      observationsByIssueId: {},
-      statusByIssueId: {},
-      rollupsByIssueId: {},
-      resetMarkersByScopeId: {},
-      healthByIssueId: {},
-    })
+    expect(INITIAL_READ_MODEL_STATE.observationsByIssueId).toEqual({})
+    expect(INITIAL_READ_MODEL_STATE.statusByIssueId).toEqual({})
+    expect(INITIAL_READ_MODEL_STATE.rollupsByIssueId).toEqual({})
+    expect(INITIAL_READ_MODEL_STATE.resetMarkersByScopeId).toEqual({})
+    expect(INITIAL_READ_MODEL_STATE.healthByIssueId).toEqual({})
     expect(INITIAL_READ_MODEL_STATE.resources).toBeNull()
   })
 })
@@ -154,8 +152,8 @@ describe('syncSnapshot', () => {
       },
     })
 
-    expect(state.memory.observationsByIssueId['PAN-1']).toEqual([])
-    expect(state.memory.healthByIssueId['PAN-1']?.status).toBe('healthy')
+    expect(state.observationsByIssueId['PAN-1']).toEqual([])
+    expect(state.healthByIssueId['PAN-1']?.status).toBe('healthy')
   })
 })
 
