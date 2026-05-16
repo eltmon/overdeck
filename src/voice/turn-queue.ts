@@ -17,6 +17,7 @@ const FILLER_WORDS = new Set([
 ]);
 
 export interface TurnQueue {
+  flush(): void;
   close(): void;
 }
 
@@ -47,8 +48,12 @@ export function createTurnQueue(
   });
 
   return {
-    close() {
+    flush() {
       if (timer) clearTimeout(timer);
+      flush();
+    },
+    close() {
+      if (timer || chunks.length > 0) this.flush();
       timer = null;
       chunks.length = 0;
     },

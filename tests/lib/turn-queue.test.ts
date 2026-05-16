@@ -28,6 +28,22 @@ describe('isTrivialTranscript', () => {
 });
 
 describe('createTurnQueue', () => {
+  it('flushes pending committed chunks when closed before debounce fires', () => {
+    vi.useFakeTimers();
+    try {
+      const emitter = createEmitter();
+      const onTurn = vi.fn();
+      const queue = createTurnQueue(emitter, onTurn);
+
+      emitter.commit('final phrase');
+      queue.close();
+
+      expect(onTurn).toHaveBeenCalledWith('final phrase');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('coalesces committed events within 150ms into one turn', async () => {
     vi.useFakeTimers();
     try {

@@ -21,6 +21,7 @@ function rawDataToBuffer(data: WebSocket.RawData): Buffer {
 }
 
 const MAX_AUDIO_FRAME_BYTES = 64_000;
+const VOICE_STOP_FINALIZE_TIMEOUT_MS = 500;
 
 function isTrustedWebSocketOrigin(request: http.IncomingMessage): boolean {
   const origin = request.headers.origin;
@@ -60,6 +61,14 @@ export function setupVoiceWebSocket(server: http.Server): void {
   wss.on('connection', (ws: WebSocket) => {
     let manager: TranscriptionManager | null = null;
     let turnQueue: TurnQueue | null = null;
+    let finalizeTimer: NodeJS.Timeout | null = null;
+
+    const finishStop = () => {
+      if (finalizeTimer) clearTimeout(finalizeTimer);
+      finalizeTimer = null;
+      turnQueue?.flush();
+      sendJson(ws, { type: 'transcript:finalized' });
+    };
 
     const configureTranscription = async (nextSettings?: Awaited<ReturnType<typeof loadVoiceSettings>>) => {
       const settings = nextSettings ?? await loadVoiceSettings();
@@ -124,11 +133,15 @@ export function setupVoiceWebSocket(server: http.Server): void {
 
       if (message && typeof message === 'object' && 'type' in message && message.type === 'stop') {
         transcription.stop();
+        if (finalizeTimer) clearTimeout(finalizeTimer);
+        finalizeTimer = setTimeout(finishStop, VOICE_STOP_FINALIZE_TIMEOUT_MS);
       }
     });
 
     const closeTranscription = () => {
       unsubscribeSettings();
+      if (finalizeTimer) clearTimeout(finalizeTimer);
+      finalizeTimer = null;
       turnQueue?.close();
       turnQueue = null;
       manager?.close();

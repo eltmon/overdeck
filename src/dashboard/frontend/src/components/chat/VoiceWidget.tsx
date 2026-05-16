@@ -72,14 +72,15 @@ export function VoiceWidget({
   }, [analyserNode, isListening]);
 
   const stopAndApply = useCallback(() => {
-    stop();
-    const text = committedText.trim();
-    if (mode === 'edit' && text) onInsert(text);
-    resetTranscript();
-  }, [committedText, mode, onInsert, resetTranscript, stop]);
+    void (async () => {
+      const text = (await stop()).trim();
+      if (mode === 'edit' && text) onInsert(text);
+      resetTranscript();
+    })();
+  }, [mode, onInsert, resetTranscript, stop]);
 
   const cancel = useCallback(() => {
-    stop();
+    void stop(false);
     resetTranscript();
   }, [resetTranscript, stop]);
 

@@ -3,9 +3,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 type VoiceMessage =
   | { type: 'transcript:partial'; text: string }
   | { type: 'transcript:committed'; text: string }
+  | { type: 'transcript:finalized' }
   | { type: 'error'; error: string };
 
 const MAX_SOCKET_BUFFERED_AUDIO_BYTES = 250_000;
+const VOICE_STOP_TIMEOUT_MS = 1000;
 
 function websocketUrl(path: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -24,11 +26,13 @@ export function useVoiceTranscription({ onCommitted }: { onCommitted?: (text: st
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const committedTextRef = useRef('');
+  const finalizeResolverRef = useRef<(() => void) | null>(null);
 
-  const stop = useCallback(() => {
+  const closeResources = useCallback((closeSocket: boolean) => {
     setIsListening(false);
-    socketRef.current?.close();
-    socketRef.current = null;
+    if (closeSocket) socketRef.current?.close();
+    if (closeSocket) socketRef.current = null;
     processorRef.current?.disconnect();
     sourceRef.current?.disconnect();
     analyserRef.current?.disconnect();
@@ -41,6 +45,24 @@ export function useVoiceTranscription({ onCommitted }: { onCommitted?: (text: st
     mediaStreamRef.current = null;
     setAnalyserNode(null);
   }, []);
+
+  const stop = useCallback(async (finalize = true) => {
+    const socket = socketRef.current;
+    closeResources(false);
+    if (finalize && socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'stop' }));
+      await new Promise<void>((resolve) => {
+        const timer = window.setTimeout(resolve, VOICE_STOP_TIMEOUT_MS);
+        finalizeResolverRef.current = () => {
+          window.clearTimeout(timer);
+          resolve();
+        };
+      });
+      finalizeResolverRef.current = null;
+    }
+    closeResources(true);
+    return committedTextRef.current;
+  }, [closeResources]);
 
   const start = useCallback(async (deviceId?: string) => {
     if (isListening) return;
@@ -61,14 +83,17 @@ export function useVoiceTranscription({ onCommitted }: { onCommitted?: (text: st
         if (message.type === 'transcript:partial') setPartialText(message.text);
         if (message.type === 'transcript:committed') {
           setPartialText('');
-          setCommittedText((existing) => [existing, message.text].filter(Boolean).join(' '));
+          const nextCommitted = [committedTextRef.current, message.text].filter(Boolean).join(' ');
+          committedTextRef.current = nextCommitted;
+          setCommittedText(nextCommitted);
           onCommitted?.(message.text);
         }
+        if (message.type === 'transcript:finalized') finalizeResolverRef.current?.();
         if (message.type === 'error') setError(message.error);
       };
       socket.onerror = () => setError('Voice connection failed');
       socket.onclose = () => {
-        if (socketRef.current === socket) stop();
+        if (socketRef.current === socket) void stop(false);
       };
 
       processor.onaudioprocess = (event) => {
@@ -104,9 +129,12 @@ export function useVoiceTranscription({ onCommitted }: { onCommitted?: (text: st
   const resetTranscript = useCallback(() => {
     setPartialText('');
     setCommittedText('');
+    committedTextRef.current = '';
   }, []);
 
-  useEffect(() => stop, [stop]);
+  useEffect(() => {
+    return () => { void stop(false); };
+  }, [stop]);
 
   return { start, stop, partialText, committedText, isListening, error, analyserNode, resetTranscript };
 }
