@@ -17,6 +17,7 @@ const mockExecAsync = vi.hoisted(() => vi.fn(async (cmd: string) => {
   if (cmd.includes('gh pr list')) return { stdout: '[]', stderr: '' };
   return { stdout: '', stderr: '' };
 }));
+const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
 const mockExec = vi.hoisted(() => vi.fn((cmd: string, optionsOrCb?: any, maybeCb?: any) => {
   const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCb;
   if (typeof callback === 'function') {
@@ -107,6 +108,10 @@ vi.mock('../../../src/lib/activity-log.js', () => ({
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/memory/cli.js', () => ({
+  createResetMarker: mockCreateResetMarker,
 }));
 
 vi.mock('../../../src/lib/git-utils.js', () => ({
@@ -208,6 +213,17 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
 
     // Should not throw — catches and falls through
     await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH)).resolves.not.toThrow();
+  }, 30_000);
+
+  it('creates a workspace-scoped memory reset marker in the in-process lifecycle', async () => {
+    await postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true });
+
+    expect(mockCreateResetMarker).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: 'test-project',
+      scope: 'workspace',
+      scopeId: 'feature-pan-444',
+      reason: 'post-merge cleanup',
+    }));
   }, 30_000);
 
   it('step 0 does not run when idempotency guard is set', async () => {

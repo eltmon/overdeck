@@ -11,6 +11,8 @@ import {
 } from '../../../src/lib/memory/cli.js';
 import { ensureDir, resolveObservationsFile, resolvePendingDir } from '../../../src/lib/memory/paths.js';
 import { getMemoryHealthPath } from '../../../src/lib/memory/health.js';
+import { closeDatabase } from '../../../src/lib/database/index.js';
+import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
@@ -32,6 +34,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  closeMemoryFtsDatabases();
+  closeDatabase();
   if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
   else process.env.PANOPTICON_HOME = originalHome;
   if (tempDir) await rm(tempDir, { recursive: true, force: true });
@@ -81,8 +85,58 @@ describe('pan memory CLI service', () => {
     expect((await searchMemory('primary', { project: 'panopticon-cli', workspace: 'other-workspace' }))).toEqual([]);
   });
 
+  it('applies project, workspace, issue, and session reset markers at read time', async () => {
+    await writeObservationRecord(observation({ id: 'issue-archived', summary: 'issue scoped memory', timestamp: '2026-05-16T20:00:00.000Z' }));
+    await writeObservationRecord(observation({ id: 'workspace-live', summary: 'workspace scoped memory', issueId: 'PAN-999', timestamp: '2026-05-16T22:00:00.000Z' }));
+    await writeObservationRecord(observation({ id: 'session-archived', summary: 'session scoped memory', issueId: 'PAN-998', workspaceId: 'feature-pan-998', timestamp: '2026-05-16T20:00:00.000Z' }));
+    await writeObservationRecord(observation({ id: 'project-live', summary: 'project scoped memory', issueId: 'PAN-997', workspaceId: 'feature-pan-997', sessionId: 'session-997', timestamp: '2026-05-16T22:00:00.000Z' }));
+
+    await createResetMarker({
+      projectId: 'panopticon-cli',
+      scope: 'issue',
+      scopeId: 'PAN-1052',
+      reason: 'issue reset',
+      fromTimestamp: '2026-05-16T21:00:00.000Z',
+      createdAt: '2026-05-16T21:00:00.000Z',
+      emitResetMarkerCreated: async () => undefined,
+    });
+    await createResetMarker({
+      projectId: 'panopticon-cli',
+      scope: 'workspace',
+      scopeId: 'feature-pan-1052',
+      reason: 'workspace reset',
+      fromTimestamp: '2026-05-16T21:00:00.000Z',
+      createdAt: '2026-05-16T21:00:00.000Z',
+      emitResetMarkerCreated: async () => undefined,
+    });
+    await createResetMarker({
+      projectId: 'panopticon-cli',
+      scope: 'session',
+      scopeId: 'session-1',
+      reason: 'session reset',
+      fromTimestamp: '2026-05-16T21:00:00.000Z',
+      createdAt: '2026-05-16T21:00:00.000Z',
+      emitResetMarkerCreated: async () => undefined,
+    });
+    await createResetMarker({
+      projectId: 'panopticon-cli',
+      scope: 'project',
+      scopeId: 'panopticon-cli',
+      reason: 'project reset',
+      fromTimestamp: '2026-05-16T21:00:00.000Z',
+      createdAt: '2026-05-16T21:00:00.000Z',
+      emitResetMarkerCreated: async () => undefined,
+    });
+
+    expect((await searchMemory('scoped', { project: 'panopticon-cli', includeArchived: true })).map((r) => r.observation.id).sort())
+      .toEqual(['issue-archived', 'project-live', 'session-archived', 'workspace-live']);
+    expect((await searchMemory('scoped', { project: 'panopticon-cli' })).map((r) => r.observation.id).sort())
+      .toEqual(['project-live', 'workspace-live']);
+  });
+
   it('creates reset markers without deleting memory records', async () => {
     await writeObservationRecord(observation());
+    const events: Array<{ marker: unknown; timestamp: string }> = [];
 
     const marker = await createResetMarker({
       projectId: 'panopticon-cli',
@@ -90,13 +144,25 @@ describe('pan memory CLI service', () => {
       scopeId: 'PAN-1052',
       reason: 'test reset',
       id: 'reset-1',
-      fromTimestamp: '2026-05-16T00:00:00.000Z',
+      fromTimestamp: '2026-05-16T21:00:00.000Z',
       createdAt: '2026-05-16T21:00:00.000Z',
+      emitResetMarkerCreated: (createdMarker, timestamp) => events.push({ marker: createdMarker, timestamp }),
     });
 
+    const indexedMarkers = await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare('SELECT scope, scope_id, from_timestamp, reason, created_at FROM reset_markers').all());
+
     expect(marker.id).toBe('reset-1');
-    expect((await searchMemory('memory', { project: 'panopticon-cli', issue: 'PAN-1052' }))).toHaveLength(1);
+    expect((await searchMemory('memory', { project: 'panopticon-cli', issue: 'PAN-1052' }))).toHaveLength(0);
+    expect((await searchMemory('memory', { project: 'panopticon-cli', issue: 'PAN-1052', includeArchived: true }))).toHaveLength(1);
     expect(JSON.parse(await readFile(join(tempDir!, 'memory/panopticon-cli/reset-markers.json'), 'utf8'))).toEqual([marker]);
+    expect(indexedMarkers).toEqual([{
+      scope: 'issue',
+      scope_id: 'PAN-1052',
+      from_timestamp: '2026-05-16T21:00:00.000Z',
+      reason: 'test reset',
+      created_at: '2026-05-16T21:00:00.000Z',
+    }]);
+    expect(events).toEqual([{ marker, timestamp: '2026-05-16T21:00:00.000Z' }]);
   });
 
   it('generates a daily summary markdown file', async () => {

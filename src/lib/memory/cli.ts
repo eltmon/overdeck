@@ -3,6 +3,7 @@ import { readdir, readFile, rename, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import type { MemoryObservation, MemoryStatus, ResetMarker } from '@panctl/contracts';
 import { getPanopticonHome } from '../paths.js';
+import { withMemoryFtsDatabase } from './fts-db.js';
 import { resolveExtractionProviderSelection } from './providers/index.js';
 import { getMemoryRollupPendingThreshold, loadMemorySettings } from './settings.js';
 import {
@@ -28,6 +29,7 @@ export interface MemorySearchOptions {
   tag?: string;
   sibling?: boolean;
   limit?: number;
+  includeArchived?: boolean;
 }
 
 export interface MemorySearchResult {
@@ -57,10 +59,12 @@ export interface MemoryDoctorResult {
 export async function searchMemory(query: string, options: MemorySearchOptions = {}): Promise<MemorySearchResult[]> {
   const projectId = options.project ?? DEFAULT_PROJECT_ID;
   const observations = await readObservationScope(projectId, options.issue, options.sibling ?? false);
+  const resetMarkers = options.includeArchived ? [] : await readResetMarkers(projectId);
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
   const results = observations
     .filter((observation) => !options.workspace || observation.workspaceId === options.workspace)
     .filter((observation) => !options.issue || options.sibling || observation.issueId === options.issue)
+    .filter((observation) => options.includeArchived || isAfterLatestResetMarker(observation, resetMarkers))
     .filter((observation) => !options.tag || observation.tags.includes(options.tag))
     .map((observation) => ({ observation, score: scoreObservation(observation, terms) }))
     .filter((result) => terms.length === 0 || result.score > 0)
@@ -81,6 +85,7 @@ export async function createResetMarker(input: {
   fromTimestamp?: string;
   id?: string;
   createdAt?: string;
+  emitResetMarkerCreated?: (marker: ResetMarker, timestamp: string) => void | Promise<void>;
 }): Promise<ResetMarker> {
   const projectId = input.projectId ?? DEFAULT_PROJECT_ID;
   const marker: ResetMarker = {
@@ -94,6 +99,8 @@ export async function createResetMarker(input: {
   const path = join(resolveMemoryRoot(projectId), 'reset-markers.json');
   const markers = await readJsonFile<ResetMarker[]>(path, []);
   await writeJsonAtomically(path, [...markers, marker]);
+  await writeResetMarkerToFtsDb(projectId, marker);
+  await (input.emitResetMarkerCreated ?? emitResetMarkerCreated)(marker, marker.createdAt);
   return marker;
 }
 
@@ -179,6 +186,69 @@ async function readIssueObservations(projectId: string, issueId: string): Promis
   })).filter((file) => file.endsWith('.jsonl')).sort();
   const nested = await Promise.all(files.map((file) => readObservationsFile(join(observationsDir, file))));
   return nested.flat();
+}
+
+async function readResetMarkers(projectId: string): Promise<ResetMarker[]> {
+  const jsonMarkers = await readJsonFile<ResetMarker[]>(join(resolveMemoryRoot(projectId), 'reset-markers.json'), []);
+  const dbMarkers = await withMemoryFtsDatabase(projectId, (db) => db.prepare(`
+    SELECT id, scope, scope_id, from_timestamp, reason, created_at
+    FROM reset_markers
+  `).all() as Array<{
+    id: number;
+    scope: ResetMarker['scope'];
+    scope_id: string;
+    from_timestamp: string;
+    reason: string | null;
+    created_at: string;
+  }>).catch((error: unknown) => {
+    if (isNoSuchTable(error)) return [];
+    throw error;
+  });
+  return dedupeResetMarkers([
+    ...jsonMarkers,
+    ...dbMarkers.map((marker) => ({
+      id: `db-${marker.id}`,
+      scope: marker.scope,
+      scopeId: marker.scope_id,
+      fromTimestamp: marker.from_timestamp,
+      reason: marker.reason ?? '',
+      createdAt: marker.created_at,
+    })),
+  ]);
+}
+
+function dedupeResetMarkers(markers: ResetMarker[]): ResetMarker[] {
+  const seen = new Set<string>();
+  const deduped: ResetMarker[] = [];
+  for (const marker of markers) {
+    const key = [marker.scope, marker.scopeId, marker.fromTimestamp, marker.reason, marker.createdAt].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(marker);
+  }
+  return deduped;
+}
+
+function isAfterLatestResetMarker(observation: MemoryObservation, markers: ResetMarker[]): boolean {
+  const latest = markers
+    .filter((marker) => appliesToObservation(marker, observation))
+    .map((marker) => marker.fromTimestamp)
+    .sort()
+    .at(-1);
+  return !latest || observation.timestamp > latest;
+}
+
+function appliesToObservation(marker: ResetMarker, observation: MemoryObservation): boolean {
+  switch (marker.scope) {
+    case 'project':
+      return marker.scopeId === observation.projectId;
+    case 'workspace':
+      return marker.scopeId === observation.workspaceId;
+    case 'issue':
+      return marker.scopeId === observation.issueId;
+    case 'session':
+      return marker.scopeId === observation.sessionId;
+  }
 }
 
 async function readObservationsFile(path: string): Promise<MemoryObservation[]> {
@@ -281,6 +351,25 @@ async function writeJsonAtomically(path: string, value: unknown): Promise<void> 
   await rename(tempPath, path);
 }
 
+async function writeResetMarkerToFtsDb(projectId: string, marker: ResetMarker): Promise<void> {
+  await withMemoryFtsDatabase(projectId, (db) => {
+    db.prepare(`
+      INSERT INTO reset_markers (scope, scope_id, from_timestamp, reason, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(marker.scope, marker.scopeId, marker.fromTimestamp, marker.reason, marker.createdAt);
+  });
+}
+
+async function emitResetMarkerCreated(marker: ResetMarker, timestamp: string): Promise<void> {
+  const { initEventStore } = await import('../../dashboard/server/event-store.js');
+  const store = await initEventStore();
+  await store.appendAsync({
+    type: 'memory.reset_marker_created',
+    timestamp,
+    payload: { marker },
+  });
+}
+
 function isStaleExtraction(lastSuccess: string | null, now: Date): boolean {
   if (!lastSuccess) return true;
   const timestamp = Date.parse(lastSuccess);
@@ -300,4 +389,8 @@ function emptyHealth(): MemoryHealthSnapshot {
 
 function isEnoent(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
+function isNoSuchTable(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('no such table: reset_markers');
 }
