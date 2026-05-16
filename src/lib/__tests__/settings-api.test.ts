@@ -76,6 +76,20 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
       },
       experimental: { claudeCodeChannels: false },
       claude: { permissionMode: 'auto' },
+      tts: {
+        enabled: false,
+        voice: '',
+        volume: 1,
+        rate: 1,
+        maxChars: 140,
+        dropInfoWhenFull: true,
+        daemonPort: 8787,
+        daemonHost: '127.0.0.1',
+        voiceMap: {},
+        mutedSources: [],
+        utteranceTemplates: {},
+        mutedIssues: [],
+      },
       ...overrides,
     },
   };
@@ -178,6 +192,43 @@ describe('loadSettingsApi', () => {
     expect(settings.workhorses?.expensive).toBe('claude-opus-4-7');
     expect(settings.roles?.work?.sub?.inspect?.model).toBe('claude-haiku-4-5');
   });
+
+  it('loads tts daemon settings from normalized config', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({
+      tts: {
+        enabled: true,
+        voice: 'voice-main',
+        statusVoice: 'voice-status',
+        volume: 0.6,
+        rate: 1.2,
+        maxChars: 180,
+        dropInfoWhenFull: false,
+        daemonPort: 8787,
+        daemonHost: '127.0.0.1',
+        voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+        mutedSources: ['merge-agent'],
+        utteranceTemplates: { readyForMerge: '{issueId} ready' },
+        mutedIssues: ['PAN-123'],
+      },
+    }));
+
+    const { loadSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    expect(settings.tts).toEqual({
+      enabled: true,
+      voice: 'voice-main',
+      statusVoice: 'voice-status',
+      volume: 0.6,
+      rate: 1.2,
+      maxChars: 180,
+      dropInfoWhenFull: false,
+      voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+      mutedSources: ['merge-agent'],
+      utteranceTemplates: { readyForMerge: '{issueId} ready' },
+      mutedIssues: ['PAN-123'],
+    });
+  });
 });
 
 describe('saveSettingsApi', () => {
@@ -208,6 +259,38 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('inspect:');
     expect(written).not.toContain('overrides:');
     expect(mockClearConfigCache).toHaveBeenCalledOnce();
+  });
+
+  it('writes tts daemon settings without removing tts.summarizer', async () => {
+    mockReadFile.mockResolvedValue('tts:\n  summarizer:\n    enabled: true\n    model: claude-haiku-4-5\n');
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({
+      ...settings,
+      tts: {
+        ...settings.tts,
+        enabled: true,
+        voice: 'voice-main',
+        volume: 0.75,
+        rate: 1.1,
+        maxChars: 180,
+        dropInfoWhenFull: false,
+        voiceMap: { 'reviewStatus.passed': 'voice-review' },
+        mutedSources: ['test-specialist'],
+        utteranceTemplates: { readyForMerge: '{issueId} ready' },
+        mutedIssues: ['PAN-123'],
+      },
+    });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('summarizer:');
+    expect(written).toContain('enabled: true');
+    expect(written).toContain('voice: voice-main');
+    expect(written).toContain('volume: 0.75');
+    expect(written).toContain('reviewStatus.passed: voice-review');
+    expect(written).toContain('mutedSources:');
+    expect(written).toContain('PAN-123');
   });
 });
 
@@ -287,5 +370,22 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toContain('Invalid model reference "not-a-model" at workhorses.mid');
     expect(result.errors).toContain('roles.plan.model references unknown workhorse slot "missing"');
     expect(result.errors).toContain('Invalid model reference "not-a-model" at roles.work.model');
+  });
+
+  it('rejects invalid tts numeric settings', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      tts: {
+        volume: 1.2,
+        rate: 0,
+        maxChars: 0,
+      },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('tts.volume must be between 0 and 1');
+    expect(result.errors).toContain('tts.rate must be greater than 0');
+    expect(result.errors).toContain('tts.maxChars must be greater than 0');
   });
 });

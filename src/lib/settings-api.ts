@@ -20,6 +20,7 @@ import {
   type RolesConfig,
   type WorkhorsesConfig,
   type WorkhorseSlot,
+  type TtsDaemonConfig,
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
@@ -34,6 +35,8 @@ export interface ApiDeprecationWarning {
   from: string;
   to: string;
 }
+
+export type ApiTtsConfig = Omit<TtsDaemonConfig, 'daemonPort' | 'daemonHost'>;
 
 // API format matches frontend SettingsConfig interface
 // Note: No cost_sensitivity - we're opinionated and always pick the best model
@@ -74,6 +77,7 @@ export interface ApiSettingsConfig {
     openrouter?: string;
     nous?: string;
   };
+  tts?: ApiTtsConfig;
   openrouter?: {
     favorites?: string[];
   };
@@ -155,6 +159,22 @@ function seededRoles(config: Pick<ReturnType<typeof loadConfig>['config'], 'role
     };
   }
   return roles;
+}
+
+function toApiTtsConfig(config: ReturnType<typeof loadConfig>['config']['tts']): ApiTtsConfig {
+  return {
+    enabled: config.enabled,
+    voice: config.voice,
+    statusVoice: config.statusVoice,
+    volume: config.volume,
+    rate: config.rate,
+    maxChars: config.maxChars,
+    dropInfoWhenFull: config.dropInfoWhenFull,
+    voiceMap: { ...config.voiceMap },
+    mutedSources: [...config.mutedSources],
+    utteranceTemplates: { ...config.utteranceTemplates },
+    mutedIssues: [...config.mutedIssues],
+  };
 }
 
 function pruneUndefined<T>(value: T): T {
@@ -347,6 +367,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
       default_conversation_model: getDefaultConversationModelApi(),
     },
     api_keys: config.apiKeys,
+    tts: toApiTtsConfig(config.tts),
     openrouter: {
       favorites: config.openrouterFavorites,
     },
@@ -425,6 +446,12 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     }
   }
 
+  if (config.tts !== undefined) {
+    for (const [key, value] of Object.entries(config.tts)) {
+      doc.setIn(['tts', key], value);
+    }
+  }
+
   await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
 }
 
@@ -477,6 +504,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
       openrouter: settings.api_keys.openrouter,
       nous: settings.api_keys.nous,
     },
+    tts: settings.tts,
     openrouter: settings.openrouter,
     tmux: settings.tmux,
     conversations: settings.conversations,
@@ -521,6 +549,10 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
     api_keys: {
       ...current.api_keys,
       ...updates.api_keys,
+    },
+    tts: {
+      ...current.tts,
+      ...updates.tts,
     },
     openrouter: {
       ...current.openrouter,
@@ -630,6 +662,23 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
       const ccc = (settings.experimental as { claudeCodeChannels?: unknown }).claudeCodeChannels;
       if (ccc !== undefined && typeof ccc !== 'boolean') {
         errors.push('experimental.claudeCodeChannels must be a boolean');
+      }
+    }
+  }
+
+  if (settings.tts !== undefined) {
+    if (!isRecord(settings.tts)) {
+      errors.push('tts must be an object');
+    } else {
+      const { volume, rate, maxChars } = settings.tts;
+      if (volume !== undefined && (typeof volume !== 'number' || volume < 0 || volume > 1)) {
+        errors.push('tts.volume must be between 0 and 1');
+      }
+      if (rate !== undefined && (typeof rate !== 'number' || rate <= 0)) {
+        errors.push('tts.rate must be greater than 0');
+      }
+      if (maxChars !== undefined && (typeof maxChars !== 'number' || maxChars <= 0)) {
+        errors.push('tts.maxChars must be greater than 0');
       }
     }
   }
