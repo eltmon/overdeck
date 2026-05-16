@@ -77,13 +77,12 @@ describe('removeLegacySkills070', () => {
   });
 
   it('removes every legacy skill that exists and returns their names', () => {
-    // Plant all seven 0.7.0 legacy skills
+    // Plant all 0.7.0 legacy skills that are no longer distributed.
     const legacyNames = [
       'pan-issue',
       'pan-plan-finalize',
       'pan-setup',
       'pan-rescue',
-      'pan-tldr',
       'pan-config',
       'pan-tracker',
     ];
@@ -104,8 +103,8 @@ describe('removeLegacySkills070', () => {
 
     const result = removeLegacySkills070();
 
-    expect(result.sort()).toEqual(['pan-config', 'pan-tldr']);
-    expect(existsSync(join(mockClaudeSkills, 'pan-tldr'))).toBe(false);
+    expect(result).toEqual(['pan-config']);
+    expect(existsSync(join(mockClaudeSkills, 'pan-tldr'))).toBe(true);
     expect(existsSync(join(mockClaudeSkills, 'pan-config'))).toBe(false);
   });
 
@@ -129,10 +128,10 @@ describe('removeLegacySkills070', () => {
     makeLegacySkill('pan-setup');
 
     const firstRun = removeLegacySkills070();
-    expect(firstRun.sort()).toEqual(['pan-setup', 'pan-tldr']);
+    expect(firstRun).toEqual(['pan-setup']);
 
     // State on disk after first run
-    expect(readdirSync(mockClaudeSkills)).toEqual([]);
+    expect(readdirSync(mockClaudeSkills)).toEqual(['pan-tldr']);
 
     const secondRun = removeLegacySkills070();
     expect(secondRun).toEqual([]);
