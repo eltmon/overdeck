@@ -237,12 +237,8 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(state.harness).toBe(DEFAULT_ROLES[role].harness ?? 'claude-code');
     });
 
-    it('launches review sub-roles in headless print mode and delivers prompt via tmux', async () => {
+    it('launches review sub-roles in headless print mode with prompt on stdin', async () => {
       const tmux = await import('../../src/lib/tmux.js');
-      vi.mocked(tmux.sessionExistsAsync)
-        .mockResolvedValueOnce(false)
-        .mockResolvedValue(true);
-      vi.mocked(tmux.capturePaneAsync).mockResolvedValue('Claude Code');
 
       await spawnRun('PAN-SUBREVIEW-1', 'review', {
         workspace: '/tmp/test-workspace',
@@ -254,14 +250,11 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       expect(launcher).toContain('exec claude --print');
       expect(launcher).toContain("--name agent-pan-subreview-1-review-security --session-id '");
-      expect(launcher).not.toContain("< '");
-      expect(launcher).not.toContain("initial-prompt.md'");
+      expect(launcher).toContain("< '");
+      expect(launcher).toContain("initial-prompt.md'");
       expect(launcher).not.toContain('prompt=$(cat');
       expect(launcher).not.toContain('"$prompt"');
-      expect(tmux.sendKeysAsync).toHaveBeenCalledWith(
-        'agent-pan-subreview-1-review-security',
-        'review this diff',
-      );
+      expect(tmux.sendKeysAsync).not.toHaveBeenCalled();
     });
 
     it('review sub-role launcher owns the REVIEWER_READY/FAILED/TIMEOUT signal (PAN-977)', async () => {
