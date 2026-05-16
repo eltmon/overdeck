@@ -104,6 +104,7 @@ def main():
                 continue
             if chunk is None:
                 commit_buffer()
+                emit({"type": "transcript:finalized"})
                 continue
             buffer.extend(chunk)
             last_audio_at = time.monotonic()

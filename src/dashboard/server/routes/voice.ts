@@ -19,6 +19,8 @@ export interface VoiceSettings {
   };
 }
 
+const MAX_VOICE_SETTINGS_BODY_BYTES = 16_384;
+
 const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   stt: {
     provider: 'moonshine',
@@ -33,11 +35,18 @@ const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
 
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
+  const contentLength = Number(request.headers['content-length'] ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_VOICE_SETTINGS_BODY_BYTES) {
+    return { ok: false as const, error: `Voice settings body exceeds ${MAX_VOICE_SETTINGS_BODY_BYTES} bytes` };
+  }
   const text = yield* request.text;
+  if (Buffer.byteLength(text, 'utf8') > MAX_VOICE_SETTINGS_BODY_BYTES) {
+    return { ok: false as const, error: `Voice settings body exceeds ${MAX_VOICE_SETTINGS_BODY_BYTES} bytes` };
+  }
   try {
-    return text ? (JSON.parse(text) as unknown) : {};
+    return { ok: true as const, body: text ? (JSON.parse(text) as unknown) : {} };
   } catch {
-    return {};
+    return { ok: true as const, body: {} };
   }
 });
 
@@ -167,7 +176,9 @@ const putVoiceSettingsRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const originError = requireTrustedOrigin(request);
     if (originError) return originError;
-    const body = yield* readJsonBody;
+    const parsed = yield* readJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 413 });
+    const body = parsed.body;
     if (!isVoiceSettings(body)) {
       return jsonResponse({ error: 'Invalid voice settings payload' }, { status: 400 });
     }

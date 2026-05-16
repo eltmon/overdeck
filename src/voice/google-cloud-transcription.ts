@@ -21,6 +21,8 @@ class GoogleCloudTranscription implements ITurnEmitter {
   private stream: NodeJS.WritableStream | null = null;
   private closed = false;
   private stopRequested = false;
+  private startComplete = false;
+  private stopResolver: (() => void) | null = null;
 
   constructor(apiKey: string, model: string) {
     if (!apiKey.trim()) {
@@ -53,12 +55,18 @@ class GoogleCloudTranscription implements ITurnEmitter {
     return this.audio.write(pcm);
   }
 
-  stop(): void {
+  stop(): Promise<void> {
     this.stopRequested = true;
-    if (this.stream) {
-      this.audio.end();
-      this.stream = null;
+    if (!this.startComplete && !this.stream) {
+      return new Promise((resolve) => {
+        this.stopResolver = resolve;
+      });
     }
+    if (!this.stream) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.stopResolver = resolve;
+      this.audio.end();
+    });
   }
 
   close(): void {
@@ -66,6 +74,8 @@ class GoogleCloudTranscription implements ITurnEmitter {
     this.closed = true;
     this.pendingAudio.length = 0;
     this.pendingAudioBytes = 0;
+    this.stopResolver?.();
+    this.stopResolver = null;
     this.stream?.end();
     this.audio.end();
     this.partialCallbacks.clear();
@@ -90,18 +100,32 @@ class GoogleCloudTranscription implements ITurnEmitter {
           interimResults: true,
           singleUtterance: false,
         })
-        .on('error', (error: Error) => this.emitError(error))
-        .on('data', (response: GoogleStreamingRecognizeResponse) => this.handleResponse(response));
+        .on('error', (error: Error) => {
+          this.emitError(error);
+          this.resolveStop();
+        })
+        .on('data', (response: GoogleStreamingRecognizeResponse) => this.handleResponse(response))
+        .on('end', () => this.resolveStop())
+        .on('close', () => this.resolveStop());
       this.stream = stream;
+      this.startComplete = true;
       this.audio.pipe(stream);
       for (const pending of this.pendingAudio.splice(0)) {
         this.audio.write(pending);
       }
       this.pendingAudioBytes = 0;
-      if (this.stopRequested) this.stop();
+      if (this.stopRequested) void this.stop();
     } catch (error) {
+      this.startComplete = true;
+      this.resolveStop();
       this.emitError(error instanceof Error ? error : new Error(String(error)));
     }
+  }
+
+  private resolveStop(): void {
+    this.stream = null;
+    this.stopResolver?.();
+    this.stopResolver = null;
   }
 
   private handleResponse(response: GoogleStreamingRecognizeResponse): void {

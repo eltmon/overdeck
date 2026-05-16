@@ -8,7 +8,7 @@ export interface ITurnEmitter {
   onCommitted(cb: (text: string) => void): void;
   onError(cb: (error: Error) => void): void;
   sendAudio(pcm: Buffer): boolean;
-  stop(): void;
+  stop(): Promise<void>;
   close(): void;
 }
 
@@ -16,6 +16,7 @@ type SidecarMessage =
   | { type: 'ready' }
   | { type: 'transcript:partial'; text: string }
   | { type: 'transcript:committed'; text: string }
+  | { type: 'transcript:finalized' }
   | { type: 'error'; error: string };
 
 const SAMPLE_RATE = 24000;
@@ -43,6 +44,7 @@ class MoonshineTranscription implements ITurnEmitter {
   private stdoutBuffer = '';
   private closed = false;
   private stopping = false;
+  private stopResolver: (() => void) | null = null;
 
   constructor(modelSize: string) {
     this.child = spawn(resolveSidecarBinary(), [], {
@@ -86,9 +88,12 @@ class MoonshineTranscription implements ITurnEmitter {
     });
   }
 
-  stop(): void {
+  stop(): Promise<void> {
     this.stopping = true;
-    this.writeJson({ type: 'stop' });
+    if (!this.writeJson({ type: 'stop' })) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.stopResolver = resolve;
+    });
   }
 
   close(): void {
@@ -96,6 +101,8 @@ class MoonshineTranscription implements ITurnEmitter {
     this.closed = true;
     this.writeJson({ type: 'close' });
     this.child.kill('SIGTERM');
+    this.stopResolver?.();
+    this.stopResolver = null;
     this.partialCallbacks.clear();
     this.committedCallbacks.clear();
     this.errorCallbacks.clear();
@@ -125,6 +132,9 @@ class MoonshineTranscription implements ITurnEmitter {
       for (const cb of this.partialCallbacks) cb(message.text);
     } else if (message.type === 'transcript:committed') {
       for (const cb of this.committedCallbacks) cb(message.text);
+    } else if (message.type === 'transcript:finalized') {
+      this.stopResolver?.();
+      this.stopResolver = null;
     } else if (message.type === 'error') {
       this.emitError(new Error(message.error));
     }

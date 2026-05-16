@@ -7,7 +7,7 @@ type VoiceMessage =
   | { type: 'error'; error: string };
 
 const MAX_SOCKET_BUFFERED_AUDIO_BYTES = 250_000;
-const VOICE_STOP_TIMEOUT_MS = 1000;
+const VOICE_STOP_TIMEOUT_MS = 6000;
 
 function websocketUrl(path: string): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

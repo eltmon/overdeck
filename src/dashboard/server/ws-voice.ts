@@ -2,6 +2,7 @@ import http from 'node:http';
 import { Buffer } from 'node:buffer';
 import { WebSocket, WebSocketServer } from 'ws';
 import { autoPresoSession } from '../../autopreso/session.js';
+import type { ITurnEmitter } from '../../voice/transcription.js';
 import { createTranscriptionManager, type TranscriptionManager } from '../../voice/transcription-manager.js';
 import { createTurnQueue, type TurnQueue } from '../../voice/turn-queue.js';
 import { loadVoiceSettings, subscribeVoiceSettings } from './routes/voice.js';
@@ -21,7 +22,7 @@ function rawDataToBuffer(data: WebSocket.RawData): Buffer {
 }
 
 const MAX_AUDIO_FRAME_BYTES = 64_000;
-const VOICE_STOP_FINALIZE_TIMEOUT_MS = 500;
+const VOICE_STOP_FINALIZE_TIMEOUT_MS = 5_000;
 
 function isTrustedWebSocketOrigin(request: http.IncomingMessage): boolean {
   const origin = request.headers.origin;
@@ -68,6 +69,24 @@ export function setupVoiceWebSocket(server: http.Server): void {
       finalizeTimer = null;
       turnQueue?.flush();
       sendJson(ws, { type: 'transcript:finalized' });
+    };
+
+    const stopWithTimeout = async (transcription: ITurnEmitter): Promise<boolean> => {
+      try {
+        await Promise.race([
+          transcription.stop(),
+          new Promise<never>((_, reject) => {
+            finalizeTimer = setTimeout(() => reject(new Error('Voice transcription finalization timed out')), VOICE_STOP_FINALIZE_TIMEOUT_MS);
+          }),
+        ]);
+        return true;
+      } catch (error) {
+        sendJson(ws, { type: 'error', error: error instanceof Error ? error.message : String(error) });
+        return false;
+      } finally {
+        if (finalizeTimer) clearTimeout(finalizeTimer);
+        finalizeTimer = null;
+      }
     };
 
     const configureTranscription = async (nextSettings?: Awaited<ReturnType<typeof loadVoiceSettings>>) => {
@@ -132,9 +151,9 @@ export function setupVoiceWebSocket(server: http.Server): void {
       }
 
       if (message && typeof message === 'object' && 'type' in message && message.type === 'stop') {
-        transcription.stop();
-        if (finalizeTimer) clearTimeout(finalizeTimer);
-        finalizeTimer = setTimeout(finishStop, VOICE_STOP_FINALIZE_TIMEOUT_MS);
+        void stopWithTimeout(transcription).then((completed) => {
+          if (completed) finishStop();
+        });
       }
     });
 

@@ -19,7 +19,7 @@ type VoiceMessage =
   | { type: 'transcript:finalized' };
 
 const MAX_SOCKET_BUFFERED_AUDIO_BYTES = 250_000;
-const VOICE_STOP_TIMEOUT_MS = 1000;
+const VOICE_STOP_TIMEOUT_MS = 6000;
 const MAX_COMMITTED_TURNS = 200;
 
 function websocketUrl(path: string): string {
