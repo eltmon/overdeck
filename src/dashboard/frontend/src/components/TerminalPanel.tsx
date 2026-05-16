@@ -5,7 +5,7 @@ import { Agent } from '../types';
 import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
 import { MessagesTimeline } from './chat/MessagesTimeline';
 import type { ChatMessage } from './chat/chat-types';
-import { ActivityView } from './MissionControl/ActivityView';
+import { ActivityView } from './CommandDeck/ActivityView';
 
 interface TerminalPanelProps {
   agent: Agent;
