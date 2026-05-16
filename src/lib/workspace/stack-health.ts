@@ -2,6 +2,11 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { emitActivityEntry } from '../activity-logger.js';
+import {
+  getCachedDockerContainerLifecycleObservedAt,
+  getCachedDockerContainerLifecycleSnapshot,
+  type DockerContainerLifecycle,
+} from '../docker-stats.js';
 import { parseIssueId } from '../issue-id.js';
 import { findProjectByTeam } from '../projects.js';
 
@@ -9,13 +14,7 @@ const execFileAsync = promisify(execFile);
 
 export const DEFAULT_STUCK_CREATED_THRESHOLD_MS = 120_000;
 
-export interface DockerContainerLifecycle {
-  id: string;
-  name: string;
-  status: string;
-  state?: string;
-  createdAt?: string;
-}
+export type { DockerContainerLifecycle } from '../docker-stats.js';
 
 export interface WorkspaceStackHealth {
   healthy: boolean;
@@ -160,17 +159,21 @@ export async function getWorkspaceStackHealth(
   options: WorkspaceStackHealthOptions = {},
 ): Promise<WorkspaceStackHealth> {
   const projectConfig = options.projectConfig ?? resolveStackProject(issueId);
-  const containers = options.containers ?? await collectDockerContainerLifecycleSnapshot();
+  const cachedObservedAt = getCachedDockerContainerLifecycleObservedAt();
+  const containers = options.containers ?? getCachedDockerContainerLifecycleSnapshot();
   const health = evaluateWorkspaceStackHealth(issueId, projectConfig, containers, {
     now: options.now,
     stuckCreatedThresholdMs: options.stuckCreatedThresholdMs,
   });
+  const observedHealth = cachedObservedAt && !options.now
+    ? { ...health, lastObserved: cachedObservedAt }
+    : health;
 
   if (options.emitTransitionActivity) {
-    recordWorkspaceStackHealthTransition(issueId, health);
+    recordWorkspaceStackHealthTransition(issueId, observedHealth);
   }
 
-  return health;
+  return observedHealth;
 }
 
 export function recordWorkspaceStackHealthTransition(issueId: string, health: WorkspaceStackHealth): boolean {

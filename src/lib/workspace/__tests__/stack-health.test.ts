@@ -1,12 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  recordDockerContainerLifecycleSnapshot,
+  resetCachedDockerContainerLifecycleSnapshotForTests,
+} from '../../docker-stats.js';
+import type { ProjectConfig } from '../../projects.js';
+import {
   evaluateWorkspaceStackHealth,
+  getWorkspaceStackHealth,
   recordWorkspaceStackHealthTransition,
   resetWorkspaceStackHealthTransitionsForTests,
   type DockerContainerLifecycle,
 } from '../stack-health.js';
-import type { ProjectConfig } from '../../projects.js';
 
 const dockerProject: ProjectConfig = {
   name: 'Panopticon',
@@ -17,6 +22,10 @@ const dockerProject: ProjectConfig = {
 };
 
 const now = new Date('2026-05-16T23:00:00.000Z');
+
+afterEach(() => {
+  resetCachedDockerContainerLifecycleSnapshotForTests();
+});
 
 function container(overrides: Partial<DockerContainerLifecycle>): DockerContainerLifecycle {
   return {
@@ -76,6 +85,24 @@ describe('evaluateWorkspaceStackHealth', () => {
 
     expect(health.healthy).toBe(true);
     expect(health.reasons).toEqual([]);
+  });
+
+  it('uses the cached Docker lifecycle snapshot when containers are omitted', async () => {
+    recordDockerContainerLifecycleSnapshot([
+      container({
+        name: 'panopticon-feature-pan-1140-init-1',
+        status: 'Exited (1) 3 minutes ago',
+        state: 'exited',
+      }),
+    ], '2026-05-16T23:01:00.000Z');
+
+    const health = await getWorkspaceStackHealth('PAN-1140', { projectConfig: dockerProject });
+
+    expect(health).toEqual({
+      healthy: false,
+      reasons: ['panopticon-feature-pan-1140-init-1 init exited non-zero (1)'],
+      lastObserved: '2026-05-16T23:01:00.000Z',
+    });
   });
 
   it('emits only on healthy to unhealthy transitions', () => {

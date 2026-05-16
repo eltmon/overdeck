@@ -9,17 +9,19 @@ Agent starts for projects with `workspace.docker.compose_template` must pass wor
 - `src/lib/agents.ts:2102` gates `spawnAgent()` before hook initialization, beads checks, state writes, or work-agent tmux creation.
 - `src/lib/agents.ts:2704`, `src/lib/agents.ts:2873`, `src/lib/agents.ts:3032`, and `src/lib/agents.ts:3198` gate fallback relaunch, resume, restart, and crash recovery before they create replacement tmux sessions.
 
+The spawn gate reads the cached Docker lifecycle snapshot maintained by `DockerStatsCollector`; it does not run `docker ps` or any Docker subprocess on the spawn path. CLI/status/manual diagnostics can still collect Docker state explicitly and pass it into stack-health evaluation.
+
 If `allowHost` is true, the gate emits `agent-spawn-host-override` and persists `hostOverride` on the agent state so later resume/restart/recovery paths honor the same operator decision.
 
 ## CLI and dashboard break-glass
 
-- `src/cli/index.ts:403` registers `pan start <id>`.
+- `src/cli/index.ts:410` registers `pan start <id>`.
 - `src/cli/index.ts:413` adds `--host`; `src/cli/index.ts:414` adds `--yes` for non-interactive confirmation.
-- `src/cli/commands/start.ts:121` prompts `Are you sure? This bypasses workspace isolation. (y/N)` for interactive `--host` and requires `--yes` when stdin is not a TTY.
-- `src/cli/commands/start.ts:965` passes `allowHost` into `spawnAgent()`.
+- `src/cli/commands/start.ts:124` prompts `Are you sure? This bypasses workspace isolation. (y/N)` for interactive `--host` and requires `--yes` when stdin is not a TTY.
+- `src/cli/commands/start.ts:972` passes `allowHost` into `spawnAgent()`.
 - `src/dashboard/server/routes/agents.ts:1765` accepts an explicit dashboard host override request.
-- `src/dashboard/server/routes/agents.ts:2551` and `src/dashboard/server/routes/agents.ts:2609` pass `--host --yes` to the detached `pan start` child only when the request explicitly set `host` or `allowHost`.
-- `src/dashboard/server/services/agent-spawner.ts:166` passes `allowHost` through its direct `spawnAgent()` service path.
+- `src/dashboard/server/routes/agents.ts:2554` and `src/dashboard/server/routes/agents.ts:2612` pass `--host --yes` to the detached `pan start` child only when the request explicitly set `host` or `allowHost`.
+- `src/dashboard/server/services/agent-spawner.ts:172` passes `allowHost` through its direct `spawnAgent()` service path.
 
 There is no `pan work` spawn command today; the CLI audit found only `pan start <id>` as the direct work-agent start surface.
 

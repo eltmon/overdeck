@@ -19,6 +19,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../workspace/stack-health.js');
     vi.doUnmock('../beads-query.js');
     vi.doUnmock('../activity-logger.js');
+    vi.doUnmock('../projects.js');
     delete process.env.PANOPTICON_HOME;
     rmSync(tempHome, { recursive: true, force: true });
   });
@@ -140,6 +141,51 @@ describe('AgentState role persistence', () => {
       eligible: false,
       reason: 'harness-pi',
     });
+  });
+
+  it('blocks spawnAgent from cached stack health before side effects', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-stack-cache-gate-'));
+    const createSessionAsync = vi.fn();
+    const emitActivityEntry = vi.fn();
+    vi.doMock('../projects.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../projects.js')),
+      findProjectByTeam: vi.fn(() => ({ workspace: { docker: { compose_template: 'infra/.devcontainer-template' } } })),
+    }));
+    vi.doMock('../tmux.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../tmux.js')),
+      sessionExistsAsync: vi.fn(async () => false),
+      createSessionAsync,
+    }));
+    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
+    vi.doMock('../activity-logger.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../activity-logger.js')),
+      emitActivityEntry,
+    }));
+    const { recordDockerContainerLifecycleSnapshot } = await import('../docker-stats.js');
+    recordDockerContainerLifecycleSnapshot([{
+      id: 'abc123',
+      name: 'panopticon-feature-pan-1140-init-1',
+      status: 'Exited (1) 5 minutes ago',
+      state: 'exited',
+      createdAt: '2026-05-16T00:00:00.000Z',
+    }], '2026-05-16T00:00:00.000Z');
+
+    const { spawnAgent } = await import('../agents.js');
+
+    await expect(spawnAgent({
+      issueId: 'PAN-1140',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+    })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: panopticon-feature-pan-1140-init-1 init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
+
+    expect(createSessionAsync).not.toHaveBeenCalled();
+    expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'error',
+      issueId: 'PAN-1140',
+      message: 'agent-spawn-blocked-stack-unhealthy: PAN-1140',
+    }));
+    rmSync(workspace, { recursive: true, force: true });
   });
 
   it('blocks spawnAgent before side effects when the workspace stack is unhealthy', async () => {
