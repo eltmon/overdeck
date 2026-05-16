@@ -61,6 +61,7 @@ import {
   setFavorite,
   removeFavorite,
   updateForkStatus,
+  updateSpawnError,
   type Conversation,
 } from '../../../lib/database/conversations-db.js';
 import {
@@ -1354,6 +1355,12 @@ const postConversationRoute = HttpRouter.add(
           } catch (spawnErr: unknown) {
             const msg = spawnErr instanceof Error ? spawnErr.message : String(spawnErr);
             console.error(`[conversations] background spawn failed for ${tmuxSession}: ${msg}`);
+            updateSpawnError(name, msg);
+            getEventStore().emitOnly({
+              type: 'conversation.created',
+              timestamp: new Date().toISOString(),
+              payload: { conversationName: name },
+            });
           }
         })();
 

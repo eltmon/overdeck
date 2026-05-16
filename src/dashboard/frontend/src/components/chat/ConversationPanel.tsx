@@ -370,14 +370,15 @@ export function ConversationPanel({
 
   const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailedHeader = conversation.forkStatus === 'failed';
+  const isSpawnFailed = !!conversation.spawnError;
   const statusColor = isForkingHeader
     ? 'var(--warning)'
-    : isForkFailedHeader
+    : isForkFailedHeader || isSpawnFailed
     ? 'var(--destructive)'
     : conversation.sessionAlive
     ? 'var(--success)'
     : 'var(--muted-foreground)';
-  const statusLabel = isForkingHeader ? 'forking' : isForkFailedHeader ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
+  const statusLabel = isForkingHeader ? 'forking' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
 
   return (
     <div className={styles.conversationTerminal}>
@@ -805,8 +806,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   const isForkInProgress = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailed = conversation.forkStatus === 'failed';
   const isForking = isForkInProgress || isForkFailed;
+  const isSpawnFailed = !!conversation.spawnError;
   const isFirstMessage = !isLoading && messages.length === 0 && conversation.sessionAlive;
-  const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive;
+  const isOrphaned = !isLoading && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed;
 
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
@@ -831,6 +833,16 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
       {isLoading ? (
         <div className={styles.conversationConnecting}>
           <span>Loading…</span>
+        </div>
+      ) : isSpawnFailed ? (
+        <div className={styles.conversationEmptyState}>
+          <p className={styles.conversationEmptyStateTitle}>Failed to start</p>
+          <p className={styles.conversationEmptyStateSubtitle}>{conversation.spawnError}</p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()}>
+              Archive
+            </button>
+          </div>
         </div>
       ) : isForking && messages.length === 0 ? (
         <ForkProgressView
