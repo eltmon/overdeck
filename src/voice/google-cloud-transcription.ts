@@ -16,8 +16,11 @@ class GoogleCloudTranscription implements ITurnEmitter {
   private readonly committedCallbacks = new Set<(text: string) => void>();
   private readonly errorCallbacks = new Set<(error: Error) => void>();
   private readonly audio = new PassThrough();
+  private readonly pendingAudio: Buffer[] = [];
+  private pendingAudioBytes = 0;
   private stream: NodeJS.WritableStream | null = null;
   private closed = false;
+  private stopRequested = false;
 
   constructor(apiKey: string, model: string) {
     if (!apiKey.trim()) {
@@ -39,19 +42,30 @@ class GoogleCloudTranscription implements ITurnEmitter {
   }
 
   sendAudio(pcm: Buffer): boolean {
-    if (this.closed) return false;
+    if (this.closed || this.stopRequested) return false;
+    if (!this.stream) {
+      if (this.pendingAudioBytes + pcm.byteLength > MAX_BACKEND_AUDIO_BUFFER_BYTES) return false;
+      this.pendingAudio.push(Buffer.from(pcm));
+      this.pendingAudioBytes += pcm.byteLength;
+      return true;
+    }
     if (this.audio.writableLength + pcm.byteLength > MAX_BACKEND_AUDIO_BUFFER_BYTES) return false;
     return this.audio.write(pcm);
   }
 
   stop(): void {
-    this.stream?.end();
-    this.stream = null;
+    this.stopRequested = true;
+    if (this.stream) {
+      this.audio.end();
+      this.stream = null;
+    }
   }
 
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    this.pendingAudio.length = 0;
+    this.pendingAudioBytes = 0;
     this.stream?.end();
     this.audio.end();
     this.partialCallbacks.clear();
@@ -80,6 +94,11 @@ class GoogleCloudTranscription implements ITurnEmitter {
         .on('data', (response: GoogleStreamingRecognizeResponse) => this.handleResponse(response));
       this.stream = stream;
       this.audio.pipe(stream);
+      for (const pending of this.pendingAudio.splice(0)) {
+        this.audio.write(pending);
+      }
+      this.pendingAudioBytes = 0;
+      if (this.stopRequested) this.stop();
     } catch (error) {
       this.emitError(error instanceof Error ? error : new Error(String(error)));
     }

@@ -448,8 +448,8 @@
     "hash": "c061700a8269f41d15183a20d597af10"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/autopreso-session.test.ts": {
-    "mtime": 1778963599.1884146,
-    "hash": "38d5f8763c081a5a7dba1a35fe5bbd2e"
+    "mtime": 1778966096.4172475,
+    "hash": "10bdd0f469effd4c46ad948dc692fe7b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/workspace-manager.test.ts": {
     "mtime": 1778342940.3768299,
@@ -476,8 +476,8 @@
     "hash": "5f307ce8a7b6aaffde4f010fa3ec7516"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/google-cloud-transcription.test.ts": {
-    "mtime": 1778963002.9139366,
-    "hash": "f2812bf3cc7c8593d3425e124e98c293"
+    "mtime": 1778966017.5782695,
+    "hash": "134258ca984e38a4994e6b384e2a66f9"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/model-deprecation.test.ts": {
     "mtime": 1778619749.1837988,
@@ -940,7 +940,7 @@
     "hash": "280d7cdfde5f4b1b47671f08a993c671"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/record-cost-event.d.ts": {
-    "mtime": 1778965133.6958046,
+    "mtime": 1778965689.6241753,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/notify-complete": {
@@ -1152,16 +1152,16 @@
     "hash": "f23cde06107702a599133e9bd6f759ce"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/session.ts": {
-    "mtime": 1778963546.1464896,
-    "hash": "63647b90b3ccc804b38174cc5781cb6c"
+    "mtime": 1778966074.745427,
+    "hash": "f915d7d687dee353e3d814a4c09ee42a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/whiteboard-tools.ts": {
     "mtime": 1778963002.9105659,
     "hash": "45eecbcd1e5a8ca4bb8edac52934f15c"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/agent.ts": {
-    "mtime": 1778963587.6809835,
-    "hash": "793baf46f8820aae56442d9d27b94c21"
+    "mtime": 1778966033.9818873,
+    "hash": "653d41a388bca9d13e22462feeb3dae8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/whiteboard-elements.ts": {
     "mtime": 1778963002.9105659,
@@ -2452,8 +2452,8 @@
     "hash": "d69d8b12a1b11ec5bd713bded956a72f"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/voice/google-cloud-transcription.ts": {
-    "mtime": 1778963002.9135334,
-    "hash": "650dcfd83f5cae2f5484783b3bcaee32"
+    "mtime": 1778966169.8570395,
+    "hash": "d81ee6878a53d25f0f9fa35ba10a63fc"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/voice/transcription.ts": {
     "mtime": 1778963002.9139366,

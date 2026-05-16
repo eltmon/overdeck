@@ -26,6 +26,24 @@ describe('createWhiteboardSession', () => {
     expect(session.canvasDirtyForAgent).toBe(false);
   });
 
+  it('aborts superseded warmup loops when start is called again', async () => {
+    const warmup = vi.spyOn(agent, 'runWhiteboardWarmupOnce');
+    const signals: AbortSignal[] = [];
+    warmup.mockImplementation((_session, _settings, signal) => {
+      if (signal) signals.push(signal);
+      return new Promise<void>((resolve) => signal?.addEventListener('abort', () => resolve(), { once: true }));
+    });
+    const session = createWhiteboardSession();
+
+    session.start([{ id: 'one', text: 'First' }]);
+    await vi.waitFor(() => expect(warmup).toHaveBeenCalledTimes(1));
+    session.start([{ id: 'two', text: 'Second' }]);
+
+    await vi.waitFor(() => expect(warmup).toHaveBeenCalledTimes(2));
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(false);
+  });
+
   it('retries warmup up to 8 times with capped exponential backoff', async () => {
     vi.useFakeTimers();
     const warmup = vi.spyOn(agent, 'runWhiteboardWarmupOnce');

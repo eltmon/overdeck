@@ -140,12 +140,14 @@ export async function runWhiteboardAgent(
 
 export async function runWhiteboardWarmupOnce(
   session: AutoPresoSession,
-  settings: AutoPresoAgentSettings = DEFAULT_SETTINGS
+  settings: AutoPresoAgentSettings = DEFAULT_SETTINGS,
+  signal?: AbortSignal
 ): Promise<void> {
   const model = await createModel(settings);
   await generateText({
     model,
     system: systemPrompt(session),
     prompt: 'Warm up for low-latency whiteboard editing. Reply with UNDERSTOOD.',
+    abortSignal: signal,
   });
 }

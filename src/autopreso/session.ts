@@ -49,8 +49,15 @@ const MAX_WARMUP_BACKOFF_MS = 30000;
 const MAX_PENDING_TRANSCRIPT_BYTES = 16_384;
 const MAX_PENDING_TRANSCRIPT_TURNS = 8;
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => {
+      clearTimeout(timer);
+      resolve();
+    }, { once: true });
+  });
 }
 
 function createWarmupUserMessage(elements: readonly ExcalidrawElementLike[]): AutoPresoAgentMessage {
@@ -65,6 +72,7 @@ function createWarmupUserMessage(elements: readonly ExcalidrawElementLike[]): Au
 export function createWhiteboardSession(): AutoPresoSession {
   const listeners = new Set<AutoPresoListener>();
   let warmupGeneration = 0;
+  let warmupAbortController: AbortController | null = null;
   let activeTranscriptRun: Promise<void> | null = null;
   let pendingTranscript: QueuedTranscript | null = null;
 
@@ -84,6 +92,9 @@ export function createWhiteboardSession(): AutoPresoSession {
       };
     },
     start(nextElements, settings) {
+      warmupAbortController?.abort();
+      const abortController = new AbortController();
+      warmupAbortController = abortController;
       const generation = ++warmupGeneration;
       const warmupUserMessage = createWarmupUserMessage(nextElements);
       session.mode = 'live';
@@ -94,10 +105,12 @@ export function createWhiteboardSession(): AutoPresoSession {
       activeTranscriptRun = null;
       pendingTranscript = null;
       const current = notify();
-      void runWarmupLoop(generation, warmupUserMessage, settings);
+      void runWarmupLoop(generation, warmupUserMessage, settings, abortController.signal);
       return current;
     },
     backToStaging() {
+      warmupAbortController?.abort();
+      warmupAbortController = null;
       warmupGeneration += 1;
       session.mode = 'staging';
       session.warmupStatus = 'idle';
@@ -106,6 +119,8 @@ export function createWhiteboardSession(): AutoPresoSession {
       return notify();
     },
     reset() {
+      warmupAbortController?.abort();
+      warmupAbortController = null;
       warmupGeneration += 1;
       session.mode = 'staging';
       session.warmupStatus = 'idle';
@@ -164,21 +179,25 @@ export function createWhiteboardSession(): AutoPresoSession {
   const runWarmupLoop = async (
     generation: number,
     warmupUserMessage: AutoPresoAgentMessage,
-    settings: AutoPresoAgentSettings
+    settings: AutoPresoAgentSettings,
+    signal: AbortSignal
   ): Promise<void> => {
     for (let attempt = 0; attempt < MAX_WARMUP_ATTEMPTS; attempt += 1) {
+      if (signal.aborted) return;
       try {
-        await runWhiteboardWarmupOnce(session, settings);
-        if (generation !== warmupGeneration) return;
+        await runWhiteboardWarmupOnce(session, settings, signal);
+        if (signal.aborted || generation !== warmupGeneration) return;
         session.agentHistory = [warmupUserMessage, { role: 'assistant', content: 'UNDERSTOOD' }];
         session.warmupStatus = 'ready';
         session.canvasDirtyForAgent = false;
+        if (warmupAbortController?.signal === signal) warmupAbortController = null;
         notify();
         return;
       } catch {
-        if (generation !== warmupGeneration) return;
+        if (signal.aborted || generation !== warmupGeneration) return;
         if (attempt === MAX_WARMUP_ATTEMPTS - 1) {
           session.warmupStatus = 'failed';
+          if (warmupAbortController?.signal === signal) warmupAbortController = null;
           notify();
           return;
         }
@@ -186,8 +205,8 @@ export function createWhiteboardSession(): AutoPresoSession {
           INITIAL_WARMUP_BACKOFF_MS * 2 ** attempt,
           MAX_WARMUP_BACKOFF_MS
         );
-        await sleep(backoff);
-        if (generation !== warmupGeneration) return;
+        await sleep(backoff, signal);
+        if (signal.aborted || generation !== warmupGeneration) return;
       }
     }
   };
