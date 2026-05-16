@@ -261,6 +261,21 @@ describe('saveSettingsApi', () => {
     expect(mockClearConfigCache).toHaveBeenCalledOnce();
   });
 
+  it('rejects untrusted tts daemon endpoint keys at runtime', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await expect(saveSettingsApi({
+      ...settings,
+      tts: {
+        ...settings.tts,
+        daemonHost: '169.254.169.254',
+      } as typeof settings.tts,
+    })).rejects.toThrow('Unknown tts setting(s): daemonHost');
+
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+
   it('writes tts daemon settings without removing tts.summarizer', async () => {
     mockReadFile.mockResolvedValue('tts:\n  summarizer:\n    enabled: true\n    model: claude-haiku-4-5\n');
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
@@ -370,6 +385,20 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toContain('Invalid model reference "not-a-model" at workhorses.mid');
     expect(result.errors).toContain('roles.plan.model references unknown workhorse slot "missing"');
     expect(result.errors).toContain('Invalid model reference "not-a-model" at roles.work.model');
+  });
+
+  it('rejects unknown tts settings', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      tts: {
+        enabled: true,
+        daemonPort: 22,
+      } as never,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Unknown tts setting(s): daemonPort');
   });
 
   it('rejects invalid tts numeric settings', async () => {

@@ -1,4 +1,4 @@
-import { loadConfig, type NormalizedTtsDaemonConfig } from './config-yaml.js';
+import type { NormalizedTtsDaemonConfig } from './config-yaml.js';
 import { findVoiceById, type TtsVoice } from './tts-voices.js';
 
 export type TtsSpeakMode = 'custom' | 'design' | 'clone';
@@ -25,12 +25,15 @@ export interface TtsSpeakPayload {
   voice: string;
   instruct: string;
   volume: number;
+  rate: number;
+  maxChars: number;
+  dropInfoWhenFull: boolean;
   mode: TtsSpeakMode;
   embedding?: number[];
 }
 
 export interface ResolveAndSpeakDeps {
-  config?: NormalizedTtsDaemonConfig;
+  config: NormalizedTtsDaemonConfig;
   findVoiceById?: (id: string) => Promise<TtsVoice | undefined>;
   fetch?: FetchLike;
   timeoutMs?: number;
@@ -38,6 +41,18 @@ export interface ResolveAndSpeakDeps {
 
 function renderTemplate(template: string, issueId: string | undefined): string {
   return template.replaceAll('{issueId}', issueId ?? '');
+}
+
+function truncateForTts(text: string, config: NormalizedTtsDaemonConfig): string {
+  return text.length > config.maxChars ? text.slice(0, config.maxChars) : text;
+}
+
+function ttsPayloadControls(config: NormalizedTtsDaemonConfig): Pick<TtsSpeakPayload, 'rate' | 'maxChars' | 'dropInfoWhenFull'> {
+  return {
+    rate: config.rate,
+    maxChars: config.maxChars,
+    dropInfoWhenFull: config.dropInfoWhenFull,
+  };
 }
 
 function resolveVoiceId(options: ResolveAndSpeakOptions, config: NormalizedTtsDaemonConfig): string {
@@ -58,6 +73,7 @@ export function buildTtsSpeakPayload(
       voice: voice.description || voice.name,
       instruct: voice.instruct || '',
       volume: config.volume,
+      ...ttsPayloadControls(config),
       mode: 'design',
     };
   }
@@ -68,6 +84,7 @@ export function buildTtsSpeakPayload(
       voice: 'clone',
       instruct: voice.instruct || '',
       volume: config.volume,
+      ...ttsPayloadControls(config),
       mode: 'clone',
       embedding: voice.embedding,
     };
@@ -78,6 +95,7 @@ export function buildTtsSpeakPayload(
     voice: voice.presetName || voice.name,
     instruct: voice.instruct || '',
     volume: config.volume,
+    ...ttsPayloadControls(config),
     mode: 'custom',
   };
 }
@@ -93,6 +111,7 @@ function buildDirectTtsSpeakPayload(
     voice: options.voice,
     instruct: options.instruct || '',
     volume: options.volume ?? config.volume,
+    ...ttsPayloadControls(config),
     mode: options.mode || 'custom',
     embedding: options.embedding,
   };
@@ -123,16 +142,20 @@ async function postSpeakPayload(
 
 export async function resolveAndSpeak(
   options: ResolveAndSpeakOptions,
-  deps: ResolveAndSpeakDeps = {},
+  deps: ResolveAndSpeakDeps,
 ): Promise<TtsSpeakResult> {
-  const config = deps.config ?? loadConfig().config.tts;
+  const config = deps.config;
 
+  if (!config.enabled) return 'muted';
   if (options.source && config.mutedSources.includes(options.source)) return 'muted';
   if (options.issueId && config.mutedIssues.includes(options.issueId)) return 'muted';
 
-  const text = options.eventType && config.utteranceTemplates[options.eventType]
-    ? renderTemplate(config.utteranceTemplates[options.eventType], options.issueId)
-    : options.text;
+  const text = truncateForTts(
+    options.eventType && config.utteranceTemplates[options.eventType]
+      ? renderTemplate(config.utteranceTemplates[options.eventType], options.issueId)
+      : options.text,
+    config,
+  );
 
   const directPayload = buildDirectTtsSpeakPayload(options, text, config);
   if (directPayload) return postSpeakPayload(directPayload, config, deps);

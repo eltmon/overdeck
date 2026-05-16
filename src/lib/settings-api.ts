@@ -38,6 +38,42 @@ export interface ApiDeprecationWarning {
 
 export type ApiTtsConfig = Omit<TtsDaemonConfig, 'daemonPort' | 'daemonHost'>;
 
+const API_TTS_KEYS = [
+  'enabled',
+  'voice',
+  'statusVoice',
+  'volume',
+  'rate',
+  'maxChars',
+  'dropInfoWhenFull',
+  'voiceMap',
+  'mutedSources',
+  'utteranceTemplates',
+  'mutedIssues',
+] as const satisfies readonly (keyof ApiTtsConfig)[];
+
+const API_TTS_KEY_SET = new Set<string>(API_TTS_KEYS);
+
+function unknownApiTtsKeys(tts: Record<string, unknown>): string[] {
+  return Object.keys(tts).filter((key) => !API_TTS_KEY_SET.has(key));
+}
+
+function sanitizeApiTtsConfig(tts: ApiTtsConfig | undefined): ApiTtsConfig | undefined {
+  if (tts === undefined) return undefined;
+  if (!isRecord(tts)) throw new Error('tts must be an object');
+
+  const unknownKeys = unknownApiTtsKeys(tts);
+  if (unknownKeys.length > 0) {
+    throw new Error(`Unknown tts setting(s): ${unknownKeys.join(', ')}`);
+  }
+
+  return Object.fromEntries(
+    API_TTS_KEYS
+      .filter((key) => tts[key] !== undefined)
+      .map((key) => [key, tts[key]]),
+  ) as ApiTtsConfig;
+}
+
 // API format matches frontend SettingsConfig interface
 // Note: No cost_sensitivity - we're opinionated and always pick the best model
 // for each task. Users control cost by which providers they enable.
@@ -504,7 +540,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
       openrouter: settings.api_keys.openrouter,
       nous: settings.api_keys.nous,
     },
-    tts: settings.tts,
+    tts: sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
     tmux: settings.tmux,
     conversations: settings.conversations,
@@ -552,7 +588,7 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
     },
     tts: {
       ...current.tts,
-      ...updates.tts,
+      ...sanitizeApiTtsConfig(updates.tts),
     },
     openrouter: {
       ...current.openrouter,
@@ -670,6 +706,11 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     if (!isRecord(settings.tts)) {
       errors.push('tts must be an object');
     } else {
+      const unknownKeys = unknownApiTtsKeys(settings.tts);
+      if (unknownKeys.length > 0) {
+        errors.push(`Unknown tts setting(s): ${unknownKeys.join(', ')}`);
+      }
+
       const { volume, rate, maxChars } = settings.tts;
       if (volume !== undefined && (typeof volume !== 'number' || volume < 0 || volume > 1)) {
         errors.push('tts.volume must be between 0 and 1');

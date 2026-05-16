@@ -796,6 +796,32 @@ function mergeTtsConfig(result: NormalizedTtsDaemonConfig, config: YamlConfig | 
   if (tts.mutedIssues !== undefined) result.mutedIssues = [...tts.mutedIssues];
 }
 
+export function getDefaultTtsDaemonConfig(): NormalizedTtsDaemonConfig {
+  return {
+    enabled: DEFAULT_CONFIG.tts.enabled,
+    voice: DEFAULT_CONFIG.tts.voice,
+    statusVoice: DEFAULT_CONFIG.tts.statusVoice,
+    volume: DEFAULT_CONFIG.tts.volume,
+    rate: DEFAULT_CONFIG.tts.rate,
+    maxChars: DEFAULT_CONFIG.tts.maxChars,
+    dropInfoWhenFull: DEFAULT_CONFIG.tts.dropInfoWhenFull,
+    daemonPort: DEFAULT_CONFIG.tts.daemonPort,
+    daemonHost: DEFAULT_CONFIG.tts.daemonHost,
+    voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
+    mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
+    utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },
+    mutedIssues: [...DEFAULT_CONFIG.tts.mutedIssues],
+  };
+}
+
+export function mergeTtsDaemonConfigs(...configs: (YamlConfig | null)[]): NormalizedTtsDaemonConfig {
+  const result = getDefaultTtsDaemonConfig();
+  for (const config of configs) {
+    mergeTtsConfig(result, config);
+  }
+  return result;
+}
+
 function isWorkhorseRef(ref: ModelRef): boolean {
   return ref.startsWith('workhorse:');
 }

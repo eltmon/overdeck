@@ -19,6 +19,12 @@ const CONFIG: NormalizedTtsDaemonConfig = {
   mutedIssues: [],
 };
 
+const PAYLOAD_CONTROLS = {
+  rate: CONFIG.rate,
+  maxChars: CONFIG.maxChars,
+  dropInfoWhenFull: CONFIG.dropInfoWhenFull,
+};
+
 const PRESET_VOICE: TtsVoice = {
   id: 'voice-preset',
   name: 'System Voice',
@@ -56,6 +62,7 @@ describe('buildTtsSpeakPayload', () => {
       voice: 'Vivian',
       instruct: 'calm',
       volume: 0.8,
+      ...PAYLOAD_CONTROLS,
       mode: 'custom',
     });
 
@@ -64,6 +71,7 @@ describe('buildTtsSpeakPayload', () => {
       voice: 'warm narrator',
       instruct: 'calm',
       volume: 0.8,
+      ...PAYLOAD_CONTROLS,
       mode: 'design',
     });
 
@@ -72,6 +80,7 @@ describe('buildTtsSpeakPayload', () => {
       voice: 'clone',
       instruct: 'bright',
       volume: 0.8,
+      ...PAYLOAD_CONTROLS,
       mode: 'clone',
       embedding: [0.1, 0.2, 0.3],
     });
@@ -90,7 +99,7 @@ describe('resolveAndSpeak', () => {
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
       method: 'POST',
-      body: JSON.stringify({ text: 'hello', voice: 'Vivian', instruct: 'calm', volume: 0.8, mode: 'custom' }),
+      body: JSON.stringify({ text: 'hello', voice: 'Vivian', instruct: 'calm', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
     }));
   });
 
@@ -104,7 +113,7 @@ describe('resolveAndSpeak', () => {
     })).resolves.toBe('spoken');
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
-      body: JSON.stringify({ text: 'routine update', voice: 'Ryan', instruct: '', volume: 0.8, mode: 'custom' }),
+      body: JSON.stringify({ text: 'routine update', voice: 'Ryan', instruct: '', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
     }));
   });
 
@@ -123,9 +132,36 @@ describe('resolveAndSpeak', () => {
         voice: 'clone',
         instruct: 'bright',
         volume: 0.8,
+        ...PAYLOAD_CONTROLS,
         mode: 'clone',
         embedding: [0.1, 0.2, 0.3],
       }),
+    }));
+  });
+
+  it('does not call the daemon when tts is disabled', async () => {
+    const fetchMock = vi.fn();
+
+    await expect(resolveAndSpeak({ text: 'skip' }, {
+      config: { ...CONFIG, enabled: false },
+      findVoiceById,
+      fetch: fetchMock,
+    })).resolves.toBe('muted');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('truncates utterances to maxChars before posting to the daemon', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
+
+    await expect(resolveAndSpeak({ text: 'abcdef' }, {
+      config: { ...CONFIG, maxChars: 3 },
+      findVoiceById,
+      fetch: fetchMock,
+    })).resolves.toBe('spoken');
+
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
+      body: JSON.stringify({ text: 'abc', voice: 'Vivian', instruct: 'calm', volume: 0.8, rate: 1.1, maxChars: 3, dropInfoWhenFull: true, mode: 'custom' }),
     }));
   });
 
@@ -157,7 +193,7 @@ describe('resolveAndSpeak', () => {
     })).resolves.toBe('spoken');
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
-      body: JSON.stringify({ text: 'PAN-829 passed review', voice: 'Vivian', instruct: 'calm', volume: 0.8, mode: 'custom' }),
+      body: JSON.stringify({ text: 'PAN-829 passed review', voice: 'Vivian', instruct: 'calm', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
     }));
   });
 
@@ -193,7 +229,7 @@ describe('resolveAndSpeak', () => {
 
     expect(findVoice).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
-      body: JSON.stringify({ text: 'preview', voice: 'warm narrator', instruct: 'clear', volume: 0.4, mode: 'design' }),
+      body: JSON.stringify({ text: 'preview', voice: 'warm narrator', instruct: 'clear', volume: 0.4, ...PAYLOAD_CONTROLS, mode: 'design' }),
     }));
   });
 });

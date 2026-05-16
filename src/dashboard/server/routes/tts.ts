@@ -1,7 +1,7 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { loadConfig } from '../../../lib/config-yaml.js';
 import { resolveAndSpeak, type ResolveAndSpeakOptions, type TtsSpeakMode, type TtsSpeakResult } from '../../../lib/tts-speak.js';
+import { getTtsRuntimeConfig } from '../services/tts-runtime-config.js';
 import {
   addVoice as addStoredVoice,
   deleteVoice as deleteStoredVoice,
@@ -32,9 +32,9 @@ export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promi
   let host = options.host;
   let port = options.port;
   if (host === undefined || port === undefined) {
-    const { config } = loadConfig();
-    host = config.tts.daemonHost;
-    port = config.tts.daemonPort;
+    const config = getTtsRuntimeConfig();
+    host = config.daemonHost;
+    port = config.daemonPort;
   }
 
   const fetchImpl = options.fetch ?? fetch;
@@ -188,7 +188,9 @@ export async function removeTtsVoice(id: string, store: TtsVoiceStore = {}): Pro
 }
 
 export async function speakTts(input: ResolveAndSpeakOptions, deps: SpeakTtsDeps = {}): Promise<SpeakTtsResponse> {
-  const result = await (deps.resolveAndSpeak ?? resolveAndSpeak)(input);
+  const result = deps.resolveAndSpeak
+    ? await deps.resolveAndSpeak(input)
+    : await resolveAndSpeak(input, { config: getTtsRuntimeConfig() });
   if (result === 'daemon-unavailable') {
     return {
       status: 503,
@@ -209,9 +211,9 @@ export async function extractTtsEmbedding(
   let host = deps.host;
   let port = deps.port;
   if (host === undefined || port === undefined) {
-    const { config } = loadConfig();
-    host = config.tts.daemonHost;
-    port = config.tts.daemonPort;
+    const config = getTtsRuntimeConfig();
+    host = config.daemonHost;
+    port = config.daemonPort;
   }
 
   const controller = new AbortController();

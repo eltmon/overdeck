@@ -13,6 +13,7 @@ import { startAgentEnrichmentService, stopAgentEnrichmentService } from './servi
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
+import { refreshTtsRuntimeConfig } from './services/tts-runtime-config.js';
 import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
@@ -267,6 +268,7 @@ void cleanupOrphanedConversationAttachments();
 console.log('[panopticon] Attachment cleanup started');
 
 // Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
+await refreshTtsRuntimeConfig();
 void startTtsSummarizer().catch(err => console.warn('[tts-summarizer] start failed:', err));
 void startTtsPlayback().catch(err => console.warn('[tts-playback] start failed:', err));
 

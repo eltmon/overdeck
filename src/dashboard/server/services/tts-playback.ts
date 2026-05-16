@@ -1,10 +1,14 @@
-import { loadConfig } from '../../../lib/config-yaml.js';
 import { resolveAndSpeak } from '../../../lib/tts-speak.js';
 import { initEventStore, type StoredEvent } from '../event-store.js';
+import { getTtsRuntimeConfig } from './tts-runtime-config.js';
+
+const MAX_TTS_QUEUE_LENGTH = 20;
 
 interface TtsPlaybackState {
   unsubscribe: (() => void) | null;
   startPromise: Promise<void> | null;
+  queue: StoredEvent[];
+  processing: boolean;
 }
 
 interface ActivityTtsPayload {
@@ -18,13 +22,28 @@ interface ActivityTtsPayload {
 const state: TtsPlaybackState = {
   unsubscribe: null,
   startPromise: null,
+  queue: [],
+  processing: false,
 };
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+function eventPriority(event: StoredEvent): number | undefined {
+  const payload = event.payload as ActivityTtsPayload;
+  return typeof payload.priority === 'number' ? payload.priority : undefined;
+}
+
+function dropIndexForFullQueue(queue: StoredEvent[]): number {
+  const infoIndex = queue.findIndex((event) => (eventPriority(event) ?? 1) >= 2);
+  return infoIndex >= 0 ? infoIndex : 0;
+}
+
 async function speakActivityTts(event: StoredEvent): Promise<void> {
+  const config = getTtsRuntimeConfig();
+  if (!config.enabled) return;
+
   const payload = event.payload as ActivityTtsPayload;
   if (typeof payload.utterance !== 'string' || payload.utterance.trim().length === 0) return;
 
@@ -35,7 +54,7 @@ async function speakActivityTts(event: StoredEvent): Promise<void> {
       eventType: optionalString(payload.eventType),
       issueId: optionalString(payload.issueId),
       priority: typeof payload.priority === 'number' ? payload.priority : undefined,
-    });
+    }, { config });
 
     if (result === 'daemon-unavailable') {
       console.warn('[tts-playback] TTS daemon unavailable');
@@ -45,17 +64,48 @@ async function speakActivityTts(event: StoredEvent): Promise<void> {
   }
 }
 
+async function drainQueue(): Promise<void> {
+  if (state.processing) return;
+  state.processing = true;
+
+  try {
+    while (state.queue.length > 0 && getTtsRuntimeConfig().enabled) {
+      const event = state.queue.shift();
+      if (event) await speakActivityTts(event);
+    }
+
+    if (!getTtsRuntimeConfig().enabled) {
+      state.queue = [];
+    }
+  } finally {
+    state.processing = false;
+  }
+}
+
+function enqueueActivityTts(event: StoredEvent): void {
+  const config = getTtsRuntimeConfig();
+  if (!config.enabled) return;
+
+  if (state.queue.length >= MAX_TTS_QUEUE_LENGTH) {
+    const priority = eventPriority(event) ?? 1;
+    if (config.dropInfoWhenFull && priority >= 2) return;
+    state.queue.splice(dropIndexForFullQueue(state.queue), 1);
+  }
+
+  state.queue.push(event);
+  void drainQueue();
+}
+
 function onEvent(event: StoredEvent): void {
   if (event.type !== 'activity.tts') return;
-  void speakActivityTts(event);
+  enqueueActivityTts(event);
 }
 
 export async function startTtsPlayback(): Promise<void> {
   if (state.unsubscribe) return;
   if (state.startPromise) return state.startPromise;
 
-  const { config } = loadConfig();
-  if (!config.tts.enabled) {
+  if (!getTtsRuntimeConfig().enabled) {
     console.log('[tts-playback] Disabled (tts.enabled=false)');
     return;
   }
@@ -75,8 +125,17 @@ export async function startTtsPlayback(): Promise<void> {
 }
 
 export function stopTtsPlayback(): void {
+  state.queue = [];
   if (state.unsubscribe) {
     state.unsubscribe();
     state.unsubscribe = null;
+  }
+}
+
+export async function syncTtsPlaybackWithConfig(): Promise<void> {
+  if (getTtsRuntimeConfig().enabled) {
+    await startTtsPlayback();
+  } else {
+    stopTtsPlayback();
   }
 }

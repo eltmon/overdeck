@@ -1,13 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { NormalizedTtsDaemonConfig } from '../../../../lib/config-yaml.js';
+
+const baseTtsConfig = (): NormalizedTtsDaemonConfig => ({
+  enabled: true,
+  voice: 'voice-main',
+  volume: 1,
+  rate: 1,
+  maxChars: 140,
+  dropInfoWhenFull: true,
+  daemonHost: '127.0.0.1',
+  daemonPort: 8787,
+  voiceMap: {},
+  mutedSources: [],
+  utteranceTemplates: {},
+  mutedIssues: [],
+});
 
 const mocks = vi.hoisted(() => ({
-  loadConfig: vi.fn(),
   initEventStore: vi.fn(),
   resolveAndSpeak: vi.fn(),
-}));
-
-vi.mock('../../../../lib/config-yaml.js', () => ({
-  loadConfig: mocks.loadConfig,
+  getTtsRuntimeConfig: vi.fn(),
 }));
 
 vi.mock('../../event-store.js', () => ({
@@ -18,6 +30,10 @@ vi.mock('../../../../lib/tts-speak.js', () => ({
   resolveAndSpeak: mocks.resolveAndSpeak,
 }));
 
+vi.mock('../tts-runtime-config.js', () => ({
+  getTtsRuntimeConfig: mocks.getTtsRuntimeConfig,
+}));
+
 import { startTtsPlayback, stopTtsPlayback } from '../tts-playback.js';
 import type { StoredEvent } from '../../event-store.js';
 
@@ -25,6 +41,7 @@ describe('TtsPlaybackService', () => {
   let subscribers: Array<(event: StoredEvent) => void>;
   let unsubscribe: ReturnType<typeof vi.fn>;
   let subscribe: ReturnType<typeof vi.fn>;
+  let config: NormalizedTtsDaemonConfig;
 
   beforeEach(() => {
     subscribers = [];
@@ -33,8 +50,9 @@ describe('TtsPlaybackService', () => {
       subscribers.push(fn);
       return unsubscribe;
     });
+    config = baseTtsConfig();
 
-    mocks.loadConfig.mockReturnValue({ config: { tts: { enabled: true } } });
+    mocks.getTtsRuntimeConfig.mockImplementation(() => config);
     mocks.initEventStore.mockResolvedValue({ subscribe });
     mocks.resolveAndSpeak.mockResolvedValue('spoken');
   });
@@ -46,7 +64,7 @@ describe('TtsPlaybackService', () => {
   });
 
   it('does not start when tts is disabled', async () => {
-    mocks.loadConfig.mockReturnValue({ config: { tts: { enabled: false } } });
+    config = { ...config, enabled: false };
 
     await startTtsPlayback();
 
@@ -76,7 +94,7 @@ describe('TtsPlaybackService', () => {
       eventType: 'reviewStatus.passed',
       issueId: 'PAN-829',
       priority: 1,
-    }));
+    }, { config }));
   });
 
   it('ignores non-tts events', async () => {
@@ -90,6 +108,55 @@ describe('TtsPlaybackService', () => {
     });
 
     expect(mocks.resolveAndSpeak).not.toHaveBeenCalled();
+  });
+
+  it('serializes activity.tts playback instead of firing concurrent daemon calls', async () => {
+    let resolveFirst: (value: 'spoken') => void = () => undefined;
+    mocks.resolveAndSpeak.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
+    mocks.resolveAndSpeak.mockResolvedValue('spoken');
+    await startTtsPlayback();
+
+    subscribers[0]({ sequence: 1, type: 'activity.tts', timestamp: '2026-05-16T00:00:00.000Z', payload: { utterance: 'first' } });
+    subscribers[0]({ sequence: 2, type: 'activity.tts', timestamp: '2026-05-16T00:00:01.000Z', payload: { utterance: 'second' } });
+
+    await vi.waitFor(() => expect(mocks.resolveAndSpeak).toHaveBeenCalledTimes(1));
+    resolveFirst('spoken');
+    await vi.waitFor(() => expect(mocks.resolveAndSpeak).toHaveBeenCalledTimes(2));
+  });
+
+  it('drops routine info events when the queue is full', async () => {
+    let resolveFirst: (value: 'spoken') => void = () => undefined;
+    mocks.resolveAndSpeak.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
+    mocks.resolveAndSpeak.mockResolvedValue('spoken');
+    await startTtsPlayback();
+
+    subscribers[0]({ sequence: 1, type: 'activity.tts', timestamp: '2026-05-16T00:00:00.000Z', payload: { utterance: 'first' } });
+    for (let i = 0; i < 20; i++) {
+      subscribers[0]({ sequence: i + 2, type: 'activity.tts', timestamp: '2026-05-16T00:00:01.000Z', payload: { utterance: `queued ${i}`, priority: 1 } });
+    }
+    subscribers[0]({ sequence: 30, type: 'activity.tts', timestamp: '2026-05-16T00:00:02.000Z', payload: { utterance: 'routine info', priority: 2 } });
+
+    resolveFirst('spoken');
+
+    await vi.waitFor(() => expect(mocks.resolveAndSpeak).toHaveBeenCalledTimes(21));
+    expect(mocks.resolveAndSpeak.mock.calls.map(([input]) => input.text)).not.toContain('routine info');
+  });
+
+  it('clears queued playback on stop', async () => {
+    let resolveFirst: (value: 'spoken') => void = () => undefined;
+    mocks.resolveAndSpeak.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
+    mocks.resolveAndSpeak.mockResolvedValue('spoken');
+    await startTtsPlayback();
+
+    subscribers[0]({ sequence: 1, type: 'activity.tts', timestamp: '2026-05-16T00:00:00.000Z', payload: { utterance: 'first' } });
+    subscribers[0]({ sequence: 2, type: 'activity.tts', timestamp: '2026-05-16T00:00:01.000Z', payload: { utterance: 'second' } });
+
+    await vi.waitFor(() => expect(mocks.resolveAndSpeak).toHaveBeenCalledTimes(1));
+    stopTtsPlayback();
+    resolveFirst('spoken');
+
+    await vi.waitFor(() => expect(unsubscribe).toHaveBeenCalledTimes(1));
+    expect(mocks.resolveAndSpeak).toHaveBeenCalledTimes(1);
   });
 
   it('is idempotent and does not double-subscribe', async () => {
