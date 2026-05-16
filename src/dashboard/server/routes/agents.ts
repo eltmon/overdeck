@@ -2539,7 +2539,7 @@ const postAgentsRoute = HttpRouter.add(
                       startedAt: new Date().toISOString(),
                       workspace: workspacePath,
                       role,
-                      message: 'Container startup timed out before work agent spawn',
+                      message: `Container startup timed out before work agent spawn. Run pan workspace rebuild ${issueId} to reset the stack.`,
                       error: `Containers for ${issueId} did not become healthy within ${maxWaitMs}ms`,
                       ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
                       ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),

@@ -251,6 +251,14 @@ export function registerWorkspaceCommands(program: Command): void {
     });
 
   workspace
+    .command('rebuild <issueId>')
+    .description('Tear down, re-render, and restart a single workspace Docker stack')
+    .action(async (issueId: string) => {
+      const { workspaceRebuildCommand } = await import('./workspace-rebuild.js');
+      await workspaceRebuildCommand(issueId);
+    });
+
+  workspace
     .command('reap')
     .description('List or remove orphaned unhealthy workspace Docker stacks')
     .option('--days <days>', 'Minimum age in days', '7')

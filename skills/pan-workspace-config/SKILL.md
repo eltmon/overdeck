@@ -296,6 +296,12 @@ pan workspace create MIN-123 --docker
 # Remove workspace
 pan workspace destroy MIN-123
 
+# Reset one Docker workspace stack from the template
+pan workspace rebuild MIN-123
+
+# List stale stuck Docker workspace stacks before applying cleanup
+pan workspace reap --days 7
+
 # List workspaces across all projects
 pan workspace list --all
 ```

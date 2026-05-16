@@ -13,7 +13,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 1,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-16T22:35:12.000Z",
+    "updated": "2026-05-16T22:42:15.000Z",
     "references": [
       { "uri": "https://github.com/eltmon/panopticon-cli/issues/1140", "label": "PAN-1140", "type": "issue" },
       { "uri": "infra/.devcontainer-template/docker-compose.devcontainer.yml.template", "label": "compose template", "type": "code" },
@@ -296,7 +296,7 @@
       {
         "id": "verify-rebuild-cmd",
         "title": "Verify (or add) `pan workspace rebuild <id>` for resetting a single stuck stack cleanly",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -312,19 +312,19 @@
           {
             "id": "verify-rebuild-cmd.ac1",
             "title": "`pan workspace rebuild <issue-id>` exists, is documented in `pan-workspace` skill, and successfully resets a stuck stack to a healthy state in a manual test.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "verify-rebuild-cmd.ac2",
             "title": "The spawn-gate rejection message from `gate-agent-spawn-on-stack-health` references this command by exact name.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "verify-rebuild-cmd.ac3",
             "title": "`pan workspace rebuild --help` is accurate; `scripts/lint-skills.sh` passes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
