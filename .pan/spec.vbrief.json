@@ -104,7 +104,7 @@
       {
         "id": "drop-desktop-devdeps-from-containers",
         "title": "Stop installing desktop-only deps (electron family) inside workspace containers",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -120,19 +120,19 @@
           {
             "id": "drop-desktop-devdeps-from-containers.ac1",
             "title": "Workspace init container logs contain no electron-related install warnings or postinstall failures after the change.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "drop-desktop-devdeps-from-containers.ac2",
             "title": "`apps/desktop` build still succeeds on host (electron deps remain available where they're needed).",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "drop-desktop-devdeps-from-containers.ac3",
             "title": "Root `package.json` devDependencies no longer contain electron-family packages (if they were there to begin with).",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
