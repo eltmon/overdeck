@@ -23,7 +23,7 @@ import {
 */
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState, type StartAgentResponse } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw, Radio } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw, Radio, VolumeX } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -49,6 +49,7 @@ import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';
 import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgress';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
 import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
+import { useTtsIssueMute } from '../hooks/useTtsIssueMute';
 
 
 // Parity registry anchor — keeps the card action surface tied to the
@@ -2718,6 +2719,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const { groups: modelGroups, defaultModel, harnessPolicy } = useAvailableModels();
   const [launchModel, setLaunchModel] = useState(defaultModel);
   const [launchHarness, setLaunchHarness] = useState<Harness>('claude-code');
+  const ttsMute = useTtsIssueMute(issue.identifier || '');
 
   // Auto-scroll into view when selected via search
   useEffect(() => {
@@ -3514,7 +3516,26 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
             </div>
           </div>
 
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                ttsMute.toggle();
+              }}
+              disabled={ttsMute.loading || ttsMute.pending}
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition-colors disabled:opacity-50 ${
+                ttsMute.muted
+                  ? 'border-warning/50 bg-warning/15 text-warning hover:bg-warning/25'
+                  : 'border-border/70 bg-card/80 text-muted-foreground hover:text-foreground hover:bg-popover'
+              }`}
+              title={ttsMute.muted ? 'Unmute TTS for this issue' : 'Mute TTS for this issue'}
+              aria-label={ttsMute.muted ? `Unmute TTS for ${issue.identifier}` : `Mute TTS for ${issue.identifier}`}
+              aria-pressed={ttsMute.muted}
+              data-testid={`card-tts-mute-${issue.identifier}`}
+            >
+              <VolumeX className="w-3.5 h-3.5" />
+            </button>
             {costsLoading && !cost && (
               <span className="inline-block h-7 w-16 rounded-full bg-popover animate-pulse" />
             )}

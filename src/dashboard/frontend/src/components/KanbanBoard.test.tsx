@@ -535,6 +535,22 @@ describe('IssueCard', () => {
     ...overrides,
   });
 
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === '/api/settings' && init?.method === 'PUT') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response);
+      }
+      if (url === '/api/settings') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ tts: { mutedIssues: [] } }) } as Response);
+      }
+      if (url === '/api/settings/available-models') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
+      }
+      return Promise.resolve({ ok: true, text: () => Promise.resolve('{}'), json: () => Promise.resolve({}) } as Response);
+    }) as unknown as typeof fetch);
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -575,9 +591,22 @@ describe('IssueCard', () => {
   });
 
   it('sends auto=true when Auto-start is clicked', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve(JSON.stringify({ success: true })),
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === '/api/settings' && init?.method === 'PUT') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response);
+      }
+      if (url === '/api/settings') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ tts: { mutedIssues: [] } }) } as Response);
+      }
+      if (url === '/api/settings/available-models') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve(JSON.stringify({ success: true })),
+        json: () => Promise.resolve({ success: true }),
+      } as Response);
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -593,6 +622,24 @@ describe('IssueCard', () => {
       expect(startCall).toBeTruthy();
       expect(JSON.parse((startCall?.[1] as RequestInit).body as string)).toMatchObject({ auto: true });
     });
+  });
+
+  it('toggles issue TTS mute from the card without selecting the card', async () => {
+    const onSelect = vi.fn();
+    renderIssueCard({ onSelect });
+
+    const muteButton = await screen.findByTestId('card-tts-mute-TEST-123');
+    await waitFor(() => expect(muteButton).not.toBeDisabled());
+    fireEvent.click(muteButton);
+
+    await waitFor(() => {
+      const putCall = vi.mocked(global.fetch).mock.calls.find(([url, init]) => (
+        url.toString() === '/api/settings' && init?.method === 'PUT'
+      ));
+      expect(putCall).toBeTruthy();
+      expect(JSON.parse(putCall?.[1]?.body as string).tts.mutedIssues).toEqual(['TEST-123']);
+    });
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('opens the inspector rather than the planning dialog for planning-only input', () => {

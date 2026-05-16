@@ -5,9 +5,25 @@
  * queuePosition / reviewStatus / testStatus combinations.
  */
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect, vi } from 'vitest';
 import { getReviewButtonState } from './InspectorPanel';
 import { shouldForceReviewTrigger } from './inspector/utils';
+
+const INSPECTOR_PANEL_SOURCE = readFileSync(
+  resolve(fileURLToPath(import.meta.url), '../InspectorPanel.tsx'),
+  'utf8',
+);
+
+describe('InspectorPanel TTS issue mute control', () => {
+  it('renders a per-issue TTS mute toggle wired to the shared hook', () => {
+    expect(INSPECTOR_PANEL_SOURCE).toContain('useTtsIssueMute(issueId)');
+    expect(INSPECTOR_PANEL_SOURCE).toContain('Mute TTS for this issue');
+    expect(INSPECTOR_PANEL_SOURCE).toContain('data-testid={`inspector-tts-mute-${issueId}`}');
+  });
+});
 
 describe('getReviewButtonState', () => {
   // ---------------------------------------------------------------------------
