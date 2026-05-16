@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -314,6 +314,8 @@ export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('model-routing');
   const [activeTtsVoiceTab, setActiveTtsVoiceTab] = useState<'presets' | 'design'>('presets');
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
+  const pendingTtsSaveRef = useRef<SettingsConfig | null>(null);
+  const ttsSaveInFlightRef = useRef(false);
 
   const scrollToSection = useCallback((id: string) => {
     setActiveSection(id);
@@ -387,6 +389,29 @@ export function SettingsPage() {
     },
   });
 
+  const queueTtsSave = useCallback((next: SettingsConfig) => {
+    pendingTtsSaveRef.current = next;
+    if (ttsSaveInFlightRef.current) return;
+
+    ttsSaveInFlightRef.current = true;
+    void (async () => {
+      while (true) {
+        const snapshot = pendingTtsSaveRef.current;
+        if (!snapshot) {
+          ttsSaveInFlightRef.current = false;
+          return;
+        }
+
+        pendingTtsSaveRef.current = null;
+        try {
+          await saveMutation.mutateAsync(snapshot);
+        } catch {
+          void 0;
+        }
+      }
+    })();
+  }, [saveMutation]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -458,7 +483,7 @@ export function SettingsPage() {
       },
     };
     setFormData(next);
-    saveMutation.mutate(next);
+    queueTtsSave(next);
   };
 
   const handleTtsVoiceMapChange = (eventKey: string, voiceId: string) => {

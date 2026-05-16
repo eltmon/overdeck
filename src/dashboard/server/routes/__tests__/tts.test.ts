@@ -137,9 +137,23 @@ describe('TTS voice routes helpers', () => {
     expect(addVoice).toHaveBeenCalledWith(body);
   });
 
+  it('accepts clone voices with non-empty embeddings', () => {
+    expect(parseCreateTtsVoiceInput({
+      name: 'Clone voice',
+      kind: 'clone',
+      embedding: [0.1, 0.2],
+    })).toEqual({
+      name: 'Clone voice',
+      kind: 'clone',
+      embedding: [0.1, 0.2],
+    });
+  });
+
   it('rejects invalid voice create payloads', () => {
     expect(parseCreateTtsVoiceInput({ name: '', kind: 'preset' })).toBeUndefined();
     expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'robot' })).toBeUndefined();
+    expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'clone' })).toBeUndefined();
+    expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'clone', embedding: [] })).toBeUndefined();
     expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'clone', embedding: ['x'] })).toBeUndefined();
   });
 

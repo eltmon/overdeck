@@ -132,6 +132,8 @@ export function parseCreateTtsVoiceInput(body: unknown): CreateTtsVoiceInput | u
     input.embedding = record.embedding;
   }
 
+  if (input.kind === 'clone' && (!input.embedding || input.embedding.length === 0)) return undefined;
+
   return input;
 }
 

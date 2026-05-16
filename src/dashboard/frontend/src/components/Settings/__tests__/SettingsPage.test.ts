@@ -80,6 +80,13 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('handleAddTtsTemplate');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsTemplateChange(eventKey');
   });
+
+  it('serializes TTS settings autosaves through a latest-snapshot queue', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('pendingTtsSaveRef');
+    expect(SETTINGS_PAGE_SOURCE).toContain('ttsSaveInFlightRef');
+    expect(SETTINGS_PAGE_SOURCE).toContain('saveMutation.mutateAsync(snapshot)');
+    expect(SETTINGS_PAGE_SOURCE).toContain('queueTtsSave(next)');
+  });
 });
 
 describe('MODELS_BY_PROVIDER', () => {
