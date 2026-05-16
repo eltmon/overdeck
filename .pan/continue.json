@@ -179,10 +179,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-e52q",
-    "itemId": "b1-storage-paths",
+    "beadId": "workspace-v6mt",
+    "itemId": "b1-pending-turn-writer",
     "status": "implemented",
-    "note": "Memory storage path resolvers now centralize project, issue, observations, pending, status, archive, summaries, rag-runs, checkpoint, and FTS DB paths under PANOPTICON_HOME, with separate idempotent directory helpers and focused unit coverage."
+    "note": "Pending turn writer now atomically writes PendingTurn payloads to pending/<millis>_<sessionId>.json using shared path helpers, same-directory temp files, sanitized session IDs, and focused unit coverage."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -251,6 +251,12 @@
       "timestamp": "2026-05-16T20:29:00.000Z",
       "reason": "work",
       "note": "workspace-e52q implemented: added src/lib/memory/paths.ts shared storage path resolvers, separate async directory helpers, tests/lib/memory/paths.test.ts coverage, and refactored memory health/query-expansion path usage; focused tests, typecheck, and lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T20:31:00.000Z",
+      "reason": "work",
+      "note": "workspace-v6mt implemented: added src/lib/memory/pending.ts atomic PendingTurn writer with chronological millis/session filenames and tests/lib/memory/pending.test.ts; focused tests, typecheck, and lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],
