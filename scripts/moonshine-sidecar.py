@@ -11,8 +11,14 @@ import wave
 from io import BytesIO
 
 SAMPLE_RATE = 24000
+BYTES_PER_SECOND = SAMPLE_RATE * 2
 COMMIT_SILENCE_SECONDS = 0.45
-MIN_COMMIT_BYTES = SAMPLE_RATE * 2 // 2
+MIN_COMMIT_BYTES = BYTES_PER_SECOND // 2
+PARTIAL_INTERVAL_SECONDS = 0.5
+MAX_PARTIAL_WINDOW_BYTES = BYTES_PER_SECOND * 3
+BROWSER_AUDIO_FRAME_SAMPLES = 4096
+MAX_QUEUE_AUDIO_SECONDS = 2
+MAX_AUDIO_QUEUE_ITEMS = max(1, int(MAX_QUEUE_AUDIO_SECONDS * SAMPLE_RATE / BROWSER_AUDIO_FRAME_SAMPLES))
 
 
 def emit(message):
@@ -68,38 +74,43 @@ def pcm16_to_wav(pcm_bytes):
 def main():
     model_name = os.environ.get("MOONSHINE_MODEL", "moonshine/base")
     transcribe = load_model(model_name)
-    audio_queue = queue.Queue()
+    audio_queue = queue.Queue(maxsize=MAX_AUDIO_QUEUE_ITEMS)
     stopped = threading.Event()
     buffer = bytearray()
     last_audio_at = 0.0
     last_partial = ""
+    last_partial_at = 0.0
+
+    def commit_buffer():
+        nonlocal last_partial
+        if not buffer:
+            return
+        pcm = bytes(buffer)
+        buffer.clear()
+        if len(pcm) >= MIN_COMMIT_BYTES:
+            text = transcribe(pcm)
+            if text:
+                emit({"type": "transcript:committed", "text": text})
+                last_partial = ""
 
     def worker():
-        nonlocal last_audio_at, last_partial
+        nonlocal last_audio_at, last_partial, last_partial_at
         while not stopped.is_set():
             try:
                 chunk = audio_queue.get(timeout=0.05)
             except queue.Empty:
                 if buffer and time.monotonic() - last_audio_at >= COMMIT_SILENCE_SECONDS:
-                    pcm = bytes(buffer)
-                    buffer.clear()
-                    if len(pcm) >= MIN_COMMIT_BYTES:
-                        text = transcribe(pcm)
-                        if text:
-                            emit({"type": "transcript:committed", "text": text})
-                            last_partial = ""
+                    commit_buffer()
                 continue
             if chunk is None:
-                if buffer:
-                    text = transcribe(bytes(buffer))
-                    buffer.clear()
-                    if text:
-                        emit({"type": "transcript:committed", "text": text})
+                commit_buffer()
                 continue
             buffer.extend(chunk)
             last_audio_at = time.monotonic()
-            if len(buffer) >= MIN_COMMIT_BYTES:
-                text = transcribe(bytes(buffer))
+            if len(buffer) >= MIN_COMMIT_BYTES and last_audio_at - last_partial_at >= PARTIAL_INTERVAL_SECONDS:
+                partial_pcm = bytes(buffer[-MAX_PARTIAL_WINDOW_BYTES:])
+                text = transcribe(partial_pcm)
+                last_partial_at = last_audio_at
                 if text and text != last_partial:
                     emit({"type": "transcript:partial", "text": text})
                     last_partial = text
@@ -116,9 +127,15 @@ def main():
                 if message.get("encoding") != "pcm16le" or message.get("sampleRate") != SAMPLE_RATE:
                     emit({"type": "error", "error": "expected pcm16le audio at 24000 Hz"})
                     continue
-                audio_queue.put(base64.b64decode(message.get("audio", "")))
+                try:
+                    audio_queue.put(base64.b64decode(message.get("audio", "")), timeout=MAX_QUEUE_AUDIO_SECONDS)
+                except queue.Full:
+                    emit({"type": "error", "error": "moonshine audio queue is full"})
             elif message_type == "stop":
-                audio_queue.put(None)
+                try:
+                    audio_queue.put(None, timeout=MAX_QUEUE_AUDIO_SECONDS)
+                except queue.Full:
+                    emit({"type": "error", "error": "moonshine audio queue is full"})
             elif message_type == "close":
                 stopped.set()
                 break

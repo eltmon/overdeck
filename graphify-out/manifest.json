@@ -8,8 +8,8 @@
     "hash": "c72c92bfe647be84085b31f6d5ebf605"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/vitest.config.ts": {
-    "mtime": 1778619749.1847987,
-    "hash": "30e8aa9c3f6d1e70a3d3803dbcba7ac7"
+    "mtime": 1778963002.9535456,
+    "hash": "9d1c316b53bc0d62daecd6b660987c74"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/vitest.workspace.ts": {
     "mtime": 1778342940.3835015,
@@ -196,7 +196,7 @@
     "hash": "12e0ef4b72231b5b61c2a85f343010b8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/unit/lib/sync-remove-legacy-skills.test.ts": {
-    "mtime": 1778824312.1080065,
+    "mtime": 1778963002.9139366,
     "hash": "821c192ee8a1e75b101978e95e5814cd"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/unit/lib/smee-process.test.ts": {
@@ -400,8 +400,8 @@
     "hash": "935a4a4b763d123aa69d7b1761aa8eb9"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/contracts/heartbeat-ingestion.test.ts": {
-    "mtime": 1778342940.3736024,
-    "hash": "f75485e779f7cdaf414490312c94c5bb"
+    "mtime": 1778963128.2623441,
+    "hash": "7a4b8c4bbc5232325c8355b7412555a4"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/contracts/agent-runtime-reducers.test.ts": {
     "mtime": 1778342940.3733618,
@@ -448,8 +448,8 @@
     "hash": "c061700a8269f41d15183a20d597af10"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/autopreso-session.test.ts": {
-    "mtime": 1778622773.356243,
-    "hash": "74c7ea3cc84ca83dd664b10070c34eaf"
+    "mtime": 1778963599.1884146,
+    "hash": "38d5f8763c081a5a7dba1a35fe5bbd2e"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/workspace-manager.test.ts": {
     "mtime": 1778342940.3768299,
@@ -476,7 +476,7 @@
     "hash": "5f307ce8a7b6aaffde4f010fa3ec7516"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/google-cloud-transcription.test.ts": {
-    "mtime": 1778622773.1402357,
+    "mtime": 1778963002.9139366,
     "hash": "f2812bf3cc7c8593d3425e124e98c293"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/model-deprecation.test.ts": {
@@ -500,7 +500,7 @@
     "hash": "9835def4c1fe308064f5889d6d9603b1"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/whiteboard-tools.test.ts": {
-    "mtime": 1778622773.210238,
+    "mtime": 1778963002.9139366,
     "hash": "00eccb1421a5155195e54aa381b16581"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/shadow-mode.test.ts": {
@@ -508,8 +508,8 @@
     "hash": "5e1c9252aac072bf95dd73f4a46e0fc0"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/turn-queue.test.ts": {
-    "mtime": 1778622773.1602364,
-    "hash": "42fd1c39a63e58f7e00ad7d54b2f6a05"
+    "mtime": 1778964851.8884478,
+    "hash": "af26f6dd957dadf55c138fb600287a6b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/lib/config.test.ts": {
     "mtime": 1778342940.3747826,
@@ -716,8 +716,8 @@
     "hash": "8c512ad8a13d05e03147e8ec6effecab"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/integration/agent-spawning.test.ts": {
-    "mtime": 1778823533.58851,
-    "hash": "cef4e949719383508c514b21e6b6b6e4"
+    "mtime": 1778965548.5931833,
+    "hash": "2e42121dbda13512a85668510e9891da"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/integration/cli/doctor.test.ts": {
     "mtime": 1778342940.374476,
@@ -827,6 +827,10 @@
     "mtime": 1778342940.3730993,
     "hash": "b57a4b2207418d1047b069633b057289"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/cli/commands/setup-hooks.test.ts": {
+    "mtime": 1778963002.9535456,
+    "hash": "733934480923d95c3e6c3c3397d92964"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/cli/commands/issues-shadow-only.test.ts": {
     "mtime": 1778342940.3730712,
     "hash": "1d2827b1fe265bcca47d6e6eb374bd1f"
@@ -931,16 +935,12 @@
     "mtime": 1778342940.2247362,
     "hash": "bc697e48a1be3dc66a0ffa9128f84f36"
   },
-  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/inspect-on-bead-close": {
-    "mtime": 1778619749.1606967,
-    "hash": "f0c24b8cbfb7dc9817d5001c60cb1657"
-  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/moonshine-sidecar.py": {
-    "mtime": 1778622772.934229,
-    "hash": "7931ab290cdb194afbbf233d4b636993"
+    "mtime": 1778965558.0165114,
+    "hash": "280d7cdfde5f4b1b47671f08a993c671"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/record-cost-event.d.ts": {
-    "mtime": 1778826432.0905182,
+    "mtime": 1778965133.6958046,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/notify-complete": {
@@ -1028,7 +1028,7 @@
     "hash": "a8f87c19664399d9e6d5767e0d3d2e88"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/build-moonshine-sidecars.js": {
-    "mtime": 1778622772.934229,
+    "mtime": 1778963002.9097524,
     "hash": "c85a332498ba9c3743d3c7fd7bd109bd"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/scripts/git-hooks/post-checkout": {
@@ -1152,23 +1152,27 @@
     "hash": "f23cde06107702a599133e9bd6f759ce"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/session.ts": {
-    "mtime": 1778825811.43428,
-    "hash": "3132347bb29c87d87663cc3f2cf4a456"
+    "mtime": 1778963546.1464896,
+    "hash": "63647b90b3ccc804b38174cc5781cb6c"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/whiteboard-tools.ts": {
-    "mtime": 1778622773.210238,
+    "mtime": 1778963002.9105659,
     "hash": "45eecbcd1e5a8ca4bb8edac52934f15c"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/agent.ts": {
-    "mtime": 1778622773.210238,
-    "hash": "3980fb30a7cfd3d571b60ab92c0d33e5"
+    "mtime": 1778963587.6809835,
+    "hash": "793baf46f8820aae56442d9d27b94c21"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/whiteboard-elements.ts": {
-    "mtime": 1778622773.210238,
+    "mtime": 1778963002.9105659,
     "hash": "c5fc0158aeb0d7da7c7482c4e1628ac4"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/limits.ts": {
+    "mtime": 1778964227.1312006,
+    "hash": "e96a667f11d2acbf7c168189b8488dbc"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/autopreso/whiteboard-keywords.ts": {
-    "mtime": 1778622773.210238,
+    "mtime": 1778963002.9105659,
     "hash": "cee5fe330dfb7b0ced11a8ba65189a8c"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/core/state-mapping.ts": {
@@ -1192,8 +1196,8 @@
     "hash": "08d2098191302cd646a239eefdb200b4"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/lib/agents.ts": {
-    "mtime": 1778823504.1775136,
-    "hash": "b432178e44ce358fdc477256d069160d"
+    "mtime": 1778965484.9539878,
+    "hash": "d0e3e3aa73a6a9c9c90f6c6877971d55"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/lib/git-activity.ts": {
     "mtime": 1778342940.3661497,
@@ -1296,8 +1300,8 @@
     "hash": "19ea41b2a856d40525d9d58c223ccd29"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/lib/workspace-manager.ts": {
-    "mtime": 1778619749.1817987,
-    "hash": "5d9b83aa652a81ef2b99ec4850b1ab42"
+    "mtime": 1778963002.9535456,
+    "hash": "d9c467950fd5fbe2d115bcdb752a967d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/lib/activity-logger.ts": {
     "mtime": 1778619749.1747985,
@@ -2252,16 +2256,16 @@
     "hash": "3f4d7defdfd5c3363f959cb8bb9851b2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/lib/database/schema.ts": {
-    "mtime": 1778822418.1214385,
-    "hash": "99100835cef5efb85567f1de2bbbb624"
+    "mtime": 1778963002.9525452,
+    "hash": "53e7764ca245f4ee05b75cc4aa7640b5"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/lib/database/index.ts": {
     "mtime": 1778342940.3661497,
     "hash": "9444edf51e88d80a7e5e99fc33cfbb27"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/lib/database/conversations-db.ts": {
-    "mtime": 1778822418.1214385,
-    "hash": "bac11d19ce1b19de9e78c365e25820c6"
+    "mtime": 1778963002.9525452,
+    "hash": "e1b22ca6240499e7f8f8e64d034ee1d9"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/lib/database/cost-events-db.ts": {
     "mtime": 1778342940.3661497,
@@ -2444,19 +2448,19 @@
     "hash": "db86cf73631401d7800fe64df31bc89a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/voice/turn-queue.ts": {
-    "mtime": 1778622773.1602364,
-    "hash": "77d5d865bb20e4dcd51fb5faface35cb"
+    "mtime": 1778964721.2971506,
+    "hash": "d69d8b12a1b11ec5bd713bded956a72f"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/voice/google-cloud-transcription.ts": {
-    "mtime": 1778822187.115499,
+    "mtime": 1778963002.9135334,
     "hash": "650dcfd83f5cae2f5484783b3bcaee32"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/voice/transcription.ts": {
-    "mtime": 1778822201.09898,
+    "mtime": 1778963002.9139366,
     "hash": "28c022795ed1093fdeb5dbe43699d448"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/voice/transcription-manager.ts": {
-    "mtime": 1778622773.1402357,
+    "mtime": 1778963002.9139366,
     "hash": "6071df580e62be18e85a2786cad696a8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/supervisor/server.ts": {
@@ -2536,7 +2540,7 @@
     "hash": "6d499b1268901cadfd71b78db0056f2a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/App.tsx": {
-    "mtime": 1778622772.9032278,
+    "mtime": 1778963002.888526,
     "hash": "6a38cc635557055cd274bed6d63ad460"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/App.test.tsx": {
@@ -2632,8 +2636,8 @@
     "hash": "714baf86f4f13fd9727bca672a679f57"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/XTerminal.test.tsx": {
-    "mtime": 1778342940.328738,
-    "hash": "22cfcc7e68f3b5e8418cab22a20d1157"
+    "mtime": 1778963002.951545,
+    "hash": "b427ad0456d504cdc1c49d17e19508b7"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/PanOpenInPicker.tsx": {
     "mtime": 1778342940.326738,
@@ -2676,8 +2680,8 @@
     "hash": "774c4cb576541e824f88c7382512c4ae"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/XTerminal.tsx": {
-    "mtime": 1778342940.328738,
-    "hash": "1b098020c019c94faf252e2a79521f58"
+    "mtime": 1778963002.951545,
+    "hash": "f39e29260c1f323bce393b04de79c6cf"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/ChannelPermissionDialog.test.tsx": {
     "mtime": 1778342940.3219078,
@@ -2800,7 +2804,7 @@
     "hash": "92e80fc9453f4b382953abc646690ebc"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/Header.tsx": {
-    "mtime": 1778622772.9032278,
+    "mtime": 1778963002.888526,
     "hash": "765344284dc586184eb9e3ef37f05f93"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/FreshnessIndicator.tsx": {
@@ -2820,7 +2824,7 @@
     "hash": "3b345e510999705cab512db22053d54c"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/Sidebar.tsx": {
-    "mtime": 1778622772.9032278,
+    "mtime": 1778963002.888526,
     "hash": "4ada3981ed7119fa6e1b6248e54f6806"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/PlanDialog.tsx": {
@@ -2900,15 +2904,15 @@
     "hash": "e8f5ed6a736f3cffc90468f030f51b09"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/autopreso/AutoPresoView.tsx": {
-    "mtime": 1778622773.0092313,
+    "mtime": 1778963002.9105659,
     "hash": "4a5d53c426d15f7dcdfe0ed763b18ddd"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/autopreso/AutoPresoControls.tsx": {
-    "mtime": 1778825835.272096,
+    "mtime": 1778963002.9105659,
     "hash": "e64433672cb9ca418f6660c1deab0fa9"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/autopreso/TranscriptPanel.tsx": {
-    "mtime": 1778622772.9892306,
+    "mtime": 1778963002.9105659,
     "hash": "5de6fd0f0806c284388b793e55658325"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/CommandDeck/RoleBadge.tsx": {
@@ -2956,16 +2960,16 @@
     "hash": "fa131dd32d800502400eed831f8d71ae"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx": {
-    "mtime": 1778619749.164798,
-    "hash": "2181481854a046e34cf7c71c0a0b97b8"
+    "mtime": 1778963002.951545,
+    "hash": "72aa734c6c6076577ab23e99a726f404"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts": {
     "mtime": 1778619749.1657982,
     "hash": "6f653df1ae510da0480570b3bc1cd4e3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx": {
-    "mtime": 1778822418.1154385,
-    "hash": "5595d30a28314013b8aeba0bc10f634b"
+    "mtime": 1778963002.951545,
+    "hash": "56cf056176ba41a2e7f5e542f3a78bd9"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx": {
     "mtime": 1778619749.164798,
@@ -3028,8 +3032,8 @@
     "hash": "b5c25055fdcfa69f0c5dfa83bb75580a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx": {
-    "mtime": 1778822418.1164384,
-    "hash": "f0cf3b020fb1396f01b88a4f5aa8c24b"
+    "mtime": 1778963002.951545,
+    "hash": "243cded378caacdddf1046acd7f01902"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/ActivityTab.tsx": {
     "mtime": 1778342940.3237379,
@@ -3460,8 +3464,8 @@
     "hash": "6b62810f568a840ae9d0cb87039cde50"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/chat/VoiceWidget.tsx": {
-    "mtime": 1778825977.710971,
-    "hash": "a5ebabc3218585cdd8bef2de75518740"
+    "mtime": 1778964838.1678889,
+    "hash": "4c50c7118d4a5d4cdbec597975cc64f9"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/chat/usePickerPosition.ts": {
     "mtime": 1778342940.3304691,
@@ -3476,7 +3480,7 @@
     "hash": "31ae0d97df50886c2a84a7da9eb9412e"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/chat/ComposerFooter.tsx": {
-    "mtime": 1778825969.4626887,
+    "mtime": 1778963002.9115329,
     "hash": "ca0f4c94cc246e3f1e244db019982268"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/chat/PlanCard.tsx": {
@@ -3484,8 +3488,8 @@
     "hash": "91832aa8e35de75c6a3e68cbf22bf766"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/chat/ConversationPanel.tsx": {
-    "mtime": 1778822418.1164384,
-    "hash": "b3cecad3e508dab56bd0af90411bf223"
+    "mtime": 1778963002.9525452,
+    "hash": "80edda253c8a8bc7344140643a34fa46"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx": {
     "mtime": 1778342940.3304691,
@@ -3512,8 +3516,8 @@
     "hash": "777446cb5834cd46ffe76eb59b59d577"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/Settings/SettingsPage.tsx": {
-    "mtime": 1778825282.7871737,
-    "hash": "2c6d0beaf7f33727c96733eac96c8a6b"
+    "mtime": 1778964331.9569535,
+    "hash": "d25778fca32f45c056361b81d5a750b2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/components/Settings/OpenRouterPage.tsx": {
     "mtime": 1778619749.166798,
@@ -3668,8 +3672,8 @@
     "hash": "69453d25cacc460d744b6c2d52375459"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/hooks/useVoiceTranscription.ts": {
-    "mtime": 1778822201.4169908,
-    "hash": "e0c3ffddef69afda841402d1082da3fd"
+    "mtime": 1778964828.3774905,
+    "hash": "ff63870c729ecdf9080f1e9b28207087"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/hooks/useRestartFromPlan.ts": {
     "mtime": 1778342940.3317382,
@@ -3688,8 +3692,8 @@
     "hash": "36e2538c25930c9b0aac0a6377f74aa2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/hooks/useAutoPresoWebSocket.ts": {
-    "mtime": 1778825989.2013643,
-    "hash": "32abccd8f9ec31859dc2bab4e0ed519b"
+    "mtime": 1778963582.0837762,
+    "hash": "15a2db88b3a58f952700b83c38b67793"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/frontend/src/hooks/useBulkSelection.ts": {
     "mtime": 1778342940.3317025,
@@ -3908,20 +3912,20 @@
     "hash": "5c61dc54f66b4328460f35bfe98e3a2a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/ws-autopreso.ts": {
-    "mtime": 1778640265.4131768,
-    "hash": "199c9d4a2030a96e46e5718e6d7da307"
+    "mtime": 1778964298.260722,
+    "hash": "5267d2c46eff4eafa92438dfaecba17b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/pty-hub.ts": {
     "mtime": 1778342940.3390944,
     "hash": "43526470d563d3531b180da7bd849aea"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/ws-voice.ts": {
-    "mtime": 1778825798.7591727,
-    "hash": "08a70c1066c60f1d3e5fc25245ca4369"
+    "mtime": 1778964759.9867144,
+    "hash": "d4313a39ed4076ca32cc988e239a1ccf"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/ws-terminal.ts": {
-    "mtime": 1778342940.3437383,
-    "hash": "e4ff6e9831c8b890b3acb48aa19f06dd"
+    "mtime": 1778963002.9525452,
+    "hash": "3a9cd0cb7dc1a3936dcd243abfe4a019"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/main.ts": {
     "mtime": 1778619749.1697981,
@@ -3940,7 +3944,7 @@
     "hash": "72f2be3315c43d0157197c21475650b8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/server.ts": {
-    "mtime": 1778622773.0812337,
+    "mtime": 1778963002.9115329,
     "hash": "4afdcfde3e64bd3944b639da547a8d78"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/event-store.ts": {
@@ -3964,8 +3968,8 @@
     "hash": "6e1b0483b32593e0f0ed25d009a5f9a5"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/routes/agents.ts": {
-    "mtime": 1778822418.1174386,
-    "hash": "7895676e481a303b0284591d0a0a619b"
+    "mtime": 1778963002.9525452,
+    "hash": "3c3d6e92b8487520977e2bc2fc58e5e4"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/routes/events.ts": {
     "mtime": 1778342940.3397384,
@@ -3980,16 +3984,16 @@
     "hash": "f90233be8c4ce0a01f64e08ce4452ff8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/routes/autopreso.ts": {
-    "mtime": 1778825065.5107412,
-    "hash": "9b1cfb1829e35c08153a45d6daa678a9"
+    "mtime": 1778964278.7930205,
+    "hash": "29737e4cd8791b5ba201796536e7b5a2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/routes/diffs.ts": {
     "mtime": 1778619749.1717982,
     "hash": "07ce61728663c7c8d2809b1c64c6f0e3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/routes/conversations.ts": {
-    "mtime": 1778822418.1174386,
-    "hash": "8b16064fb78e0bbd35ea097e31b5b73b"
+    "mtime": 1778963002.9525452,
+    "hash": "8be5478415b740f9329998a46c1dce36"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/routes/codex-auth.ts": {
     "mtime": 1778342940.3397384,
@@ -4040,7 +4044,7 @@
     "hash": "05dbc76e45b62f26fa52001b08f9142c"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/routes/origin-validation.ts": {
-    "mtime": 1778822144.1100197,
+    "mtime": 1778963002.9115329,
     "hash": "02374db3713253c00a089d96a1a11c3a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/routes/cliproxy.ts": {
@@ -4056,7 +4060,7 @@
     "hash": "8125192ed41c7d9c21a9ff45825dd291"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/routes/voice.ts": {
-    "mtime": 1778825742.376916,
+    "mtime": 1778963002.9115329,
     "hash": "e6632339d0e672c99ebc60c244df835d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/routes/projects.ts": {
@@ -4183,6 +4187,10 @@
     "mtime": 1778619749.1737983,
     "hash": "2aa7ed3b00da1802cfb5740cda1832ae"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/services/agent-event-utils.ts": {
+    "mtime": 1778963002.9525452,
+    "hash": "de4410f12243d32c6e8affabccbc8991"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/services/system-health-service.ts": {
     "mtime": 1778822418.1194384,
     "hash": "f713524ff667a0213ef3e7fd4d7dadb9"
@@ -4232,8 +4240,8 @@
     "hash": "1335ac673a1777b97f3798c397edb5d3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/services/conversation-lifecycle.ts": {
-    "mtime": 1778342940.3428507,
-    "hash": "db5faa6dfffe86bfd13c693f1c658f79"
+    "mtime": 1778963002.9525452,
+    "hash": "2f09683d659c848c300ef3dbed28217a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/dashboard/server/services/github-client.ts": {
     "mtime": 1778342940.3428507,
@@ -4584,7 +4592,7 @@
     "hash": "772e2da7681228f9724806ab2fec65fc"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/cli/commands/open.ts": {
-    "mtime": 1778623272.7149477,
+    "mtime": 1778963002.9105659,
     "hash": "92377e5404e9b7f83a37473d8429108e"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/cli/commands/config.ts": {
@@ -4616,8 +4624,8 @@
     "hash": "30a51c30d09b6aed010c1a1c7e0e915e"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/cli/commands/admin/index.ts": {
-    "mtime": 1778342940.3182511,
-    "hash": "9cc6d967ad08efa3a8d6e05c1f636a6b"
+    "mtime": 1778963002.951545,
+    "hash": "29f76bbdabf84948f62bab204a441012"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/cli/commands/specialists/done.ts": {
     "mtime": 1778822418.1154385,
@@ -4683,9 +4691,13 @@
     "mtime": 1778342940.3178227,
     "hash": "8ab27efe8526c4a0aa25cf152920b973"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/cli/commands/setup/safe-settings.ts": {
+    "mtime": 1778963002.951545,
+    "hash": "2bf71af44ff76daedf5843f87d313a03"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/cli/commands/setup/hooks.ts": {
-    "mtime": 1778619749.162798,
-    "hash": "cc2a0b042a732d0fbbc7e39179f53709"
+    "mtime": 1778963002.951545,
+    "hash": "cdf2f44ac4f804187603bb0582a6f3ba"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/src/cli/commands/remote/init.ts": {
     "mtime": 1778342940.3194914,
@@ -4716,12 +4728,12 @@
     "hash": "8ec39fe596fb6e8edca644edcb54d06f"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/packages/pi-extension/src/index.ts": {
-    "mtime": 1778342940.222046,
-    "hash": "b22f5e7d366cdb5b740602536bdca053"
+    "mtime": 1778963002.951545,
+    "hash": "e15788e4d3d35fb1cdd433c7977c1a7c"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/packages/pi-extension/src/__tests__/index.test.ts": {
-    "mtime": 1778342940.222046,
-    "hash": "3b96487a7f6ad3797904a9a07c695e40"
+    "mtime": 1778963002.951545,
+    "hash": "caef0a8a41a721bf8c8f8bb386e53486"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/packages/contracts/vitest.config.ts": {
     "mtime": 1778342940.221767,
@@ -4824,7 +4836,7 @@
     "hash": "e170d738b37b54ef16d4d3ce85a7284f"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/fixtures/synced-skills.txt": {
-    "mtime": 1778824369.2949584,
+    "mtime": 1778963002.9139366,
     "hash": "fafacfdd1acb61b378a83fed6e8797e2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/tests/fixtures/handoff-test.txt": {
@@ -4842,6 +4854,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/workflow-orchestration-landscape.md": {
     "mtime": 1778342940.1607351,
     "hash": "a92068a5b3557041d99da60168263746"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/HOOKS.md": {
+    "mtime": 1778963002.9505446,
+    "hash": "893b339ec60d66d55b1da3e40c91131a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/SPECIALIST_WORKFLOW.md": {
     "mtime": 1778619749.1587977,
@@ -5071,17 +5087,53 @@
     "mtime": 1778342940.0827336,
     "hash": "f1dab41edd1f74340b2dfafdcb60fcf3"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/pipeline-cross-project-gpt5.html": {
+    "mtime": 1778963002.9505446,
+    "hash": "e6a9c3e3fd6e31fba2f0d22aca037f9e"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/board-opus.html": {
+    "mtime": 1778963002.9505446,
+    "hash": "0bac9958f5c6cfe9c14d12118f17a860"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/command-deck-terminology-map.html": {
     "mtime": 1778342940.0827336,
     "hash": "294391ca74043261c53680e9874b01ff"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/pipeline-cross-project-opus.html": {
+    "mtime": 1778963002.951545,
+    "hash": "415f411ac98f067fb1ad0bdccfde2145"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/system-map-opus.html": {
+    "mtime": 1778963002.951545,
+    "hash": "e17f84e30b984d5f71fbd0a568d81041"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/pipeline-cross-project-kimi.html": {
+    "mtime": 1778963002.9505446,
+    "hash": "622456fb09a646ccda966c23b109c9be"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/pipeline-command-deck-opus.html": {
+    "mtime": 1778963002.9505446,
+    "hash": "4c934327f89349865d66163f08314589"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/issue-detail-opus.html": {
+    "mtime": 1778963002.9505446,
+    "hash": "6114b4a3d3c8c8d3df7c1da9c8ad36e6"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/agents-redesign-stitch.html": {
     "mtime": 1778342940.0827336,
     "hash": "4761e3da686154998cd5176887439045"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/agents-opus.html": {
+    "mtime": 1778963002.9505446,
+    "hash": "9c8b480509901751495eb4f639f1ffbe"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/PAN-830-unified-command-deck.html": {
     "mtime": 1778342940.080482,
     "hash": "07f1b03aab606353e729abcb54c31f47"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/design/mockups/pipeline-cross-project-minimax.html": {
+    "mtime": 1778963002.9505446,
+    "hash": "4258c7d21a9f3d400f70225d44c7fab5"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/history/IMPLEMENTATION_SUMMARY.md": {
     "mtime": 1778342940.0897338,
@@ -5647,6 +5699,10 @@
     "mtime": 1778342940.0999706,
     "hash": "3d632588530d5a49681ea6779ffeee72"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/research/evals-framework.md": {
+    "mtime": 1778963002.951545,
+    "hash": "f3465e1143a34e72bd1412721f307578"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/docs/research/glm-5.1-work-type-fit.md": {
     "mtime": 1778342940.0999706,
     "hash": "66d66d1a4a77c0128ef28349ba7f6c50"
@@ -5696,8 +5752,8 @@
     "hash": "7c226f021e417fb6664d633e07486305"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/agents/pan-review-agent.md": {
-    "mtime": 1778619749.1569557,
-    "hash": "5ccbe49f1c751bbc804b2259d96c8ec4"
+    "mtime": 1778963002.9505446,
+    "hash": "d079035447c46d746ca15354441dcd10"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/agents/codebase-explorer.md": {
     "mtime": 1778342940.0673897,
@@ -6564,7 +6620,7 @@
     "hash": "05f8835b1ab4c865a6383be7952341be"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/packages/moonshine-linux-x64/README.md": {
-    "mtime": 1778622772.9192283,
+    "mtime": 1778963002.908532,
     "hash": "084a67eab7d182d1d8a9a352e1451f1a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/cli/core-commands.mdx": {

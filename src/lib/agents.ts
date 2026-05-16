@@ -1947,10 +1947,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
-  // PAN-1059 / PAN-977: interactive specialist roles avoid positional prompts
+  // PAN-1059 / PAN-977: interactive Claude Code specialist roles avoid positional prompts
   // by delivering through tmux after Claude boots. Headless review sub-roles run
   // `claude --print`, so they must receive the prompt on stdin instead.
-  const shouldDeliverPromptViaTmux = isSpecialistRole && !isClaudeCodeReviewSubRole;
+  const shouldDeliverPromptViaTmux = isSpecialistRole && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
+  const shouldDeliverPromptViaPi = isSpecialistRole && resolvedHarness === 'pi';
 
   const launcherContent = generateLauncherScript({
     role,
@@ -1998,28 +1999,35 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   await setOptionAsync(agentId, 'destroy-unattached', 'off');
   await setOptionAsync(agentId, 'remain-on-exit', 'on');
 
-  // Deliver prompt via tmux for specialist roles after Claude boots.
-  if (shouldDeliverPromptViaTmux && options.prompt) {
-    let ready = false;
-    for (let i = 0; i < 30; i++) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
-      if (!(await sessionExistsAsync(agentId))) {
-        console.error(`[${agentId}] Tmux session died before becoming ready`);
-        break;
-      }
+  if (options.prompt) {
+    if (shouldDeliverPromptViaPi) {
       try {
-        const pane = await capturePaneAsync(agentId, 200);
-        if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
-          ready = true;
+        await writePiAgentPrompt(agentId, options.prompt);
+      } catch (err) {
+        console.error(`[${agentId}] Pi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
+      }
+    } else if (shouldDeliverPromptViaTmux) {
+      let ready = false;
+      for (let i = 0; i < 30; i++) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+        if (!(await sessionExistsAsync(agentId))) {
+          console.error(`[${agentId}] Tmux session died before becoming ready`);
           break;
         }
-      } catch { /* non-fatal */ }
-    }
-    if (ready) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 500));
-      await deliverAgentMessage(agentId, options.prompt, 'spawnRun:initial-prompt');
-    } else {
-      console.error(`[${agentId}] Claude did not become ready within 30s`);
+        try {
+          const pane = await capturePaneAsync(agentId, 200);
+          if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
+            ready = true;
+            break;
+          }
+        } catch { /* non-fatal */ }
+      }
+      if (ready) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 500));
+        await deliverAgentMessage(agentId, options.prompt, 'spawnRun:initial-prompt');
+      } else {
+        console.error(`[${agentId}] Claude did not become ready within 30s`);
+      }
     }
   }
 

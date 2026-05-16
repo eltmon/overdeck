@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, rmSync, existsSync, readFileSync } from 'fs';
+import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
@@ -25,6 +25,28 @@ import {
 } from '../../src/lib/agents.js';
 import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
 import { DEFAULT_ROLES, DEFAULT_WORKHORSES } from '../../src/lib/config-yaml.js';
+
+const piFifoMocks = vi.hoisted(() => ({
+  writePiCommand: vi.fn(),
+}));
+
+vi.mock('../../src/lib/runtimes/pi-fifo.js', () => ({
+  PiNotReady: class PiNotReady extends Error {},
+  createPiFifo: vi.fn(async (agentId: string) => {
+    const dir = join(process.env.PANOPTICON_HOME ?? tmpdir(), 'agents', agentId);
+    mkdirSync(dir, { recursive: true });
+    return join(dir, 'rpc.in');
+  }),
+  piFifoPaths: (agentId: string) => {
+    const dir = join(process.env.PANOPTICON_HOME ?? tmpdir(), 'agents', agentId);
+    return {
+      agentDir: dir,
+      readyPath: join(dir, 'ready.json'),
+      fifoPath: join(dir, 'rpc.in'),
+    };
+  },
+  writePiCommand: piFifoMocks.writePiCommand,
+}));
 
 // Mock tmux module to avoid actual session creation
 vi.mock('../../src/lib/tmux.js', () => ({
@@ -137,6 +159,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
     vi.mocked(cliproxy.isCliproxyRunning).mockReturnValue(true);
     const beadsQuery = await import('../../src/lib/beads-query.js');
     vi.mocked(beadsQuery.assertIssueHasBeads).mockResolvedValue(undefined);
+    piFifoMocks.writePiCommand.mockClear();
   });
 
   afterEach(() => {
@@ -291,6 +314,30 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       const state = getAgentState('agent-pan-subsignal-1-review-correctness');
       expect(state?.reviewSynthesisAgentId).toBe('agent-pan-subsignal-1-review');
       expect(state?.reviewOutputPath).toBe('/tmp/out/review-correctness.md');
+    });
+
+    it('delivers Pi specialist prompts through the FIFO instead of tmux readiness', async () => {
+      const tmux = await import('../../src/lib/tmux.js');
+      vi.mocked(tmux.createSessionAsync).mockImplementationOnce(async (agentId: string) => {
+        const agentDir = join(testAgentsDir, agentId);
+        mkdirSync(agentDir, { recursive: true });
+        writeFileSync(join(agentDir, 'ready.json'), JSON.stringify({ ready: true }));
+      });
+      vi.mocked(tmux.capturePaneAsync).mockResolvedValueOnce('pi rpc mode');
+
+      const state = await spawnRun('PAN-PI-PROMPT-1', 'test', {
+        workspace: '/tmp/test-workspace',
+        harness: 'pi',
+        prompt: 'run the tests',
+      });
+
+      expect(state.harness).toBe('pi');
+      expect(piFifoMocks.writePiCommand).toHaveBeenCalledWith(
+        'agent-pan-pi-prompt-1-test',
+        expect.objectContaining({ type: 'prompt', message: 'run the tests' }),
+      );
+      expect(tmux.capturePaneAsync).not.toHaveBeenCalled();
+      expect(tmux.sendKeysAsync).not.toHaveBeenCalled();
     });
 
     it('refuses to spawn when a role session is already in tmux', async () => {
