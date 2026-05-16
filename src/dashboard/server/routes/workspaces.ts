@@ -91,7 +91,7 @@ import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js
 import { getCostsForIssue } from '../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPlan, readPlan, readPlanAsync, readWorkspacePlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { findPlanAsync, readPlanAsync, isPlanningCompleteAsync } from '../../../lib/vbrief/io.js';
 import { VBRIEF_INSPECTION_POLICIES } from '../../../lib/vbrief/types.js';
 import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief/types.js';
 import { findVBriefByIssueAsync, readVBriefDocumentAsync } from '../../../lib/vbrief/vbrief-index.js';
@@ -954,7 +954,7 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
 
   // Acceptance criteria checklist from vBRIEF plan items
   try {
-    const planPath = findPlan(workspacePath);
+    const planPath = await findPlanAsync(workspacePath);
     if (planPath && existsSync(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);
@@ -1460,9 +1460,9 @@ const getWorkspaceRoute = HttpRouter.add(
           .filter(isSalvageableStash)
           .filter((entry) => entry.issueId === issueId.toUpperCase());
 
-        const planPath = findPlan(workspacePath);
+        const planPath = yield* Effect.promise(() => findPlanAsync(workspacePath));
         const hasPlan = planPath !== null;
-        const planningComplete = hasPlan ? isPlanningComplete(workspacePath) : false;
+        const planningComplete = hasPlan ? yield* Effect.promise(() => isPlanningCompleteAsync(workspacePath)) : false;
         const hasBeads = planningComplete;
 
         const issueData = getCostsForIssue(issueId);
@@ -1651,7 +1651,7 @@ function resolvePlanLocation(projectPath: string, issueId: string): Promise<{ pa
 
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planPath = findPlan(workspacePath);
+    const planPath = await findPlanAsync(workspacePath);
     if (!planPath) return null;
     return {
       path: planPath,

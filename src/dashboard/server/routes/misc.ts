@@ -65,7 +65,7 @@ import { loadConfig as loadPanConfig } from '../../../lib/config.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../../lib/health-filtering.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
-import { findPlan, isPlanningComplete, isPlanningProposed } from '../../../lib/vbrief/io.js';
+import { findPlanAsync, isPlanningCompleteAsync, isPlanningProposedAsync } from '../../../lib/vbrief/io.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
@@ -982,17 +982,17 @@ const getPlanningStatusRoute = HttpRouter.add(
         const panDir = join(workspacePath, PAN_DIRNAME);
         const panContinueFile = join(panDir, PAN_CONTINUE_FILENAME);
         const hasContinueFile = existsSync(panContinueFile);
-        const hasPlanningState = hasContinueFile || findPlan(workspacePath) !== null;
+        const hasPlanningState = hasContinueFile || await findPlanAsync(workspacePath) !== null;
         const hasPromptFile = hasPlanningState;
         // hasCompletionMarker means `plan.status === 'proposed'` (gates the
         // dashboard Done button which should hide once the user has approved).
         // planningCompleted means `plan.status` indicates planning has finished
         // (any of proposed/approved/pending/running/completed/blocked).
         const hasCompletionMarker = existsSync(panDir)
-          ? isPlanningProposed(workspacePath, panDir)
+          ? await isPlanningProposedAsync(workspacePath, panDir)
           : false;
         const planningCompleted = existsSync(panDir)
-          ? isPlanningComplete(workspacePath, panDir)
+          ? await isPlanningCompleteAsync(workspacePath, panDir)
           : false;
 
         return jsonResponse({

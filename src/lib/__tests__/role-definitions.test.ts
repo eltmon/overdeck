@@ -36,7 +36,8 @@ describe('role definitions', () => {
     expect(body).toContain('AskUserQuestion');
     expect(body).toContain('vBRIEF plan');
     expect(body).toContain('Beads');
-    expect(body).toContain('pan plan finalize <ISSUE-ID>');
+    expect(body).toContain('pan plan finalize');
+    expect(body).not.toContain('pan plan finalize <ISSUE-ID>');
     expect(body).toContain('Stop after planning is complete');
     // Status-as-field model — files do not move between directories
     expect(body).toContain('Files never move between directories');

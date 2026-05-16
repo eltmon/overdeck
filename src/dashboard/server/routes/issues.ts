@@ -37,9 +37,10 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
-import { findPlan, findWorkspaceDraftPlan, isPlanningComplete, readPlan, readPlanAsync } from '../../../lib/vbrief/io.js';
+import { findPlanAsync, findWorkspaceDraftPlanAsync, isPlanningCompleteAsync, readPlan, readPlanAsync } from '../../../lib/vbrief/io.js';
 import { appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
 import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../../../lib/pan-dir/index.js';
+import type { CreateBeadsResult } from '../../../lib/vbrief/beads.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
@@ -89,6 +90,51 @@ export async function cleanupAgentStateDirs(dirs: string[]): Promise<void> {
 
 export async function removeCompletionMarker(markerPath: string): Promise<void> {
   if (existsSync(markerPath)) await rm(markerPath);
+}
+
+export async function completePlanningArtifacts(options: {
+  projectPath: string;
+  workspacePath: string;
+  issueId: string;
+  createBeads?: (workspacePath: string) => Promise<CreateBeadsResult>;
+}): Promise<{ proposed: { path: string; filename: string }; beadCount: number; beadsWarning: string | null }> {
+  const { projectPath, workspacePath, issueId } = options;
+  const issueLower = issueId.toLowerCase();
+  const upperIssueId = issueId.toUpperCase();
+  const workspacePlanPath = await findWorkspaceDraftPlanAsync(workspacePath) ?? await findPlanAsync(workspacePath);
+  if (!workspacePlanPath) {
+    throw new Error(`No workspace vBRIEF found for ${upperIssueId} at ${workspacePath}/.pan/spec.vbrief.json`);
+  }
+
+  const workspaceDoc = await readPlanAsync(workspacePlanPath);
+  const workspaceIssueId = workspaceDoc.plan?.id;
+  if (workspaceIssueId && workspaceIssueId.toLowerCase() !== issueLower) {
+    throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
+  }
+
+  const existingSpec = findSpecByIssue(projectPath, upperIssueId);
+  const proposed = existingSpec
+    ? (() => {
+        const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
+        writeSpec(existingSpec.path, nextDoc);
+        return { path: existingSpec.path, filename: existingSpec.filename };
+      })()
+    : writeSpecForIssue(projectPath, workspaceDoc, 'proposed');
+
+  const createBeads = options.createBeads ?? (async (path: string) => {
+    const mod = await import('../../../lib/vbrief/beads.js');
+    return withBdMutex(() => mod.createBeadsFromVBrief(path));
+  });
+  const beadsResult = await createBeads(workspacePath);
+  const planItemCount = workspaceDoc.plan.items?.length ?? 0;
+  if (planItemCount === 0 || !beadsResult.success || beadsResult.created.length !== planItemCount) {
+    const detail = beadsResult.errors.length > 0
+      ? beadsResult.errors.join('; ')
+      : `created ${beadsResult.created.length} beads for ${planItemCount} plan items`;
+    throw new Error(`Failed to materialize beads for ${upperIssueId}: ${detail}`);
+  }
+
+  return { proposed, beadCount: beadsResult.created.length, beadsWarning: null };
 }
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -1047,122 +1093,74 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       }
 
       const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-      const workspacePlanPath = findWorkspaceDraftPlan(workspacePath) ?? findPlan(workspacePath);
-      if (!workspacePlanPath) {
-        throw new Error(`No workspace vBRIEF found for ${id.toUpperCase()} at ${workspacePath}/.pan/spec.vbrief.json`);
-      }
-
       const gitRoot = workspacePath;
+      const upperIssueId = id.toUpperCase();
+      const { proposed, beadCount, beadsWarning } = await completePlanningArtifacts({ projectPath, workspacePath, issueId: id });
+      console.log(`[complete-planning] Wrote pan spec to ${proposed.path}`);
+      console.log(`[complete-planning] Materialized ${beadCount} beads for ${upperIssueId}`);
 
-      try {
-        const beadsWarning: string | null = null;
-        const upperIssueId = id.toUpperCase();
-        const workspaceDoc = await readPlanAsync(workspacePlanPath);
-        const workspaceIssueId = workspaceDoc.plan?.id;
-        if (workspaceIssueId && workspaceIssueId.toLowerCase() !== issueLower) {
-          throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
-        }
-
-        const canonicalFilename = workspaceDoc.plan.metadata?.canonicalFilename;
-        const existingSpec = findSpecByIssue(projectPath, upperIssueId);
-        const proposed = existingSpec
-          ? (() => {
-              const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
-              writeSpec(existingSpec.path, nextDoc);
-              return { path: existingSpec.path, filename: existingSpec.filename };
-            })()
-          : writeSpecForIssue(projectPath, workspaceDoc, 'proposed', canonicalFilename);
-        console.log(`[complete-planning] Wrote pan spec to ${proposed.path}`);
-
-        const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
-        const beadsResult = await withBdMutex(() => createBeadsFromVBrief(workspacePath));
-        if (!beadsResult.success || beadsResult.created.length === 0) {
-          const detail = beadsResult.errors.length > 0 ? beadsResult.errors.join('; ') : 'beads creation produced no tasks';
-          throw new Error(`Failed to materialize beads for ${upperIssueId}: ${detail}`);
-        }
-        console.log(`[complete-planning] Materialized ${beadsResult.created.length} beads for ${upperIssueId}`);
-
-        const filesToStage = [`.pan/specs/${proposed.filename}`];
-
+      const filesToStage = [`.pan/specs/${proposed.filename}`];
+      const { stdout: branchStdout } = await execFileAsync(
+        'git',
+        ['rev-parse', '--abbrev-ref', 'HEAD'],
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      const currentBranch = branchStdout.trim();
+      if (currentBranch === 'main') {
+        await execFileAsync('git', ['add', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
         try {
-          const { stdout: branchStdout } = await execAsync(
-            'git rev-parse --abbrev-ref HEAD',
+          await execFileAsync('git', ['diff', '--cached', '--quiet', '--', ...filesToStage], { cwd: projectPath, encoding: 'utf-8' });
+        } catch {
+          await execFileAsync(
+            'git',
+            ['commit', '-m', `chore(scope): propose ${upperIssueId} vBRIEF`, '--no-verify', '--', ...filesToStage],
             { cwd: projectPath, encoding: 'utf-8' },
           );
-          const currentBranch = branchStdout.trim();
-          if (currentBranch === 'main') {
-            const quoted = filesToStage.map(f => `"${f}"`).join(' ');
-            await execAsync(`git add -- ${quoted}`, { cwd: projectPath, encoding: 'utf-8' });
-            try {
-              await execAsync(`git diff --cached --quiet -- ${quoted}`, { cwd: projectPath, encoding: 'utf-8' });
-            } catch {
-              await execAsync(
-                `git commit -m "chore(scope): propose ${upperIssueId} vBRIEF" --no-verify -- ${quoted}`,
-                { cwd: projectPath, encoding: 'utf-8' },
-              );
-              console.log(`[complete-planning] Committed pan spec on main for ${upperIssueId}`);
-              try {
-                const { stdout: remotes } = await execAsync('git remote', { cwd: projectPath, encoding: 'utf-8' });
-                if (remotes.trim()) {
-                  const pushChild = spawn('git', ['push'], { cwd: projectPath, detached: true, stdio: 'ignore' });
-                  pushChild.unref();
-                }
-              } catch { /* push failed — no remote or auth — non-fatal */ }
+          console.log(`[complete-planning] Committed pan spec on main for ${upperIssueId}`);
+          try {
+            const { stdout: remotes } = await execFileAsync('git', ['remote'], { cwd: projectPath, encoding: 'utf-8' });
+            if (remotes.trim()) {
+              const pushChild = spawn('git', ['push'], { cwd: projectPath, detached: true, stdio: 'ignore' });
+              pushChild.unref();
             }
-          } else {
-            console.log(`[complete-planning] Project root not on main (${currentBranch}) — pan spec updated on disk but not committed on main`);
-          }
-        } catch (gitErr: any) {
-          console.warn(`[complete-planning] pan spec commit failed (non-fatal): ${gitErr?.message ?? gitErr}`);
+          } catch { /* push failed — no remote or auth — non-fatal */ }
         }
-
-        // Sync beads
-        try {
-          await withBdMutex(() => execAsync('bd sync 2>/dev/null || true', { cwd: gitRoot, encoding: 'utf-8', timeout: 10000 }));
-        } catch { /* bd might not be installed */ }
-
-        // The proposed planning state is written by `pan plan finalize` from the
-        // planning agent, not here. The Done button is gated on that workspace
-        // state, so by the time this endpoint fires it is already on disk.
-
-        // Git operations
-        const isGitRepo = existsSync(join(gitRoot, '.git'));
-        if (!isGitRepo) {
-          await execAsync('git init', { cwd: gitRoot, encoding: 'utf-8' });
-        }
-
-        if (existsSync(join(gitRoot, '.pan'))) {
-          await execAsync('git add -f .pan/', { cwd: gitRoot, encoding: 'utf-8' });
-        }
-        if (existsSync(join(gitRoot, '.beads'))) {
-          await execAsync('git add .beads/', { cwd: gitRoot, encoding: 'utf-8' });
-        }
-
-        try {
-          await execAsync('git diff --cached --quiet', { cwd: gitRoot, encoding: 'utf-8' });
-        } catch {
-          // Use conventional-commits format so this passes commitlint/husky in
-          // repos that gate commits (panopticon-cli does). The previous message
-          // "Complete planning for PAN-NNNN" was rejected as missing a type and
-          // subject, which silently failed the entire spec-promotion-and-push
-          // chain — saw PAN-1048 land with no main-side spec because of this.
-          await execAsync(`git commit -m "chore(plan): complete planning for ${id}" --no-verify`, { cwd: gitRoot, encoding: 'utf-8' });
-        }
-
-        try {
-          const { stdout: remotes } = await execAsync('git remote', { cwd: gitRoot, encoding: 'utf-8' });
-          if (remotes.trim()) {
-            const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
-            pushChild.unref();
-            return { pushed: true, beadsWarning };
-          } else {
-            return { pushed: true, beadsWarning };
-          }
-        } catch { /* Non-fatal */ }
-      } catch (gitErr) {
-        console.error('Git commit/push failed:', gitErr);
+      } else {
+        console.log(`[complete-planning] Project root not on main (${currentBranch}) — pan spec updated on disk but not committed on main`);
       }
-      return { pushed: false, beadsWarning: null };
+
+      try {
+        await withBdMutex(() => execFileAsync('bd', ['sync'], { cwd: gitRoot, encoding: 'utf-8', timeout: 10000 }));
+      } catch { /* bd might not be installed */ }
+
+      const isGitRepo = existsSync(join(gitRoot, '.git'));
+      if (!isGitRepo) {
+        await execFileAsync('git', ['init'], { cwd: gitRoot, encoding: 'utf-8' });
+      }
+
+      if (existsSync(join(gitRoot, '.pan'))) {
+        await execFileAsync('git', ['add', '-f', '.pan/'], { cwd: gitRoot, encoding: 'utf-8' });
+      }
+      if (existsSync(join(gitRoot, '.beads'))) {
+        await execFileAsync('git', ['add', '.beads/'], { cwd: gitRoot, encoding: 'utf-8' });
+      }
+
+      try {
+        await execFileAsync('git', ['diff', '--cached', '--quiet'], { cwd: gitRoot, encoding: 'utf-8' });
+      } catch {
+        await execFileAsync('git', ['commit', '-m', `chore(plan): complete planning for ${id}`, '--no-verify'], { cwd: gitRoot, encoding: 'utf-8' });
+      }
+
+      try {
+        const { stdout: remotes } = await execFileAsync('git', ['remote'], { cwd: gitRoot, encoding: 'utf-8' });
+        if (remotes.trim()) {
+          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
+          pushChild.unref();
+        }
+        return { pushed: true, beadsWarning };
+      } catch {
+        return { pushed: false, beadsWarning };
+      }
     });
 
     // Update Linear/GitHub issue state
@@ -1534,12 +1532,13 @@ const postIssueReopenRoute = HttpRouter.add(
         const projectPath = projectConfig?.path || '';
         if (projectPath) {
           const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-          const { findPlan } = await import('../../../lib/vbrief/io.js');
+          const { findPlanAsync } = await import('../../../lib/vbrief/io.js');
           const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
-          if (existsSync(workspacePath) && findPlan(workspacePath)) {
+          if (existsSync(workspacePath) && await findPlanAsync(workspacePath)) {
             try {
-              const { stdout: bdCheck } = await withBdMutex(() => execAsync(
-                `bd list --json -l ${issueLower} --limit 1`,
+              const { stdout: bdCheck } = await withBdMutex(() => execFileAsync(
+                'bd',
+                ['list', '--json', '-l', issueLower, '--limit', '1'],
                 { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 },
               ));
               const existing = JSON.parse(bdCheck.trim() || '[]');
@@ -2495,7 +2494,7 @@ const getIssueBeadsRoute = HttpRouter.add(
     const { beads, querySource } = yield* Effect.promise(async (): Promise<{ beads: any[]; querySource: string }> => {
       try {
         const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
-        const { stdout } = await withBdMutex(() => execAsync(`bd list --json -l "${id.toLowerCase()}" --status all --limit 0`, {
+        const { stdout } = await withBdMutex(() => execFileAsync('bd', ['list', '--json', '-l', id.toLowerCase(), '--status', 'all', '--limit', '0'], {
           cwd: bdSearchDir,
           encoding: 'utf-8',
           timeout: 10000,
@@ -2568,12 +2567,12 @@ const getIssuePlanningStateRoute = HttpRouter.add(
     const workspacePath = projectPath
       ? join(projectPath, 'workspaces', `feature-${issueLower}`)
       : '';
-    const planPath = workspacePath ? findPlan(workspacePath) : null;
+    const planPath = workspacePath ? yield* Effect.promise(() => findPlanAsync(workspacePath)) : null;
     const hasPlan = planPath !== null;
     // planningComplete now means "plan.status indicates planning has finished" —
     // any of proposed/approved/pending/running/completed/blocked.
     // It's the definitive signal for "tasks have been generated from this plan."
-    const planningComplete = workspacePath ? isPlanningComplete(workspacePath) : false;
+    const planningComplete = workspacePath ? yield* Effect.promise(() => isPlanningCompleteAsync(workspacePath)) : false;
 
     const hasBeads = !!planningComplete;
 
@@ -2622,7 +2621,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     }
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planPath = findPlan(workspacePath);
+    const planPath = yield* Effect.promise(() => findPlanAsync(workspacePath));
     if (!planPath || !existsSync(planPath)) {
       return jsonResponse(
         { success: false, error: `No vBRIEF spec found on main for ${id} — run planning first.` },

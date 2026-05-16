@@ -238,6 +238,10 @@ export function isPlanningProposed(workspacePath: string, planningDir?: string):
   return checkPlanStatus(workspacePath, planningDir, status => status === 'proposed');
 }
 
+export function isPlanningProposedAsync(workspacePath: string, planningDir?: string): Promise<boolean> {
+  return checkPlanStatusAsync(workspacePath, planningDir, status => status === 'proposed');
+}
+
 /**
  * Check whether planning has finished for this workspace — i.e., beads have
  * been generated and the agent can (or already did) start work.
@@ -249,6 +253,10 @@ export function isPlanningComplete(workspacePath: string, planningDir?: string):
   return checkPlanStatus(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
 }
 
+export function isPlanningCompleteAsync(workspacePath: string, planningDir?: string): Promise<boolean> {
+  return checkPlanStatusAsync(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
+}
+
 function checkPlanStatus(
   workspacePath: string,
   _planningDir: string | undefined,
@@ -258,6 +266,24 @@ function checkPlanStatus(
   if (!planPath) return false;
   try {
     const doc = readPlan(planPath);
+    const status = doc.plan?.status;
+    if (status && matchStatus(status)) return true;
+    if (status) return false;
+  } catch {
+    // Corrupt / unreadable plan
+  }
+  return false;
+}
+
+async function checkPlanStatusAsync(
+  workspacePath: string,
+  _planningDir: string | undefined,
+  matchStatus: (status: string) => boolean,
+): Promise<boolean> {
+  const planPath = await findPlanAsync(workspacePath);
+  if (!planPath) return false;
+  try {
+    const doc = await readPlanAsync(planPath);
     const status = doc.plan?.status;
     if (status && matchStatus(status)) return true;
     if (status) return false;
