@@ -34,13 +34,14 @@ import {
   countDiscoveredSessions,
   getDiscoveredSessionById,
   getDiscoveredStats,
+  aggregateDiscoveredSessionCost,
 } from '../../../lib/database/discovered-sessions-db.js';
 import { scan } from '../../../lib/conversations/scanner.js';
 import { searchSessions } from '../../../lib/conversations/search.js';
 import { enrichSessions, CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
-import { getConversationsConfig, loadConfig, saveConfig } from '../../../lib/config.js';
+import { getConversationsConfigAsync, loadConfigAsync, saveConfigAsync } from '../../../lib/config.js';
 import { embed } from '../../../lib/conversations/embeddings/providers.js';
 
 // ─── GET /api/discovered-sessions/stats ───────────────────────────────────────
@@ -150,7 +151,8 @@ const searchRoute = HttpRouter.add(
     const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? rawOffset : 0;
 
     const filter = parseSearchParams(params);
-    const result = yield* Effect.promise(() => searchSessions({ q, similarTo, filter, limit, offset }));
+    const config = yield* Effect.promise(() => getConversationsConfigAsync());
+    const result = yield* Effect.promise(() => searchSessions({ q, similarTo, filter, limit, offset, config }));
     return jsonResponse(result);
   })),
 );
@@ -168,17 +170,7 @@ const getCostRoute = HttpRouter.add(
     if (params.has('since')) filter.since = parseRelativeTime(params.get('since')!);
     if (params.has('workspace')) filter.workspacePath = params.get('workspace')!;
 
-    const sessions = findDiscoveredSessions(filter);
-    const total = sessions.reduce((sum, s) => sum + s.estimatedCost, 0);
-    const totalTokensIn = sessions.reduce((sum, s) => sum + s.tokenInput, 0);
-    const totalTokensOut = sessions.reduce((sum, s) => sum + s.tokenOutput, 0);
-
-    return jsonResponse({
-      sessionCount: sessions.length,
-      totalCost: total,
-      totalTokensIn,
-      totalTokensOut,
-    });
+    return jsonResponse(aggregateDiscoveredSessionCost(filter));
   })),
 );
 
@@ -231,8 +223,9 @@ const postEnrichByIdRoute = HttpRouter.add(
     const tier = rawTier as 1 | 2 | 3;
 
     try {
+      const config = yield* Effect.promise(() => getConversationsConfigAsync());
       const result = yield* Effect.promise(() =>
-        enrichSessions({ tier, sessionIds: [id] }),
+        enrichSessions({ tier, sessionIds: [id], config }),
       );
       return jsonResponse(result);
     } catch (err) {
@@ -279,8 +272,10 @@ const postScanRoute = HttpRouter.add(
 
     const maxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : undefined;
 
-    const watchDirs = getConversationsConfig().watchDirs;
+    const config = yield* Effect.promise(() => getConversationsConfigAsync());
+    const watchDirs = config.watchDirs;
     const eventStore = yield* EventStoreService;
+    let lastProgressEmit = 0;
 
     // Emit ScanStartedEvent
     const startedEvent: Omit<ScanStartedEvent, 'sequence'> = {
@@ -297,7 +292,11 @@ const postScanRoute = HttpRouter.add(
         dirs: body.dirs,
         dryRun: body.dryRun,
         maxParallel,
-        onProgress: (progress) => {
+        onProgress: async (progress) => {
+          const now = Date.now();
+          const complete = progress.dirsProcessed >= progress.dirsTotal;
+          if (!complete && now - lastProgressEmit < 500) return;
+          lastProgressEmit = now;
           const progressEvent: Omit<ScanProgressEvent, 'sequence'> = {
             type: 'scan.progress',
             timestamp: new Date().toISOString(),
@@ -308,7 +307,7 @@ const postScanRoute = HttpRouter.add(
               elapsedMs: progress.elapsedMs,
             },
           };
-          Effect.runSync(eventStore.append(progressEvent as ScanProgressEvent));
+          await Effect.runPromise(eventStore.append(progressEvent as ScanProgressEvent));
         },
       }),
     );
@@ -349,7 +348,8 @@ const postEnrichRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid tier: must be 1, 2, or 3' }, { status: 400 });
     }
     const tier = rawTier as 1 | 2 | 3;
-    const enrichMaxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : undefined;
+    const config = yield* Effect.promise(() => getConversationsConfigAsync());
+    const enrichMaxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : config.enrichment.maxParallel;
     const enrichSessionIds = body.sessionIds ? body.sessionIds.slice(0, 500) : undefined;
     const eventStore = yield* EventStoreService;
 
@@ -359,7 +359,8 @@ const postEnrichRoute = HttpRouter.add(
           tier,
           sessionIds: enrichSessionIds,
           maxParallel: enrichMaxParallel,
-          onProgress: (progress) => {
+          config,
+          onProgress: async (progress) => {
             if (progress.session) {
               const { session } = progress;
               const progressEvent: Omit<EnrichProgressEvent, 'sequence'> = {
@@ -374,7 +375,7 @@ const postEnrichRoute = HttpRouter.add(
                   error: session.error,
                 },
               };
-              Effect.runSync(eventStore.append(progressEvent as EnrichProgressEvent));
+              await Effect.runPromise(eventStore.append(progressEvent as EnrichProgressEvent));
             }
           },
         }),
@@ -429,7 +430,8 @@ const postEmbedRoute = HttpRouter.add(
     if (body.provider !== undefined && !VALID_PROVIDERS.has(body.provider)) {
       return jsonResponse({ error: `Invalid provider: must be one of openai, voyage, ollama` }, { status: 400 });
     }
-    const embedMaxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : undefined;
+    const config = yield* Effect.promise(() => getConversationsConfigAsync());
+    const embedMaxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : config.enrichment.maxParallel;
     const embedSessionIds = body.sessionIds ? body.sessionIds.slice(0, 500) : undefined;
 
     const result = yield* Effect.promise(() =>
@@ -438,6 +440,7 @@ const postEmbedRoute = HttpRouter.add(
         provider: body.provider as 'openai' | 'voyage' | 'ollama' | undefined,
         model: body.model,
         maxParallel: embedMaxParallel,
+        config,
       }),
     );
 
@@ -451,7 +454,7 @@ const getConvConfigRoute = HttpRouter.add(
   'GET',
   '/api/discovered-sessions/config',
   httpHandler(Effect.gen(function* () {
-    const config = getConversationsConfig();
+    const config = yield* Effect.promise(() => getConversationsConfigAsync());
     return jsonResponse({
       embeddings: config.embeddings,
       embeddingProvider: config.embeddingProvider,
@@ -476,14 +479,14 @@ const putConvConfigRoute = HttpRouter.add(
     };
 
     yield* Effect.promise(async () => {
-      const cfg = loadConfig();
+      const cfg = await loadConfigAsync();
       if (!cfg.conversations) cfg.conversations = {} as typeof cfg.conversations;
       const conv = cfg.conversations!;
       if (body.embeddings !== undefined) conv.embeddings = body.embeddings;
       if (body.embeddingProvider !== undefined) conv.embeddingProvider = body.embeddingProvider as typeof conv.embeddingProvider;
       if (body.embeddingModel !== undefined) conv.embeddingModel = body.embeddingModel;
       if (body.embeddingAutoOnDeep !== undefined) conv.embeddingAutoOnDeep = body.embeddingAutoOnDeep;
-      saveConfig(cfg);
+      await saveConfigAsync(cfg);
     });
 
     return jsonResponse({ ok: true });

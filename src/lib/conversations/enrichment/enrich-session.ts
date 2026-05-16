@@ -45,6 +45,15 @@ export interface EnrichSessionResult {
 
 // ─── JSONL message reader ─────────────────────────────────────────────────────
 
+function redactSensitiveText(text: string): string {
+  return text
+    .replace(/\b(?:sk-ant|sk-proj|sk-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]+\b/g, '[REDACTED_API_KEY]')
+    .replace(/\b(?:ghp|github_pat|glpat|xox[baprs])-?[A-Za-z0-9_\-]{20,}\b/g, '[REDACTED_TOKEN]')
+    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[REDACTED_AWS_KEY]')
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '[REDACTED_PRIVATE_KEY]')
+    .replace(/\b(password|passwd|api[_-]?key|secret|token)\s*[:=]\s*[^\s,;]+/gi, '$1=[REDACTED]');
+}
+
 /**
  * Read up to `maxLines` lines from a JSONL file.
  * Returns raw line strings (not parsed) for prompt construction.
@@ -105,7 +114,7 @@ function buildConversationExcerpt(lines: string[]): string {
           .slice(0, 500);
       }
       if (text) {
-        parts.push(`[${role}]: ${text}`);
+        parts.push(`[${role}]: ${redactSensitiveText(text)}`);
       }
     } catch {
       // skip malformed lines

@@ -17,6 +17,7 @@ import type { DiscoveredSession } from '../../database/discovered-sessions-db.js
 import { runWithPool } from '../work-pool.js';
 import { embed } from './providers.js';
 import { getConversationsConfig } from '../../config.js';
+import type { ConversationsConfig } from '../../config.js';
 import type { EmbeddingProviderName } from './providers.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -32,6 +33,10 @@ export interface EmbedSessionsOptions {
   ollamaBaseUrl?: string;
   /** Max concurrent embedding tasks */
   maxParallel?: number;
+  /** Replace existing embeddings instead of selecting only missing ones */
+  regenerate?: boolean;
+  /** Preloaded conversations config for dashboard callers */
+  config?: ConversationsConfig;
   /** Injected embed function for testing */
   embedFn?: typeof embed;
   /** Progress callback */
@@ -76,6 +81,7 @@ export function buildEmbeddingText(session: DiscoveredSession): string {
 function selectSessionsForEmbedding(
   sessionIds: number[] | undefined,
   model: string,
+  regenerate: boolean,
 ): DiscoveredSession[] {
   if (sessionIds && sessionIds.length > 0) {
     return sessionIds
@@ -83,8 +89,8 @@ function selectSessionsForEmbedding(
       .filter((s): s is DiscoveredSession => s != null);
   }
 
-  // All enriched sessions (level >= 1) that don't yet have an embedding for this model
   const enriched = findDiscoveredSessions({ enriched: true });
+  if (regenerate) return enriched;
   return enriched.filter((s) => getEmbedding(s.id, model) === null);
 }
 
@@ -103,13 +109,13 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
   const startTs = Date.now();
   const result: EmbedResult = { embedded: 0, skipped: 0, errors: 0, durationMs: 0 };
 
-  const config = getConversationsConfig();
+  const config = opts.config ?? getConversationsConfig();
   const provider = (opts.provider ?? config.embeddingProvider) as EmbeddingProviderName;
   const model = opts.model ?? config.embeddingModel;
   const maxParallel = opts.maxParallel ?? config.enrichment.maxParallel;
   const embedFn = opts.embedFn ?? embed;
 
-  const sessions = selectSessionsForEmbedding(opts.sessionIds, model);
+  const sessions = selectSessionsForEmbedding(opts.sessionIds, model, opts.regenerate === true);
 
   if (sessions.length === 0) {
     result.durationMs = Date.now() - startTs;

@@ -44,7 +44,7 @@ export interface ScanOptions {
   /** Override parallelism from system-probe */
   maxParallel?: number | null;
   /** Progress callback */
-  onProgress?: (progress: ScanProgress) => void;
+  onProgress?: (progress: ScanProgress) => void | Promise<void>;
 }
 
 export interface ScanProgress {
@@ -118,14 +118,30 @@ async function discoverAllJsonlFiles(): Promise<
   return result;
 }
 
+async function discoverJsonlFilesForDirs(dirs: string[]): Promise<
+  Array<{ projectDir: string; jsonlPath: string }>
+> {
+  const claudeProjectsDir = join(homedir(), '.claude', 'projects');
+  const result: Array<{ projectDir: string; jsonlPath: string }> = [];
+
+  for (const dir of dirs) {
+    const projectDir = join(claudeProjectsDir, encodeClaudeProjectDir(normalizeDir(dir)));
+    await collectJsonlFiles(projectDir, projectDir, result);
+  }
+
+  return result;
+}
+
 // ─── Scanner ──────────────────────────────────────────────────────────────────
 
 export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const startTs = Date.now();
   const result: ScanResult = { inserted: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0 };
 
-  // 1. Discover all JSONL candidates
-  const allFiles = await discoverAllJsonlFiles();
+  // 1. Discover JSONL candidates
+  const allFiles = opts.mode === 'targeted'
+    ? await discoverJsonlFilesForDirs(opts.dirs ?? [])
+    : await discoverAllJsonlFiles();
 
   // 2. Filter by mode
   const filteredFiles = filterByMode(allFiles, opts);
@@ -172,7 +188,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     ) {
       result.skipped++;
       dirsProcessed++;
-      opts.onProgress?.({
+      await opts.onProgress?.({
         dirsProcessed,
         dirsTotal,
         sessionsFound,
@@ -233,7 +249,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     }
 
     dirsProcessed++;
-    opts.onProgress?.({
+    await opts.onProgress?.({
       dirsProcessed,
       dirsTotal,
       sessionsFound,

@@ -44,6 +44,7 @@ export async function embedAction(
     provider,
     model,
     maxParallel,
+    regenerate,
     onProgress: (p) => {
       const pct = p.total > 0 ? Math.round((p.processed / p.total) * 100) : 0;
       const elapsed = (p.elapsedMs / 1000).toFixed(1);

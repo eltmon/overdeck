@@ -21,6 +21,17 @@ import { listSessionNamesAsync } from '../../lib/tmux.js';
 import { listProjects } from '../../lib/projects.js';
 import type { AgentStatus, ConversationEvent, DomainEvent, SessionTreeDelta } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
+import { scan } from '../../lib/conversations/scanner.js';
+import { searchSessions } from '../../lib/conversations/search.js';
+import { enrichSessions } from '../../lib/conversations/enrichment/index.js';
+import { embedSessions } from '../../lib/conversations/embeddings/index.js';
+import { getConversationsConfigAsync } from '../../lib/config.js';
+import {
+  aggregateDiscoveredSessionCostBy,
+  findDiscoveredSessions,
+  getDiscoveredSessionById,
+} from '../../lib/database/discovered-sessions-db.js';
+import type { DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -31,6 +42,37 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
     timestamp: stored.timestamp,
     payload: stored.payload,
   } as DomainEvent;
+}
+
+function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
+  return {
+    id: session.id,
+    jsonlPath: session.jsonlPath,
+    sessionId: session.sessionId ?? undefined,
+    workspacePath: session.workspacePath ?? undefined,
+    workspaceHash: session.workspaceHash ?? undefined,
+    messageCount: session.messageCount,
+    firstTs: session.firstTs ?? undefined,
+    lastTs: session.lastTs ?? undefined,
+    modelsUsed: session.modelsUsed,
+    primaryModel: session.primaryModel ?? undefined,
+    tokenInput: session.tokenInput,
+    tokenOutput: session.tokenOutput,
+    estimatedCost: session.estimatedCost,
+    toolsUsed: session.toolsUsed,
+    filesTouched: session.filesTouched,
+    tags: session.tags,
+    summary: session.summary ?? undefined,
+    summaryDetailed: session.summaryDetailed ?? undefined,
+    enrichmentLevel: session.enrichmentLevel,
+    enrichmentModel: session.enrichmentModel ?? undefined,
+    enrichedAt: session.enrichedAt ?? undefined,
+    enrichmentFailed: session.enrichmentFailed,
+    panopticonManaged: session.panopticonManaged,
+    panIssueId: session.panIssueId ?? undefined,
+    panAgentId: session.panAgentId ?? undefined,
+    scannedAt: session.scannedAt,
+  };
 }
 
 // ─── Session Tree Subscription Helpers (PAN-821) ──────────────────────────────
@@ -425,6 +467,82 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         panOpen.getAvailableEditors().pipe(
           Effect.map((editors) => ({ editors })),
         ),
+
+      [WS_METHODS.scanConversations]: (input) =>
+        Effect.promise(async () => {
+          const config = await getConversationsConfigAsync();
+          return scan({
+            mode: input.mode,
+            dirs: input.dirs,
+            dryRun: input.dryRun,
+            watchDirs: config.watchDirs,
+            maxParallel: config.scanMaxParallel,
+          });
+        }),
+
+      [WS_METHODS.searchConversations]: (input) =>
+        Effect.promise(async () => {
+          const config = await getConversationsConfigAsync();
+          const result = await searchSessions({
+            q: input.query,
+            similarTo: input.similarTo,
+            filter: input,
+            limit: input.limit,
+            offset: input.offset,
+            config,
+          });
+          return result.sessions.map(toDiscoveredSessionSnapshot);
+        }),
+
+      [WS_METHODS.listDiscoveredSessions]: (input) =>
+        Effect.sync(() => findDiscoveredSessions({
+          managed: input.managed === true ? true : undefined,
+          unmanaged: input.managed === false ? true : undefined,
+          limit: input.limit,
+          offset: input.offset,
+        }).map(toDiscoveredSessionSnapshot)),
+
+      [WS_METHODS.getDiscoveredSession]: (input) =>
+        Effect.try({
+          try: () => {
+            const session = getDiscoveredSessionById(input.id);
+            if (!session) {
+              throw new PanRpcError({ message: `Session ${input.id} not found`, code: 'NOT_FOUND' });
+            }
+            return toDiscoveredSessionSnapshot(session);
+          },
+          catch: (cause) => cause instanceof PanRpcError
+            ? cause
+            : new PanRpcError({ message: String(cause), code: 'GET_DISCOVERED_SESSION_FAILED' }),
+        }),
+
+      [WS_METHODS.enrichSessions]: (input) =>
+        Effect.promise(async () => {
+          const config = await getConversationsConfigAsync();
+          const result = await enrichSessions({
+            tier: input.level,
+            sessionIds: input.ids,
+            maxParallel: input.limit,
+            modelOverride: input.model,
+            promptSuffix: input.customPrompt,
+            skipAlreadyEnriched: input.upgrade !== true,
+            config,
+          });
+          return { processed: result.enriched + result.errors, totalCost: 0, failures: result.errors };
+        }),
+
+      [WS_METHODS.embedSessions]: (input) =>
+        Effect.promise(async () => {
+          const config = await getConversationsConfigAsync();
+          const result = await embedSessions({ sessionIds: input.ids, regenerate: input.regenerate, config });
+          return { total: result.embedded + result.skipped + result.errors, embedded: result.embedded, model: config.embeddingModel };
+        }),
+
+      [WS_METHODS.getConversationCost]: (input) =>
+        Effect.sync(() => {
+          const groupBy = input.groupBy ?? 'workspace';
+          return { groupBy, ...aggregateDiscoveredSessionCostBy(groupBy) };
+        }),
     });
   }),
 );

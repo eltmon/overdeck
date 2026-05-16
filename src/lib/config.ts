@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { promises as fs } from 'fs';
 import { join, dirname, parse as parsePath } from 'path';
 import { homedir } from 'os';
 import { parse, stringify } from '@iarna/toml';
@@ -271,6 +272,25 @@ export function saveConfig(config: PanopticonConfig): void {
   writeFileSync(CONFIG_FILE, content, 'utf8');
 }
 
+export async function loadConfigAsync(): Promise<PanopticonConfig> {
+  try {
+    const content = await fs.readFile(CONFIG_FILE, 'utf8');
+    const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
+    return deepMerge(DEFAULT_CONFIG, parsed);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return DEFAULT_CONFIG;
+    }
+    console.error('Warning: Failed to parse config, using defaults');
+    return DEFAULT_CONFIG;
+  }
+}
+
+export async function saveConfigAsync(config: PanopticonConfig): Promise<void> {
+  const content = stringify(config as any);
+  await fs.writeFile(CONFIG_FILE, content, 'utf8');
+}
+
 export function getDefaultConfig(): PanopticonConfig {
   return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 }
@@ -337,8 +357,7 @@ export function findDevrootForProject(projectPath: string): string {
  * Get the conversations config block, with defaults merged in.
  * Resolves watchDirs ~ to home directory.
  */
-export function getConversationsConfig(): ConversationsConfig {
-  const config = loadConfig();
+function resolveConversationsConfig(config: PanopticonConfig): ConversationsConfig {
   const conv = config.conversations ?? (DEFAULT_CONFIG.conversations as ConversationsConfig);
   return {
     ...conv,
@@ -346,4 +365,12 @@ export function getConversationsConfig(): ConversationsConfig {
       d.startsWith('~/') ? join(homedir(), d.slice(2)) : d,
     ),
   };
+}
+
+export function getConversationsConfig(): ConversationsConfig {
+  return resolveConversationsConfig(loadConfig());
+}
+
+export async function getConversationsConfigAsync(): Promise<ConversationsConfig> {
+  return resolveConversationsConfig(await loadConfigAsync());
 }

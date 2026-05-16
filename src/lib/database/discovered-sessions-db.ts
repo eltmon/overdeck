@@ -156,78 +156,79 @@ export function getDiscoveredSessionById(id: number): DiscoveredSession | null {
 
 // ─── Filter SQL builder (shared by find + count) ─────────────────────────────
 
-function buildFilterSql(filter: ConversationFilter): { where: string; params: unknown[] } {
+function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { where: string; params: unknown[] } {
   const conditions: string[] = [];
   const params: unknown[] = [];
+  const col = (name: string) => tableAlias ? `${tableAlias}.${name}` : name;
 
   if (filter.workspacePath !== undefined) {
-    conditions.push(`workspace_path = ?`);
+    conditions.push(`${col('workspace_path')} = ?`);
     params.push(filter.workspacePath);
   }
   if (filter.primaryModel !== undefined) {
-    conditions.push(`primary_model = ?`);
+    conditions.push(`${col('primary_model')} = ?`);
     params.push(filter.primaryModel);
   }
   if (filter.managed === true) {
-    conditions.push(`panopticon_managed = 1`);
+    conditions.push(`${col('panopticon_managed')} = 1`);
   }
   if (filter.unmanaged === true) {
-    conditions.push(`panopticon_managed = 0`);
+    conditions.push(`${col('panopticon_managed')} = 0`);
   }
   if (filter.since !== undefined) {
-    conditions.push(`last_ts >= ?`);
+    conditions.push(`${col('last_ts')} >= ?`);
     params.push(filter.since);
   }
   if (filter.before !== undefined) {
-    conditions.push(`last_ts < ?`);
+    conditions.push(`${col('last_ts')} < ?`);
     params.push(filter.before);
   }
   if (filter.after !== undefined) {
-    conditions.push(`first_ts >= ?`);
+    conditions.push(`${col('first_ts')} >= ?`);
     params.push(filter.after);
   }
   if (filter.minCost !== undefined) {
-    conditions.push(`estimated_cost >= ?`);
+    conditions.push(`${col('estimated_cost')} >= ?`);
     params.push(filter.minCost);
   }
   if (filter.maxCost !== undefined) {
-    conditions.push(`estimated_cost <= ?`);
+    conditions.push(`${col('estimated_cost')} <= ?`);
     params.push(filter.maxCost);
   }
   if (filter.minMessages !== undefined) {
-    conditions.push(`message_count >= ?`);
+    conditions.push(`${col('message_count')} >= ?`);
     params.push(filter.minMessages);
   }
   if (filter.issueId !== undefined) {
-    conditions.push(`pan_issue_id = ?`);
+    conditions.push(`${col('pan_issue_id')} = ?`);
     params.push(filter.issueId);
   }
   if (filter.enriched === true) {
-    conditions.push(`enrichment_level > 0`);
+    conditions.push(`${col('enrichment_level')} > 0`);
   }
   if (filter.notEnriched === true) {
-    conditions.push(`enrichment_level = 0`);
+    conditions.push(`${col('enrichment_level')} = 0`);
   }
   if (filter.enrichmentLevelLessThan !== undefined) {
-    conditions.push(`enrichment_level < ?`);
+    conditions.push(`${col('enrichment_level')} < ?`);
     params.push(filter.enrichmentLevelLessThan);
   }
   if (filter.tags && filter.tags.length > 0) {
-    const tagConditions = filter.tags.map(() => `tags LIKE ? ESCAPE '\\'`);
+    const tagConditions = filter.tags.map(() => `${col('tags')} LIKE ? ESCAPE '\\'`);
     conditions.push(`(${tagConditions.join(' OR ')})`);
     for (const tag of filter.tags) {
       params.push(`%"${escapeLike(tag)}"%`);
     }
   }
   if (filter.tools && filter.tools.length > 0) {
-    const toolConditions = filter.tools.map(() => `tools_used LIKE ? ESCAPE '\\'`);
+    const toolConditions = filter.tools.map(() => `${col('tools_used')} LIKE ? ESCAPE '\\'`);
     conditions.push(`(${toolConditions.join(' OR ')})`);
     for (const tool of filter.tools) {
       params.push(`%"${escapeLike(tool)}"%`);
     }
   }
   if (filter.files && filter.files.length > 0) {
-    const fileConditions = filter.files.map(() => `files_touched LIKE ? ESCAPE '\\'`);
+    const fileConditions = filter.files.map(() => `${col('files_touched')} LIKE ? ESCAPE '\\'`);
     conditions.push(`(${fileConditions.join(' OR ')})`);
     for (const file of filter.files) {
       params.push(`%${escapeLike(file)}%`);
@@ -269,6 +270,55 @@ export function countDiscoveredSessions(filter: ConversationFilter = {}): number
     .prepare(`SELECT COUNT(*) AS cnt FROM discovered_sessions ${where}`)
     .get(...params) as { cnt: number };
   return row.cnt;
+}
+
+export function aggregateDiscoveredSessionCost(filter: ConversationFilter = {}): {
+  sessionCount: number;
+  totalCost: number;
+  totalTokensIn: number;
+  totalTokensOut: number;
+} {
+  const db = getDatabase();
+  const { where, params } = buildFilterSql(filter);
+  const row = db
+    .prepare(
+      `SELECT
+         COUNT(*) AS sessionCount,
+         COALESCE(SUM(estimated_cost), 0) AS totalCost,
+         COALESCE(SUM(token_input), 0) AS totalTokensIn,
+         COALESCE(SUM(token_output), 0) AS totalTokensOut
+       FROM discovered_sessions ${where}`,
+    )
+    .get(...params) as {
+    sessionCount: number;
+    totalCost: number;
+    totalTokensIn: number;
+    totalTokensOut: number;
+  };
+  return row;
+}
+
+export function aggregateDiscoveredSessionCostBy(groupBy: 'workspace' | 'model'): {
+  entries: Array<{ key: string; totalCost: number; sessionCount: number }>;
+  grandTotal: number;
+} {
+  const db = getDatabase();
+  const column = groupBy === 'workspace' ? 'workspace_path' : 'primary_model';
+  const rows = db
+    .prepare(
+      `SELECT
+         COALESCE(${column}, 'unknown') AS key,
+         COALESCE(SUM(estimated_cost), 0) AS totalCost,
+         COUNT(*) AS sessionCount
+       FROM discovered_sessions
+       GROUP BY COALESCE(${column}, 'unknown')
+       ORDER BY totalCost DESC`,
+    )
+    .all() as Array<{ key: string; totalCost: number; sessionCount: number }>;
+  const total = db
+    .prepare(`SELECT COALESCE(SUM(estimated_cost), 0) AS grandTotal FROM discovered_sessions`)
+    .get() as { grandTotal: number };
+  return { entries: rows, grandTotal: total.grandTotal };
 }
 
 // ─── Write operations ─────────────────────────────────────────────────────────
@@ -481,6 +531,52 @@ export function countFts(query: string): number {
   }
 }
 
+export function searchFtsSessions(
+  query: string,
+  filter: ConversationFilter = {},
+  limit = 50,
+  offset = 0,
+): DiscoveredSession[] {
+  const db = getDatabase();
+  const { where, params } = buildFilterSql(filter, 'ds');
+  const whereClause = where ? `${where} AND sessions_fts MATCH ?` : 'WHERE sessions_fts MATCH ?';
+  try {
+    const rows = db
+      .prepare(
+        `SELECT ds.* FROM sessions_fts
+         JOIN discovered_sessions ds ON ds.id = sessions_fts.rowid
+         ${whereClause}
+         ORDER BY sessions_fts.rank
+         LIMIT ? OFFSET ?`,
+      )
+      .all(...params, query, limit, offset) as Record<string, unknown>[];
+    return rows.map(rowToSession);
+  } catch {
+    return [];
+  }
+}
+
+export function countFtsSessions(
+  query: string,
+  filter: ConversationFilter = {},
+): number {
+  const db = getDatabase();
+  const { where, params } = buildFilterSql(filter, 'ds');
+  const whereClause = where ? `${where} AND sessions_fts MATCH ?` : 'WHERE sessions_fts MATCH ?';
+  try {
+    const row = db
+      .prepare(
+        `SELECT COUNT(*) AS cnt FROM sessions_fts
+         JOIN discovered_sessions ds ON ds.id = sessions_fts.rowid
+         ${whereClause}`,
+      )
+      .get(...params, query) as { cnt: number } | undefined;
+    return row?.cnt ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 /**
  * Count sessions that match both a FTS5 query and a restricted set of row IDs.
  * Queries discovered_sessions (not the FTS virtual table) to avoid FTS5 quirks
@@ -530,11 +626,16 @@ export function insertEmbedding(
  * Load all embeddings for a given model.
  * Returns an array of { sessionId, embedding } for cosine search.
  */
-export function loadEmbeddings(model: string): Array<{ sessionId: number; embedding: Float32Array }> {
+export function loadEmbeddings(
+  model: string,
+  sessionIds?: number[],
+): Array<{ sessionId: number; embedding: Float32Array }> {
+  if (sessionIds && sessionIds.length === 0) return [];
   const db = getDatabase();
+  const idClause = sessionIds ? ` AND session_id IN (${sessionIds.map(() => '?').join(',')})` : '';
   const rows = db
-    .prepare(`SELECT session_id, dim, embedding FROM session_embeddings WHERE model = ?`)
-    .all(model) as Array<{ session_id: number; dim: number; embedding: Buffer }>;
+    .prepare(`SELECT session_id, dim, embedding FROM session_embeddings WHERE model = ?${idClause}`)
+    .all(...(sessionIds ? [model, ...sessionIds] : [model])) as Array<{ session_id: number; dim: number; embedding: Buffer }>;
   return rows.map((r) => ({
     sessionId: r.session_id,
     embedding: new Float32Array(r.embedding.buffer, r.embedding.byteOffset, r.dim),

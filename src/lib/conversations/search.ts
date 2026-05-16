@@ -21,8 +21,9 @@ import {
   findDiscoveredSessions,
   countDiscoveredSessions,
   countFts,
-  countFtsInSet,
   searchFts,
+  searchFtsSessions,
+  countFtsSessions,
   loadEmbeddings,
   getEmbedding,
   getDiscoveredSessionById,
@@ -31,6 +32,7 @@ import type { DiscoveredSession, ConversationFilter } from '../database/discover
 import { embed } from './embeddings/providers.js';
 import type { EmbeddingProviderName } from './embeddings/providers.js';
 import { getConversationsConfig } from '../config.js';
+import type { ConversationsConfig } from '../config.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -53,6 +55,8 @@ export interface SearchQuery {
   offset?: number;
   /** Output format (for CLI callers) */
   format?: 'table' | 'json' | 'brief' | 'ids';
+  /** Preloaded conversations config for dashboard callers */
+  config?: ConversationsConfig;
 }
 
 /**
@@ -183,8 +187,8 @@ function semanticSearch(
   const refEmbedding = getEmbedding(referenceId, model);
   if (!refEmbedding) return [];
 
-  const allEmbeddings = loadEmbeddings(model);
   const sessionMap = new Map(allSessions.map((s) => [s.id, s]));
+  const allEmbeddings = loadEmbeddings(model, allSessions.map((s) => s.id));
 
   const scored: Array<{ session: DiscoveredSession; score: number }> = [];
   for (const { sessionId, embedding } of allEmbeddings) {
@@ -214,7 +218,7 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
   const start = Date.now();
   const limit = query.limit ?? 50;
   const offset = query.offset ?? 0;
-  const config = getConversationsConfig();
+  const config = query.config ?? getConversationsConfig();
   const embeddingModel = query.embeddingModel ?? config.embeddingModel ?? 'text-embedding-3-small';
 
   // ── Semantic free-text query path ─────────────────────────────────────────
@@ -222,9 +226,10 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
     const provider = (query.semanticProvider ?? config.embeddingProvider ?? 'openai') as EmbeddingProviderName;
     const embedResult = await embed(provider, { text: query.semanticQuery.trim(), model: embeddingModel });
     const queryEmbedding = embedResult.embedding;
-    const filter = normalizeFilter(query.filter, undefined, undefined);
+    const candidateLimit = offset + limit;
+    const filter = normalizeFilter(query.filter, candidateLimit, 0);
     const allSessions = findDiscoveredSessions(filter);
-    const allEmbeddings = loadEmbeddings(embeddingModel);
+    const allEmbeddings = loadEmbeddings(embeddingModel, allSessions.map((s) => s.id));
     const embMap = new Map(allEmbeddings.map((e) => [e.sessionId, e.embedding]));
     const sessionMap = new Map(allSessions.map((s) => [s.id, s]));
     const scored: Array<{ session: DiscoveredSession; score: number }> = [];
@@ -261,31 +266,14 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
 
   // ── Strategy 2: FTS5 only or FTS5 + filter ───────────────────────────────
   if (hasQ && !hasSimilarTo) {
-    // FTS+filter needs all matches for correct intersection; FTS-only needs offset+limit
-    const ftsMatches = hasFilter ? searchFts(query.q!) : searchFts(query.q!, offset + limit);
-    if (ftsMatches.length === 0) {
-      return { sessions: [], total: 0, mode: 'fts', durationMs: Date.now() - start };
-    }
-
-    const ftsIds = new Set(ftsMatches.map((m) => m.id));
-
-    // Fetch sessions in FTS rank order
     let sessions: DiscoveredSession[];
     let total: number;
     if (hasFilter) {
-      // Apply structured filter then intersect with FTS result IDs.
-      // Total = count of filter results that also match the FTS query (true intersection).
       const filter = normalizeFilter(query.filter, undefined, undefined);
-      const allFiltered = findDiscoveredSessions(filter);
-      total = countFtsInSet(query.q!, allFiltered.map((s) => s.id));
-      // Preserve FTS rank order for the page
-      const rankMap = new Map(ftsMatches.map((m, i) => [m.id, i]));
-      sessions = allFiltered
-        .filter((s) => ftsIds.has(s.id))
-        .sort((a, b) => (rankMap.get(a.id) ?? 999) - (rankMap.get(b.id) ?? 999))
-        .slice(offset, offset + limit);
+      sessions = searchFtsSessions(query.q!, filter, limit, offset);
+      total = countFtsSessions(query.q!, filter);
     } else {
-      // FTS only — use COUNT query for true total (not bounded by over-fetch cap)
+      const ftsMatches = searchFts(query.q!, offset + limit);
       total = countFts(query.q!);
       sessions = ftsMatches
         .slice(offset, offset + limit)
@@ -303,34 +291,29 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
 
   // ── Strategy 3: semantic only ─────────────────────────────────────────────
   if (hasSimilarTo && !hasQ) {
-    const filter = normalizeFilter(query.filter, undefined, undefined);
-    const allSessions = findDiscoveredSessions(filter);
-    // Rank ALL sessions (no limit cap) so pagination is correct
-    const allRanked = semanticSearch(query.similarTo!, embeddingModel, allSessions, allSessions.length);
+    const filter = normalizeFilter(query.filter, offset + limit, 0);
+    const candidateSessions = findDiscoveredSessions(filter);
+    const ranked = semanticSearch(query.similarTo!, embeddingModel, candidateSessions, offset + limit);
     return {
-      sessions: allRanked.slice(offset, offset + limit),
-      total: allRanked.length,
+      sessions: ranked.slice(offset, offset + limit),
+      total: countDiscoveredSessions(normalizeFilter(query.filter, undefined, undefined)),
       mode: 'semantic',
       durationMs: Date.now() - start,
     };
   }
 
   // ── Strategy 4: FTS + semantic re-ranking ─────────────────────────────────
-  // similarTo + q: get FTS candidates, re-rank by cosine similarity
-  // Fetch all FTS matches — semantic re-ranking changes order so we need the full set
   const refEmbedding = getEmbedding(query.similarTo!, embeddingModel);
-  const ftsMatches = searchFts(query.q!);
+  const candidateLimit = offset + limit;
 
   let candidates: DiscoveredSession[];
   let ftsTotal: number;
   if (hasFilter) {
-    // Intersect FTS candidates with filter constraints so results respect all filters
     const filter = normalizeFilter(query.filter, undefined, undefined);
-    const allFiltered = findDiscoveredSessions(filter);
-    const ftsIdSet = new Set(ftsMatches.map((m) => m.id));
-    candidates = allFiltered.filter((s) => ftsIdSet.has(s.id));
-    ftsTotal = countFtsInSet(query.q!, allFiltered.map((s) => s.id));
+    candidates = searchFtsSessions(query.q!, filter, candidateLimit, 0);
+    ftsTotal = countFtsSessions(query.q!, filter);
   } else {
+    const ftsMatches = searchFts(query.q!, candidateLimit);
     const ftsIds = ftsMatches.map((m) => m.id);
     candidates = ftsIds
       .map((id) => getDiscoveredSessionById(id))
@@ -351,7 +334,7 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
 
   // Re-rank FTS candidates by cosine similarity
   const embeddingMap = new Map(
-    loadEmbeddings(embeddingModel).map((e) => [e.sessionId, e.embedding]),
+    loadEmbeddings(embeddingModel, candidates.map((s) => s.id)).map((e) => [e.sessionId, e.embedding]),
   );
   const scored = candidates
     .map((s) => {
