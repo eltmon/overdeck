@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-16T21:24:00.000Z",
+  "updated": "2026-05-16T21:40:00.000Z",
   "gitState": {
     "branch": "feature/pan-1052",
-    "sha": "be3e598b4",
+    "sha": "3f7a5b18e",
     "dirty": true
   },
   "decisions": [
@@ -183,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-hxxs",
-    "itemId": "b1-activity-feed-sidebar",
+    "beadId": "workspace-qdn9",
+    "itemId": "b1-status-rollup-trigger",
     "status": "implemented",
-    "note": "ActivityFeedSidebar selects memory observations from the Zustand store with a stable selector, filters non-null actionStatus entries, buckets them with the shared time-bucket helper, skips empty headers, renders actionStatus plus workspace/issue label and relative time, and is wired into the Command Deck activity tab. Focused tests, lint, typecheck, and a Playwright browser smoke check passed."
+    "note": "Pending turn writes now reload memory.rollup_pending_threshold from config with default 4, count pending files across all sessions in chronological filename order, collapse concurrent workspace rollup triggers to one in-flight enqueue, and append memory.rollup_triggered through the async event store path. Focused tests, lint, typecheck, and graphify update passed."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -297,6 +297,12 @@
       "timestamp": "2026-05-16T21:24:00.000Z",
       "reason": "work",
       "note": "workspace-hxxs implemented: added ActivityFeedSidebar, wired it into the Command Deck activity tab, and verified filtering, bucket headers, item labels, selector stability, lint, typecheck, and browser smoke coverage.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T21:40:00.000Z",
+      "reason": "work",
+      "note": "workspace-qdn9 implemented: pending writes reload the configurable rollup threshold, count pending turns across all workspace sessions, collapse concurrent triggers per workspace, and append memory.rollup_triggered through the async event store path; focused tests, lint, typecheck, and graphify update passed.",
       "agentModel": "gpt-5.5"
     }
   ],
