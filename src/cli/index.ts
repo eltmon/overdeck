@@ -410,6 +410,8 @@ program
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
   .option('--auto', 'Skip planning agent by synthesizing a minimal vBRIEF and beads from the issue title/body')
+  .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
+  .option('--yes', 'Confirm --host in non-interactive contexts')
   .action(startCommand);
 
 program

@@ -188,7 +188,7 @@
       {
         "id": "gate-agent-spawn-on-stack-health",
         "title": "Gate agent spawn on workspace docker stack health; add --host break-glass flag",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -204,49 +204,49 @@
           {
             "id": "gate-agent-spawn-on-stack-health.ac1",
             "title": "`spawnAgent` and `spawnRun` reject (throw) when the project has compose_template configured AND `getWorkspaceStackHealth` returns unhealthy AND `allowHost` is not true.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "gate-agent-spawn-on-stack-health.ac2",
             "title": "The rejection message names the issue ID, lists the unhealthy reasons, and tells the operator the exact next step (`pan workspace rebuild <id>` or `--host`).",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "gate-agent-spawn-on-stack-health.ac3",
             "title": "`--host` flag is wired through every CLI surface that can spawn an agent (`pan start`, `pan work` if present, dashboard spawn endpoints). Interactive use requires y/N confirmation; non-TTY requires explicit `--yes`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "gate-agent-spawn-on-stack-health.ac4",
             "title": "Projects WITHOUT a `workspace.docker.compose_template` keep current behavior — no gate, no flag required, no regression in spawn latency.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "gate-agent-spawn-on-stack-health.ac5",
             "title": "Audit doc (`docs/SPAWN-GATING.md`) lists every spawn entrypoint reachable today and states whether it goes through the gate, with file:line references.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "gate-agent-spawn-on-stack-health.ac6",
             "title": "Vitest unit test asserts both branches: (a) stack unhealthy + docker project → spawn rejected; (b) stack unhealthy + `allowHost: true` → spawn proceeds with a logged warning.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "gate-agent-spawn-on-stack-health.ac7",
             "title": "Activity stream emits `agent-spawn-blocked-stack-unhealthy` (or equivalent) when the gate blocks, observable in the dashboard activity feed.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "gate-agent-spawn-on-stack-health.ac8",
             "title": "No code path inside `src/lib/agents.ts` calls `createSessionAsync(agentId, workspace, ...)` for a work/role agent without first either passing the gate or honoring `allowHost`; restartAgent and session-rotation paths are included in the audit.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]

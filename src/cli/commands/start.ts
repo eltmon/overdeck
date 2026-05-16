@@ -3,6 +3,7 @@ import ora, { type Ora } from 'ora';
 import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
 import { exec, execFile, execFileSync } from 'child_process';
 
@@ -88,6 +89,8 @@ interface IssueOptions {
   remote?: boolean;
   local?: boolean;
   auto?: boolean;
+  host?: boolean;
+  yes?: boolean;
 }
 
 /**
@@ -116,6 +119,27 @@ function determineWorkspaceLocation(options: IssueOptions): 'local' | 'remote' |
 
   // Default: check both (local takes precedence if both exist)
   return null;
+}
+
+async function confirmHostOverride(options: IssueOptions): Promise<boolean> {
+  if (!options.host) return true;
+
+  if (!process.stdin.isTTY) {
+    if (options.yes) {
+      console.warn(chalk.yellow('--host --yes given in a non-interactive context; bypassing workspace isolation.'));
+      return true;
+    }
+    console.error(chalk.red('Error: --host requires an interactive confirmation, or pass --yes for non-interactive use.'));
+    return false;
+  }
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question(chalk.bold('Are you sure? This bypasses workspace isolation. (y/N) '))).trim().toLowerCase();
+    return answer === 'y' || answer === 'yes';
+  } finally {
+    rl.close();
+  }
 }
 
 /**
@@ -645,6 +669,10 @@ async function failPostCreateValidation(options: PostCreateValidationFailureOpti
 }
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
+  if (!(await confirmHostOverride(options))) {
+    process.exit(1);
+  }
+
   // PAN-636 — validate --harness up front. canUseHarness gates the
   // {harness, model, authMode} combination; invalid combos exit non-zero
   // with the human-readable reason text on stderr (no spinner, no
@@ -978,6 +1006,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       model: options.model,
       role: 'work',
       prompt,
+      allowHost: options.host,
     });
 
     spinner.succeed(`Agent spawned: ${agent.id}`);

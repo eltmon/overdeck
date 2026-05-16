@@ -1763,6 +1763,7 @@ const postAgentsRoute = HttpRouter.add(
     const { issueId, projectId } = body as any;
     const autoStart = (body as any).auto === true;
     const guardrailAcknowledged = (body as any).guardrailAcknowledged === true;
+    const allowHost = (body as any).host === true || (body as any).allowHost === true;
 
     if (!issueId) {
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
@@ -2468,6 +2469,7 @@ const postAgentsRoute = HttpRouter.add(
             startedAt: new Date().toISOString(),
             workspace: workspacePath,
             role,
+            hostOverride: allowHost || undefined,
             message: 'Waiting for containers to start...',
             ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
             ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
@@ -2573,7 +2575,8 @@ const postAgentsRoute = HttpRouter.add(
                   });
                   await spawnPanCommand(
                     ['start', issueId, '--local', '--model', spawnModel,
-                      ...(effectiveHarness ? ['--harness', effectiveHarness] : [])],
+                      ...(effectiveHarness ? ['--harness', effectiveHarness] : []),
+                      ...(allowHost ? ['--host', '--yes'] : [])],
                     workspacePath,
                   );
                   await updateIssueStatus();
@@ -2630,7 +2633,8 @@ const postAgentsRoute = HttpRouter.add(
     }));
     const activityId = yield* Effect.promise(() => spawnPanCommand(
       ['start', issueId, '--local', '--model', spawnModel,
-        ...(effectiveHarness ? ['--harness', effectiveHarness] : [])],
+        ...(effectiveHarness ? ['--harness', effectiveHarness] : []),
+        ...(allowHost ? ['--host', '--yes'] : [])],
       workspacePath,
     ));
 
@@ -2652,6 +2656,7 @@ const postAgentsRoute = HttpRouter.add(
       startedAt: new Date().toISOString(),
       workspace: workspacePath,
       role,
+      hostOverride: allowHost || undefined,
       message: 'Work agent spawn requested',
       ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
       ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),

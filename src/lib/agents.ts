@@ -37,6 +37,7 @@ import { canUseHarness } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtimes/pi-fifo.js';
 import { assertIssueHasBeads } from './beads-query.js';
+import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 
 const execAsync = promisify(exec);
 
@@ -581,6 +582,7 @@ export interface AgentState {
   reviewSynthesisAgentId?: string;
   reviewDeadlineAt?: string;
   reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
+  hostOverride?: boolean;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -619,6 +621,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
     reviewDeadlineAt: raw.reviewDeadlineAt,
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
+    hostOverride: raw.hostOverride,
   };
 }
 
@@ -1457,6 +1460,7 @@ export interface SpawnOptions {
   // and the one-agent-per-issue uniqueness check is scoped to the slot.
   slotId?: number;
   swarmItemId?: string; // vBRIEF item ID this slot is working on
+  allowHost?: boolean;
 }
 
 export interface SpawnRunOptions {
@@ -1480,6 +1484,7 @@ export interface SpawnRunOptions {
    */
   reviewSynthesisAgentId?: string;
   reviewOutputPath?: string;
+  allowHost?: boolean;
 }
 
 /**
@@ -1800,6 +1805,42 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  */
 const REVIEW_SUBROLE_TIMEOUT_SECONDS = 20 * 60;
 
+export async function assertWorkspaceStackHealthyForSpawn(
+  issueId: string,
+  role: Role,
+  allowHost = false,
+): Promise<void> {
+  if (role === 'plan') return;
+
+  const health = await getWorkspaceStackHealth(issueId);
+  if (health.healthy) return;
+
+  const normalizedIssue = issueId.toUpperCase();
+  const details = health.reasons.join('; ');
+  const message = `Workspace docker stack for ${normalizedIssue} is not healthy: ${details}. Run 'pan workspace rebuild ${normalizedIssue}' or retry with --host to override.`;
+
+  if (allowHost) {
+    console.warn(`[agents] ${message}`);
+    emitActivityEntry({
+      source: role,
+      level: 'warn',
+      issueId: normalizedIssue,
+      message: `agent-spawn-host-override: ${normalizedIssue}`,
+      details,
+    });
+    return;
+  }
+
+  emitActivityEntry({
+    source: role,
+    level: 'error',
+    issueId: normalizedIssue,
+    message: `agent-spawn-blocked-stack-unhealthy: ${normalizedIssue}`,
+    details,
+  });
+  throw new Error(message);
+}
+
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
 
@@ -1811,6 +1852,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       model: options.model,
       prompt: options.prompt,
       role: 'work',
+      allowHost: options.allowHost,
     });
   }
 
@@ -1818,6 +1860,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (await sessionExistsAsync(agentId)) {
     throw new Error(`Role run ${agentId} already running. Use 'pan tell' to message it.`);
   }
+
+  await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost);
 
   initHook(agentId);
   const selectedModel = determineModel({ model: options.model, role });
@@ -1864,6 +1908,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     status: 'starting',
     startedAt: new Date().toISOString(),
     costSoFar: 0,
+    hostOverride: options.allowHost || undefined,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
@@ -2055,16 +2100,18 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const agentId = options.slotId != null
     ? `agent-${options.issueId.toLowerCase()}-${options.slotId}`
     : `agent-${options.issueId.toLowerCase()}`;
+  const role: 'work' = options.role ?? 'work';
 
   // Check if already running (scoped to the exact session name, including slot suffix)
   if (await sessionExistsAsync(agentId)) {
     throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
+  await assertWorkspaceStackHealthyForSpawn(options.issueId, role, options.allowHost);
+
   // Initialize hook for this agent (FPP support)
   initHook(agentId);
 
-  const role: 'work' = options.role ?? 'work';
   await assertIssueHasBeads(options.workspace, options.issueId);
 
   // Determine model based on role configuration
@@ -2119,6 +2166,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     preSpawnStashRef: existingState?.preSpawnStashRef,
     preSpawnStashMessage: existingState?.preSpawnStashMessage,
     preSpawnBaselineHead: existingState?.preSpawnBaselineHead,
+    hostOverride: options.allowHost || undefined,
   };
 
   saveAgentState(state);
@@ -2661,6 +2709,11 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     // emitted a launcher that would crash on resume for any Pi role agent.
     const resumeModel = agentState.model || 'claude-sonnet-4-6';
     const fallbackHarness = agentState.harness ?? 'claude-code';
+    await assertWorkspaceStackHealthyForSpawn(
+      agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
+      resumeRole,
+      agentState.hostOverride === true,
+    );
     const fallbackPiFields = fallbackHarness === 'pi'
       ? await getPiLauncherFields(normalizedId, resumeModel)
       : {};
@@ -2824,6 +2877,18 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     };
   }
 
+  try {
+    await assertWorkspaceStackHealthyForSpawn(
+      agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
+      agentState.role ?? 'work',
+      agentState.hostOverride === true,
+    );
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+    return { success: false, error: reason };
+  }
+
   // Kill any zombie tmux session (crashed agent left behind)
   if (await sessionExistsAsync(normalizedId)) {
     try {
@@ -2970,6 +3035,18 @@ export async function restartAgent(
   }
 
   logAgentLifecycle(normalizedId, `restartAgent called (graceful=${graceful}, model=${newModel || 'unchanged'}, harness=${newHarness || 'unchanged'})`);
+
+  try {
+    await assertWorkspaceStackHealthyForSpawn(
+      agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
+      agentState.role ?? 'work',
+      agentState.hostOverride === true,
+    );
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    logAgentLifecycle(normalizedId, `restartAgent BLOCKED: ${reason}`);
+    return { success: false, error: reason };
+  }
 
   if (graceful && await sessionExistsAsync(normalizedId)) {
     const warning = 'Restarting in 30s. Update .pan/continue.json now with all progress, decisions, hazards, and resume point.';
@@ -3123,6 +3200,20 @@ export async function recoverAgent(
     return null;
   }
 
+  const recoveryRole: Role = state.role
+    ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work');
+  try {
+    await assertWorkspaceStackHealthyForSpawn(
+      state.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
+      recoveryRole,
+      state.hostOverride === true,
+    );
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: ${reason}`);
+    return null;
+  }
+
   // Check if already running — session may exist with only a bare shell
   // after Claude exited (zombie session). Kill it and recover.
   if (sessionExists(normalizedId)) {
@@ -3165,8 +3256,6 @@ export async function recoverAgent(
   // the saved AgentState (or the session-id heuristic for legacy planning-* IDs)
   // and route through getRoleRuntimeBaseCommand so review/test/ship don't get
   // resurrected as work agents.
-  const recoveryRole: Role = state.role
-    ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work');
   const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code')
     ? state.harness
     : 'claude-code';

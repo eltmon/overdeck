@@ -16,6 +16,9 @@ describe('AgentState role persistence', () => {
   afterEach(() => {
     vi.doUnmock('../config-yaml.js');
     vi.doUnmock('../tmux.js');
+    vi.doUnmock('../workspace/stack-health.js');
+    vi.doUnmock('../beads-query.js');
+    vi.doUnmock('../activity-logger.js');
     delete process.env.PANOPTICON_HOME;
     rmSync(tempHome, { recursive: true, force: true });
   });
@@ -137,6 +140,107 @@ describe('AgentState role persistence', () => {
       eligible: false,
       reason: 'harness-pi',
     });
+  });
+
+  it('blocks spawnAgent before side effects when the workspace stack is unhealthy', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-stack-gate-'));
+    const createSessionAsync = vi.fn();
+    const emitActivityEntry = vi.fn();
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(async () => ({
+        healthy: false,
+        reasons: ['panopticon-feature-pan-1140-init init exited non-zero (1)'],
+        lastObserved: '2026-05-16T00:00:00.000Z',
+      })),
+    }));
+    vi.doMock('../tmux.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../tmux.js')),
+      sessionExistsAsync: vi.fn(async () => false),
+      createSessionAsync,
+    }));
+    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
+    vi.doMock('../activity-logger.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../activity-logger.js')),
+      emitActivityEntry,
+    }));
+
+    const { spawnAgent } = await import('../agents.js');
+
+    await expect(spawnAgent({
+      issueId: 'PAN-1140',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+    })).rejects.toThrow("Workspace docker stack for PAN-1140 is not healthy: panopticon-feature-pan-1140-init init exited non-zero (1). Run 'pan workspace rebuild PAN-1140' or retry with --host to override.");
+
+    expect(createSessionAsync).not.toHaveBeenCalled();
+    expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'error',
+      issueId: 'PAN-1140',
+      message: 'agent-spawn-blocked-stack-unhealthy: PAN-1140',
+    }));
+    rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it('allows explicit host override when the workspace stack is unhealthy', async () => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-stack-host-'));
+    const createSessionAsync = vi.fn(async () => undefined);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const emitActivityEntry = vi.fn();
+    vi.doMock('../config-yaml.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../config-yaml.js')),
+      isClaudeCodeChannelsEnabled: () => false,
+    }));
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(async () => ({
+        healthy: false,
+        reasons: ['panopticon-feature-pan-1140-server stuck Created for 180s'],
+        lastObserved: '2026-05-16T00:00:00.000Z',
+      })),
+    }));
+    vi.doMock('../tmux.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../tmux.js')),
+      sessionExistsAsync: vi.fn(async () => false),
+      sessionExists: vi.fn(() => false),
+      createSessionAsync,
+      capturePaneAsync: vi.fn(async () => 'Claude Code'),
+    }));
+    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(async () => undefined) }));
+    vi.doMock('../activity-logger.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../activity-logger.js')),
+      emitActivityEntry,
+      emitActivityTts: vi.fn(),
+    }));
+
+    const { spawnAgent } = await import('../agents.js');
+
+    const state = await spawnAgent({
+      issueId: 'PAN-1140',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      allowHost: true,
+    });
+
+    expect(state.hostOverride).toBe(true);
+    expect(createSessionAsync).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('retry with --host to override'));
+    expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      level: 'warn',
+      issueId: 'PAN-1140',
+      message: 'agent-spawn-host-override: PAN-1140',
+    }));
+    warnSpy.mockRestore();
+    rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it('does not block when workspace stack health is healthy', async () => {
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(async () => ({ healthy: true, reasons: [], lastObserved: '2026-05-16T00:00:00.000Z' })),
+    }));
+    const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
+
+    await expect(assertWorkspaceStackHealthyForSpawn('MIN-1', 'work')).resolves.toBeUndefined();
   });
 
   it('treats state.json without a valid role as missing', async () => {
