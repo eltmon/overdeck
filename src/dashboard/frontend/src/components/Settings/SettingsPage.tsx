@@ -42,6 +42,7 @@ import { RolesPanel } from './RolesPanel';
 import { SavedVoicesTab } from './SavedVoicesTab';
 import { VoiceDesignTab } from './VoiceDesignTab';
 import { VoicePresetsTab } from './VoicePresetsTab';
+import { TtsSystemVoicePicker } from './TtsSystemVoicePicker';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
 // PAN-1055: drop the cached available-models response when Settings is saved
 // so subsequent picker renders see the new provider/keys mix immediately.
@@ -284,11 +285,12 @@ export function SettingsPage() {
     queryFn: fetchTtsHealth,
     refetchInterval: 10_000,
   });
-  const { data: ttsVoices = [] } = useQuery({
+  const ttsVoicesQuery = useQuery({
     queryKey: ['tts-voices'],
     queryFn: fetchTtsVoices,
     staleTime: 60_000,
   });
+  const ttsVoices = ttsVoicesQuery.data ?? [];
 
   const [formData, setFormData] = useState<SettingsConfig | null>(null);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
@@ -1296,6 +1298,16 @@ export function SettingsPage() {
             }`} />
           </button>
         </SettingsRow>
+
+        <TtsSystemVoicePicker
+          voices={ttsVoices}
+          isLoading={ttsVoicesQuery.isLoading}
+          systemVoiceId={ttsConfig.voice}
+          statusVoiceId={ttsConfig.statusVoice}
+          disabled={saveMutation.isPending}
+          onSetSystemVoice={(voiceId) => handleTtsConfigChange({ voice: voiceId })}
+          onSetStatusVoice={(voiceId) => handleTtsConfigChange({ statusVoice: voiceId })}
+        />
 
         <div className="mt-6" data-testid="tts-voice-library-tabs">
           <div className="rounded-t-xl border border-border/70 bg-card/40 p-2">
