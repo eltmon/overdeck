@@ -179,10 +179,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-6nf3",
-    "itemId": "b1-turn-compression",
+    "beadId": "workspace-4x4b",
+    "itemId": "b1-query-expansion",
     "status": "implemented",
-    "note": "Transcript delta compressor now reads only the claimed byte range, emits compact user/assistant/tool summaries, returns lastFullLineOffset for partial trailing JSONL, categorizes Write/Edit/MultiEdit/NotebookEdit/Bash/unknown tools, truncates long user text, and passes focused tests/typecheck/lint."
+    "note": "Query expansion now turns user prompts plus the last three observations into normalized BM25 terms through the configured provider policy, caches results by session/content hash, falls back to the raw prompt on failures, logs query-expansion decisions to rag-runs, and passes focused tests/typecheck/lint."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -239,6 +239,12 @@
       "timestamp": "2026-05-15T00:00:00.000Z",
       "reason": "work",
       "note": "workspace-6nf3 implemented: added src/lib/memory/compress.ts byte-range JSONL compression, partial-line offset handling, tool-call categorization, long-user truncation, and tests/lib/memory/compress.test.ts; focused tests, typecheck, and lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T20:26:00.000Z",
+      "reason": "work",
+      "note": "workspace-4x4b implemented: added src/lib/memory/query-expansion.ts with provider-policy BM25 query expansion, session/content-hash cache, raw prompt fallback, rag-runs JSONL telemetry, and tests/lib/memory/query-expansion.test.ts; focused tests, typecheck, and lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],
