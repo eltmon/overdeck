@@ -3,21 +3,34 @@
  */
 
 import chalk from 'chalk';
-import { enrichSessions, CostThresholdError, estimateEnrichmentCost } from '../../../lib/conversations/enrichment/index.js';
+import { createInterface } from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
+import { enrichSessions, CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
 import type { EnrichmentTier } from '../../../lib/conversations/enrichment/index.js';
+
+async function confirmCost(): Promise<boolean> {
+  if (!input.isTTY) return false;
+  const rl = createInterface({ input, output });
+  try {
+    const answer = await rl.question('Proceed with enrichment? [y/N] ');
+    return answer.trim().toLowerCase() === 'y' || answer.trim().toLowerCase() === 'yes';
+  } finally {
+    rl.close();
+  }
+}
 
 export async function enrichAction(
   positionalIds: string[],
   opts: Record<string, string | boolean | undefined>,
 ): Promise<void> {
-  // --deep is shorthand for --tier 3
   const deep = Boolean(opts['deep']);
-  const tierRaw = deep ? 3 : parseInt((opts['tier'] as string) ?? '1', 10);
+  const upgrade = Boolean(opts['upgrade']);
+  const tierRaw = deep ? (upgrade ? 2 : 3) : parseInt((opts['tier'] as string) ?? '1', 10);
   const tier = tierRaw as EnrichmentTier;
   const yes = Boolean(opts['yes']);
   const maxParallel = opts['maxParallel'] ? parseInt(opts['maxParallel'] as string, 10) : undefined;
-  const skipAlreadyEnriched = !Boolean(opts['full']) && !Boolean(opts['upgrade']);
-  const force = Boolean(opts['full']) || Boolean(opts['upgrade']);
+  const skipAlreadyEnriched = !Boolean(opts['full']) && !upgrade;
+  const force = yes;
   const limit = opts['limit'] ? parseInt(opts['limit'] as string, 10) : undefined;
   const workspace = opts['workspace'] as string | undefined;
   const since = opts['since'] as string | undefined;
@@ -94,16 +107,11 @@ export async function enrichAction(
       console.log(chalk.yellow(`Estimated cost: $${err.estimatedCost.toFixed(4)} for ${err.sessionCount} sessions`));
       console.log(chalk.yellow(`Threshold:      $${err.threshold.toFixed(2)}`));
 
-      if (!yes) {
-        // In a real CLI we'd prompt interactively; for now, show the --yes flag
-        console.log();
-        console.log(chalk.dim('Rerun with --yes to proceed despite cost threshold.'));
+      if (!yes && !(await confirmCost())) {
         process.exit(1);
       }
 
-      // Retry with threshold bypassed by running directly
-      // (enrichSessions checks config threshold; --yes means caller accepts)
-      console.log(chalk.yellow(`Proceeding anyway (--yes)...`));
+      console.log(chalk.yellow(`Proceeding with accepted cost...`));
       const result = await enrichSessions({
         tier,
         sessionIds,

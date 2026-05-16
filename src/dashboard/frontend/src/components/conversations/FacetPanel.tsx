@@ -7,10 +7,14 @@ interface Filters {
   since?: string;
   managed?: boolean;
   enriched?: boolean;
+  model?: string;
+  minCost?: string;
+  maxCost?: string;
 }
 
 interface Props {
   filters: Filters;
+  facets: { models: string[]; workspaces: string[] };
   onChange: (key: string, value: string | boolean | undefined) => void;
 }
 
@@ -22,7 +26,7 @@ const SINCE_OPTIONS = [
   { label: 'Last 90 days', value: '90d' },
 ];
 
-export function FacetPanel({ filters, onChange }: Props) {
+export function FacetPanel({ filters, facets, onChange }: Props) {
   return (
     <div className="w-48 shrink-0 border-r border-gray-800 bg-gray-950 p-3 overflow-auto">
       <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">
@@ -50,11 +54,50 @@ export function FacetPanel({ filters, onChange }: Props) {
         <label className="text-xs text-gray-400 block mb-1">Workspace path</label>
         <input
           type="text"
+          list="conversation-workspaces"
           value={filters.workspace ?? ''}
           onChange={(e) => onChange('workspace', e.target.value || undefined)}
           placeholder="e.g. /Projects/myapp"
           className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
         />
+        <datalist id="conversation-workspaces">
+          {facets.workspaces.map((workspace) => <option key={workspace} value={workspace} />)}
+        </datalist>
+      </div>
+
+      <div className="mb-4">
+        <label className="text-xs text-gray-400 block mb-1">Model</label>
+        <select
+          value={filters.model ?? ''}
+          onChange={(e) => onChange('model', e.target.value || undefined)}
+          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+        >
+          <option value="">All models</option>
+          {facets.models.map((model) => <option key={model} value={model}>{model}</option>)}
+        </select>
+      </div>
+
+      <div className="mb-4 grid grid-cols-2 gap-2">
+        <label className="text-xs text-gray-400 block">
+          Min cost
+          <input
+            type="number"
+            step="0.001"
+            value={filters.minCost ?? ''}
+            onChange={(e) => onChange('minCost', e.target.value || undefined)}
+            className="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+          />
+        </label>
+        <label className="text-xs text-gray-400 block">
+          Max cost
+          <input
+            type="number"
+            step="0.001"
+            value={filters.maxCost ?? ''}
+            onChange={(e) => onChange('maxCost', e.target.value || undefined)}
+            className="mt-1 w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+          />
+        </label>
       </div>
 
       {/* Toggle filters */}
@@ -88,6 +131,9 @@ export function FacetPanel({ filters, onChange }: Props) {
             onChange('workspace', undefined);
             onChange('managed', undefined);
             onChange('enriched', undefined);
+            onChange('model', undefined);
+            onChange('minCost', undefined);
+            onChange('maxCost', undefined);
           }}
           className="mt-4 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
         >

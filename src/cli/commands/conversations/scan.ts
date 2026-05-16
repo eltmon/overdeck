@@ -63,6 +63,11 @@ export async function scanAction(opts: {
   if (result.errors > 0) {
     console.log(`  Errors:   ${chalk.red(result.errors)}`);
   }
+  if (result.warnings?.length) {
+    for (const warning of result.warnings) {
+      console.warn(chalk.yellow(`  Warning:  ${warning}`));
+    }
+  }
   console.log(`  Duration: ${(result.durationMs / 1000).toFixed(2)}s`);
 }
 

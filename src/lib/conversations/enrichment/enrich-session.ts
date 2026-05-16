@@ -11,8 +11,10 @@ import * as readline from 'readline';
 import { createReadStream } from 'fs';
 
 import { updateEnrichment, markEnrichmentFailed } from '../../database/discovered-sessions-db.js';
-import { selectModelForTier, maxMessagesForTier } from './model-fallback.js';
-import type { EnrichmentTier, TierConfig } from './model-fallback.js';
+import { calculateCost, getPricing } from '../../cost.js';
+import { selectEnrichmentModelForTier } from '../../model-fallback.js';
+import type { TokenUsage } from '../../cost.js';
+import type { EnrichmentTier, EnrichmentTierConfig } from '../../model-fallback.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,13 +22,14 @@ export interface EnrichmentResponse {
   summary: string;
   summaryDetailed?: string;
   tags: string[];
+  usage?: TokenUsage & { cost: number };
 }
 
 export interface EnrichSessionOptions {
   sessionId: number;
   jsonlPath: string;
   tier: EnrichmentTier;
-  config: TierConfig;
+  config: EnrichmentTierConfig;
   /** Override the model used (ignores tier-based selection) */
   modelOverride?: string;
   /** Append custom text to the enrichment prompt */
@@ -40,6 +43,7 @@ export interface EnrichSessionResult {
   tier: EnrichmentTier;
   model: string;
   tokensUsed?: number;
+  cost?: number;
   error?: string;
 }
 
@@ -58,7 +62,7 @@ function redactSensitiveText(text: string): string {
  * Read up to `maxLines` lines from a JSONL file.
  * Returns raw line strings (not parsed) for prompt construction.
  */
-async function readJsonlLines(filePath: string, maxLines: number | null): Promise<string[]> {
+async function readJsonlLines(filePath: string): Promise<string[]> {
   const lines: string[] = [];
   try {
     await fs.access(filePath);
@@ -72,20 +76,38 @@ async function readJsonlLines(filePath: string, maxLines: number | null): Promis
       crlfDelay: Infinity,
     });
 
-    let count = 0;
     rl.on('line', (line) => {
       const trimmed = line.trim();
-      if (!trimmed) return;
-      lines.push(trimmed);
-      count++;
-      if (maxLines !== null && count >= maxLines) {
-        rl.close();
-      }
+      if (trimmed) lines.push(trimmed);
     });
 
     rl.on('close', () => resolve(lines));
     rl.on('error', () => resolve(lines));
   });
+}
+
+function pickMiddle<T>(items: T[], count: number): T[] {
+  if (items.length <= count) return items;
+  if (count <= 0) return [];
+  const selected: T[] = [];
+  const step = (items.length - 1) / Math.max(1, count - 1);
+  for (let i = 0; i < count; i++) {
+    selected.push(items[Math.round(i * step)]);
+  }
+  return selected;
+}
+
+function sampleLinesForTier(lines: string[], tier: EnrichmentTier): string[] {
+  if (tier === 3 || lines.length <= 3) return lines;
+  if (tier === 1) {
+    const middle = lines.length > 2 ? [lines[Math.floor(lines.length / 2)]] : [];
+    return [...lines.slice(0, 1), ...middle, ...lines.slice(-1)];
+  }
+
+  const first = lines.slice(0, 3);
+  const last = lines.slice(-3);
+  const middlePool = lines.slice(3, Math.max(3, lines.length - 3));
+  return [...first, ...pickMiddle(middlePool, 5), ...last];
 }
 
 /**
@@ -108,8 +130,13 @@ function buildConversationExcerpt(lines: string[]): string {
         text = content.slice(0, 500);
       } else if (Array.isArray(content)) {
         text = content
-          .filter((b: unknown) => (b as { type?: string }).type === 'text')
-          .map((b: unknown) => (b as { text?: string }).text ?? '')
+          .map((b: unknown) => {
+            const block = b as { type?: string; text?: string; name?: string; input?: unknown };
+            if (block.type === 'text') return block.text ?? '';
+            if (block.type === 'tool_use') return `[tool_use:${block.name ?? 'unknown'}] ${JSON.stringify(block.input ?? {}).slice(0, 200)}`;
+            return '';
+          })
+          .filter(Boolean)
           .join(' ')
           .slice(0, 500);
       }
@@ -201,6 +228,12 @@ export async function callClaudeApi(
 
   const data = (await resp.json()) as {
     content: Array<{ type: string; text?: string }>;
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_read_input_tokens?: number;
+      cache_creation_input_tokens?: number;
+    };
   };
 
   const text = data.content.find((b) => b.type === 'text')?.text ?? '';
@@ -209,7 +242,18 @@ export async function callClaudeApi(
   const cleaned = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
 
   try {
-    return JSON.parse(cleaned) as EnrichmentResponse;
+    const parsed = JSON.parse(cleaned) as EnrichmentResponse;
+    if (data.usage) {
+      const usage: TokenUsage = {
+        inputTokens: data.usage.input_tokens ?? 0,
+        outputTokens: data.usage.output_tokens ?? 0,
+        cacheReadTokens: data.usage.cache_read_input_tokens ?? 0,
+        cacheWriteTokens: data.usage.cache_creation_input_tokens ?? 0,
+      };
+      const pricing = getPricing('anthropic', model);
+      if (pricing) parsed.usage = { ...usage, cost: calculateCost(usage, pricing) };
+    }
+    return parsed;
   } catch {
     throw new Error(`Failed to parse enrichment JSON: ${cleaned.slice(0, 200)}`);
   }
@@ -223,14 +267,12 @@ export async function callClaudeApi(
  */
 export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichSessionResult> {
   const { sessionId, jsonlPath, tier, config } = opts;
-  const model = opts.modelOverride ?? selectModelForTier(tier, config);
-  const maxLines = maxMessagesForTier(tier);
+  const model = opts.modelOverride ?? selectEnrichmentModelForTier(tier, config);
 
   const apiCall = opts.callApi ?? callClaudeApi;
 
   try {
-    // Read JSONL lines up to tier context limit
-    const lines = await readJsonlLines(jsonlPath, maxLines);
+    const lines = sampleLinesForTier(await readJsonlLines(jsonlPath), tier);
     if (lines.length === 0) {
       return { sessionId, tier, model, error: 'No readable messages in JSONL' };
     }
@@ -260,7 +302,13 @@ export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichS
       enrichmentModel: model,
     });
 
-    return { sessionId, tier, model };
+    return {
+      sessionId,
+      tier,
+      model,
+      tokensUsed: response.usage ? response.usage.inputTokens + response.usage.outputTokens + (response.usage.cacheReadTokens ?? 0) + (response.usage.cacheWriteTokens ?? 0) : undefined,
+      cost: response.usage?.cost,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // Mark as failed in DB

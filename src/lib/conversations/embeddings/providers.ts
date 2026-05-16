@@ -3,7 +3,7 @@
  *
  * Supported providers:
  *   openai  — text-embedding-3-small (default) via api.openai.com
- *   voyage  — voyage-3-lite via api.voyageai.com
+ *   voyage  — voyage-code-3 via api.voyageai.com
  *   ollama  — configurable model via localhost:11434
  *
  * All providers return a normalized Float32Array.

@@ -6,6 +6,7 @@ import chalk from 'chalk';
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import type { EmbeddingProviderName } from '../../../lib/conversations/embeddings/index.js';
 import { getDiscoveredStats } from '../../../lib/database/discovered-sessions-db.js';
+import { getConversationsConfig } from '../../../lib/config.js';
 
 export async function embedAction(
   positionalIds: string[],
@@ -14,12 +15,21 @@ export async function embedAction(
   // --status: show coverage and exit
   if (opts['status']) {
     const stats = getDiscoveredStats();
+    const config = getConversationsConfig();
     console.log(chalk.bold('Embedding coverage'));
+    console.log(`  Provider:         ${config.embeddingProvider}`);
+    console.log(`  Config model:     ${config.embeddingModel}`);
     console.log(`  Total sessions:   ${stats.total}`);
     console.log(`  Enriched:         ${stats.enriched}`);
     console.log(`  Embedded:         ${stats.embedded}`);
     const pct = stats.enriched > 0 ? Math.round((stats.embedded / stats.enriched) * 100) : 0;
     console.log(`  Coverage:         ${pct}%`);
+    if (stats.embeddingModels.length > 0) {
+      console.log('  Models:');
+      for (const row of stats.embeddingModels) {
+        console.log(`    ${row.model}: ${row.embedded}`);
+      }
+    }
     return;
   }
 

@@ -1126,7 +1126,7 @@ export function SettingsPage() {
                         const defaultModel = provider === 'openai'
                           ? 'text-embedding-3-small'
                           : provider === 'voyage'
-                            ? 'voyage-3-lite'
+                            ? 'voyage-code-3'
                             : 'nomic-embed-text';
                         handleConvConfigChange({ embeddingProvider: provider, embeddingModel: defaultModel });
                       }}

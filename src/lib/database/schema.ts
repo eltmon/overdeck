@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 36;
+export const SCHEMA_VERSION = 37;
 
 /**
  * Initialize the complete database schema.
@@ -398,6 +398,9 @@ export function initSchema(db: Database.Database): void {
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
       ON session_embeddings(session_id, model);
+
+    CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
+      ON session_embeddings(model, session_id);
   `);
 
   // Record schema version
@@ -963,6 +966,14 @@ export function runMigrations(db: Database.Database): void {
       );
       CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
         ON session_embeddings(session_id, model);
+    `);
+  }
+
+  // v36 → v37: add model-leading embedding index for semantic search scans
+  if (currentVersion < 37) {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
+        ON session_embeddings(model, session_id)
     `);
   }
 

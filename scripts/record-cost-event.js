@@ -712,8 +712,11 @@ function initSchema(db) {
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
       ON session_embeddings(session_id, model);
+
+    CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
+      ON session_embeddings(model, session_id);
   `);
-	db.pragma(`user_version = 36`);
+	db.pragma(`user_version = 37`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -721,7 +724,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 36) return;
+	if (currentVersion === 37) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -1145,7 +1148,11 @@ function runMigrations(db) {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
         ON session_embeddings(session_id, model);
     `);
-	db.pragma(`user_version = 36`);
+	if (currentVersion < 37) db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
+        ON session_embeddings(model, session_id)
+    `);
+	db.pragma(`user_version = 37`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

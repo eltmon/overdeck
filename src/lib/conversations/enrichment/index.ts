@@ -9,9 +9,10 @@
  */
 
 import { findDiscoveredSessions, getDiscoveredSessionById } from '../../database/discovered-sessions-db.js';
-import type { DiscoveredSession } from '../../database/discovered-sessions-db.js';
+import type { ConversationFilter, DiscoveredSession } from '../../database/discovered-sessions-db.js';
 import { runWithPool } from '../work-pool.js';
 import { enrichSession } from './enrich-session.js';
+import { embedSessions } from '../embeddings/index.js';
 import type { EnrichSessionOptions } from './enrich-session.js';
 import { getConversationsConfig } from '../../config.js';
 import type { ConversationsConfig } from '../../config.js';
@@ -26,6 +27,10 @@ export interface EnrichOptions {
   sessionIds?: number[];
   /** Maximum concurrent enrichment tasks */
   maxParallel?: number;
+  /** Structured filter used when sessionIds is omitted */
+  filter?: ConversationFilter;
+  /** Cap selected sessions after filtering */
+  limit?: number;
   /** If true, skip sessions already enriched at this tier or higher */
   skipAlreadyEnriched?: boolean;
   /** If true, bypass the cost confirmation threshold */
@@ -63,6 +68,9 @@ export interface EnrichResult {
   skipped: number;
   errors: number;
   durationMs: number;
+  estimatedCost: number;
+  actualCost: number | null;
+  embedded: number;
 }
 
 // ─── Cost estimation ──────────────────────────────────────────────────────────
@@ -94,13 +102,16 @@ function selectSessionsForEnrichment(
       .filter((s): s is DiscoveredSession => s != null);
   }
 
+  const baseFilter = opts.filter ?? {};
+  const limited = (sessions: DiscoveredSession[]) =>
+    opts.limit !== undefined ? sessions.slice(0, Math.max(0, opts.limit)) : sessions;
+
   const skipAlready = opts.skipAlreadyEnriched !== false; // default true
   if (skipAlready) {
-    // Only enrich sessions whose enrichment_level is below the requested tier
-    return findDiscoveredSessions({ enrichmentLevelLessThan: tier });
+    return limited(findDiscoveredSessions({ ...baseFilter, enrichmentLevelLessThan: tier }));
   }
 
-  return findDiscoveredSessions({});
+  return limited(findDiscoveredSessions(baseFilter));
 }
 
 // ─── Main bulk enrichment ─────────────────────────────────────────────────────
@@ -116,7 +127,7 @@ function selectSessionsForEnrichment(
  */
 export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichResult> {
   const startTs = Date.now();
-  const result: EnrichResult = { enriched: 0, skipped: 0, errors: 0, durationMs: 0 };
+  const result: EnrichResult = { enriched: 0, skipped: 0, errors: 0, durationMs: 0, estimatedCost: 0, actualCost: null, embedded: 0 };
 
   const tier = opts.tier ?? 1;
   const config = opts.config ?? getConversationsConfig();
@@ -136,6 +147,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
 
   // Cost gate: check against threshold
   const estimatedCost = estimateEnrichmentCost(sessions.length, tier);
+  result.estimatedCost = estimatedCost;
   const threshold = config.enrichment.costConfirmThreshold;
   if (estimatedCost > threshold && !opts.force) {
     // Callers can check the threshold themselves before calling.
@@ -144,7 +156,10 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
   }
 
   let processed = 0;
+  let actualCost = 0;
+  let actualCostCount = 0;
   const total = sessions.length;
+  const enrichedIds: number[] = [];
 
   const tasks = sessions.map((session) => async () => {
     const sessionResult = await enrichSession({
@@ -162,6 +177,11 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       result.errors++;
     } else {
       result.enriched++;
+      enrichedIds.push(session.id);
+      if (sessionResult.cost !== undefined) {
+        actualCost += sessionResult.cost;
+        actualCostCount++;
+      }
     }
 
     await opts.onProgress?.({
@@ -173,7 +193,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
         sessionId: session.id,
         tier,
         model: sessionResult.model,
-        cost: sessionResult.error ? undefined : estimateEnrichmentCost(1, tier),
+        cost: sessionResult.error ? undefined : sessionResult.cost ?? estimateEnrichmentCost(1, tier),
         success: !sessionResult.error,
         error: sessionResult.error,
       },
@@ -182,6 +202,14 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
 
   await runWithPool(tasks, maxParallel);
 
+  if (tier >= 2 && config.embeddings && config.embeddingAutoOnDeep) {
+    if (enrichedIds.length > 0) {
+      const embedded = await embedSessions({ sessionIds: enrichedIds, config });
+      result.embedded = embedded.embedded;
+    }
+  }
+
+  result.actualCost = actualCostCount > 0 ? actualCost : null;
   result.durationMs = Date.now() - startTs;
   return result;
 }

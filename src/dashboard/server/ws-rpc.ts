@@ -7,7 +7,7 @@
  */
 
 import { Effect, Layer, Queue, Stream } from 'effect';
-import { HttpRouter } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panctl/contracts';
 import { PanOpen } from './services/open.js';
@@ -19,19 +19,17 @@ import { parseConversationMessages, watchConversation } from './services/convers
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNamesAsync } from '../../lib/tmux.js';
 import { listProjects } from '../../lib/projects.js';
-import type { AgentStatus, ConversationEvent, DomainEvent, SessionTreeDelta } from '@panctl/contracts';
+import type { AgentStatus, ConversationEvent, DomainEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionTreeDelta } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
 import { scan } from '../../lib/conversations/scanner.js';
-import { searchSessions } from '../../lib/conversations/search.js';
+import type { SearchResult } from '../../lib/conversations/search.js';
 import { enrichSessions } from '../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../lib/conversations/embeddings/index.js';
 import { getConversationsConfigAsync } from '../../lib/config.js';
-import {
-  aggregateDiscoveredSessionCostBy,
-  findDiscoveredSessions,
-  getDiscoveredSessionById,
-} from '../../lib/database/discovered-sessions-db.js';
 import type { DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
+import { validateOrigin } from './routes/origin-validation.js';
+import { jsonResponse } from './http-helpers.js';
+import { runDashboardDbJob } from './services/dashboard-db-task.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -471,19 +469,48 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       [WS_METHODS.scanConversations]: (input) =>
         Effect.promise(async () => {
           const config = await getConversationsConfigAsync();
-          return scan({
+          await Effect.runPromise(eventStore.append({
+            type: 'scan.started',
+            timestamp: new Date().toISOString(),
+            payload: { mode: input.mode, dirs: input.dirs ?? [] },
+          } as ScanStartedEvent));
+          let lastProgressEmit = 0;
+          const result = await scan({
             mode: input.mode,
             dirs: input.dirs,
             dryRun: input.dryRun,
             watchDirs: config.watchDirs,
             maxParallel: config.scanMaxParallel,
+            onProgress: async (progress) => {
+              const now = Date.now();
+              const complete = progress.dirsProcessed >= progress.dirsTotal;
+              if (!complete && now - lastProgressEmit < 500) return;
+              lastProgressEmit = now;
+              await Effect.runPromise(eventStore.append({
+                type: 'scan.progress',
+                timestamp: new Date().toISOString(),
+                payload: progress,
+              } as ScanProgressEvent));
+            },
           });
+          await Effect.runPromise(eventStore.append({
+            type: 'scan.complete',
+            timestamp: new Date().toISOString(),
+            payload: {
+              inserted: result.inserted,
+              updated: result.updated,
+              skipped: result.skipped,
+              errors: result.errors,
+              durationMs: result.durationMs,
+            },
+          } as ScanCompleteEvent));
+          return result;
         }),
 
       [WS_METHODS.searchConversations]: (input) =>
         Effect.promise(async () => {
           const config = await getConversationsConfigAsync();
-          const result = await searchSessions({
+          const result = await runDashboardDbJob<SearchResult>('searchSessions', {
             q: input.query,
             similarTo: input.similarTo,
             filter: input,
@@ -495,26 +522,28 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         }),
 
       [WS_METHODS.listDiscoveredSessions]: (input) =>
-        Effect.sync(() => findDiscoveredSessions({
-          managed: input.managed === true ? true : undefined,
-          unmanaged: input.managed === false ? true : undefined,
-          limit: input.limit,
-          offset: input.offset,
-        }).map(toDiscoveredSessionSnapshot)),
+        Effect.promise(async () => {
+          const { sessions } = await runDashboardDbJob<{ sessions: DiscoveredSession[]; total: number }>('listDiscoveredSessions', {
+            managed: input.managed === true ? true : undefined,
+            unmanaged: input.managed === false ? true : undefined,
+            limit: input.limit,
+            offset: input.offset,
+          });
+          return sessions.map(toDiscoveredSessionSnapshot);
+        }),
 
       [WS_METHODS.getDiscoveredSession]: (input) =>
-        Effect.try({
-          try: () => {
-            const session = getDiscoveredSessionById(input.id);
-            if (!session) {
-              throw new PanRpcError({ message: `Session ${input.id} not found`, code: 'NOT_FOUND' });
-            }
-            return toDiscoveredSessionSnapshot(session);
-          },
-          catch: (cause) => cause instanceof PanRpcError
+        Effect.promise(async () => {
+          const session = await runDashboardDbJob<DiscoveredSession | null>('getDiscoveredSessionById', input.id);
+          if (!session) {
+            throw new PanRpcError({ message: `Session ${input.id} not found`, code: 'NOT_FOUND' });
+          }
+          return toDiscoveredSessionSnapshot(session);
+        }).pipe(
+          Effect.mapError((cause) => cause instanceof PanRpcError
             ? cause
-            : new PanRpcError({ message: String(cause), code: 'GET_DISCOVERED_SESSION_FAILED' }),
-        }),
+            : new PanRpcError({ message: String(cause), code: 'GET_DISCOVERED_SESSION_FAILED' })),
+        ),
 
       [WS_METHODS.enrichSessions]: (input) =>
         Effect.promise(async () => {
@@ -522,13 +551,37 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           const result = await enrichSessions({
             tier: input.level,
             sessionIds: input.ids,
-            maxParallel: input.limit,
+            filter: input.filter,
+            limit: input.limit,
+            maxParallel: config.enrichment.maxParallel,
             modelOverride: input.model,
             promptSuffix: input.customPrompt,
             skipAlreadyEnriched: input.upgrade !== true,
             config,
+            onProgress: async (progress) => {
+              if (!progress.session) return;
+              const { session } = progress;
+              await Effect.runPromise(eventStore.append({
+                type: 'enrich.progress',
+                timestamp: new Date().toISOString(),
+                payload: {
+                  sessionId: session.sessionId,
+                  level: session.tier,
+                  model: session.model,
+                  cost: session.cost ?? 0,
+                  success: session.success,
+                  error: session.error,
+                },
+              } as EnrichProgressEvent));
+            },
           });
-          return { processed: result.enriched + result.errors, totalCost: 0, failures: result.errors };
+          const processed = result.enriched + result.errors;
+          await Effect.runPromise(eventStore.append({
+            type: 'enrich.complete',
+            timestamp: new Date().toISOString(),
+            payload: { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors, durationMs: result.durationMs },
+          } as EnrichCompleteEvent));
+          return { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors };
         }),
 
       [WS_METHODS.embedSessions]: (input) =>
@@ -539,9 +592,9 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         }),
 
       [WS_METHODS.getConversationCost]: (input) =>
-        Effect.sync(() => {
+        Effect.promise(async () => {
           const groupBy = input.groupBy ?? 'workspace';
-          return { groupBy, ...aggregateDiscoveredSessionCostBy(groupBy) };
+          return { groupBy, ...(await runDashboardDbJob<Record<string, unknown>>('aggregateDiscoveredSessionCostBy', groupBy)) };
         }),
     });
   }),
@@ -565,6 +618,13 @@ export const websocketRpcRouteLayer = Layer.unwrap(
       ),
     );
 
-    return HttpRouter.add('GET', '/ws/rpc', rpcWebSocketHttpEffect);
+    return HttpRouter.add('GET', '/ws/rpc', Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const originCheck = validateOrigin(request);
+      if (!originCheck.ok) {
+        return jsonResponse({ error: originCheck.error }, { status: 403 });
+      }
+      return yield* rpcWebSocketHttpEffect;
+    }));
   }),
 );

@@ -27,6 +27,7 @@ import {
   loadEmbeddings,
   getEmbedding,
   getDiscoveredSessionById,
+  topKCosine,
 } from '../database/discovered-sessions-db.js';
 import type { DiscoveredSession, ConversationFilter } from '../database/discovered-sessions-db.js';
 import { embed } from './embeddings/providers.js';
@@ -178,30 +179,6 @@ export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
 
 // ─── Search strategies ────────────────────────────────────────────────────────
 
-function semanticSearch(
-  referenceId: number,
-  model: string,
-  allSessions: DiscoveredSession[],
-  limit: number,
-): DiscoveredSession[] {
-  const refEmbedding = getEmbedding(referenceId, model);
-  if (!refEmbedding) return [];
-
-  const sessionMap = new Map(allSessions.map((s) => [s.id, s]));
-  const allEmbeddings = loadEmbeddings(model, allSessions.map((s) => s.id));
-
-  const scored: Array<{ session: DiscoveredSession; score: number }> = [];
-  for (const { sessionId, embedding } of allEmbeddings) {
-    if (sessionId === referenceId) continue;
-    const session = sessionMap.get(sessionId);
-    if (!session) continue;
-    scored.push({ session, score: cosineSimilarity(refEmbedding, embedding) });
-  }
-
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.session);
-}
-
 // ─── Main search entry point ──────────────────────────────────────────────────
 
 /**
@@ -226,22 +203,11 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
     const provider = (query.semanticProvider ?? config.embeddingProvider ?? 'openai') as EmbeddingProviderName;
     const embedResult = await embed(provider, { text: query.semanticQuery.trim(), model: embeddingModel });
     const queryEmbedding = embedResult.embedding;
-    const candidateLimit = offset + limit;
-    const filter = normalizeFilter(query.filter, candidateLimit, 0);
-    const allSessions = findDiscoveredSessions(filter);
-    const allEmbeddings = loadEmbeddings(embeddingModel, allSessions.map((s) => s.id));
-    const embMap = new Map(allEmbeddings.map((e) => [e.sessionId, e.embedding]));
-    const sessionMap = new Map(allSessions.map((s) => [s.id, s]));
-    const scored: Array<{ session: DiscoveredSession; score: number }> = [];
-    for (const [sid, emb] of embMap) {
-      const session = sessionMap.get(sid);
-      if (!session) continue;
-      scored.push({ session, score: cosineSimilarity(queryEmbedding, emb) });
-    }
-    scored.sort((a, b) => b.score - a.score);
+    const filter = normalizeFilter(query.filter, undefined, undefined);
+    const ranked = topKCosine(queryEmbedding, embeddingModel, filter, limit, offset);
     return {
-      sessions: scored.slice(offset, offset + limit).map((x) => x.session),
-      total: scored.length,
+      sessions: ranked.results.map((x) => x.session),
+      total: ranked.total,
       mode: 'semantic',
       durationMs: Date.now() - start,
     };
@@ -291,12 +257,19 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
 
   // ── Strategy 3: semantic only ─────────────────────────────────────────────
   if (hasSimilarTo && !hasQ) {
-    const filter = normalizeFilter(query.filter, offset + limit, 0);
-    const candidateSessions = findDiscoveredSessions(filter);
-    const ranked = semanticSearch(query.similarTo!, embeddingModel, candidateSessions, offset + limit);
+    const refEmbedding = getEmbedding(query.similarTo!, embeddingModel);
+    if (!refEmbedding) {
+      return { sessions: [], total: 0, mode: 'semantic', durationMs: Date.now() - start };
+    }
+    const filter = normalizeFilter(query.filter, undefined, undefined);
+    const ranked = topKCosine(refEmbedding, embeddingModel, filter, limit + 1, offset);
+    const sessions = ranked.results
+      .map((x) => x.session)
+      .filter((s) => s.id !== query.similarTo)
+      .slice(0, limit);
     return {
-      sessions: ranked.slice(offset, offset + limit),
-      total: countDiscoveredSessions(normalizeFilter(query.filter, undefined, undefined)),
+      sessions,
+      total: Math.max(0, ranked.total - 1),
       mode: 'semantic',
       durationMs: Date.now() - start,
     };
@@ -304,21 +277,20 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
 
   // ── Strategy 4: FTS + semantic re-ranking ─────────────────────────────────
   const refEmbedding = getEmbedding(query.similarTo!, embeddingModel);
-  const candidateLimit = offset + limit;
 
   let candidates: DiscoveredSession[];
   let ftsTotal: number;
   if (hasFilter) {
     const filter = normalizeFilter(query.filter, undefined, undefined);
-    candidates = searchFtsSessions(query.q!, filter, candidateLimit, 0);
     ftsTotal = countFtsSessions(query.q!, filter);
+    candidates = searchFtsSessions(query.q!, filter, ftsTotal, 0);
   } else {
-    const ftsMatches = searchFts(query.q!, candidateLimit);
+    ftsTotal = countFts(query.q!);
+    const ftsMatches = searchFts(query.q!, ftsTotal);
     const ftsIds = ftsMatches.map((m) => m.id);
     candidates = ftsIds
       .map((id) => getDiscoveredSessionById(id))
       .filter((s): s is DiscoveredSession => s != null);
-    ftsTotal = countFts(query.q!);
   }
 
   if (!refEmbedding || candidates.length === 0) {

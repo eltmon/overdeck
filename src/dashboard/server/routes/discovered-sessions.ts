@@ -29,29 +29,33 @@ import type {
   EnrichProgressEvent,
   EnrichCompleteEvent,
 } from '@panctl/contracts';
-import {
-  findDiscoveredSessions,
-  countDiscoveredSessions,
-  getDiscoveredSessionById,
-  getDiscoveredStats,
-  aggregateDiscoveredSessionCost,
-} from '../../../lib/database/discovered-sessions-db.js';
+import type { ConversationFilter, DiscoveredSession } from '../../../lib/database/discovered-sessions-db.js';
 import { scan } from '../../../lib/conversations/scanner.js';
-import { searchSessions } from '../../../lib/conversations/search.js';
+import type { SearchResult } from '../../../lib/conversations/search.js';
 import { enrichSessions, CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getConversationsConfigAsync, loadConfigAsync, saveConfigAsync } from '../../../lib/config.js';
 import { embed } from '../../../lib/conversations/embeddings/providers.js';
+import { validateOrigin } from './origin-validation.js';
+import { runDashboardDbJob } from '../services/dashboard-db-task.js';
+
+function rejectUntrustedOrigin(request: HttpServerRequest.HttpServerRequest): Response | null {
+  const originCheck = validateOrigin(request);
+  if (!originCheck.ok) {
+    return jsonResponse({ error: originCheck.error }, { status: 403 });
+  }
+  return null;
+}
 
 // ─── GET /api/discovered-sessions/stats ───────────────────────────────────────
 
 const getStatsRoute = HttpRouter.add(
   'GET',
   '/api/discovered-sessions/stats',
-  httpHandler(Effect.try({
-    try: () => jsonResponse(getDiscoveredStats()),
-  })),
+  httpHandler(Effect.promise(async () =>
+    jsonResponse(await runDashboardDbJob('getDiscoveredStats')),
+  )),
 );
 
 // ─── GET /api/discovered-sessions ────────────────────────────────────────────
@@ -72,7 +76,7 @@ const listRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid offset' }, { status: 400 });
     }
 
-    const filter: Parameters<typeof findDiscoveredSessions>[0] = {
+    const filter: ConversationFilter = {
       limit: Math.min(rawLimit, 500),
       offset: rawOffset,
     };
@@ -83,9 +87,12 @@ const listRoute = HttpRouter.add(
     if (params.has('managed')) filter.managed = params.get('managed') === 'true';
     if (params.has('enriched')) filter.enriched = true;
     if (params.has('not_enriched')) filter.notEnriched = true;
+    if (params.has('min_cost')) filter.minCost = parseFloat(params.get('min_cost')!);
+    if (params.has('max_cost')) filter.maxCost = parseFloat(params.get('max_cost')!);
 
-    const sessions = findDiscoveredSessions(filter);
-    const total = countDiscoveredSessions({ ...filter, limit: undefined, offset: undefined });
+    const { sessions, total } = yield* Effect.promise(() =>
+      runDashboardDbJob<{ sessions: DiscoveredSession[]; total: number }>('listDiscoveredSessions', filter),
+    );
     return jsonResponse({ sessions, count: sessions.length, total });
   })),
 );
@@ -98,8 +105,8 @@ const listRoute = HttpRouter.add(
  */
 export function parseSearchParams(
   params: URLSearchParams,
-): Parameters<typeof findDiscoveredSessions>[0] {
-  const filter: Parameters<typeof findDiscoveredSessions>[0] = {};
+): ConversationFilter {
+  const filter: ConversationFilter = {};
   if (params.has('workspace')) filter.workspacePath = params.get('workspace')!;
   if (params.has('model')) filter.primaryModel = params.get('model')!;
   if (params.has('since')) filter.since = parseRelativeTime(params.get('since')!);
@@ -143,6 +150,7 @@ const searchRoute = HttpRouter.add(
     const params = new URL(req.url, 'http://localhost').searchParams;
 
     const q = params.get('q') ?? undefined;
+    const semantic = params.get('semantic') === 'true';
     const rawSimilarTo = params.has('similar_to') ? parseInt(params.get('similar_to')!, 10) : undefined;
     const similarTo = rawSimilarTo !== undefined && Number.isFinite(rawSimilarTo) ? rawSimilarTo : undefined;
     const rawLimit = parseInt(params.get('limit') ?? '20', 10);
@@ -152,8 +160,31 @@ const searchRoute = HttpRouter.add(
 
     const filter = parseSearchParams(params);
     const config = yield* Effect.promise(() => getConversationsConfigAsync());
-    const result = yield* Effect.promise(() => searchSessions({ q, similarTo, filter, limit, offset, config }));
-    return jsonResponse(result);
+    return yield* Effect.promise(async () => {
+      try {
+        const result = await runDashboardDbJob<SearchResult>('searchSessions', {
+          q: semantic ? undefined : q,
+          semanticQuery: semantic ? q : undefined,
+          similarTo,
+          filter,
+          limit,
+          offset,
+          config,
+        });
+        return jsonResponse(result);
+      } catch (err) {
+        if (semantic) {
+          return jsonResponse({
+            sessions: [],
+            total: 0,
+            mode: 'semantic',
+            durationMs: 0,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        throw err;
+      }
+    });
   })),
 );
 
@@ -166,11 +197,9 @@ const getCostRoute = HttpRouter.add(
     const req = yield* HttpServerRequest.HttpServerRequest;
     const params = new URL(req.url, 'http://localhost').searchParams;
 
-    const filter: Parameters<typeof findDiscoveredSessions>[0] = {};
-    if (params.has('since')) filter.since = parseRelativeTime(params.get('since')!);
-    if (params.has('workspace')) filter.workspacePath = params.get('workspace')!;
+    const filter = parseSearchParams(params);
 
-    return jsonResponse(aggregateDiscoveredSessionCost(filter));
+    return jsonResponse(yield* Effect.promise(() => runDashboardDbJob('aggregateDiscoveredSessionCost', filter)));
   })),
 );
 
@@ -187,7 +216,7 @@ const getByIdRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid session ID' }, { status: 400 });
     }
 
-    const session = getDiscoveredSessionById(id);
+    const session = yield* Effect.promise(() => runDashboardDbJob('getDiscoveredSessionById', id));
     if (!session) {
       return jsonResponse({ error: `Session ${id} not found` }, { status: 404 });
     }
@@ -203,6 +232,8 @@ const postEnrichByIdRoute = HttpRouter.add(
   '/api/discovered-sessions/:id/enrich',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const originError = rejectUntrustedOrigin(req);
+    if (originError) return originError;
     const params = yield* HttpRouter.params;
     const id = parseInt(params.id ?? '', 10);
 
@@ -210,7 +241,7 @@ const postEnrichByIdRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid session ID' }, { status: 400 });
     }
 
-    const session = getDiscoveredSessionById(id);
+    const session = yield* Effect.promise(() => runDashboardDbJob('getDiscoveredSessionById', id));
     if (!session) {
       return jsonResponse({ error: `Session ${id} not found` }, { status: 404 });
     }
@@ -252,6 +283,8 @@ const postScanRoute = HttpRouter.add(
   '/api/discovered-sessions/scan',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const originError = rejectUntrustedOrigin(req);
+    if (originError) return originError;
     const body = (yield* req.json) as {
       mode?: string;
       dryRun?: boolean;
@@ -337,6 +370,8 @@ const postEnrichRoute = HttpRouter.add(
   '/api/discovered-sessions/enrich',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const originError = rejectUntrustedOrigin(req);
+    if (originError) return originError;
     const body = (yield* req.json) as {
       tier?: number;
       sessionIds?: number[];
@@ -387,7 +422,7 @@ const postEnrichRoute = HttpRouter.add(
         timestamp: new Date().toISOString(),
         payload: {
           processed: result.enriched + result.errors,
-          totalCost: 0, // aggregate cost tracking would require session-level cost accumulation
+          totalCost: result.actualCost ?? result.estimatedCost,
           failures: result.errors,
           durationMs: result.durationMs,
         },
@@ -419,6 +454,8 @@ const postEmbedRoute = HttpRouter.add(
   '/api/discovered-sessions/embed',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const originError = rejectUntrustedOrigin(req);
+    if (originError) return originError;
     const body = (yield* req.json) as {
       sessionIds?: number[];
       provider?: string;
@@ -471,6 +508,8 @@ const putConvConfigRoute = HttpRouter.add(
   '/api/discovered-sessions/config',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const originError = rejectUntrustedOrigin(req);
+    if (originError) return originError;
     const body = (yield* req.json) as {
       embeddings?: boolean;
       embeddingProvider?: string;
@@ -500,6 +539,8 @@ const postTestConnectionRoute = HttpRouter.add(
   '/api/discovered-sessions/test-connection',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const originError = rejectUntrustedOrigin(req);
+    if (originError) return originError;
     const body = (yield* req.json) as {
       provider: string;
       model: string;

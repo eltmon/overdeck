@@ -60,6 +60,7 @@ export interface ScanResult {
   skipped: number;
   errors: number;
   durationMs: number;
+  warnings?: string[];
 }
 
 // ─── Discovery ────────────────────────────────────────────────────────────────
@@ -74,11 +75,16 @@ async function collectJsonlFiles(
   projectDir: string,
   dir: string,
   result: Array<{ projectDir: string; jsonlPath: string }>,
+  warnings: string[],
 ): Promise<void> {
   let entries: import('fs').Dirent[];
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch {
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EACCES' || code === 'EPERM') {
+      warnings.push(`Permission denied while scanning ${dir}`);
+    }
     return;
   }
   for (const entry of entries) {
@@ -86,7 +92,7 @@ async function collectJsonlFiles(
     if (entry.isFile() && name.endsWith('.jsonl')) {
       result.push({ projectDir, jsonlPath: join(dir, name) });
     } else if (entry.isDirectory()) {
-      await collectJsonlFiles(projectDir, join(dir, name), result);
+      await collectJsonlFiles(projectDir, join(dir, name), result, warnings);
     }
   }
 }
@@ -95,7 +101,7 @@ async function collectJsonlFiles(
  * Walk ~/.claude/projects/ and return all .jsonl files (including nested subagent transcripts).
  * Each entry is { projectDir, jsonlPath }.
  */
-async function discoverAllJsonlFiles(): Promise<
+async function discoverAllJsonlFiles(warnings: string[]): Promise<
   Array<{ projectDir: string; jsonlPath: string }>
 > {
   const claudeProjectsDir = join(homedir(), '.claude', 'projects');
@@ -107,18 +113,22 @@ async function discoverAllJsonlFiles(): Promise<
     projectDirs = entries
       .filter((e) => e.isDirectory())
       .map((e) => join(claudeProjectsDir, e.name));
-  } catch {
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EACCES' || code === 'EPERM') {
+      warnings.push(`Permission denied while scanning ${claudeProjectsDir}`);
+    }
     return result;
   }
 
   for (const projectDir of projectDirs) {
-    await collectJsonlFiles(projectDir, projectDir, result);
+    await collectJsonlFiles(projectDir, projectDir, result, warnings);
   }
 
   return result;
 }
 
-async function discoverJsonlFilesForDirs(dirs: string[]): Promise<
+async function discoverJsonlFilesForDirs(dirs: string[], warnings: string[]): Promise<
   Array<{ projectDir: string; jsonlPath: string }>
 > {
   const claudeProjectsDir = join(homedir(), '.claude', 'projects');
@@ -126,7 +136,7 @@ async function discoverJsonlFilesForDirs(dirs: string[]): Promise<
 
   for (const dir of dirs) {
     const projectDir = join(claudeProjectsDir, encodeClaudeProjectDir(normalizeDir(dir)));
-    await collectJsonlFiles(projectDir, projectDir, result);
+    await collectJsonlFiles(projectDir, projectDir, result, warnings);
   }
 
   return result;
@@ -136,18 +146,35 @@ async function discoverJsonlFilesForDirs(dirs: string[]): Promise<
 
 export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const startTs = Date.now();
-  const result: ScanResult = { inserted: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0 };
+  const result: ScanResult = { inserted: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0, warnings: [] };
 
   // 1. Discover JSONL candidates
   const allFiles = opts.mode === 'targeted'
-    ? await discoverJsonlFilesForDirs(opts.dirs ?? [])
-    : await discoverAllJsonlFiles();
+    ? await discoverJsonlFilesForDirs(opts.dirs ?? [], result.warnings!)
+    : await discoverAllJsonlFiles(result.warnings!);
 
   // 2. Filter by mode
   const filteredFiles = filterByMode(allFiles, opts);
 
   if (opts.dryRun) {
+    for (const { jsonlPath } of filteredFiles) {
+      const existing = getDiscoveredSessionByJsonlPath(jsonlPath);
+      try {
+        const stat = await fs.stat(jsonlPath);
+        const fileMtime = new Date(stat.mtimeMs).toISOString();
+        if (existing && existing.fileSize === stat.size && existing.fileMtime === fileMtime) {
+          result.skipped++;
+        } else if (existing) {
+          result.updated++;
+        } else {
+          result.inserted++;
+        }
+      } catch {
+        result.errors++;
+      }
+    }
     result.durationMs = Date.now() - startTs;
+    if (result.warnings?.length === 0) delete result.warnings;
     return result;
   }
 
@@ -265,6 +292,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   });
 
   result.durationMs = Date.now() - startTs;
+  if (result.warnings?.length === 0) delete result.warnings;
   return result;
 }
 

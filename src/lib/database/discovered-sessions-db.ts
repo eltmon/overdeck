@@ -97,6 +97,25 @@ export interface FtsSearchResult {
   rank: number;
 }
 
+export interface CosineSearchResult {
+  session: DiscoveredSession;
+  score: number;
+}
+
+function cosineSimilarity(a: Float32Array, b: Float32Array): number {
+  if (a.length !== b.length || a.length === 0) return 0;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
 // ─── Row mapper ───────────────────────────────────────────────────────────────
 
 function rowToSession(row: Record<string, unknown>): DiscoveredSession {
@@ -259,6 +278,8 @@ export function findDiscoveredSessions(filter: ConversationFilter = {}): Discove
     .all(...params) as Record<string, unknown>[];
   return rows.map(rowToSession);
 }
+
+export const findByFilters = findDiscoveredSessions;
 
 /**
  * Count sessions matching filters using a SQL COUNT(*) — no rows materialized.
@@ -515,6 +536,8 @@ export function searchFts(query: string, limit?: number): FtsSearchResult[] {
   }
 }
 
+export const searchFTS = searchFts;
+
 /**
  * Count total FTS5 matches for a query without a LIMIT.
  * Returns 0 for malformed queries instead of throwing.
@@ -602,6 +625,40 @@ export function countFtsInSet(query: string, ids: number[]): number {
 
 // ─── Embedding operations ─────────────────────────────────────────────────────
 
+export function topKCosine(
+  queryEmbedding: Float32Array,
+  model: string,
+  filter: ConversationFilter = {},
+  limit = 50,
+  offset = 0,
+): { results: CosineSearchResult[]; total: number } {
+  const db = getDatabase();
+  const { where, params } = buildFilterSql({ ...filter, limit: undefined, offset: undefined }, 'ds');
+  const modelClause = where ? `${where} AND se.model = ?` : 'WHERE se.model = ?';
+  const rows = db
+    .prepare(
+      `SELECT ds.*, se.dim AS embedding_dim, se.embedding AS embedding_blob
+       FROM session_embeddings se
+       JOIN discovered_sessions ds ON ds.id = se.session_id
+       ${modelClause}`,
+    )
+    .all(...params, model) as Array<Record<string, unknown> & { embedding_dim: number; embedding_blob: Buffer }>;
+
+  const scored = rows
+    .map((row) => ({
+      session: rowToSession(row),
+      score: cosineSimilarity(
+        queryEmbedding,
+        new Float32Array(row.embedding_blob.buffer, row.embedding_blob.byteOffset, row.embedding_dim),
+      ),
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const safeLimit = Number.isFinite(limit) && limit >= 0 ? limit : 50;
+  const safeOffset = Number.isFinite(offset) && offset >= 0 ? offset : 0;
+  return { results: scored.slice(safeOffset, safeOffset + safeLimit), total: scored.length };
+}
+
 /**
  * Insert or replace an embedding for a session.
  */
@@ -665,6 +722,7 @@ export function getDiscoveredStats(): {
   enriched: number;
   embedded: number;
   managedCount: number;
+  embeddingModels: Array<{ model: string; embedded: number }>;
 } {
   const db = getDatabase();
   const total = (
@@ -687,5 +745,13 @@ export function getDiscoveredStats(): {
       .prepare(`SELECT COUNT(*) AS n FROM discovered_sessions WHERE panopticon_managed = 1`)
       .get() as { n: number }
   ).n;
-  return { total, enriched, embedded, managedCount };
+  const embeddingModels = db
+    .prepare(
+      `SELECT model, COUNT(DISTINCT session_id) AS embedded
+       FROM session_embeddings
+       GROUP BY model
+       ORDER BY embedded DESC, model ASC`,
+    )
+    .all() as Array<{ model: string; embedded: number }>;
+  return { total, enriched, embedded, managedCount, embeddingModels };
 }

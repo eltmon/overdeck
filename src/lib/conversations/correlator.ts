@@ -7,6 +7,7 @@
  */
 
 import { getDatabase } from '../database/index.js';
+import { sessionFilePath } from '../paths.js';
 
 export interface CorrelationResult {
   panopticonManaged: boolean;
@@ -28,22 +29,33 @@ export function buildCorrelationMap(
 
   if (jsonlPaths.length === 0) return map;
 
-  // Query conversations table for session_file matches
-  // conversations.session_file is the path to the JSONL for a Panopticon-spawned session
+  const pathSet = new Set(jsonlPaths);
   const rows = db
     .prepare(
-      `SELECT session_file, issue_id FROM conversations
-       WHERE session_file IS NOT NULL`,
+      `SELECT name, cwd, session_file, claude_session_id, issue_id FROM conversations
+       WHERE session_file IS NOT NULL OR claude_session_id IS NOT NULL`,
     )
-    .all() as Array<{ session_file: string; issue_id: string | null }>;
+    .all() as Array<{
+    name: string;
+    cwd: string;
+    session_file: string | null;
+    claude_session_id: string | null;
+    issue_id: string | null;
+  }>;
 
   for (const row of rows) {
-    if (jsonlPaths.includes(row.session_file)) {
-      map.set(row.session_file, {
-        panopticonManaged: true,
-        panIssueId: row.issue_id,
-        panAgentId: null,
-      });
+    const candidatePaths = new Set<string>();
+    if (row.session_file) candidatePaths.add(row.session_file);
+    if (row.claude_session_id) candidatePaths.add(sessionFilePath(row.cwd, row.claude_session_id));
+
+    for (const path of candidatePaths) {
+      if (pathSet.has(path)) {
+        map.set(path, {
+          panopticonManaged: true,
+          panIssueId: row.issue_id,
+          panAgentId: row.name,
+        });
+      }
     }
   }
 
