@@ -35,9 +35,21 @@ function eventPriority(event: StoredEvent): number | undefined {
   return typeof payload.priority === 'number' ? payload.priority : undefined;
 }
 
-function dropIndexForFullQueue(queue: StoredEvent[]): number {
+function dropIndexForFullQueue(queue: StoredEvent[], incomingPriority: number): number | undefined {
   const infoIndex = queue.findIndex((event) => (eventPriority(event) ?? 1) >= 2);
-  return infoIndex >= 0 ? infoIndex : 0;
+  if (infoIndex >= 0) return infoIndex;
+
+  let candidateIndex = 0;
+  let candidatePriority = eventPriority(queue[0]!) ?? 1;
+  for (let index = 1; index < queue.length; index += 1) {
+    const priority = eventPriority(queue[index]!) ?? 1;
+    if (priority > candidatePriority) {
+      candidateIndex = index;
+      candidatePriority = priority;
+    }
+  }
+
+  return incomingPriority < candidatePriority ? candidateIndex : undefined;
 }
 
 async function speakActivityTts(event: StoredEvent): Promise<void> {
@@ -89,7 +101,9 @@ function enqueueActivityTts(event: StoredEvent): void {
   if (state.queue.length >= MAX_TTS_QUEUE_LENGTH) {
     const priority = eventPriority(event) ?? 1;
     if (config.dropInfoWhenFull && priority >= 2) return;
-    state.queue.splice(dropIndexForFullQueue(state.queue), 1);
+    const dropIndex = config.dropInfoWhenFull ? dropIndexForFullQueue(state.queue, priority) : 0;
+    if (dropIndex === undefined) return;
+    state.queue.splice(dropIndex, 1);
   }
 
   state.queue.push(event);

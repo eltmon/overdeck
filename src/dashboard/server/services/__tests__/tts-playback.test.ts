@@ -142,6 +142,46 @@ describe('TtsPlaybackService', () => {
     expect(mocks.resolveAndSpeak.mock.calls.map(([input]) => input.text)).not.toContain('routine info');
   });
 
+  it('does not evict important queued speech for equal-priority incoming speech', async () => {
+    let resolveFirst: (value: 'spoken') => void = () => undefined;
+    mocks.resolveAndSpeak.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
+    mocks.resolveAndSpeak.mockResolvedValue('spoken');
+    await startTtsPlayback();
+
+    subscribers[0]({ sequence: 1, type: 'activity.tts', timestamp: '2026-05-16T00:00:00.000Z', payload: { utterance: 'first' } });
+    for (let i = 0; i < 20; i++) {
+      subscribers[0]({ sequence: i + 2, type: 'activity.tts', timestamp: '2026-05-16T00:00:01.000Z', payload: { utterance: `important ${i}`, priority: 1 } });
+    }
+    subscribers[0]({ sequence: 30, type: 'activity.tts', timestamp: '2026-05-16T00:00:02.000Z', payload: { utterance: 'new important', priority: 1 } });
+
+    resolveFirst('spoken');
+
+    await vi.waitFor(() => expect(mocks.resolveAndSpeak).toHaveBeenCalledTimes(21));
+    const spoken = mocks.resolveAndSpeak.mock.calls.map(([input]) => input.text);
+    expect(spoken).toContain('important 0');
+    expect(spoken).not.toContain('new important');
+  });
+
+  it('admits higher-priority speech over lower-priority queued speech', async () => {
+    let resolveFirst: (value: 'spoken') => void = () => undefined;
+    mocks.resolveAndSpeak.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
+    mocks.resolveAndSpeak.mockResolvedValue('spoken');
+    await startTtsPlayback();
+
+    subscribers[0]({ sequence: 1, type: 'activity.tts', timestamp: '2026-05-16T00:00:00.000Z', payload: { utterance: 'first' } });
+    for (let i = 0; i < 20; i++) {
+      subscribers[0]({ sequence: i + 2, type: 'activity.tts', timestamp: '2026-05-16T00:00:01.000Z', payload: { utterance: `important ${i}`, priority: 1 } });
+    }
+    subscribers[0]({ sequence: 30, type: 'activity.tts', timestamp: '2026-05-16T00:00:02.000Z', payload: { utterance: 'urgent', priority: 0 } });
+
+    resolveFirst('spoken');
+
+    await vi.waitFor(() => expect(mocks.resolveAndSpeak).toHaveBeenCalledTimes(21));
+    const spoken = mocks.resolveAndSpeak.mock.calls.map(([input]) => input.text);
+    expect(spoken).not.toContain('important 0');
+    expect(spoken).toContain('urgent');
+  });
+
   it('clears queued playback on stop', async () => {
     let resolveFirst: (value: 'spoken') => void = () => undefined;
     mocks.resolveAndSpeak.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));

@@ -77,7 +77,7 @@ export function emitActivityEntry(options: EmitActivityOptions): void {
         issueId: options.issueId,
       },
     };
-    store.append(entry);
+    void store.appendAsync(entry).catch(() => undefined);
   } catch {
     // Non-fatal — event store may not be initialized during early boot
   }
@@ -103,7 +103,7 @@ export function emitActivityDetailed(options: EmitDetailedOptions): void {
         triggeringEvent: options.triggeringEvent,
       },
     };
-    store.append(entry);
+    void store.appendAsync(entry).catch(() => undefined);
   } catch {
     // Non-fatal
   }
@@ -134,7 +134,7 @@ export function emitActivityTts(options: EmitTtsOptions): void {
         eventType: options.eventType,
       },
     };
-    store.append(entry);
+    void store.appendAsync(entry).catch(() => undefined);
   } catch {
     // Non-fatal
   }

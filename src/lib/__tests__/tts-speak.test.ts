@@ -139,7 +139,7 @@ describe('resolveAndSpeak', () => {
     }));
   });
 
-  it('does not call the daemon when tts is disabled', async () => {
+  it('does not call the daemon for automatic playback when tts is disabled', async () => {
     const fetchMock = vi.fn();
 
     await expect(resolveAndSpeak({ text: 'skip' }, {
@@ -149,6 +149,20 @@ describe('resolveAndSpeak', () => {
     })).resolves.toBe('muted');
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('posts direct user-triggered preview payloads when tts is disabled', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
+
+    await expect(resolveAndSpeak({ text: 'preview', voice: 'Vivian', instruct: 'calm' }, {
+      config: { ...CONFIG, enabled: false },
+      findVoiceById,
+      fetch: fetchMock,
+    })).resolves.toBe('spoken');
+
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
+      body: JSON.stringify({ text: 'preview', voice: 'Vivian', instruct: 'calm', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
+    }));
   });
 
   it('truncates utterances to maxChars before posting to the daemon', async () => {

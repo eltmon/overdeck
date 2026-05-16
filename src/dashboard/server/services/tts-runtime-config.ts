@@ -54,15 +54,21 @@ async function findProjectRootAsync(startDir: string = process.cwd()): Promise<s
   return null;
 }
 
+export function stripProjectTtsEndpoint(config: YamlConfig | null): YamlConfig | null {
+  if (!config?.tts) return config;
+  const { daemonHost: _daemonHost, daemonPort: _daemonPort, ...tts } = config.tts;
+  return { ...config, tts };
+}
+
 async function readProjectConfig(): Promise<YamlConfig | null> {
   const projectRoot = await findProjectRootAsync();
   if (!projectRoot) return null;
 
   const configPath = join(projectRoot, '.pan.yaml');
-  if (await pathExists(configPath)) return readYamlConfig(configPath);
+  if (await pathExists(configPath)) return stripProjectTtsEndpoint(await readYamlConfig(configPath));
 
   const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
-  if (await pathExists(legacyConfigPath)) return readYamlConfig(legacyConfigPath);
+  if (await pathExists(legacyConfigPath)) return stripProjectTtsEndpoint(await readYamlConfig(legacyConfigPath));
 
   return null;
 }

@@ -146,10 +146,6 @@ export async function resolveAndSpeak(
 ): Promise<TtsSpeakResult> {
   const config = deps.config;
 
-  if (!config.enabled) return 'muted';
-  if (options.source && config.mutedSources.includes(options.source)) return 'muted';
-  if (options.issueId && config.mutedIssues.includes(options.issueId)) return 'muted';
-
   const text = truncateForTts(
     options.eventType && config.utteranceTemplates[options.eventType]
       ? renderTemplate(config.utteranceTemplates[options.eventType], options.issueId)
@@ -159,6 +155,10 @@ export async function resolveAndSpeak(
 
   const directPayload = buildDirectTtsSpeakPayload(options, text, config);
   if (directPayload) return postSpeakPayload(directPayload, config, deps);
+
+  if (!config.enabled) return 'muted';
+  if (options.source && config.mutedSources.includes(options.source)) return 'muted';
+  if (options.issueId && config.mutedIssues.includes(options.issueId)) return 'muted';
 
   const voiceId = resolveVoiceId(options, config).trim();
   if (!voiceId) return 'no-voice';
