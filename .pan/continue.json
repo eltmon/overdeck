@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-16T22:12:00.000Z",
+  "updated": "2026-05-16T22:20:00.000Z",
   "gitState": {
     "branch": "feature/pan-1052",
-    "sha": "00ef1ce1",
+    "sha": "b27c0410",
     "dirty": true
   },
   "decisions": [
@@ -183,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-dq2a",
-    "itemId": "b1-memory-settings-ui",
+    "beadId": "workspace-60l5",
+    "itemId": "b1-transcript-source-adapter",
     "status": "implemented",
-    "note": "Settings now round-trip memory provider/model, fallback, cost cap, observations and prompt-time injection toggles, rollup threshold, and sidebar refresh interval through the existing YAML Settings storage; memory provider resolution reads the same YAML path with PANOPTICON_MEMORY_PROVIDER and PANOPTICON_MEMORY_MODEL precedence. Focused tests, frontend settings tests, frontend build, lint, typecheck, and graphify update passed. Browser UI interaction was not run because this session has no browser tool."
+    "note": "TranscriptSource now has a Claude Code adapter that resolves active transcript entries from agent session metadata, a Pi no-op stub until its transcript surface is defined, and a registry-facing getActiveTranscriptEntries seam so the future poller can consume harness adapters without harness branches. Focused tests, lint, typecheck, and graphify update passed."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -327,6 +327,12 @@
       "timestamp": "2026-05-16T22:12:00.000Z",
       "reason": "work",
       "note": "workspace-dq2a implemented: added YAML-backed memory settings for extraction provider/model/fallback, cost cap, observation and prompt-time injection toggles, rollup threshold, and sidebar refresh interval; Settings UI exposes the controls and documents env override precedence.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T22:20:00.000Z",
+      "reason": "work",
+      "note": "workspace-60l5 implemented: added src/lib/memory/transcript-source.ts with TranscriptSource, Claude Code transcript resolution from active agent session metadata, Pi no-op stub, registry collection seam, and tests/lib/memory/transcript-source.test.ts coverage.",
       "agentModel": "gpt-5.5"
     }
   ],
