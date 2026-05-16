@@ -274,7 +274,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
 - Do not use AskUserQuestion.
 - When normal planning would ask a question, choose the most defensible default and record it in \`plan.autoDecisions[]\` as \`{ "summary": "...", "rationale": "..." }\`.
 - Halt only for a genuine contradiction between authoritative inputs, such as the issue body requiring one behavior while a linked PRD requires the opposite. If that happens, write the contradiction into continue.json hazards and stop with a clear escalation message so the dashboard surfaces it.
-- Still produce the same complete vBRIEF and beads via \`pan plan-finalize\` when no contradiction exists.
+- Still produce the same complete vBRIEF and beads via \`pan plan finalize\` when no contradiction exists.
 ` : '';
 
   return renderPrompt({

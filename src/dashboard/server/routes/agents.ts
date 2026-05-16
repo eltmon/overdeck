@@ -88,7 +88,7 @@ import { canUseHarness } from '../../../lib/harness-policy.js';
 import { getProviderForModel } from '../../../lib/providers.js';
 import { validateProviderHealth, ProviderHealthError } from '../../../lib/provider-health.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { findPlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { findPlan, isPlanningComplete, readPlanAsync } from '../../../lib/vbrief/io.js';
 import { writeAutoStartVBrief } from '../../../lib/vbrief/auto-synthesize.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
 import type { ContinueState } from '../../../lib/vbrief/continue-state.js';
@@ -1866,12 +1866,12 @@ const postAgentsRoute = HttpRouter.add(
     void hasPlan;
     void isComplete;
 
+    let planItemCount: number | null = null;
     try {
-      const { readPlan } = yield* Effect.promise(() => import('../../../lib/vbrief/io.js'));
       if (!planPath) {
         throw new Error('No workspace vBRIEF found');
       }
-      const planDoc = readPlan(planPath);
+      const planDoc = yield* Effect.promise(() => readPlanAsync(planPath));
       const planIssueId = planDoc?.plan?.id;
       if (planIssueId && planIssueId.toLowerCase() !== issueLower) {
         return jsonResponse({
@@ -1882,8 +1882,8 @@ const postAgentsRoute = HttpRouter.add(
           actualIssue: planIssueId.toUpperCase(),
         }, { status: 422 });
       }
-      const itemCount = planDoc?.plan?.items?.length ?? 0;
-      if (itemCount === 0) {
+      planItemCount = planDoc?.plan?.items?.length ?? 0;
+      if (planItemCount === 0) {
         return jsonResponse({
           error: 'Plan exists but contains no items. Planning may have failed or produced an empty plan.',
           hint: 'Re-run planning to produce a plan with tasks and acceptance criteria.',
@@ -1893,13 +1893,18 @@ const postAgentsRoute = HttpRouter.add(
     } catch {}
 
     let hasBeads = false;
+    let beadCount = 0;
     try {
       const { stdout: bdOutput } = yield* Effect.promise(() => withBdMutex(() => execAsync(
-        `bd list --json -l ${issueId.toLowerCase()} --status all --limit 1`,
+        `bd list --json -l ${issueId.toLowerCase()} --status all --limit 0`,
         { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
       )));
       const bdTasks = JSON.parse(bdOutput.trim() || '[]');
-      hasBeads = bdTasks.length > 0;
+      beadCount = Array.isArray(bdTasks) ? bdTasks.length : 0;
+      hasBeads = beadCount > 0;
+      if (planItemCount !== null && planItemCount > 0 && beadCount !== planItemCount) {
+        hasBeads = false;
+      }
     } catch {}
 
     let recoveryError: string | null = null;
@@ -1910,9 +1915,12 @@ const postAgentsRoute = HttpRouter.add(
       try {
         const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
         const recovery = yield* Effect.promise(() => createBeadsFromVBrief(workspacePath));
-        hasBeads = recovery.created.length > 0;
+        beadCount = recovery.created.length;
+        hasBeads = recovery.created.length > 0 && (planItemCount === null || recovery.created.length === planItemCount);
         if (hasBeads) {
           console.log(`[agents] Auto-recovery created ${recovery.created.length} beads for ${issueId}`);
+        } else if (recovery.created.length > 0 && planItemCount !== null) {
+          recoveryError = `created ${recovery.created.length} beads, but vBRIEF has ${planItemCount} plan items`;
         } else if (recovery.errors.length > 0) {
           recoveryError = recovery.errors[0] ?? 'Unknown error during beads creation';
           console.warn(`[agents] Auto-recovery errors: ${recovery.errors.join(', ')}`);

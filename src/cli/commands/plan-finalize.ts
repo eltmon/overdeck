@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import { existsSync, renameSync, writeFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
-import { findPlan, readPlan } from '../../lib/vbrief/io.js';
+import { findPlan, findWorkspaceDraftPlan, readPlan } from '../../lib/vbrief/io.js';
 import { generateVBriefFilename, slugify } from '../../lib/vbrief/lifecycle.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
@@ -34,7 +34,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     process.exit(1);
   }
 
-  const planPath = findPlan(workspacePath);
+  const planPath = findWorkspaceDraftPlan(workspacePath) ?? findPlan(workspacePath);
   if (!planPath) {
     const msg = `vBRIEF plan not readable at ${workspacePath}/.pan/spec.vbrief.json`;
     if (options.json) console.log(JSON.stringify({ success: false, error: msg }));

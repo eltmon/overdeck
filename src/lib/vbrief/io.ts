@@ -15,11 +15,12 @@
  * continue file — they cannot mutate the spec on main.
  */
 
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { findSpecByIssue, findSpecByIssueAsync } from '../pan-dir/specs.js';
 import { readWorkspaceContinue, readWorkspaceContinueAsync, writeWorkspaceContinue } from '../pan-dir/continue.js';
+import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
 
 /**
@@ -37,16 +38,62 @@ function projectRootFromWorkspace(workspacePath: string): string {
   return resolve(workspacePath, '..', '..');
 }
 
+function workspaceDraftPath(workspacePath: string): string {
+  return join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
+}
+
+export function findWorkspaceDraftPlan(workspacePath: string): string | null {
+  const path = workspaceDraftPath(workspacePath);
+  if (!existsSync(path)) return null;
+
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return path;
+
+  try {
+    const doc = readPlan(path);
+    const planIssueId = doc.plan?.id;
+    if (planIssueId && planIssueId.toLowerCase() !== issueId.toLowerCase()) return null;
+  } catch {
+    return path;
+  }
+
+  return path;
+}
+
+export async function findWorkspaceDraftPlanAsync(workspacePath: string): Promise<string | null> {
+  const path = workspaceDraftPath(workspacePath);
+  try {
+    await readFile(path, 'utf-8');
+  } catch (error: any) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return path;
+
+  try {
+    const doc = await readPlanAsync(path);
+    const planIssueId = doc.plan?.id;
+    if (planIssueId && planIssueId.toLowerCase() !== issueId.toLowerCase()) return null;
+  } catch {
+    return path;
+  }
+
+  return path;
+}
+
 /**
- * Returns the path to the canonical vBRIEF spec on main for this workspace's issue.
- * Returns null if no spec exists — callers must handle the missing-spec case.
+ * Returns the path to this workspace's vBRIEF source. The canonical main-side
+ * spec wins after promotion; before first promotion, the workspace draft is the
+ * only valid source.
  */
 export function findPlan(workspacePath: string): string | null {
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return null;
   const projectRoot = projectRootFromWorkspace(workspacePath);
   const entry = findSpecByIssue(projectRoot, issueId);
-  return entry ? entry.path : null;
+  return entry ? entry.path : findWorkspaceDraftPlan(workspacePath);
 }
 
 /** Async variant of findPlan — safe to call from dashboard server code. */
@@ -55,7 +102,7 @@ export async function findPlanAsync(workspacePath: string): Promise<string | nul
   if (!issueId) return null;
   const projectRoot = projectRootFromWorkspace(workspacePath);
   const entry = await findSpecByIssueAsync(projectRoot, issueId);
-  return entry ? entry.path : null;
+  return entry ? entry.path : findWorkspaceDraftPlanAsync(workspacePath);
 }
 
 /**

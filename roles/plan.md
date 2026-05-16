@@ -39,7 +39,7 @@ Research-only agent that produces an executable plan for an issue. Never writes 
 3. **Continue context** in `.pan/continue.json` with decisions, hazards, and a clear `resumePoint` for the implementation agent
 4. **Beads** created with `bd create` and labelled with the issue id, one per `items[]` entry, with edges that mirror the plan's `edges`
 
-`pan plan-finalize` writes the canonical spec to `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` with `plan.status: "proposed"`. You do not write to `.pan/specs/` directly. See docs/VBRIEF.md for the four-artifact model.
+`pan plan finalize` writes the canonical spec to `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` with `plan.status: "proposed"`. You do not write to `.pan/specs/` directly. See docs/VBRIEF.md for the four-artifact model.
 
 ## Process
 
@@ -48,7 +48,7 @@ Research-only agent that produces an executable plan for an issue. Never writes 
 3. Empirically test risky assumptions (use `claude --print` to probe CLI behavior, run the dev server briefly to check shape)
 4. Surface ambiguities to the user via AskUserQuestion before committing to an approach
 5. Materialize the plan: write `.pan/spec.vbrief.json`, `.pan/continue.json`, beads (workspace-local)
-6. Run `pan plan-finalize <ISSUE-ID>` — that promotes the workspace spec to the canonical `<projectRoot>/.pan/specs/` location with `plan.status: "proposed"`
+6. Run `pan plan finalize <ISSUE-ID>` — that promotes the workspace spec to the canonical `<projectRoot>/.pan/specs/` location with `plan.status: "proposed"`
 7. Stop after planning is complete; do not start implementation work
 
 ## TLDR: prefer code summaries over full reads
