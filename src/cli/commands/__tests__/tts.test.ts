@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildTtsSpeakPayload, DEFAULT_TTS_TEST_TEXT, runTtsTest } from '../tts.js';
+import {
+  buildTtsSpeakPayload,
+  DEFAULT_TTS_TEST_TEXT,
+  formatVoiceDetails,
+  formatVoicesTable,
+  listTtsVoices,
+  runTtsTest,
+  showTtsVoice,
+} from '../tts.js';
 import type { NormalizedTtsDaemonConfig } from '../../../lib/config-yaml.js';
 import type { TtsVoice } from '../../../lib/tts-voices.js';
 
@@ -26,6 +34,92 @@ const PRESET_VOICE: TtsVoice = {
   presetName: 'Vivian',
   instruct: 'calm',
 };
+
+const DESIGN_VOICE: TtsVoice = {
+  id: 'voice-2',
+  name: 'Design Voice',
+  kind: 'design',
+  createdAt: '2026-05-16T00:00:00.000Z',
+  description: 'warm narrator with crisp diction and fri cadence',
+};
+
+const CLONE_VOICE: TtsVoice = {
+  id: 'voice-3',
+  name: 'Clone Voice',
+  kind: 'clone',
+  createdAt: '2026-05-16T00:00:00.000Z',
+  description: 'designed from warm narrator sample',
+  embedding: [0.1, 0.2, 0.3],
+};
+
+describe('pan tts voices', () => {
+  it('prints a table of all saved voices', async () => {
+    const stdout = { log: vi.fn() };
+    const voices = await listTtsVoices({
+      loadVoices: vi.fn().mockResolvedValue([PRESET_VOICE, DESIGN_VOICE, CLONE_VOICE]),
+      stdout,
+    });
+
+    expect(voices).toEqual([PRESET_VOICE, DESIGN_VOICE, CLONE_VOICE]);
+    const output = stdout.log.mock.calls[0][0] as string;
+    expect(output).toContain('NAME');
+    expect(output).toContain('KIND');
+    expect(output).toContain('MODEL/SOURCE');
+    expect(output).toContain('System Voice');
+    expect(output).toContain('preset');
+    expect(output).toContain('Vivian');
+    expect(output).toContain('warm narrator with crisp diction and fri');
+    expect(output).toContain('embedding (designed from designed from warm narrator sa)');
+  });
+
+  it('prints the empty library message', async () => {
+    const stdout = { log: vi.fn() };
+    await listTtsVoices({ loadVoices: vi.fn().mockResolvedValue([]), stdout });
+
+    expect(stdout.log).toHaveBeenCalledWith('No voices saved yet');
+  });
+
+  it('prints voice details without raw embedding values', async () => {
+    const details = formatVoiceDetails(CLONE_VOICE);
+
+    expect(details).toContain('"name": "Clone Voice"');
+    expect(details).toContain('"embedding": "[3 floats]"');
+    expect(details).not.toContain('0.1');
+  });
+
+  it('shows a voice by name', async () => {
+    const stdout = { log: vi.fn() };
+    const result = await showTtsVoice('Clone Voice', {
+      findVoiceByName: vi.fn().mockResolvedValue(CLONE_VOICE),
+      stdout,
+      stderr: { error: vi.fn() },
+    });
+
+    expect(result).toEqual(CLONE_VOICE);
+    expect(stdout.log).toHaveBeenCalledWith(formatVoiceDetails(CLONE_VOICE));
+  });
+
+  it('prints a not found error for unknown voices', async () => {
+    const stderr = { error: vi.fn() };
+    const result = await showTtsVoice('Missing', {
+      findVoiceByName: vi.fn().mockResolvedValue(undefined),
+      stdout: { log: vi.fn() },
+      stderr,
+    });
+
+    expect(result).toBeUndefined();
+    expect(stderr.error).toHaveBeenCalledWith(expect.stringContaining('Voice not found: Missing'));
+  });
+
+  it('formats the voices table without raw embedding values', () => {
+    const output = formatVoicesTable([CLONE_VOICE]);
+
+    expect(output).toContain('Clone Voice');
+    expect(output).toContain('clone');
+    expect(output).toContain('embedding (designed from designed from warm narrator sa)');
+    expect(output).not.toContain('0.1');
+  });
+});
 
 describe('pan tts test', () => {
   it('builds daemon payloads for preset, design, and clone voices', () => {
