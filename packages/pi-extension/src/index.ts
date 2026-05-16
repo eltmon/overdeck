@@ -1,22 +1,27 @@
 /**
- * @panopticon/pi-extension (PAN-636)
+ * @panopticon/pi-extension (PAN-636, PAN-1134)
  *
  * Vendored extension loaded by the Pi Coding Agent (`pi --extension <path>`)
- * to emit Panopticon lifecycle signals via filesystem markers.
+ * to emit Panopticon lifecycle signals via filesystem markers and HTTP POSTs.
  *
  * The extension writes to two roots, both under HOME:
  *   ~/.panopticon/agents/<agentId>/
- *     ready.json     — written on session_start. Carries the Pi session id
- *                      so PiRuntime.killAgent / resume can locate it.
- *     completed      — touched when the agent invokes `/pan-done`. Acts as
- *                      the "agent says it's finished" marker that Cloister
- *                      polls before waking the review specialist.
- *     events.jsonl   — append-only domain events emitted from Pi native
- *                      lifecycle hooks (PAN-1134). Consumed by the dashboard.
+ *     ready.json          — written on session_start. Carries the Pi session id
+ *                           so PiRuntime.killAgent / resume can locate it.
+ *     completed           — touched when the agent invokes `/pan-done`. Acts as
+ *                           the "agent says it's finished" marker that Cloister
+ *                           polls before waking the review specialist.
+ *     pending-events.jsonl — buffered domain events when the dashboard is
+ *                           unreachable. Drained automatically on the next
+ *                           successful POST (PAN-1134).
  *   ~/.panopticon/heartbeats/<agentId>.json
  *     timestamp/tool/pid — refreshed on every tool_execution_end and
  *                          turn_end so the dashboard health monitor knows
  *                          the agent is still alive.
+ *
+ * Domain events flow through HTTP POST to /api/agents/:id/heartbeat, using
+ * the same validation path as Claude Code hooks. POST failures buffer to
+ * pending-events.jsonl and flush on retry — mirroring scripts/pan-hook-lib.sh.
  *
  * agentId comes EXCLUSIVELY from process.env.PANOPTICON_AGENT_ID. We never
  * default — an extension running outside Panopticon (e.g. the user starts pi
@@ -24,7 +29,7 @@
  * instances launched with different agent ids never collide on either path.
  */
 
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile, readFile, unlink } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
@@ -80,10 +85,10 @@ export interface PanopticonPaths {
    */
   sessionIdPath: string
   /**
-   * Append-only JSONL of domain events emitted by Pi native lifecycle hooks.
-   * Consumed by the dashboard's Pi event poller (PAN-1134).
+   * Buffered domain events from POST failures. Drained on the next successful
+   * POST (PAN-1134). Same FIFO model as scripts/pan-hook-lib.sh.
    */
-  eventsPath: string
+  pendingEventsPath: string
 }
 
 export function panopticonPathsFor(agentId: string, home: string = homedir()): PanopticonPaths {
@@ -96,7 +101,7 @@ export function panopticonPathsFor(agentId: string, home: string = homedir()): P
     completedPath: join(agentDir, 'completed'),
     heartbeatPath: join(heartbeatsDir, `${agentId}.json`),
     sessionIdPath: join(agentDir, 'session.id'),
-    eventsPath: join(agentDir, 'events.jsonl'),
+    pendingEventsPath: join(agentDir, 'pending-events.jsonl'),
   }
 }
 
@@ -104,10 +109,117 @@ async function writeJson(path: string, body: unknown): Promise<void> {
   await writeFile(path, `${JSON.stringify(body, null, 2)}\n`, 'utf8')
 }
 
-async function writeEvent(paths: PanopticonPaths, body: Record<string, unknown>): Promise<void> {
-  await mkdir(paths.agentDir, { recursive: true })
-  const line = `${JSON.stringify(body)}\n`
-  await writeFile(paths.eventsPath, line, { encoding: 'utf8', flag: 'a' })
+// ────────────────────────────────────────────────────────────────────────
+// HTTP event emitter — POSTs to the dashboard heartbeat endpoint.
+// Same validation path as Claude Code hooks. Buffers on failure.
+// ────────────────────────────────────────────────────────────────────────
+
+const POST_TIMEOUT_MS = 1_000
+
+function getDashboardUrl(): string {
+  return process.env['PANOPTICON_DASHBOARD_URL'] ?? 'http://localhost:3010'
+}
+
+async function postEvent(env: HookEnv, body: Record<string, unknown>): Promise<void> {
+  const url = `${getDashboardUrl()}/api/agents/${env.agentId}/heartbeat`
+  const paths = panopticonPathsFor(env.agentId, env.home)
+  const pendingPath = paths.pendingEventsPath
+
+  // 1. Drain any previously-buffered events before emitting the new one.
+  await drainPendingEvents(env, url, pendingPath)
+
+  // 2. POST the new event.
+  const ok = await postWithTimeout(url, body)
+  if (ok) return
+
+  // 3. On failure, buffer for retry. On 4xx (client error), drop — the
+  // server told us this body is invalid and retrying won't help.
+  if (ok === false) {
+    // Network/5xx failure — buffer.
+    const line = `${JSON.stringify(body)}\n`
+    await mkdir(paths.agentDir, { recursive: true })
+    await writeFile(pendingPath, line, { encoding: 'utf8', flag: 'a' }).catch(() => {
+      // ignore write failure — event is lost, but extension must not block Pi.
+    })
+  }
+  // ok === null means 4xx — drop silently.
+}
+
+/**
+ * POST a single event body. Returns:
+ *   true  — 2xx success
+ *   false — network failure / timeout / 5xx (caller should buffer)
+ *   null  — 4xx client error (caller should drop)
+ */
+async function postWithTimeout(url: string, body: Record<string, unknown>): Promise<boolean | null> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    if (res.status >= 200 && res.status < 300) return true
+    if (res.status >= 400 && res.status < 500) return null
+    return false
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * Drain pending-events.jsonl in FIFO order. Reads the file, clears it,
+ * then POSTs each line. If any POST fails, the remaining lines are written
+ * back so they can be retried next time.
+ */
+async function drainPendingEvents(env: HookEnv, url: string, pendingPath: string): Promise<void> {
+  let raw: string
+  try {
+    raw = await readFile(pendingPath, 'utf8')
+  } catch {
+    return
+  }
+  if (!raw.trim()) {
+    await unlink(pendingPath).catch(() => { /* ignore */ })
+    return
+  }
+
+  // Clear the file before posting so we don't double-deliver on crash.
+  await unlink(pendingPath).catch(() => { /* ignore */ })
+
+  const lines = raw.split('\n').filter((l) => l.trim())
+  const remaining: string[] = []
+
+  for (const line of lines) {
+    let body: Record<string, unknown>
+    try {
+      body = JSON.parse(line) as Record<string, unknown>
+    } catch {
+      continue // skip malformed line
+    }
+
+    const ok = await postWithTimeout(url, body)
+    if (ok) {
+      continue // drained successfully
+    }
+    if (ok === null) {
+      continue // 4xx — drop
+    }
+    // Network failure — put this and the rest back.
+    remaining.push(line)
+  }
+
+  if (remaining.length > 0) {
+    const paths = panopticonPathsFor(env.agentId, env.home)
+    await mkdir(paths.agentDir, { recursive: true })
+    await writeFile(pendingPath, remaining.map((l) => `${l}\n`).join(''), { encoding: 'utf8' }).catch(() => {
+      // ignore write failure
+    })
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -151,9 +263,9 @@ export async function handleSessionStart(env: HookEnv, event: SessionStartEvent)
   if (event.sessionId) {
     await writeFile(paths.sessionIdPath, `${event.sessionId}\n`, 'utf8')
   }
-  // PAN-1134: emit domain events for dashboard activity tracking
-  await writeEvent(paths, { kind: 'model_set', model: 'pi', claudeSessionId: event.sessionId ?? undefined, timestamp: ts })
-  await writeEvent(paths, { kind: 'activity', activity: 'idle', timestamp: ts })
+  // PAN-1134: POST domain events to the dashboard heartbeat endpoint.
+  await postEvent(env, { kind: 'model_set', model: 'pi', claudeSessionId: event.sessionId ?? undefined, timestamp: ts })
+  await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
 }
 
 export async function handleToolExecutionEnd(env: HookEnv, event: ToolExecutionEndEvent): Promise<void> {
@@ -167,8 +279,8 @@ export async function handleToolExecutionEnd(env: HookEnv, event: ToolExecutionE
     last_action: event.isError ? 'tool_error' : 'tool_end',
     pid,
   })
-  // PAN-1134: emit domain event so Pi agents show activity in the dashboard
-  await writeEvent(paths, { kind: 'activity', activity: 'working', tool: event.toolName ?? 'unknown', timestamp: ts })
+  // PAN-1134: POST domain event so Pi agents show activity in the dashboard.
+  await postEvent(env, { kind: 'activity', activity: 'working', tool: event.toolName ?? 'unknown', timestamp: ts })
 }
 
 export async function handleTurnEnd(env: HookEnv, _event: TurnEndEvent): Promise<void> {
@@ -182,8 +294,8 @@ export async function handleTurnEnd(env: HookEnv, _event: TurnEndEvent): Promise
     last_action: 'turn_end',
     pid,
   })
-  // PAN-1134: turn_end approximates the Claude Stop hook (agent back at prompt)
-  await writeEvent(paths, { kind: 'activity', activity: 'idle', timestamp: ts })
+  // PAN-1134: turn_end approximates the Claude Stop hook (agent back at prompt).
+  await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })
 }
 
 export async function handlePanDone(env: HookEnv, args: string): Promise<void> {
@@ -215,7 +327,7 @@ export default function panopticonPiExtension(pi: PiExtensionAPI): void {
     try {
       await handleSessionStart(env, event)
     } catch {
-      // Filesystem failures must never break Pi.
+      // Filesystem / network failures must never break Pi.
     }
   })
 
