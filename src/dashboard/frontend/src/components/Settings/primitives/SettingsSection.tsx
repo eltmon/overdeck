@@ -24,7 +24,7 @@ export function SettingsSection({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <section id={id} className="py-6 first:pt-0">
+    <section id={id} className="py-6 first:pt-0 scroll-mt-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3 min-w-0">
           {collapsible ? (

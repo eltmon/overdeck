@@ -57,6 +57,16 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).not.toContain('<AgentCardsPanel');
     expect(SETTINGS_PAGE_SOURCE).not.toContain("from './AgentCards'");
   });
+
+  it('includes the TTS sidebar item and settings section controls', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'tts', label: 'TTS'");
+    expect(SETTINGS_PAGE_SOURCE).toContain('id="tts"');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ enabled:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ volume:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ dropInfoWhenFull:');
+  });
 });
 
 describe('MODELS_BY_PROVIDER', () => {
@@ -103,6 +113,15 @@ describe('buildMiniMaxFormData', () => {
     };
     const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
     expect(result.openrouter?.favorites).toEqual(['qwen/qwq-32b']);
+  });
+
+  it('preserves existing TTS settings from formData', () => {
+    const existing: SettingsConfig = {
+      ...MINIMAX_DEFAULTS,
+      tts: { enabled: true, volume: 0.6, rate: 1.2, maxChars: 200, dropInfoWhenFull: false },
+    };
+    const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
+    expect(result.tts).toEqual(existing.tts);
   });
 
   it('preserves gemini_thinking_level from formData, not from defaults', () => {

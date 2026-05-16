@@ -66,6 +66,20 @@ export interface DeprecationWarning {
   to: string;
 }
 
+export interface TtsConfig {
+  enabled?: boolean;
+  voice?: string;
+  statusVoice?: string;
+  volume?: number;
+  rate?: number;
+  maxChars?: number;
+  dropInfoWhenFull?: boolean;
+  voiceMap?: Record<string, string>;
+  mutedSources?: string[];
+  utteranceTemplates?: Record<string, string>;
+  mutedIssues?: string[];
+}
+
 export interface SettingsConfig {
   workhorses?: WorkhorsesConfig;
   roles?: RolesConfig;
@@ -75,6 +89,7 @@ export interface SettingsConfig {
     favorites?: string[];
   };
   tracker_keys?: TrackerKeysConfig;
+  tts?: TtsConfig;
   deprecation_warnings?: DeprecationWarning[];
   tmux?: {
     config_mode?: 'managed' | 'inherit-user';

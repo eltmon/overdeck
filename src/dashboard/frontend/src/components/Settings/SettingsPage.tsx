@@ -28,8 +28,9 @@ import {
   Wrench,
   Monitor,
   ShieldCheck,
+  Volume2,
 } from 'lucide-react';
-import { SettingsConfig, Provider, ModelId } from './types';
+import { SettingsConfig, Provider, ModelId, type TtsConfig } from './types';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
@@ -46,6 +47,8 @@ import {
   SettingsLayout,
   SettingsHeader,
   SettingsSidebarNav,
+  SettingsSection,
+  SettingsRow,
   type NavItem,
 } from './primitives';
 
@@ -80,6 +83,16 @@ async function fetchOpenRouterCatalog(): Promise<OpenRouterCatalogResponse | nul
 async function fetchSettings(): Promise<SettingsConfig> {
   const res = await fetch('/api/settings');
   if (!res.ok) throw new Error('Failed to fetch settings');
+  return res.json();
+}
+
+interface TtsHealthResponse {
+  ok: boolean;
+}
+
+async function fetchTtsHealth(): Promise<TtsHealthResponse> {
+  const res = await fetch('/api/tts/health');
+  if (!res.ok) throw new Error('Failed to fetch TTS health');
   return res.json();
 }
 
@@ -151,6 +164,7 @@ export function buildMiniMaxFormData(
     conversations: { ...(formData?.conversations || miniMaxDefaults.conversations || {}) },
     tmux: { ...(formData?.tmux || miniMaxDefaults.tmux || {}) },
     openrouter: { ...(formData?.openrouter || miniMaxDefaults.openrouter || {}) },
+    tts: { ...(formData?.tts || miniMaxDefaults.tts || {}) },
   };
 }
 
@@ -199,6 +213,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
   { id: 'conversations', label: 'Conversations', icon: MessageCircle },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
+  { id: 'tts', label: 'TTS', icon: Volume2 },
   { id: 'tracker-keys', label: 'Tracker Keys', icon: GitBranch },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'diff', label: 'Diff', icon: SplitSquareVertical },
@@ -214,6 +229,11 @@ export function SettingsPage() {
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
+  });
+  const { data: ttsHealth } = useQuery({
+    queryKey: ['tts-health'],
+    queryFn: fetchTtsHealth,
+    refetchInterval: 10_000,
   });
 
   const [formData, setFormData] = useState<SettingsConfig | null>(null);
@@ -372,6 +392,18 @@ export function SettingsPage() {
     });
   };
 
+  const handleTtsConfigChange = (patch: Partial<TtsConfig>) => {
+    const next: SettingsConfig = {
+      ...formData,
+      tts: {
+        ...formData.tts,
+        ...patch,
+      },
+    };
+    setFormData(next);
+    saveMutation.mutate(next);
+  };
+
   const handleCompactionModelChange = (modelId: ModelId) => {
     setFormData({
       ...formData,
@@ -481,6 +513,12 @@ export function SettingsPage() {
       setTestingModel(null);
     }
   };
+
+  const ttsConfig = formData.tts ?? {};
+  const ttsVolume = ttsConfig.volume ?? 1;
+  const ttsRate = ttsConfig.rate ?? 1;
+  const ttsMaxChars = ttsConfig.maxChars ?? 140;
+  const ttsDaemonOnline = ttsHealth?.ok === true;
 
   return (
     <SettingsLayout
@@ -1043,6 +1081,115 @@ export function SettingsPage() {
           </div>
         </div>
       </section>
+
+      <SettingsSection
+        id="tts"
+        title="TTS"
+        description="Built-in voice playback"
+        actions={
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs ${
+            ttsHealth === undefined
+              ? 'bg-muted/50 text-muted-foreground'
+              : ttsDaemonOnline
+                ? 'bg-success/10 text-success'
+                : 'bg-destructive/10 text-destructive'
+          }`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${ttsDaemonOnline ? 'bg-success' : 'bg-current'}`} />
+            Daemon status: {ttsHealth === undefined ? 'checking' : ttsDaemonOnline ? 'online' : 'offline'}
+          </span>
+        }
+      >
+        <SettingsRow
+          label="Enable TTS"
+          description="Speak activity events through the local Qwen3-TTS daemon"
+        >
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!ttsConfig.enabled}
+            aria-label="Toggle TTS"
+            onClick={() => handleTtsConfigChange({ enabled: !ttsConfig.enabled })}
+            disabled={saveMutation.isPending}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+              ttsConfig.enabled ? 'bg-primary' : 'bg-muted'
+            }`}
+          >
+            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              ttsConfig.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
+            }`} />
+          </button>
+        </SettingsRow>
+
+        <SettingsRow
+          label="Volume"
+          description={`${Math.round(ttsVolume * 100)}% output volume`}
+        >
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={ttsVolume}
+            onChange={(e) => handleTtsConfigChange({ volume: Number(e.target.value) })}
+            disabled={saveMutation.isPending}
+            className="w-40 accent-primary disabled:opacity-50"
+          />
+          <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
+            {Math.round(ttsVolume * 100)}%
+          </span>
+        </SettingsRow>
+
+        <SettingsRow
+          label="Rate"
+          description="Speech speed multiplier"
+        >
+          <input
+            type="number"
+            min={0.1}
+            step={0.1}
+            value={ttsRate}
+            onChange={(e) => handleTtsConfigChange({ rate: Number(e.target.value) })}
+            disabled={saveMutation.isPending}
+            className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          label="Max chars"
+          description="Maximum text length per spoken utterance"
+        >
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={ttsMaxChars}
+            onChange={(e) => handleTtsConfigChange({ maxChars: Number(e.target.value) })}
+            disabled={saveMutation.isPending}
+            className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+          />
+        </SettingsRow>
+
+        <SettingsRow
+          label="Drop info when queue full"
+          description="Skip low-priority speech when the daemon queue is saturated"
+        >
+          <button
+            type="button"
+            role="switch"
+            aria-checked={ttsConfig.dropInfoWhenFull ?? true}
+            aria-label="Toggle dropping low-priority TTS when queue is full"
+            onClick={() => handleTtsConfigChange({ dropInfoWhenFull: !(ttsConfig.dropInfoWhenFull ?? true) })}
+            disabled={saveMutation.isPending}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 ${
+              (ttsConfig.dropInfoWhenFull ?? true) ? 'bg-primary' : 'bg-muted'
+            }`}
+          >
+            <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+              (ttsConfig.dropInfoWhenFull ?? true) ? 'translate-x-[18px]' : 'translate-x-[3px]'
+            }`} />
+          </button>
+        </SettingsRow>
+      </SettingsSection>
 
       {/* Tracker Keys */}
       <section id="tracker-keys" className="py-6 scroll-mt-4">
