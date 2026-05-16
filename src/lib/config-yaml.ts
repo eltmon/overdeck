@@ -82,6 +82,38 @@ export interface TtsSummarizerConfig {
   batch_window_seconds?: number;
 }
 
+export interface TtsDaemonConfig {
+  enabled?: boolean;
+  voice?: string;
+  statusVoice?: string;
+  volume?: number;
+  rate?: number;
+  maxChars?: number;
+  dropInfoWhenFull?: boolean;
+  daemonPort?: number;
+  daemonHost?: string;
+  voiceMap?: Record<string, string>;
+  mutedSources?: string[];
+  utteranceTemplates?: Record<string, string>;
+  mutedIssues?: string[];
+}
+
+export interface NormalizedTtsDaemonConfig {
+  enabled: boolean;
+  voice: string;
+  statusVoice?: string;
+  volume: number;
+  rate: number;
+  maxChars: number;
+  dropInfoWhenFull: boolean;
+  daemonPort: number;
+  daemonHost: string;
+  voiceMap: Record<string, string>;
+  mutedSources: string[];
+  utteranceTemplates: Record<string, string>;
+  mutedIssues: string[];
+}
+
 export type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 export type ModelRef = string;
 
@@ -244,8 +276,8 @@ export interface YamlConfig {
     caveman?: CavemanConfig;
   };
 
-  /** TTS summarizer configuration */
-  tts?: {
+  /** TTS configuration */
+  tts?: TtsDaemonConfig & {
     summarizer?: TtsSummarizerConfig;
   };
 
@@ -417,6 +449,9 @@ export interface NormalizedConfig {
   /** Caveman compressed output configuration (normalised, never undefined) */
   caveman: NormalizedCavemanConfig;
 
+  /** TTS daemon configuration (normalised, never undefined) */
+  tts: NormalizedTtsDaemonConfig;
+
   /** TTS summarizer configuration (normalised, never undefined) */
   ttsSummarizer: {
     enabled: boolean;
@@ -537,6 +572,20 @@ const DEFAULT_CONFIG: NormalizedConfig = {
       test: 'full',
       merge: 'full',
     },
+  },
+  tts: {
+    enabled: false,
+    voice: '',
+    volume: 1,
+    rate: 1,
+    maxChars: 140,
+    dropInfoWhenFull: true,
+    daemonPort: 8787,
+    daemonHost: '127.0.0.1',
+    voiceMap: {},
+    mutedSources: [],
+    utteranceTemplates: {},
+    mutedIssues: [],
   },
   ttsSummarizer: {
     enabled: false,
@@ -728,6 +777,25 @@ function mergeCavemanConfig(
   }
 }
 
+function mergeTtsConfig(result: NormalizedTtsDaemonConfig, config: YamlConfig | null): void {
+  const tts = config?.tts;
+  if (!tts) return;
+
+  if (tts.enabled !== undefined) result.enabled = tts.enabled;
+  if (tts.voice !== undefined) result.voice = tts.voice;
+  if (tts.statusVoice !== undefined) result.statusVoice = tts.statusVoice;
+  if (tts.volume !== undefined) result.volume = tts.volume;
+  if (tts.rate !== undefined) result.rate = tts.rate;
+  if (tts.maxChars !== undefined) result.maxChars = tts.maxChars;
+  if (tts.dropInfoWhenFull !== undefined) result.dropInfoWhenFull = tts.dropInfoWhenFull;
+  if (tts.daemonPort !== undefined) result.daemonPort = tts.daemonPort;
+  if (tts.daemonHost !== undefined) result.daemonHost = tts.daemonHost;
+  if (tts.voiceMap !== undefined) result.voiceMap = { ...tts.voiceMap };
+  if (tts.mutedSources !== undefined) result.mutedSources = [...tts.mutedSources];
+  if (tts.utteranceTemplates !== undefined) result.utteranceTemplates = { ...tts.utteranceTemplates };
+  if (tts.mutedIssues !== undefined) result.mutedIssues = [...tts.mutedIssues];
+}
+
 function isWorkhorseRef(ref: ModelRef): boolean {
   return ref.startsWith('workhorse:');
 }
@@ -854,6 +922,20 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       enabled: DEFAULT_CONFIG.caveman.enabled,
       abTest: DEFAULT_CONFIG.caveman.abTest,
       modes: { ...DEFAULT_CONFIG.caveman.modes },
+    },
+    tts: {
+      enabled: DEFAULT_CONFIG.tts.enabled,
+      voice: DEFAULT_CONFIG.tts.voice,
+      volume: DEFAULT_CONFIG.tts.volume,
+      rate: DEFAULT_CONFIG.tts.rate,
+      maxChars: DEFAULT_CONFIG.tts.maxChars,
+      dropInfoWhenFull: DEFAULT_CONFIG.tts.dropInfoWhenFull,
+      daemonPort: DEFAULT_CONFIG.tts.daemonPort,
+      daemonHost: DEFAULT_CONFIG.tts.daemonHost,
+      voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
+      mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
+      utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },
+      mutedIssues: [...DEFAULT_CONFIG.tts.mutedIssues],
     },
     ttsSummarizer: {
       enabled: DEFAULT_CONFIG.ttsSummarizer.enabled,
@@ -1109,6 +1191,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge caveman configuration
     mergeCavemanConfig(result.caveman, config);
+
+    // Merge TTS daemon configuration
+    mergeTtsConfig(result.tts, config);
 
     // Merge TTS summarizer configuration
     if (config.tts?.summarizer) {
