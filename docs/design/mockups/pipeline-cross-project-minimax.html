@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pipeline Overview - Panopticon</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #21262d;
+      --border: #30363d;
+      --text-primary: #e6edf3;
+      --text-secondary: #8b949e;
+      --text-muted: #6e7681;
+      --accent-blue: #58a6ff;
+      --accent-green: #3fb950;
+      --accent-purple: #a371f7;
+      --accent-orange: #d29922;
+      --accent-red: #f85149;
+      --accent-cyan: #39d353;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .date-range {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 12px;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .view-tabs {
+      display: flex;
+      background: var(--bg-tertiary);
+      border-radius: 6px;
+      padding: 3px;
+    }
+
+    .view-tab {
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .view-tab.active {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .list-view {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .list-header {
+      display: grid;
+      grid-template-columns: 40px 1fr 120px 100px 100px 80px;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .list-body {
+      max-height: calc(100vh - 320px);
+      overflow-y: auto;
+    }
+
+    .list-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 120px 100px 100px 80px;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .list-row:last-child {
+      border-bottom: none;
+    }
+
+    .list-row:hover {
+      background: var(--bg-tertiary);
+    }
+
+    .row-num {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    .row-main {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .row-id {
+      font-size: 12px;
+      color: var(--accent-blue);
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    .row-title {
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    .row-labels {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .label {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    .label.bug { background: rgba(248, 81, 73, 0.15); color: var(--accent-red); }
+    .label.feature { background: rgba(88, 166, 255, 0.15); color: var(--accent-blue); }
+    .label.enhancement { background: rgba(163, 113, 247, 0.15); color: var(--accent-purple); }
+    .label.docs { background: rgba(63, 185, 80, 0.15); color: var(--accent-green); }
+    .label.performance { background: rgba(210, 153, 34, 0.15); color: var(--accent-orange); }
+    .label.security { background: rgba(248, 81, 73, 0.25); color: #ff7b72; }
+
+    .row-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .status-dot.success { background: var(--accent-green); }
+    .status-dot.pending { background: var(--accent-orange); }
+    .status-dot.running { background: var(--accent-blue); animation: pulse 1.5s infinite; }
+    .status-dot.error { background: var(--accent-red); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .row-priority {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .row-priority.urgent { color: var(--accent-red); font-weight: 500; }
+
+    .row-age {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .row-age.overdue {
+      color: var(--accent-red);
+    }
+
+    .row-assignees {
+      display: flex;
+    }
+
+    .avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      margin-left: -8px;
+      border: 2px solid var(--bg-secondary);
+    }
+
+    .avatar:first-child { margin-left: 0; }
+    .avatar.eltmon { background: #58a6ff; }
+    .avatar.bee { background: #a371f7; }
+    .avatar.norbert { background: #3fb950; }
+    .avatar.ziggy { background: #d29922; }
+    .avatar.fry { background: #f85149; }
+    .avatar.bender { background: #8b949e; }
+
+    .status-badge {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .status-badge.ready { background: rgba(88, 166, 255, 0.15); color: var(--accent-blue); }
+    .status-badge.blocked { background: rgba(248, 81, 73, 0.15); color: var(--accent-red); }
+    .status-badge.approved { background: rgba(63, 185, 80, 0.15); color: var(--accent-green); }
+    .status-badge.shipped { background: rgba(63, 185, 80, 0.2); color: var(--accent-green); }
+    .status-badge.in-progress { background: rgba(163, 113, 247, 0.15); color: var(--accent-purple); }
+    .status-badge.in-review { background: rgba(210, 153, 34, 0.15); color: var(--accent-orange); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Pipeline Overview</h1>
+    <div class="header-actions">
+      <div class="date-range">Apr 15 – May 15, 2026</div>
+      <div class="view-tabs">
+        <div class="view-tab">Board</div>
+        <div class="view-tab active">List</div>
+        <div class="view-tab">Timeline</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Commits</div>
+      <div class="stat-value">47</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pull Requests</div>
+      <div class="stat-value">12</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Check Runs</div>
+      <div class="stat-value">89</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Deployments</div>
+      <div class="stat-value">23</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Environments</div>
+      <div class="stat-value">5</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Contributors</div>
+      <div class="stat-value">4</div>
+    </div>
+  </div>
+
+  <div class="list-view">
+    <div class="list-header">
+      <span>#</span>
+      <span>Title</span>
+      <span>Status</span>
+      <span>Priority</span>
+      <span>Age</span>
+      <span>Assignees</span>
+    </div>
+    <div class="list-body">
+      <div class="list-row">
+        <span class="row-num">19</span>
+        <div class="row-main">
+          <span class="row-id">PAN-148</span>
+          <span class="row-title">Add SSH key rotation support for workspace credentials</span>
+          <div class="row-labels">
+            <span class="label security">security</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot success"></span>
+          Ready
+        </span>
+        <span class="row-priority urgent">Urgent</span>
+        <span class="row-age">2d</span>
+        <div class="row-assignees">
+          <div class="avatar eltmon">E</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">18</span>
+        <div class="row-main">
+          <span class="row-id">PAN-145</span>
+          <span class="row-title">Add workspace archive functionality with export/import</span>
+          <div class="row-labels">
+            <span class="label enhancement">enhancement</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot error"></span>
+          Blocked
+        </span>
+        <span class="row-priority">Medium</span>
+        <span class="row-age overdue">5d</span>
+        <div class="row-assignees">
+          <div class="avatar eltmon">E</div>
+          <div class="avatar bee">B</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">17</span>
+        <div class="row-main">
+          <span class="row-id">PAN-143</span>
+          <span class="row-title">Fix memory leak in agent heartbeat monitoring</span>
+          <div class="row-labels">
+            <span class="label bug">bug</span>
+            <span class="label performance">performance</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot pending"></span>
+          In Review
+        </span>
+        <span class="row-priority urgent">High</span>
+        <span class="row-age">3d</span>
+        <div class="row-assignees">
+          <div class="avatar eltmon">E</div>
+          <div class="avatar bee">B</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">16</span>
+        <div class="row-main">
+          <span class="row-id">PAN-142</span>
+          <span class="row-title">Implement tmux session persistence across dashboard restarts</span>
+          <div class="row-labels">
+            <span class="label feature">feature</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot pending"></span>
+          In Progress
+        </span>
+        <span class="row-priority">Medium</span>
+        <span class="row-age">1d</span>
+        <div class="row-assignees">
+          <div class="avatar eltmon">E</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">15</span>
+        <div class="row-main">
+          <span class="row-id">PAN-141</span>
+          <span class="row-title">Add rate limiting to WebSocket event broadcasting</span>
+          <div class="row-labels">
+            <span class="label performance">performance</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot success"></span>
+          Approved
+        </span>
+        <span class="row-priority">Low</span>
+        <span class="row-age">4d</span>
+        <div class="row-assignees">
+          <div class="avatar norbert">N</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">14</span>
+        <div class="row-main">
+          <span class="row-id">PAN-139</span>
+          <span class="row-title">Refactor Cloister handoff logic to reduce race conditions</span>
+          <div class="row-labels">
+            <span class="label bug">bug</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot running"></span>
+          In Review
+        </span>
+        <span class="row-priority urgent">High</span>
+        <span class="row-age">6d</span>
+        <div class="row-assignees">
+          <div class="avatar bee">B</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">13</span>
+        <div class="row-main">
+          <span class="row-id">PAN-138</span>
+          <span class="row-title">Add beeps panic button for emergency agent termination</span>
+          <div class="row-labels">
+            <span class="label feature">feature</span>
+            <span class="label security">security</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot success"></span>
+          Approved
+        </span>
+        <span class="row-priority">Medium</span>
+        <span class="row-age">7d</span>
+        <div class="row-assignees">
+          <div class="avatar bender">Bd</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">12</span>
+        <div class="row-main">
+          <span class="row-id">PAN-137</span>
+          <span class="row-title">Pan-merge-agent should handle merge conflicts automatically</span>
+          <div class="row-labels">
+            <span class="label enhancement">enhancement</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot running"></span>
+          Testing
+        </span>
+        <span class="row-priority">Medium</span>
+        <span class="row-age">8d</span>
+        <div class="row-assignees">
+          <div class="avatar ziggy">Z</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">11</span>
+        <div class="row-main">
+          <span class="row-id">PAN-136</span>
+          <span class="row-title">Add dashboard dark/light theme toggle with system preference detection</span>
+          <div class="row-labels">
+            <span class="label enhancement">enhancement</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot success"></span>
+          Approved
+        </span>
+        <span class="row-priority">Low</span>
+        <span class="row-age">9d</span>
+        <div class="row-assignees">
+          <div class="avatar fry">F</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">10</span>
+        <div class="row-main">
+          <span class="row-id">PAN-134</span>
+          <span class="row-title">Add beeps completion check for long-running work agents</span>
+          <div class="row-labels">
+            <span class="label feature">feature</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot success"></span>
+          Ready to Merge
+        </span>
+        <span class="row-priority">Medium</span>
+        <span class="row-age">10d</span>
+        <div class="row-assignees">
+          <div class="avatar eltmon">E</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">9</span>
+        <div class="row-main">
+          <span class="row-id">PAN-135</span>
+          <span class="row-title">Add pan install --force flag for reinstall</span>
+          <div class="row-labels">
+            <span class="label enhancement">enhancement</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot success"></span>
+          <span class="status-badge shipped">Shipped</span>
+        </span>
+        <span class="row-priority">Low</span>
+        <span class="row-age">12d</span>
+        <div class="row-assignees">
+          <div class="avatar fry">F</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">8</span>
+        <div class="row-main">
+          <span class="row-id">PAN-133</span>
+          <span class="row-title">Fix CLI timeout handling for long-running commands</span>
+          <div class="row-labels">
+            <span class="label bug">bug</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot success"></span>
+          <span class="status-badge shipped">Shipped</span>
+        </span>
+        <span class="row-priority urgent">High</span>
+        <span class="row-age">14d</span>
+        <div class="row-assignees">
+          <div class="avatar eltmon">E</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">7</span>
+        <div class="row-main">
+          <span class="row-id">PAN-132</span>
+          <span class="row-title">Add agent health monitoring to dashboard</span>
+          <div class="row-labels">
+            <span class="label feature">feature</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot success"></span>
+          <span class="status-badge shipped">Shipped</span>
+        </span>
+        <span class="row-priority">Medium</span>
+        <span class="row-age">16d</span>
+        <div class="row-assignees">
+          <div class="avatar norbert">N</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">6</span>
+        <div class="row-main">
+          <span class="row-id">PAN-131</span>
+          <span class="row-title">Add pan workspace list with status indicators</span>
+          <div class="row-labels">
+            <span class="label feature">feature</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot success"></span>
+          <span class="status-badge shipped">Shipped</span>
+        </span>
+        <span class="row-priority">Medium</span>
+        <span class="row-age">18d</span>
+        <div class="row-assignees">
+          <div class="avatar bee">B</div>
+        </div>
+      </div>
+
+      <div class="list-row">
+        <span class="row-num">5</span>
+        <div class="row-main">
+          <span class="row-id">PAN-130</span>
+          <span class="row-title">Implement worktree cleanup on workspace delete</span>
+          <div class="row-labels">
+            <span class="label bug">bug</span>
+          </div>
+        </div>
+        <span class="row-status">
+          <span class="status-dot success"></span>
+          <span class="status-badge shipped">Shipped</span>
+        </span>
+        <span class="row-priority">Medium</span>
+        <span class="row-age">20d</span>
+        <div class="row-assignees">
+          <div class="avatar eltmon">E</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
