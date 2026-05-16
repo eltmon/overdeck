@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   checkTtsHealth,
   createTtsVoice,
+  EXTRACT_EMBEDDING_TIMEOUT_MS,
+  extractTtsEmbedding,
   listTtsVoices,
   parseCreateTtsVoiceInput,
+  parseExtractEmbeddingInput,
   parseSpeakTtsInput,
   removeTtsVoice,
   speakTts,
@@ -178,5 +181,48 @@ describe('TTS speak route helpers', () => {
       status: 503,
       body: { spoken: false, result: 'daemon-unavailable', error: 'TTS daemon unavailable' },
     });
+  });
+});
+
+describe('TTS embedding extraction route helpers', () => {
+  it('parses extraction requests', () => {
+    expect(parseExtractEmbeddingInput({ design: 'warm narrator', text: 'sample text' })).toEqual({
+      design: 'warm narrator',
+      text: 'sample text',
+    });
+  });
+
+  it('rejects invalid extraction requests', () => {
+    expect(parseExtractEmbeddingInput({ design: '', text: 'sample text' })).toBeUndefined();
+    expect(parseExtractEmbeddingInput({ design: 'warm narrator', text: '' })).toBeUndefined();
+    expect(parseExtractEmbeddingInput({ design: 1, text: 'sample text' })).toBeUndefined();
+  });
+
+  it('proxies extraction requests to the daemon with a 60-second timeout', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ embedding: [0.1, 0.2] }), { status: 200 }));
+
+    await expect(extractTtsEmbedding({ design: 'warm narrator', text: 'sample text' }, {
+      fetch: fetchImpl,
+      host: '127.0.0.1',
+      port: 8787,
+    })).resolves.toEqual({ status: 200, body: { embedding: [0.1, 0.2] } });
+
+    expect(EXTRACT_EMBEDDING_TIMEOUT_MS).toBe(60_000);
+    expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:8787/extract-embedding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ design: 'warm narrator', text: 'sample text' }),
+      signal: expect.any(AbortSignal),
+    });
+  });
+
+  it('returns 503 when the daemon is unreachable', async () => {
+    const fetchImpl = vi.fn(async () => { throw new Error('ECONNREFUSED'); });
+
+    await expect(extractTtsEmbedding({ design: 'warm narrator', text: 'sample text' }, {
+      fetch: fetchImpl,
+      host: '127.0.0.1',
+      port: 8787,
+    })).resolves.toEqual({ status: 503, body: { error: 'TTS daemon unavailable' } });
   });
 });

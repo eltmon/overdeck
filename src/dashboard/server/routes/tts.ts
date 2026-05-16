@@ -12,6 +12,8 @@ import { jsonResponse } from '../http-helpers.js';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
+export const EXTRACT_EMBEDDING_TIMEOUT_MS = 60_000;
+
 export interface TtsHealthResult {
   ok: boolean;
   queue?: unknown;
@@ -71,6 +73,22 @@ export interface SpeakTtsResponse {
 
 export interface SpeakTtsDeps {
   resolveAndSpeak?: (input: ResolveAndSpeakOptions) => Promise<TtsSpeakResult>;
+}
+
+export interface ExtractEmbeddingInput {
+  design: string;
+  text: string;
+}
+
+export type ExtractEmbeddingResponse =
+  | { status: 200; body: unknown }
+  | { status: 503; body: { error: string } };
+
+export interface ExtractEmbeddingDeps {
+  fetch?: FetchLike;
+  host?: string;
+  port?: number;
+  timeoutMs?: number;
 }
 
 export function toPublicVoice(voice: TtsVoice): PublicTtsVoice {
@@ -147,6 +165,14 @@ export function parseSpeakTtsInput(body: unknown): ResolveAndSpeakOptions | unde
   return input;
 }
 
+export function parseExtractEmbeddingInput(body: unknown): ExtractEmbeddingInput | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const record = body as Record<string, unknown>;
+  if (typeof record.design !== 'string' || record.design.trim().length === 0) return undefined;
+  if (typeof record.text !== 'string' || record.text.trim().length === 0) return undefined;
+  return { design: record.design, text: record.text };
+}
+
 export async function createTtsVoice(input: CreateTtsVoiceInput, store: TtsVoiceStore = {}): Promise<TtsVoice> {
   const addVoice = store.addVoice ?? addStoredVoice;
   return addVoice(input);
@@ -170,6 +196,37 @@ export async function speakTts(input: ResolveAndSpeakOptions, deps: SpeakTtsDeps
     status: 200,
     body: { spoken: result === 'spoken', result },
   };
+}
+
+export async function extractTtsEmbedding(
+  input: ExtractEmbeddingInput,
+  deps: ExtractEmbeddingDeps = {},
+): Promise<ExtractEmbeddingResponse> {
+  let host = deps.host;
+  let port = deps.port;
+  if (host === undefined || port === undefined) {
+    const { config } = loadConfig();
+    host = config.tts.daemonHost;
+    port = config.tts.daemonPort;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), deps.timeoutMs ?? EXTRACT_EMBEDDING_TIMEOUT_MS);
+
+  try {
+    const response = await (deps.fetch ?? fetch)(`http://${host}:${port}/extract-embedding`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+      signal: controller.signal,
+    });
+    if (!response.ok) return { status: 503, body: { error: 'TTS daemon unavailable' } };
+    return { status: 200, body: await response.json() };
+  } catch {
+    return { status: 503, body: { error: 'TTS daemon unavailable' } };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function parseJsonBody(text: string): unknown | undefined {
@@ -239,10 +296,27 @@ const postTtsSpeakRoute = HttpRouter.add(
   }),
 );
 
+const postExtractEmbeddingRoute = HttpRouter.add(
+  'POST',
+  '/api/tts/extract-embedding',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const body = parseJsonBody(yield* request.text);
+    if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
+
+    const input = parseExtractEmbeddingInput(body);
+    if (!input) return jsonResponse({ error: 'invalid extraction request' }, { status: 400 });
+
+    const response = yield* Effect.promise(() => extractTtsEmbedding(input));
+    return jsonResponse(response.body, { status: response.status });
+  }),
+);
+
 export const ttsRouteLayer = Layer.mergeAll(
   getTtsHealthRoute,
   getTtsVoicesRoute,
   postTtsVoiceRoute,
   deleteTtsVoiceRoute,
   postTtsSpeakRoute,
+  postExtractEmbeddingRoute,
 );
