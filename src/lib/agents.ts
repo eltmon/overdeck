@@ -1998,16 +1998,13 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
-  // PAN-1059 / PAN-977: specialist roles (review sub-roles, test, ship) must not
-  // pass the prompt as a positional argument to Claude Code. Inside a detached
-  // tmux session, `--session-id` combined with a large positional prompt causes
-  // Claude Code to exit immediately (session-env directory created, then silent
-  // death). Work agents avoid this by delivering the prompt via tmux send-keys
-  // after Claude boots. Specialist roles now use the same delivery path.
-  // Exception: review sub-roles use `--print` mode which requires the prompt
-  // as an argument — tmux send-keys delivery doesn't work with `--print`.
-  const usesPrintMode = role === 'review' && options.subRole;
-  const shouldDeliverPromptViaTmux = isSpecialistRole && !usesPrintMode;
+  // PAN-1059 / PAN-977: specialist roles (test, ship, and interactive review
+  // roles) must not pass the prompt as a positional argument to Claude Code.
+  // Headless Claude Code review sub-roles are different: they run `claude --print`
+  // and must receive the prompt on stdin because there is no interactive TUI to
+  // wait for before tmux delivery.
+  const shouldUsePromptFileStdin = isClaudeCodeReviewSubRole;
+  const shouldDeliverPromptViaTmux = isSpecialistRole && !shouldUsePromptFileStdin;
 
   const launcherContent = generateLauncherScript({
     role,
@@ -2017,6 +2014,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setTerminalEnv: true,
     providerExports,
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
+    promptFileMode: shouldUsePromptFileStdin ? 'stdin' : undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
     sessionId,
