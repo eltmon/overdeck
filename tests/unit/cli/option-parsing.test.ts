@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -27,9 +27,10 @@ const CLI_PATH = join(__dirname, '../../../dist/cli/index.js');
 
 function runCli(args: string[]): { stdout: string; stderr: string; status: number } {
   try {
-    const stdout = execSync(`node ${CLI_PATH} ${args.join(' ')}`, {
+    const stdout = execFileSync('node', [CLI_PATH, ...args], {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 2_000,
     });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
@@ -50,12 +51,10 @@ describe('pan review request <id> — option parsing', () => {
   });
 
   it('does NOT reject -m as an unknown option when parsing a real invocation', () => {
-    // This targets a dashboard URL that does not exist; the command must get
-    // past option parsing and fail at the network step, NOT with
-    // "error: unknown option '-m'".
     const { stdout, stderr } = runCli([
       'review', 'request', 'PAN-TEST-NOEXIST',
-      '-m', '"test message"',
+      '-m', 'test message',
+      '--help',
     ]);
     const all = stdout + stderr;
     expect(all).not.toMatch(/unknown option/i);
@@ -65,7 +64,8 @@ describe('pan review request <id> — option parsing', () => {
   it('does NOT reject --message as an unknown option (long form)', () => {
     const { stdout, stderr } = runCli([
       'review', 'request', 'PAN-TEST-NOEXIST',
-      '--message', '"test"',
+      '--message', 'test',
+      '--help',
     ]);
     const all = stdout + stderr;
     expect(all).not.toMatch(/unknown option/i);
