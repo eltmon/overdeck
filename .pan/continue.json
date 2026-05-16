@@ -179,10 +179,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-v6mt",
-    "itemId": "b1-pending-turn-writer",
+    "beadId": "workspace-cedr",
+    "itemId": "b1-observation-writer",
     "status": "implemented",
-    "note": "Pending turn writer now atomically writes PendingTurn payloads to pending/<millis>_<sessionId>.json using shared path helpers, same-directory temp files, sanitized session IDs, and focused unit coverage."
+    "note": "Observation writer now appends date-scoped JSONL with O_APPEND and updates an idempotent markdown mirror by observation ID using async same-directory temp writes and rename."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -257,6 +257,12 @@
       "timestamp": "2026-05-16T20:31:00.000Z",
       "reason": "work",
       "note": "workspace-v6mt implemented: added src/lib/memory/pending.ts atomic PendingTurn writer with chronological millis/session filenames and tests/lib/memory/pending.test.ts; focused tests, typecheck, and lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T20:33:00.000Z",
+      "reason": "work",
+      "note": "workspace-cedr implemented: added src/lib/memory/observations.ts with O_APPEND JSONL writes, idempotent markdown mirror upserts, and tests/lib/memory/observations.test.ts; focused tests, typecheck, and lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],
