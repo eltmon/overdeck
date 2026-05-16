@@ -126,9 +126,14 @@ For Panopticon's configured system voice, use the built-in CLI smoke test:
 ```bash
 pan tts test
 pan tts test "Build is green, ready for review."
+pan tts voices list
+pan tts voices show "Vivian Voice"
+pan tts voices play "Vivian Voice"
+pan tts voices set-default "Vivian Voice"
+pan tts voices map reviewStatus.passed "Vivian Voice"
 ```
 
-`pan tts test` reads `tts.voice` from `~/.panopticon/config.yaml`, resolves it in `~/.panopticon/tts-voices.json`, and POSTs directly to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (or the configured `tts.daemonHost`/`tts.daemonPort`). If no system voice is configured, set one in the TTS voice settings before running the smoke test.
+`pan tts test` reads `tts.voice` from `~/.panopticon/config.yaml`, resolves it in `~/.panopticon/tts-voices.json`, and POSTs directly to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (or the configured `tts.daemonHost`/`tts.daemonPort`). If no system voice is configured, set one with `pan tts voices set-default <name>` before running the smoke test.
 
 The skill also bundles `scripts/say.sh` for one-off utterances that bypass Panopticon voice settings:
 

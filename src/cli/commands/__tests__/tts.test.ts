@@ -2,10 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   buildTtsSpeakPayload,
   DEFAULT_TTS_TEST_TEXT,
+  deleteTtsVoiceByName,
   formatVoiceDetails,
   formatVoicesTable,
   listTtsVoices,
+  mapTtsVoice,
+  playTtsVoice,
   runTtsTest,
+  setDefaultTtsVoice,
   showTtsVoice,
 } from '../tts.js';
 import type { NormalizedTtsDaemonConfig } from '../../../lib/config-yaml.js';
@@ -118,6 +122,62 @@ describe('pan tts voices', () => {
     expect(output).toContain('clone');
     expect(output).toContain('embedding (designed from designed from warm narrator sa)');
     expect(output).not.toContain('0.1');
+  });
+
+  it('plays a named voice through the daemon directly', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"queued":true}', { status: 202 }));
+    const result = await playTtsVoice('System Voice', 'custom phrase', {
+      config: CONFIG,
+      findVoiceByName: vi.fn().mockResolvedValue(PRESET_VOICE),
+      fetch: fetchMock,
+      stdout: { log: vi.fn() },
+      stderr: { error: vi.fn() },
+    });
+
+    expect(result).toEqual({ ok: true, url: 'http://127.0.0.1:8787/speak' });
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ text: 'custom phrase', voice: 'Vivian', instruct: 'calm', volume: 0.8 }),
+    }));
+  });
+
+  it('deletes a named voice by id', async () => {
+    const stdout = { log: vi.fn() };
+    const deleteMock = vi.fn().mockResolvedValue(true);
+    await expect(deleteTtsVoiceByName('System Voice', {
+      findVoiceByName: vi.fn().mockResolvedValue(PRESET_VOICE),
+      deleteVoice: deleteMock,
+      stdout,
+    })).resolves.toBe(true);
+
+    expect(deleteMock).toHaveBeenCalledWith('voice-1');
+    expect(stdout.log).toHaveBeenCalledWith('Deleted System Voice');
+  });
+
+  it('sets a named voice as the system default', async () => {
+    const stdout = { log: vi.fn() };
+    const updateMock = vi.fn().mockResolvedValue(undefined);
+    await expect(setDefaultTtsVoice('System Voice', {
+      findVoiceByName: vi.fn().mockResolvedValue(PRESET_VOICE),
+      updateTtsConfig: updateMock,
+      stdout,
+    })).resolves.toEqual(PRESET_VOICE);
+
+    expect(updateMock).toHaveBeenCalledWith({ voice: 'voice-1' });
+    expect(stdout.log).toHaveBeenCalledWith('Set System Voice as system voice');
+  });
+
+  it('maps an event key to a named voice', async () => {
+    const stdout = { log: vi.fn() };
+    const updateMock = vi.fn().mockResolvedValue(undefined);
+    await expect(mapTtsVoice('reviewStatus.passed', 'System Voice', {
+      findVoiceByName: vi.fn().mockResolvedValue(PRESET_VOICE),
+      updateTtsConfig: updateMock,
+      stdout,
+    })).resolves.toEqual(PRESET_VOICE);
+
+    expect(updateMock).toHaveBeenCalledWith({ voiceMap: { 'reviewStatus.passed': 'voice-1' } });
+    expect(stdout.log).toHaveBeenCalledWith('Mapped reviewStatus.passed → System Voice');
   });
 });
 
