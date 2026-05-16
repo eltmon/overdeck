@@ -12,9 +12,15 @@ interface Filters {
   maxCost?: string;
 }
 
+interface FacetValue {
+  value: string;
+  count: number;
+  cost?: number;
+}
+
 interface Props {
   filters: Filters;
-  facets: { models: string[]; workspaces: string[] };
+  facets: { models: FacetValue[]; workspaces: FacetValue[]; enrichmentLevels: FacetValue[] };
   onChange: (key: string, value: string | boolean | undefined) => void;
 }
 
@@ -61,7 +67,7 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
           className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
         />
         <datalist id="conversation-workspaces">
-          {facets.workspaces.map((workspace) => <option key={workspace} value={workspace} />)}
+          {facets.workspaces.map((workspace) => <option key={workspace.value} value={workspace.value} />)}
         </datalist>
       </div>
 
@@ -73,8 +79,35 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
           className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
         >
           <option value="">All models</option>
-          {facets.models.map((model) => <option key={model} value={model}>{model}</option>)}
+          {facets.models.map((model) => <option key={model.value} value={model.value}>{model.value} ({model.count})</option>)}
         </select>
+      </div>
+
+      <div className="mb-4">
+        <div className="text-xs text-gray-400 block mb-1">Workspace cost</div>
+        <div className="space-y-1 max-h-24 overflow-auto">
+          {facets.workspaces.slice(0, 8).map((workspace) => (
+            <button
+              key={workspace.value}
+              onClick={() => onChange('workspace', workspace.value)}
+              className="w-full text-left text-[10px] text-gray-500 hover:text-gray-300 truncate"
+              title={workspace.value}
+            >
+              {workspace.count} · ${(workspace.cost ?? 0).toFixed(4)} · {workspace.value}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <div className="text-xs text-gray-400 block mb-1">Enrichment levels</div>
+        <div className="flex flex-wrap gap-1">
+          {facets.enrichmentLevels.map((level) => (
+            <span key={level.value} className="rounded bg-gray-900 px-1.5 py-0.5 text-[10px] text-gray-400">
+              {level.value}: {level.count}
+            </span>
+          ))}
+        </div>
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-2">

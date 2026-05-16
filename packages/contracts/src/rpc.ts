@@ -355,6 +355,8 @@ export const EnrichSessionsRpc = Rpc.make(WS_METHODS.enrichSessions, {
     customPrompt: Schema.optional(Schema.String),
     upgrade: Schema.optional(Schema.Boolean),
     limit: Schema.optional(Schema.Number),
+    confirmed: Schema.optional(Schema.Boolean),
+    force: Schema.optional(Schema.Boolean),
   }),
   success: Schema.Struct({
     processed: Schema.Number,

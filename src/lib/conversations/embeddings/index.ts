@@ -55,6 +55,7 @@ export interface EmbedResult {
   skipped: number;
   errors: number;
   durationMs: number;
+  errorMessages?: string[];
 }
 
 // ─── Text builder ─────────────────────────────────────────────────────────────
@@ -107,7 +108,7 @@ function selectSessionsForEmbedding(
  */
 export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<EmbedResult> {
   const startTs = Date.now();
-  const result: EmbedResult = { embedded: 0, skipped: 0, errors: 0, durationMs: 0 };
+  const result: EmbedResult = { embedded: 0, skipped: 0, errors: 0, durationMs: 0, errorMessages: [] };
 
   const config = opts.config ?? getConversationsConfig();
   const provider = (opts.provider ?? config.embeddingProvider) as EmbeddingProviderName;
@@ -143,8 +144,12 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
 
       insertEmbedding(session.id, model, embedResult.embedding);
       result.embedded++;
-    } catch {
+    } catch (err) {
       result.errors++;
+      const message = err instanceof Error ? err.message : String(err);
+      if (result.errorMessages && result.errorMessages.length < 5 && !result.errorMessages.includes(message)) {
+        result.errorMessages.push(message);
+      }
     }
 
     processed++;

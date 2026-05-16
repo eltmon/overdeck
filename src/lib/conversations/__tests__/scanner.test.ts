@@ -189,6 +189,14 @@ describe('scanner', () => {
     expect(result.inserted + result.updated).toBeGreaterThanOrEqual(1);
   });
 
+  it('targeted mode includes sessions whose resolved cwd is under the requested directory', async () => {
+    const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'targeted-child.jsonl');
+    writeFileSync(p, SESSION_JSONL, 'utf8');
+
+    const result = await scan({ mode: 'targeted', dirs: ['/home/user/Projects'], watchDirs: [] });
+    expect(result.inserted + result.updated).toBe(1);
+  });
+
   it('scan persists sessionId from JSONL into discovered_sessions', async () => {
     const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'with-session-id.jsonl');
     writeFileSync(p, SESSION_JSONL, 'utf8');

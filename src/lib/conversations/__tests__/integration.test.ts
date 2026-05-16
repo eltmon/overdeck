@@ -5,15 +5,18 @@
  * and asserts expected state at each stage.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 import { scan } from '../scanner.js';
+import { parseSessionJsonl } from '../jsonl-async.js';
 import { searchSessions } from '../search.js';
+import { enrichSessions } from '../enrichment/index.js';
 import { enrichSession } from '../enrichment/enrich-session.js';
 import { embedSessions } from '../embeddings/index.js';
+import { getDatabase } from '../../database/index.js';
 import {
   findDiscoveredSessions,
   getDiscoveredSessionById,
@@ -78,6 +81,22 @@ const OTHERAPP_SESSION = [
   }),
 ].join('\n') + '\n';
 
+const AUTHLIB_SESSION = [
+  JSON.stringify({
+    sessionId: 'authlib-sess-1',
+    timestamp: '2025-03-03T09:00:00Z',
+    cwd: '/home/user/Projects/authlib',
+    message: { role: 'user', model: 'claude-opus-4-7', usage: { input_tokens: 120, output_tokens: 0 } },
+    content: 'Document authentication token refresh behavior',
+  }),
+  JSON.stringify({
+    sessionId: 'authlib-sess-1',
+    timestamp: '2025-03-03T09:20:00Z',
+    message: { role: 'assistant', model: 'claude-opus-4-7', usage: { input_tokens: 0, output_tokens: 260 } },
+    content: [{ type: 'text', text: 'Updated auth token refresh documentation and examples.' }],
+  }),
+].join('\n') + '\n';
+
 async function resetDb() {
   const { resetDatabase } = await import('../../database/index.js');
   resetDatabase();
@@ -88,6 +107,7 @@ beforeEach(() => {
   claudeProjectsDir = join(TEST_HOME, '.claude', 'projects');
   mkdirSync(join(claudeProjectsDir, '-home-user-Projects-myapp'), { recursive: true });
   mkdirSync(join(claudeProjectsDir, '-home-user-Projects-otherapp'), { recursive: true });
+  mkdirSync(join(claudeProjectsDir, '-home-user-Projects-authlib'), { recursive: true });
 
   writeFileSync(
     join(claudeProjectsDir, '-home-user-Projects-myapp', 'myapp-sess.jsonl'),
@@ -97,6 +117,11 @@ beforeEach(() => {
   writeFileSync(
     join(claudeProjectsDir, '-home-user-Projects-otherapp', 'other-sess.jsonl'),
     OTHERAPP_SESSION,
+    'utf8',
+  );
+  writeFileSync(
+    join(claudeProjectsDir, '-home-user-Projects-authlib', 'authlib-sess.jsonl'),
+    AUTHLIB_SESSION,
     'utf8',
   );
 
@@ -117,12 +142,12 @@ describe('Stage 1: scan', () => {
   it('discovers both JSONL files and inserts sessions', async () => {
     const result = await scan({ mode: 'system', watchDirs: [] });
 
-    expect(result.inserted).toBe(2);
+    expect(result.inserted).toBe(3);
     expect(result.updated).toBe(0);
     expect(result.errors).toBe(0);
 
     const sessions = findDiscoveredSessions({});
-    expect(sessions.length).toBe(2);
+    expect(sessions.length).toBe(3);
   });
 
   it('parses token counts and tools correctly', async () => {
@@ -138,12 +163,28 @@ describe('Stage 1: scan', () => {
     expect(myapp!.toolsUsed).toContain('Edit');
   });
 
-  it('re-scan of unchanged files skips them', async () => {
+  it('re-scan of unchanged files skips them without reparsing', async () => {
     await scan({ mode: 'system', watchDirs: [] });
-    const r2 = await scan({ mode: 'system', watchDirs: [] });
+    const parser = vi.fn(parseSessionJsonl);
+    const r2 = await scan({ mode: 'system', watchDirs: [], parseJsonl: parser });
 
-    expect(r2.skipped).toBe(2);
+    expect(r2.skipped).toBe(3);
     expect(r2.inserted + r2.updated).toBe(0);
+    expect(parser).not.toHaveBeenCalled();
+  });
+
+  it('links managed session_file rows to issue IDs', async () => {
+    const myappPath = join(claudeProjectsDir, '-home-user-Projects-myapp', 'myapp-sess.jsonl');
+    getDatabase().prepare(
+      `INSERT INTO conversations (name, tmux_session, status, cwd, issue_id, created_at, session_file)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run('agent-pan-457', 'agent-pan-457', 'active', '/home/user/Projects/myapp', 'PAN-457', new Date().toISOString(), myappPath);
+
+    await scan({ mode: 'system', watchDirs: [] });
+    const myapp = findDiscoveredSessions({}).find((s) => s.jsonlPath === myappPath)!;
+
+    expect(myapp.panopticonManaged).toBe(true);
+    expect(myapp.panIssueId).toBe('PAN-457');
   });
 
   it('dry-run does not persist to DB', async () => {
@@ -196,7 +237,7 @@ describe('Stage 2: enrich after scan', () => {
     });
 
     const stats = getDiscoveredStats();
-    expect(stats.total).toBe(2);
+    expect(stats.total).toBe(3);
     expect(stats.enriched).toBe(1);
   });
 });
@@ -207,9 +248,10 @@ const mockEmbedFn = async (
   _provider: unknown,
   opts: { text: string },
 ): Promise<EmbeddingResult> => {
-  // Deterministic: use text length to vary embeddings
-  const dim = 16;
-  const values = Array.from({ length: dim }, (_, i) => (opts.text.charCodeAt(i % opts.text.length) / 128));
+  const text = opts.text.toLowerCase();
+  const values = text.includes('dashboard') || text.includes('metrics')
+    ? [0, 1, 0, 0]
+    : [1, 0, 0, 0];
   return { embedding: new Float32Array(values), model: 'text-embedding-3-small' };
 };
 
@@ -245,6 +287,42 @@ describe('Stage 3: embed after enrich', () => {
 // ─── Stage 4: Search ──────────────────────────────────────────────────────────
 
 describe('Stage 4: search after enrichment', () => {
+  it('runs scan → enrich → embed → semantic search with the expected top result', async () => {
+    await scan({ mode: 'system', watchDirs: [] });
+
+    await enrichSessions({
+      tier: 1,
+      maxParallel: 1,
+      force: true,
+      callApi: async (_model, prompt) => {
+        if (prompt.includes('dashboard metrics')) {
+          return { summary: 'Created dashboard metrics page.', tags: ['dashboard', 'metrics'] };
+        }
+        if (prompt.includes('token refresh')) {
+          return { summary: 'Documented auth token refresh behavior.', tags: ['auth', 'token-refresh'] };
+        }
+        return { summary: 'Fixed JWT authentication bug preventing user login.', tags: ['auth', 'jwt', 'login'] };
+      },
+    });
+
+    await embedSessions({
+      model: 'text-embedding-3-small',
+      provider: 'openai',
+      embedFn: mockEmbedFn as typeof import('../embeddings/providers.js').embed,
+      maxParallel: 1,
+    });
+
+    const myapp = findDiscoveredSessions({}).find((s) => s.jsonlPath.includes('myapp'))!;
+    const result = await searchSessions({
+      similarTo: myapp.id,
+      embeddingModel: 'text-embedding-3-small',
+      limit: 1,
+    });
+
+    expect(result.mode).toBe('semantic');
+    expect(result.sessions[0].jsonlPath).toContain('authlib');
+  });
+
   it('structured filter finds sessions by workspace', async () => {
     await scan({ mode: 'system', watchDirs: [] });
     const sessions = findDiscoveredSessions({});
@@ -313,7 +391,7 @@ describe('Stage 5: cost aggregation', () => {
     await scan({ mode: 'system', watchDirs: [] });
     const stats = getDiscoveredStats();
 
-    expect(stats.total).toBe(2);
+    expect(stats.total).toBe(3);
     expect(stats.enriched).toBe(0);
     expect(stats.embedded).toBe(0);
     expect(stats.managedCount).toBe(0);

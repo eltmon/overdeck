@@ -63,6 +63,8 @@ export interface ReadModelState {
   scanProgress: ScanProgressSnapshot | null
   /** PAN-457 — latest enrichment stats */
   enrichStats: EnrichStatsSnapshot | null
+  /** PAN-457 — latest per-session enrichment progress */
+  enrichProgressBySessionId: Record<number, EnrichProgressSnapshot>
 }
 
 export interface ScanProgressSnapshot {
@@ -85,6 +87,16 @@ export interface EnrichStatsSnapshot {
   totalCost: number
   failures: number
   durationMs: number
+}
+
+export interface EnrichProgressSnapshot {
+  sessionId: number
+  level: number
+  model: string
+  cost: number
+  success: boolean
+  error?: string
+  timestamp: string
 }
 
 export interface DashboardLifecycleState {
@@ -120,6 +132,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   conversationsListRevision: 0,
   scanProgress: null,
   enrichStats: null,
+  enrichProgressBySessionId: {},
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -1106,7 +1119,6 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
 
     case 'enrich.progress': {
       const { sessionId, level, model, cost, success, error } = event.payload
-      void sessionId; void level; void model; void error
       const prev = state.enrichStats ?? { processed: 0, totalCost: 0, failures: 0, durationMs: 0 }
       return {
         ...state,
@@ -1115,7 +1127,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           processed: prev.processed + 1,
           totalCost: prev.totalCost + (success ? cost : 0),
           failures: prev.failures + (success ? 0 : 1),
-          durationMs: 0, // individual session, no duration tracking
+          durationMs: 0,
+        },
+        enrichProgressBySessionId: {
+          ...state.enrichProgressBySessionId,
+          [sessionId]: { sessionId, level, model, cost, success, error, timestamp: event.timestamp },
         },
       }
     }

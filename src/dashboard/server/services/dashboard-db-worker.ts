@@ -10,6 +10,12 @@ import {
 import type { ConversationFilter } from '../../../lib/database/discovered-sessions-db.js';
 import { searchSessions } from '../../../lib/conversations/search.js';
 import type { SearchQuery } from '../../../lib/conversations/search.js';
+import { scan } from '../../../lib/conversations/scanner.js';
+import type { ScanOptions } from '../../../lib/conversations/scanner.js';
+import { enrichSessions, CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
+import type { EnrichOptions } from '../../../lib/conversations/enrichment/index.js';
+import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
+import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings/index.js';
 
 type DashboardDbOperation =
   | 'getDiscoveredStats'
@@ -17,7 +23,10 @@ type DashboardDbOperation =
   | 'getDiscoveredSessionById'
   | 'aggregateDiscoveredSessionCost'
   | 'aggregateDiscoveredSessionCostBy'
-  | 'searchSessions';
+  | 'searchSessions'
+  | 'scanConversations'
+  | 'enrichSessions'
+  | 'embedSessions';
 
 interface DashboardDbRequest {
   id: string;
@@ -25,7 +34,15 @@ interface DashboardDbRequest {
   payload: unknown;
 }
 
-async function runJob(operation: DashboardDbOperation, payload: unknown): Promise<unknown> {
+async function runJob(
+  id: string,
+  operation: DashboardDbOperation,
+  payload: unknown,
+): Promise<unknown> {
+  const emitProgress = (progress: unknown) => {
+    parentPort?.postMessage({ id, progress });
+  };
+
   switch (operation) {
     case 'getDiscoveredStats':
       return getDiscoveredStats();
@@ -44,12 +61,18 @@ async function runJob(operation: DashboardDbOperation, payload: unknown): Promis
       return aggregateDiscoveredSessionCostBy(payload as 'workspace' | 'model' | 'day' | 'tier');
     case 'searchSessions':
       return searchSessions(payload as SearchQuery);
+    case 'scanConversations':
+      return scan({ ...(payload as ScanOptions), onProgress: emitProgress });
+    case 'enrichSessions':
+      return enrichSessions({ ...(payload as EnrichOptions), onProgress: emitProgress });
+    case 'embedSessions':
+      return embedSessions(payload as EmbedSessionsOptions);
   }
 }
 
 parentPort?.on('message', async (message: DashboardDbRequest) => {
   try {
-    const result = await runJob(message.operation, message.payload);
+    const result = await runJob(message.id, message.operation, message.payload);
     parentPort?.postMessage({ id: message.id, ok: true, result });
   } catch (err) {
     parentPort?.postMessage({
@@ -59,6 +82,9 @@ parentPort?.on('message', async (message: DashboardDbRequest) => {
         name: err instanceof Error ? err.name : 'Error',
         message: err instanceof Error ? err.message : String(err),
         stack: err instanceof Error ? err.stack : undefined,
+        estimatedCost: err instanceof CostThresholdError ? err.estimatedCost : undefined,
+        threshold: err instanceof CostThresholdError ? err.threshold : undefined,
+        sessionCount: err instanceof CostThresholdError ? err.sessionCount : undefined,
       },
     });
   }

@@ -4,7 +4,7 @@
  * Shows indexed Claude Code sessions with search, filters, and enrichment controls.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Filter } from 'lucide-react';
 import { SessionTable } from './SessionTable';
@@ -67,6 +67,24 @@ interface ScanResult {
   skipped: number;
   errors: number;
   durationMs: number;
+}
+
+interface FacetValue {
+  value: string;
+  count: number;
+  cost?: number;
+}
+
+function countFacetValues(values: Array<string | null | undefined>, costs?: number[]): FacetValue[] {
+  const counts = new Map<string, FacetValue>();
+  values.forEach((value, index) => {
+    if (!value) return;
+    const current = counts.get(value) ?? { value, count: 0, cost: 0 };
+    current.count += 1;
+    current.cost = (current.cost ?? 0) + (costs?.[index] ?? 0);
+    counts.set(value, current);
+  });
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 }
 
 function buildFilterParams(filters: {
@@ -154,7 +172,18 @@ export function ConversationsPage() {
   }>({});
 
   const trimmedQuery = query.trim();
+  const [debouncedSemanticQuery, setDebouncedSemanticQuery] = useState(trimmedQuery);
+  const effectiveQuery = semanticSearch ? debouncedSemanticQuery : trimmedQuery;
   const filterParams = buildFilterParams(filters);
+
+  useEffect(() => {
+    if (!semanticSearch) {
+      setDebouncedSemanticQuery(trimmedQuery);
+      return;
+    }
+    const timer = window.setTimeout(() => setDebouncedSemanticQuery(trimmedQuery), 350);
+    return () => window.clearTimeout(timer);
+  }, [semanticSearch, trimmedQuery]);
 
   const listParams = new URLSearchParams({ limit: '50' });
   for (const [key, value] of filterParams) {
@@ -170,9 +199,9 @@ export function ConversationsPage() {
   const SEARCH_PAGE_SIZE = 50;
 
   const { data: searchData, isLoading: isSearchLoading } = useQuery({
-    queryKey: ['discovered-sessions-search', trimmedQuery, filterParams.toString(), searchOffset, semanticSearch],
-    queryFn: () => fetchSearch(trimmedQuery, filterParams, SEARCH_PAGE_SIZE, searchOffset, semanticSearch),
-    enabled: !!trimmedQuery,
+    queryKey: ['discovered-sessions-search', effectiveQuery, filterParams.toString(), searchOffset, semanticSearch],
+    queryFn: () => fetchSearch(effectiveQuery, filterParams, SEARCH_PAGE_SIZE, searchOffset, semanticSearch),
+    enabled: !!effectiveQuery,
   });
 
   const { data: stats } = useQuery({
@@ -195,15 +224,16 @@ export function ConversationsPage() {
     },
   });
 
-  const isLoading = trimmedQuery ? isSearchLoading : isListLoading;
-  const sessions = trimmedQuery
+  const isLoading = effectiveQuery ? isSearchLoading : isListLoading;
+  const sessions = effectiveQuery
     ? (searchData?.sessions ?? [])
     : (listData?.sessions ?? []);
 
   const selected = selectedId != null ? sessions.find((s) => s.id === selectedId) ?? null : null;
   const facetOptions = {
-    models: [...new Set(sessions.map((s) => s.primaryModel).filter((m): m is string => Boolean(m)))].sort(),
-    workspaces: [...new Set(sessions.map((s) => s.workspacePath).filter((w): w is string => Boolean(w)))].sort(),
+    models: countFacetValues(sessions.map((s) => s.primaryModel)),
+    workspaces: countFacetValues(sessions.map((s) => s.workspacePath), sessions.map((s) => s.estimatedCost)),
+    enrichmentLevels: countFacetValues(sessions.map((s) => `L${s.enrichmentLevel}`)),
   };
   const activeFilterChips = [
     filters.workspace ? { key: 'workspace', label: `Workspace: ${filters.workspace}` } : null,

@@ -13,7 +13,7 @@
  */
 
 import { promises as fs } from 'fs';
-import { join, basename } from 'path';
+import { basename, join, relative, resolve } from 'path';
 import { encodeClaudeProjectDir } from '../paths.js';
 import { homedir } from 'os';
 
@@ -45,6 +45,8 @@ export interface ScanOptions {
   maxParallel?: number | null;
   /** Progress callback */
   onProgress?: (progress: ScanProgress) => void | Promise<void>;
+  /** Injected parser for integration tests */
+  parseJsonl?: typeof parseSessionJsonl;
 }
 
 export interface ScanProgress {
@@ -128,36 +130,34 @@ async function discoverAllJsonlFiles(warnings: string[]): Promise<
   return result;
 }
 
-async function discoverJsonlFilesForDirs(dirs: string[], warnings: string[]): Promise<
-  Array<{ projectDir: string; jsonlPath: string }>
-> {
-  const claudeProjectsDir = join(homedir(), '.claude', 'projects');
-  const result: Array<{ projectDir: string; jsonlPath: string }> = [];
-
-  for (const dir of dirs) {
-    const projectDir = join(claudeProjectsDir, encodeClaudeProjectDir(normalizeDir(dir)));
-    await collectJsonlFiles(projectDir, projectDir, result, warnings);
-  }
-
-  return result;
-}
-
 // ─── Scanner ──────────────────────────────────────────────────────────────────
 
 export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const startTs = Date.now();
   const result: ScanResult = { inserted: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0, warnings: [] };
 
+  const parseJsonl = opts.parseJsonl ?? parseSessionJsonl;
+
   // 1. Discover JSONL candidates
-  const allFiles = opts.mode === 'targeted'
-    ? await discoverJsonlFilesForDirs(opts.dirs ?? [], result.warnings!)
-    : await discoverAllJsonlFiles(result.warnings!);
+  const allFiles = await discoverAllJsonlFiles(result.warnings!);
 
   // 2. Filter by mode
   const filteredFiles = filterByMode(allFiles, opts);
+  const resolver = new HashResolver(opts.watchDirs ?? []);
 
   if (opts.dryRun) {
     for (const { jsonlPath } of filteredFiles) {
+      if (opts.mode === 'targeted') {
+        try {
+          const meta = await parseJsonl(jsonlPath);
+          const resolved = await resolver.resolve(jsonlPath, meta.cwdFromFirstMessage);
+          if (resolved.warning) result.warnings!.push(resolved.warning);
+          if (!workspaceUnderAnyDir(resolved.workspacePath, opts.dirs ?? [])) continue;
+        } catch {
+          result.errors++;
+          continue;
+        }
+      }
       const existing = getDiscoveredSessionByJsonlPath(jsonlPath);
       try {
         const stat = await fs.stat(jsonlPath);
@@ -186,10 +186,7 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const caps = await getSystemCapabilities(opts.maxParallel);
   const maxParallel = caps.recommendedParallelism;
 
-  // 5. Create HashResolver (shared across all tasks in this scan)
-  const resolver = new HashResolver(opts.watchDirs ?? []);
-
-  // 6. Track progress
+  // 5. Track progress
   let dirsProcessed = 0;
   const dirsTotal = filteredFiles.length;
   let sessionsFound = 0;
@@ -226,10 +223,21 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
 
     // Parse, resolve, and upsert — wrap so one bad file can't leave progress incomplete.
     try {
-      const meta = await parseSessionJsonl(jsonlPath);
+      const meta = await parseJsonl(jsonlPath);
 
       // Resolve workspace path
       const resolved = await resolver.resolve(jsonlPath, meta.cwdFromFirstMessage);
+      if (resolved.warning) result.warnings!.push(resolved.warning);
+      if (opts.mode === 'targeted' && !workspaceUnderAnyDir(resolved.workspacePath, opts.dirs ?? [])) {
+        dirsProcessed++;
+        await opts.onProgress?.({
+          dirsProcessed,
+          dirsTotal,
+          sessionsFound,
+          elapsedMs: Date.now() - startTs,
+        });
+        return;
+      }
 
       // Correlation (managed by Panopticon?)
       const correlation = correlationMap.get(jsonlPath) ?? {
@@ -337,9 +345,7 @@ function filterByMode(
   const targetEncodings = targetDirs.map(encodeClaudeProjectDir);
 
   if (opts.mode === 'targeted') {
-    // targeted: dirs are the exact workspace paths — match the hash exactly
-    const targetHashes = new Set(targetEncodings);
-    return files.filter(({ projectDir }) => targetHashes.has(basename(projectDir)));
+    return files;
   }
 
   // watched: watchDirs are parent roots — include sessions whose workspace lives
@@ -349,6 +355,15 @@ function filterByMode(
   return files.filter(({ projectDir }) => {
     const hash = basename(projectDir);
     return targetEncodings.some((enc) => hash === enc || hash.startsWith(enc + '-'));
+  });
+}
+
+function workspaceUnderAnyDir(workspacePath: string | null, dirs: string[]): boolean {
+  if (!workspacePath) return false;
+  const normalizedWorkspace = resolve(normalizeDir(workspacePath));
+  return dirs.map((dir) => resolve(normalizeDir(dir))).some((dir) => {
+    const rel = relative(dir, normalizedWorkspace);
+    return rel === '' || (!rel.startsWith('..') && !rel.startsWith('/') && rel !== '..');
   });
 }
 

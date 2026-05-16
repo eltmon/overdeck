@@ -79,6 +79,9 @@ export async function embedAction(
   console.log(`  Skipped:  ${chalk.dim(result.skipped)}`);
   if (result.errors > 0) {
     console.log(`  Errors:   ${chalk.red(result.errors)}`);
+    for (const message of result.errorMessages ?? []) {
+      console.log(chalk.red(`    ${message}`));
+    }
   }
   console.log(`  Duration: ${(result.durationMs / 1000).toFixed(2)}s`);
 }

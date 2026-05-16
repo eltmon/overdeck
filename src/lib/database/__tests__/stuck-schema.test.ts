@@ -51,6 +51,22 @@ describe('stuck state schema (PAN-653)', () => {
     expect(stuckCol?.dflt_value).toBe('0');
   });
 
+  it('workspace discovered-session schema initializer creates all PAN-457 tables', async () => {
+    const { default: Database } = await import('better-sqlite3');
+    const { initWorkspaceDiscoveredSessionsSchema } = await import('../schema.js');
+    const db = new Database(join(TEST_HOME, 'workspace.db'));
+    try {
+      initWorkspaceDiscoveredSessionsSchema(db);
+      const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type IN ('table', 'virtual')`).all() as Array<{ name: string }>;
+      const names = tables.map((t) => t.name);
+      expect(names).toContain('discovered_sessions');
+      expect(names).toContain('sessions_fts');
+      expect(names).toContain('session_embeddings');
+    } finally {
+      db.close();
+    }
+  });
+
   it('markWorkspaceStuck persists across a read', async () => {
     const { markWorkspaceStuck } = await import('../../review-status.js');
     const { getReviewStatusFromDb } = await import('../review-status-db.js');

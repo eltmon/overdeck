@@ -16,7 +16,7 @@
  * Zero sync FS calls — all lib functions use fs/promises or better-sqlite3 (sync only in CLI context).
  */
 
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { EventStoreService } from '../services/domain-services.js';
@@ -30,10 +30,8 @@ import type {
   EnrichCompleteEvent,
 } from '@panctl/contracts';
 import type { ConversationFilter, DiscoveredSession } from '../../../lib/database/discovered-sessions-db.js';
-import { scan } from '../../../lib/conversations/scanner.js';
 import type { SearchResult } from '../../../lib/conversations/search.js';
-import { enrichSessions, CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
-import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
+import { CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
 import { getConversationsConfigAsync, loadConfigAsync, saveConfigAsync } from '../../../lib/config.js';
 import { embed } from '../../../lib/conversations/embeddings/providers.js';
@@ -46,6 +44,59 @@ function rejectUntrustedOrigin(request: HttpServerRequest.HttpServerRequest): Re
     return jsonResponse({ error: originCheck.error }, { status: 403 });
   }
   return null;
+}
+
+const EnrichByIdBodySchema = Schema.Struct({
+  tier: Schema.optional(Schema.Number),
+  confirmed: Schema.optional(Schema.Boolean),
+  force: Schema.optional(Schema.Boolean),
+});
+
+const ScanBodySchema = Schema.Struct({
+  mode: Schema.optional(Schema.String),
+  dryRun: Schema.optional(Schema.Boolean),
+  maxParallel: Schema.optional(Schema.Number),
+  dirs: Schema.optional(Schema.Array(Schema.String)),
+});
+
+const EnrichBodySchema = Schema.Struct({
+  tier: Schema.optional(Schema.Number),
+  sessionIds: Schema.optional(Schema.Array(Schema.Number)),
+  maxParallel: Schema.optional(Schema.Number),
+  confirmed: Schema.optional(Schema.Boolean),
+  force: Schema.optional(Schema.Boolean),
+});
+
+const EmbedBodySchema = Schema.Struct({
+  sessionIds: Schema.optional(Schema.Array(Schema.Number)),
+  provider: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
+  maxParallel: Schema.optional(Schema.Number),
+});
+
+const ConversationsConfigBodySchema = Schema.Struct({
+  embeddings: Schema.optional(Schema.Boolean),
+  embeddingProvider: Schema.optional(Schema.String),
+  embeddingModel: Schema.optional(Schema.String),
+  embeddingAutoOnDeep: Schema.optional(Schema.Boolean),
+});
+
+const TestConnectionBodySchema = Schema.Struct({
+  provider: Schema.String,
+  model: Schema.String,
+  apiKey: Schema.optional(Schema.String),
+  ollamaBaseUrl: Schema.optional(Schema.String),
+});
+
+function parseRequestBody<A>(schema: Schema.Schema<A, unknown, never>, raw: unknown): { ok: true; body: A } | { ok: false; response: Response } {
+  try {
+    return { ok: true, body: Schema.decodeUnknownSync(schema)(raw) };
+  } catch (err) {
+    return {
+      ok: false,
+      response: jsonResponse({ error: 'Invalid request body', details: err instanceof Error ? err.message : String(err) }, { status: 400 }),
+    };
+  }
 }
 
 // ─── GET /api/discovered-sessions/stats ───────────────────────────────────────
@@ -246,7 +297,9 @@ const postEnrichByIdRoute = HttpRouter.add(
       return jsonResponse({ error: `Session ${id} not found` }, { status: 404 });
     }
 
-    const body = (yield* req.json) as { tier?: number };
+    const parsedBody = parseRequestBody(EnrichByIdBodySchema, yield* req.json);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
     const rawTier = body.tier ?? 1;
     if (rawTier !== 1 && rawTier !== 2 && rawTier !== 3) {
       return jsonResponse({ error: 'Invalid tier: must be 1, 2, or 3' }, { status: 400 });
@@ -255,8 +308,33 @@ const postEnrichByIdRoute = HttpRouter.add(
 
     try {
       const config = yield* Effect.promise(() => getConversationsConfigAsync());
+      const eventStore = yield* EventStoreService;
       const result = yield* Effect.promise(() =>
-        enrichSessions({ tier, sessionIds: [id], config }),
+        runDashboardDbJob('enrichSessions', {
+          tier,
+          sessionIds: [id],
+          config,
+          force: body.confirmed === true || body.force === true,
+        }, async (rawProgress) => {
+          const progress = rawProgress as {
+            session?: { sessionId: number; tier: number; model: string; cost?: number; success: boolean; error?: string };
+          };
+          if (!progress.session) return;
+          const { session: progressSession } = progress;
+          const progressEvent: Omit<EnrichProgressEvent, 'sequence'> = {
+            type: 'enrich.progress',
+            timestamp: new Date().toISOString(),
+            payload: {
+              sessionId: progressSession.sessionId,
+              level: progressSession.tier,
+              model: progressSession.model,
+              cost: progressSession.cost ?? 0,
+              success: progressSession.success,
+              error: progressSession.error,
+            },
+          };
+          await Effect.runPromise(eventStore.append(progressEvent as EnrichProgressEvent));
+        }),
       );
       return jsonResponse(result);
     } catch (err) {
@@ -285,12 +363,9 @@ const postScanRoute = HttpRouter.add(
     const req = yield* HttpServerRequest.HttpServerRequest;
     const originError = rejectUntrustedOrigin(req);
     if (originError) return originError;
-    const body = (yield* req.json) as {
-      mode?: string;
-      dryRun?: boolean;
-      maxParallel?: number;
-      dirs?: string[];
-    };
+    const parsedBody = parseRequestBody(ScanBodySchema, yield* req.json);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
 
     const VALID_MODES = new Set(['system', 'watched', 'targeted']);
     const rawMode = body.mode ?? 'system';
@@ -319,29 +394,34 @@ const postScanRoute = HttpRouter.add(
     yield* Effect.promise(() => Effect.runPromise(eventStore.append(startedEvent as ScanStartedEvent)));
 
     const result = yield* Effect.promise(() =>
-      scan({
+      runDashboardDbJob('scanConversations', {
         mode,
         watchDirs,
         dirs: body.dirs,
         dryRun: body.dryRun,
         maxParallel,
-        onProgress: async (progress) => {
-          const now = Date.now();
-          const complete = progress.dirsProcessed >= progress.dirsTotal;
-          if (!complete && now - lastProgressEmit < 500) return;
-          lastProgressEmit = now;
-          const progressEvent: Omit<ScanProgressEvent, 'sequence'> = {
-            type: 'scan.progress',
-            timestamp: new Date().toISOString(),
-            payload: {
-              dirsProcessed: progress.dirsProcessed,
-              dirsTotal: progress.dirsTotal,
-              sessionsFound: progress.sessionsFound,
-              elapsedMs: progress.elapsedMs,
-            },
-          };
-          await Effect.runPromise(eventStore.append(progressEvent as ScanProgressEvent));
-        },
+      }, async (rawProgress) => {
+        const progress = rawProgress as {
+          dirsProcessed: number;
+          dirsTotal: number;
+          sessionsFound: number;
+          elapsedMs: number;
+        };
+        const now = Date.now();
+        const complete = progress.dirsProcessed >= progress.dirsTotal;
+        if (!complete && now - lastProgressEmit < 500) return;
+        lastProgressEmit = now;
+        const progressEvent: Omit<ScanProgressEvent, 'sequence'> = {
+          type: 'scan.progress',
+          timestamp: new Date().toISOString(),
+          payload: {
+            dirsProcessed: progress.dirsProcessed,
+            dirsTotal: progress.dirsTotal,
+            sessionsFound: progress.sessionsFound,
+            elapsedMs: progress.elapsedMs,
+          },
+        };
+        await Effect.runPromise(eventStore.append(progressEvent as ScanProgressEvent));
       }),
     );
 
@@ -372,11 +452,9 @@ const postEnrichRoute = HttpRouter.add(
     const req = yield* HttpServerRequest.HttpServerRequest;
     const originError = rejectUntrustedOrigin(req);
     if (originError) return originError;
-    const body = (yield* req.json) as {
-      tier?: number;
-      sessionIds?: number[];
-      maxParallel?: number;
-    };
+    const parsedBody = parseRequestBody(EnrichBodySchema, yield* req.json);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
 
     const rawTier = body.tier ?? 1;
     if (rawTier !== 1 && rawTier !== 2 && rawTier !== 3) {
@@ -390,29 +468,31 @@ const postEnrichRoute = HttpRouter.add(
 
     try {
       const result = yield* Effect.promise(() =>
-        enrichSessions({
+        runDashboardDbJob('enrichSessions', {
           tier,
           sessionIds: enrichSessionIds,
           maxParallel: enrichMaxParallel,
           config,
-          onProgress: async (progress) => {
-            if (progress.session) {
-              const { session } = progress;
-              const progressEvent: Omit<EnrichProgressEvent, 'sequence'> = {
-                type: 'enrich.progress',
-                timestamp: new Date().toISOString(),
-                payload: {
-                  sessionId: session.sessionId,
-                  level: session.tier,
-                  model: session.model,
-                  cost: session.cost ?? 0,
-                  success: session.success,
-                  error: session.error,
-                },
-              };
-              await Effect.runPromise(eventStore.append(progressEvent as EnrichProgressEvent));
-            }
-          },
+          force: body.confirmed === true || body.force === true,
+        }, async (rawProgress) => {
+          const progress = rawProgress as {
+            session?: { sessionId: number; tier: number; model: string; cost?: number; success: boolean; error?: string };
+          };
+          if (!progress.session) return;
+          const { session } = progress;
+          const progressEvent: Omit<EnrichProgressEvent, 'sequence'> = {
+            type: 'enrich.progress',
+            timestamp: new Date().toISOString(),
+            payload: {
+              sessionId: session.sessionId,
+              level: session.tier,
+              model: session.model,
+              cost: session.cost ?? 0,
+              success: session.success,
+              error: session.error,
+            },
+          };
+          await Effect.runPromise(eventStore.append(progressEvent as EnrichProgressEvent));
         }),
       );
 
@@ -456,12 +536,9 @@ const postEmbedRoute = HttpRouter.add(
     const req = yield* HttpServerRequest.HttpServerRequest;
     const originError = rejectUntrustedOrigin(req);
     if (originError) return originError;
-    const body = (yield* req.json) as {
-      sessionIds?: number[];
-      provider?: string;
-      model?: string;
-      maxParallel?: number;
-    };
+    const parsedBody = parseRequestBody(EmbedBodySchema, yield* req.json);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
 
     const VALID_PROVIDERS = new Set(['openai', 'voyage', 'ollama']);
     if (body.provider !== undefined && !VALID_PROVIDERS.has(body.provider)) {
@@ -472,7 +549,7 @@ const postEmbedRoute = HttpRouter.add(
     const embedSessionIds = body.sessionIds ? body.sessionIds.slice(0, 500) : undefined;
 
     const result = yield* Effect.promise(() =>
-      embedSessions({
+      runDashboardDbJob('embedSessions', {
         sessionIds: embedSessionIds,
         provider: body.provider as 'openai' | 'voyage' | 'ollama' | undefined,
         model: body.model,
@@ -510,12 +587,9 @@ const putConvConfigRoute = HttpRouter.add(
     const req = yield* HttpServerRequest.HttpServerRequest;
     const originError = rejectUntrustedOrigin(req);
     if (originError) return originError;
-    const body = (yield* req.json) as {
-      embeddings?: boolean;
-      embeddingProvider?: string;
-      embeddingModel?: string;
-      embeddingAutoOnDeep?: boolean;
-    };
+    const parsedBody = parseRequestBody(ConversationsConfigBodySchema, yield* req.json);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
 
     yield* Effect.promise(async () => {
       const cfg = await loadConfigAsync();
@@ -541,12 +615,9 @@ const postTestConnectionRoute = HttpRouter.add(
     const req = yield* HttpServerRequest.HttpServerRequest;
     const originError = rejectUntrustedOrigin(req);
     if (originError) return originError;
-    const body = (yield* req.json) as {
-      provider: string;
-      model: string;
-      apiKey?: string;
-      ollamaBaseUrl?: string;
-    };
+    const parsedBody = parseRequestBody(TestConnectionBodySchema, yield* req.json);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
 
     const VALID_PROVIDERS = new Set(['openai', 'voyage', 'ollama']);
     if (!VALID_PROVIDERS.has(body.provider)) {

@@ -19,6 +19,11 @@ async function confirmCost(): Promise<boolean> {
   }
 }
 
+function formatCost(actualCost: number | null | undefined, estimatedCost: number | undefined): string {
+  const cost = actualCost ?? estimatedCost ?? 0;
+  return `$${cost.toFixed(4)}${actualCost == null ? ' estimated' : ''}`;
+}
+
 export async function enrichAction(
   positionalIds: string[],
   opts: Record<string, string | boolean | undefined>,
@@ -100,6 +105,7 @@ export async function enrichAction(
     if (result.errors > 0) {
       console.log(`  Errors:   ${chalk.red(result.errors)}`);
     }
+    console.log(`  Cost:     ${formatCost(result.actualCost, result.estimatedCost)}`);
     console.log(`  Duration: ${(result.durationMs / 1000).toFixed(2)}s`);
   } catch (err) {
     if (err instanceof CostThresholdError) {
@@ -121,7 +127,7 @@ export async function enrichAction(
         promptSuffix: opts['prompt'] as string | undefined,
         force: true,
       });
-      console.log(`  Enriched: ${chalk.green(result.enriched)}, Errors: ${chalk.red(result.errors)}`);
+      console.log(`  Enriched: ${chalk.green(result.enriched)}, Errors: ${chalk.red(result.errors)}, Cost: ${formatCost(result.actualCost, result.estimatedCost)}`);
     } else {
       throw err;
     }

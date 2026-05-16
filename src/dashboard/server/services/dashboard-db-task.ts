@@ -11,6 +11,12 @@ import {
 import type { ConversationFilter } from '../../../lib/database/discovered-sessions-db.js';
 import { searchSessions } from '../../../lib/conversations/search.js';
 import type { SearchQuery } from '../../../lib/conversations/search.js';
+import { scan } from '../../../lib/conversations/scanner.js';
+import type { ScanOptions } from '../../../lib/conversations/scanner.js';
+import { enrichSessions, CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
+import type { EnrichOptions } from '../../../lib/conversations/enrichment/index.js';
+import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
+import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings/index.js';
 
 export type DashboardDbOperation =
   | 'getDiscoveredStats'
@@ -18,18 +24,31 @@ export type DashboardDbOperation =
   | 'getDiscoveredSessionById'
   | 'aggregateDiscoveredSessionCost'
   | 'aggregateDiscoveredSessionCostBy'
-  | 'searchSessions';
+  | 'searchSessions'
+  | 'scanConversations'
+  | 'enrichSessions'
+  | 'embedSessions';
 
 interface PendingJob {
   resolve: (value: unknown) => void;
   reject: (err: Error) => void;
+  onProgress?: (progress: unknown) => void | Promise<void>;
+  progressChain: Promise<void>;
 }
 
 interface WorkerResponse {
   id: string;
-  ok: boolean;
+  ok?: boolean;
   result?: unknown;
-  error?: { name?: string; message?: string; stack?: string };
+  progress?: unknown;
+  error?: {
+    name?: string;
+    message?: string;
+    stack?: string;
+    estimatedCost?: number;
+    threshold?: number;
+    sessionCount?: number;
+  };
 }
 
 let worker: Worker | null = null;
@@ -57,17 +76,31 @@ function getWorker(): Worker {
   worker.on('message', (message: WorkerResponse) => {
     const job = pending.get(message.id);
     if (!job) return;
-    pending.delete(message.id);
 
-    if (message.ok) {
-      job.resolve(message.result);
+    if (message.progress !== undefined) {
+      if (job.onProgress) {
+        job.progressChain = job.progressChain.then(() => Promise.resolve(job.onProgress?.(message.progress)));
+      }
       return;
     }
 
-    const err = new Error(message.error?.message ?? 'Dashboard database worker failed');
+    pending.delete(message.id);
+
+    if (message.ok) {
+      job.progressChain.then(() => job.resolve(message.result), job.reject);
+      return;
+    }
+
+    const err = message.error?.name === 'CostThresholdError'
+      ? new CostThresholdError(
+        message.error.estimatedCost ?? 0,
+        message.error.threshold ?? 0,
+        message.error.sessionCount ?? 0,
+      )
+      : new Error(message.error?.message ?? 'Dashboard database worker failed');
     err.name = message.error?.name ?? 'DashboardDatabaseWorkerError';
     err.stack = message.error?.stack;
-    job.reject(err);
+    job.progressChain.then(() => job.reject(err), job.reject);
   });
 
   worker.on('error', (err) => {
@@ -83,7 +116,11 @@ function getWorker(): Worker {
   return worker;
 }
 
-async function runInline(operation: DashboardDbOperation, payload: unknown): Promise<unknown> {
+async function runInline(
+  operation: DashboardDbOperation,
+  payload: unknown,
+  onProgress?: (progress: unknown) => void | Promise<void>,
+): Promise<unknown> {
   switch (operation) {
     case 'getDiscoveredStats':
       return getDiscoveredStats();
@@ -102,17 +139,32 @@ async function runInline(operation: DashboardDbOperation, payload: unknown): Pro
       return aggregateDiscoveredSessionCostBy(payload as 'workspace' | 'model' | 'day' | 'tier');
     case 'searchSessions':
       return searchSessions(payload as SearchQuery);
+    case 'scanConversations':
+      return scan({ ...(payload as ScanOptions), onProgress });
+    case 'enrichSessions':
+      return enrichSessions({ ...(payload as EnrichOptions), onProgress });
+    case 'embedSessions':
+      return embedSessions(payload as EmbedSessionsOptions);
   }
 }
 
-export function runDashboardDbJob<T>(operation: DashboardDbOperation, payload?: unknown): Promise<T> {
+export function runDashboardDbJob<T>(
+  operation: DashboardDbOperation,
+  payload?: unknown,
+  onProgress?: (progress: unknown) => void | Promise<void>,
+): Promise<T> {
   if (import.meta.url.endsWith('.ts') && process.env['VITEST']) {
-    return runInline(operation, payload) as Promise<T>;
+    return runInline(operation, payload, onProgress) as Promise<T>;
   }
 
   const id = randomUUID();
   return new Promise<T>((resolve, reject) => {
-    pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+    pending.set(id, {
+      resolve: resolve as (value: unknown) => void,
+      reject,
+      onProgress,
+      progressChain: Promise.resolve(),
+    });
     getWorker().postMessage({ id, operation, payload });
   });
 }

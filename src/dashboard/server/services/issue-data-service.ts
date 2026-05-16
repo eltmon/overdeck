@@ -12,7 +12,8 @@
  */
 
 import { Octokit } from '@octokit/rest';
-import { existsSync, statSync } from 'fs';
+import { existsSync } from 'fs';
+import { stat } from 'fs/promises';
 import { join } from 'path';
 import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
 import { CacheService, DEFAULT_TTLS } from './cache-service.js';
@@ -20,7 +21,7 @@ import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig }
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { findPlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { findPlanAsync, readWorkspacePlanAsync } from '../../../lib/vbrief/io.js';
 
 /**
  * Map a raw status string to its canonical state.
@@ -133,7 +134,10 @@ interface PlanningStateCacheEntry {
 }
 const planningStateCache = new Map<string, PlanningStateCacheEntry>();
 
-function computePlanningState(identifier: string): {
+const planningStateRefreshInFlight = new Set<string>();
+const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
+
+function getCachedPlanningState(identifier: string): {
   hasPlan: boolean;
   hasBeads: boolean;
   planningComplete: boolean;
@@ -147,16 +151,38 @@ function computePlanningState(identifier: string): {
     }
     const issueLower = identifier.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    if (!existsSync(workspacePath)) {
-      return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath };
-    }
-    const planPath = findPlan(workspacePath);
+    return planningStateCache.get(identifier)?.result
+      ?? { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath };
+  } catch {
+    return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' };
+  }
+}
 
-    // Use the plan file's mtime as the cache key; -1 stands in for "no plan file".
+async function refreshPlanningState(identifier: string): Promise<boolean> {
+  if (planningStateRefreshInFlight.has(identifier)) return false;
+  planningStateRefreshInFlight.add(identifier);
+  try {
+    const resolved = resolveProjectFromIssue(identifier);
+    const projectPath = resolved?.projectPath ?? '';
+    if (!projectPath) return updatePlanningStateCache(identifier, {
+      result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' },
+      planMtimeMs: -1,
+    });
+
+    const issueLower = identifier.toLowerCase();
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    if (!existsSync(workspacePath)) {
+      return updatePlanningStateCache(identifier, {
+        result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath },
+        planMtimeMs: -1,
+      });
+    }
+
+    const planPath = await findPlanAsync(workspacePath);
     let planMtimeMs = -1;
     if (planPath) {
       try {
-        planMtimeMs = statSync(planPath).mtimeMs;
+        planMtimeMs = (await stat(planPath)).mtimeMs;
       } catch {
         planMtimeMs = -1;
       }
@@ -164,20 +190,32 @@ function computePlanningState(identifier: string): {
 
     const cached = planningStateCache.get(identifier);
     if (cached && cached.planMtimeMs === planMtimeMs && cached.result.workspacePath === workspacePath) {
-      return cached.result;
+      return false;
     }
 
-    const hasPlan = planPath !== null;
-    // planningComplete reads the plan file — gated by the cache above so this
-    // only runs when the file actually changes.
-    const planningComplete = isPlanningComplete(workspacePath);
-    const hasBeads = planningComplete;
-    const result = { hasPlan, hasBeads, planningComplete, workspacePath };
-    planningStateCache.set(identifier, { result, planMtimeMs });
-    return result;
+    const doc = planPath ? await readWorkspacePlanAsync(workspacePath) : null;
+    const planningComplete = doc?.plan?.status ? PLANNING_FINISHED_STATUSES.has(doc.plan.status) : false;
+    return updatePlanningStateCache(identifier, {
+      result: { hasPlan: planPath !== null, hasBeads: planningComplete, planningComplete, workspacePath },
+      planMtimeMs,
+    });
   } catch {
-    return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' };
+    return updatePlanningStateCache(identifier, {
+      result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' },
+      planMtimeMs: -1,
+    });
+  } finally {
+    planningStateRefreshInFlight.delete(identifier);
   }
+}
+
+function updatePlanningStateCache(identifier: string, entry: PlanningStateCacheEntry): boolean {
+  const prev = planningStateCache.get(identifier);
+  const changed = !prev
+    || prev.planMtimeMs !== entry.planMtimeMs
+    || JSON.stringify(prev.result) !== JSON.stringify(entry.result);
+  planningStateCache.set(identifier, entry);
+  return changed;
 }
 
 export class IssueDataService {
@@ -190,6 +228,7 @@ export class IssueDataService {
    * path (`getIssues`) reads from this map — no disk I/O on every request. */
   private shadowStatesCache: Map<string, any> = new Map();
   private _onIssuesChanged: ((issues: unknown[]) => void) | null = null;
+  private planningSnapshotQueued = false;
 
   /** Register a callback invoked whenever issue data changes (PAN-433). */
   onIssuesChanged(fn: (issues: unknown[]) => void): void {
@@ -366,9 +405,12 @@ export class IssueDataService {
       // review-status.json may not exist yet
     }
 
-    // Enrich with planning-state (filesystem checks, no bd process)
+    // Enrich with cached planning-state; async refreshes update the snapshot when files change.
     allIssues = allIssues.map(issue => {
-      const ps = computePlanningState(issue.identifier);
+      const ps = getCachedPlanningState(issue.identifier);
+      void refreshPlanningState(issue.identifier).then((changed) => {
+        if (changed) this.queuePlanningSnapshot();
+      });
       return {
         ...issue,
         hasPlan: ps.hasPlan,
@@ -586,6 +628,15 @@ export class IssueDataService {
 
   private pushUpdated(): void {
     this._onIssuesChanged?.(this.getIssues());
+  }
+
+  private queuePlanningSnapshot(): void {
+    if (this.planningSnapshotQueued) return;
+    this.planningSnapshotQueued = true;
+    setTimeout(() => {
+      this.planningSnapshotQueued = false;
+      if (this.started) this.pushSnapshot();
+    }, 50);
   }
 
   private pushMeta(): void {

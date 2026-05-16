@@ -294,7 +294,7 @@ describe('scan targeted mode with dirs', () => {
     const pB = join(fakeClaudeDir, '-home-user-Projects-otherapp', 'b.jsonl');
     mkdirSync(join(fakeClaudeDir, '-home-user-Projects-otherapp'), { recursive: true });
     writeFileSync(pA, SESSION_JSONL, 'utf8');
-    writeFileSync(pB, SESSION_JSONL, 'utf8');
+    writeFileSync(pB, SESSION_JSONL.replace('/home/user/Projects/myapp', '/home/user/Projects/otherapp'), 'utf8');
 
     // Route passes dirs when mode is targeted
     const result = await scan({

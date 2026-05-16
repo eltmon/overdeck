@@ -11,6 +11,10 @@ import { costAction } from './cost.js';
 import { enrichAction } from './enrich.js';
 import { embedAction } from './embed.js';
 
+function collectRepeatable(value: string, previous: string[] = []): string[] {
+  return [...previous, value];
+}
+
 export function registerConversationsCommands(program: Command): void {
   const conversations = program
     .command('conversations')
@@ -50,9 +54,9 @@ export function registerConversationsCommands(program: Command): void {
     .option('--unmanaged', 'Show only unmanaged (personal) sessions')
     .option('--enriched', 'Show only enriched sessions')
     .option('--not-enriched', 'Show only unenriched sessions')
-    .option('--tag <value>', 'Filter by tag (repeatable: --tag foo --tag bar)')
-    .option('--tool <name>', 'Filter by tool used (repeatable)')
-    .option('--file <path>', 'Filter by file referenced (repeatable)')
+    .option('--tag <value>', 'Filter by tag (repeatable: --tag foo --tag bar)', collectRepeatable, [])
+    .option('--tool <name>', 'Filter by tool used (repeatable)', collectRepeatable, [])
+    .option('--file <path>', 'Filter by file referenced (repeatable)', collectRepeatable, [])
     .option('--issue <id>', 'Filter by associated issue ID')
     .option('--similar <id>', 'Find sessions similar to this session ID (semantic)')
     .option('--semantic <query>', 'Find sessions semantically similar to query text')

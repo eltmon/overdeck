@@ -68,6 +68,18 @@ export interface ConversationsConfig {
   rich_compaction?: boolean;
   /** Model used for AI-generated conversation titles (default: claude-haiku-4-5) */
   title_model?: ModelId;
+  watch_dirs?: string[];
+  scan_max_parallel?: number | null;
+  embeddings?: boolean;
+  embedding_provider?: 'openai' | 'voyage' | 'ollama';
+  embedding_model?: string;
+  embedding_auto_on_deep?: boolean;
+  enrichment?: {
+    quick_model?: string | null;
+    deep_model?: string | null;
+    max_parallel?: number;
+    cost_confirm_threshold?: number;
+  };
 }
 
 /**
@@ -409,6 +421,18 @@ export interface NormalizedConfig {
     manualCompactMode: ManualCompactMode;
     richCompaction: boolean;
     titleModel: ModelId;
+    watchDirs: string[];
+    scanMaxParallel: number | null;
+    embeddings: boolean;
+    embeddingProvider: 'openai' | 'voyage' | 'ollama';
+    embeddingModel: string;
+    embeddingAutoOnDeep: boolean;
+    enrichment: {
+      quickModel: string | null;
+      deepModel: string | null;
+      maxParallel: number;
+      costConfirmThreshold: number;
+    };
   };
 
   /** Shadow mode configuration */
@@ -518,6 +542,18 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     manualCompactMode: 'claude-code',
     richCompaction: true,
     titleModel: 'claude-haiku-4-5',
+    watchDirs: ['~/Projects'],
+    scanMaxParallel: null,
+    embeddings: false,
+    embeddingProvider: 'openai',
+    embeddingModel: 'text-embedding-3-small',
+    embeddingAutoOnDeep: false,
+    enrichment: {
+      quickModel: null,
+      deepModel: null,
+      maxParallel: 2,
+      costConfirmThreshold: 0.25,
+    },
   },
   shadow: {
     enabled: false,
@@ -1007,6 +1043,36 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     }
     if (config.conversations?.title_model) {
       result.conversations.titleModel = resolveModelId(config.conversations.title_model);
+    }
+    if (config.conversations?.watch_dirs) {
+      result.conversations.watchDirs = config.conversations.watch_dirs;
+    }
+    if (config.conversations?.scan_max_parallel !== undefined) {
+      result.conversations.scanMaxParallel = config.conversations.scan_max_parallel;
+    }
+    if (config.conversations?.embeddings !== undefined) {
+      result.conversations.embeddings = config.conversations.embeddings;
+    }
+    if (config.conversations?.embedding_provider) {
+      result.conversations.embeddingProvider = config.conversations.embedding_provider;
+    }
+    if (config.conversations?.embedding_model) {
+      result.conversations.embeddingModel = config.conversations.embedding_model;
+    }
+    if (config.conversations?.embedding_auto_on_deep !== undefined) {
+      result.conversations.embeddingAutoOnDeep = config.conversations.embedding_auto_on_deep;
+    }
+    if (config.conversations?.enrichment?.quick_model !== undefined) {
+      result.conversations.enrichment.quickModel = config.conversations.enrichment.quick_model;
+    }
+    if (config.conversations?.enrichment?.deep_model !== undefined) {
+      result.conversations.enrichment.deepModel = config.conversations.enrichment.deep_model;
+    }
+    if (config.conversations?.enrichment?.max_parallel !== undefined) {
+      result.conversations.enrichment.maxParallel = config.conversations.enrichment.max_parallel;
+    }
+    if (config.conversations?.enrichment?.cost_confirm_threshold !== undefined) {
+      result.conversations.enrichment.costConfirmThreshold = config.conversations.enrichment.cost_confirm_threshold;
     }
 
     // Merge OpenRouter favorites

@@ -2,8 +2,12 @@
  * Session detail drawer (PAN-457)
  */
 
+import { useState } from 'react';
 import { X, ExternalLink, Sparkles } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { WS_METHODS } from '@panctl/contracts';
+import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
+import { useDashboardStore } from '../../lib/store';
 
 interface Session {
   id: number;
@@ -31,13 +35,40 @@ interface Props {
   onClose: () => void;
 }
 
-async function enrichSession(sessionId: number, tier: number): Promise<void> {
-  const resp = await fetch(`/api/discovered-sessions/${sessionId}/enrich`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tier }),
-  });
-  if (!resp.ok) throw new Error('Enrichment failed');
+interface EnrichRequest {
+  tier: 1 | 2;
+  confirmed?: boolean;
+}
+
+interface CostThresholdDetails {
+  tier: 1 | 2;
+  estimatedCost: number;
+  threshold: number;
+  sessionCount: number;
+}
+
+async function enrichSession(sessionId: number, request: EnrichRequest): Promise<void> {
+  await getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.enrichSessions]({
+      ids: [sessionId],
+      level: request.tier,
+      confirmed: request.confirmed,
+    }),
+  );
+}
+
+function parseCostThreshold(err: unknown, tier: 1 | 2): CostThresholdDetails | null {
+  const code = typeof err === 'object' && err !== null && 'code' in err
+    ? String((err as { code?: unknown }).code ?? '')
+    : '';
+  const match = /^COST_THRESHOLD:([^:]+):([^:]+):([^:]+)$/.exec(code);
+  if (!match) return null;
+  return {
+    tier,
+    estimatedCost: Number(match[1]),
+    threshold: Number(match[2]),
+    sessionCount: Number(match[3]),
+  };
 }
 
 async function fetchSession(sessionId: number): Promise<Session> {
@@ -48,6 +79,8 @@ async function fetchSession(sessionId: number): Promise<Session> {
 
 export function SessionDetail({ session, onClose }: Props) {
   const queryClient = useQueryClient();
+  const [pendingCost, setPendingCost] = useState<CostThresholdDetails | null>(null);
+  const enrichProgress = useDashboardStore((s) => s.enrichProgressBySessionId[session.id]);
 
   const { data: freshSession } = useQuery({
     queryKey: ['discovered-session', session.id],
@@ -58,12 +91,16 @@ export function SessionDetail({ session, onClose }: Props) {
   const displaySession = freshSession ?? session;
 
   const enrichMutation = useMutation({
-    mutationFn: (tier: number) => enrichSession(session.id, tier),
+    mutationFn: (request: EnrichRequest) => enrichSession(session.id, request),
     onSuccess: () => {
+      setPendingCost(null);
       void queryClient.invalidateQueries({ queryKey: ['discovered-session', session.id] });
       void queryClient.invalidateQueries({ queryKey: ['discovered-sessions'] });
       void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-search'] });
       void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-stats'] });
+    },
+    onError: (err, request) => {
+      setPendingCost(parseCostThreshold(err, request.tier));
     },
   });
 
@@ -172,10 +209,13 @@ export function SessionDetail({ session, onClose }: Props) {
           <div className="text-[10px] text-gray-500 mb-1.5">
             {displaySession.enrichmentFailed ? 'Enrichment failed — retry:' : 'Enrich this session'}
           </div>
+          <div className="text-[10px] text-amber-500/80 mb-1.5">
+            Sends redacted conversation excerpts to the configured enrichment provider.
+          </div>
           <div className="flex gap-2">
             {displaySession.enrichmentLevel < 1 && (
               <button
-                onClick={() => enrichMutation.mutate(1)}
+                onClick={() => enrichMutation.mutate({ tier: 1 })}
                 disabled={enrichMutation.isPending}
                 className="flex items-center gap-1 px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs transition-colors disabled:opacity-50"
               >
@@ -184,7 +224,7 @@ export function SessionDetail({ session, onClose }: Props) {
               </button>
             )}
             <button
-              onClick={() => enrichMutation.mutate(2)}
+              onClick={() => enrichMutation.mutate({ tier: 2 })}
               disabled={enrichMutation.isPending}
               className="flex items-center gap-1 px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs transition-colors disabled:opacity-50"
             >
@@ -195,7 +235,24 @@ export function SessionDetail({ session, onClose }: Props) {
           {enrichMutation.isPending && (
             <div className="text-[10px] text-blue-400 mt-1">Enriching…</div>
           )}
-          {enrichMutation.isError && (
+          {enrichProgress && (
+            <div className={enrichProgress.success ? 'text-[10px] text-green-400 mt-1' : 'text-[10px] text-red-400 mt-1'}>
+              L{enrichProgress.level} {enrichProgress.success ? 'complete' : `failed: ${enrichProgress.error ?? 'unknown error'}`} · {enrichProgress.model}
+            </div>
+          )}
+          {pendingCost && (
+            <div className="mt-2 rounded border border-amber-700/60 bg-amber-950/30 p-2 text-[10px] text-amber-200">
+              Estimated cost ${pendingCost.estimatedCost.toFixed(4)} exceeds threshold ${pendingCost.threshold.toFixed(2)} for {pendingCost.sessionCount} session{pendingCost.sessionCount === 1 ? '' : 's'}.
+              <button
+                onClick={() => enrichMutation.mutate({ tier: pendingCost.tier, confirmed: true })}
+                disabled={enrichMutation.isPending}
+                className="ml-2 rounded bg-amber-700 px-1.5 py-0.5 text-amber-50 disabled:opacity-50"
+              >
+                Confirm
+              </button>
+            </div>
+          )}
+          {enrichMutation.isError && !pendingCost && (
             <div className="text-[10px] text-red-400 mt-1">Enrichment failed</div>
           )}
         </div>

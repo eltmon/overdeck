@@ -94,6 +94,9 @@ export interface SearchResult {
   durationMs: number;
 }
 
+const SEMANTIC_RERANK_FACTOR = 5;
+const SEMANTIC_RERANK_MIN_CANDIDATES = 200;
+
 // ─── Relative time parsing ────────────────────────────────────────────────────
 
 const RELATIVE_PATTERN = /^(\d+)\s*(s|sec|second|seconds|m|min|minute|minutes|h|hr|hour|hours|d|day|days|w|week|weeks|mo|month|months)$/i;
@@ -204,7 +207,7 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
     const embedResult = await embed(provider, { text: query.semanticQuery.trim(), model: embeddingModel });
     const queryEmbedding = embedResult.embedding;
     const filter = normalizeFilter(query.filter, undefined, undefined);
-    const ranked = topKCosine(queryEmbedding, embeddingModel, filter, limit, offset);
+    const ranked = topKCosine(queryEmbedding, embeddingModel, filter, limit, offset, semanticCandidateWindow(limit, offset));
     return {
       sessions: ranked.results.map((x) => x.session),
       total: ranked.total,
@@ -262,11 +265,12 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
       return { sessions: [], total: 0, mode: 'semantic', durationMs: Date.now() - start };
     }
     const filter = normalizeFilter(query.filter, undefined, undefined);
-    const ranked = topKCosine(refEmbedding, embeddingModel, filter, limit + 1, offset);
-    const sessions = ranked.results
+    const candidateWindow = semanticCandidateWindow(limit + 1, offset);
+    const ranked = topKCosine(refEmbedding, embeddingModel, filter, offset + limit + 1, 0, candidateWindow);
+    const filtered = ranked.results
       .map((x) => x.session)
-      .filter((s) => s.id !== query.similarTo)
-      .slice(0, limit);
+      .filter((s) => s.id !== query.similarTo);
+    const sessions = filtered.slice(offset, offset + limit);
     return {
       sessions,
       total: Math.max(0, ranked.total - 1),
@@ -283,10 +287,12 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
   if (hasFilter) {
     const filter = normalizeFilter(query.filter, undefined, undefined);
     ftsTotal = countFtsSessions(query.q!, filter);
-    candidates = searchFtsSessions(query.q!, filter, ftsTotal, 0);
+    const candidateLimit = semanticRerankCandidateLimit(ftsTotal, limit, offset);
+    candidates = searchFtsSessions(query.q!, filter, candidateLimit, 0);
   } else {
     ftsTotal = countFts(query.q!);
-    const ftsMatches = searchFts(query.q!, ftsTotal);
+    const candidateLimit = semanticRerankCandidateLimit(ftsTotal, limit, offset);
+    const ftsMatches = searchFts(query.q!, candidateLimit);
     const ftsIds = ftsMatches.map((m) => m.id);
     candidates = ftsIds
       .map((id) => getDiscoveredSessionById(id))
@@ -323,4 +329,12 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
     mode: 'semantic+fts',
     durationMs: Date.now() - start,
   };
+}
+
+function semanticCandidateWindow(limit: number, offset: number): number {
+  return Math.max(offset + limit * SEMANTIC_RERANK_FACTOR, SEMANTIC_RERANK_MIN_CANDIDATES);
+}
+
+function semanticRerankCandidateLimit(total: number, limit: number, offset: number): number {
+  return Math.min(total, semanticCandidateWindow(limit, offset));
 }

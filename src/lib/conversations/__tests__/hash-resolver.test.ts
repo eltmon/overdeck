@@ -94,4 +94,18 @@ describe('HashResolver', () => {
     expect(result.workspacePath).toBeNull();
     expect(result.strategy).toBe('unresolved');
   });
+
+  it('returns null with a warning for ambiguous reverse-map hash collisions', async () => {
+    const a = join(tmpRoot, 'Projects', 'foo_bar');
+    const b = join(tmpRoot, 'Projects', 'foo:bar');
+    mkdirSync(a, { recursive: true });
+    mkdirSync(b, { recursive: true });
+    const hash = encodeClaudeProjectDir(a);
+
+    const resolver = new HashResolver([join(tmpRoot, 'Projects')]);
+    const result = await resolver.resolve(`/home/user/.claude/projects/${hash}/sess.jsonl`, null);
+    expect(result.workspacePath).toBeNull();
+    expect(result.strategy).toBe('unresolved');
+    expect(result.warning).toContain('Ambiguous Claude project hash');
+  });
 });

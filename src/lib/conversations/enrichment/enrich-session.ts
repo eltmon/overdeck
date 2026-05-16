@@ -12,9 +12,12 @@ import { createReadStream } from 'fs';
 
 import { updateEnrichment, markEnrichmentFailed } from '../../database/discovered-sessions-db.js';
 import { calculateCost, getPricing } from '../../cost.js';
-import { selectEnrichmentModelForTier } from '../../model-fallback.js';
+import { applyFallback, selectEnrichmentModelForTier } from '../../model-fallback.js';
+import { loadConfig as loadYamlConfig } from '../../config-yaml.js';
+import { getProviderEnv, getProviderForModel } from '../../providers.js';
 import type { TokenUsage } from '../../cost.js';
 import type { EnrichmentTier, EnrichmentTierConfig } from '../../model-fallback.js';
+import type { ModelId } from '../../settings.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -194,28 +197,51 @@ Reply ONLY with valid JSON matching this schema:
 {"summary": "...", "summaryDetailed": "...", "tags": ["tag1", "tag2"]}`;
 }
 
-// ─── Claude API call ──────────────────────────────────────────────────────────
+// ─── Provider-aware Messages API call ─────────────────────────────────────────
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
+
+function resolveEnrichmentModel(model: string): string {
+  const { config } = loadYamlConfig();
+  return applyFallback(model as ModelId, config.enabledProviders);
+}
+
+function getProviderApiKey(providerName: string, configuredKey?: string): string | undefined {
+  if (providerName === 'anthropic') {
+    return process.env.ANTHROPIC_AUTH_TOKEN ?? process.env.ANTHROPIC_API_KEY;
+  }
+  return configuredKey;
+}
 
 export async function callClaudeApi(
   model: string,
   prompt: string,
 ): Promise<EnrichmentResponse> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const effectiveModel = resolveEnrichmentModel(model);
+  const provider = getProviderForModel(effectiveModel);
+  const { config } = loadYamlConfig();
+  const configuredKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
+  const apiKey = getProviderApiKey(provider.name, configuredKey);
   if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY is not set — cannot enrich sessions');
+    throw new Error(`${provider.displayName} API key is not set — cannot enrich sessions with ${effectiveModel}`);
   }
 
-  const resp = await fetch(ANTHROPIC_API_URL, {
+  const providerEnv = provider.name === 'anthropic' ? {} : getProviderEnv(provider, apiKey);
+  const baseUrl = provider.name === 'anthropic'
+    ? DEFAULT_ANTHROPIC_BASE_URL
+    : providerEnv.ANTHROPIC_BASE_URL ?? DEFAULT_ANTHROPIC_BASE_URL;
+  const authToken = providerEnv.ANTHROPIC_AUTH_TOKEN ?? apiKey;
+
+  const resp = await fetch(`${baseUrl.replace(/\/$/, '')}/messages`, {
     method: 'POST',
     headers: {
-      'x-api-key': apiKey,
+      'x-api-key': authToken,
+      authorization: `Bearer ${authToken}`,
       'anthropic-version': '2023-06-01',
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model,
+      model: effectiveModel,
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }],
     }),
@@ -250,7 +276,10 @@ export async function callClaudeApi(
         cacheReadTokens: data.usage.cache_read_input_tokens ?? 0,
         cacheWriteTokens: data.usage.cache_creation_input_tokens ?? 0,
       };
-      const pricing = getPricing('anthropic', model);
+      const pricingProvider = provider.name === 'anthropic' || provider.name === 'openai' || provider.name === 'google'
+        ? provider.name
+        : 'custom';
+      const pricing = getPricing(pricingProvider, effectiveModel);
       if (pricing) parsed.usage = { ...usage, cost: calculateCost(usage, pricing) };
     }
     return parsed;
@@ -267,7 +296,8 @@ export async function callClaudeApi(
  */
 export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichSessionResult> {
   const { sessionId, jsonlPath, tier, config } = opts;
-  const model = opts.modelOverride ?? selectEnrichmentModelForTier(tier, config);
+  const requestedModel = opts.modelOverride ?? selectEnrichmentModelForTier(tier, config);
+  const model = opts.callApi ? requestedModel : resolveEnrichmentModel(requestedModel);
 
   const apiCall = opts.callApi ?? callClaudeApi;
 

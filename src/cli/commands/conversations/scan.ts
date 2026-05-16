@@ -32,7 +32,7 @@ export async function scanAction(opts: {
     const pct = p.dirsTotal > 0 ? Math.round((p.dirsProcessed / p.dirsTotal) * 100) : 0;
     const bar = buildBar(pct, 30);
     const elapsed = (p.elapsedMs / 1000).toFixed(1);
-    const line = `  ${bar} ${pct}% · ${p.dirsProcessed}/${p.dirsTotal} dirs · ${p.sessionsFound} found · ${elapsed}s`;
+    const line = `${bar} ${p.dirsProcessed}/${p.dirsTotal} dirs | ${p.sessionsFound} sessions found | ${elapsed}s`;
 
     if (process.stdout.isTTY) {
       process.stdout.write(`\r${line}`);

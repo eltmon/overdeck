@@ -344,6 +344,59 @@ describe('FTS pagination with non-zero offset', () => {
   });
 });
 
+// ─── Similar-session pagination ───────────────────────────────────────────────
+
+describe('similar-session search paginates after excluding the reference session', () => {
+  const MODEL = 'text-embedding-3-small';
+
+  beforeEach(async () => {
+    const vectors = [
+      [1, 0],
+      [0.99, 0.01],
+      [0.98, 0.02],
+      [0.97, 0.03],
+      [0.96, 0.04],
+      [0.95, 0.05],
+    ];
+    for (let i = 0; i < vectors.length; i++) {
+      const s = upsertDiscoveredSession({
+        jsonlPath: `/semantic-page/${i}.jsonl`,
+        workspacePath: '/home/user/Projects/semantic-page',
+        workspaceHash: `hsemantic${i}`,
+        messageCount: 2,
+        firstTs: '2025-04-01T00:00:00Z',
+        lastTs: '2025-04-01T01:00:00Z',
+        modelsUsed: ['claude-sonnet-4-6'],
+        primaryModel: 'claude-sonnet-4-6',
+        tokenInput: 50,
+        tokenOutput: 100,
+        estimatedCost: 0.005,
+        toolsUsed: [],
+        filesTouched: [],
+        panopticonManaged: false,
+        panIssueId: null,
+        panAgentId: null,
+        fileSize: 512,
+        fileMtime: '2025-04-01T00:00:00Z',
+        tags: [],
+      });
+      insertEmbedding(s.id, MODEL, new Float32Array(vectors[i]));
+    }
+  });
+
+  it('returns non-overlapping pages after the reference is removed', async () => {
+    const page1 = await searchSessions({ similarTo: 1, embeddingModel: MODEL, limit: 2, offset: 0 });
+    const page2 = await searchSessions({ similarTo: 1, embeddingModel: MODEL, limit: 2, offset: 2 });
+
+    expect(page1.total).toBe(5);
+    expect(page2.total).toBe(5);
+    expect(page1.sessions.every((s) => s.id !== 1)).toBe(true);
+    expect(page2.sessions.every((s) => s.id !== 1)).toBe(true);
+    const ids1 = new Set(page1.sessions.map((s) => s.id));
+    expect(page2.sessions.some((s) => ids1.has(s.id))).toBe(false);
+  });
+});
+
 // ─── Strategy 4: semantic+FTS with filter (regression for PAN-457 review) ─────
 
 describe('semantic+FTS search respects filter constraints', () => {

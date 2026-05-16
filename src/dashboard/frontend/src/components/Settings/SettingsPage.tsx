@@ -1093,7 +1093,7 @@ export function SettingsPage() {
                 <div className="min-w-0">
                   <span className="text-sm font-medium text-foreground">Semantic embeddings</span>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Store vector embeddings for semantic conversation search
+                    Store vector embeddings for semantic conversation search. Non-local providers receive session-derived summaries, tags, workspace paths, and tool names.
                   </p>
                 </div>
                 <button
@@ -1160,6 +1160,7 @@ export function SettingsPage() {
                           {convConfig.embeddingProvider === 'openai' ? 'OPENAI_API_KEY' : 'VOYAGE_API_KEY'}
                         </code>{' '}
                         or <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">~/.panopticon.env</code>.
+                        Session-derived summaries, tags, workspace paths, and tool names are sent to this provider.
                       </p>
                     </div>
                   )}

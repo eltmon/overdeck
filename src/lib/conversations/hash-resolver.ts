@@ -16,6 +16,7 @@ import { promises as fs } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { encodeClaudeProjectDir } from '../paths.js';
+import { listProjects } from '../projects.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,13 @@ export interface ResolvedWorkspace {
   workspaceHash: string;
   /** How the resolution was accomplished */
   strategy: 'jsonl-cwd' | 'reverse-map' | 'unresolved';
+  /** Warning emitted when fallback resolution found an ambiguous hash. */
+  warning?: string;
+}
+
+interface ReverseMapCache {
+  paths: Map<string, string>;
+  collisions: Map<string, string[]>;
 }
 
 /**
@@ -36,7 +44,7 @@ export interface ResolvedWorkspace {
  * Construct one per scan and reuse across all sessions.
  */
 export class HashResolver {
-  private reverseMap: Map<string, string> | null = null;
+  private reverseMap: ReverseMapCache | null = null;
   private readonly watchDirs: string[];
 
   constructor(watchDirs: string[]) {
@@ -62,7 +70,13 @@ export class HashResolver {
 
     // Strategy 2: Reverse-map lookup
     const map = await this.getReverseMap();
-    const resolved = map.get(workspaceHash) ?? null;
+    const collisions = map.collisions.get(workspaceHash);
+    if (collisions) {
+      const warning = `Ambiguous Claude project hash ${workspaceHash} matches ${collisions.join(', ')}`;
+      console.warn(warning);
+      return { workspacePath: null, workspaceHash, strategy: 'unresolved', warning };
+    }
+    const resolved = map.paths.get(workspaceHash) ?? null;
     if (resolved) {
       return { workspacePath: resolved, workspaceHash, strategy: 'reverse-map' };
     }
@@ -74,22 +88,29 @@ export class HashResolver {
    * Build (lazily) and return the reverse map from hash → workspace path.
    * The map is computed once per resolver instance.
    */
-  private async getReverseMap(): Promise<Map<string, string>> {
+  private async getReverseMap(): Promise<ReverseMapCache> {
     if (this.reverseMap !== null) return this.reverseMap;
 
-    const map = new Map<string, string>();
+    const paths = new Map<string, string>();
+    const collisions = new Map<string, string[]>();
     const candidates = await collectCandidatePaths(this.watchDirs);
 
     for (const candidate of candidates) {
       const hash = encodeClaudeProjectDir(candidate);
-      // On hash collision, keep first match (log warning only — not thrown)
-      if (!map.has(hash)) {
-        map.set(hash, candidate);
+      const existing = paths.get(hash);
+      if (!existing) {
+        paths.set(hash, candidate);
+        continue;
       }
+      if (existing === candidate) continue;
+      const collided = collisions.get(hash) ?? [existing];
+      if (!collided.includes(candidate)) collided.push(candidate);
+      collisions.set(hash, collided);
+      paths.delete(hash);
     }
 
-    this.reverseMap = map;
-    return map;
+    this.reverseMap = { paths, collisions };
+    return this.reverseMap;
   }
 }
 
@@ -118,27 +139,37 @@ export function extractHashFromJsonlPath(jsonlPath: string): string {
 async function collectCandidatePaths(watchDirs: string[]): Promise<string[]> {
   const candidates = new Set<string>();
 
-  // Also include the watchDirs themselves
-  for (const dir of watchDirs) {
-    try {
-      const resolved = dir.startsWith('~/') ? join(homedir(), dir.slice(2)) : dir;
-      const stat = await fs.stat(resolved).catch(() => null);
-      if (!stat?.isDirectory()) continue;
-
-      // The watchDir itself is a candidate
-      candidates.add(resolved);
-
-      // Walk one level of subdirectories
-      const entries = await fs.readdir(resolved, { withFileTypes: true }).catch(() => []);
-      for (const entry of entries) {
-        if (entry.isDirectory() && !entry.name.startsWith('.')) {
-          candidates.add(join(resolved, entry.name));
-        }
-      }
-    } catch {
-      // Permission denied or non-existent directory — skip
-    }
+  for (const dir of [...watchDirs, ...projectCandidateRoots()]) {
+    await addCandidateRoot(candidates, dir);
   }
 
   return [...candidates];
+}
+
+function projectCandidateRoots(): string[] {
+  const roots: string[] = [];
+  for (const { config } of listProjects()) {
+    roots.push(config.path);
+    if (config.workspace?.workspaces_dir) roots.push(config.workspace.workspaces_dir);
+  }
+  return roots;
+}
+
+async function addCandidateRoot(candidates: Set<string>, dir: string): Promise<void> {
+  try {
+    const resolved = dir.startsWith('~/') ? join(homedir(), dir.slice(2)) : dir;
+    const stat = await fs.stat(resolved).catch(() => null);
+    if (!stat?.isDirectory()) return;
+
+    candidates.add(resolved);
+
+    const entries = await fs.readdir(resolved, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith('.')) {
+        candidates.add(join(resolved, entry.name));
+      }
+    }
+  } catch {
+    // Permission denied or non-existent directory — skip
+  }
 }

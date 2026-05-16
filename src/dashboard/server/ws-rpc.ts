@@ -21,10 +21,8 @@ import { listSessionNamesAsync } from '../../lib/tmux.js';
 import { listProjects } from '../../lib/projects.js';
 import type { AgentStatus, ConversationEvent, DomainEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionTreeDelta } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
-import { scan } from '../../lib/conversations/scanner.js';
 import type { SearchResult } from '../../lib/conversations/search.js';
-import { enrichSessions } from '../../lib/conversations/enrichment/index.js';
-import { embedSessions } from '../../lib/conversations/embeddings/index.js';
+import { CostThresholdError } from '../../lib/conversations/enrichment/index.js';
 import { getConversationsConfigAsync } from '../../lib/config.js';
 import type { DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
 import { validateOrigin } from './routes/origin-validation.js';
@@ -475,23 +473,34 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             payload: { mode: input.mode, dirs: input.dirs ?? [] },
           } as ScanStartedEvent));
           let lastProgressEmit = 0;
-          const result = await scan({
+          const result = await runDashboardDbJob<{
+            inserted: number;
+            updated: number;
+            skipped: number;
+            errors: number;
+            durationMs: number;
+          }>('scanConversations', {
             mode: input.mode,
             dirs: input.dirs,
             dryRun: input.dryRun,
             watchDirs: config.watchDirs,
             maxParallel: config.scanMaxParallel,
-            onProgress: async (progress) => {
-              const now = Date.now();
-              const complete = progress.dirsProcessed >= progress.dirsTotal;
-              if (!complete && now - lastProgressEmit < 500) return;
-              lastProgressEmit = now;
-              await Effect.runPromise(eventStore.append({
-                type: 'scan.progress',
-                timestamp: new Date().toISOString(),
-                payload: progress,
-              } as ScanProgressEvent));
-            },
+          }, async (rawProgress) => {
+            const progress = rawProgress as {
+              dirsProcessed: number;
+              dirsTotal: number;
+              sessionsFound: number;
+              elapsedMs: number;
+            };
+            const now = Date.now();
+            const complete = progress.dirsProcessed >= progress.dirsTotal;
+            if (!complete && now - lastProgressEmit < 500) return;
+            lastProgressEmit = now;
+            await Effect.runPromise(eventStore.append({
+              type: 'scan.progress',
+              timestamp: new Date().toISOString(),
+              payload: progress,
+            } as ScanProgressEvent));
           });
           await Effect.runPromise(eventStore.append({
             type: 'scan.complete',
@@ -548,17 +557,28 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       [WS_METHODS.enrichSessions]: (input) =>
         Effect.promise(async () => {
           const config = await getConversationsConfigAsync();
-          const result = await enrichSessions({
-            tier: input.level,
-            sessionIds: input.ids,
-            filter: input.filter,
-            limit: input.limit,
-            maxParallel: config.enrichment.maxParallel,
-            modelOverride: input.model,
-            promptSuffix: input.customPrompt,
-            skipAlreadyEnriched: input.upgrade !== true,
-            config,
-            onProgress: async (progress) => {
+          try {
+            const result = await runDashboardDbJob<{
+              enriched: number;
+              errors: number;
+              estimatedCost: number;
+              actualCost: number | null;
+              durationMs: number;
+            }>('enrichSessions', {
+              tier: input.level,
+              sessionIds: input.ids,
+              filter: input.filter,
+              limit: input.limit,
+              maxParallel: config.enrichment.maxParallel,
+              modelOverride: input.model,
+              promptSuffix: input.customPrompt,
+              skipAlreadyEnriched: input.upgrade !== true,
+              force: input.confirmed === true || input.force === true,
+              config,
+            }, async (rawProgress) => {
+              const progress = rawProgress as {
+                session?: { sessionId: number; tier: number; model: string; cost?: number; success: boolean; error?: string };
+              };
               if (!progress.session) return;
               const { session } = progress;
               await Effect.runPromise(eventStore.append({
@@ -573,21 +593,33 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                   error: session.error,
                 },
               } as EnrichProgressEvent));
-            },
-          });
-          const processed = result.enriched + result.errors;
-          await Effect.runPromise(eventStore.append({
-            type: 'enrich.complete',
-            timestamp: new Date().toISOString(),
-            payload: { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors, durationMs: result.durationMs },
-          } as EnrichCompleteEvent));
-          return { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors };
+            });
+            const processed = result.enriched + result.errors;
+            await Effect.runPromise(eventStore.append({
+              type: 'enrich.complete',
+              timestamp: new Date().toISOString(),
+              payload: { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors, durationMs: result.durationMs },
+            } as EnrichCompleteEvent));
+            return { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors };
+          } catch (err) {
+            if (err instanceof CostThresholdError) {
+              throw new PanRpcError({
+                message: err.message,
+                code: `COST_THRESHOLD:${err.estimatedCost}:${err.threshold}:${err.sessionCount}`,
+              });
+            }
+            throw err;
+          }
         }),
 
       [WS_METHODS.embedSessions]: (input) =>
         Effect.promise(async () => {
           const config = await getConversationsConfigAsync();
-          const result = await embedSessions({ sessionIds: input.ids, regenerate: input.regenerate, config });
+          const result = await runDashboardDbJob<{ embedded: number; skipped: number; errors: number }>('embedSessions', {
+            sessionIds: input.ids,
+            regenerate: input.regenerate,
+            config,
+          });
           return { total: result.embedded + result.skipped + result.errors, embedded: result.embedded, model: config.embeddingModel };
         }),
 

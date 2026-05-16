@@ -257,6 +257,18 @@ describe('discovered-sessions-db', () => {
     expect(all[0].embedding[1]).toBeCloseTo(1.0);
   });
 
+  it('insertEmbedding stores only the Float32Array view bytes', async () => {
+    const { upsertDiscoveredSession, insertEmbedding, getEmbedding } = await import(
+      '../discovered-sessions-db.js'
+    );
+    const session = upsertDiscoveredSession({ jsonlPath: '/embed-view.jsonl' });
+    const backing = new Float32Array([99, 1, 2, 3, 100]);
+    const view = new Float32Array(backing.buffer, Float32Array.BYTES_PER_ELEMENT, 3);
+    insertEmbedding(session.id, 'text-embedding-3-small', view);
+    const retrieved = getEmbedding(session.id, 'text-embedding-3-small');
+    expect(Array.from(retrieved ?? [])).toEqual([1, 2, 3]);
+  });
+
   it('getEmbedding returns null for missing model', async () => {
     const { upsertDiscoveredSession, getEmbedding } = await import(
       '../discovered-sessions-db.js'
