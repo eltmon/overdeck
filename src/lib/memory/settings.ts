@@ -1,11 +1,17 @@
 import { readFile } from 'fs/promises';
 import yaml from 'js-yaml';
 import { getGlobalConfigPath } from '../config-yaml.js';
+import type { ExtractionProviderTarget, MemoryProviderSettings } from './providers/types.js';
 
 export const DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD = 4;
+export const DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS = 10_000;
 
 export interface MemorySettings {
+  extraction: MemoryProviderSettings;
+  observationsEnabled: boolean;
+  promptTimeInjectionEnabled: boolean;
   rollupPendingThreshold: number;
+  sidebarRefreshIntervalMs: number;
 }
 
 export async function loadMemorySettings(configPath = getGlobalConfigPath()): Promise<MemorySettings> {
@@ -21,10 +27,21 @@ export async function loadMemorySettings(configPath = getGlobalConfigPath()): Pr
 
   const config = isRecord(parsed) ? parsed : {};
   const memory = isRecord(config.memory) ? config.memory : {};
-  const threshold = memory.rollup_pending_threshold;
+  const extraction = isRecord(memory.extraction) ? memory.extraction : {};
+  const features = isRecord(memory.features) ? memory.features : {};
+  const fallbackChain = parseFallbackChain(extraction.fallback_chain);
 
   return {
-    rollupPendingThreshold: positiveIntegerOrDefault(threshold, DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD),
+    extraction: {
+      provider: stringOrUndefined(extraction.provider),
+      model: stringOrUndefined(extraction.model),
+      perDayCostCapUsd: nonNegativeNumberOrUndefined(extraction.per_day_cost_cap_usd),
+      fallbackChain,
+    },
+    observationsEnabled: booleanOrDefault(features.observations, true),
+    promptTimeInjectionEnabled: booleanOrDefault(features.prompt_time_injection, true),
+    rollupPendingThreshold: positiveIntegerOrDefault(memory.rollup_pending_threshold, DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD),
+    sidebarRefreshIntervalMs: positiveIntegerOrDefault(memory.sidebar_refresh_interval_ms, DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS),
   };
 }
 
@@ -32,12 +49,47 @@ export async function getMemoryRollupPendingThreshold(): Promise<number> {
   return (await loadMemorySettings()).rollupPendingThreshold;
 }
 
+export async function areMemoryObservationsEnabled(): Promise<boolean> {
+  return (await loadMemorySettings()).observationsEnabled;
+}
+
+export async function isMemoryPromptTimeInjectionEnabled(): Promise<boolean> {
+  return (await loadMemorySettings()).promptTimeInjectionEnabled;
+}
+
 function defaultMemorySettings(): MemorySettings {
-  return { rollupPendingThreshold: DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD };
+  return {
+    extraction: {},
+    observationsEnabled: true,
+    promptTimeInjectionEnabled: true,
+    rollupPendingThreshold: DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD,
+    sidebarRefreshIntervalMs: DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS,
+  };
+}
+
+function parseFallbackChain(value: unknown): ExtractionProviderTarget[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const targets = value
+    .filter(isRecord)
+    .map((target) => ({ provider: stringOrUndefined(target.provider), model: stringOrUndefined(target.model) }))
+    .filter((target): target is ExtractionProviderTarget => !!target.provider && !!target.model);
+  return targets.length > 0 ? targets : undefined;
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function nonNegativeNumberOrUndefined(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
 function positiveIntegerOrDefault(value: unknown, fallback: number): number {
   return Number.isInteger(value) && (value as number) > 0 ? value as number : fallback;
+}
+
+function booleanOrDefault(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

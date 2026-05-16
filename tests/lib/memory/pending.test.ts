@@ -149,14 +149,47 @@ describe('pending turn writer', () => {
   it('loads the rollup threshold from settings each time', async () => {
     const configPath = join(tempDir!, 'config.yaml');
     await writeFile(configPath, 'memory:\n  rollup_pending_threshold: 6\n', 'utf8');
-    expect(await loadMemorySettings(configPath)).toEqual({ rollupPendingThreshold: 6 });
+    expect((await loadMemorySettings(configPath)).rollupPendingThreshold).toBe(6);
 
     await writeFile(configPath, 'memory:\n  rollup_pending_threshold: 2\n', 'utf8');
-    expect(await loadMemorySettings(configPath)).toEqual({ rollupPendingThreshold: 2 });
+    expect((await loadMemorySettings(configPath)).rollupPendingThreshold).toBe(2);
+  });
+
+  it('loads memory provider, feature toggles, cost cap, and refresh settings', async () => {
+    const configPath = join(tempDir!, 'config.yaml');
+    await writeFile(configPath, [
+      'memory:',
+      '  extraction:',
+      '    provider: cliproxy',
+      '    model: gpt-4.1-nano',
+      '    per_day_cost_cap_usd: 0',
+      '    fallback_chain:',
+      '      - provider: anthropic',
+      '        model: claude-haiku-4-5-20251001',
+      '  features:',
+      '    observations: false',
+      '    prompt_time_injection: false',
+      '  rollup_pending_threshold: 6',
+      '  sidebar_refresh_interval_ms: 15000',
+      '',
+    ].join('\n'), 'utf8');
+
+    expect(await loadMemorySettings(configPath)).toMatchObject({
+      extraction: {
+        provider: 'cliproxy',
+        model: 'gpt-4.1-nano',
+        perDayCostCapUsd: 0,
+        fallbackChain: [{ provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }],
+      },
+      observationsEnabled: false,
+      promptTimeInjectionEnabled: false,
+      rollupPendingThreshold: 6,
+      sidebarRefreshIntervalMs: 15000,
+    });
   });
 
   it('uses the default threshold when memory settings are absent', async () => {
-    expect(await loadMemorySettings(join(tempDir!, 'missing.yaml'))).toEqual({ rollupPendingThreshold: 4 });
+    expect((await loadMemorySettings(join(tempDir!, 'missing.yaml'))).rollupPendingThreshold).toBe(4);
     expect(await maybeTriggerStatusRollup(identity, { loadThreshold: () => 0 })).toEqual({
       status: 'below-threshold',
       pendingCount: 0,

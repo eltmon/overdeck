@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-16T22:00:00.000Z",
+  "updated": "2026-05-16T22:12:00.000Z",
   "gitState": {
     "branch": "feature/pan-1052",
-    "sha": "8d768435",
+    "sha": "00ef1ce1",
     "dirty": true
   },
   "decisions": [
@@ -183,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-bcid",
-    "itemId": "b1-memory-cli-umbrella",
+    "beadId": "workspace-dq2a",
+    "itemId": "b1-memory-settings-ui",
     "status": "implemented",
-    "note": "Memory CLI umbrella now provides search, status, reset, summary, doctor, and config subcommands, wires pan memory into the CLI dispatcher, documents the pan-memory skill wrapper, and verifies search filters, sibling search, reset markers, summaries, and stale-agent doctor exit behavior. Focused tests, lint, typecheck, and graphify update passed."
+    "note": "Settings now round-trip memory provider/model, fallback, cost cap, observations and prompt-time injection toggles, rollup threshold, and sidebar refresh interval through the existing YAML Settings storage; memory provider resolution reads the same YAML path with PANOPTICON_MEMORY_PROVIDER and PANOPTICON_MEMORY_MODEL precedence. Focused tests, frontend settings tests, frontend build, lint, typecheck, and graphify update passed. Browser UI interaction was not run because this session has no browser tool."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -321,6 +321,12 @@
       "timestamp": "2026-05-16T22:00:00.000Z",
       "reason": "work",
       "note": "workspace-bcid implemented: added pan memory search/status/reset/summary/doctor/config, CLI dispatcher wiring, pan-memory skill docs, and focused tests for search filters, sibling search, reset markers, summaries, and stale active agent doctor failures.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T22:12:00.000Z",
+      "reason": "work",
+      "note": "workspace-dq2a implemented: added YAML-backed memory settings for extraction provider/model/fallback, cost cap, observation and prompt-time injection toggles, rollup threshold, and sidebar refresh interval; Settings UI exposes the controls and documents env override precedence.",
       "agentModel": "gpt-5.5"
     }
   ],

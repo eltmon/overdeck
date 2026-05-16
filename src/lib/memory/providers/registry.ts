@@ -1,5 +1,4 @@
-import { readFile } from 'fs/promises';
-import { SETTINGS_FILE } from '../../paths.js';
+import { loadMemorySettings } from '../settings.js';
 import { AnthropicExtractionProvider } from './anthropic.js';
 import { CliproxyExtractionProvider } from './cliproxy.js';
 import type {
@@ -7,7 +6,6 @@ import type {
   ExtractionProviderSelection,
   ExtractionProviderTarget,
   MemoryProviderSettings,
-  MemorySettingsFile,
 } from './types.js';
 
 const DEFAULT_PROVIDER = 'anthropic';
@@ -74,17 +72,8 @@ export async function resolveExtractionProvider(
 }
 
 async function loadMemoryProviderSettings(): Promise<MemoryProviderSettings | null> {
-  let raw: string;
-  try {
-    raw = await readFile(SETTINGS_FILE, 'utf8');
-  } catch (error) {
-    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : null;
-    if (code === 'ENOENT') return null;
-    throw error;
-  }
-
-  const parsed = JSON.parse(raw) as MemorySettingsFile;
-  return parsed.memory?.extraction ?? null;
+  const settings = await loadMemorySettings();
+  return settings.extraction;
 }
 
 function getProviderDefaultModel(providerName: string): string {

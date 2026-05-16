@@ -15,6 +15,7 @@ const MINIMAX_DEFAULTS: SettingsConfig = {
       minimax: true,
       zai: false,
       kimi: false,
+      mimo: false,
       openrouter: false,
       nous: false,
     },
@@ -97,6 +98,12 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })');
   });
+
+  it('surfaces memory settings and environment override precedence', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'memory', label: 'Memory'");
+    expect(SETTINGS_PAGE_SOURCE).toContain('PANOPTICON_MEMORY_PROVIDER and PANOPTICON_MEMORY_MODEL override these UI values');
+    expect(SETTINGS_PAGE_SOURCE).toContain('0 disables the cap');
+  });
 });
 
 describe('MODELS_BY_PROVIDER', () => {
@@ -153,6 +160,15 @@ describe('buildMiniMaxFormData', () => {
     };
     const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
     expect(result.tmux?.config_mode).toBe('inherit-user');
+  });
+
+  it('preserves existing memory settings from formData', () => {
+    const existing: SettingsConfig = {
+      ...MINIMAX_DEFAULTS,
+      memory: { provider: 'cliproxy', model: 'gpt-4.1-nano', per_day_cost_cap_usd: 0 },
+    };
+    const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
+    expect(result.memory).toEqual({ provider: 'cliproxy', model: 'gpt-4.1-nano', per_day_cost_cap_usd: 0 });
   });
 
   it('preserves existing openrouter settings from formData', () => {

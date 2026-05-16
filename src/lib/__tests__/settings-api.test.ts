@@ -76,6 +76,13 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
         richCompaction: true,
         titleModel: 'claude-haiku-4-5',
       },
+      memory: {
+        extraction: { fallbackChain: [] },
+        observationsEnabled: true,
+        promptTimeInjectionEnabled: true,
+        rollupPendingThreshold: 4,
+        sidebarRefreshIntervalMs: 10000,
+      },
       experimental: { claudeCodeChannels: false },
       claude: { permissionMode: 'auto' },
       tts: {
@@ -258,6 +265,38 @@ describe('loadSettingsApi', () => {
       mutedIssues: ['PAN-123'],
     });
   });
+
+  it('loads memory settings from config', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({
+      memory: {
+        extraction: {
+          provider: 'cliproxy',
+          model: 'gpt-4.1-nano',
+          perDayCostCapUsd: 0,
+          fallbackChain: [{ provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }],
+        },
+        observationsEnabled: false,
+        promptTimeInjectionEnabled: false,
+        rollupPendingThreshold: 6,
+        sidebarRefreshIntervalMs: 15000,
+      },
+    }));
+
+    const { loadSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    expect(settings.memory).toEqual({
+      provider: 'cliproxy',
+      model: 'gpt-4.1-nano',
+      per_day_cost_cap_usd: 0,
+      fallback_provider: 'anthropic',
+      fallback_model: 'claude-haiku-4-5-20251001',
+      observations_enabled: false,
+      prompt_time_injection_enabled: false,
+      rollup_pending_threshold: 6,
+      sidebar_refresh_interval_ms: 15000,
+    });
+  });
 });
 
 describe('saveSettingsApi', () => {
@@ -267,7 +306,7 @@ describe('saveSettingsApi', () => {
     mockReadFile.mockResolvedValue('# user comment\nmodels:\n  providers:\n    anthropic: true\n  overrides:\n    issue-agent:implementation: glm-5.1\n');
   });
 
-  it('round-trips config.yaml comments while writing roles and dropping overrides', async () => {
+  it('round-trips config.yaml comments while writing roles, memory settings, and dropping overrides', async () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
@@ -278,6 +317,17 @@ describe('saveSettingsApi', () => {
         ...settings.roles,
         work: { model: 'workhorse:mid', sub: { inspect: { model: 'claude-haiku-4-5' } } },
       },
+      memory: {
+        provider: 'cliproxy',
+        model: 'gpt-4.1-nano',
+        per_day_cost_cap_usd: 0,
+        fallback_provider: 'anthropic',
+        fallback_model: 'claude-haiku-4-5-20251001',
+        observations_enabled: false,
+        prompt_time_injection_enabled: false,
+        rollup_pending_threshold: 6,
+        sidebar_refresh_interval_ms: 15000,
+      },
     });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
@@ -286,6 +336,10 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('mid: gpt-5.5-mini');
     expect(written).toContain('roles:');
     expect(written).toContain('inspect:');
+    expect(written).toContain('memory:');
+    expect(written).toContain('provider: cliproxy');
+    expect(written).toContain('per_day_cost_cap_usd: 0');
+    expect(written).toContain('observations: false');
     expect(written).not.toContain('overrides:');
     expect(mockClearConfigCache).toHaveBeenCalledOnce();
   });
@@ -490,5 +544,22 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toContain('tts.volume must be between 0 and 1');
     expect(result.errors).toContain('tts.rate must be greater than 0');
     expect(result.errors).toContain('tts.maxChars must be greater than 0');
+  });
+
+  it('rejects invalid memory numeric settings', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      memory: {
+        per_day_cost_cap_usd: -1,
+        rollup_pending_threshold: 0,
+        sidebar_refresh_interval_ms: 0,
+      },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('memory.per_day_cost_cap_usd must be greater than or equal to 0');
+    expect(result.errors).toContain('memory.rollup_pending_threshold must be a positive integer');
+    expect(result.errors).toContain('memory.sidebar_refresh_interval_ms must be a positive integer');
   });
 });
