@@ -4,7 +4,9 @@ import {
   createTtsVoice,
   listTtsVoices,
   parseCreateTtsVoiceInput,
+  parseSpeakTtsInput,
   removeTtsVoice,
+  speakTts,
 } from '../tts.js';
 import type { TtsVoice } from '../../../../lib/tts-voices.js';
 
@@ -105,5 +107,76 @@ describe('TTS voice routes helpers', () => {
     await expect(removeTtsVoice('missing', { deleteVoice })).resolves.toBe(false);
     expect(deleteVoice).toHaveBeenNthCalledWith(1, 'voice-1');
     expect(deleteVoice).toHaveBeenNthCalledWith(2, 'missing');
+  });
+});
+
+describe('TTS speak route helpers', () => {
+  it('parses a speak request with voice resolution fields', () => {
+    expect(parseSpeakTtsInput({
+      text: 'PAN-829 passed review',
+      source: 'review-specialist',
+      eventType: 'reviewStatus.passed',
+      issueId: 'PAN-829',
+      priority: 1,
+      voiceId: 'voice-1',
+    })).toEqual({
+      text: 'PAN-829 passed review',
+      source: 'review-specialist',
+      eventType: 'reviewStatus.passed',
+      issueId: 'PAN-829',
+      priority: 1,
+      voiceId: 'voice-1',
+    });
+  });
+
+  it('parses a direct preview speak request', () => {
+    expect(parseSpeakTtsInput({
+      text: 'preview voice',
+      voice: 'Vivian',
+      instruct: 'calm',
+      mode: 'custom',
+      embedding: [0.1, 0.2],
+    })).toEqual({
+      text: 'preview voice',
+      voice: 'Vivian',
+      instruct: 'calm',
+      mode: 'custom',
+      embedding: [0.1, 0.2],
+    });
+  });
+
+  it('rejects invalid speak payloads', () => {
+    expect(parseSpeakTtsInput({ text: '' })).toBeUndefined();
+    expect(parseSpeakTtsInput({ text: 'bad', mode: 'robot' })).toBeUndefined();
+    expect(parseSpeakTtsInput({ text: 'bad', embedding: ['x'] })).toBeUndefined();
+  });
+
+  it('returns 200 with spoken true when the resolver speaks', async () => {
+    const resolve = vi.fn(async () => 'spoken' as const);
+
+    await expect(speakTts({ text: 'hello' }, { resolveAndSpeak: resolve })).resolves.toEqual({
+      status: 200,
+      body: { spoken: true, result: 'spoken' },
+    });
+    expect(resolve).toHaveBeenCalledWith({ text: 'hello' });
+  });
+
+  it('returns 200 with spoken false for muted and no-voice results', async () => {
+    await expect(speakTts({ text: 'hello' }, { resolveAndSpeak: vi.fn(async () => 'muted' as const) })).resolves.toEqual({
+      status: 200,
+      body: { spoken: false, result: 'muted' },
+    });
+
+    await expect(speakTts({ text: 'hello' }, { resolveAndSpeak: vi.fn(async () => 'no-voice' as const) })).resolves.toEqual({
+      status: 200,
+      body: { spoken: false, result: 'no-voice' },
+    });
+  });
+
+  it('returns 503 when the daemon is unavailable', async () => {
+    await expect(speakTts({ text: 'hello' }, { resolveAndSpeak: vi.fn(async () => 'daemon-unavailable' as const) })).resolves.toEqual({
+      status: 503,
+      body: { spoken: false, result: 'daemon-unavailable', error: 'TTS daemon unavailable' },
+    });
   });
 });

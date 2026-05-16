@@ -1,6 +1,7 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { loadConfig } from '../../../lib/config-yaml.js';
+import { resolveAndSpeak, type ResolveAndSpeakOptions, type TtsSpeakMode, type TtsSpeakResult } from '../../../lib/tts-speak.js';
 import {
   addVoice as addStoredVoice,
   deleteVoice as deleteStoredVoice,
@@ -59,6 +60,19 @@ export interface TtsVoiceStore {
   deleteVoice?: (id: string) => Promise<boolean>;
 }
 
+export interface SpeakTtsResponse {
+  status: number;
+  body: {
+    spoken: boolean;
+    result: TtsSpeakResult;
+    error?: string;
+  };
+}
+
+export interface SpeakTtsDeps {
+  resolveAndSpeak?: (input: ResolveAndSpeakOptions) => Promise<TtsSpeakResult>;
+}
+
 export function toPublicVoice(voice: TtsVoice): PublicTtsVoice {
   const { embedding: _embedding, ...publicVoice } = voice;
   return publicVoice;
@@ -102,6 +116,37 @@ export function parseCreateTtsVoiceInput(body: unknown): CreateTtsVoiceInput | u
   return input;
 }
 
+function parseTtsSpeakMode(value: unknown): TtsSpeakMode | undefined {
+  if (value === undefined) return undefined;
+  return value === 'custom' || value === 'design' || value === 'clone' ? value : undefined;
+}
+
+export function parseSpeakTtsInput(body: unknown): ResolveAndSpeakOptions | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+
+  const record = body as Record<string, unknown>;
+  if (typeof record.text !== 'string' || record.text.trim().length === 0) return undefined;
+
+  const mode = parseTtsSpeakMode(record.mode);
+  if (record.mode !== undefined && !mode) return undefined;
+
+  const input: ResolveAndSpeakOptions = { text: record.text };
+  if (typeof record.source === 'string') input.source = record.source;
+  if (typeof record.eventType === 'string') input.eventType = record.eventType;
+  if (typeof record.issueId === 'string') input.issueId = record.issueId;
+  if (typeof record.priority === 'number') input.priority = record.priority;
+  if (typeof record.voiceId === 'string') input.voiceId = record.voiceId;
+  if (typeof record.voice === 'string') input.voice = record.voice;
+  if (typeof record.instruct === 'string') input.instruct = record.instruct;
+  if (mode) input.mode = mode;
+  if (record.embedding !== undefined) {
+    if (!Array.isArray(record.embedding) || !record.embedding.every((value) => typeof value === 'number')) return undefined;
+    input.embedding = record.embedding;
+  }
+
+  return input;
+}
+
 export async function createTtsVoice(input: CreateTtsVoiceInput, store: TtsVoiceStore = {}): Promise<TtsVoice> {
   const addVoice = store.addVoice ?? addStoredVoice;
   return addVoice(input);
@@ -110,6 +155,21 @@ export async function createTtsVoice(input: CreateTtsVoiceInput, store: TtsVoice
 export async function removeTtsVoice(id: string, store: TtsVoiceStore = {}): Promise<boolean> {
   const deleteVoice = store.deleteVoice ?? deleteStoredVoice;
   return deleteVoice(id);
+}
+
+export async function speakTts(input: ResolveAndSpeakOptions, deps: SpeakTtsDeps = {}): Promise<SpeakTtsResponse> {
+  const result = await (deps.resolveAndSpeak ?? resolveAndSpeak)(input);
+  if (result === 'daemon-unavailable') {
+    return {
+      status: 503,
+      body: { spoken: false, result, error: 'TTS daemon unavailable' },
+    };
+  }
+
+  return {
+    status: 200,
+    body: { spoken: result === 'spoken', result },
+  };
 }
 
 function parseJsonBody(text: string): unknown | undefined {
@@ -163,9 +223,26 @@ const deleteTtsVoiceRoute = HttpRouter.add(
   }),
 );
 
+const postTtsSpeakRoute = HttpRouter.add(
+  'POST',
+  '/api/tts/speak',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const body = parseJsonBody(yield* request.text);
+    if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
+
+    const input = parseSpeakTtsInput(body);
+    if (!input) return jsonResponse({ error: 'invalid speak request' }, { status: 400 });
+
+    const response = yield* Effect.promise(() => speakTts(input));
+    return jsonResponse(response.body, { status: response.status });
+  }),
+);
+
 export const ttsRouteLayer = Layer.mergeAll(
   getTtsHealthRoute,
   getTtsVoicesRoute,
   postTtsVoiceRoute,
   deleteTtsVoiceRoute,
+  postTtsSpeakRoute,
 );
