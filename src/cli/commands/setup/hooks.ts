@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, chmod
 import { join, dirname } from 'path';
 import { execSync } from 'child_process';
 import { homedir } from 'os';
+import { readSettingsOrAbortSync, backupSettingsSync, pruneBackupsSync, atomicWriteJsonSync, diffJson } from './safe-settings.js';
 
 export interface HookConfig {
   matcher: string;  // Regex pattern, e.g. ".*" for all tools or "Bash" for specific
@@ -181,11 +182,24 @@ function removeHookIfPresent(
   return removed;
 }
 
+export interface SetupHooksOptions {
+  /**
+   * Preview the proposed settings.json diff and exit without writing.
+   * Hook scripts and directories are still installed; only the
+   * settings.json mutation is skipped. (PAN-1137)
+   */
+  dryRun?: boolean;
+}
+
 /**
  * Setup Claude Code hooks for Panopticon heartbeat
  */
-export async function setupHooksCommand(): Promise<void> {
+export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<void> {
+  const dryRun = opts.dryRun === true;
   console.log(chalk.bold('Setting up Panopticon heartbeat hooks\n'));
+  if (dryRun) {
+    console.log(chalk.cyan('— dry run: no settings.json write will be performed —\n'));
+  }
 
   // 1. Check for jq dependency
   if (!checkJqInstalled()) {
@@ -272,17 +286,17 @@ export async function setupHooksCommand(): Promise<void> {
   const claudeDir = join(homedir(), '.claude');
   const settingsPath = join(claudeDir, 'settings.json');
 
-  let settings: ClaudeSettings = {};
+  // PAN-1137: refuse to proceed on parse failure. Previous behavior reset
+  // settings to `{}` on JSON.parse error and wrote it back, erasing every
+  // user customization (statusLine, theme, mcpServers, etc.).
+  const settingsBefore: ClaudeSettings = readSettingsOrAbortSync(settingsPath);
+  // Deep clone the pre-mutation snapshot for the dry-run diff. Cheap —
+  // settings.json is small.
+  const beforeSnapshot: ClaudeSettings = JSON.parse(JSON.stringify(settingsBefore));
+  let settings: ClaudeSettings = settingsBefore;
 
   if (existsSync(settingsPath)) {
-    try {
-      const settingsContent = readFileSync(settingsPath, 'utf-8');
-      settings = JSON.parse(settingsContent);
-      console.log(chalk.green('✓ Read existing Claude Code settings'));
-    } catch (error) {
-      console.log(chalk.yellow('⚠ Could not parse settings.json, creating new file'));
-      settings = {};
-    }
+    console.log(chalk.green('✓ Read existing Claude Code settings'));
   } else {
     console.log(chalk.dim('No existing settings.json found, creating new file'));
     if (!existsSync(claudeDir)) {
@@ -426,9 +440,20 @@ export async function setupHooksCommand(): Promise<void> {
     console.log(chalk.yellow(`⚠ Caveman hook install failed: ${err instanceof Error ? err.message : String(err)} (non-fatal)`));
   }
 
-  // 9. Write updated settings
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-  console.log(chalk.green('✓ Updated Claude Code settings.json'));
+  // 9. Write updated settings — PAN-1137: backup + atomic write + dry-run
+  if (dryRun) {
+    console.log(chalk.cyan('\nProposed settings.json diff:'));
+    console.log(diffJson(beforeSnapshot, settings));
+    console.log(chalk.cyan('\nDry run complete — no file changes written.'));
+  } else {
+    const backupPath = backupSettingsSync(settingsPath);
+    if (backupPath) {
+      console.log(chalk.dim(`✓ Backed up settings.json → ${backupPath}`));
+    }
+    atomicWriteJsonSync(settingsPath, settings);
+    pruneBackupsSync(settingsPath);
+    console.log(chalk.green('✓ Updated Claude Code settings.json'));
+  }
 
   // 10. Success message
   console.log(chalk.green.bold('\n✓ Setup complete!\n'));

@@ -51,7 +51,8 @@ export function registerAdminCommands(program: Command): void {
   hooks
     .command('install')
     .description('Configure heartbeat hooks in settings.json')
-    .action(setupHooksCommand);
+    .option('--dry-run', 'Preview the proposed settings.json diff without writing')
+    .action((opts: { dryRun?: boolean }) => setupHooksCommand({ dryRun: opts.dryRun }));
 
   // pan admin tldr — TLDR daemon management
   admin
