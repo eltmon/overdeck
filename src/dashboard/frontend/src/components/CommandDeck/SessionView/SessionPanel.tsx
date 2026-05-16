@@ -136,6 +136,15 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
   });
 
   const handleSetView = (v: PanelView) => {
+    if (v === 'terminal') {
+      const w = window as unknown as { __panTerminalClickAt?: number };
+      w.__panTerminalClickAt = performance.now();
+      try {
+        if (localStorage.getItem('PANOPTICON_TERMINAL_PROFILE') === '1') {
+          console.log(`[xterm-click] session=${session.sessionId} t=${w.__panTerminalClickAt.toFixed(1)}`);
+        }
+      } catch { /* ignore */ }
+    }
     setView(v);
     writeView(session.sessionId, v);
   };
