@@ -67,6 +67,16 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars:');
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ dropInfoWhenFull:');
   });
+
+  it('includes advanced TTS voice map, muted sources, and template controls', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('fetchTtsVoices');
+    expect(SETTINGS_PAGE_SOURCE).toContain('TTS_EVENT_KEYS.map');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsVoiceMapChange(eventKey');
+    expect(SETTINGS_PAGE_SOURCE).toContain('ACTIVITY_SOURCE_OPTIONS.map');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsMutedSourceChange(source');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleAddTtsTemplate');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsTemplateChange(eventKey');
+  });
 });
 
 describe('MODELS_BY_PROVIDER', () => {

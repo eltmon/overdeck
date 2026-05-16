@@ -90,9 +90,24 @@ interface TtsHealthResponse {
   ok: boolean;
 }
 
+interface TtsVoiceListItem {
+  id: string;
+  name: string;
+  kind: 'preset' | 'design' | 'clone';
+  presetName?: string;
+  description?: string;
+  instruct?: string;
+}
+
 async function fetchTtsHealth(): Promise<TtsHealthResponse> {
   const res = await fetch('/api/tts/health');
   if (!res.ok) throw new Error('Failed to fetch TTS health');
+  return res.json();
+}
+
+async function fetchTtsVoices(): Promise<TtsVoiceListItem[]> {
+  const res = await fetch('/api/tts/voices');
+  if (!res.ok) throw new Error('Failed to fetch TTS voices');
   return res.json();
 }
 
@@ -198,6 +213,37 @@ const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[
   { id: 'nous', name: 'Nous Portal', icon: Globe, placeholder: 'ns-...' },
 ];
 
+const TTS_EVENT_KEYS = [
+  'reviewStatus.passed',
+  'reviewStatus.failed',
+  'reviewStatus.blocked',
+  'testStatus.testing',
+  'testStatus.passed',
+  'testStatus.failed',
+  'testStatus.skipped',
+  'testStatus.dispatch_failed',
+  'verificationStatus.passed',
+  'verificationStatus.failed',
+  'verificationStatus.skipped',
+  'mergeStatus.queued',
+  'mergeStatus.merging',
+  'mergeStatus.verifying',
+  'mergeStatus.merged',
+  'mergeStatus.failed',
+  'readyForMerge',
+] as const;
+
+const ACTIVITY_SOURCE_OPTIONS = [
+  'merge-agent',
+  'review-specialist',
+  'test-specialist',
+  'cloister',
+  'work-agent',
+  'planning-agent',
+  'dashboard',
+  'deploy-script',
+] as const;
+
 // Tracker definitions
 type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
 const TRACKERS: { id: TrackerType; name: string; icon: any; envVar: string; placeholder: string }[] = [
@@ -234,6 +280,11 @@ export function SettingsPage() {
     queryKey: ['tts-health'],
     queryFn: fetchTtsHealth,
     refetchInterval: 10_000,
+  });
+  const { data: ttsVoices = [] } = useQuery({
+    queryKey: ['tts-voices'],
+    queryFn: fetchTtsVoices,
+    staleTime: 60_000,
   });
 
   const [formData, setFormData] = useState<SettingsConfig | null>(null);
@@ -404,6 +455,56 @@ export function SettingsPage() {
     saveMutation.mutate(next);
   };
 
+  const handleTtsVoiceMapChange = (eventKey: string, voiceId: string) => {
+    const nextVoiceMap = { ...(ttsConfig.voiceMap ?? {}) };
+    if (voiceId) nextVoiceMap[eventKey] = voiceId;
+    else delete nextVoiceMap[eventKey];
+    handleTtsConfigChange({ voiceMap: nextVoiceMap });
+  };
+
+  const handleTtsMutedSourceChange = (source: string, muted: boolean) => {
+    const current = ttsConfig.mutedSources ?? [];
+    const nextMutedSources = muted
+      ? Array.from(new Set([...current, source]))
+      : current.filter((value) => value !== source);
+    handleTtsConfigChange({ mutedSources: nextMutedSources });
+  };
+
+  const handleTtsTemplateChange = (eventKey: string, text: string) => {
+    handleTtsConfigChange({
+      utteranceTemplates: {
+        ...(ttsConfig.utteranceTemplates ?? {}),
+        [eventKey]: text,
+      },
+    });
+  };
+
+  const handleTtsTemplateKeyChange = (oldKey: string, newKey: string) => {
+    const nextTemplates = { ...(ttsConfig.utteranceTemplates ?? {}) };
+    const text = nextTemplates[oldKey] ?? '';
+    delete nextTemplates[oldKey];
+    nextTemplates[newKey] = text;
+    handleTtsConfigChange({ utteranceTemplates: nextTemplates });
+  };
+
+  const handleRemoveTtsTemplate = (eventKey: string) => {
+    const nextTemplates = { ...(ttsConfig.utteranceTemplates ?? {}) };
+    delete nextTemplates[eventKey];
+    handleTtsConfigChange({ utteranceTemplates: nextTemplates });
+  };
+
+  const handleAddTtsTemplate = () => {
+    const templates = ttsConfig.utteranceTemplates ?? {};
+    const eventKey = TTS_EVENT_KEYS.find((key) => templates[key] === undefined);
+    if (!eventKey) return;
+    handleTtsConfigChange({
+      utteranceTemplates: {
+        ...templates,
+        [eventKey]: '',
+      },
+    });
+  };
+
   const handleCompactionModelChange = (modelId: ModelId) => {
     setFormData({
       ...formData,
@@ -519,6 +620,8 @@ export function SettingsPage() {
   const ttsRate = ttsConfig.rate ?? 1;
   const ttsMaxChars = ttsConfig.maxChars ?? 140;
   const ttsDaemonOnline = ttsHealth?.ok === true;
+  const ttsTemplateEntries = Object.entries(ttsConfig.utteranceTemplates ?? {});
+  const canAddTtsTemplate = ttsTemplateEntries.length < TTS_EVENT_KEYS.length;
 
   return (
     <SettingsLayout
@@ -1189,6 +1292,125 @@ export function SettingsPage() {
             }`} />
           </button>
         </SettingsRow>
+
+        <div className="mt-6 rounded-xl border border-border/70 bg-card/40 p-4" data-testid="tts-advanced-settings">
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Advanced</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Route event types to specific voices, silence noisy activity sources, and override spoken text.
+            </p>
+          </div>
+
+          <div className="space-y-5">
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Voice Map</h4>
+                  <p className="text-xs text-muted-foreground mt-1">Use default falls back to the configured TTS voice.</p>
+                </div>
+                <span className="text-[10px] text-muted-foreground">{ttsVoices.length} saved voices</span>
+              </div>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <div className="grid grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] bg-muted/30 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  <span>Event key</span>
+                  <span>Voice</span>
+                </div>
+                {TTS_EVENT_KEYS.map((eventKey) => (
+                  <div key={eventKey} className="grid grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] items-center gap-3 border-t border-border px-3 py-2">
+                    <code className="truncate text-xs text-foreground">{eventKey}</code>
+                    <select
+                      value={ttsConfig.voiceMap?.[eventKey] ?? ''}
+                      onChange={(e) => handleTtsVoiceMapChange(eventKey, e.target.value)}
+                      disabled={saveMutation.isPending}
+                      aria-label={`Voice for ${eventKey}`}
+                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+                    >
+                      <option value="">Use default</option>
+                      {ttsVoices.map((voice) => (
+                        <option key={voice.id} value={voice.id}>{voice.name} ({voice.kind})</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Muted Sources</h4>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {ACTIVITY_SOURCE_OPTIONS.map((source) => (
+                  <label key={source} className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-xs text-foreground">
+                    <input
+                      type="checkbox"
+                      checked={ttsConfig.mutedSources?.includes(source) ?? false}
+                      onChange={(e) => handleTtsMutedSourceChange(source, e.target.checked)}
+                      disabled={saveMutation.isPending}
+                      className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary disabled:opacity-50"
+                    />
+                    <span>{source}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Utterance Templates</h4>
+                  <p className="text-xs text-muted-foreground mt-1">Templates may include {'{issueId}'}.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddTtsTemplate}
+                  disabled={!canAddTtsTemplate || saveMutation.isPending}
+                  className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-popover disabled:opacity-50"
+                >
+                  Add template
+                </button>
+              </div>
+              <div className="space-y-2">
+                {ttsTemplateEntries.length === 0 && (
+                  <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                    No utterance templates configured.
+                  </p>
+                )}
+                {ttsTemplateEntries.map(([eventKey, template]) => (
+                  <div key={eventKey} className="grid gap-2 rounded-lg border border-border bg-background/60 p-2 md:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_auto]">
+                    <select
+                      value={eventKey}
+                      onChange={(e) => handleTtsTemplateKeyChange(eventKey, e.target.value)}
+                      disabled={saveMutation.isPending}
+                      aria-label="Template event key"
+                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+                    >
+                      {TTS_EVENT_KEYS.map((key) => (
+                        <option key={key} value={key}>{key}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={template}
+                      onChange={(e) => handleTtsTemplateChange(eventKey, e.target.value)}
+                      disabled={saveMutation.isPending}
+                      placeholder="e.g. {issueId} passed review"
+                      aria-label={`Template text for ${eventKey}`}
+                      className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTtsTemplate(eventKey)}
+                      disabled={saveMutation.isPending}
+                      className="inline-flex items-center justify-center rounded-md border border-border px-2 py-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                      aria-label={`Remove template for ${eventKey}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </SettingsSection>
 
       {/* Tracker Keys */}
