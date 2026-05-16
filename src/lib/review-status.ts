@@ -353,10 +353,10 @@ export function setReviewStatus(
     });
   }
   if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
-    const mMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
-      queued:    { level: 'info',    msg: `${issueId} — queued for merge` },
-      merging:   { level: 'info',    msg: `${issueId} — merge in progress` },
-      verifying: { level: 'info',    msg: `${issueId} — post-merge verification` },
+    const mMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string; ttsPriority?: number }> = {
+      queued:    { level: 'info',    msg: `${issueId} — queued for merge`, tts: `${issueId} queued for merge`, ttsPriority: 2 },
+      merging:   { level: 'info',    msg: `${issueId} — merge in progress`, tts: `${issueId} merge in progress`, ttsPriority: 2 },
+      verifying: { level: 'info',    msg: `${issueId} — post-merge verification`, tts: `${issueId} post-merge verification running`, ttsPriority: 2 },
       merged:    { level: 'success', msg: `${issueId} — merged`, tts: `${issueId} merged to main` },
       failed:    { level: 'error',   msg: `${issueId} — merge failed`, tts: `${issueId} merge failed` },
     };
@@ -364,7 +364,7 @@ export function setReviewStatus(
     if (entry) emitActivityEntry({ source: 'ship', level: entry.level, message: entry.msg, details: update.mergeNotes, issueId });
     if (entry?.tts) emitActivityTts({
       utterance: entry.tts,
-      priority: entry.level === 'error' ? 0 : 1,
+      priority: entry.ttsPriority ?? (entry.level === 'error' ? 0 : 1),
       issueId,
       source: 'merge-agent',
       eventType: `mergeStatus.${update.mergeStatus}`,
