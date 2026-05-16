@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { inferCategory, mergeActivitiesById, applyPinWarnings, ActivityPanel } from './ActivityPanel';
 import type { ActivityEntry, TtsEntry } from './ActivityPanel';
 
@@ -34,9 +35,9 @@ vi.mock('../lib/store', () => ({
   useDashboardStore: (selector: (s: typeof dashboardState) => unknown) => selector(dashboardState),
 }));
 
-function renderPanel() {
+function renderPanel(fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => [] })) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
+  vi.stubGlobal('fetch', fetchImpl);
   return render(
     <QueryClientProvider client={client}>
       <ActivityPanel onClose={vi.fn()} />
@@ -116,7 +117,11 @@ describe('ActivityPanel', () => {
       priority: 1,
       issueId: 'PAN-829',
     }];
-    renderPanel();
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      if (input.toString() === '/api/tts/speak') return { ok: true, json: async () => ({ spoken: true, result: 'spoken' }) } as Response;
+      return { ok: true, json: async () => [] } as Response;
+    });
+    renderPanel(fetchMock);
 
     fireEvent.click(screen.getByRole('button', { name: 'TTS' }));
     expect(screen.getByText('PAN-829 is ready to merge')).toBeInTheDocument();
@@ -129,6 +134,26 @@ describe('ActivityPanel', () => {
         body: JSON.stringify({ text: 'PAN-829 is ready to merge' }),
       });
     });
+  });
+
+  it('reports TTS replay no-op responses as errors', async () => {
+    dashboardState.ttsActivity = [{
+      id: 'tts-1',
+      timestamp: new Date().toISOString(),
+      utterance: 'PAN-829 is muted',
+      priority: 1,
+      issueId: 'PAN-829',
+    }];
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      if (input.toString() === '/api/tts/speak') return { ok: true, json: async () => ({ spoken: false, result: 'muted' }) } as Response;
+      return { ok: true, json: async () => [] } as Response;
+    });
+    renderPanel(fetchMock);
+
+    fireEvent.click(screen.getByRole('button', { name: 'TTS' }));
+    fireEvent.click(screen.getByTestId('tts-activity-replay-tts-1'));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to replay TTS: TTS did not speak (muted)'));
   });
 });
 

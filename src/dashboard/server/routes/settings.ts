@@ -35,7 +35,7 @@ import { canUseHarness } from '../../../lib/harness-policy.js';
 import {
   detectProviderEnvConflicts,
 } from '../../../lib/claude-settings-overlay.js';
-import { applyTtsRuntimeSettings } from '../services/tts-runtime-config.js';
+import { refreshTtsRuntimeConfig } from '../services/tts-runtime-config.js';
 import { syncTtsPlaybackWithConfig } from '../services/tts-playback.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -632,7 +632,7 @@ const putSettingsRoute = HttpRouter.add(
           return jsonResponse({ error: validation.errors.join('; ') }, { status: 400 });
         }
         await saveSettingsApi(newSettings);
-        applyTtsRuntimeSettings(newSettings.tts);
+        await refreshTtsRuntimeConfig();
         await syncTtsPlaybackWithConfig();
         return jsonResponse({
           success: true,

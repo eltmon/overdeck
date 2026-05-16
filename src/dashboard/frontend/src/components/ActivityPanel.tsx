@@ -71,10 +71,12 @@ async function replayTtsUtterance(text: string): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
   });
-  if (!res.ok) {
-    const message = await res.text().catch(() => 'TTS daemon unavailable');
-    throw new Error(message || 'TTS daemon unavailable');
-  }
+  const body = await res.json().catch(() => undefined) as { spoken?: unknown; result?: unknown; error?: unknown } | undefined;
+  const error = typeof body?.error === 'string' ? body.error : undefined;
+  const result = typeof body?.result === 'string' ? body.result : undefined;
+
+  if (!res.ok) throw new Error(error || result || 'TTS daemon unavailable');
+  if (body?.spoken !== true) throw new Error(error || (result ? `TTS did not speak (${result})` : 'TTS daemon unavailable'));
 }
 
 function LevelIcon({ level }: { level: ActivityEntry['level'] }) {

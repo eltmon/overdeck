@@ -6,7 +6,6 @@ import {
   getGlobalConfigPath,
   mergeTtsDaemonConfigs,
   type NormalizedTtsDaemonConfig,
-  type TtsDaemonConfig,
   type YamlConfig,
 } from '../../../lib/config-yaml.js';
 
@@ -80,13 +79,6 @@ export function getTtsRuntimeConfig(): NormalizedTtsDaemonConfig {
 
 export function setTtsRuntimeConfig(config: NormalizedTtsDaemonConfig): void {
   currentConfig = cloneTtsConfig(config);
-}
-
-export function applyTtsRuntimeSettings(tts: TtsDaemonConfig | undefined): NormalizedTtsDaemonConfig {
-  if (!tts) return getTtsRuntimeConfig();
-
-  currentConfig = mergeTtsDaemonConfigs({ tts: currentConfig }, { tts });
-  return getTtsRuntimeConfig();
 }
 
 export async function refreshTtsRuntimeConfig(): Promise<NormalizedTtsDaemonConfig> {
