@@ -165,6 +165,32 @@ describe('resolveAndSpeak', () => {
     }));
   });
 
+  it('posts saved voice preview payloads when tts is disabled', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
+
+    await expect(resolveAndSpeak({ text: 'preview', voiceId: 'voice-preset', preview: true }, {
+      config: { ...CONFIG, enabled: false },
+      findVoiceById,
+      fetch: fetchMock,
+    })).resolves.toBe('spoken');
+
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
+      body: JSON.stringify({ text: 'preview', voice: 'Vivian', instruct: 'calm', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
+    }));
+  });
+
+  it('keeps saved voice playback muted when it is not an explicit preview', async () => {
+    const fetchMock = vi.fn();
+
+    await expect(resolveAndSpeak({ text: 'skip', voiceId: 'voice-preset' }, {
+      config: { ...CONFIG, enabled: false },
+      findVoiceById,
+      fetch: fetchMock,
+    })).resolves.toBe('muted');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('truncates utterances to maxChars before posting to the daemon', async () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
 

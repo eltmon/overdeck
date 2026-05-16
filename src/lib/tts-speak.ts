@@ -13,6 +13,7 @@ export interface ResolveAndSpeakOptions {
   issueId?: string;
   priority?: number;
   voiceId?: string;
+  preview?: boolean;
   voice?: string;
   instruct?: string;
   volume?: number;
@@ -156,9 +157,12 @@ export async function resolveAndSpeak(
   const directPayload = buildDirectTtsSpeakPayload(options, text, config);
   if (directPayload) return postSpeakPayload(directPayload, config, deps);
 
-  if (!config.enabled) return 'muted';
-  if (options.source && config.mutedSources.includes(options.source)) return 'muted';
-  if (options.issueId && config.mutedIssues.includes(options.issueId)) return 'muted';
+  const isSavedVoicePreview = options.preview === true && typeof options.voiceId === 'string';
+  if (!isSavedVoicePreview) {
+    if (!config.enabled) return 'muted';
+    if (options.source && config.mutedSources.includes(options.source)) return 'muted';
+    if (options.issueId && config.mutedIssues.includes(options.issueId)) return 'muted';
+  }
 
   const voiceId = resolveVoiceId(options, config).trim();
   if (!voiceId) return 'no-voice';

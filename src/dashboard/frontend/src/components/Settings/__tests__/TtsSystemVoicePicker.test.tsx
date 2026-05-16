@@ -71,6 +71,7 @@ describe('TtsSystemVoicePicker', () => {
         body: JSON.stringify({
           voiceId: 'voice-design',
           text: 'This is the current Panopticon system voice.',
+          preview: true,
         }),
       });
     });

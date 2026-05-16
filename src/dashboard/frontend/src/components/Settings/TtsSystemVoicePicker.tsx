@@ -5,6 +5,15 @@ import type { TtsVoiceListItem } from './SavedVoicesTab';
 
 const TEST_TEXT = 'This is the current Panopticon system voice.';
 
+async function requireTtsSpoken(res: Response, fallback: string): Promise<void> {
+  const body = await res.json().catch(() => undefined) as { spoken?: unknown; result?: unknown; error?: unknown } | undefined;
+  const error = typeof body?.error === 'string' ? body.error : undefined;
+  const result = typeof body?.result === 'string' ? body.result : undefined;
+
+  if (!res.ok) throw new Error(error || result || fallback);
+  if (body?.spoken !== true) throw new Error(error || (result ? `TTS did not speak (${result})` : fallback));
+}
+
 interface TtsSystemVoicePickerProps {
   voices: TtsVoiceListItem[];
   isLoading: boolean;
@@ -19,12 +28,9 @@ async function playVoice(voiceId: string): Promise<void> {
   const res = await fetch('/api/tts/speak', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ voiceId, text: TEST_TEXT }),
+    body: JSON.stringify({ voiceId, text: TEST_TEXT, preview: true }),
   });
-  if (!res.ok) {
-    const message = await res.text().catch(() => 'Failed to play TTS voice');
-    throw new Error(message || 'Failed to play TTS voice');
-  }
+  await requireTtsSpoken(res, 'Failed to play TTS voice');
 }
 
 function kindClass(kind: TtsVoiceListItem['kind']): string {

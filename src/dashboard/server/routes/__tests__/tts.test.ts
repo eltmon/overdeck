@@ -176,6 +176,7 @@ describe('TTS speak route helpers', () => {
       issueId: 'PAN-829',
       priority: 1,
       voiceId: 'voice-1',
+      preview: true,
     })).toEqual({
       text: 'PAN-829 passed review',
       source: 'review-specialist',
@@ -183,6 +184,7 @@ describe('TTS speak route helpers', () => {
       issueId: 'PAN-829',
       priority: 1,
       voiceId: 'voice-1',
+      preview: true,
     });
   });
 
@@ -207,6 +209,7 @@ describe('TTS speak route helpers', () => {
   it('rejects invalid speak payloads', () => {
     expect(parseSpeakTtsInput({ text: '' })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', mode: 'robot' })).toBeUndefined();
+    expect(parseSpeakTtsInput({ text: 'bad', preview: 'yes' })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', volume: 2 })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', embedding: ['x'] })).toBeUndefined();
   });
