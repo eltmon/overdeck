@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-16T23:05:00.000Z",
+  "updated": "2026-05-16T23:09:00.000Z",
   "gitState": {
     "branch": "feature/pan-1052",
-    "sha": "8cb0119d5",
+    "sha": "ba1999366",
     "dirty": true
   },
   "decisions": [
@@ -183,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-3f8f",
-    "itemId": "b1-reset-marker-retrieval-filtering",
+    "beadId": "workspace-ujc0",
+    "itemId": "b1-memory-fts-search",
     "status": "implemented",
-    "note": "Reset markers now persist to JSON and the project FTS database, emit memory.reset_marker_created events, filter search results by project/workspace/issue/session markers at read time, support --include-archived to bypass filtering, and post-merge lifecycle creates workspace-scoped markers. Focused tests, full suite, lint, typecheck, and graphify update passed."
+    "note": "Memory FTS search now builds safe quoted MATCH queries, queries the project-scoped memory_fts table, returns metadata plus raw BM25, overfetches limit*3 before tag filtering, and applies reset_markers by project/workspace/issue/session unless includeArchived is set. Focused tests, full suite, lint, typecheck, and graphify update passed."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -363,6 +363,12 @@
       "timestamp": "2026-05-16T23:05:00.000Z",
       "reason": "work",
       "note": "workspace-3f8f implemented: reset markers are written to reset-markers.json and reset_markers FTS DB table, memory.reset_marker_created is emitted, searchMemory filters by project/workspace/issue/session markers unless includeArchived is set, pan memory search exposes --include-archived, and postMergeLifecycle creates workspace-scoped markers.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T23:09:00.000Z",
+      "reason": "work",
+      "note": "workspace-ujc0 implemented: added src/lib/memory/search.ts FTS search with safe quoted MATCH query construction, project/workspace/issue predicates, reset marker filtering, includeArchived bypass, limit*3 overfetch before tag filtering, BM25 metadata hits, and tests/lib/memory/search.test.ts coverage.",
       "agentModel": "gpt-5.5"
     }
   ],
