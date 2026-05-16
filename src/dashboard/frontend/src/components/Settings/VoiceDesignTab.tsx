@@ -95,7 +95,7 @@ export function VoiceDesignTab() {
   };
 
   return (
-    <div className="mt-6 rounded-xl border border-border/70 bg-card/40 p-4" data-testid="tts-voice-design-tab">
+    <div className="rounded-b-xl border border-t-0 border-border/70 bg-card/40 p-4" data-testid="tts-voice-design-tab">
       <div className="mb-4">
         <h3 className="text-sm font-semibold text-foreground">VoiceDesign</h3>
         <p className="mt-1 text-xs text-muted-foreground">

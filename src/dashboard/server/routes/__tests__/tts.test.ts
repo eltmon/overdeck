@@ -137,12 +137,14 @@ describe('TTS speak route helpers', () => {
       text: 'preview voice',
       voice: 'Vivian',
       instruct: 'calm',
+      volume: 0.4,
       mode: 'custom',
       embedding: [0.1, 0.2],
     })).toEqual({
       text: 'preview voice',
       voice: 'Vivian',
       instruct: 'calm',
+      volume: 0.4,
       mode: 'custom',
       embedding: [0.1, 0.2],
     });
@@ -151,6 +153,7 @@ describe('TTS speak route helpers', () => {
   it('rejects invalid speak payloads', () => {
     expect(parseSpeakTtsInput({ text: '' })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', mode: 'robot' })).toBeUndefined();
+    expect(parseSpeakTtsInput({ text: 'bad', volume: 2 })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', embedding: ['x'] })).toBeUndefined();
   });
 

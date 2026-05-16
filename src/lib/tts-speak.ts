@@ -15,6 +15,7 @@ export interface ResolveAndSpeakOptions {
   voiceId?: string;
   voice?: string;
   instruct?: string;
+  volume?: number;
   mode?: TtsSpeakMode;
   embedding?: number[];
 }
@@ -91,7 +92,7 @@ function buildDirectTtsSpeakPayload(
     text,
     voice: options.voice,
     instruct: options.instruct || '',
-    volume: config.volume,
+    volume: options.volume ?? config.volume,
     mode: options.mode || 'custom',
     embedding: options.embedding,
   };

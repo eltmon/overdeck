@@ -185,7 +185,7 @@ describe('resolveAndSpeak', () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
     const findVoice = vi.fn();
 
-    await expect(resolveAndSpeak({ text: 'preview', voice: 'warm narrator', instruct: 'clear', mode: 'design' }, {
+    await expect(resolveAndSpeak({ text: 'preview', voice: 'warm narrator', instruct: 'clear', volume: 0.4, mode: 'design' }, {
       config: CONFIG,
       findVoiceById: findVoice,
       fetch: fetchMock,
@@ -193,7 +193,7 @@ describe('resolveAndSpeak', () => {
 
     expect(findVoice).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', expect.objectContaining({
-      body: JSON.stringify({ text: 'preview', voice: 'warm narrator', instruct: 'clear', volume: 0.8, mode: 'design' }),
+      body: JSON.stringify({ text: 'preview', voice: 'warm narrator', instruct: 'clear', volume: 0.4, mode: 'design' }),
     }));
   });
 });

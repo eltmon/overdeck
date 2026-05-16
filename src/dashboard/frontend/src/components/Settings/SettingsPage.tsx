@@ -41,6 +41,7 @@ import { WorkhorsePanel } from './WorkhorsePanel';
 import { RolesPanel } from './RolesPanel';
 import { SavedVoicesTab } from './SavedVoicesTab';
 import { VoiceDesignTab } from './VoiceDesignTab';
+import { VoicePresetsTab } from './VoicePresetsTab';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
 // PAN-1055: drop the cached available-models response when Settings is saved
 // so subsequent picker renders see the new provider/keys mix immediately.
@@ -309,6 +310,7 @@ export function SettingsPage() {
     hasAnthropicApiKey: boolean;
   } | null>(null);
   const [activeSection, setActiveSection] = useState('model-routing');
+  const [activeTtsVoiceTab, setActiveTtsVoiceTab] = useState<'presets' | 'design'>('presets');
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
 
   const scrollToSection = useCallback((id: string) => {
@@ -1295,7 +1297,33 @@ export function SettingsPage() {
           </button>
         </SettingsRow>
 
-        <VoiceDesignTab />
+        <div className="mt-6" data-testid="tts-voice-library-tabs">
+          <div className="rounded-t-xl border border-border/70 bg-card/40 p-2">
+            <div className="inline-flex rounded-lg bg-background/60 p-1">
+              {([
+                ['presets', 'CustomVoice Presets'],
+                ['design', 'VoiceDesign'],
+              ] as const).map(([tabId, label]) => (
+                <button
+                  key={tabId}
+                  type="button"
+                  onClick={() => setActiveTtsVoiceTab(tabId)}
+                  aria-pressed={activeTtsVoiceTab === tabId}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    activeTtsVoiceTab === tabId
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-popover'
+                  }`}
+                  data-testid={`tts-voice-library-tab-${tabId}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {activeTtsVoiceTab === 'presets' ? <VoicePresetsTab /> : <VoiceDesignTab />}
+        </div>
+
         <SavedVoicesTab />
 
         <div className="mt-6 rounded-xl border border-border/70 bg-card/40 p-4" data-testid="tts-advanced-settings">

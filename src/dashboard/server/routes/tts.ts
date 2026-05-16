@@ -156,6 +156,10 @@ export function parseSpeakTtsInput(body: unknown): ResolveAndSpeakOptions | unde
   if (typeof record.voiceId === 'string') input.voiceId = record.voiceId;
   if (typeof record.voice === 'string') input.voice = record.voice;
   if (typeof record.instruct === 'string') input.instruct = record.instruct;
+  if (record.volume !== undefined) {
+    if (typeof record.volume !== 'number' || record.volume < 0 || record.volume > 1) return undefined;
+    input.volume = record.volume;
+  }
   if (mode) input.mode = mode;
   if (record.embedding !== undefined) {
     if (!Array.isArray(record.embedding) || !record.embedding.every((value) => typeof value === 'number')) return undefined;
