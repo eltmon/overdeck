@@ -1,6 +1,6 @@
 ---
 name: pan-tts
-description: Optional local text-to-speech sidecar that speaks Panopticon activity log entries through Qwen3-TTS (or any local TTS engine). Subscribes to the public /events/stream SSE feed; no pan-core dependency. Also exposes an ad-hoc speak helper (scripts/say.sh) so agents can announce one-off messages on demand.
+description: Built-in dashboard text-to-speech playback plus optional external sidecar support through Qwen3-TTS (or any local TTS engine). The dashboard speaks activity.tts events directly when tts.enabled=true; the SSE sidecar remains optional for external TTS on another machine. Also exposes an ad-hoc speak helper (scripts/say.sh) so agents can announce one-off messages on demand.
 triggers:
   - pan tts
   - panopticon tts
@@ -15,33 +15,41 @@ allowed-tools:
   - Write
 ---
 
-# pan-tts — Panopticon Activity TTS Sidecar
+# pan-tts — Panopticon Activity TTS
 
-**Status: reference sidecar for the External Event Stream (spec stage).** Enable once the `/events/stream` endpoint has shipped.
+**Status: built into the dashboard when `tts.enabled=true`; external sidecar optional.**
 
 ## What It Is
 
-`pan-tts` is an **optional** local sidecar that subscribes to Panopticon's public SSE feed, filters for `activity.entry` events, and speaks the message aloud using a local text-to-speech engine. It runs as its own process — nothing inside pan depends on it, and pan users who do not want audio notifications will never know it exists.
+Panopticon has built-in dashboard TTS playback for `activity.tts` events when `tts.enabled=true` in `~/.panopticon/config.yaml`. The dashboard server resolves the configured voice and POSTs directly to the local Qwen3-TTS daemon, so no external subscriber is needed for the normal local-dashboard path.
 
-The TTS pipeline is split into two independent components:
+`pan-tts` remains an **optional** external sidecar for users who want SSE-based TTS on a different machine or want to consume Panopticon's public event stream independently.
 
-1. **Qwen3-TTS HTTP daemon** (`skills/pan-tts/scripts/tts_daemon.py`) — keeps the 1.7B model resident in VRAM, synthesizes speech on demand via `POST /speak`, and plays audio through the default PipeWire sink. This is the component that actually drives the speaker.
-2. **SSE subscriber** (`~/Projects/pan-tts/`) — connects to Panopticon's `/events/stream`, formats condensed utterances, and forwards them to the daemon. This is the component that decides *what* to speak.
+The TTS pipeline has three independent components:
+
+1. **Dashboard playback service** — subscribes to internal `activity.tts` events, resolves `tts.voice` / `tts.statusVoice` / `tts.voiceMap`, and forwards utterances to the daemon when dashboard TTS is enabled.
+2. **Qwen3-TTS HTTP daemon** (`skills/pan-tts/scripts/tts_daemon.py`) — keeps the 1.7B model resident in VRAM, synthesizes speech on demand via `POST /speak`, and plays audio through the default PipeWire sink. This is the component that actually drives the speaker.
+3. **Optional SSE subscriber** (`~/Projects/pan-tts/`) — connects to Panopticon's `/events/stream`, formats condensed utterances, and forwards them to the daemon for external playback.
 
 ## Architecture
 
 ```
-pan dashboard            pan-tts subscriber          qwen-tts daemon            audio out
-─────────────────        ───────────────────         ─────────────────          ─────────
-/events/stream ──SSE──▶  filter activity.entry  ──▶  POST /speak  ──▶         PipeWire
-                         dedupe by sequence          synthesize (GPU)
-                         priority queue              persistent pw-play stream
+pan dashboard                  qwen-tts daemon            audio out
+────────────────────────       ─────────────────          ─────────
+activity.tts ──▶ resolve voice ──▶ POST /speak ──▶         PipeWire
+                 mute/filter      synthesize (GPU)
+                 priority voice   persistent pw-play stream
+
+Optional external path:
+
+/events/stream ──SSE──▶ pan-tts subscriber ──▶ POST /speak ──▶ PipeWire
 ```
 
-### Why two components?
+### Why keep the sidecar?
 
+- The dashboard path is the default local playback path when `tts.enabled=true`.
 - The GPU daemon is expensive to start (model load ~10s) and must stay resident.
-- The subscriber is cheap to restart and can be swapped for a different consumer (Discord bot, desktop notification, etc.) without touching the GPU runtime.
+- The optional subscriber is cheap to restart and can run on another machine without touching the dashboard server.
 - The `/speak` contract is simple HTTP; anything that can POST JSON can use the daemon.
 
 ## Qwen3-TTS HTTP Daemon
@@ -89,7 +97,7 @@ endpoint: http://127.0.0.1:3000/events/stream
 token: ${PANOPTICON_EVENTS_TOKEN}   # optional, only if pan has the token set
 
 filters:
-  types: [activity.entry]
+  types: [activity.tts]
   sources: [merge-agent, cloister, review-specialist, test-specialist]
   # issueId: PAN-537  # uncomment to focus on one issue
 
@@ -144,28 +152,29 @@ The skill also bundles `scripts/say.sh` for one-off utterances that bypass Panop
 
 The script POSTs to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (override via `QWEN_TTS_ENDPOINT`). It waits for the daemon to acknowledge the request (up to 5 s); audio then plays asynchronously in the daemon's worker thread. Keep utterances short (under ~200 characters); the daemon's queue caps at 6.
 
-Use ad-hoc speak sparingly — the dashboard or SSE-subscribed sidecar already speaks activity entries. Ad-hoc speak is for:
+Use ad-hoc speak sparingly — the built-in dashboard playback service or optional SSE sidecar already speaks activity TTS events. Ad-hoc speak is for:
 - Announcements that don't warrant a dashboard activity entry (local test runs, meta-commentary)
 - Pulling the user's attention during long-running work
 - Testing the audio path after a restart
 
 ## Verifying It
 
-1. `pan up` — start the dashboard.
-2. Start the Qwen3-TTS daemon: `cd skills/pan-tts/scripts && python tts_daemon.py`
-3. Start the sidecar: `systemctl --user start pan-tts`
-4. `journalctl --user -u pan-tts -f` — watch logs.
-5. In another terminal: `pan start PAN-XXX` and listen. You should hear the merge agent, review specialist, etc. as they post activity entries.
+1. Start the Qwen3-TTS daemon: `cd skills/pan-tts/scripts && python tts_daemon.py`.
+2. Set `tts.enabled: true` and a default voice in `~/.panopticon/config.yaml`.
+3. `pan up` — start the dashboard.
+4. In another terminal: `pan start PAN-XXX` and listen. You should hear dashboard-emitted `activity.tts` events.
+5. Optional external sidecar path: start `pan-tts` and watch `journalctl --user -u pan-tts -f`.
 
 If nothing speaks:
 
-- Check `curl -N http://127.0.0.1:3000/events/stream?types=activity.entry` directly. If that is empty, the issue is pan-side (endpoint or event emission).
-- Check `~/.pan-tts/state.json` — if `last_sequence` is advancing but no audio, the issue is in the TTS engine.
+- Check the dashboard TTS badge and `GET /api/tts/health` to confirm the daemon is reachable.
+- Check that `tts.voice` points at an existing voice in `~/.panopticon/tts-voices.json`.
+- For the optional sidecar path, check `curl -N http://127.0.0.1:3000/events/stream?types=activity.tts` directly.
 - Check `aplay -l` — make sure the default audio device is reachable from the user session.
 
 ## Do Not
 
-- **Do not** make pan core depend on this. No import, no config key, no menu item, no health check. The sidecar must be strictly additive.
+- **Do not** make the external sidecar required for local dashboard playback. It must remain strictly additive.
 - **Do not** speak `details` text or full agent stdout — utterances must be short, human-friendly, and interruptible.
 - **Do not** re-emit TTS events back into pan. The feed is one-way.
 

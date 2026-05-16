@@ -12,6 +12,7 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
+import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
 import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
@@ -267,6 +268,7 @@ console.log('[panopticon] Attachment cleanup started');
 
 // Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
 void startTtsSummarizer().catch(err => console.warn('[tts-summarizer] start failed:', err));
+void startTtsPlayback().catch(err => console.warn('[tts-playback] start failed:', err));
 
 // Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
 startCliproxyWatchdog();
@@ -294,6 +296,7 @@ process.once('SIGTERM', () => {
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
+  stopTtsPlayback();
 });
 process.once('SIGINT', () => {
   emitShutdownActivity();
@@ -301,6 +304,7 @@ process.once('SIGINT', () => {
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
+  stopTtsPlayback();
 });
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
