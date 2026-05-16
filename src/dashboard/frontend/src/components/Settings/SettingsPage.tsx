@@ -40,6 +40,7 @@ import { DesktopSettingsSection } from './DesktopSettingsSection';
 import { WorkhorsePanel } from './WorkhorsePanel';
 import { RolesPanel } from './RolesPanel';
 import { SavedVoicesTab } from './SavedVoicesTab';
+import { VoiceDesignTab } from './VoiceDesignTab';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
 // PAN-1055: drop the cached available-models response when Settings is saved
 // so subsequent picker renders see the new provider/keys mix immediately.
@@ -1294,6 +1295,7 @@ export function SettingsPage() {
           </button>
         </SettingsRow>
 
+        <VoiceDesignTab />
         <SavedVoicesTab />
 
         <div className="mt-6 rounded-xl border border-border/70 bg-card/40 p-4" data-testid="tts-advanced-settings">
