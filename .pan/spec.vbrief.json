@@ -13,7 +13,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 1,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-16T22:05:00.000Z",
+    "updated": "2026-05-16T22:17:35.204Z",
     "references": [
       { "uri": "https://github.com/eltmon/panopticon-cli/issues/1140", "label": "PAN-1140", "type": "issue" },
       { "uri": "infra/.devcontainer-template/docker-compose.devcontainer.yml.template", "label": "compose template", "type": "code" },
@@ -56,7 +56,7 @@
       {
         "id": "fix-init-script",
         "title": "Fix workspace init container so bun install + builds succeed (exit 0)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -72,31 +72,31 @@
           {
             "id": "fix-init-script.ac1",
             "title": "Init container in a fresh workspace exits 0 within 5 minutes of `docker compose ... up -d --build` (verified in this workspace's own stack as the acceptance target).",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "fix-init-script.ac2",
             "title": "Frontend and server containers transition from `Created` to `Up` (Running) after init succeeds, confirmed via `docker compose ps`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "fix-init-script.ac3",
             "title": "Template file (`infra/.devcontainer-template/docker-compose.devcontainer.yml.template`) and the rendered workspace copy both reflect the fix; no $HOME/.panopticon mount appears on the server service; PANOPTICON_DISABLE_DEACON=1 remains set on the server service.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "fix-init-script.ac4",
             "title": "Init logs no longer show `husky: command not found` or `tsdown: command not found`; `bun install` resolves significantly more than 22 packages (devDeps included).",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "fix-init-script.ac5",
             "title": "Host-side `bun install` in the worktree still works after the change (verified by running it and confirming the husky git hooks installed correctly on the host).",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
