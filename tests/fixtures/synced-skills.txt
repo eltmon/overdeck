@@ -64,6 +64,7 @@ pan-sync
 pan-sync-main
 pan-tell
 pan-test-config
+pan-tldr
 pan-tts
 pan-up
 pan-wipe

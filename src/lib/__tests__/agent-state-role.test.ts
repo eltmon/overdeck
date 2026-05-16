@@ -139,7 +139,7 @@ describe('AgentState role persistence', () => {
     });
   });
 
-  it('infers role from agent ID suffix when state.json has no role field', async () => {
+  it('rejects legacy state.json files with no role field', async () => {
     const { getAgentState } = await import('../agents.js');
     const dir = join(tempHome, 'agents', 'agent-pan-legacy');
     mkdirSync(dir, { recursive: true });
@@ -153,8 +153,7 @@ describe('AgentState role persistence', () => {
     }));
 
     const state = getAgentState('agent-pan-legacy');
-    expect(state).not.toBeNull();
-    expect(state!.role).toBe('work');
+    expect(state).toBeNull();
   });
 
   it('drops legacy agent state directories missing role during startup scan', async () => {

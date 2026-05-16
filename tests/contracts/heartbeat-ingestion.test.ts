@@ -11,7 +11,7 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { DomainEvent } from '@panctl/contracts'
-import { bodyToEvent } from '../../src/dashboard/server/routes/agents'
+import { bodyToEvent } from '../../src/dashboard/server/services/agent-event-utils'
 
 const AGENT = 'agent-800'
 const TS = '2026-04-22T06:00:00.000Z'
