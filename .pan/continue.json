@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1111",
   "created": "2026-05-15T05:33:19.125Z",
-  "updated": "2026-05-16T04:18:00.696Z",
+  "updated": "2026-05-16T04:19:58.235Z",
   "gitState": {
     "branch": "feature/pan-1111",
     "sha": "c75c7b2bf",
@@ -159,6 +159,11 @@
     },
     {
       "timestamp": "2026-05-16T04:18:00.696Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-16T04:19:58.235Z",
       "reason": "end",
       "note": "Agent signaled work complete"
     }
