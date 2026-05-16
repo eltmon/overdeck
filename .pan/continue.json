@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-16T21:12:00.000Z",
+  "updated": "2026-05-16T21:24:00.000Z",
   "gitState": {
     "branch": "feature/pan-1052",
     "sha": "be3e598b4",
@@ -183,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-jeym",
-    "itemId": "b1-workspace-status-card",
+    "beadId": "workspace-hxxs",
+    "itemId": "b1-activity-feed-sidebar",
     "status": "implemented",
-    "note": "WorkspaceStatusCard renders phase icon/color, headline, 3-line-clamped summary, latest 3 actionStatus observations, stats footer, stale indicator, and overview-tab click behavior; focused frontend tests, lint, and typecheck passed. Full app browser harness was blocked by unrelated shell mock failures before the Command Deck card could render."
+    "note": "ActivityFeedSidebar selects memory observations from the Zustand store with a stable selector, filters non-null actionStatus entries, buckets them with the shared time-bucket helper, skips empty headers, renders actionStatus plus workspace/issue label and relative time, and is wired into the Command Deck activity tab. Focused tests, lint, typecheck, and a Playwright browser smoke check passed."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -291,6 +291,12 @@
       "timestamp": "2026-05-16T21:12:00.000Z",
       "reason": "work",
       "note": "workspace-jeym implemented: added WorkspaceStatusCard, wired it into the Command Deck overview from memory status/observations plus PR/workspace stats, and verified focused frontend tests, lint, and typecheck. Isolated full-app browser mocking failed in the app shell before card render, so no browser pass was claimed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T21:24:00.000Z",
+      "reason": "work",
+      "note": "workspace-hxxs implemented: added ActivityFeedSidebar, wired it into the Command Deck activity tab, and verified filtering, bucket headers, item labels, selector stability, lint, typecheck, and browser smoke coverage.",
       "agentModel": "gpt-5.5"
     }
   ],
