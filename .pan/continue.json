@@ -183,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-gdn4",
-    "itemId": "b1-memory-store-slices",
+    "beadId": "workspace-ocgu",
+    "itemId": "b1-realtime-memory-sidebar",
     "status": "implemented",
-    "note": "Memory observations, status, reset markers, rollups, and health now live as typed shared read-model slices consumed by the Zustand store; observations are capped at the configurable rolling window default of 50 per issue."
+    "note": "GodView activity feed now derives memory observations from the event-sourced Zustand store, renders fresh entries with the shared just-now formatter, and uses a bounded 2s/3min snapshot fallback during initial WebSocket bootstrap."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -279,6 +279,12 @@
       "timestamp": "2026-05-16T20:46:13.542Z",
       "reason": "work",
       "note": "workspace-gdn4 implemented: promoted memory projection to typed shared slices, added frontend selectors, capped observations at PANOPTICON_MEMORY_OBSERVATION_LIMIT/default 50, and verified focused tests, lint, and typecheck.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T20:56:59.004Z",
+      "reason": "work",
+      "note": "workspace-ocgu implemented: MemoryObservationCreatedEvent reaches GodView activity through the existing RPC/Zustand path, the initial-load fallback poller is bounded to 2s for 3 minutes, focused frontend/unit tests, lint, typecheck, and a browser check passed.",
       "agentModel": "gpt-5.5"
     }
   ],

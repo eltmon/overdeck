@@ -19,6 +19,9 @@ import { WS_METHODS } from '@panctl/contracts'
 import { Stream } from 'effect'
 import { loadSnapshotFromCache } from '../lib/snapshotCache'
 
+const SNAPSHOT_FALLBACK_INTERVAL_MS = 2_000
+const SNAPSHOT_FALLBACK_WINDOW_MS = 3 * 60_000
+
 // ─── EventRouter component ────────────────────────────────────────────────────
 
 export function EventRouter() {
@@ -32,6 +35,29 @@ export function EventRouter() {
     const transport = getTransport()
     const coordinator = createRecoveryCoordinator()
     recovery.current = coordinator
+    let bootstrapInFlight = false
+    let bootstrapComplete = false
+    let fallbackInterval: ReturnType<typeof setInterval> | null = null
+    let fallbackTimeout: ReturnType<typeof setTimeout> | null = null
+
+    function stopFallbackPoller() {
+      if (fallbackInterval) clearInterval(fallbackInterval)
+      if (fallbackTimeout) clearTimeout(fallbackTimeout)
+      fallbackInterval = null
+      fallbackTimeout = null
+    }
+
+    function startFallbackPoller() {
+      stopFallbackPoller()
+      fallbackInterval = setInterval(() => {
+        if (bootstrapComplete) {
+          stopFallbackPoller()
+          return
+        }
+        bootstrap().catch(console.error)
+      }, SNAPSHOT_FALLBACK_INTERVAL_MS)
+      fallbackTimeout = setTimeout(stopFallbackPoller, SNAPSHOT_FALLBACK_WINDOW_MS)
+    }
 
     // ── Instant render: load from localStorage cache ─────────────────────────
     const cached = loadSnapshotFromCache()
@@ -41,12 +67,16 @@ export function EventRouter() {
 
     // ── Bootstrap: fetch initial snapshot ───────────────────────────────────
     async function bootstrap() {
+      if (bootstrapInFlight) return
+      bootstrapInFlight = true
       coordinator.beginSnapshotRecovery('bootstrap')
       try {
         const snapshot = await transport.request((client) =>
           (client as PanRpcProtocolClient)[WS_METHODS.getSnapshot]({}),
         ) as DashboardSnapshot
         syncSnapshot(snapshot)
+        bootstrapComplete = true
+        stopFallbackPoller()
         const needsReplay = coordinator.completeSnapshotRecovery(snapshot.sequence)
         if (needsReplay) {
           await replay(snapshot.sequence)
@@ -54,8 +84,8 @@ export function EventRouter() {
       } catch (err) {
         console.error('[EventRouter] bootstrap failed:', err)
         coordinator.failRecovery()
-        // Retry after delay
-        setTimeout(bootstrap, 2000)
+      } finally {
+        bootstrapInFlight = false
       }
     }
 
@@ -136,8 +166,10 @@ export function EventRouter() {
     )
 
     bootstrap()
+    startFallbackPoller()
 
     return () => {
+      stopFallbackPoller()
       unsubscribe()
     }
   }, [syncSnapshot, applyEvents])

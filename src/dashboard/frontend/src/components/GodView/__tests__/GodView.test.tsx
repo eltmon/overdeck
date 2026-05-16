@@ -65,6 +65,40 @@ describe('GodView selectors', () => {
     expect(selectGodViewActivityFeed({ recentActivity: events })).toEqual(events);
   });
 
+  it('selectGodViewActivityFeed includes memory observations in timestamp order', () => {
+    const state = {
+      recentActivity: [{ agentId: 'a', timestamp: '2026-05-16T20:00:00.000Z', type: 'x', message: 'older' }],
+      observationsByIssueId: {
+        'PAN-1052': [{
+          id: 'obs-1',
+          timestamp: '2026-05-16T20:01:00.000Z',
+          projectId: 'panopticon-cli',
+          workspaceId: 'feature-pan-1052',
+          issueId: 'PAN-1052',
+          runId: 'run-1',
+          sessionId: 'session-1',
+          agentRole: 'work',
+          agentHarness: 'claude-code',
+          gitBranch: 'feature/pan-1052',
+          sourceTranscriptOffset: 1,
+          actionStatus: 'Wired memory observation stream',
+          narrative: 'Memory observation events update the sidebar feed.',
+          summary: 'Memory observation stream updates sidebar.',
+          files: [],
+          tags: [],
+          tokens: { prompt: 1, completion: 1, total: 2 },
+          model: 'stub-model',
+        }],
+      },
+    } as const;
+
+    expect(selectGodViewActivityFeed(state)[0]).toMatchObject({
+      agentId: 'feature-pan-1052',
+      issueId: 'PAN-1052',
+      message: 'Wired memory observation stream',
+    });
+  });
+
   it('selectIssueActivityFeed filters to the matching issueId', () => {
     const events = [
       { agentId: 'agent-pan-866', issueId: 'PAN-866', timestamp: 'T1', type: 'x', message: 'match' },
