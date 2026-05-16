@@ -1,7 +1,7 @@
-import { mkdir, readFile, writeFile } from 'fs/promises';
-import { dirname, join } from 'path';
+import { readFile, writeFile } from 'fs/promises';
+import { join } from 'path';
 import type { MemoryIdentity } from '@panctl/contracts';
-import { getPanopticonHome } from '../paths.js';
+import { ensureParentDir, resolveIssueMemoryRoot } from './paths.js';
 
 export type MemoryHealthStatus = 'healthy' | 'degraded' | 'failing';
 
@@ -48,12 +48,12 @@ export async function updateMemoryHealth(identity: MemoryIdentity, update: Memor
         },
   };
 
-  await mkdir(dirname(path), { recursive: true });
+  await ensureParentDir(path);
   await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
 }
 
 export function getMemoryHealthPath(identity: Pick<MemoryIdentity, 'projectId' | 'issueId'>): string {
-  return join(getPanopticonHome(), 'memory', identity.projectId, identity.issueId, 'health.json');
+  return join(resolveIssueMemoryRoot(identity.projectId, identity.issueId), 'health.json');
 }
 
 async function readMemoryHealth(path: string): Promise<MemoryHealthSnapshot> {

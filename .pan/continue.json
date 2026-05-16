@@ -179,10 +179,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-4x4b",
-    "itemId": "b1-query-expansion",
+    "beadId": "workspace-e52q",
+    "itemId": "b1-storage-paths",
     "status": "implemented",
-    "note": "Query expansion now turns user prompts plus the last three observations into normalized BM25 terms through the configured provider policy, caches results by session/content hash, falls back to the raw prompt on failures, logs query-expansion decisions to rag-runs, and passes focused tests/typecheck/lint."
+    "note": "Memory storage path resolvers now centralize project, issue, observations, pending, status, archive, summaries, rag-runs, checkpoint, and FTS DB paths under PANOPTICON_HOME, with separate idempotent directory helpers and focused unit coverage."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -245,6 +245,12 @@
       "timestamp": "2026-05-16T20:26:00.000Z",
       "reason": "work",
       "note": "workspace-4x4b implemented: added src/lib/memory/query-expansion.ts with provider-policy BM25 query expansion, session/content-hash cache, raw prompt fallback, rag-runs JSONL telemetry, and tests/lib/memory/query-expansion.test.ts; focused tests, typecheck, and lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T20:29:00.000Z",
+      "reason": "work",
+      "note": "workspace-e52q implemented: added src/lib/memory/paths.ts shared storage path resolvers, separate async directory helpers, tests/lib/memory/paths.test.ts coverage, and refactored memory health/query-expansion path usage; focused tests, typecheck, and lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],

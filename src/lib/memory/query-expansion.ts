@@ -1,9 +1,8 @@
 import { createHash, randomUUID } from 'crypto';
-import { mkdir, appendFile } from 'fs/promises';
-import { dirname, join } from 'path';
+import { appendFile } from 'fs/promises';
 import { Result, Schema } from 'effect';
 import type { MemoryIdentity, MemoryObservation } from '@panctl/contracts';
-import { getPanopticonHome } from '../paths.js';
+import { ensureParentDir, resolveRagRunsFile } from './paths.js';
 import {
   extractWithProviderPolicy,
   type MemoryExtractionPolicyResult,
@@ -198,11 +197,7 @@ function normalizeTerms(terms: readonly string[]): string[] {
   return normalized;
 }
 
-function resolveRagRunsFile(projectId: string, issueId: string, timestamp: string): string {
-  return join(getPanopticonHome(), 'memory', projectId, issueId, 'rag-runs', `${timestamp.slice(0, 10)}.jsonl`);
-}
-
 async function appendJsonl(filePath: string, entry: QueryExpansionLogEntry): Promise<void> {
-  await mkdir(dirname(filePath), { recursive: true });
+  await ensureParentDir(filePath);
   await appendFile(filePath, `${JSON.stringify(entry)}\n`, 'utf8');
 }
