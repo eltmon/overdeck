@@ -17,6 +17,15 @@ interface SaveDesignVoiceInput {
   instruct: string;
 }
 
+interface ExtractEmbeddingInput {
+  design: string;
+  text: string;
+}
+
+interface SaveCloneVoiceInput extends SaveDesignVoiceInput {
+  embedding: number[];
+}
+
 async function previewDesignVoice(input: PreviewDesignVoiceInput): Promise<void> {
   const res = await fetch('/api/tts/speak', {
     method: 'POST',
@@ -51,6 +60,41 @@ async function saveDesignVoice(input: SaveDesignVoiceInput): Promise<void> {
   }
 }
 
+async function extractEmbedding(input: ExtractEmbeddingInput): Promise<number[]> {
+  const res = await fetch('/api/tts/extract-embedding', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const message = await res.text().catch(() => 'Failed to extract speaker embedding');
+    throw new Error(message || 'Failed to extract speaker embedding');
+  }
+  const data = await res.json() as { embedding?: unknown };
+  if (!Array.isArray(data.embedding) || data.embedding.length === 0 || !data.embedding.every((value) => typeof value === 'number')) {
+    throw new Error('TTS daemon returned an invalid speaker embedding');
+  }
+  return data.embedding;
+}
+
+async function saveCloneVoice(input: SaveCloneVoiceInput): Promise<void> {
+  const res = await fetch('/api/tts/voices', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: input.name,
+      kind: 'clone',
+      description: input.description,
+      instruct: input.instruct,
+      embedding: input.embedding,
+    }),
+  });
+  if (!res.ok) {
+    const message = await res.text().catch(() => 'Failed to save cloned voice');
+    throw new Error(message || 'Failed to save cloned voice');
+  }
+}
+
 export function VoiceDesignTab() {
   const queryClient = useQueryClient();
   const [description, setDescription] = useState('A calm, measured female voice with a subtle synthetic quality');
@@ -74,6 +118,27 @@ export function VoiceDesignTab() {
     onError: (error: Error) => toast.error(`Failed to save design voice: ${error.message}`),
   });
 
+  const cloneMutation = useMutation({
+    mutationFn: async (input: ExtractEmbeddingInput & { description: string; instruct: string }) => {
+      const embedding = await extractEmbedding({ design: input.design, text: input.text });
+      const name = window.prompt('Name this cloned voice');
+      if (!name?.trim()) return false;
+      await saveCloneVoice({
+        name: name.trim(),
+        description: input.description,
+        instruct: input.instruct,
+        embedding,
+      });
+      return true;
+    },
+    onSuccess: async (saved) => {
+      if (!saved) return;
+      await queryClient.invalidateQueries({ queryKey: ['tts-voices'] });
+      toast.success('Cloned voice saved');
+    },
+    onError: (error: Error) => toast.error(`Failed to clone exact voice: ${error.message}`),
+  });
+
   const handlePreview = () => {
     if (!canSubmit) return;
     previewMutation.mutate({
@@ -90,6 +155,17 @@ export function VoiceDesignTab() {
     saveMutation.mutate({
       name: name.trim(),
       description: description.trim(),
+      instruct: instruct.trim(),
+    });
+  };
+
+  const handleClone = () => {
+    if (!canSubmit) return;
+    const trimmedDescription = description.trim();
+    cloneMutation.mutate({
+      design: trimmedDescription,
+      text: testText.trim(),
+      description: trimmedDescription,
       instruct: instruct.trim(),
     });
   };
@@ -161,6 +237,21 @@ export function VoiceDesignTab() {
           {saveMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
           Save This Design…
         </button>
+        <button
+          type="button"
+          onClick={handleClone}
+          disabled={!canSubmit || cloneMutation.isPending}
+          className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-popover hover:text-foreground disabled:opacity-50"
+          data-testid="tts-design-clone"
+        >
+          {cloneMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+          Clone to Exact Voice…
+        </button>
+        {cloneMutation.isPending && (
+          <span className="text-xs text-muted-foreground" data-testid="tts-design-clone-loading">
+            Extracting speaker embedding... this takes ~30s
+          </span>
+        )}
       </div>
     </div>
   );
