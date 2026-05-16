@@ -11,12 +11,13 @@
  * emit an in-memory-only event via emitOnly().
  */
 
-import { Effect } from 'effect';
-import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { Effect, Layer } from 'effect';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { getEventStore } from '../event-store.js';
 import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
+import { isSubagentHookPayload } from '../../../lib/memory/subagent-filter.js';
 
 const CLEAR_ON = new Set([
   'PostToolUse',
@@ -25,6 +26,32 @@ const CLEAR_ON = new Set([
   'StopFailure',
   'PermissionDenied',
 ])
+
+export function memoryTurnHookResponse(body: unknown): typeof HttpServerResponse.Type | null {
+  if (!isSubagentHookPayload(body)) return null;
+  return HttpServerResponse.text('', { status: 204 });
+}
+
+const postMemoryTurnRoute = HttpRouter.add(
+  'POST',
+  '/api/memory/turn',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const rawBody = yield* request.text;
+
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
+    }
+
+    const subagentResponse = memoryTurnHookResponse(body);
+    if (subagentResponse) return subagentResponse;
+
+    return jsonResponse({ ok: true }, { status: 202 });
+  })),
+);
 
 const postPermissionEventRoute = HttpRouter.add(
   'POST',
@@ -72,4 +99,7 @@ const postPermissionEventRoute = HttpRouter.add(
   })),
 );
 
-export const hooksRouteLayer = postPermissionEventRoute;
+export const hooksRouteLayer = Layer.mergeAll(
+  postMemoryTurnRoute,
+  postPermissionEventRoute,
+);

@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-16T22:20:00.000Z",
+  "updated": "2026-05-16T22:25:00.000Z",
   "gitState": {
     "branch": "feature/pan-1052",
-    "sha": "b27c0410",
+    "sha": "8e311329",
     "dirty": true
   },
   "decisions": [
@@ -183,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-60l5",
-    "itemId": "b1-transcript-source-adapter",
+    "beadId": "workspace-moik",
+    "itemId": "b1-subagent-memory-filter",
     "status": "implemented",
-    "note": "TranscriptSource now has a Claude Code adapter that resolves active transcript entries from agent session metadata, a Pi no-op stub until its transcript surface is defined, and a registry-facing getActiveTranscriptEntries seam so the future poller can consume harness adapters without harness branches. Focused tests, lint, typecheck, and graphify update passed."
+    "note": "Memory subagent filtering now detects hook payloads with agent_id, returns 204 from the memory turn hook seam for subagent payloads, and lets the transcript source registry exclude subagent session IDs before poller registration. Focused tests, lint, typecheck, and graphify update passed."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -333,6 +333,12 @@
       "timestamp": "2026-05-16T22:20:00.000Z",
       "reason": "work",
       "note": "workspace-60l5 implemented: added src/lib/memory/transcript-source.ts with TranscriptSource, Claude Code transcript resolution from active agent session metadata, Pi no-op stub, registry collection seam, and tests/lib/memory/transcript-source.test.ts coverage.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T22:25:00.000Z",
+      "reason": "work",
+      "note": "workspace-moik implemented: added src/lib/memory/subagent-filter.ts, memory turn hook 204 short-circuit for agent_id payloads, and TranscriptSource subagent session exclusion with focused tests.",
       "agentModel": "gpt-5.5"
     }
   ],

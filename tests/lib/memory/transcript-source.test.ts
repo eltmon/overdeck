@@ -68,17 +68,19 @@ describe('ClaudeCodeTranscriptSource', () => {
     expect((await source.getActiveTranscripts())[0]?.sessionId).toBe('runtime-session');
   });
 
-  it('ignores inactive, missing, and non-Claude agents', async () => {
+  it('ignores inactive, missing, non-Claude, and subagent sessions', async () => {
     const source = new ClaudeCodeTranscriptSource({
       listAgents: async () => [
         agent({ id: 'agent-inactive', tmuxActive: false }),
         agent({ id: 'agent-stopped', status: 'stopped' }),
         agent({ id: 'agent-pi', harness: 'pi' }),
         agent({ id: 'agent-missing', sessionId: undefined }),
+        agent({ id: 'agent-subagent', sessionId: 'subagent-session' }),
       ],
       getRuntimeState: async () => null,
       resolveTranscriptPath: (workspace, sessionId) => `${workspace}/${sessionId}.jsonl`,
       statTranscript: async () => ({ size: 10, mtimeMs: 20 }),
+      isSubagentSession: (sessionId) => sessionId === 'subagent-session',
     });
 
     expect(await source.getActiveTranscripts()).toEqual([]);

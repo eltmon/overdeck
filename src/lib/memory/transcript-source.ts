@@ -34,6 +34,7 @@ interface ClaudeCodeTranscriptSourceOptions {
   getRuntimeState?: (agentId: string) => Promise<{ claudeSessionId?: string } | null>;
   resolveTranscriptPath?: (workspace: string, sessionId: string) => string;
   statTranscript?: (path: string) => Promise<{ size: number; mtimeMs: number }>;
+  isSubagentSession?: (sessionId: string, agent: RunningAgent) => boolean | Promise<boolean>;
 }
 
 export class ClaudeCodeTranscriptSource implements TranscriptSource {
@@ -43,12 +44,14 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
   private readonly getRuntimeState: (agentId: string) => Promise<{ claudeSessionId?: string } | null>;
   private readonly resolveTranscriptPath: (workspace: string, sessionId: string) => string;
   private readonly statTranscript: (path: string) => Promise<{ size: number; mtimeMs: number }>;
+  private readonly isSubagentSession: (sessionId: string, agent: RunningAgent) => boolean | Promise<boolean>;
 
   constructor(options: ClaudeCodeTranscriptSourceOptions = {}) {
     this.listAgents = options.listAgents ?? listRunningAgentsAsync;
     this.getRuntimeState = options.getRuntimeState ?? getAgentRuntimeStateAsync;
     this.resolveTranscriptPath = options.resolveTranscriptPath ?? sessionFilePath;
     this.statTranscript = options.statTranscript ?? stat;
+    this.isSubagentSession = options.isSubagentSession ?? (() => false);
   }
 
   async getActiveTranscripts(): Promise<TranscriptEntry[]> {
@@ -74,6 +77,7 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
   private async resolveAgentTranscript(agent: RunningAgent): Promise<TranscriptEntry | null> {
     const sessionId = agent.sessionId ?? (await this.getRuntimeState(agent.id))?.claudeSessionId;
     if (!sessionId) return null;
+    if (await this.isSubagentSession(sessionId, agent)) return null;
 
     const transcriptPath = this.resolveTranscriptPath(agent.workspace, sessionId);
     let fileStat: { size: number; mtimeMs: number };
