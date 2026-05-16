@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import yaml from 'js-yaml';
 import {
   getDefaultTtsDaemonConfig,
@@ -46,12 +46,13 @@ async function pathExists(filePath: string): Promise<boolean> {
 async function findProjectRootAsync(startDir: string = process.cwd()): Promise<string | null> {
   let currentDir = startDir;
 
-  while (currentDir !== '/') {
+  while (true) {
     if (await pathExists(join(currentDir, '.git'))) return currentDir;
-    currentDir = join(currentDir, '..');
-  }
 
-  return null;
+    const parent = dirname(currentDir);
+    if (parent === currentDir) return null;
+    currentDir = parent;
+  }
 }
 
 export function stripProjectTtsEndpoint(config: YamlConfig | null): YamlConfig | null {
