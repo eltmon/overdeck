@@ -10,8 +10,9 @@
  */
 
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Terminal, XCircle, Loader2, X, Info, AlertTriangle, CheckCircle2, Volume2 } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Terminal, XCircle, Loader2, X, Info, AlertTriangle, CheckCircle2, Volume2, Play } from 'lucide-react';
+import { toast } from 'sonner';
 import { useDashboardStore } from '../lib/store';
 
 export interface ActivityEntry {
@@ -62,6 +63,18 @@ async function fetchGitActivity(): Promise<ActivityEntry[]> {
   const res = await fetch('/api/git-activity');
   if (!res.ok) return [];
   return res.json() as Promise<ActivityEntry[]>;
+}
+
+async function replayTtsUtterance(text: string): Promise<void> {
+  const res = await fetch('/api/tts/speak', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) {
+    const message = await res.text().catch(() => 'TTS daemon unavailable');
+    throw new Error(message || 'TTS daemon unavailable');
+  }
 }
 
 function LevelIcon({ level }: { level: ActivityEntry['level'] }) {
@@ -219,6 +232,11 @@ function ActivityItem({ activity }: { activity: ActivityEntry }) {
 }
 
 function TtsItem({ entry }: { entry: TtsEntry }) {
+  const replayMutation = useMutation({
+    mutationFn: replayTtsUtterance,
+    onError: (error: Error) => toast.error(`Failed to replay TTS: ${error.message}`),
+  });
+
   return (
     <div className="p-3 hover:bg-card/50 transition-colors">
       <div className="flex items-start gap-2">
@@ -247,6 +265,17 @@ function TtsItem({ entry }: { entry: TtsEntry }) {
             )}
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => replayMutation.mutate(entry.utterance)}
+          disabled={replayMutation.isPending}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-popover hover:text-foreground disabled:opacity-50"
+          aria-label={`Replay TTS utterance: ${entry.utterance}`}
+          title="Replay TTS utterance"
+          data-testid={`tts-activity-replay-${entry.id}`}
+        >
+          {replayMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+        </button>
       </div>
     </div>
   );

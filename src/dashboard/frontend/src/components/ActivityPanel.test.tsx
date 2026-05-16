@@ -7,22 +7,35 @@
  *   - applyPinWarnings(): warn/error pinned to top
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { inferCategory, mergeActivitiesById, applyPinWarnings, ActivityPanel } from './ActivityPanel';
-import type { ActivityEntry } from './ActivityPanel';
+import type { ActivityEntry, TtsEntry } from './ActivityPanel';
 
 // ── ActivityPanel component tests ─────────────────────────────────────────────
 
+const dashboardState: {
+  recentActivity: ActivityEntry[];
+  detailedActivity: ActivityEntry[];
+  ttsActivity: TtsEntry[];
+} = {
+  recentActivity: [],
+  detailedActivity: [],
+  ttsActivity: [],
+};
+
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn() },
+}));
+
 vi.mock('../lib/store', () => ({
-  useDashboardStore: (selector: (s: { recentActivity: unknown[] }) => unknown) =>
-    selector({ recentActivity: [] }),
+  useDashboardStore: (selector: (s: typeof dashboardState) => unknown) => selector(dashboardState),
 }));
 
 function renderPanel() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
   return render(
     <QueryClientProvider client={client}>
@@ -31,9 +44,16 @@ function renderPanel() {
   );
 }
 
-describe('ActivityPanel — Clear button', () => {
+describe('ActivityPanel', () => {
   beforeEach(() => {
+    dashboardState.recentActivity = [];
+    dashboardState.detailedActivity = [];
+    dashboardState.ttsActivity = [];
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => [] }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('does not show Clear button when all filters are at defaults', () => {
@@ -86,6 +106,29 @@ describe('ActivityPanel — Clear button', () => {
     expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
     // Other filters reset
     expect((screen.getAllByRole('combobox')[0] as HTMLSelectElement).value).toBe('all');
+  });
+
+  it('replays TTS utterances from the TTS tab', async () => {
+    dashboardState.ttsActivity = [{
+      id: 'tts-1',
+      timestamp: new Date().toISOString(),
+      utterance: 'PAN-829 is ready to merge',
+      priority: 1,
+      issueId: 'PAN-829',
+    }];
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'TTS' }));
+    expect(screen.getByText('PAN-829 is ready to merge')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('tts-activity-replay-tts-1'));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/tts/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'PAN-829 is ready to merge' }),
+      });
+    });
   });
 });
 
