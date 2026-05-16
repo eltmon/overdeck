@@ -66,6 +66,7 @@ import { reviewRestartCommand } from './commands/review-restart.js';
 import { reviewSpawnReviewerCommand } from './commands/review-spawn-reviewer.js';
 import { destroyCommand as destroyWorkspaceCommand, registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
+import { registerTtsCommands } from './commands/tts.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
@@ -432,6 +433,8 @@ registerWorkspaceCommands(program);
 
 // Register test commands (pan test run, pan test list)
 registerTestCommands(program);
+
+registerTtsCommands(program);
 
 // Register release commands (pan release check/stable/canary/notes)
 registerReleaseCommands(program);

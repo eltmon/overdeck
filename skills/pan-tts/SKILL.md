@@ -119,9 +119,18 @@ systemctl --user enable --now pan-tts.service
 
 A `pan-tts.service` unit template lives at `~/Projects/pan-tts/systemd/pan-tts.service` — `User=` and `WorkingDirectory=` are pre-filled for this machine.
 
-## Ad-Hoc Speak (For Agents)
+## Ad-Hoc Speak and CLI Smoke Test
 
-The skill bundles `scripts/say.sh` for one-off utterances — agents can use this to announce build completions, merge outcomes, or attention requests without routing through the dashboard event store:
+For Panopticon's configured system voice, use the built-in CLI smoke test:
+
+```bash
+pan tts test
+pan tts test "Build is green, ready for review."
+```
+
+`pan tts test` reads `tts.voice` from `~/.panopticon/config.yaml`, resolves it in `~/.panopticon/tts-voices.json`, and POSTs directly to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (or the configured `tts.daemonHost`/`tts.daemonPort`). If no system voice is configured, set one in the TTS voice settings before running the smoke test.
+
+The skill also bundles `scripts/say.sh` for one-off utterances that bypass Panopticon voice settings:
 
 ```bash
 ./scripts/say.sh "Build is green, ready for review."
@@ -130,7 +139,7 @@ The skill bundles `scripts/say.sh` for one-off utterances — agents can use thi
 
 The script POSTs to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (override via `QWEN_TTS_ENDPOINT`). It waits for the daemon to acknowledge the request (up to 5 s); audio then plays asynchronously in the daemon's worker thread. Keep utterances short (under ~200 characters); the daemon's queue caps at 6.
 
-Use this sparingly — the SSE-subscribed sidecar already speaks every activity entry. Ad-hoc speak is for:
+Use ad-hoc speak sparingly — the dashboard or SSE-subscribed sidecar already speaks activity entries. Ad-hoc speak is for:
 - Announcements that don't warrant a dashboard activity entry (local test runs, meta-commentary)
 - Pulling the user's attention during long-running work
 - Testing the audio path after a restart
