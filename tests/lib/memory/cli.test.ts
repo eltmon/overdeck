@@ -165,8 +165,9 @@ describe('pan memory CLI service', () => {
     expect(events).toEqual([{ marker, timestamp: '2026-05-16T21:00:00.000Z' }]);
   });
 
-  it('generates a daily summary markdown file', async () => {
-    await writeObservationRecord(observation({ summary: 'Summary-ready observation' }));
+  it('returns insufficient data below the daily summary observation threshold', async () => {
+    await writeObservationRecord(observation({ id: 'summary-1', summary: 'First observation' }));
+    await writeObservationRecord(observation({ id: 'summary-2', summary: 'Second observation', timestamp: '2026-05-16T20:01:00.000Z' }));
 
     const result = await generateDailySummary({
       projectId: 'panopticon-cli',
@@ -174,9 +175,77 @@ describe('pan memory CLI service', () => {
       date: '2026-05-16',
     });
 
-    expect(result.observationCount).toBe(1);
-    expect(result.markdown).toContain('Summary-ready observation');
+    expect(result.status).toBe('insufficient-data');
+    expect(result.observationCount).toBe(2);
+    await expect(readFile(result.path, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('generates a daily summary markdown file and indexes it into FTS', async () => {
+    for (let index = 0; index < 3; index += 1) {
+      await writeObservationRecord(observation({
+        id: `summary-${index}`,
+        summary: `Summary-ready observation ${index}`,
+        timestamp: `2026-05-16T20:0${index}:00.000Z`,
+      }));
+    }
+
+    const result = await generateDailySummary({
+      projectId: 'panopticon-cli',
+      issueId: 'PAN-1052',
+      date: '2026-05-16',
+    });
+    const indexedSummaries = await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare(`
+      SELECT content, doc_type, scope, project_id, issue_id, tags
+      FROM memory_fts
+      WHERE doc_type = 'summary'
+    `).all());
+
+    expect(result.status).toBe('generated');
+    expect(result.observationCount).toBe(3);
+    expect(result.markdown).toContain('Summary-ready observation 2');
     expect(await readFile(result.path, 'utf8')).toBe(result.markdown);
+    expect(indexedSummaries).toEqual([expect.objectContaining({
+      content: result.markdown,
+      doc_type: 'summary',
+      scope: 'issue',
+      project_id: 'panopticon-cli',
+      issue_id: 'PAN-1052',
+      tags: expect.stringContaining('summary'),
+    })]);
+  });
+
+  it('regenerates an existing daily summary only after twenty new observations', async () => {
+    for (let index = 0; index < 3; index += 1) {
+      await writeObservationRecord(observation({
+        id: `initial-${index}`,
+        summary: `Initial observation ${index}`,
+        timestamp: `2026-05-16T20:0${index}:00.000Z`,
+      }));
+    }
+    const initial = await generateDailySummary({ projectId: 'panopticon-cli', issueId: 'PAN-1052', date: '2026-05-16' });
+
+    for (let index = 0; index < 19; index += 1) {
+      await writeObservationRecord(observation({
+        id: `unchanged-${index}`,
+        summary: `Unchanged observation ${index}`,
+        timestamp: `2026-05-16T21:${index.toString().padStart(2, '0')}:00.000Z`,
+      }));
+    }
+    const unchanged = await generateDailySummary({ projectId: 'panopticon-cli', issueId: 'PAN-1052', date: '2026-05-16' });
+
+    await writeObservationRecord(observation({
+      id: 'regenerated-20',
+      summary: 'Twentieth new observation',
+      timestamp: '2026-05-16T21:19:00.000Z',
+    }));
+    const regenerated = await generateDailySummary({ projectId: 'panopticon-cli', issueId: 'PAN-1052', date: '2026-05-16' });
+
+    expect(unchanged.status).toBe('up-to-date');
+    expect(unchanged.markdown).toBe(initial.markdown);
+    expect(regenerated.status).toBe('generated');
+    expect(regenerated.previousObservationCount).toBe(3);
+    expect(regenerated.observationCount).toBe(23);
+    expect(regenerated.markdown).toContain('Twentieth new observation');
   });
 
   it('reports stale active agents with a non-zero doctor exit code', async () => {

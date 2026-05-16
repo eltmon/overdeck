@@ -3917,6 +3917,22 @@ function initSchema(db) {
       event_count    INTEGER NOT NULL DEFAULT 0
     );
 
+    CREATE TABLE IF NOT EXISTS transcript_checkpoints (
+      session_id                     TEXT PRIMARY KEY,
+      project_id                     TEXT NOT NULL,
+      workspace_id                   TEXT NOT NULL,
+      issue_id                       TEXT NOT NULL,
+      transcript_path                TEXT NOT NULL,
+      last_offset                    INTEGER NOT NULL DEFAULT 0,
+      last_observation_at            TEXT,
+      last_mid_turn_at               TEXT,
+      mid_turn_count_in_current_turn INTEGER NOT NULL DEFAULT 0,
+      updated_at                     TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_transcript_checkpoints_issue
+      ON transcript_checkpoints(project_id, issue_id, workspace_id);
+
     -- ===== API Cache =====
     CREATE TABLE IF NOT EXISTS api_cache (
       key         TEXT PRIMARY KEY,
@@ -4163,7 +4179,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 38`);
+	db.pragma(`user_version = 39`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -4171,7 +4187,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 38) return;
+	if (currentVersion === 39) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -4603,7 +4619,24 @@ function runMigrations(db) {
 		initDiscoveredSessionsSchema(db);
 		backfillDiscoveredSessionArrayIndexes(db);
 	}
-	db.pragma(`user_version = 38`);
+	if (currentVersion < 39) db.exec(`
+      CREATE TABLE IF NOT EXISTS transcript_checkpoints (
+        session_id                     TEXT PRIMARY KEY,
+        project_id                     TEXT NOT NULL,
+        workspace_id                   TEXT NOT NULL,
+        issue_id                       TEXT NOT NULL,
+        transcript_path                TEXT NOT NULL,
+        last_offset                    INTEGER NOT NULL DEFAULT 0,
+        last_observation_at            TEXT,
+        last_mid_turn_at               TEXT,
+        mid_turn_count_in_current_turn INTEGER NOT NULL DEFAULT 0,
+        updated_at                     TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_transcript_checkpoints_issue
+        ON transcript_checkpoints(project_id, issue_id, workspace_id);
+    `);
+	db.pragma(`user_version = 39`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

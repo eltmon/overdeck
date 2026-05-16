@@ -21,6 +21,8 @@ import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { readCurrentStatus } from './rollup.js';
 
 const DEFAULT_PROJECT_ID = 'panopticon-cli';
+const MIN_DAILY_SUMMARY_OBSERVATIONS = 3;
+const DAILY_SUMMARY_REGENERATION_OBSERVATIONS = 20;
 
 export interface MemorySearchOptions {
   project?: string;
@@ -35,6 +37,16 @@ export interface MemorySearchOptions {
 export interface MemorySearchResult {
   observation: MemoryObservation;
   score: number;
+}
+
+export type DailySummaryStatus = 'generated' | 'insufficient-data' | 'up-to-date';
+
+export interface DailySummaryResult {
+  status: DailySummaryStatus;
+  path: string;
+  markdown: string;
+  observationCount: number;
+  previousObservationCount: number | null;
 }
 
 export interface MemoryDoctorOptions {
@@ -108,33 +120,27 @@ export async function generateDailySummary(input: {
   projectId?: string;
   issueId: string;
   date?: string;
-}): Promise<{ path: string; markdown: string; observationCount: number }> {
+}): Promise<DailySummaryResult> {
   const projectId = input.projectId ?? DEFAULT_PROJECT_ID;
   const date = input.date ?? new Date().toISOString().slice(0, 10);
-  const observations = await readObservationsFile(resolveObservationsFile(projectId, input.issueId, date));
-  const actions = observations.filter((observation) => observation.actionStatus !== null);
-  const markdown = [
-    `# ${input.issueId} memory summary — ${date}`,
-    '',
-    `Observations: ${observations.length}`,
-    `Action updates: ${actions.length}`,
-    '',
-    ...observations.map((observation) => [
-      `## ${observation.timestamp}`,
-      '',
-      observation.actionStatus ? `**Action:** ${observation.actionStatus}` : '**Action:** none',
-      '',
-      observation.summary,
-      '',
-      observation.files.length > 0 ? `Files: ${observation.files.join(', ')}` : 'Files: none',
-      observation.tags.length > 0 ? `Tags: ${observation.tags.join(', ')}` : 'Tags: none',
-      '',
-    ].join('\n')),
-  ].join('\n');
   const path = join(resolveSummariesDir(projectId, input.issueId), `${date}.md`);
+  const observations = await readObservationsFile(resolveObservationsFile(projectId, input.issueId, date));
+  const existingMarkdown = await readTextFile(path);
+  const previousObservationCount = existingMarkdown ? parseSummaryObservationCount(existingMarkdown) : null;
+
+  if (observations.length < MIN_DAILY_SUMMARY_OBSERVATIONS) {
+    return { status: 'insufficient-data', path, markdown: existingMarkdown ?? '', observationCount: observations.length, previousObservationCount };
+  }
+
+  if (existingMarkdown && previousObservationCount !== null && observations.length - previousObservationCount < DAILY_SUMMARY_REGENERATION_OBSERVATIONS) {
+    return { status: 'up-to-date', path, markdown: existingMarkdown, observationCount: observations.length, previousObservationCount };
+  }
+
+  const markdown = buildDailySummaryMarkdown(input.issueId, date, observations);
   await ensureParentDir(path);
   await writeFile(path, markdown, 'utf8');
-  return { path, markdown, observationCount: observations.length };
+  await indexDailySummary(projectId, input.issueId, date, observations, markdown);
+  return { status: 'generated', path, markdown, observationCount: observations.length, previousObservationCount };
 }
 
 export async function runMemoryDoctor(options: MemoryDoctorOptions = {}): Promise<MemoryDoctorResult> {
@@ -262,6 +268,99 @@ async function readObservationsFile(path: string): Promise<MemoryObservation[]> 
   return raw.split('\n')
     .filter((line) => line.trim().length > 0)
     .map((line) => JSON.parse(line) as MemoryObservation);
+}
+
+async function readTextFile(path: string): Promise<string | null> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch (error) {
+    if (isEnoent(error)) return null;
+    throw error;
+  }
+}
+
+function buildDailySummaryMarkdown(issueId: string, date: string, observations: MemoryObservation[]): string {
+  const actions = observations.filter((observation) => observation.actionStatus !== null);
+  return [
+    `# ${issueId} memory summary — ${date}`,
+    '',
+    `Observations: ${observations.length}`,
+    `Action updates: ${actions.length}`,
+    '',
+    ...observations.map((observation) => [
+      `## ${observation.timestamp}`,
+      '',
+      observation.actionStatus ? `**Action:** ${observation.actionStatus}` : '**Action:** none',
+      '',
+      observation.summary,
+      '',
+      observation.files.length > 0 ? `Files: ${observation.files.join(', ')}` : 'Files: none',
+      observation.tags.length > 0 ? `Tags: ${observation.tags.join(', ')}` : 'Tags: none',
+      '',
+    ].join('\n')),
+  ].join('\n');
+}
+
+function parseSummaryObservationCount(markdown: string): number | null {
+  const match = markdown.match(/^Observations: (\d+)$/m);
+  return match ? Number(match[1]) : null;
+}
+
+async function indexDailySummary(projectId: string, issueId: string, date: string, observations: MemoryObservation[], markdown: string): Promise<void> {
+  const latest = observations.at(-1);
+  const files = [...new Set(observations.flatMap((observation) => observation.files))].join(',');
+  const tags = [...new Set(['memory', 'summary', ...observations.flatMap((observation) => observation.tags)])].join(',');
+  const entryTime = latest?.timestamp.slice(11) ?? '00:00:00.000Z';
+  await withMemoryFtsDatabase(projectId, (db) => {
+    db.prepare(`
+      DELETE FROM memory_fts
+      WHERE project_id = ?
+        AND issue_id = ?
+        AND doc_type = 'summary'
+        AND entry_date = ?
+    `).run(projectId, issueId, date);
+    db.prepare(`
+      INSERT INTO memory_fts (
+        content,
+        display_content,
+        source,
+        branch,
+        entry_date,
+        entry_time,
+        entry_type,
+        files,
+        tags,
+        doc_type,
+        scope,
+        project_id,
+        workspace_id,
+        issue_id,
+        run_id,
+        session_id,
+        agent_role,
+        agent_harness
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      markdown,
+      markdown,
+      'summary',
+      latest?.gitBranch ?? '',
+      date,
+      entryTime,
+      'memory-summary',
+      files,
+      tags,
+      'summary',
+      'issue',
+      projectId,
+      latest?.workspaceId ?? '',
+      issueId,
+      latest?.runId ?? '',
+      latest?.sessionId ?? '',
+      latest?.agentRole ?? '',
+      latest?.agentHarness ?? '',
+    );
+  });
 }
 
 async function listIssueIds(projectId: string): Promise<string[]> {

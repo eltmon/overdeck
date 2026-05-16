@@ -90,6 +90,8 @@ export function createMemoryCommand(): Command {
     .action(async (issue, options) => {
       const result = await generateDailySummary({ projectId: options.project, issueId: issue, date: options.date });
       if (options.json) console.log(JSON.stringify(result, null, 2));
+      else if (result.status === 'insufficient-data') console.log(chalk.yellow(`Insufficient data: ${result.observationCount} observations found; 3 required.`));
+      else if (result.status === 'up-to-date') console.log(chalk.yellow(`Summary already up to date at ${result.path}; ${result.observationCount - (result.previousObservationCount ?? 0)} new observations found, 20 required.`));
       else console.log(chalk.green(`Wrote ${result.observationCount} observations to ${result.path}`));
     });
 
