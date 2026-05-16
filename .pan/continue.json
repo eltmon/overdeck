@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-16T22:39:00.000Z",
+  "updated": "2026-05-16T22:45:00.000Z",
   "gitState": {
     "branch": "feature/pan-1052",
-    "sha": "5916a1396",
+    "sha": "653f46c8a",
     "dirty": true
   },
   "decisions": [
@@ -183,10 +183,10 @@
     }
   ],
   "resumePoint": {
-    "beadId": "workspace-l3rs",
-    "itemId": "b1-memory-extraction-worker-pool",
+    "beadId": "workspace-ye4e",
+    "itemId": "b1-transcript-checkpoints-claim-range",
     "status": "implemented",
-    "note": "Memory extraction now has a dashboard-side bounded worker pool with enqueue/reconciliation seams, one health update per job, health transition events, configurable worker concurrency in Settings/YAML/API/UI, and focused plus full-suite verification passing."
+    "note": "Transcript checkpoint storage now has schema v35, transcript_checkpoints table creation/migration, atomic claimTranscriptRange() using UPDATE ... WHERE last_offset = expectedFromOffset RETURNING, mid-turn counter tracking/reset on Stop-hook claims, and 50-way concurrency coverage. Focused tests, full suite, lint, typecheck, and graphify update passed."
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -345,6 +345,12 @@
       "timestamp": "2026-05-16T22:39:00.000Z",
       "reason": "work",
       "note": "workspace-l3rs implemented: added src/lib/memory/worker-pool.ts with bounded async extraction jobs, reconciliation enqueue, non-blocking result handling, one health.json update per job, memory.health_changed transition emission, and worker_concurrency Settings wiring.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-16T22:45:00.000Z",
+      "reason": "work",
+      "note": "workspace-ye4e implemented: added schema v35 transcript_checkpoints, src/lib/memory/checkpoints.ts claimTranscriptRange(), atomic offset-mismatch behavior, mid-turn rate-limit fields, Stop-hook reset semantics, and tests/lib/memory/checkpoints.test.ts coverage including 50 simultaneous overlapping claims.",
       "agentModel": "gpt-5.5"
     }
   ],
