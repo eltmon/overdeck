@@ -140,7 +140,7 @@
       {
         "id": "surface-init-failures",
         "title": "Surface workspace stack health (init failure, stuck Created) in pan status and dashboard",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -156,31 +156,31 @@
           {
             "id": "surface-init-failures.ac1",
             "title": "`pan status` shows an explicit `STACK BROKEN` (or equivalent red) line for any workspace whose init exited non-zero or whose services are stuck in Created > 120s.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "surface-init-failures.ac2",
             "title": "Dashboard workspace card shows a visible error state (red badge or banner) for broken stacks within 30s of the failure being observable to docker-stats.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "surface-init-failures.ac3",
             "title": "Activity stream emits exactly one `workspace-stack-unhealthy` event per healthy→unhealthy transition (not on every poll cycle).",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "surface-init-failures.ac4",
             "title": "No new execSync / readFileSync calls introduced into server-reachable code (lint passes; rule `no-execsync-server.md` honored).",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "surface-init-failures.ac5",
             "title": "Unit test covers the threshold logic (Created < 120s = healthy, Created ≥ 120s = unhealthy, Exited non-zero = unhealthy, Up = healthy).",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]

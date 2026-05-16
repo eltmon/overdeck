@@ -956,6 +956,18 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         </Tile>
       </div>
 
+      {workspace.data?.stackHealth && !workspace.data.stackHealth.healthy && (
+        <Section title="Workspace Stack">
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: 10, borderRadius: 10, border: '1px solid color-mix(in srgb, var(--destructive) 40%, transparent)', background: 'color-mix(in srgb, var(--destructive) 10%, transparent)', color: 'var(--destructive)', fontSize: 12 }}>
+            <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <div style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>STACK BROKEN</div>
+              <div style={{ color: 'var(--muted-foreground)', marginTop: 3 }}>{workspace.data.stackHealth.reasons.join('; ')}</div>
+            </div>
+          </div>
+        </Section>
+      )}
+
       {/* 3. Containers */}
       {workspace.data?.containers && Object.keys(workspace.data.containers).length > 0 && (
         <Section title="Containers" rightSlot={<span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>right-click</span>}>

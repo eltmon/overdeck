@@ -336,6 +336,12 @@ export interface WorkspaceContainerStatus {
   status?: string;
 }
 
+export interface WorkspaceStackHealth {
+  healthy: boolean;
+  reasons: string[];
+  lastObserved: string;
+}
+
 export interface WorkspaceData {
   exists: boolean;
   issueId: string;
@@ -351,6 +357,7 @@ export interface WorkspaceData {
   repoGit?: { ahead: number; behind: number; branch: string; dirty: boolean } | null;
   services?: Array<{ name: string; url?: string }>;
   containers?: Record<string, WorkspaceContainerStatus> | null;
+  stackHealth?: WorkspaceStackHealth;
   hasDocker?: boolean;
   canContainerize?: boolean;
   pendingOperation?: string | null;

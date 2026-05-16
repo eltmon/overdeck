@@ -107,6 +107,7 @@ import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js
 import { extractPrefix, extractNumber, parseIssueId } from '../../../lib/issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
+import { getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
@@ -1414,10 +1415,11 @@ const getWorkspaceRoute = HttpRouter.add(
         const canContainerize = false;
 
         const agentSession = `agent-${issueLower}`;
-        const [git, repoGit, containers, mrUrl, sessionNames, paneOutput] = yield* Effect.promise(() => Promise.all([
+        const [git, repoGit, containers, stackHealth, mrUrl, sessionNames, paneOutput] = yield* Effect.promise(() => Promise.all([
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
+          getWorkspaceStackHealth(issueId, { emitTransitionActivity: true }),
           getMrUrlAsync(issueId, workspacePath),
           listSessionNamesAsync(),
           capturePaneAsync(agentSession, 50).catch(() => ''),
@@ -1488,6 +1490,7 @@ const getWorkspaceRoute = HttpRouter.add(
           repoGit,
           services,
           containers,
+          stackHealth,
           hasDocker,
           canContainerize,
           pendingOperation,

@@ -4,6 +4,7 @@ import { join, basename } from 'path';
 import { listRunningAgents, getAgentDir } from '../../lib/agents.js';
 import { isShadowed, getShadowState } from '../../lib/shadow-state.js';
 import { getTldrMetrics, getTldrDaemonService } from '../../lib/tldr-daemon.js';
+import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../lib/workspace/stack-health.js';
 
 interface StatusOptions {
   json?: boolean;
@@ -34,6 +35,13 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const agents = listRunningAgents().filter(agent =>
     agent.id && agent.issueId && agent.workspace
   );
+  const dockerContainers = await collectDockerContainerLifecycleSnapshot();
+  const stackHealthByIssue = new Map(await Promise.all(
+    agents.map(async agent => [
+      agent.issueId!,
+      await getWorkspaceStackHealth(agent.issueId!, { containers: dockerContainers }),
+    ] as const)
+  ));
 
   if (options.json) {
     // Add shadow mode info and optional context % to JSON output
@@ -45,6 +53,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
         shadowMode: shadowed,
         shadowStatus: shadowState?.shadowStatus,
         trackerStatus: shadowState?.trackerStatus,
+        stackHealth: agent.issueId ? stackHealthByIssue.get(agent.issueId) : undefined,
         ...(options.context ? { contextPercent: readContextPercent(agent.id) } : {}),
       };
     }));
@@ -91,6 +100,11 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     console.log(`  Role:     ${agent.role}`);
     console.log(`  Duration: ${duration} min`);
     console.log(`  Workspace: ${chalk.dim(agent.workspace)}`);
+
+    const stackHealth = agent.issueId ? stackHealthByIssue.get(agent.issueId) : undefined;
+    if (stackHealth && !stackHealth.healthy) {
+      console.log(`  Stack:    ${chalk.red('STACK BROKEN')} ${stackHealth.reasons.join('; ')}`);
+    }
 
     // Show TLDR session metrics if a .tldr/ dir exists in the workspace
     try {
