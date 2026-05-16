@@ -49,6 +49,7 @@ import { projectsRouteLayer } from './routes/projects.js';
 import { adminRouteLayer } from './routes/admin.js';
 import { prereqsRouteLayer } from './routes/prereqs.js';
 import { cliproxyRouteLayer } from './routes/cliproxy.js';
+import { ttsRouteLayer } from './routes/tts.js';
 import { webhooksRouteLayer } from './routes/webhooks.js';
 import { hooksRouteLayer } from './routes/hooks.js';
 import { diffsRouteLayer } from './routes/diffs.js';
@@ -218,6 +219,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   adminRouteLayer,
   prereqsRouteLayer,
   cliproxyRouteLayer,
+  ttsRouteLayer,
   webhooksRouteLayer,
   hooksRouteLayer,
   diffsRouteLayer,
