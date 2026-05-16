@@ -809,6 +809,7 @@ async function spawnConversationSession(
   issueId?: string,
   resume = false,
   harness: RuntimeName = 'claude-code',
+  plainFork = false,
 ): Promise<void> {
   const stateDir = join(homedir(), '.panopticon', 'conversations', tmuxSession);
   await mkdir(stateDir, { recursive: true });
@@ -913,9 +914,23 @@ async function spawnConversationSession(
   // Channels setup for Claude Code conversations when the experimental flag
   // is on. Writes a per-session bridge token and MCP config so Claude loads
   // the panopticon-bridge stdio server on startup.
+  //
+  // Plain forks skip channels wiring entirely. Two reasons:
+  //   1. The panopticon-bridge MCP server registers its tool schema into
+  //      Claude's context budget. On a plain fork the whole source JSONL is
+  //      loaded via --resume; pushing borderline-sized conversations across
+  //      Claude Code's ~200K auto-compact threshold defeats the entire
+  //      purpose of plain fork (pick up exactly where you left off).
+  //   2. dismissDevChannelsDialog spams Enter to clear the dev-channels
+  //      warning. If the resumed session shows an auto-compact suggestion in
+  //      the same window, a stray Enter confirms it — silently triggering
+  //      /compact on the brand-new fork.
+  // Subsequent messages to the fork can still reach the agent via tmux,
+  // which is the channels delivery fallback anyway.
   let channelsBridgeMcpConfig: string | undefined;
   if (
     !piFields &&
+    !plainFork &&
     isClaudeCodeChannelsEnabled() &&
     (!model || getProviderForModel(model).name === 'anthropic') &&
     process.env.CLAUDE_CODE_USE_BEDROCK !== '1' &&
@@ -2296,6 +2311,8 @@ async function runForkPipeline(
       conv.issueId ?? undefined,
       true, // resume — load the copied JSONL history
       conv.harness ?? 'claude-code',
+      true, // plainFork — skip channels MCP wiring so it doesn't inflate the
+            // resumed context past Claude Code's auto-compact threshold
     );
     await waitForTmuxSession(conv.tmuxSession);
 
