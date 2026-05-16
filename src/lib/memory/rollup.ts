@@ -1,4 +1,5 @@
-import { readdir, readFile } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import { readdir, readFile, rename, unlink, writeFile } from 'fs/promises';
 import { dirname } from 'path';
 import { Result, Schema } from 'effect';
 import {
@@ -12,7 +13,8 @@ import {
   type MemoryExtractionPolicyResult,
   type MemoryProviderSettings,
 } from './providers/index.js';
-import { resolveArchiveDir, resolveObservationsFile } from './paths.js';
+import { pendingTurnFileName } from './pending.js';
+import { ensureDir, ensureParentDir, resolveArchiveDir, resolveObservationsFile, resolvePendingDir, resolveStatusFile } from './paths.js';
 
 const STATUS_RESPONSE_JSON_SCHEMA = {
   type: 'object',
@@ -69,6 +71,29 @@ export type SynthesizeStatusRollupResult =
   | { status: 'skipped'; reason: 'cost-cap' }
   | { status: 'dropped'; reason: 'extraction-failed' | 'malformed-response' | 'missing-identity' };
 
+export interface CommitStatusRollupInput {
+  identity: Pick<MemoryIdentity, 'projectId' | 'workspaceId' | 'issueId'>;
+  status: MemoryStatus;
+  pendingTurns: PendingTurn[];
+  now?: Date;
+  emitStatusUpdated?: EmitStatusUpdated;
+  failAfterArchive?: boolean;
+  failAfterStatusWrite?: boolean;
+}
+
+export interface CommitStatusRollupResult {
+  previousStatus?: MemoryStatus;
+  archivedPath?: string;
+  statusPath: string;
+  clearedPending: string[];
+}
+
+export type EmitStatusUpdated = (event: {
+  identity: Pick<MemoryIdentity, 'projectId' | 'workspaceId' | 'issueId'>;
+  status: MemoryStatus;
+  previousStatus?: MemoryStatus;
+}) => void | Promise<void>;
+
 export async function synthesizeStatusRollup(input: SynthesizeStatusRollupInput): Promise<SynthesizeStatusRollupResult> {
   const identity = input.identity ?? input.pendingTurns[0]?.identity;
   if (!identity) return { status: 'dropped', reason: 'missing-identity' };
@@ -98,6 +123,42 @@ export async function synthesizeStatusRollup(input: SynthesizeStatusRollupInput)
   }
 
   return { status: 'dropped', reason: 'malformed-response' };
+}
+
+export async function commitStatusRollup(input: CommitStatusRollupInput): Promise<CommitStatusRollupResult> {
+  const { projectId, workspaceId, issueId } = input.identity;
+  const statusPath = resolveStatusFile(projectId, issueId);
+  const previousStatus = await readCurrentStatus(projectId, issueId);
+  let archivedPath: string | undefined;
+
+  if (previousStatus) {
+    archivedPath = await archiveStatus(projectId, issueId, previousStatus, input.now ?? new Date());
+    await pruneArchivedStatuses(projectId, issueId, 3);
+  }
+
+  if (input.failAfterArchive) throw new Error('Injected rollup archive failure');
+
+  await writeJsonAtomically(statusPath, input.status);
+
+  if (input.failAfterStatusWrite) throw new Error('Injected rollup status write failure');
+
+  await (input.emitStatusUpdated ?? emitStatusUpdatedEvent)({
+    identity: { projectId, workspaceId, issueId },
+    status: input.status,
+    previousStatus,
+  });
+
+  const clearedPending = await clearPendingTurns(projectId, issueId, input.pendingTurns);
+  return { previousStatus, archivedPath, statusPath, clearedPending };
+}
+
+export async function readCurrentStatus(projectId: string, issueId: string): Promise<MemoryStatus | undefined> {
+  try {
+    return JSON.parse(await readFile(resolveStatusFile(projectId, issueId), 'utf8')) as MemoryStatus;
+  } catch (error) {
+    if (isEnoent(error)) return undefined;
+    throw error;
+  }
 }
 
 export function buildStatusRollupPrompt(input: {
@@ -155,6 +216,67 @@ export async function readArchivedStatuses(projectId: string, issueId: string, l
     statuses.push(JSON.parse(await readFile(`${archiveDir}/${file}`, 'utf8')) as MemoryStatus);
   }
   return statuses;
+}
+
+async function archiveStatus(projectId: string, issueId: string, status: MemoryStatus, now: Date): Promise<string> {
+  const archiveDir = resolveArchiveDir(projectId, issueId);
+  await ensureDir(archiveDir);
+  const path = `${archiveDir}/${now.toISOString().slice(0, 10)}_${slugify(status.name)}.json`;
+  await writeJsonAtomically(path, status);
+  return path;
+}
+
+async function pruneArchivedStatuses(projectId: string, issueId: string, keep: number): Promise<void> {
+  const archiveDir = resolveArchiveDir(projectId, issueId);
+  const files = (await readdir(archiveDir).catch((error: unknown) => {
+    if (isEnoent(error)) return [] as string[];
+    throw error;
+  }))
+    .filter((file) => file.endsWith('.json'))
+    .sort();
+
+  await Promise.all(files.slice(0, Math.max(0, files.length - keep)).map((file) => unlink(`${archiveDir}/${file}`)));
+}
+
+async function clearPendingTurns(projectId: string, issueId: string, pendingTurns: PendingTurn[]): Promise<string[]> {
+  const pendingDir = resolvePendingDir(projectId, issueId);
+  const cleared: string[] = [];
+  for (const turn of pendingTurns) {
+    const path = `${pendingDir}/${pendingTurnFileName(turn)}`;
+    try {
+      await unlink(path);
+      cleared.push(path);
+    } catch (error) {
+      if (!isEnoent(error)) throw error;
+    }
+  }
+  return cleared;
+}
+
+async function emitStatusUpdatedEvent(event: {
+  identity: Pick<MemoryIdentity, 'projectId' | 'workspaceId' | 'issueId'>;
+  status: MemoryStatus;
+  previousStatus?: MemoryStatus;
+}): Promise<void> {
+  const { initEventStore } = await import('../../dashboard/server/event-store.js');
+  const store = await initEventStore();
+  await store.appendAsync({
+    type: 'memory.status_updated',
+    timestamp: new Date().toISOString(),
+    payload: event,
+  });
+}
+
+async function writeJsonAtomically(path: string, value: unknown): Promise<void> {
+  await ensureParentDir(path);
+  const tempPath = `${dirname(path)}/.${randomUUID()}.tmp`;
+  await writeFile(tempPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  await rename(tempPath, path);
+}
+
+function slugify(value: string): string {
+  const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return slug.length > 0 ? slug : 'status';
 }
 
 function renderArchivedStatuses(statuses: MemoryStatus[]): string {

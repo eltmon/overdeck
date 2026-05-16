@@ -1,16 +1,19 @@
-import { mkdtemp, rm, writeFile } from 'fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { MemoryObservation, MemoryStatus, PendingTurn } from '@panctl/contracts';
 import {
   buildStatusRollupPrompt,
+  commitStatusRollup,
   readArchivedStatuses,
+  readCurrentStatus,
   readRecentObservations,
   synthesizeStatusRollup,
   type StatusRollupExtractCall,
 } from '../../../src/lib/memory/rollup.js';
-import { ensureDir, resolveArchiveDir, resolveObservationsFile } from '../../../src/lib/memory/paths.js';
+import { pendingTurnFileName, writePendingTurn } from '../../../src/lib/memory/pending.js';
+import { ensureDir, resolveArchiveDir, resolveObservationsFile, resolvePendingDir, resolveStatusFile } from '../../../src/lib/memory/paths.js';
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
@@ -209,5 +212,76 @@ describe('memory status rollup synthesis', () => {
       archivedStatuses: [],
       extract,
     })).resolves.toEqual({ status: 'dropped', reason: 'malformed-response' });
+  });
+
+  it('archives previous status, writes the new status, emits after commit, then clears included pending turns', async () => {
+    const previousStatus = { ...baseStatus, name: 'Previous Status' };
+    const nextStatus = { ...baseStatus, name: 'Next Status', phase: 'shipping' as const };
+    await ensureDir(join(tempDir!, 'memory/panopticon-cli/PAN-1052'));
+    await writeFile(resolveStatusFile(identity.projectId, identity.issueId), `${JSON.stringify(previousStatus)}\n`, 'utf8');
+    const turns = [pendingTurn(1), pendingTurn(2)];
+    for (const turn of turns) await writePendingTurn(turn, { loadThreshold: () => 10 });
+
+    const emitted: unknown[] = [];
+    const result = await commitStatusRollup({
+      identity,
+      status: nextStatus,
+      pendingTurns: turns,
+      now: new Date('2026-05-16T22:00:00.000Z'),
+      emitStatusUpdated: async (event) => {
+        expect(JSON.parse(await readFile(resolveStatusFile(identity.projectId, identity.issueId), 'utf8'))).toEqual(nextStatus);
+        emitted.push(event);
+      },
+    });
+
+    expect(result.previousStatus).toEqual(previousStatus);
+    expect(JSON.parse(await readFile(resolveStatusFile(identity.projectId, identity.issueId), 'utf8'))).toEqual(nextStatus);
+    expect(JSON.parse(await readFile(result.archivedPath!, 'utf8'))).toEqual(previousStatus);
+    expect(emitted).toEqual([{ identity: { projectId: identity.projectId, workspaceId: identity.workspaceId, issueId: identity.issueId }, status: nextStatus, previousStatus }]);
+    await expect(readdir(resolvePendingDir(identity.projectId, identity.issueId))).resolves.toEqual([]);
+    expect(result.clearedPending.map((path) => path.split('/').at(-1))).toEqual(turns.map(pendingTurnFileName));
+  });
+
+  it('leaves pending turns intact when rollup commit fails before the clear step', async () => {
+    const previousStatus = { ...baseStatus, name: 'Previous Status' };
+    const nextStatus = { ...baseStatus, name: 'Next Status' };
+    await ensureDir(join(tempDir!, 'memory/panopticon-cli/PAN-1052'));
+    await writeFile(resolveStatusFile(identity.projectId, identity.issueId), `${JSON.stringify(previousStatus)}\n`, 'utf8');
+    const turn = pendingTurn(1);
+    await writePendingTurn(turn, { loadThreshold: () => 10 });
+
+    await expect(commitStatusRollup({
+      identity,
+      status: nextStatus,
+      pendingTurns: [turn],
+      failAfterStatusWrite: true,
+    })).rejects.toThrow('Injected rollup status write failure');
+
+    await expect(readdir(resolvePendingDir(identity.projectId, identity.issueId))).resolves.toEqual([pendingTurnFileName(turn)]);
+    expect(await readCurrentStatus(identity.projectId, identity.issueId)).toEqual(nextStatus);
+  });
+
+  it('keeps only the latest three archived statuses', async () => {
+    const archiveDir = resolveArchiveDir(identity.projectId, identity.issueId);
+    await ensureDir(archiveDir);
+    await writeFile(join(archiveDir, '2026-05-13_old.json'), JSON.stringify({ ...baseStatus, name: 'Old' }), 'utf8');
+    await writeFile(join(archiveDir, '2026-05-14_one.json'), JSON.stringify({ ...baseStatus, name: 'One' }), 'utf8');
+    await writeFile(join(archiveDir, '2026-05-15_two.json'), JSON.stringify({ ...baseStatus, name: 'Two' }), 'utf8');
+    await ensureDir(join(tempDir!, 'memory/panopticon-cli/PAN-1052'));
+    await writeFile(resolveStatusFile(identity.projectId, identity.issueId), JSON.stringify({ ...baseStatus, name: 'Three' }), 'utf8');
+
+    await commitStatusRollup({
+      identity,
+      status: { ...baseStatus, name: 'Current' },
+      pendingTurns: [],
+      now: new Date('2026-05-16T22:00:00.000Z'),
+      emitStatusUpdated: () => undefined,
+    });
+
+    expect(await readdir(archiveDir)).toEqual([
+      '2026-05-14_one.json',
+      '2026-05-15_two.json',
+      '2026-05-16_three.json',
+    ]);
   });
 });
