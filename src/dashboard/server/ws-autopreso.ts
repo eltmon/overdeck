@@ -1,12 +1,18 @@
 import http from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { autoPresoSession } from '../../autopreso/session.js';
+import { boundedAutoPresoElements } from '../../autopreso/limits.js';
 import { isTrustedOriginForHost } from './routes/origin-validation.js';
 
 function sendJson(ws: WebSocket, payload: unknown): void {
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(payload));
   }
+}
+
+function boundedSnapshotPayload(type: 'whiteboard:snapshot' | 'whiteboard:update') {
+  const snapshot = autoPresoSession.snapshot();
+  return { type, ...snapshot, elements: boundedAutoPresoElements(snapshot.elements) };
 }
 
 function isTrustedWebSocketOrigin(request: http.IncomingMessage): boolean {
@@ -45,9 +51,9 @@ export function setupAutoPresoWebSocket(server: http.Server): void {
   });
 
   wss.on('connection', (ws: WebSocket) => {
-    sendJson(ws, { type: 'whiteboard:snapshot', ...autoPresoSession.snapshot() });
-    const unsubscribe = autoPresoSession.subscribe((snapshot) => {
-      sendJson(ws, { type: 'whiteboard:update', ...snapshot });
+    sendJson(ws, boundedSnapshotPayload('whiteboard:snapshot'));
+    const unsubscribe = autoPresoSession.subscribe(() => {
+      sendJson(ws, boundedSnapshotPayload('whiteboard:update'));
     });
     ws.on('close', unsubscribe);
     ws.on('error', unsubscribe);

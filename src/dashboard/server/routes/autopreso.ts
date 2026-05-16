@@ -1,6 +1,11 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { autoPresoSession, type ExcalidrawElementLike } from '../../../autopreso/session.js';
+import { autoPresoSession } from '../../../autopreso/session.js';
+import {
+  MAX_AUTOPRESO_START_BODY_BYTES,
+  readElementLikes,
+  validateAutoPresoCanvasElements,
+} from '../../../autopreso/limits.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
@@ -8,19 +13,20 @@ import { loadVoiceSettings } from './voice.js';
 
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
+  const contentLength = Number(request.headers['content-length'] ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_AUTOPRESO_START_BODY_BYTES) {
+    return { ok: false as const, error: `AutoPreso start body exceeds ${MAX_AUTOPRESO_START_BODY_BYTES} bytes` };
+  }
   const text = yield* request.text;
+  if (Buffer.byteLength(text, 'utf8') > MAX_AUTOPRESO_START_BODY_BYTES) {
+    return { ok: false as const, error: `AutoPreso start body exceeds ${MAX_AUTOPRESO_START_BODY_BYTES} bytes` };
+  }
   try {
-    return text ? (JSON.parse(text) as unknown) : {};
+    return { ok: true as const, body: text ? (JSON.parse(text) as unknown) : {} };
   } catch {
-    return {};
+    return { ok: true as const, body: {} };
   }
 });
-
-function readElements(body: unknown): readonly ExcalidrawElementLike[] {
-  if (!body || typeof body !== 'object' || !('elements' in body)) return [];
-  const elements = body.elements;
-  return Array.isArray(elements) ? elements.filter((element): element is ExcalidrawElementLike => !!element && typeof element === 'object') : [];
-}
 
 function requireTrustedOrigin(request: HttpServerRequest.HttpServerRequest) {
   const originCheck = validateOrigin(request);
@@ -34,9 +40,13 @@ const startRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const originError = requireTrustedOrigin(request);
     if (originError) return originError;
-    const body = yield* readJsonBody;
+    const parsed = yield* readJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 413 });
+    const elements = readElementLikes(parsed.body);
+    const validation = validateAutoPresoCanvasElements(elements);
+    if (!validation.ok) return jsonResponse({ error: validation.error }, { status: 413 });
     const settings = yield* Effect.promise(loadVoiceSettings);
-    return jsonResponse(autoPresoSession.start(readElements(body), settings));
+    return jsonResponse(autoPresoSession.start(elements, settings));
   })),
 );
 

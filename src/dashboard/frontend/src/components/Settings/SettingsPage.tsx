@@ -398,17 +398,18 @@ export function SettingsPage() {
       settings: SettingsConfig;
       voiceSettings: VoiceSettings;
     }) => {
-      const [response] = await Promise.all([
+      const [response, savedVoiceSettings] = await Promise.all([
         saveSettings(nextSettings),
         saveVoiceSettings(nextVoiceSettings),
       ]);
-      return response;
+      return { response, savedVoiceSettings };
     },
-    onSuccess: (response) => {
+    onSuccess: ({ response, savedVoiceSettings }) => {
       invalidateAvailableModelsCache();
       queryClient.invalidateQueries({ queryKey: ['settings'] });
-      queryClient.invalidateQueries({ queryKey: ['voice-settings'] });
+      queryClient.setQueryData(['voice-settings'], savedVoiceSettings);
       queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
+      setVoiceFormData(savedVoiceSettings);
 
       // Show success toast
       toast.success('Settings saved successfully');

@@ -56,15 +56,16 @@ async function writeLauncherScriptAtomic(launcherScript: string, content: string
 }
 
 /**
- * BFS-walk a process subtree rooted at `rootPid` looking for the Claude Code
- * runtime (comm == 'claude'). Returns true if any process in the tree matches,
+ * BFS-walk a process subtree rooted at `rootPid` looking for the active agent
+ * runtime. Returns true if any process in the tree matches the expected harness,
  * false if the tree exists but no match, false on any error.
  *
  * Used by sendAgentMessage zombie detection. pane_pid is the tmux pane's root
- * process, which is bash for work-agent launchers (`bash launcher.sh`) but
- * claude directly for specialists (`exec claude ...`).
+ * process, which is bash for work-agent launchers (`bash launcher.sh`) but can
+ * be the runtime directly for specialists (`exec claude ...` / `exec pi ...`).
  */
-async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
+async function hasAgentRuntimeInSubtree(rootPid: string, harness: 'claude-code' | 'pi' = 'claude-code'): Promise<boolean> {
+  const expectedProcessNames = harness === 'pi' ? new Set(['pi']) : new Set(['claude']);
   const queue: string[] = [rootPid];
   const seen = new Set<string>();
   while (queue.length > 0) {
@@ -75,7 +76,7 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
     try {
       const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
       const name = comm.trim();
-      if (name === 'claude') return true;
+      if (expectedProcessNames.has(name)) return true;
     } catch {
       continue;
     }
@@ -2730,10 +2731,11 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   // Launchers differ: specialists `exec claude` so pane_pid IS claude, but
   // work-agent launchers run `bash launcher.sh` so pane_pid is bash and claude
   // runs as a descendant. Walk the pane's process subtree and treat the pane
-  // as live if any descendant is a claude runtime.
+  // as live if any descendant is the expected runtime for the saved harness.
   const panePids = await listPaneValuesAsync(normalizedId, '#{pane_pid}');
-  if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0]))) {
-    console.warn(`[agents] ${normalizedId} tmux session is a zombie (no Claude) — attempting resume`);
+  const expectedHarness = agentState?.harness ?? 'claude-code';
+  if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0], expectedHarness))) {
+    console.warn(`[agents] ${normalizedId} tmux session is a zombie (no ${expectedHarness} runtime) — attempting resume`);
     const resumeResult = await resumeAgent(normalizedId, message);
     if (resumeResult.success) {
       return;
