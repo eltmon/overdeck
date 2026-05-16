@@ -18,6 +18,17 @@ import type { DomainEvent } from '@panctl/contracts';
 import type { Role } from './agents.js';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';
+export type ActivitySource =
+  | Role
+  | 'cloister'
+  | 'dashboard'
+  | 'planning-agent'
+  | 'work-agent'
+  | 'review-specialist'
+  | 'test-specialist'
+  | 'merge-agent'
+  | 'tts-summarizer'
+  | 'deploy-script';
 
 export interface EmitActivityOptions {
   source: Role | 'cloister' | 'dashboard';
@@ -40,6 +51,8 @@ export interface EmitTtsOptions {
   utterance: string;
   priority?: number; // 0=error (interrupt), 1=warn/success, 2=info
   issueId?: string;
+  source?: ActivitySource;
+  eventType?: string;
 }
 
 /**
@@ -117,6 +130,8 @@ export function emitActivityTts(options: EmitTtsOptions): void {
         utterance: normalizeForSpeech(options.utterance),
         priority: options.priority ?? 2,
         issueId: options.issueId,
+        source: options.source,
+        eventType: options.eventType,
       },
     };
     store.append(entry);

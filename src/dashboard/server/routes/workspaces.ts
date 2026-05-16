@@ -5183,6 +5183,8 @@ const postForgeApproveRoute = HttpRouter.add(
           utterance: `Merge approved for ${issueId}`,
           priority: 1,
           issueId,
+          source: 'dashboard',
+          eventType: 'merge.approved',
         });
       }
 
@@ -5292,6 +5294,8 @@ const postForgeMergeRoute = HttpRouter.add(
           utterance: `${issueId} has been merged`,
           priority: 1,
           issueId,
+          source: 'dashboard',
+          eventType: 'forgeMerge.merged',
         });
       }
 

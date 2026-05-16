@@ -1240,6 +1240,8 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       utterance: `${id} planning complete, ready for work`,
       priority: 2,
       issueId: id,
+      source: 'planning-agent',
+      eventType: 'planning.complete',
     });
 
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later

@@ -142,7 +142,12 @@ async function flush(): Promise<void> {
   const priority = hasError ? 0 : hasWarn ? 1 : 2;
 
   try {
-    emitActivityTts({ utterance, priority });
+    emitActivityTts({
+      utterance,
+      priority,
+      source: 'tts-summarizer',
+      eventType: 'ttsSummary.generated',
+    });
   } catch {
     // Non-fatal
   }

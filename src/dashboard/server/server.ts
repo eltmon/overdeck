@@ -274,7 +274,12 @@ export const makeServerLayer = Layer.unwrap(
             level: 'success',
             message: `Dashboard started in ${mode}`,
           });
-          emitActivityTts({ utterance: `Dashboard started in ${mode}`, priority: 2 });
+          emitActivityTts({
+            utterance: `Dashboard started in ${mode}`,
+            priority: 2,
+            source: 'dashboard',
+            eventType: 'dashboard.started',
+          });
         });
       }),
     );

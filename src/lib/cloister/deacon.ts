@@ -4902,6 +4902,8 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
             : `Deacon auto resumed agent ${agentId}`,
           priority: 1,
           issueId,
+          source: 'cloister',
+          eventType: 'agent.autoResumed',
         });
       } else {
         const msg = `Failed to auto-resume ${agentId}: ${result.error}`;

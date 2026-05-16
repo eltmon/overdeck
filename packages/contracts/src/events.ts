@@ -666,6 +666,8 @@ export const ActivityTtsEvent = Schema.Struct({
     utterance: Schema.String,
     priority: Schema.optional(Schema.Number),
     issueId: Schema.optional(IssueId),
+    source: Schema.optional(Schema.String),
+    eventType: Schema.optional(Schema.String),
   }),
 })
 export type ActivityTtsEvent = typeof ActivityTtsEvent.Type

@@ -302,7 +302,13 @@ export function setReviewStatus(
     };
     const entry = vMap[update.verificationStatus];
     if (entry) emitActivityEntry({ source: 'cloister', level: entry.level, message: entry.msg, details: update.verificationNotes, issueId });
-    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
+    if (entry?.tts) emitActivityTts({
+      utterance: entry.tts,
+      priority: entry.level === 'error' ? 0 : 1,
+      issueId,
+      source: 'cloister',
+      eventType: `verificationStatus.${update.verificationStatus}`,
+    });
   }
   if (update.reviewStatus && update.reviewStatus !== status.reviewStatus) {
     let reviewMsg = `${issueId} — review started`;
@@ -320,7 +326,13 @@ export function setReviewStatus(
     };
     const entry = rMap[update.reviewStatus];
     if (entry) emitActivityEntry({ source: 'review', level: entry.level, message: entry.msg, details: update.reviewNotes, issueId });
-    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
+    if (entry?.tts) emitActivityTts({
+      utterance: entry.tts,
+      priority: entry.level === 'error' ? 0 : 1,
+      issueId,
+      source: 'review-specialist',
+      eventType: `reviewStatus.${update.reviewStatus}`,
+    });
   }
   if (update.testStatus && update.testStatus !== status.testStatus) {
     const tMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
@@ -332,7 +344,13 @@ export function setReviewStatus(
     };
     const entry = tMap[update.testStatus];
     if (entry) emitActivityEntry({ source: 'test', level: entry.level, message: entry.msg, details: update.testNotes, issueId });
-    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
+    if (entry?.tts) emitActivityTts({
+      utterance: entry.tts,
+      priority: entry.level === 'error' ? 0 : 1,
+      issueId,
+      source: 'test-specialist',
+      eventType: `testStatus.${update.testStatus}`,
+    });
   }
   if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
     const mMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
@@ -344,11 +362,23 @@ export function setReviewStatus(
     };
     const entry = mMap[update.mergeStatus];
     if (entry) emitActivityEntry({ source: 'ship', level: entry.level, message: entry.msg, details: update.mergeNotes, issueId });
-    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
+    if (entry?.tts) emitActivityTts({
+      utterance: entry.tts,
+      priority: entry.level === 'error' ? 0 : 1,
+      issueId,
+      source: 'merge-agent',
+      eventType: `mergeStatus.${update.mergeStatus}`,
+    });
   }
   if (update.readyForMerge === true && !status.readyForMerge) {
     emitActivityEntry({ source: 'cloister', level: 'success', message: `${issueId} — ready for merge`, issueId });
-    emitActivityTts({ utterance: `${issueId} ready for merge`, priority: 1, issueId });
+    emitActivityTts({
+      utterance: `${issueId} ready for merge`,
+      priority: 1,
+      issueId,
+      source: 'cloister',
+      eventType: 'readyForMerge',
+    });
   }
 
   // Reactive Cloister owns review→test and test→ship scheduling. setReviewStatus

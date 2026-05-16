@@ -280,7 +280,12 @@ const emitShutdownActivity = () => {
       level: 'info',
       message: 'Dashboard stopping',
     });
-    emitActivityTts({ utterance: 'Dashboard stopping', priority: 2 });
+    emitActivityTts({
+      utterance: 'Dashboard stopping',
+      priority: 2,
+      source: 'dashboard',
+      eventType: 'dashboard.stopping',
+    });
   } catch { /* non-fatal */ }
 };
 process.once('SIGTERM', () => {
