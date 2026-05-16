@@ -294,17 +294,17 @@ export function setReviewStatus(
   // Emit activity log entries for meaningful pipeline state transitions.
   // Each transition produces one entry so the ActivityPanel shows live pipeline progress.
   if (update.verificationStatus && update.verificationStatus !== status.verificationStatus) {
-    const vMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
+    const vMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string; ttsPriority?: number }> = {
       running:  { level: 'info',    msg: `${issueId} — verification running`, tts: `${issueId} verification running` },
       passed:   { level: 'success', msg: `${issueId} — verification passed`, tts: `${issueId} verification passed` },
       failed:   { level: 'error',   msg: `${issueId} — verification failed`, tts: `${issueId} verification failed` },
-      skipped:  { level: 'info',    msg: `${issueId} — verification skipped` },
+      skipped:  { level: 'info',    msg: `${issueId} — verification skipped`, tts: `${issueId} verification skipped`, ttsPriority: 2 },
     };
     const entry = vMap[update.verificationStatus];
     if (entry) emitActivityEntry({ source: 'cloister', level: entry.level, message: entry.msg, details: update.verificationNotes, issueId });
     if (entry?.tts) emitActivityTts({
       utterance: entry.tts,
-      priority: entry.level === 'error' ? 0 : 1,
+      priority: entry.ttsPriority ?? (entry.level === 'error' ? 0 : 1),
       issueId,
       source: 'cloister',
       eventType: `verificationStatus.${update.verificationStatus}`,
@@ -335,18 +335,18 @@ export function setReviewStatus(
     });
   }
   if (update.testStatus && update.testStatus !== status.testStatus) {
-    const tMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
-      testing:         { level: 'info',    msg: `${issueId} — tests running` },
+    const tMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string; ttsPriority?: number }> = {
+      testing:         { level: 'info',    msg: `${issueId} — tests running`, tts: `${issueId} tests running`, ttsPriority: 2 },
       passed:          { level: 'success', msg: `${issueId} — tests passed`, tts: `${issueId} tests passed` },
       failed:          { level: 'error',   msg: `${issueId} — tests failed`, tts: `${issueId} tests failed` },
-      skipped:         { level: 'info',    msg: `${issueId} — tests skipped` },
-      dispatch_failed: { level: 'warn',    msg: `${issueId} — test dispatch failed` },
+      skipped:         { level: 'info',    msg: `${issueId} — tests skipped`, tts: `${issueId} tests skipped`, ttsPriority: 2 },
+      dispatch_failed: { level: 'warn',    msg: `${issueId} — test dispatch failed`, tts: `${issueId} test dispatch failed`, ttsPriority: 1 },
     };
     const entry = tMap[update.testStatus];
     if (entry) emitActivityEntry({ source: 'test', level: entry.level, message: entry.msg, details: update.testNotes, issueId });
     if (entry?.tts) emitActivityTts({
       utterance: entry.tts,
-      priority: entry.level === 'error' ? 0 : 1,
+      priority: entry.ttsPriority ?? (entry.level === 'error' ? 0 : 1),
       issueId,
       source: 'test-specialist',
       eventType: `testStatus.${update.testStatus}`,
