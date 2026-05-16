@@ -121,6 +121,10 @@ interface SaveSettingsResponse {
   warnings?: string[];
 }
 
+export function buildTtsAutosavePayload(latest: SettingsConfig, tts: TtsConfig): SettingsConfig {
+  return { ...latest, tts };
+}
+
 async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsResponse> {
   // PAN-1048 review feedback 004 (C4): WorkhorsePanel and RolesPanel save
   // workhorses + roles via their own PUTs. SettingsPage's parent formData is
@@ -314,7 +318,7 @@ export function SettingsPage() {
   const [activeSection, setActiveSection] = useState('model-routing');
   const [activeTtsVoiceTab, setActiveTtsVoiceTab] = useState<'presets' | 'design'>('presets');
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
-  const pendingTtsSaveRef = useRef<SettingsConfig | null>(null);
+  const pendingTtsSaveRef = useRef<TtsConfig | null>(null);
   const ttsSaveInFlightRef = useRef(false);
 
   const scrollToSection = useCallback((id: string) => {
@@ -389,7 +393,7 @@ export function SettingsPage() {
     },
   });
 
-  const queueTtsSave = useCallback((next: SettingsConfig) => {
+  const queueTtsSave = useCallback((next: TtsConfig) => {
     pendingTtsSaveRef.current = next;
     if (ttsSaveInFlightRef.current) return;
 
@@ -404,7 +408,8 @@ export function SettingsPage() {
 
         pendingTtsSaveRef.current = null;
         try {
-          await saveMutation.mutateAsync(snapshot);
+          const latest = await fetchSettings();
+          await saveMutation.mutateAsync(buildTtsAutosavePayload(latest, snapshot));
         } catch {
           void 0;
         }
@@ -475,15 +480,16 @@ export function SettingsPage() {
   };
 
   const handleTtsConfigChange = (patch: Partial<TtsConfig>) => {
+    const nextTts = {
+      ...formData.tts,
+      ...patch,
+    };
     const next: SettingsConfig = {
       ...formData,
-      tts: {
-        ...formData.tts,
-        ...patch,
-      },
+      tts: nextTts,
     };
     setFormData(next);
-    queueTtsSave(next);
+    queueTtsSave(nextTts);
   };
 
   const handleTtsVoiceMapChange = (eventKey: string, voiceId: string) => {

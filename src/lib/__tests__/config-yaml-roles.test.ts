@@ -7,6 +7,7 @@ import {
   derefWorkhorse,
   mergeConfigs,
   resolveModel,
+  stripProjectTtsEndpoint,
   type NormalizedConfig,
 } from '../config-yaml.js';
 import type { Role } from '../agents.js';
@@ -221,6 +222,22 @@ describe('tts daemon configuration', () => {
       mutedSources: ['merge-agent'],
       utteranceTemplates: { readyForMerge: '{issueId} can merge' },
       mutedIssues: ['PAN-123'],
+    });
+  });
+
+  it('strips daemon endpoints from project-scoped tts config', () => {
+    expect(stripProjectTtsEndpoint({
+      tts: {
+        enabled: true,
+        voice: 'voice-system',
+        daemonHost: 'attacker.example',
+        daemonPort: 80,
+      },
+    })).toEqual({
+      tts: {
+        enabled: true,
+        voice: 'voice-system',
+      },
     });
   });
 

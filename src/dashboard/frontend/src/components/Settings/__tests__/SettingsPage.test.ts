@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { buildMiniMaxFormData } from '../SettingsPage';
+import { buildMiniMaxFormData, buildTtsAutosavePayload } from '../SettingsPage';
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import type { SettingsConfig } from '../types';
 
@@ -81,11 +81,12 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsTemplateChange(eventKey');
   });
 
-  it('serializes TTS settings autosaves through a latest-snapshot queue', () => {
-    expect(SETTINGS_PAGE_SOURCE).toContain('pendingTtsSaveRef');
+  it('serializes TTS settings autosaves through a TTS-only latest-snapshot queue', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('pendingTtsSaveRef = useRef<TtsConfig | null>(null)');
     expect(SETTINGS_PAGE_SOURCE).toContain('ttsSaveInFlightRef');
-    expect(SETTINGS_PAGE_SOURCE).toContain('saveMutation.mutateAsync(snapshot)');
-    expect(SETTINGS_PAGE_SOURCE).toContain('queueTtsSave(next)');
+    expect(SETTINGS_PAGE_SOURCE).toContain('const latest = await fetchSettings()');
+    expect(SETTINGS_PAGE_SOURCE).toContain('saveMutation.mutateAsync(buildTtsAutosavePayload(latest, snapshot))');
+    expect(SETTINGS_PAGE_SOURCE).toContain('queueTtsSave(nextTts)');
   });
 });
 
@@ -94,6 +95,25 @@ describe('MODELS_BY_PROVIDER', () => {
     const allModelIds = Object.values(MODELS_BY_PROVIDER).flatMap(p => p.models.map(m => m.id));
     const found = DEPRECATED_MODEL_IDS.filter(dep => allModelIds.includes(dep as never));
     expect(found).toEqual([]);
+  });
+});
+
+
+describe('buildTtsAutosavePayload', () => {
+  it('overlays only TTS settings onto the latest server snapshot', () => {
+    const latest: SettingsConfig = {
+      ...MINIMAX_DEFAULTS,
+      api_keys: { openai: 'server-key' },
+      tracker_keys: { github: 'server-token' },
+      tmux: { config_mode: 'managed' },
+      tts: { enabled: false, volume: 0.4 },
+    };
+    const result = buildTtsAutosavePayload(latest, { enabled: true, volume: 0.8 });
+
+    expect(result).toEqual({
+      ...latest,
+      tts: { enabled: true, volume: 0.8 },
+    });
   });
 });
 

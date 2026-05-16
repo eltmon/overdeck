@@ -9,7 +9,7 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
 import { ModelId } from './settings.js';
@@ -674,14 +674,21 @@ function loadYamlFile(filePath: string): YamlConfig | null {
 function findProjectRoot(startDir: string = process.cwd()): string | null {
   let currentDir = startDir;
 
-  while (currentDir !== '/') {
+  while (true) {
     if (existsSync(join(currentDir, '.git'))) {
       return currentDir;
     }
-    currentDir = join(currentDir, '..');
-  }
 
-  return null;
+    const parent = dirname(currentDir);
+    if (parent === currentDir) return null;
+    currentDir = parent;
+  }
+}
+
+export function stripProjectTtsEndpoint(config: YamlConfig | null): YamlConfig | null {
+  if (!config?.tts) return config;
+  const { daemonHost: _daemonHost, daemonPort: _daemonPort, ...tts } = config.tts;
+  return { ...config, tts };
 }
 
 /**
@@ -695,7 +702,7 @@ function loadProjectConfig(): YamlConfig | null {
 
   const newConfigPath = join(projectRoot, '.pan.yaml');
   if (existsSync(newConfigPath)) {
-    return loadYamlFile(newConfigPath);
+    return stripProjectTtsEndpoint(loadYamlFile(newConfigPath));
   }
 
   const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
@@ -703,7 +710,7 @@ function loadProjectConfig(): YamlConfig | null {
     process.stderr.write(
       `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
     );
-    return loadYamlFile(legacyConfigPath);
+    return stripProjectTtsEndpoint(loadYamlFile(legacyConfigPath));
   }
 
   return null;
