@@ -332,7 +332,7 @@
       {
         "id": "docs-workspace-containers",
         "title": "Document the workspace container contract, failure surfaces, and break-glass flags",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -348,13 +348,13 @@
           {
             "id": "docs-workspace-containers.ac1",
             "title": "New doc `docs/WORKSPACE-CONTAINERS.md` exists and covers init contract, stack health surfacing, spawn gate + --host, and the reap/rebuild commands.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           },
           {
             "id": "docs-workspace-containers.ac2",
             "title": "CLAUDE.md links to the new doc; `.claude/rules/single-deacon-invariant.md` cross-links to it.",
-            "status": "pending",
+            "status": "completed",
             "metadata": { "kind": "acceptance_criterion" }
           }
         ]
