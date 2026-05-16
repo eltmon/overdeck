@@ -37,6 +37,7 @@ export function useAutoPresoWebSocket() {
   const voiceSocketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const reconnectAttemptRef = useRef(0);
+  const shouldReconnectRef = useRef(true);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
@@ -60,20 +61,12 @@ export function useAutoPresoWebSocket() {
       }
     };
     socket.onclose = () => {
-      if (whiteboardSocketRef.current !== socket) return;
+      if (!shouldReconnectRef.current || whiteboardSocketRef.current !== socket) return;
       const delay = Math.min(1000 * 2 ** reconnectAttemptRef.current, 10000);
       reconnectAttemptRef.current += 1;
       reconnectTimerRef.current = window.setTimeout(connectWhiteboard, delay);
     };
   }, []);
-
-  useEffect(() => {
-    connectWhiteboard();
-    return () => {
-      if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
-      whiteboardSocketRef.current?.close();
-    };
-  }, [connectWhiteboard]);
 
   const stopListening = useCallback(() => {
     setIsListening(false);
@@ -91,6 +84,20 @@ export function useAutoPresoWebSocket() {
     mediaStreamRef.current = null;
     setAnalyserNode(null);
   }, []);
+
+  useEffect(() => {
+    shouldReconnectRef.current = true;
+    connectWhiteboard();
+    return () => {
+      shouldReconnectRef.current = false;
+      if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+      const socket = whiteboardSocketRef.current;
+      whiteboardSocketRef.current = null;
+      socket?.close();
+      stopListening();
+    };
+  }, [connectWhiteboard, stopListening]);
 
   const startListening = useCallback(async () => {
     if (isListening) return;

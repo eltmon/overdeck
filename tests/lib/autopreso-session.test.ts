@@ -54,6 +54,18 @@ describe('createWhiteboardSession', () => {
     }
   });
 
+  it('rejects pending transcript turns once the busy-agent queue is full', () => {
+    vi.spyOn(agent, 'runWhiteboardAgent').mockImplementation(() => new Promise(() => {}));
+    const session = createWhiteboardSession();
+    session.mode = 'live';
+
+    expect(session.processTranscript('active turn', { autopreso: { provider: 'openai', model: 'gpt-4.1-mini' } }).accepted).toBe(true);
+    for (let index = 0; index < 8; index += 1) {
+      expect(session.processTranscript(`queued turn ${index}`, { autopreso: { provider: 'openai', model: 'gpt-4.1-mini' } })).toMatchObject({ accepted: true, coalesced: true });
+    }
+    expect(session.processTranscript('overflow turn', { autopreso: { provider: 'openai', model: 'gpt-4.1-mini' } })).toMatchObject({ accepted: false, coalesced: true });
+  });
+
   it('resets to staging state', () => {
     const session = createWhiteboardSession();
     session.start([{ id: 'one' }]);

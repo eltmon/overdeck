@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type VoiceMessage =
   | { type: 'transcript:partial'; text: string }
@@ -105,6 +105,8 @@ export function useVoiceTranscription({ onCommitted }: { onCommitted?: (text: st
     setPartialText('');
     setCommittedText('');
   }, []);
+
+  useEffect(() => stop, [stop]);
 
   return { start, stop, partialText, committedText, isListening, error, analyserNode, resetTranscript };
 }

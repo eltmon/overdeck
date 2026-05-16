@@ -18,7 +18,8 @@ interface AutoPresoSnapshot {
 type AutoPresoListener = (snapshot: AutoPresoSnapshot) => void;
 
 type QueuedTranscript = {
-  transcript: string;
+  transcripts: string[];
+  byteLength: number;
   settings: AutoPresoAgentSettings;
 };
 
@@ -45,6 +46,8 @@ export interface AutoPresoSession {
 const MAX_WARMUP_ATTEMPTS = 8;
 const INITIAL_WARMUP_BACKOFF_MS = 2000;
 const MAX_WARMUP_BACKOFF_MS = 30000;
+const MAX_PENDING_TRANSCRIPT_BYTES = 16_384;
+const MAX_PENDING_TRANSCRIPT_TURNS = 8;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -116,10 +119,16 @@ export function createWhiteboardSession(): AutoPresoSession {
       if (session.mode !== 'live') {
         return { accepted: false, coalesced: false, snapshot: session.snapshot() };
       }
+      const encodedLength = Buffer.byteLength(transcript, 'utf8');
+      const nextTurnCount = (pendingTranscript?.transcripts.length ?? 0) + 1;
+      const nextByteLength = (pendingTranscript?.byteLength ?? 0) + encodedLength;
+      if (nextTurnCount > MAX_PENDING_TRANSCRIPT_TURNS || nextByteLength > MAX_PENDING_TRANSCRIPT_BYTES) {
+        return { accepted: false, coalesced: activeTranscriptRun !== null, snapshot: session.snapshot() };
+      }
       const coalesced = activeTranscriptRun !== null;
       pendingTranscript = pendingTranscript
-        ? { transcript: `${pendingTranscript.transcript}\n${transcript}`, settings }
-        : { transcript, settings };
+        ? { transcripts: [...pendingTranscript.transcripts, transcript], byteLength: nextByteLength, settings }
+        : { transcripts: [transcript], byteLength: encodedLength, settings };
       runNextTranscript(warmupGeneration);
       return { accepted: true, coalesced, snapshot: session.snapshot() };
     },
@@ -141,7 +150,7 @@ export function createWhiteboardSession(): AutoPresoSession {
     pendingTranscript = null;
     activeTranscriptRun = (async () => {
       if (generation !== warmupGeneration || session.mode !== 'live') return;
-      await runWhiteboardAgent(next.transcript, session, next.settings);
+      await runWhiteboardAgent(next.transcripts.join('\n'), session, next.settings);
       if (generation !== warmupGeneration || session.mode !== 'live') return;
       notify();
     })().catch((error) => {

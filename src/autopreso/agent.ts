@@ -44,7 +44,9 @@ async function createModel(settings: AutoPresoAgentSettings) {
     return createOpenAI({ apiKey: process.env.OPENAI_API_KEY })(model);
   }
   if (provider === 'codex') {
-    return createOpenAI({ apiKey: await readCodexBearerToken() })(model);
+    const baseURL = process.env.AUTOPRESO_CODEX_BASE_URL;
+    if (!baseURL) throw new Error('AUTOPRESO_CODEX_BASE_URL must be set to use the Codex AutoPreso provider');
+    return createOpenAI({ apiKey: await readCodexBearerToken(), baseURL })(model);
   }
   return createOpenAI({ apiKey: 'ollama', baseURL: 'http://localhost:11434/v1' })(model);
 }
