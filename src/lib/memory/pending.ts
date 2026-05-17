@@ -20,6 +20,7 @@ export type EnqueueStatusRollup = (job: StatusRollupJob) => void | Promise<void>
 export interface StatusRollupTriggerOptions {
   enqueueStatusRollup?: EnqueueStatusRollup;
   loadThreshold?: () => number | Promise<number>;
+  triggerRollup?: boolean;
 }
 
 export type StatusRollupTriggerResult =
@@ -48,7 +49,7 @@ export async function writePendingTurn(turn: PendingTurn, options: StatusRollupT
 
   await writeFile(tempPath, `${JSON.stringify(turn, null, 2)}\n`, 'utf8');
   await rename(tempPath, path);
-  await maybeTriggerStatusRollup(turn.identity, options);
+  if (options.triggerRollup !== false) await maybeTriggerStatusRollup(turn.identity, options);
 
   return { path, fileName };
 }
