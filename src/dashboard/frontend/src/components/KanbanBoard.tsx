@@ -23,7 +23,7 @@ import {
 */
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState, type StartAgentResponse } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw, Radio } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw, Radio, Unlock } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -41,6 +41,7 @@ import { MergeButton } from './MergeButton';
 import { RecoverButton } from './RecoverButton';
 import { getPendingQuestionTitle, hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { getIssueWorkAgentMap, getWorkSessionLabel, isAgentSessionAttachable } from '../lib/swarmSlots';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useBulkSelection } from '../hooks/useBulkSelection';
@@ -50,6 +51,7 @@ import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgre
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
 import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
 import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
+import { NO_RESUME_QUERY_KEY, type NoResumeMode } from './NoResumeBanner';
 
 
 // Parity registry anchor — keeps the card action surface tied to the
@@ -2726,6 +2728,7 @@ interface IssueCardProps {
 
 export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp, workspace: workspaceProp }: IssueCardProps) {
   const queryClient = useQueryClient();
+  const noResumeMode = queryClient.getQueryData<NoResumeMode>(NO_RESUME_QUERY_KEY);
   const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -2790,6 +2793,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
 
   // For display in terminal viewer and INPUT badge, prefer work agent, fall back to planning agent
   const agent = activeAgent || planningAgent;
+  const controlledAgent = activeAgent && (activeAgent.role ?? 'work') === 'work' ? activeAgent : undefined;
 
   // Compute agent idle duration for "inactive" badge
   const agentIdleMinutes = (() => {
@@ -2816,6 +2820,32 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     canonical === 'in_review' ? (isReadyToMerge ? 'Awaiting merge' : isPipelineStuck ? 'Needs recovery' : 'Review pipeline') :
     canonical === 'done' ? 'Completed' :
     'Canceled';
+  const controlledAgentCompletedStopped = controlledAgent?.status === 'stopped' && controlledAgent.runtimeState === 'completed' && controlledAgent.paused !== true && controlledAgent.troubled !== true;
+  const pauseTitle = [
+    'Paused',
+    controlledAgent?.pausedReason ? `Reason: ${controlledAgent.pausedReason}` : undefined,
+    controlledAgent?.pausedAt ? `Paused: ${formatRelativeTime(controlledAgent.pausedAt, new Date())}` : undefined,
+  ].filter(Boolean).join('\n');
+  const troubledTitle = controlledAgent ? [
+    `${controlledAgent.consecutiveFailures ?? 0} consecutive failure${(controlledAgent.consecutiveFailures ?? 0) === 1 ? '' : 's'}`,
+    controlledAgent.lastFailureReason ? `Last reason: ${controlledAgent.lastFailureReason}` : undefined,
+    controlledAgent.lastFailureAt ? `Last failure: ${formatRelativeTime(controlledAgent.lastFailureAt, new Date())}` : undefined,
+    controlledAgent.lastFailureNextRetryAt ? `Next retry: ${formatRelativeTime(controlledAgent.lastFailureNextRetryAt, new Date())}` : undefined,
+  ].filter(Boolean).join('\n') : '';
+  const agentGatingReason = controlledAgent && !isRunning && !controlledAgentCompletedStopped
+    ? controlledAgent.paused === true
+      ? 'Paused'
+      : controlledAgent.troubled === true
+        ? `Troubled (${controlledAgent.consecutiveFailures ?? 0} failure${(controlledAgent.consecutiveFailures ?? 0) === 1 ? '' : 's'})`
+        : noResumeMode?.active === true
+          ? 'Boot --no-resume'
+          : canonical === 'in_progress'
+            ? 'Manual'
+            : undefined
+    : undefined;
+  const agentGatingTitle = agentGatingReason === 'Boot --no-resume' && noResumeMode?.since
+    ? `No-resume mode active since ${formatRelativeTime(noResumeMode.since, new Date())}`
+    : agentGatingReason;
   const cardTone = isStackUnhealthy || isPipelineStuck
     ? 'from-destructive/12 via-destructive/5 to-transparent'
     : isReadyToMerge
@@ -2885,6 +2915,68 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   // Send message mutation
   const [messageInput, setMessageInput] = useState('');
   const [showMessageInput, setShowMessageInput] = useState(false);
+  const [showPauseReason, setShowPauseReason] = useState(false);
+  const [pauseReason, setPauseReason] = useState('');
+
+  const pauseAgentMutation = useMutation({
+    mutationFn: async ({ agentId, reason }: { agentId: string; reason?: string }) => {
+      const res = await fetch(`/api/agents/${agentId}/pause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reason ? { reason } : {}),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to pause agent');
+      }
+      return res.json();
+    },
+    onSuccess: async (_updated, variables) => {
+      await refreshDashboardState(queryClient);
+      setShowPauseReason(false);
+      setPauseReason('');
+      showAlert({ message: `Paused ${variables.agentId}`, variant: 'success' });
+    },
+    onError: (error: Error) => {
+      showAlert({ message: `Failed to pause agent: ${error.message}`, variant: 'error' });
+    },
+  });
+
+  const unpauseAgentMutation = useMutation({
+    mutationFn: async (agentId: string) => {
+      const res = await fetch(`/api/agents/${agentId}/unpause`, { method: 'POST' });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to unpause agent');
+      }
+      return res.json();
+    },
+    onSuccess: async (_updated, agentId) => {
+      await refreshDashboardState(queryClient);
+      showAlert({ message: `Unpaused ${agentId}`, variant: 'success' });
+    },
+    onError: (error: Error) => {
+      showAlert({ message: `Failed to unpause agent: ${error.message}`, variant: 'error' });
+    },
+  });
+
+  const clearTroubledAgentMutation = useMutation({
+    mutationFn: async (agentId: string) => {
+      const res = await fetch(`/api/agents/${agentId}/untroubled`, { method: 'POST' });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || 'Failed to clear troubled state');
+      }
+      return res.json();
+    },
+    onSuccess: async (_updated, agentId) => {
+      await refreshDashboardState(queryClient);
+      showAlert({ message: `Cleared troubled state for ${agentId}`, variant: 'success' });
+    },
+    onError: (error: Error) => {
+      showAlert({ message: `Failed to clear troubled state: ${error.message}`, variant: 'error' });
+    },
+  });
 
   const sendMessageMutation = useMutation({
     mutationFn: async ({ agentId, message }: { agentId: string; message: string }) => {
@@ -2905,6 +2997,34 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const handleTell = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMessageInput(!showMessageInput);
+  };
+
+  const handlePauseClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowPauseReason(true);
+  };
+
+  const handlePauseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!controlledAgent) return;
+    pauseAgentMutation.mutate({ agentId: controlledAgent.id, reason: pauseReason.trim() || undefined });
+  };
+
+  const handlePauseCancel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowPauseReason(false);
+    setPauseReason('');
+  };
+
+  const handleUnpause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (controlledAgent) unpauseAgentMutation.mutate(controlledAgent.id);
+  };
+
+  const handleClearTroubled = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (controlledAgent) clearTroubledAgentMutation.mutate(controlledAgent.id);
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -3078,6 +3198,46 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     onPlan(autoStart);
   };
 
+  const agentLifecycleControls = controlledAgent ? (
+    <>
+      {controlledAgent.paused === true ? (
+        <button
+          onClick={handleUnpause}
+          disabled={unpauseAgentMutation.isPending}
+          className="flex items-center gap-1 text-xs text-success hover:text-success/80 transition-colors disabled:opacity-50"
+          title={controlledAgent.pausedReason ? `Unpause agent (${controlledAgent.pausedReason})` : 'Unpause agent'}
+          data-testid={`card-agent-unpause-${issue.identifier}`}
+        >
+          {unpauseAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />}
+          Unpause
+        </button>
+      ) : (
+        <button
+          onClick={handlePauseClick}
+          disabled={pauseAgentMutation.isPending}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-warning transition-colors disabled:opacity-50"
+          title="Pause agent"
+          data-testid={`card-agent-pause-${issue.identifier}`}
+        >
+          {pauseAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Pause className="w-3.5 h-3.5" />}
+          Pause
+        </button>
+      )}
+      {controlledAgent.troubled === true && (
+        <button
+          onClick={handleClearTroubled}
+          disabled={clearTroubledAgentMutation.isPending}
+          className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors disabled:opacity-50"
+          title={troubledTitle || 'Clear troubled state'}
+          data-testid={`card-agent-clear-troubled-${issue.identifier}`}
+        >
+          {clearTroubledAgentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+          Clear troubled
+        </button>
+      )}
+    </>
+  ) : null;
+
   // Deep wipe is now handled by the DeepWipeDialog component (PAN-461)
 
   return (
@@ -3240,6 +3400,35 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-warning-foreground animate-pulse" />
                 Session lost
+              </span>
+            )}
+            {controlledAgent?.paused === true && (
+              <span
+                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border"
+                title={pauseTitle}
+                data-testid={`card-agent-paused-${issue.identifier}`}
+              >
+                <Pause className="w-3 h-3" />
+                Paused
+              </span>
+            )}
+            {controlledAgent?.troubled === true && (
+              <span
+                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded badge-bg-destructive text-destructive-foreground"
+                title={troubledTitle || 'Troubled'}
+                data-testid={`card-agent-troubled-${issue.identifier}`}
+              >
+                <AlertTriangle className="w-3 h-3" />
+                Troubled
+              </span>
+            )}
+            {agentGatingReason && (
+              <span
+                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-orange-500/15 text-orange-300 border border-orange-500/30"
+                title={agentGatingTitle}
+                data-testid={`card-agent-gating-${issue.identifier}`}
+              >
+                {agentGatingReason}
               </span>
             )}
             {/* Agent attribution badges */}
@@ -3566,6 +3755,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       {isRunning && (
         <div className={actionBarClass}>
           {artifactLinks}
+          {agentLifecycleControls}
           <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
@@ -3630,6 +3820,43 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
         </form>
       )}
 
+      {showPauseReason && controlledAgent && (
+        <form
+          onSubmit={handlePauseSubmit}
+          className="mt-2"
+          onClick={(e) => e.stopPropagation()}
+          data-testid={`card-agent-pause-form-${issue.identifier}`}
+        >
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={pauseReason}
+              onChange={(e) => setPauseReason(e.target.value)}
+              placeholder="Pause reason (optional)"
+              className="flex-1 bg-card text-foreground text-sm px-3 py-1.5 rounded border border-border focus:border-warning focus:outline-none"
+              autoFocus
+              data-testid={`card-agent-pause-reason-${issue.identifier}`}
+            />
+            <button
+              type="submit"
+              disabled={pauseAgentMutation.isPending}
+              className="px-3 py-1.5 bg-warning text-warning-foreground text-sm rounded hover:bg-warning/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid={`card-agent-pause-submit-${issue.identifier}`}
+            >
+              {pauseAgentMutation.isPending ? 'Pausing...' : 'Pause'}
+            </button>
+            <button
+              type="button"
+              onClick={handlePauseCancel}
+              className="px-3 py-1.5 bg-card text-muted-foreground text-sm rounded border border-border hover:text-foreground disabled:opacity-50"
+              data-testid={`card-agent-pause-cancel-${issue.identifier}`}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
       {/* Start/Plan buttons for backlog/todo items without running agent */}
       {!isRunning && (STATUS_LABELS[issue.status] === 'backlog' || STATUS_LABELS[issue.status] === 'todo') && (
         <div className={actionBarClass}>
@@ -3648,6 +3875,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
           {planLabelExists && (
             <>
               {artifactLinks}
+              {agentLifecycleControls}
               <div className="min-w-[220px]" onClick={(e) => e.stopPropagation()}>
                 <ModelHarnessPicker
                   model={launchModel}
@@ -3705,6 +3933,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
             planChip
           )}
           {artifactLinks}
+          {agentLifecycleControls}
           {/* Resume Session only when there's an actual prior work agent to resume.
               For freshly-planned issues with no work agent yet, show Start Agent
               instead (gated on beads existing). */}
@@ -3771,6 +4000,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
             </div>
           )}
           <div className={actionBarClass}>
+            {agentLifecycleControls}
             <MergeButton issueId={issue.identifier} reviewStatus={reviewStatus} variant="card" />
             {((activeAgent?.lifecycle?.canResumeSession ?? false) || isSessionLost || isResuming) && (
             <button

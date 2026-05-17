@@ -17,16 +17,16 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
     process.exit(1);
   }
 
-  const wasRunning = sessionExists(agentId);
+  const shouldStop = sessionExists(agentId) || state.status === 'running' || state.status === 'starting';
 
   try {
-    setAgentPaused(agentId, options.reason, wasRunning || state.status === 'running' || state.status === 'starting');
-    if (wasRunning) {
+    setAgentPaused(agentId, options.reason, shouldStop);
+    if (shouldStop) {
       stopAgent(agentId);
     }
 
     const reason = options.reason ? ` (${options.reason})` : '';
-    const stopped = wasRunning ? ' and stopped' : '';
+    const stopped = shouldStop ? ' and stopped' : '';
     console.log(chalk.green(`Paused${stopped} agent: ${agentId}${reason}`));
   } catch (error: any) {
     console.error(chalk.red('Error: ' + error.message));

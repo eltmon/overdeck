@@ -4269,12 +4269,31 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
 /**
  * Start the deacon patrol loop
  */
+let recoverOrphanedAgentsInFlight: Promise<string[]> | null = null;
+
 /**
  * On startup, detect agents whose state.json claims 'running' or 'starting' but have
  * no live tmux session — this happens after a system crash where tmux was killed but
  * state.json was never updated. Reset them to 'stopped' so resume/re-plan works correctly.
  */
 export async function recoverOrphanedAgents(context?: string): Promise<string[]> {
+  if (recoverOrphanedAgentsInFlight) {
+    logDeaconEvent(`recoverOrphanedAgents coalesced${context ? ` (${context})` : ''}: scan already in flight`);
+    return recoverOrphanedAgentsInFlight;
+  }
+
+  const scan = recoverOrphanedAgentsOnce(context);
+  recoverOrphanedAgentsInFlight = scan;
+  try {
+    return await scan;
+  } finally {
+    if (recoverOrphanedAgentsInFlight === scan) {
+      recoverOrphanedAgentsInFlight = null;
+    }
+  }
+}
+
+async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
   const noResumeMode = getNoResumeMode();
   if (noResumeMode.active) {
     logDeaconEvent(`PANOPTICON_NO_RESUME=1 — skipping recoverOrphanedAgents${context ? ` (${context})` : ''}`);
@@ -5011,25 +5030,17 @@ export function startDeacon(): void {
   console.log(`[deacon] Starting health monitor (patrol every ${config.patrolIntervalMs / 1000}s)`);
   logDeaconEvent(`startDeacon: health monitor starting (patrol every ${config.patrolIntervalMs / 1000}s)`);
 
-  // Recover agents whose tmux sessions were killed by a system crash, THEN
-  // auto-resume the ones that were orphaned. We MUST await recovery so that
-  // state.json is updated to 'stopped' before autoResume scans it — otherwise
-  // autoResume sees 'running' and skips, leaving the agent permanently stuck.
-  recoverOrphanedAgents('Startup recovery')
-    .then(async () => {
-      await autoResumeStoppedWorkAgents();
-    })
-    .catch((err) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[deacon] Startup recovery/auto-resume error:', err);
-      logDeaconEvent(`startDeacon: startup recovery chain error: ${msg}`);
-    });
-
-  // Run initial patrol (includes autoResumeStoppedWorkAgents via runPatrol)
-  runPatrol().catch((err) => {
+  // Recover agents whose tmux sessions were killed by a system crash before the
+  // first patrol. The recovery mutex also coalesces any interval patrol that fires
+  // while startup recovery is still scanning.
+  void (async () => {
+    await recoverOrphanedAgents('Startup recovery');
+    await autoResumeStoppedWorkAgents();
+    await runPatrol();
+  })().catch((err) => {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[deacon] Patrol error:', err);
-    logDeaconEvent(`startDeacon: runPatrol error: ${msg}`);
+    console.error('[deacon] Startup recovery/patrol error:', err);
+    logDeaconEvent(`startDeacon: startup recovery/patrol error: ${msg}`);
   });
 
   // Schedule regular patrols

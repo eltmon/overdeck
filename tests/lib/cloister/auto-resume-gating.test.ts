@@ -229,6 +229,55 @@ describe('auto-resume gates', () => {
     expect(resumeAgentMock).not.toHaveBeenCalled();
   });
 
+  it('pan pause stops stale-running agents without live tmux sessions', async () => {
+    const agentId = 'agent-pan-1141';
+    const { agents } = await loadDeaconWithResumeMock();
+    const pause = await import('../../../src/cli/commands/pause.js');
+    agents.saveAgentState({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: workspaceFor(agentId),
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: BASE_TIME.toISOString(),
+    });
+
+    await pause.pauseCommand('PAN-1141', { reason: 'manual inspection' });
+
+    const state = agents.getAgentState(agentId);
+    expect(state?.status).toBe('stopped');
+    expect(state?.paused).toBe(true);
+    expect(state?.pausedReason).toBe('manual inspection');
+    expect(state?.stoppedByPause).toBe(true);
+    expect(state?.stoppedByUser).toBe(true);
+  });
+
+  it('coalesces concurrent orphan recovery scans', async () => {
+    const agentId = 'agent-pan-1141-orphan';
+    const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
+    agents.saveAgentState({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: workspaceFor(agentId),
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: BASE_TIME.toISOString(),
+    });
+
+    await Promise.all([
+      recoverOrphanedAgents('startup'),
+      recoverOrphanedAgents('patrol'),
+    ]);
+
+    const state = agents.getAgentState(agentId);
+    expect(state?.status).toBe('stopped');
+    expect(state?.consecutiveFailures).toBe(1);
+  });
+
   it('auto-resumes unpaused agents stopped by pause', async () => {
     const agentId = 'agent-pan-1141-paused-stop';
     resumeAgentMock.mockResolvedValue({ success: true });
