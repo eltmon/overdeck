@@ -71,7 +71,8 @@ vi.mock('fs', async (importOriginal) => {
   };
 });
 
-import { patrolWorkAgentResolutions } from '../deacon.js';
+import { existsSync, readFileSync } from 'fs';
+import { isSynthesisForActiveReviewRun, patrolWorkAgentResolutions } from '../deacon.js';
 import { listRunningAgents, getAgentRuntimeState } from '../../../lib/agents.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
 import { sendKeysAsync } from '../../../lib/tmux.js';
@@ -80,10 +81,59 @@ const mockListRunningAgents = vi.mocked(listRunningAgents);
 const mockGetAgentRuntimeState = vi.mocked(getAgentRuntimeState);
 const mockGetReviewStatus = vi.mocked(getReviewStatus);
 const mockSendKeysAsync = vi.mocked(sendKeysAsync);
+const mockExistsSync = vi.mocked(existsSync);
+const mockReadFileSync = vi.mocked(readFileSync);
+
+describe('review synthesis recovery', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockExistsSync.mockReturnValue(false);
+    mockReadFileSync.mockReturnValue('{}');
+  });
+
+  it('rejects synthesis files from before the active review spawn', () => {
+    const activeSpawn = Date.parse('2026-05-17T01:04:23.422Z');
+
+    expect(isSynthesisForActiveReviewRun('/tmp/old-review', {
+      reviewSpawnedAt: '2026-05-17T01:04:23.422Z',
+      lastVerifiedCommit: 'ca82f38f407ffa1847911ab490c72e7a064df22a',
+    }, activeSpawn - 60_000)).toBe(false);
+
+    expect(mockReadFileSync).not.toHaveBeenCalled();
+  });
+
+  it('rejects synthesis files whose context belongs to an older review run', () => {
+    mockExistsSync.mockReturnValue(true);
+    mockReadFileSync.mockReturnValue(JSON.stringify({
+      generatedAt: '2026-05-17T00:24:19.250Z',
+      headSha: '35b1e85155383b75f653506c0eebdaa153603b27',
+    }));
+
+    expect(isSynthesisForActiveReviewRun('/tmp/old-review', {
+      reviewSpawnedAt: '2026-05-17T01:04:23.422Z',
+      lastVerifiedCommit: 'ca82f38f407ffa1847911ab490c72e7a064df22a',
+    }, Date.parse('2026-05-17T01:10:00.000Z'))).toBe(false);
+  });
+
+  it('accepts synthesis files from the active verified review head', () => {
+    mockExistsSync.mockReturnValue(true);
+    mockReadFileSync.mockReturnValue(JSON.stringify({
+      generatedAt: '2026-05-17T01:04:23.634Z',
+      headSha: 'ca82f38f407ffa1847911ab490c72e7a064df22a',
+    }));
+
+    expect(isSynthesisForActiveReviewRun('/tmp/current-review', {
+      reviewSpawnedAt: '2026-05-17T01:04:23.422Z',
+      lastVerifiedCommit: 'ca82f38f407ffa1847911ab490c72e7a064df22a',
+    }, Date.parse('2026-05-17T01:10:00.000Z'))).toBe(true);
+  });
+});
 
 describe('patrolWorkAgentResolutions — stuck workspace skip (PAN-653)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockExistsSync.mockReturnValue(false);
+    mockReadFileSync.mockReturnValue('{}');
   });
 
   it('produces zero poke/respawn actions for a stuck workspace', async () => {
