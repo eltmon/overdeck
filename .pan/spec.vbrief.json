@@ -335,7 +335,7 @@
       {
         "id": "cli-pause",
         "title": "Add `pan pause <id> [--reason \"<text>\"]` command",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -351,36 +351,41 @@
           {
             "id": "cli-pause.ac1",
             "title": "`pan pause <id>` succeeds when the agent is running (kills it) AND when it is already stopped (just sets the flag)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:32:40.229Z"
           },
           {
             "id": "cli-pause.ac2",
             "title": "`--reason \"text\"` writes the reason to `pausedReason`; absence omits the field",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:32:40.229Z"
           },
           {
             "id": "cli-pause.ac3",
             "title": "Re-pausing an already-paused agent updates the reason but does NOT overwrite `pausedAt`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:32:40.229Z"
           },
           {
             "id": "cli-pause.ac4",
             "title": "Unknown agent ID prints a clear error and exits non-zero",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:32:40.229Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T15:32:40.229Z"
       },
       {
         "id": "cli-unpause",

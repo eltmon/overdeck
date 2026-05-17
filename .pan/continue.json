@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T15:27:45.794Z",
+  "updated": "2026-05-17T15:32:40.229Z",
   "gitState": {
     "branch": "feature/pan-1141",
-    "sha": "c47e43985",
+    "sha": "e291498d9",
     "dirty": true
   },
   "decisions": [
@@ -128,14 +128,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-8pog (dashboard backend pause/unpause/untroubled endpoints, agent snapshot fields, status_changed event payload propagation, and contracts rebuild). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-8pog",
+    "description": "Completed bead workspace-f0u6 (pan pause CLI command registered with --reason, persistent pause state, and stop-if-running behavior). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-f0u6",
     "filesToRead": [
-      "src/dashboard/server/routes/agents.ts",
-      "packages/contracts/src/types.ts",
-      "packages/contracts/src/events.ts",
-      "packages/contracts/src/event-reducers.ts",
-      "src/dashboard/server/read-model.ts",
+      "src/cli/commands/pause.ts",
+      "src/cli/index.ts",
+      "src/lib/agents.ts",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -194,6 +192,12 @@
       "timestamp": "2026-05-17T15:27:45.794Z",
       "reason": "bead-complete",
       "note": "Implemented dashboard backend pause/unpause/untroubled endpoints with async agent-state helpers, tmux kill on pause, status_changed events carrying pause/troubled/failure fields, read-model snapshot propagation, and contracts rebuild. npm run typecheck, npm run lint, and npm --prefix packages/contracts run build passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T15:32:40.229Z",
+      "reason": "bead-complete",
+      "note": "Implemented pan pause <id> with --reason support, persistent AgentState pause helper usage, stop-if-running behavior, non-zero unknown-agent errors, and CLI registration. npm run typecheck and npm run lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],
