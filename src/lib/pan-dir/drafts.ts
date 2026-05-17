@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'fs'
+import { queueAutoCommit } from './auto-commit.js'
 import { join, basename } from 'path'
 
 import { getProjectPanPaths, ensurePanDirs } from './specs.js'
@@ -29,6 +30,11 @@ export function writeIssueDraft(projectRoot: string, issueId: string, content: s
   ensurePanDirs(projectRoot)
   const path = getIssueDraftPath(projectRoot, issueId)
   writeFileSync(path, content, 'utf-8')
+  queueAutoCommit({
+    projectRoot,
+    paths: [path],
+    subject: `chore(state): update PRD draft for ${issueId.toUpperCase()}`,
+  })
   return path
 }
 

@@ -1,0 +1,67 @@
+{
+  "version": "1",
+  "issueId": "PAN-1140",
+  "created": "2026-05-16T23:57:08.390Z",
+  "updated": "2026-05-17T01:43:00.873Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-17T01:43:00Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1140\n\n# Review Synthesis — PAN-1140\n\n**Reviewers:** security (BLOCKED), correctness (BLOCKED), performance (PASSED), requirements (PARTIAL)\n**Run ID:** agent-pan-1140-review-77fc4868\n\n---\n\n## Verdict: BLOCKED\n\nTwo critical blockers and one high-severity security finding require resolution before this branch can merge.\n\n---\n\n## Blocker 1 — Security: Unvalidated model overrides → command injection (CRITICAL)\n\n**Severity:** Critical — remote code execution on the Panopticon host\n**Reviewer:** security\n\n`model` is accepted as an arbitrary string at multiple API and CLI entry points and interpolated directly into generated bash launcher scripts without validation or quoting. The affected surfaces are:\n\n- `POST /api/agents` → `determineModel()` → `pan start --model <model>` → `spawnAgent()`\n- `POST /api/agents/:id/restart` → `restartAgent()` → `getAgentRuntimeBaseCommand()` → bash launcher\n- `PATCH /api/agents/:id/switch-model` → persists `newModel.trim()` → later spawn path\n- `pan start --model <model>` CLI path → `spawnAgent()`\n- `spawnRun()` path\n\nThe attack: submit `claude-sonnet-4-6; touch /tmp/pan-model-pwned #` as the model value. Shell metacharacters are interpreted when the launcher script runs `exec ${cmd.trim()}`. Impact is RCE under the Panopticon server user.\n\nThe swarm route already has the correct pattern (`MODEL_ID_PATTERN` at `swarm.ts:103`), but that validation is not applied to the equivalent non-swarm agent paths above.\n\n**Required fix:**\n1. Add a central model validator (reuse or adapt `MODEL_ID_PATTERN`) enforced before any value reaches `determineModel()`, `restartAgent()`, `switch-model` persistence, `spawnAgent()`, `spawnRun()`, and CLI `--model`.\n2. Reject whitespace and shell metacharacters at all API and CLI boundaries.\n3. Shell-quote `--model` arguments in generated launcher scripts, or generate argv arrays and use `execFile`/`spawn` semantics.\n4. Add regression tests that malicious model values are rejected at all seven identified surfaces.\n\n---\n\n## Blocker 2 — Correctness: Dashboard spawn flows cannot exercise the host override escape hatch\n\n**Severity:** High — spawn gate is non-actionable from the primary UI entry point\n**Reviewer:** correctness\n\nWhen `assertWorkspaceStackHealthyForSpawn()` blocks a spawn, the API returns a 422 describing the failure and advising users to \"retry with a confirmed host override.\" However, the dashboard's two primary spawn surfaces — `OverviewTab.tsx` (posts `{ issueId }`) and `InspectorPanel.tsx` (posts `{ issueId, projectId, message, harness }`) — do not include any host override fields in their requests. There is no dashboard path that can send `host`, `allowHost`, and `hostOverrideConfirmation`.\n\nDashboard users are stranded: the system describes an escape hatch they cannot reach from the UI, and the only remediation is switching to the CLI.\n\n**Required fix:**\nEither (a) add dashboard handling for the 422 / 409 response, collect the explicit confirmation, and retry with the required fields wired through, or (b) remove the dashboard-facing host-override hint and direct users exclusively to `pan start <issue> --host` if dashboard override is intentionally unsupported.\n\n---\n\n## Blocker 3 — Correctness: Empty Docker lifecycle snapshots → false healthy\n\n**Severity:** Medium\n**Reviewer:** correctness\n\n`evaluateWorkspaceStackHealth()` returns `healthy: true` when no matching containers are found:\n\n```ts\nconst stackContainers = containers.filter((container) => isStackContainer(container, issueId));\nreturn { healthy: reasons.length === 0, reasons, lastObserved };\n```\n\nThis is wrong for Docker-backed workspaces. The function has already established `hasDockerWorkspace(projectConfig) === true`, so \"no containers found\" means the stack is absent or unobservable — not that it is healthy. A workspace whose lifecycle snapshot is empty, or whose compose project never created containers, can pass the spawn gate despite being broken.\n\n**Required fix:** For Docker-backed workspaces, treat the absence of matching stack containers as unhealthy. Add a regression test for a Docker workspace with an empty container lifecycle list.\n\n---\n\n## Partial Coverage — Requirements: Dashboard workspace card stack health not confirmed in evidence\n\n**Severity:** Low (clarification needed)\n**Reviewer:** requirements\n\nAC #29 requires \"dashboard workspace card shows a visible error state within 30 seconds.\" The requirements reviewer found evidence for `stackHealth` rendering in `OverviewTab.tsx` and `InspectorPanel.tsx`, but no changed artifact wiring it into the kanban/workspace card component. If \"card\" means the Overview/Inspector surface, the requirement is met. If it means the dedicated issue card on the kanban board, this is incomplete.\n\n**Required:** Confirm whether the kanban board card is in scope and, if so, provide evidence of the wiring.\n\n---\n\n## Clean Areas\n\n- **Performance:** No blockers. Async Docker/tmux/process calls, bounded swarm concurrency, cached lifecycle snapshots, no new unbounded work or event-loop blocking in server routes.\n- **Docker compose security:** No `${HOME}/.panopticon` mount on server service, `PANOPTICON_DISABLE_DEACON=1` set, Docker socket read-only mount. Single-deacon invariant correctly implemented in both template and rendered compose files.\n- **Swarm security:** Model IDs constrained to safe grammar, internal token required, `synthesisOutput` capped at 64 KiB.\n- **Workspace paths:** Built from parsed issue IDs, checked for containment under workspace root.\n- **Docker CLI operations:** All use `execFile`, bounded concurrency, dry-run defaults.\n- **Init container sequencing:** `init` service gates `frontend` and `server` on `service_completed_successfully`; `NODE_ENV=development` + `HUSKY=0` prevent Husky/tsdown failures.\n- **Host Husky preservation:** Root `postinstall`/`prepare` scripts unaffected by container changes.\n- **Stack health evaluation:** Correctly marks non-zero exits, stuck `Created` containers, and emits `workspace-stack-unhealthy` transition events idempotently.\n- **Spawn gate:** All non-plan roles blocked by `assertWorkspaceStackHealthyForSpawn()` before tmux session creation; plan role exempt.\n- **Host override wiring:** `pan start`, `pan swarm`, and the server routes all correctly require the explicit confirmation string.\n- **Workspace cleanup:** `pan workspace reap` (dry-run default, `--apply` for destructive) and `pan workspace rebuild` implemented and available.\n- **Documentation:** `WORKSPACE-CONTAINERS.md`, skills, and CLAUDE.md updated.\n\n---\n\n## Requirements Coverage\n\n| Category | Count |\n|---|---|\n| Total requirements | 30 |\n| Implemented | 29 |\n| Partial (card clarification needed) | 1 |\n| Missing | 0 |\n\n---\n\n## Summary of Required Fixes\n\n| # | Finding | Severity | Reviewer |\n|---|---|---|---|\n| 1 | Command injection via unvalidated `model` in bash launcher generation | Critical | security |\n| 2 | Dashboard cannot send host override confirmation (escape hatch non-functional) | High | correctness |\n| 3 | Empty Docker lifecycle snapshot → false healthy | Medium | correctness |\n| 4 | Kanban card stack-health wiring needs confirmation | Low | requirements |\n\nItems 1–3 are hard blockers. Item 4 requires clarification before it can be closed.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1140/.pan/review/agent-pan-1140-review-77fc4868/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1140 -m \"Fixed review issues\"`"
+    }
+  ],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T23:57Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T23:57:08.391Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:12Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T00:12:51.827Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:21Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T00:21:18.385Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:28Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-05-17T00:28:22.792Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:37Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T00:37:24.481Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:43Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T00:43:33.006Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T01:11Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T01:11:22.633Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T01:29Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T01:29:24.586Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T01:43Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T01:43:00.873Z"
+    }
+  ]
+}

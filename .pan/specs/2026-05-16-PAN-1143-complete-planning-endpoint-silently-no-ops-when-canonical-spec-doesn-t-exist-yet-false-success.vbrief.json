@@ -1,0 +1,173 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-16T22:47:31.251Z",
+    "updated": "2026-05-17T00:04:05.755Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1143: complete-planning endpoint silently no-ops when canonical spec doesn't exist yet (false success)",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1143",
+    "title": "complete-planning endpoint silently no-ops when canonical spec doesn't exist yet (false success)",
+    "status": "proposed",
+    "uid": "5f0f8562-ee1a-4d62-9751-d1e89f862fb4",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 74,
+    "created": "2026-05-16T22:47:31.251Z",
+    "updated": "2026-05-17T00:04:05.755Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1143",
+        "label": "PAN-1143",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-16-PAN-1143-complete-planning-endpoint-silently-no-ops-when-canonical-spec-doesn-t-exist-yet-false-success.vbrief.json",
+      "pipeline": {
+        "phase": "done",
+        "issueId": "PAN-1143",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-17T00:04:05.754Z",
+        "work": {
+          "updatedAt": "2026-05-17T00:04:05.754Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-17T00:04:05.754Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-17T00:04:05.754Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-05-17T00:04:05.754Z",
+          "notes": "All 4 reviewers passed; all 6 ACs implemented, no findings",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-17T00:04:05.754Z",
+              "notes": "All 4 reviewers passed; all 6 ACs implemented, no findings"
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "passed",
+          "updatedAt": "2026-05-17T00:04:05.754Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-17T00:04:05.754Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-17T00:04:05.754Z",
+          "history": []
+        },
+        "merge": {
+          "status": "merged",
+          "updatedAt": "2026-05-17T00:04:05.754Z",
+          "history": [
+            {
+              "status": "merged",
+              "at": "2026-05-17T00:04:05.754Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1144"
+        }
+      }
+    },
+    "narratives": {
+      "Problem": "## Symptom\n\n`pan plan done <id>` (and the dashboard \"Done\" button) report **success** even when the canonical spec was never written and beads were never materialized. The user sees a green check, agent gets started, work agent has nothing to do (or has 1 placeholder bead instead of the planned 22).\n\nConcrete reproduction (PAN-1141, 2026-05-16):\n- Planning agent (auto mode) wrote `workspaces/feature-pan-1141/.pan/spec.vbrief.json` with 22 plan items\n- No canonical spec created at `<projectRoot>/.pan/specs/`\n- `pan plan done PAN-1141` returned: `✓ Planning complete for PAN-1141`\n- After: still no canonical spec, beads still show only 1 generic `PAN-1141: Implement issue` placeholder\n- Work agent spawned successfully and loaded \"1 task\"\n\n## Root cause\n\n`src/dashboard/server/routes/issues.ts:1044-1053`:\n\n```ts\nconst { pushed: gitPushed, beadsWarning } = yield* Effect.promise(async () => {\n  if (!projectPath) return { pushed: false, beadsWarning: null };\n\n  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);\n  const workspacePlanPath = findPlan(workspacePath);   // ← returns null on first run\n\n  let gitRoot = '';\n  if (workspacePlanPath) gitRoot = workspacePath;\n\n  if (!gitRoot) return { pushed: false, beadsWarning: null };  // ← bails silently\n  // ... spec promotion + bead sync never runs\n```\n\n`findPlan(workspacePath)` resolves via `findSpecByIssue(projectRoot, issueId)` in `src/lib/vbrief/io.ts:44`, which scans **only** `<projectRoot>/.pan/specs/`. There is no workspace-draft fallback. So on the **first** finalize attempt — when the canonical spec by definition doesn't yet exist — `findPlan` returns null and the entire promotion-and-bead-sync block is skipped. The endpoint returns `{ success: true }` regardless.\n\nAdditionally: the catch on line 1117-1119 around `writeSpecForIssue` swallows any promotion error as \"non-fatal\" with only a `console.warn` — so even if the path executed, errors wouldn't surface to the caller.\n\n## Why this is critical\n\nThe documented planning lifecycle is: workspace draft → `pan plan-finalize` → `pan plan done`. The first link is broken because **`pan plan finalize` also calls `findPlan(workspace)` and fails with \"No workspace spec found\"** for the same reason — it expects the canonical spec to already exist, which it can't on first run.\n\nNet effect: the auto-plan path silently produces unusable artifacts. Bug-by-bug:\n1. **First-run chicken-and-egg.** `findPlan` requires canonical spec; canonical spec requires successful finalize; finalize requires canonical spec.\n2. **Silent success.** Both `pan plan finalize` (\"✓ No workspace spec found\" is `process.exit(1)`, fine) and `complete-planning` (returns 200 with `success: true`) fail to surface the missing-canonical case usefully to the operator.\n3. **Work agent runs on stub beads.** `pan start` happily spawns an agent with 1 placeholder bead, leading to \"agent has nothing to do\" or \"agent does ill-defined mega-task\" failures downstream.\n\n## Acceptance criteria\n\n- [ ] **First-run path works.** When `complete-planning` runs and no canonical spec exists, it reads the workspace draft at `<workspace>/.pan/spec.vbrief.json`, validates it, and uses it as the source for `writeSpecForIssue(...)`. The canonical spec gets written, beads get materialized, the issue advances. No more silent bail at line 1053.\n- [ ] **Same for `pan plan finalize`.** If invoked when canonical spec doesn't exist, it should accept the workspace draft as the source.\n- [ ] **No more silent error swallow.** Remove or narrow the catch at line 1117-1119 — promotion failures must propagate to the HTTP response so the CLI fails loudly with the real error.\n- [ ] **Work-agent start validates beads count > 1.** Or validates plan items match bead count. Refuses to spawn with the stub placeholder.\n- [ ] **Planning role doc is accurate.** `roles/plan.md` step 6 references `pan plan-finalize` (hyphenated, doesn't exist as a separate command). Align doc with actual CLI: `pan plan finalize`.\n- [ ] **Test coverage.** Integration test for the first-run path: create a workspace draft, call complete-planning, assert canonical spec written + N beads created.\n\n## Out of scope\n\n- Reworking the four-artifact model in `docs/VBRIEF.md` — the model is fine; the implementation diverges from it.\n- Adding new planning modes.\n\n## Why this matters operationally\n\nI just spent ~20 minutes of context tracing why PAN-1141 had 1 bead instead of 22. A first-time user would hit this on their first non-trivial plan, get an unusable workspace, and have no idea why. This is the kind of bug that destroys trust in the planning pipeline.\n\n## Related\n\n- PAN-1124 (single-spec-on-main model) — the architecture that introduced this. The model is sound; the first-run case wasn't wired up.\n- PAN-1140 (workspace init container fix) — concurrent in-flight work, no direct overlap.\n\n## Workaround until fixed\n\nManually re-run the planning agent for the affected issue. If it fails the second time the same way, that's a deterministic bug — file a comment with the agent's transcript.",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-16T22:47:31.251Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1143",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Symptom\n\n`pan plan done <id>` (and the dashboard \"Done\" button) report **success** even when the canonical spec was never written and beads were never materialized. The user sees a green check, agent gets started, work agent has nothing to do (or has 1 placeholder bead instead of the planned 22).\n\nConcrete reproduction (PAN-1141, 2026-05-16):\n- Planning agent (auto mode) wrote `workspaces/feature-pan-1141/.pan/spec.vbrief.json` with 22 plan items\n- No canonical spec created at `<projectRoot>/.pan/specs/`\n- `pan plan done PAN-1141` returned: `✓ Planning complete for PAN-1141`\n- After: still no canonical spec, beads still show only 1 generic `PAN-1141: Implement issue` placeholder\n- Work agent spawned successfully and loaded \"1 task\"\n\n## Root cause\n\n`src/dashboard/server/routes/issues.ts:1044-1053`:\n\n```ts\nconst { pushed: gitPushed, beadsWarning } = yield* Effect.promise(async () => {\n  if (!projectPath) return { pushed: false, beadsWarning: null };\n\n  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);\n  const workspacePlanPath = findPlan(workspacePath);   // ← returns null on first run\n\n  let gitRoot = '';\n  if (workspacePlanPath) gitRoot = workspacePath;\n\n  if (!gitRoot) return { pushed: false, beadsWarning: null };  // ← bails silently\n  // ... spec promotion + bead sync never runs\n```\n\n`findPlan(workspacePath)` resolves via `findSpecByIssue(projectRoot, issueId)` in `src/lib/vbrief/io.ts:44`, which scans **only** `<projectRoot>/.pan/specs/`. There is no workspace-draft fallback. So on the **first** finalize attempt — when the canonical spec by definition doesn't yet exist — `findPlan` returns null and the entire promotion-and-bead-sync block is skipped. The endpoint returns `{ success: true }` regardless.\n\nAdditionally: the catch on line 1117-1119 around `writeSpecForIssue` swallows any promotion error as \"non-fatal\" with only a `console.warn` — so even if the path executed, errors wouldn't surface to the caller.\n\n## Why this is critical\n\nThe documented planning lifecycle is: workspace draft → `pan plan-finalize` → `pan plan done`. The first link is broken because **`pan plan finalize` also calls `findPlan(workspace)` and fails with \"No workspace spec found\"** for the same reason — it expects the canonical spec to already exist, which it can't on first run.\n\nNet effect: the auto-plan path silently produces unusable artifacts. Bug-by-bug:\n1. **First-run chicken-and-egg.** `findPlan` requires canonical spec; canonical spec requires successful finalize; finalize requires canonical spec.\n2. **Silent success.** Both `pan plan finalize` (\"✓ No workspace spec found\" is `process.exit(1)`, fine) and `complete-planning` (returns 200 with `success: true`) fail to surface the missing-canonical case usefully to the operator.\n3. **Work agent runs on stub beads.** `pan start` happily spawns an agent with 1 placeholder bead, leading to \"agent has nothing to do\" or \"agent does ill-defined mega-task\" failures downstream.\n\n## Acceptance criteria\n\n- [ ] **First-run path works.** When `complete-planning` runs and no canonical spec exists, it reads the workspace draft at `<workspace>/.pan/spec.vbrief.json`, validates it, and uses it as the source for `writeSpecForIssue(...)`. The canonical spec gets written, beads get materialized, the issue advances. No more silent bail at line 1053.\n- [ ] **Same for `pan plan finalize`.** If invoked when canonical spec doesn't exist, it should accept the workspace draft as the source.\n- [ ] **No more silent error swallow.** Remove or narrow the catch at line 1117-1119 — promotion failures must propagate to the HTTP response so the CLI fails loudly with the real error.\n- [ ] **Work-agent start validates beads count > 1.** Or validates plan items match bead count. Refuses to spawn with the stub placeholder.\n- [ ] **Planning role doc is accurate.** `roles/plan.md` step 6 references `pan plan-finalize` (hyphenated, doesn't exist as a separate command). Align doc with actual CLI: `pan plan finalize`.\n- [ ] **Test coverage.** Integration test for the first-run path: create a workspace draft, call complete-planning, assert canonical spec written + N beads created.\n\n## Out of scope\n\n- Reworking the four-artifact model in `docs/VBRIEF.md` — the model is fine; the implementation diverges from it.\n- Adding new planning modes.\n\n## Why this matters operationally\n\nI just spent ~20 minutes of context tracing why PAN-1141 had 1 bead instead of 22. A first-time user would hit this on their first non-trivial plan, get an unusable workspace, and have no idea why. This is the kind of bug that destroys trust in the planning pipeline.\n\n## Related\n\n- PAN-1124 (single-spec-on-main model) — the architecture that introduced this. The model is sound; the first-run case wasn't wired up.\n- PAN-1140 (workspace init container fix) — concurrent in-flight work, no direct overlap.\n\n## Workaround until fixed\n\nManually re-run the planning agent for the affected issue. If it fails the second time the same way, that's a deterministic bug — file a comment with the agent's transcript."
+        },
+        "subItems": [
+          {
+            "id": "auto-start.ac1",
+            "title": "**First-run path works.** When complete-planning runs and no canonical spec exists, it reads the workspace draft at <workspace>/.pan/spec.vbrief.json, validates it, and uses it as the source for writeSpecForIssue(...). The canonical spec gets written, beads get materialized, the issue advances. No more silent bail at line 1053.",
+            "status": "pending",
+            "created": "2026-05-16T22:47:31.251Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "**Same for pan plan finalize.** If invoked when canonical spec doesn't exist, it should accept the workspace draft as the source.",
+            "status": "pending",
+            "created": "2026-05-16T22:47:31.251Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "**No more silent error swallow.** Remove or narrow the catch at line 1117-1119 — promotion failures must propagate to the HTTP response so the CLI fails loudly with the real error.",
+            "status": "pending",
+            "created": "2026-05-16T22:47:31.251Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "**Work-agent start validates beads count > 1.** Or validates plan items match bead count. Refuses to spawn with the stub placeholder.",
+            "status": "pending",
+            "created": "2026-05-16T22:47:31.251Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "**Planning role doc is accurate.** roles/plan.md step 6 references pan plan-finalize (hyphenated, doesn't exist as a separate command). Align doc with actual CLI: pan plan finalize.",
+            "status": "pending",
+            "created": "2026-05-16T22:47:31.251Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "**Test coverage.** Integration test for the first-run path: create a workspace draft, call complete-planning, assert canonical spec written + N beads created.",
+            "status": "pending",
+            "created": "2026-05-16T22:47:31.251Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

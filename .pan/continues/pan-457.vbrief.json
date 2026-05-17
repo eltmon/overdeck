@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-457",
   "created": "2026-05-06T02:00:42.665Z",
-  "updated": "2026-05-15T05:29:42.545Z",
+  "updated": "2026-05-17T02:16:11.086Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,29 +114,107 @@
       "reason": "resume",
       "agentModel": "minimax-m2.7-highspeed",
       "timestamp": "2026-05-15T05:29:42.545Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-16T04:05:35.688Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-16T20:22:59.188Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-16T20:23:02.833Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T20:51Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-05-16T20:51:23.467Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-16T20:51:23.493Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T20:54Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-16T20:54:41.176Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-16T20:54:41.226Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T20:58Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-16T20:58:07.973Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-16T20:58:08.021Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T21:04Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-05-16T21:04:03.299Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T21:21Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T21:21:12.511Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T21:32Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T21:32:58.732Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T22:38Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T22:38:06.423Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T23:48Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T23:48:23.662Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:04Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-17T00:04:53.164Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:22Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T00:22:20.466Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T00:33Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T00:33:26.314Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T01:05Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T01:05:21.212Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T01:21Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T01:21:57.803Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T01:57Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T01:57:10.229Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-05-12T22:03:55Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-457\n\n# Review Synthesis — PAN-457 — 2026-05-12T17:10:16Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-457/.pan/review/agent-pan-457-review-5c799040/context.json\n- Branch: feature/pan-457\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-457\n\n## Convoy Status\n| Sub-role | Status | Blocking findings |\n| --- | --- | --- |\n| security | failed | — |\n| correctness | failed | — |\n| performance | failed | — |\n| requirements | failed | — |\n\n## Blocking Findings\n\n### [security] Reviewer failed to write report — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-457/.pan/review/agent-pan-457-review-5c799040/security.md`\nThe security reviewer session exited before producing a non-empty report. A retry was attempted and also exited without producing the required output file.\n\n### [correctness] Reviewer failed to write report — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-457/.pan/review/agent-pan-457-review-5c799040/correctness.md`\nThe correctness reviewer session exited before producing a non-empty report. A retry was attempted and also exited without producing the required output file.\n\n### [performance] Reviewer failed to write report — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-457/.pan/review/agent-pan-457-review-5c799040/performance.md`\nThe performance reviewer session exited before producing a non-empty report. A retry was attempted and also exited without producing the required output file.\n\n### [requirements] Reviewer failed to write report — `/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-457/.pan/review/agent-pan-457-review-5c799040/requirements.md`\nThe requirements reviewer session exited before producing a non-empty report. A retry was attempted and also exited without producing the required output file.\n\n## Non-blocking Findings\nNone. No convoy reports were available to synthesize.\n\n## Clean Sub-roles\nNone. All four required reviewer reports are missing.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-457/.pan/review/agent-pan-457-review-5c799040/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-457 -m \"Fixed review issues\"`"
-    },
-    {
-      "seq": 2,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-05-12T22:12:33Z",
-      "markdownBody": "TESTS FAILED for PAN-457:\n\nQuality gates (typecheck, lint, 3689 tests) all pass.\n\nUAT FAILURE — GET /api/discovered-sessions/:id returns HTTP 500 (`Cannot read properties of undefined (reading 'id')`). Root cause: src/dashboard/server/routes/discovered-sessions.ts lines 184 and 207 access `req.params as { id?: string }` to extract the route parameter, but the correct Effect HTTP pattern in this codebase is `yield* HttpRouter.params`. The `req.params` property is undefined on the HttpServerRequest object, causing a null-deref on every parameterised session request. This breaks two routes: `GET /api/discovered-sessions/:id` (session detail fetch, triggered by clicking any session row) and `POST /api/discovered-sessions/:id/enrich` (single-session enrichment). All other routes in the same file that do NOT use `req.params` (list, scan, batch-enrich, stats, search) work correctly. The unit tests for this path test the DB function directly (`getDiscoveredSessionById`), not the HTTP handler, so the route bug was not caught by the test suite.\n\nAdditional: console warning `[EventRouter] replay failed: Missing key at [\"value\"][32][\"payload\"][\"issueId\"]` on server startup — appears pre-existing (EventRouter.tsx unchanged in this branch, main server uses same event store without known crash).\n\nFix required: replace `req.params as { id?: string }` with `yield* HttpRouter.params` at lines 184 and 207 of src/dashboard/server/routes/discovered-sessions.ts.\n\n## REQUIRED: Fix ALL test failures, then invoke the /rebase-and-submit skill\n\n1. Read each test failure carefully\n2. Fix the code causing EVERY failure\n3. Run the test suite locally to verify your fixes pass\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-457 — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully."
-    },
-    {
-      "seq": 3,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-05-12T22:17:34Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-457 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (24993ms):\n\n\u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m 86.97 kB\u001b[22m \u001b[2m│ gzip: 15.10 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m165.46 kB\u001b[22m \u001b[2m│ gzip: 27.11 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 18.48 kB\u001b[22m \u001b[2m│ gzip:  2.48 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m296.98 kB\u001b[22m \u001b[2m│ gzip: 27.30 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 567.89 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m2984ms\u001b[39m\n\n> @panctl/cli@0.9.3 test\n> vitest run --run\n\n\n RUN  v4.1.6 /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-457\n\n ❯ |root| tests/unit/cli/option-parsing.test.ts (7 tests | 1 failed) 10571ms\n     × does NOT reject -m as an unknown option when parsing a real invocation 5597ms\n\n Test Files  1 failed | 328 passed | 4 skipped (333)\n      Tests  1 failed | 3688 passed | 49 skipped (3745)\n   Start at  18:17:13\n   Duration  20.91s (transform 37.01s, setup 36.88s, import 177.26s, tests 119.18s, environment 51ms)\n\n DEPRECATED  `test.poolOptions` was removed in Vitest 4. All previous `poolOptions` are now top-level options. Please, refer to the migration guide: https://vitest.dev/guide/migration#pool-rework\n- Fetching issues...\n- Fetching issues...\n- Fetching issues...\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  |root| tests/unit/cli/option-parsing.test.ts > pan review request <id> — option parsing > does NOT reject -m as an unknown option when parsing a real invocation\nError: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\n ❯ tests/unit/cli/option-parsing.test.ts:52:3\n     50|   });\n     51|\n     52|   it('does NOT reject -m as an unknown option when parsing a real invo…\n       |   ^\n     53|     // This targets a dashboard URL that does not exist; the command m…\n     54|     // past option parsing and fail at the network step, NOT with\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-457 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-457 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
-    }
-  ]
+  "feedback": []
 }
