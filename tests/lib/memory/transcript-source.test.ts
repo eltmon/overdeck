@@ -74,6 +74,7 @@ describe('ClaudeCodeTranscriptSource', () => {
         agent({ id: 'agent-inactive', tmuxActive: false }),
         agent({ id: 'agent-stopped', status: 'stopped' }),
         agent({ id: 'agent-pi', harness: 'pi' }),
+        agent({ id: 'agent-review', role: 'review' }),
         agent({ id: 'agent-missing', sessionId: undefined }),
         agent({ id: 'agent-subagent', sessionId: 'subagent-session' }),
       ],

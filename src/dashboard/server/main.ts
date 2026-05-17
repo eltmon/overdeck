@@ -23,7 +23,7 @@ import { ensureInternalToken } from '../../lib/internal-token.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatus, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { clearStuckForks } from '../../lib/database/conversations-db.js';
-import { getEventStore } from './event-store.js';
+import { getEventStore, initEventStore } from './event-store.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
@@ -37,6 +37,7 @@ import { startCliproxyWatchdog } from './routes/cliproxy.js';
 import { resumeSwarmAutoAdvanceLoopOnStartup } from './routes/swarm.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
+import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
 
 declare const Bun: unknown;
 
@@ -327,6 +328,19 @@ await refreshTtsRuntimeConfig();
 void startTtsSummarizer().catch(err => console.warn('[tts-summarizer] start failed:', err));
 void startTtsPlayback().catch(err => console.warn('[tts-playback] start failed:', err));
 
+void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] initial registry sync failed:', err?.message ?? err));
+startTranscriptPoller();
+console.log('[panopticon] Memory transcript poller started');
+
+void (async () => {
+  const store = await initEventStore();
+  store.subscribe((event) => {
+    if (event.type === 'agent.started' || event.type === 'agent.stopped') {
+      void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] lifecycle registry sync failed:', err?.message ?? err));
+    }
+  });
+})().catch(err => console.warn('[memory-poller] lifecycle subscription failed:', err?.message ?? err));
+
 // Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
 startCliproxyWatchdog();
 console.log('[panopticon] CLIProxy watchdog started (30s interval)');
@@ -356,6 +370,7 @@ const handleShutdownSignal = (signal: NodeJS.Signals) => {
   stopConversationLifecycleService();
   stopTtsSummarizer();
   stopTtsPlayback();
+  stopTranscriptPoller();
   closeMemoryFtsDatabases();
   process.exit(0);
 };

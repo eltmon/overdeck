@@ -58,7 +58,7 @@ export class ClaudeCodeTranscriptSource implements TranscriptSource {
     const agents = await this.listAgents();
     const entries = await Promise.all(
       agents
-        .filter((agent) => agent.tmuxActive && agent.status === 'running' && (agent.harness ?? 'claude-code') === 'claude-code')
+        .filter((agent) => agent.tmuxActive && agent.status === 'running' && agent.role === 'work' && (agent.harness ?? 'claude-code') === 'claude-code')
         .map((agent) => this.resolveAgentTranscript(agent)),
     );
     return entries.filter((entry): entry is TranscriptEntry => entry !== null);

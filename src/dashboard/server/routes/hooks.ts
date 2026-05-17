@@ -19,11 +19,12 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { getEventStore } from '../event-store.js';
-import { getAgentStateAsync } from '../../../lib/agents.js';
+import { getAgentRuntimeStateAsync, getAgentStateAsync, listRunningAgentsAsync, type AgentState } from '../../../lib/agents.js';
 import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
 import { getTranscriptCheckpoint } from '../../../lib/memory/checkpoints.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
 import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput } from '../../../lib/memory/pipeline.js';
+import { registerTranscriptForPolling } from '../../../lib/memory/poller.js';
 import { isSubagentHookPayload } from '../../../lib/memory/subagent-filter.js';
 
 const CLEAR_ON = new Set([
@@ -43,7 +44,14 @@ const MemoryTurnHookPayload = Schema.Struct({
   to_offset: Schema.optional(Schema.Number),
 });
 
+const MemorySessionStartHookPayload = Schema.Struct({
+  session_id: Schema.String,
+  transcript_path: Schema.String,
+  identity: Schema.optional(Schema.Unknown),
+});
+
 type MemoryTurnHookPayload = typeof MemoryTurnHookPayload.Type;
+type MemorySessionStartHookPayload = typeof MemorySessionStartHookPayload.Type;
 
 export interface HandleMemoryTurnBodyOptions {
   resolveIdentity?: (body: Record<string, unknown>, sessionId: string) => Promise<MemoryIdentity | null>;
@@ -52,9 +60,20 @@ export interface HandleMemoryTurnBodyOptions {
   enqueuePipeline?: (input: ExtractFromTranscriptDeltaInput) => void;
 }
 
+export interface HandleMemorySessionStartBodyOptions {
+  resolveIdentity?: (body: Record<string, unknown>, sessionId: string) => Promise<MemoryIdentity | null>;
+  statTranscript?: (transcriptPath: string) => Promise<{ size: number; mtimeMs: number }>;
+  registerTranscript?: typeof registerTranscriptForPolling;
+}
+
 export type HandleMemoryTurnBodyResult =
   | { status: 'subagent' }
   | { status: 'accepted'; pipelineInput: ExtractFromTranscriptDeltaInput }
+  | { status: 'error'; statusCode: 400 | 422; error: string };
+
+export type HandleMemorySessionStartBodyResult =
+  | { status: 'subagent' }
+  | { status: 'accepted'; sessionId: string }
   | { status: 'error'; statusCode: 400 | 422; error: string };
 
 export function memoryTurnHookResponse(body: unknown): typeof HttpServerResponse.Type | null {
@@ -107,6 +126,44 @@ export async function handleMemoryTurnBody(
   return { status: 'accepted', pipelineInput };
 }
 
+export async function handleMemorySessionStartBody(
+  body: Record<string, unknown>,
+  options: HandleMemorySessionStartBodyOptions = {},
+): Promise<HandleMemorySessionStartBodyResult> {
+  if (isSubagentHookPayload(body)) return { status: 'subagent' };
+
+  const payloadResult = Schema.decodeUnknownResult(MemorySessionStartHookPayload)(body);
+  if (payloadResult._tag === 'Failure') {
+    return { status: 'error', statusCode: 400, error: 'invalid memory session start payload' };
+  }
+
+  const payload = Result.getOrThrow(payloadResult) as MemorySessionStartHookPayload;
+  const sessionId = payload.session_id.trim();
+  const transcriptPath = payload.transcript_path.trim();
+  if (!sessionId || !transcriptPath) {
+    return { status: 'error', statusCode: 400, error: 'session_id and transcript_path are required' };
+  }
+
+  const identity = parseMemoryIdentity(payload.identity, sessionId)
+    ?? await (options.resolveIdentity ?? resolveMemoryIdentity)(body, sessionId);
+  if (!identity) {
+    return { status: 'error', statusCode: 422, error: 'memory identity could not be resolved' };
+  }
+
+  const fileStat = await (options.statTranscript ?? getTranscriptStat)(transcriptPath);
+  (options.registerTranscript ?? registerTranscriptForPolling)({
+    agentId: stringField(body.agentId) ?? stringField(body.agent_id) ?? identity.runId,
+    sessionId,
+    transcriptPath,
+    identity,
+    harness: identity.agentHarness,
+    size: fileStat.size,
+    mtimeMs: fileStat.mtimeMs,
+  });
+
+  return { status: 'accepted', sessionId };
+}
+
 export async function handleMemoryInjectBody(body: Record<string, unknown>) {
   const prompt = typeof body.prompt === 'string'
     ? body.prompt
@@ -149,6 +206,28 @@ const postMemoryInjectRoute = HttpRouter.add(
     const result = yield* Effect.promise(() => handleMemoryInjectBody(body));
     if ('error' in result) return jsonResponse({ ok: false, error: result.error }, { status: result.status });
     return jsonResponse({ ok: true, ...result });
+  })),
+);
+
+const postMemorySessionStartRoute = HttpRouter.add(
+  'POST',
+  '/api/memory/session/start',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const rawBody = yield* request.text;
+
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
+    }
+
+    const result = yield* Effect.promise(() => handleMemorySessionStartBody(body));
+    if (result.status === 'subagent') return HttpServerResponse.text('', { status: 204 });
+    if (result.status === 'error') return jsonResponse({ ok: false, error: result.error }, { status: result.statusCode });
+
+    return jsonResponse({ ok: true }, { status: 202 });
   })),
 );
 
@@ -222,6 +301,7 @@ const postPermissionEventRoute = HttpRouter.add(
 
 export const hooksRouteLayer = Layer.mergeAll(
   postMemoryInjectRoute,
+  postMemorySessionStartRoute,
   postMemoryTurnRoute,
   postPermissionEventRoute,
 );
@@ -242,8 +322,7 @@ function parseMemoryIdentity(value: unknown, sessionId: string): MemoryIdentity 
 
 async function resolveMemoryIdentity(body: Record<string, unknown>, sessionId: string): Promise<MemoryIdentity | null> {
   const agentId = stringField(body.agentId) ?? stringField(body.agent_id);
-  if (!agentId) return null;
-  const state = await getAgentStateAsync(agentId);
+  const state = agentId ? await getAgentStateAsync(agentId) : await findAgentStateBySessionId(sessionId);
   if (!state) return null;
   return {
     projectId: inferProjectId(state.workspace),
@@ -254,6 +333,15 @@ async function resolveMemoryIdentity(body: Record<string, unknown>, sessionId: s
     agentRole: state.role,
     agentHarness: state.harness ?? 'claude-code',
   };
+}
+
+async function findAgentStateBySessionId(sessionId: string): Promise<AgentState | null> {
+  const agents = await listRunningAgentsAsync();
+  for (const agent of agents) {
+    if (agent.sessionId === sessionId) return agent;
+    if ((await getAgentRuntimeStateAsync(agent.id))?.claudeSessionId === sessionId) return agent;
+  }
+  return null;
 }
 
 function inferProjectId(workspacePath: string): string {
@@ -267,7 +355,12 @@ function validOffset(value: number | undefined): value is number {
 }
 
 async function getTranscriptSize(transcriptPath: string): Promise<number> {
-  return (await stat(transcriptPath)).size;
+  return (await getTranscriptStat(transcriptPath)).size;
+}
+
+async function getTranscriptStat(transcriptPath: string): Promise<{ size: number; mtimeMs: number }> {
+  const fileStat = await stat(transcriptPath);
+  return { size: fileStat.size, mtimeMs: fileStat.mtimeMs };
 }
 
 function enqueueMemoryTurnPipeline(input: ExtractFromTranscriptDeltaInput): void {

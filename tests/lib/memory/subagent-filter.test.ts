@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { isSubagentHookPayload } from '../../../src/lib/memory/subagent-filter.js';
-import { handleMemoryTurnBody, memoryTurnHookResponse } from '../../../src/dashboard/server/routes/hooks.js';
+import { handleMemorySessionStartBody, handleMemoryTurnBody, memoryTurnHookResponse } from '../../../src/dashboard/server/routes/hooks.js';
 
 describe('memory subagent filter', () => {
   it('detects Claude Code subagent hook payloads by agent_id presence', () => {
@@ -96,5 +96,43 @@ describe('memory subagent filter', () => {
       error: 'invalid memory turn payload',
     });
     expect(enqueuePipeline).not.toHaveBeenCalled();
+  });
+
+  it('registers primary-agent session starts with the transcript poller', async () => {
+    const registerTranscript = vi.fn();
+
+    const result = await handleMemorySessionStartBody({
+      session_id: 'session-1',
+      transcript_path: '/tmp/session-1.jsonl',
+      identity: {
+        projectId: 'panopticon-cli',
+        workspaceId: 'feature-pan-1052',
+        issueId: 'PAN-1052',
+        runId: 'run-1',
+        agentRole: 'work',
+        agentHarness: 'claude-code',
+      },
+    }, {
+      statTranscript: async () => ({ size: 10, mtimeMs: 20 }),
+      registerTranscript,
+    });
+
+    expect(result).toEqual({ status: 'accepted', sessionId: 'session-1' });
+    expect(registerTranscript).toHaveBeenCalledWith(expect.objectContaining({
+      agentId: 'run-1',
+      sessionId: 'session-1',
+      transcriptPath: '/tmp/session-1.jsonl',
+      harness: 'claude-code',
+      size: 10,
+      mtimeMs: 20,
+    }));
+  });
+
+  it('returns 204 for memory session starts from subagents', async () => {
+    await expect(handleMemorySessionStartBody({
+      agent_id: 'agent-abc',
+      session_id: 'session-1',
+      transcript_path: '/tmp/session-1.jsonl',
+    })).resolves.toEqual({ status: 'subagent' });
   });
 });
