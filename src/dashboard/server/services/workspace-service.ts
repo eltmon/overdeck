@@ -202,11 +202,8 @@ export const WorkspaceServiceLive = Layer.effect(
           try: async () => {
             const { workspacePath } = getWorkspacePath(issueId);
             const issueLower = issueId.toLowerCase();
-            const project = resolveProjectFromIssue(issueId);
-            const projectName = project?.name ?? issueId;
-
             const { stopWorkspaceDocker } = await import('../../../lib/workspace-manager.js');
-            await stopWorkspaceDocker(workspacePath, projectName, issueLower);
+            await stopWorkspaceDocker(workspacePath, issueLower);
           },
           catch: () => undefined, // non-fatal
         }).pipe(Effect.ignore),

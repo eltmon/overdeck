@@ -411,6 +411,8 @@ program
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
   .option('--auto', 'Skip planning agent by synthesizing a minimal vBRIEF and beads from the issue title/body')
+  .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
+  .option('--yes', 'Confirm --host in non-interactive contexts')
   .action(startCommand);
 
 program
@@ -422,6 +424,8 @@ program
   .option('--max-slots <n>', 'Max concurrent agents')
   .option('--auto-advance', 'Automatically dispatch the next wave when the current one completes')
   .option('--no-auto-advance', 'Disable automatic next-wave dispatching for this swarm')
+  .option('--host', 'Bypass workspace docker stack-health gate and spawn swarm slots on the host')
+  .option('--yes', 'Confirm --host in non-interactive contexts')
   .option('--task <op>', 'vBRIEF task operation: next | show | claim | done | block | unblock | cancel')
   .option('--item <id>', 'vBRIEF item ID for show/claim/done/block operations')
   .option('--reason <text>', 'Reason for task status mutation')

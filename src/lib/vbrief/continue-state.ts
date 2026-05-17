@@ -196,6 +196,8 @@ export interface SwarmRuntime {
   totalWaves?: number;
   /** Whether event/polling auto-advance is enabled. */
   autoAdvance?: boolean;
+  /** Whether this swarm was explicitly confirmed to bypass workspace isolation. */
+  hostOverride?: boolean;
   autoAdvanceFailureCount?: number;
   autoAdvanceRetryAfter?: string;
   lastAutoAdvanceError?: string;

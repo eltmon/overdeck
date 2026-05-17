@@ -5,7 +5,7 @@
   ],
   "service": "dev",
   "workspaceFolder": "/workspaces/panopticon",
-  "postCreateCommand": "bun install",
+  "postCreateCommand": "bun install --filter '@panctl/cli' --filter '@panctl/contracts' --filter '@panopticon/pi-extension' --filter 'panopticon-server' --filter 'panopticon-dashboard'",
   "customizations": {
     "vscode": {
       "settings": {

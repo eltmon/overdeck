@@ -32,7 +32,7 @@ import {
   renderDevcontainer,
   type DevcontainerRenderResult,
 } from './devcontainer-renderer.js';
-import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
+import { getProject, resolveProjectFromIssue } from '../projects.js';
 
 export interface EnsureDevcontainerInput {
   /** Absolute workspace path. e.g. `/home/x/Projects/myn/workspaces/feature-min-846`. */
@@ -80,8 +80,8 @@ export function ensureDevcontainer(
     };
   }
 
-  const teamPrefix = extractTeamPrefix(input.issueId);
-  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
+  const resolvedProject = resolveProjectFromIssue(input.issueId);
+  const projectConfig = resolvedProject ? getProject(resolvedProject.projectKey) : null;
   if (!projectConfig) {
     return {
       step: stepFailed(

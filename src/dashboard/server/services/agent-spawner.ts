@@ -23,6 +23,7 @@ export interface StartWorkOptions {
   readonly phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response';
   readonly prompt?: string;
   readonly agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
+  readonly allowHost?: boolean;
 }
 
 export interface StartPlanningOptions {
@@ -168,6 +169,7 @@ export const AgentSpawnerLive = Layer.effect(
             model: opts.model,
             role: 'work',
             prompt: opts.prompt,
+            allowHost: opts.allowHost,
           });
 
           return {

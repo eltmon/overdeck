@@ -50,6 +50,10 @@ function syncHooksIfInitialized() {
 }
 
 function rebuildNativeModules() {
+  if (process.env.PANOPTICON_SKIP_NATIVE_POSTINSTALL === '1') {
+    return;
+  }
+
   const npmExecPath = process.env.npm_execpath;
   const userAgent = process.env.npm_config_user_agent || '';
   const packageManager = userAgent.startsWith('bun/') ? 'bun' : 'npm';

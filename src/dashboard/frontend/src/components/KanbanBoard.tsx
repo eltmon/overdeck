@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef, createContext, useContext } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, createContext, useContext, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAgentList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
@@ -49,6 +49,7 @@ import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';
 import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgress';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
 import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
+import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
 
 
 // Parity registry anchor — keeps the card action surface tied to the
@@ -103,6 +104,14 @@ function LiveLastHeardBadge({ lastActivity }: { lastActivity?: string }) {
 // Shared one-second tick for all KanbanBoard child components (eliminates
 // N independent setInterval timers when many agent cards are visible).
 const KanbanTickContext = createContext<number>(Date.now());
+function KanbanTickProvider({ children }: { children: ReactNode }) {
+  const [kanbanTick, setKanbanTick] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setKanbanTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return <KanbanTickContext.Provider value={kanbanTick}>{children}</KanbanTickContext.Provider>;
+}
 function useKanbanTick() {
   return useContext(KanbanTickContext);
 }
@@ -1142,13 +1151,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   // Rally feature expand/collapse state (lifted from ColumnContent for expand/collapse all)
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
 
-  // Shared one-second tick for all child badges (eliminates per-badge intervals)
-  const [kanbanTick, setKanbanTick] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setKanbanTick(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
   const toggleFeature = useCallback((featureId: string) => {
     setCollapsedFeatures(prev => {
       const next = new Set(prev);
@@ -1647,8 +1649,16 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     return result;
   }, [grouped, planningStateById]);
 
+  const kanbanIssueIds = useMemo(() => {
+    if (cycleFilter === 'all' || cycleFilter === 'backlog' || cycleFilter === 'canceled') return [];
+    return STATUS_ORDER
+      .filter((status) => status !== 'backlog')
+      .flatMap((status) => sortedGrouped[status].map((issue) => issue.identifier));
+  }, [cycleFilter, sortedGrouped]);
+  const stackHealthByIssue = useWorkspaceStackHealthQuery(kanbanIssueIds).data?.workspaces ?? {};
+
   return (
-    <KanbanTickContext.Provider value={kanbanTick}>
+    <KanbanTickProvider>
     <div className="space-y-4">
       {/* Filter bar */}
       <div className="flex flex-col gap-2">
@@ -1930,6 +1940,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     bulkSelectedIds={bulkSelection.selectedIds}
                     onBulkToggle={bulkSelection.toggle}
                     planningStateById={planningStateById}
+                    workspaceByIssueId={stackHealthByIssue}
                   />
                 </div>
               </div>
@@ -2019,7 +2030,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         onClose={handleCloseProgress}
       />
     </div>
-    </KanbanTickContext.Provider>
+    </KanbanTickProvider>
   );
 }
 
@@ -2041,6 +2052,7 @@ function ColumnContent({
   bulkSelectedIds,
   onBulkToggle,
   planningStateById,
+  workspaceByIssueId,
 }: {
   issues: Issue[];
   issueWorkAgentsById: Map<string, Agent[]>;
@@ -2059,6 +2071,7 @@ function ColumnContent({
   bulkSelectedIds?: Set<string>;
   onBulkToggle?: (issueId: string) => void;
   planningStateById?: Record<string, PlanningState>;
+  workspaceByIssueId?: Record<string, WorkspaceData>;
 }) {
   // Check if any Rally issues with hierarchy exist
   const hasRallyHierarchy = issues.some(i => i.artifactType?.includes('PortfolioItem'));
@@ -2095,6 +2108,7 @@ function ColumnContent({
         isBulkSelected={bulkSelectedIds?.has(issue.identifier)}
         onBulkToggle={onBulkToggle ? () => onBulkToggle(issue.identifier) : undefined}
         planningState={planningStateById?.[issue.identifier]}
+        workspace={workspaceByIssueId?.[issue.identifier.toUpperCase()]}
       />
     );
   };
@@ -2707,15 +2721,19 @@ interface IssueCardProps {
   isBulkSelected?: boolean;
   onBulkToggle?: () => void;
   planningState?: PlanningState;
+  workspace?: WorkspaceData;
 }
 
-export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp }: IssueCardProps) {
+export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp, workspace: workspaceProp }: IssueCardProps) {
   const queryClient = useQueryClient();
   const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const { prefs: _prefs } = useUIPreferences();
   const { groups: modelGroups, defaultModel, harnessPolicy } = useAvailableModels();
+  const stackHealth = workspaceProp?.stackHealth;
+  const isStackUnhealthy = stackHealth?.healthy === false;
+  const stackHealthDetails = stackHealth?.reasons.join('; ');
   const [launchModel, setLaunchModel] = useState(defaultModel);
   const [launchHarness, setLaunchHarness] = useState<Harness>('claude-code');
 
@@ -2798,7 +2816,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     canonical === 'in_review' ? (isReadyToMerge ? 'Awaiting merge' : isPipelineStuck ? 'Needs recovery' : 'Review pipeline') :
     canonical === 'done' ? 'Completed' :
     'Canceled';
-  const cardTone = isPipelineStuck
+  const cardTone = isStackUnhealthy || isPipelineStuck
     ? 'from-destructive/12 via-destructive/5 to-transparent'
     : isReadyToMerge
       ? 'from-warning/20 via-warning/6 to-transparent'
@@ -3070,15 +3088,17 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       className={`group relative overflow-hidden rounded-2xl border cursor-pointer transition-all shadow-[0_6px_22px_rgba(0,0,0,0.08)] ${isSessionLost ? 'border-warning/50' : ''} ${
         isSelected
           ? 'ring-2 ring-warning/70 shadow-[0_12px_30px_rgba(245,158,11,0.18)]'
-          : isBulkSelected
-            ? 'border-primary/50 bg-primary/[0.03] shadow-[0_6px_22px_rgba(0,0,0,0.08)]'
-            : 'hover:-translate-y-0.5 border-border/70 hover:border-border hover:shadow-[0_12px_28px_rgba(0,0,0,0.12)]'
+          : isStackUnhealthy
+            ? 'border-destructive/60 bg-destructive/[0.03] shadow-[0_10px_26px_rgba(239,68,68,0.14)]'
+            : isBulkSelected
+              ? 'border-primary/50 bg-primary/[0.03] shadow-[0_6px_22px_rgba(0,0,0,0.08)]'
+              : 'hover:-translate-y-0.5 border-border/70 hover:border-border hover:shadow-[0_12px_28px_rgba(0,0,0,0.12)]'
       } bg-[linear-gradient(145deg,var(--color-surface)_0%,rgba(255,255,255,0.03)_100%)]`}
     >
       <div className={`pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br ${cardTone}`} />
       <div
         className={`absolute inset-y-0 left-0 w-1.5 ${
-          isPipelineStuck
+          isStackUnhealthy || isPipelineStuck
             ? 'bg-destructive'
             : isReadyToMerge
               ? 'bg-warning'
@@ -3340,6 +3360,16 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
               >
                 <AlertCircle className="w-3 h-3" />
                 {pipelineCallToAction.label}
+              </span>
+            )}
+            {isStackUnhealthy && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-destructive text-destructive-foreground border border-destructive/50"
+                title={stackHealthDetails || 'Workspace Docker stack is unhealthy'}
+                data-testid={`card-stack-health-${issue.identifier}`}
+              >
+                <AlertTriangle className="w-3 h-3" />
+                Workspace unhealthy
               </span>
             )}
             {/* Lifecycle resolution badges (PAN-309) */}

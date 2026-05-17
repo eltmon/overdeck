@@ -853,6 +853,18 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
           </div>
         )}
 
+        {workspace?.stackHealth && !workspace.stackHealth.healthy && (
+          <div className="px-3 py-2 border-b border-destructive/40 bg-destructive/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0" />
+              <span className="text-xs font-bold uppercase tracking-wide text-destructive">Workspace Stack Broken</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground" title={workspace.stackHealth.reasons.join('; ')}>
+              {workspace.stackHealth.reasons.join('; ')}
+            </p>
+          </div>
+        )}
+
         {/* Awaiting input banner */}
         {agent && awaitingInput && (
           <div className="px-3 py-2 border-b border-warning/40 bg-warning/10" data-testid={`inspector-input-${issueId}`}>

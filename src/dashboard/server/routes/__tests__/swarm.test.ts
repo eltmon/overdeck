@@ -308,6 +308,7 @@ describe('swarm route helpers', () => {
       totalWaves: 2,
       model: 'kimi-k2.6',
       autoAdvance: true,
+      hostOverride: true,
       slots: [
         {
           slot: 1,
@@ -348,11 +349,15 @@ describe('swarm route helpers', () => {
     // PAN-977 blocker #4: prior slots are persisted cumulatively, so the new
     // dispatch appears alongside the prior completed slot.
     expect(nextState.autoAdvance).toBe(true);
+    expect(nextState.hostOverride).toBe(true);
     const newSlot = nextState.slots.find((s) => s.itemId === 'wave-1-item');
     expect(newSlot).toBeTruthy();
     expect(newSlot?.itemTitle).toBe('Dispatch next wave');
     expect(newSlot?.status).toBe('running');
     expect(agents.spawnAgent).toHaveBeenCalledTimes(1);
+    expect(agents.spawnAgent).toHaveBeenCalledWith(expect.objectContaining({
+      allowHost: true,
+    }));
   });
 
   // PAN-977 round-12 blocker #1: regression — onSlotMergeComplete must not
@@ -683,6 +688,25 @@ describe('swarm route helpers', () => {
     expect(newDispatch?.slot, 'must allocate slot 2 (lowest free) instead of stalling on slot 1').toBe(2);
     expect(newDispatch?.sessionName).toBe('agent-pan-971-2');
     expect(newDispatch?.status).toBe('running');
+  });
+
+  it('passes confirmed host override into swarm slot spawns', async () => {
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue([]);
+
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 0,
+      allowHost: true,
+    });
+
+    expect(result.status).toBe(200);
+    expect(agents.spawnAgent).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-971',
+      allowHost: true,
+    }));
+    const state = await __testInternals.loadSwarmState('PAN-971');
+    expect(state?.hostOverride).toBe(true);
   });
 
   it('does not advance while current wave still has running slots', async () => {

@@ -87,8 +87,10 @@ import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
 import { getProviderForModel } from '../../../lib/providers.js';
 import { validateProviderHealth, ProviderHealthError } from '../../../lib/provider-health.js';
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { getProject, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { findPlanAsync, readPlanAsync } from '../../../lib/vbrief/io.js';
+import { getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
+import { normalizeModelOverride, requireModelOverride } from '../../../lib/model-validation.js';
 import { writeAutoStartVBrief } from '../../../lib/vbrief/auto-synthesize.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
 import type { ContinueState } from '../../../lib/vbrief/continue-state.js';
@@ -198,6 +200,10 @@ const readJsonBody = Effect.gen(function* () {
     return {};
   }
 });
+
+function buildHostOverrideConfirmation(issueId: string): string {
+  return `I understand this bypasses workspace isolation for ${issueId.toUpperCase()}`;
+}
 
 function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
   if (issuePrefix) {
@@ -1355,6 +1361,12 @@ const postAgentResumeRoute = HttpRouter.add(
     const body = yield* readJsonBody;
 
     const { message, model } = body as any;
+    let resumeModel: string | undefined;
+    try {
+      resumeModel = normalizeModelOverride(model);
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+    }
     const eventStore = yield* EventStoreService;
     // Snapshot lifecycle state BEFORE taking any action so callers can see the
     // temporal context (why was this resume allowed) without recomputing state.
@@ -1368,10 +1380,10 @@ const postAgentResumeRoute = HttpRouter.add(
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_requested', {
       hasMessage: !!message,
-      model: model || undefined,
+      model: resumeModel || undefined,
       lifecycle: lifecycleBefore,
     }));
-    const result = yield* Effect.promise(() => resumeAgent(id, message, model ? { model } : undefined));
+    const result = yield* Effect.promise(() => resumeAgent(id, message, resumeModel ? { model: resumeModel } : undefined));
     if (result.success) {
       // Emit agent.started event so the read model transitions agent status
       // from 'stopped' → 'running' and the frontend updates immediately.
@@ -1441,6 +1453,12 @@ const postAgentRestartRoute = HttpRouter.add(
       graceful?: boolean;
       message?: string;
     };
+    let restartModel: string | undefined;
+    try {
+      restartModel = normalizeModelOverride(model);
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+    }
 
     const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
     if (!agentState) {
@@ -1448,7 +1466,7 @@ const postAgentRestartRoute = HttpRouter.add(
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.restart_requested', {
-      model: model || agentState.model,
+      model: restartModel || agentState.model,
       graceful,
       hasMessage: !!message,
     }));
@@ -1463,7 +1481,7 @@ const postAgentRestartRoute = HttpRouter.add(
             payload: { agentId: id, issueId: agentState.issueId },
           }));
 
-          const result = await restartAgent(id, { model, harness, graceful: true, message });
+          const result = await restartAgent(id, { model: restartModel, harness, graceful: true, message });
 
           if (result.success) {
             const updatedState = getAgentState(id);
@@ -1482,7 +1500,7 @@ const postAgentRestartRoute = HttpRouter.add(
                   // below — surface the actual harness so Pi agents do not
                   // get mis-labelled as Claude Code on graceful restart.
                   runtime: updatedState?.harness ?? agentState.harness ?? 'claude-code',
-                  model: model || updatedState?.model || agentState.model,
+                  model: restartModel || updatedState?.model || agentState.model,
                   status: 'running',
                   startedAt: updatedState?.startedAt || agentState.startedAt,
                   lastActivity: new Date().toISOString(),
@@ -1507,7 +1525,7 @@ const postAgentRestartRoute = HttpRouter.add(
     }
 
     // Quick restart — synchronous
-    const result = yield* Effect.promise(() => restartAgent(id, { model, graceful: false, message }));
+    const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, graceful: false, message }));
 
     if (result.success) {
       const updatedState = yield* Effect.promise(() => getAgentStateAsync(id));
@@ -1532,7 +1550,7 @@ const postAgentRestartRoute = HttpRouter.add(
             // is what getHarness() reads, so a Pi agent restarted through
             // this path was being mis-labelled as Claude Code.
             runtime: updatedState?.harness ?? agentState.harness ?? 'claude-code',
-            model: model || updatedState?.model || agentState.model,
+            model: restartModel || updatedState?.model || agentState.model,
             status: 'running',
             startedAt: updatedState?.startedAt || agentState.startedAt,
             lastActivity: new Date().toISOString(),
@@ -1541,7 +1559,7 @@ const postAgentRestartRoute = HttpRouter.add(
         },
       })));
       invalidateAgentsCache();
-      return jsonResponse({ success: true, restarted: true, agentId: id, model: model || agentState.model });
+      return jsonResponse({ success: true, restarted: true, agentId: id, model: restartModel || agentState.model });
     }
 
     return jsonResponse({ error: result.error }, { status: 500 });
@@ -1627,12 +1645,15 @@ const postAgentHandoffRoute = HttpRouter.add(
     const body = yield* readJsonBody;
 
     const { toModel, reason } = body as any;
-    if (!toModel) {
-      return jsonResponse({ error: 'toModel is required' }, { status: 400 });
+    let targetModel: string;
+    try {
+      targetModel = requireModelOverride(toModel);
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
     const result = yield* Effect.promise(() => performHandoff(id, {
-      targetModel: toModel,
+      targetModel,
       reason: reason || 'Manual handoff from dashboard',
     }));
 
@@ -1755,6 +1776,12 @@ const postAgentsRoute = HttpRouter.add(
   'POST',
   '/api/agents',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
+    }
+
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const lifecycle = yield* IssueLifecycle;
@@ -1763,6 +1790,7 @@ const postAgentsRoute = HttpRouter.add(
     const { issueId, projectId } = body as any;
     const autoStart = (body as any).auto === true;
     const guardrailAcknowledged = (body as any).guardrailAcknowledged === true;
+    const requestedHostOverride = (body as any).host === true || (body as any).allowHost === true;
 
     if (!issueId) {
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
@@ -1803,6 +1831,18 @@ const postAgentsRoute = HttpRouter.add(
       );
     }
 
+    const hostOverrideConfirmation = buildHostOverrideConfirmation(String(issueId));
+    const allowHost = requestedHostOverride && (body as any).hostOverrideConfirmation === hostOverrideConfirmation;
+    if (requestedHostOverride && !allowHost) {
+      return jsonResponse({
+        success: false,
+        error: 'host_override_confirmation_required',
+        requiresHostConfirmation: true,
+        confirmation: hostOverrideConfirmation,
+        hint: `Host override bypasses workspace isolation. Retry only after explicitly confirming: ${hostOverrideConfirmation}`,
+      }, { status: 409 });
+    }
+
     // Guard: reject starting agents for already-closed issues
     const issueDataService = getIssueDataService();
     const cachedIssues = issueDataService.getIssues();
@@ -1826,7 +1866,9 @@ const postAgentsRoute = HttpRouter.add(
     const isRemote = workspaceMetadata?.location === 'remote';
 
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
-    const projectPath = getProjectPath(projectId, issuePrefix);
+    const resolvedProject = resolveProjectFromIssue(String(issueId));
+    const projectConfig = resolvedProject ? getProject(resolvedProject.projectKey) : null;
+    const projectPath = projectConfig?.path ?? getProjectPath(projectId, issuePrefix);
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
@@ -1996,10 +2038,15 @@ const postAgentsRoute = HttpRouter.add(
       }, { status: spawnGuardrails.status });
     }
 
-    const spawnModel = determineModel({
-      model: (body as any).model,
-      role,
-    });
+    let spawnModel: string;
+    try {
+      spawnModel = determineModel({
+        model: (body as any).model,
+        role,
+      });
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+    }
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
       const codexAuth = yield* Effect.promise(() => checkCodexAuthStatus());
@@ -2039,6 +2086,44 @@ const postAgentsRoute = HttpRouter.add(
         }, { status: 429 });
       }
       throw err;
+    }
+
+    if (!isRemote) {
+      const stackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, workspacePath }));
+      if (!stackHealth.healthy) {
+        yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_stack_unhealthy', {
+          issueId,
+          reasons: stackHealth.reasons,
+          lastObserved: stackHealth.lastObserved,
+        }));
+        if (!allowHost) {
+          emitActivityEntry({
+            source: 'dashboard',
+            level: 'error',
+            issueId: issueId.toUpperCase(),
+            message: `agent-spawn-blocked-stack-unhealthy: ${issueId.toUpperCase()}`,
+            details: stackHealth.reasons.join('; '),
+          });
+          return jsonResponse({
+            success: false,
+            blocked: true,
+            skipped: true,
+            error: `Workspace docker stack for ${issueId} is not healthy: ${stackHealth.reasons.join('; ')}`,
+            hint: `Run 'pan workspace rebuild ${issueId}' or use the CLI break-glass path: pan start ${issueId} --host.`,
+            stackHealth,
+          }, { status: 422 });
+        }
+      }
+    }
+
+    if (allowHost) {
+      emitActivityEntry({
+        source: 'dashboard',
+        level: 'warn',
+        issueId: issueId.toUpperCase(),
+        message: `agent-spawn-host-override: ${issueId.toUpperCase()}`,
+        details: 'Dashboard request included confirmed host override.',
+      });
     }
 
     if (existsSync(workspacePanContinuePath) || existsSync(workspacePanDir)) {
@@ -2342,18 +2427,6 @@ const postAgentsRoute = HttpRouter.add(
         detached: true,
         stdio: ['ignore', spawnLogHandle.fd, spawnLogHandle.fd],
       });
-      child.on('error', (error) => {
-        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_error', {
-          issueId,
-          role,
-          workspacePath,
-          activityId,
-          error: error.message,
-          args,
-          cwd: cwd || workspacePath,
-          spawnLogPath,
-        }).catch(() => undefined);
-      });
       child.once('spawn', () => {
         void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_spawned', {
           issueId,
@@ -2366,22 +2439,46 @@ const postAgentsRoute = HttpRouter.add(
           spawnLogPath,
         }).catch(() => undefined);
       });
-      child.once('close', (code, signal) => {
-        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_closed', {
-          issueId,
-          role,
-          workspacePath,
-          activityId,
-          code,
-          signal,
-          args,
-          cwd: cwd || workspacePath,
-          spawnLogPath,
-        }).catch(() => undefined);
-      });
-      child.unref();
-      await spawnLogHandle.close();
-      return activityId;
+      try {
+        const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+          child.once('error', (error) => {
+            void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_error', {
+              issueId,
+              role,
+              workspacePath,
+              activityId,
+              error: error.message,
+              args,
+              cwd: cwd || workspacePath,
+              spawnLogPath,
+            }).catch(() => undefined);
+            reject(error);
+          });
+          child.once('close', (code, signal) => {
+            void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_closed', {
+              issueId,
+              role,
+              workspacePath,
+              activityId,
+              code,
+              signal,
+              args,
+              cwd: cwd || workspacePath,
+              spawnLogPath,
+            }).catch(() => undefined);
+            resolve({ code, signal });
+          });
+        });
+        if (result.code !== 0) {
+          const output = await readFile(spawnLogPath, 'utf-8').catch(() => '');
+          const error = new Error(output.trim() || `pan ${args.join(' ')} exited with code ${result.code ?? 'null'}`);
+          Object.assign(error, { activityId, spawnLogPath, code: result.code, signal: result.signal, output });
+          throw error;
+        }
+        return activityId;
+      } finally {
+        await spawnLogHandle.close();
+      }
     };
 
     // Use IssueLifecycle service to transition issue to "In Progress" (PAN-449)
@@ -2399,30 +2496,44 @@ const postAgentsRoute = HttpRouter.add(
       } catch {}
 
       if (dockerRunning) {
-        const getComposeProjectName = async (id: string, pPath?: string): Promise<string> => {
-          const lower = id.toLowerCase();
-          const featureFolder = `feature-${lower}`;
-          if (pPath) {
-            const devScriptPaths = [
-              join(pPath, 'workspaces', featureFolder, '.devcontainer', 'dev'),
-              join(pPath, 'workspaces', featureFolder, 'dev'),
-            ];
-            for (const devPath of devScriptPaths) {
-              try {
-                if (existsSync(devPath)) {
-                  const content = await readFile(devPath, 'utf-8');
-                  const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-                  if (match) return `${match[1]}${featureFolder}`;
-                  const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
-                  if (literalMatch) return literalMatch[1];
-                }
-              } catch {}
+        const getComposeProjectName = async (id: string, wPath: string): Promise<string> => {
+          const featureFolder = `feature-${id.toLowerCase()}`;
+          const expected = `panopticon-${featureFolder}`;
+          const validate = (value: string, devPath: string): string => {
+            if (value !== expected) {
+              throw new Error(`Invalid COMPOSE_PROJECT_NAME in ${devPath}: expected ${expected}`);
+            }
+            return value;
+          };
+
+          const devScriptPaths = [join(wPath, '.devcontainer', 'dev'), join(wPath, 'dev')];
+          for (const devPath of devScriptPaths) {
+            try {
+              if (existsSync(devPath)) {
+                const content = await readFile(devPath, 'utf-8');
+                const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
+                if (match) return validate(`${match[1]}${featureFolder}`, devPath);
+                const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
+                if (literalMatch) return validate(literalMatch[1], devPath);
+              }
+            } catch (error) {
+              if (error instanceof Error && error.message.startsWith('Invalid COMPOSE_PROJECT_NAME')) throw error;
             }
           }
-          return featureFolder;
+          return expected;
         };
 
-        const featureName = yield* Effect.promise(() => getComposeProjectName(issueId, projectPath));
+        let featureName: string;
+        try {
+          featureName = yield* Effect.promise(() => getComposeProjectName(issueId, workspacePath));
+        } catch (error) {
+          return jsonResponse({
+            success: false,
+            blocked: true,
+            skipped: true,
+            error: error instanceof Error ? error.message : String(error),
+          }, { status: 422 });
+        }
         yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_container_check', {
           issueId,
           featureName,
@@ -2431,8 +2542,9 @@ const postAgentsRoute = HttpRouter.add(
         let containersReady = false;
 
         try {
-          const { stdout: existing } = yield* Effect.promise(() => execAsync(
-            `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
+          const { stdout: existing } = yield* Effect.promise(() => execFileAsync(
+            'docker',
+            ['ps', '--filter', `name=${featureName}`, '--format', '{{.Names}}|{{.Status}}'],
             { encoding: 'utf-8' }
           ));
           const runningContainers = existing.trim().split('\n').filter(Boolean);
@@ -2449,7 +2561,7 @@ const postAgentsRoute = HttpRouter.add(
           containersReady,
         }));
 
-        if (!containersReady) {
+        if (!containersReady && !allowHost) {
           const earlyAgentId = agentSessionName;
           const earlyStateDir = join(homedir(), '.panopticon', 'agents', earlyAgentId);
           yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
@@ -2468,6 +2580,7 @@ const postAgentsRoute = HttpRouter.add(
             startedAt: new Date().toISOString(),
             workspace: workspacePath,
             role,
+            hostOverride: allowHost || undefined,
             message: 'Waiting for containers to start...',
             ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
             ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
@@ -2507,8 +2620,9 @@ const postAgentsRoute = HttpRouter.add(
 
                   while (Date.now() - startTime < maxWaitMs) {
                     try {
-                      const { stdout } = await execAsync(
-                        `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
+                      const { stdout } = await execFileAsync(
+                        'docker',
+                        ['ps', '--filter', `name=${featureName}`, '--format', '{{.Names}}|{{.Status}}'],
                         { encoding: 'utf-8' }
                       );
                       const containers = stdout.trim().split('\n').filter(Boolean);
@@ -2539,7 +2653,7 @@ const postAgentsRoute = HttpRouter.add(
                       startedAt: new Date().toISOString(),
                       workspace: workspacePath,
                       role,
-                      message: 'Container startup timed out before work agent spawn',
+                      message: `Container startup timed out before work agent spawn. Run pan workspace rebuild ${issueId} to reset the stack.`,
                       error: `Containers for ${issueId} did not become healthy within ${maxWaitMs}ms`,
                       ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
                       ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
@@ -2573,7 +2687,8 @@ const postAgentsRoute = HttpRouter.add(
                   });
                   await spawnPanCommand(
                     ['start', issueId, '--local', '--model', spawnModel,
-                      ...(effectiveHarness ? ['--harness', effectiveHarness] : [])],
+                      ...(effectiveHarness ? ['--harness', effectiveHarness] : []),
+                      ...(allowHost ? ['--host', '--yes'] : [])],
                     workspacePath,
                   );
                   await updateIssueStatus();
@@ -2628,11 +2743,45 @@ const postAgentsRoute = HttpRouter.add(
       role,
       workspacePath,
     }));
-    const activityId = yield* Effect.promise(() => spawnPanCommand(
-      ['start', issueId, '--local', '--model', spawnModel,
-        ...(effectiveHarness ? ['--harness', effectiveHarness] : [])],
-      workspacePath,
-    ));
+    let activityId: string;
+    try {
+      activityId = yield* Effect.promise(() => spawnPanCommand(
+        ['start', issueId, '--local', '--model', spawnModel,
+          ...(effectiveHarness ? ['--harness', effectiveHarness] : []),
+          ...(allowHost ? ['--host', '--yes'] : [])],
+        workspacePath,
+      ));
+    } catch (error: any) {
+      const output = String(error?.output ?? error?.message ?? '');
+      if (output.includes(`Workspace docker stack for ${issueId}`) && output.includes('is not healthy')) {
+        const failedStackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, workspacePath }));
+        emitActivityEntry({
+          source: 'dashboard',
+          level: 'error',
+          issueId: issueId.toUpperCase(),
+          message: `agent-spawn-blocked-stack-unhealthy: ${issueId.toUpperCase()}`,
+          details: failedStackHealth.reasons.length > 0 ? failedStackHealth.reasons.join('; ') : output.trim(),
+        });
+        return jsonResponse({
+          success: false,
+          blocked: true,
+          skipped: true,
+          error: failedStackHealth.reasons.length > 0
+            ? `Workspace docker stack for ${issueId} is not healthy: ${failedStackHealth.reasons.join('; ')}`
+            : output.trim(),
+          hint: `Run 'pan workspace rebuild ${issueId}' or use the CLI break-glass path: pan start ${issueId} --host.`,
+          stackHealth: failedStackHealth,
+          activityId: error?.activityId,
+        }, { status: 422 });
+      }
+      return jsonResponse({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: output.trim() || `Failed to start agent for ${issueId}`,
+        activityId: error?.activityId,
+      }, { status: 500 });
+    }
 
     // Write early state.json so the dashboard immediately shows agent-<id> as the
     // active agent. Without this there's a race window between spawnPanCommand returning
@@ -2652,6 +2801,7 @@ const postAgentsRoute = HttpRouter.add(
       startedAt: new Date().toISOString(),
       workspace: workspacePath,
       role,
+      hostOverride: allowHost || undefined,
       message: 'Work agent spawn requested',
       ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
       ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
@@ -2850,10 +3000,24 @@ const postAgentResetSessionRoute = HttpRouter.add(
 // ─── Route: POST /api/agents/:id/delivery-method ─────────────────────────────
 // Updates the agent's delivery method (auto | channels | tmux) in state.json.
 
+export function validateAgentDeliveryMethodOrigin(
+  request: HttpServerRequest.HttpServerRequest,
+): { ok: true } | { ok: false; status: 403; body: { error: 'forbidden' } } {
+  const originCheck = validateOrigin(request);
+  if (originCheck.ok) return { ok: true };
+  return { ok: false, status: 403, body: { error: 'forbidden' } };
+}
+
 const postAgentDeliveryMethodRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/delivery-method',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originDecision = validateAgentDeliveryMethodOrigin(request);
+    if (!originDecision.ok) {
+      return jsonResponse(originDecision.body, { status: originDecision.status });
+    }
+
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
@@ -2889,9 +3053,12 @@ const postAgentSwitchModelRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
-    const { model: newModel } = body as { model?: string; message?: string };
-    if (!newModel || typeof newModel !== 'string' || !newModel.trim()) {
-      return jsonResponse({ error: 'model is required' }, { status: 400 });
+    const { model: rawNewModel } = body as { model?: string; message?: string };
+    let newModel: string;
+    try {
+      newModel = requireModelOverride(rawNewModel);
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
     const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
@@ -2938,7 +3105,7 @@ const postAgentSwitchModelRoute = HttpRouter.add(
       try {
         const stateContent = yield* Effect.promise(() => readFile(stateFile, 'utf-8'));
         const state = JSON.parse(stateContent);
-        state.model = newModel.trim();
+        state.model = newModel;
         yield* Effect.promise(() => writeFile(stateFile, JSON.stringify(state, null, 2)));
       } catch { /* non-fatal */ }
     }
