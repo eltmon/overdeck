@@ -2496,30 +2496,44 @@ const postAgentsRoute = HttpRouter.add(
       } catch {}
 
       if (dockerRunning) {
-        const getComposeProjectName = async (id: string, pPath?: string): Promise<string> => {
-          const lower = id.toLowerCase();
-          const featureFolder = `feature-${lower}`;
-          if (pPath) {
-            const devScriptPaths = [
-              join(pPath, 'workspaces', featureFolder, '.devcontainer', 'dev'),
-              join(pPath, 'workspaces', featureFolder, 'dev'),
-            ];
-            for (const devPath of devScriptPaths) {
-              try {
-                if (existsSync(devPath)) {
-                  const content = await readFile(devPath, 'utf-8');
-                  const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-                  if (match) return `${match[1]}${featureFolder}`;
-                  const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
-                  if (literalMatch) return literalMatch[1];
-                }
-              } catch {}
+        const getComposeProjectName = async (id: string, wPath: string): Promise<string> => {
+          const featureFolder = `feature-${id.toLowerCase()}`;
+          const expected = `panopticon-${featureFolder}`;
+          const validate = (value: string, devPath: string): string => {
+            if (value !== expected) {
+              throw new Error(`Invalid COMPOSE_PROJECT_NAME in ${devPath}: expected ${expected}`);
+            }
+            return value;
+          };
+
+          const devScriptPaths = [join(wPath, '.devcontainer', 'dev'), join(wPath, 'dev')];
+          for (const devPath of devScriptPaths) {
+            try {
+              if (existsSync(devPath)) {
+                const content = await readFile(devPath, 'utf-8');
+                const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
+                if (match) return validate(`${match[1]}${featureFolder}`, devPath);
+                const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
+                if (literalMatch) return validate(literalMatch[1], devPath);
+              }
+            } catch (error) {
+              if (error instanceof Error && error.message.startsWith('Invalid COMPOSE_PROJECT_NAME')) throw error;
             }
           }
-          return featureFolder;
+          return expected;
         };
 
-        const featureName = yield* Effect.promise(() => getComposeProjectName(issueId, projectPath));
+        let featureName: string;
+        try {
+          featureName = yield* Effect.promise(() => getComposeProjectName(issueId, workspacePath));
+        } catch (error) {
+          return jsonResponse({
+            success: false,
+            blocked: true,
+            skipped: true,
+            error: error instanceof Error ? error.message : String(error),
+          }, { status: 422 });
+        }
         yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_container_check', {
           issueId,
           featureName,
@@ -2528,8 +2542,9 @@ const postAgentsRoute = HttpRouter.add(
         let containersReady = false;
 
         try {
-          const { stdout: existing } = yield* Effect.promise(() => execAsync(
-            `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
+          const { stdout: existing } = yield* Effect.promise(() => execFileAsync(
+            'docker',
+            ['ps', '--filter', `name=${featureName}`, '--format', '{{.Names}}|{{.Status}}'],
             { encoding: 'utf-8' }
           ));
           const runningContainers = existing.trim().split('\n').filter(Boolean);
@@ -2605,8 +2620,9 @@ const postAgentsRoute = HttpRouter.add(
 
                   while (Date.now() - startTime < maxWaitMs) {
                     try {
-                      const { stdout } = await execAsync(
-                        `docker ps --filter "name=${featureName}" --format "{{.Names}}|{{.Status}}"`,
+                      const { stdout } = await execFileAsync(
+                        'docker',
+                        ['ps', '--filter', `name=${featureName}`, '--format', '{{.Names}}|{{.Status}}'],
                         { encoding: 'utf-8' }
                       );
                       const containers = stdout.trim().split('\n').filter(Boolean);
