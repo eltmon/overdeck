@@ -289,7 +289,7 @@ describe('auto-resume gates', () => {
     expect(agents.getAgentState(runningAgentId)?.status).toBe('running');
   });
 
-  it('clears paused state when pan start --force is used', async () => {
+  it('keeps paused state when pan start --force is only a dry run', async () => {
     const { agents, issueCommand } = await loadStartCommand();
     const agentId = 'agent-pan-1141';
     agents.saveAgentState({
@@ -309,9 +309,9 @@ describe('auto-resume gates', () => {
     await issueCommand('PAN-1141', { model: '', force: true, dryRun: true } as any);
 
     const state = agents.getAgentState(agentId);
-    expect(state?.paused).toBeUndefined();
-    expect(state?.pausedReason).toBeUndefined();
-    expect(state?.pausedAt).toBeUndefined();
+    expect(state?.paused).toBe(true);
+    expect(state?.pausedReason).toBe('manual inspection');
+    expect(state?.pausedAt).toBe(BASE_TIME.toISOString());
   });
 
   it('refuses pan start without --force when paused', async () => {

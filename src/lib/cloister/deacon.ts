@@ -4829,6 +4829,32 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
+    // Skip if workspace is missing
+    if (!state.workspace || !existsSync(state.workspace)) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — workspace missing (${state.workspace || 'undefined'})`);
+      continue;
+    }
+
+    if (state.paused === true) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — paused (${state.pausedReason ?? 'no reason'})`);
+      continue;
+    }
+
+    if (state.troubled === true) {
+      const failureCount = state.consecutiveFailures ?? 0;
+      const since = state.firstFailureInRunAt ?? state.troubledAt ?? 'unknown';
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — troubled (${failureCount} consecutive failures since ${since})`);
+      continue;
+    }
+
+    if (state.lastFailureNextRetryAt !== undefined) {
+      const nextRetryMs = Date.parse(state.lastFailureNextRetryAt);
+      if (Number.isFinite(nextRetryMs) && nextRetryMs > Date.now()) {
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — backoff active (next retry at ${state.lastFailureNextRetryAt})`);
+        continue;
+      }
+    }
+
     // Skip if the agent has a completed marker (or processed completion) — unless
     // review or test found issues that need fixing (blocked / failed).
     const completedFile = join(getAgentDir(agentId), 'completed');
@@ -4852,12 +4878,6 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — pipeline mid-flight (review=${review?.reviewStatus ?? 'none'}, test=${review?.testStatus ?? 'none'})`);
         continue;
       }
-    }
-
-    // Skip if workspace is missing
-    if (!state.workspace || !existsSync(state.workspace)) {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — workspace missing (${state.workspace || 'undefined'})`);
-      continue;
     }
 
     // Skip if already merge-ready (review+test passed) or already merged
@@ -4887,26 +4907,6 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     if (issueClosed) {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${state.issueId} is CLOSED on tracker`);
       continue;
-    }
-
-    if (state.paused === true) {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — paused (${state.pausedReason ?? 'no reason'})`);
-      continue;
-    }
-
-    if (state.troubled === true) {
-      const failureCount = state.consecutiveFailures ?? 0;
-      const since = state.firstFailureInRunAt ?? state.troubledAt ?? 'unknown';
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — troubled (${failureCount} consecutive failures since ${since})`);
-      continue;
-    }
-
-    if (state.lastFailureNextRetryAt !== undefined) {
-      const nextRetryMs = Date.parse(state.lastFailureNextRetryAt);
-      if (Number.isFinite(nextRetryMs) && nextRetryMs > Date.now()) {
-        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — backoff active (next retry at ${state.lastFailureNextRetryAt})`);
-        continue;
-      }
     }
 
     const deliberatelyStopped = state.stoppedByUser === true;

@@ -277,7 +277,8 @@ async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIs
 async function handleRemoteWorkspace(
   issueId: string,
   options: IssueOptions,
-  spinner: Ora
+  spinner: Ora,
+  clearPauseAfterSpawn: boolean
 ): Promise<void> {
   const config = loadConfig();
 
@@ -379,6 +380,10 @@ async function handleRemoteWorkspace(
       model: options.model,
       prompt,
     });
+
+    if (clearPauseAfterSpawn) {
+      clearAgentPaused(remoteAgent.id);
+    }
 
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
 
@@ -707,16 +712,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
   const existingAgentState = getAgentState(agentId);
-  if (existingAgentState?.paused === true) {
-    if (!options.force) {
-      process.stderr.write(chalk.red(`Agent ${agentId} is paused and will not be started.\n`));
-      if (existingAgentState.pausedReason) {
-        process.stderr.write(chalk.red(`Pause reason: ${existingAgentState.pausedReason}\n`));
-      }
-      process.stderr.write(chalk.red(`Run pan unpause ${id} to clear the pause, or pan start ${id} --force to override.\n`));
-      process.exit(1);
+  const shouldClearPauseAfterSpawn = existingAgentState?.paused === true && options.force === true;
+  if (existingAgentState?.paused === true && !options.force) {
+    process.stderr.write(chalk.red(`Agent ${agentId} is paused and will not be started.\n`));
+    if (existingAgentState.pausedReason) {
+      process.stderr.write(chalk.red(`Pause reason: ${existingAgentState.pausedReason}\n`));
     }
-    clearAgentPaused(agentId);
+    process.stderr.write(chalk.red(`Run pan unpause ${id} to clear the pause, or pan start ${id} --force to override.\n`));
+    process.exit(1);
   }
 
   const spinner = ora(`Preparing workspace for ${id}...`).start();
@@ -747,7 +750,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Handle remote workspace
     if (isRemote || (locationPreference === 'remote' && !workspacePath)) {
-      await handleRemoteWorkspace(id, options, spinner);
+      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseAfterSpawn);
       return;
     }
 
@@ -1032,6 +1035,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       prompt,
       allowHost: options.host,
     });
+
+    if (shouldClearPauseAfterSpawn) {
+      clearAgentPaused(agent.id);
+    }
 
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
