@@ -39,7 +39,7 @@ import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtime
 import { assertIssueHasBeads } from './beads-query.js';
 import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 import { normalizeModelOverride, requireModelOverride, shellQuoteModelId } from './model-validation.js';
-import { DEFAULT_AUTO_RESUME_CONFIG } from './cloister/auto-resume-config.js';
+import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.js';
 
 const execAsync = promisify(exec);
 
@@ -810,12 +810,13 @@ export function recordAgentFailure(agentId: string, reason: string): boolean {
   const state = getAgentState(agentId);
   if (!state) return false;
 
+  const config = resolveAutoResumeConfigForIssue(state.issueId);
   const nowMs = Date.now();
   const now = new Date(nowMs).toISOString();
   const firstFailureMs = Date.parse(state.firstFailureInRunAt ?? '');
   const hasValidFirstFailure = Number.isFinite(firstFailureMs);
   const windowElapsed = hasValidFirstFailure
-    && nowMs - firstFailureMs > DEFAULT_AUTO_RESUME_CONFIG.troubledWindowMs;
+    && nowMs - firstFailureMs > config.troubledWindowMs;
 
   if (windowElapsed || !hasValidFirstFailure) {
     state.consecutiveFailures = 1;
@@ -824,17 +825,17 @@ export function recordAgentFailure(agentId: string, reason: string): boolean {
     state.consecutiveFailures = (state.consecutiveFailures ?? 0) + 1;
   }
 
-  const backoffSeconds = DEFAULT_AUTO_RESUME_CONFIG.failureBackoffSchedule[
-    Math.min(state.consecutiveFailures - 1, DEFAULT_AUTO_RESUME_CONFIG.failureBackoffSchedule.length - 1)
+  const backoffSeconds = config.failureBackoffSchedule[
+    Math.min(state.consecutiveFailures - 1, config.failureBackoffSchedule.length - 1)
   ];
   state.lastFailureAt = now;
   state.lastFailureReason = reason;
   state.lastFailureNextRetryAt = new Date(nowMs + backoffSeconds * 1000).toISOString();
 
   const firstFailureInRunMs = Date.parse(state.firstFailureInRunAt ?? '');
-  const shouldMarkTroubled = state.consecutiveFailures >= DEFAULT_AUTO_RESUME_CONFIG.maxConsecutiveFailures
+  const shouldMarkTroubled = state.consecutiveFailures >= config.maxConsecutiveFailures
     && Number.isFinite(firstFailureInRunMs)
-    && nowMs - firstFailureInRunMs <= DEFAULT_AUTO_RESUME_CONFIG.troubledWindowMs;
+    && nowMs - firstFailureInRunMs <= config.troubledWindowMs;
 
   saveAgentState(state);
   if (shouldMarkTroubled) {

@@ -128,12 +128,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-kauw (default auto-resume config, backoff next-retry timestamps, troubled flip threshold/window, and backoff skip logging). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-kauw",
+    "description": "Completed bead workspace-v1vk (projects.yaml autoResume overrides with validation and fallback warnings wired into recordAgentFailure). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-v1vk",
     "filesToRead": [
+      "src/lib/projects.ts",
       "src/lib/cloister/auto-resume-config.ts",
       "src/lib/agents.ts",
-      "src/lib/cloister/deacon.ts",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -180,6 +180,12 @@
       "timestamp": "2026-05-17T15:10:56.199Z",
       "reason": "bead-complete",
       "note": "Implemented default auto-resume backoff config, next-retry timestamps, sliding troubled window, troubled marking after 3 failures within 10 minutes, and Deacon backoff skip logging. npm run typecheck and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T15:15:05.816Z",
+      "reason": "bead-complete",
+      "note": "Added projects.yaml autoResume schema typing, validation with warning fallback for invalid overrides, and issue-to-project auto-resume config resolution in recordAgentFailure. npm run typecheck and npm run lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],

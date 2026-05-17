@@ -929,7 +929,7 @@
       {
         "id": "config-overrides",
         "title": "Per-project autoResume overrides in projects.yaml",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -945,7 +945,7 @@
           {
             "id": "config-overrides.ac1",
             "title": "projects.yaml accepts an optional `autoResume` block per project; absent block uses defaults",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -953,7 +953,7 @@
           {
             "id": "config-overrides.ac2",
             "title": "Failure tracking honors the project's threshold and backoff schedule when present",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -961,7 +961,7 @@
           {
             "id": "config-overrides.ac3",
             "title": "Invalid config values (negative numbers, non-array schedule) fall back to defaults with a logged warning",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
