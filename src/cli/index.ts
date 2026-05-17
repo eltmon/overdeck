@@ -73,6 +73,7 @@ import { doctorCommand } from './commands/doctor.js';
 import { systemHealthCommand } from './commands/system-health.js';
 import { updateCommand } from './commands/update.js';
 import { restartCommand } from './commands/restart.js';
+import { reloadCommand } from './commands/reload.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { planCommand } from './commands/plan.js';
@@ -1056,6 +1057,14 @@ program
 
     console.log('');
   });
+
+program
+  .command('reload')
+  .description('Build Panopticon, then restart the dashboard only after the build succeeds')
+  .option('--skip-build', 'Skip npm run build and restart the existing bundle')
+  .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 30000)')
+  .option('--no-deacon', 'Skip Cloister/Deacon auto-start after reload')
+  .action(reloadCommand);
 
 // Scoped restart: `pan restart` defaults to the dashboard only and never
 // touches CLIProxy / Traefik / TLDR. Use `--full` for the nuclear option.

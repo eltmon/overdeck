@@ -66,7 +66,7 @@ function resolveNode22(): string {
   return 'node';
 }
 
-function resolveBundledServerPath(): string {
+export function resolveBundledServerPath(): string {
   // After tsdown bundles the CLI, this code runs inside `dist/cli/index.js`,
   // so `__dirname` is `dist/cli` and the sibling dashboard bundle sits at
   // `dist/dashboard/server.js` — one `..` up, not two. The old two-up form
@@ -76,7 +76,7 @@ function resolveBundledServerPath(): string {
   return join(__dirname, '..', 'dashboard', 'server.js');
 }
 
-function spawnDashboardDetached(config: PlatformConfig, opts?: { disableDeacon?: boolean }): void {
+export function spawnDashboardDetached(config: PlatformConfig, opts?: { disableDeacon?: boolean }): void {
   const serverPath = resolveBundledServerPath();
   if (!existsSync(serverPath)) {
     throw new StageError({
