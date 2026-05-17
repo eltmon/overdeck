@@ -441,6 +441,12 @@ export function IssueAgentCard({
   const gatingTitle = gatingReason === 'Boot --no-resume' && noResumeMode?.since
     ? `No-resume mode active since ${formatRelativeTime(noResumeMode.since, now)}`
     : gatingReason;
+  const isStartGated = agent.paused === true || agent.troubled === true;
+  const startGateTitle = agent.paused === true
+    ? 'Unpause agent before starting'
+    : agent.troubled === true
+      ? 'Clear troubled state before starting'
+      : undefined;
 
   const toggleHandoffPanel = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -708,12 +714,38 @@ export function IssueAgentCard({
             harnessPolicy={harnessPolicy}
             modelLabel="Agent model"
           />
+          {agent.paused === true && (
+            <button
+              type="button"
+              onClick={handleUnpause}
+              disabled={unpauseMutation.isPending}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded bg-success text-success-foreground hover:bg-success/90 disabled:opacity-50"
+              title={agent.pausedReason ? `Unpause agent (${agent.pausedReason})` : 'Unpause agent'}
+              data-testid="issue-agent-card-start-unpause"
+            >
+              <Unlock className="w-4 h-4" />
+              {unpauseMutation.isPending ? 'Unpausing…' : 'Unpause agent'}
+            </button>
+          )}
+          {agent.troubled === true && (
+            <button
+              type="button"
+              onClick={handleClearTroubled}
+              disabled={clearTroubledMutation.isPending}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded bg-success text-success-foreground hover:bg-success/90 disabled:opacity-50"
+              title={failureTitle ? `Clear troubled state\n${failureTitle}` : 'Clear troubled state'}
+              data-testid="issue-agent-card-start-clear-troubled"
+            >
+              <RotateCcw className="w-4 h-4" />
+              {clearTroubledMutation.isPending ? 'Clearing…' : 'Clear troubled state'}
+            </button>
+          )}
           <button
             type="button"
             onClick={handleStart}
-            disabled={startMutation.isPending || !issueId}
+            disabled={startMutation.isPending || !issueId || isStartGated}
             className="inline-flex items-center gap-2 px-3 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            title={issueId ? 'Start agent' : 'No issue ID available for this agent'}
+            title={startGateTitle ?? (issueId ? 'Start agent' : 'No issue ID available for this agent')}
             data-testid="issue-agent-card-start-agent"
           >
             <Play className="w-4 h-4" />

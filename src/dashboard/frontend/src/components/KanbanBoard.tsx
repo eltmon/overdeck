@@ -2846,6 +2846,12 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const agentGatingTitle = agentGatingReason === 'Boot --no-resume' && noResumeMode?.since
     ? `No-resume mode active since ${formatRelativeTime(noResumeMode.since, new Date())}`
     : agentGatingReason;
+  const isAgentStartGated = controlledAgent?.paused === true || controlledAgent?.troubled === true;
+  const startGateTitle = controlledAgent?.paused === true
+    ? 'Unpause the agent before starting'
+    : controlledAgent?.troubled === true
+      ? 'Clear troubled state before starting'
+      : undefined;
   const cardTone = isStackUnhealthy || isPipelineStuck
     ? 'from-destructive/12 via-destructive/5 to-transparent'
     : isReadyToMerge
@@ -3120,6 +3126,12 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       showAlert({ message: `Failed to start agent: ${err.message}`, variant: 'error' });
     },
   });
+
+  const startButtonDisabled = startAgentMutation.isPending || isStarting || isAgentStartGated;
+  const startButtonTitle = startAgentMutation.isPending || isStarting
+    ? 'Starting...'
+    : startGateTitle ?? 'Start Agent';
+  const autoStartButtonTitle = startGateTitle ?? 'Synthesize a minimal vBRIEF from the issue and start the agent';
 
   const [isResuming, setIsResuming] = useState(false);
   const resumingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -3891,9 +3903,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                 <button
                   ref={startButtonRef}
                   onClick={(e) => handleStartAgent(e)}
-                  disabled={startAgentMutation.isPending || isStarting}
+                  disabled={startButtonDisabled}
                   className="flex items-center gap-1 text-xs font-semibold bg-success hover:bg-success/90 text-foreground transition-colors px-2 py-1 disabled:opacity-50"
-                  title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
+                  title={startButtonTitle}
                   data-testid={`card-start-agent-${issue.identifier}`}
                 >
                   {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
@@ -3901,9 +3913,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                 </button>
                 <button
                   onClick={(e) => handleStartAgent(e, true)}
-                  disabled={startAgentMutation.isPending || isStarting}
+                  disabled={startButtonDisabled}
                   className="flex items-center gap-1 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground transition-colors border-l border-background/20 px-2 py-1 disabled:opacity-50"
-                  title="Synthesize a minimal vBRIEF from the issue and start the agent"
+                  title={autoStartButtonTitle}
                   data-testid={`card-auto-start-agent-${issue.identifier}`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
@@ -3965,9 +3977,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                 <button
                   ref={startButtonRef}
                   onClick={(e) => handleStartAgent(e)}
-                  disabled={startAgentMutation.isPending || isStarting}
+                  disabled={startButtonDisabled}
                   className="flex items-center gap-1 text-xs font-semibold bg-success text-success-foreground hover:bg-emerald-500 transition-colors px-2 py-1 disabled:opacity-50"
-                  title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
+                  title={startButtonTitle}
                   data-testid={`card-start-agent-${issue.identifier}`}
                 >
                   {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
@@ -3975,9 +3987,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                 </button>
                 <button
                   onClick={(e) => handleStartAgent(e, true)}
-                  disabled={startAgentMutation.isPending || isStarting}
+                  disabled={startButtonDisabled}
                   className="flex items-center gap-1 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground transition-colors border-l border-background/20 px-2 py-1 disabled:opacity-50"
-                  title="Synthesize a minimal vBRIEF from the issue and start the agent"
+                  title={autoStartButtonTitle}
                   data-testid={`card-auto-start-agent-${issue.identifier}`}
                 >
                   <Sparkles className="w-3.5 h-3.5" />

@@ -934,12 +934,12 @@ export function resetAgentFailureCount(agentId: string): boolean {
   return true;
 }
 
-/** Reports whether the manual pause gate is set for this agent. */
+/** Reports whether callers should block start, resume, auto-resume, or message delivery on the manual pause gate. */
 export function isAgentPaused(agentId: string): boolean {
   return getAgentState(agentId)?.paused === true;
 }
 
-/** Reports whether the troubled gate is set for this agent. */
+/** Reports whether callers should block start, resume, auto-resume, or message delivery on the troubled gate. */
 export function isAgentTroubled(agentId: string): boolean {
   return getAgentState(agentId)?.troubled === true;
 }
@@ -1691,6 +1691,22 @@ export function getLatestSessionId(agentId: string): string | null {
   }
 
   return null;
+}
+
+export async function getLatestSessionIdAsync(agentId: string): Promise<string | null> {
+  const agentDir = getAgentDir(agentId);
+  try {
+    const sessionId = (await readFile(join(agentDir, 'session.id'), 'utf8')).trim();
+    if (sessionId) return sessionId;
+  } catch { /* non-fatal */ }
+
+  try {
+    const sessions = JSON.parse(await readFile(join(agentDir, 'sessions.json'), 'utf8'));
+    if (Array.isArray(sessions) && sessions.length > 0) return sessions[sessions.length - 1];
+  } catch { /* non-fatal */ }
+
+  const runtimeState = await getAgentRuntimeStateAsync(agentId);
+  return runtimeState?.claudeSessionId ?? null;
 }
 
 export interface SpawnOptions {

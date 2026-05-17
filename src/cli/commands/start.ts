@@ -721,6 +721,15 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.stderr.write(chalk.red(`Run pan unpause ${id} to clear the pause, or pan start ${id} --force to override.\n`));
     process.exit(1);
   }
+  if (existingAgentState?.troubled === true) {
+    const failures = existingAgentState.consecutiveFailures ?? 0;
+    process.stderr.write(chalk.red(`Agent ${agentId} is troubled (${failures} failure${failures === 1 ? '' : 's'}) and will not be started.\n`));
+    if (existingAgentState.lastFailureReason) {
+      process.stderr.write(chalk.red(`Last failure: ${existingAgentState.lastFailureReason}\n`));
+    }
+    process.stderr.write(chalk.red(`Investigate the crash cause, then run pan untroubled ${id} before starting.\n`));
+    process.exit(1);
+  }
 
   const spinner = ora(`Preparing workspace for ${id}...`).start();
 
