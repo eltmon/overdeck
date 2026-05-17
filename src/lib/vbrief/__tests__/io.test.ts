@@ -43,6 +43,14 @@ function writePlanDoc(doc: VBriefDocument): string {
   return writeMainSpec(doc);
 }
 
+function writeWorkspaceDraft(doc: VBriefDocument): string {
+  const panDir = join(WORKSPACE_PATH, '.pan');
+  mkdirSync(panDir, { recursive: true });
+  const planPath = join(panDir, 'spec.vbrief.json');
+  writeFileSync(planPath, JSON.stringify(doc, null, 2));
+  return planPath;
+}
+
 beforeEach(() => {
   PROJECT_ROOT = join(tmpdir(), `vbrief-io-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   WORKSPACE_PATH = join(PROJECT_ROOT, 'workspaces', `feature-${ISSUE_ID.toLowerCase()}`);
@@ -70,6 +78,22 @@ describe('findPlan', () => {
     expect(result).toContain('.pan/specs/');
     expect(result).toContain(SPEC_FILENAME);
     expect(existsSync(result!)).toBe(true);
+  });
+
+  it('falls back to the matching workspace draft before the canonical spec exists', () => {
+    const doc = makePlanDoc([{ id: 'draft-item' }]);
+    doc.plan.id = ISSUE_ID.toLowerCase();
+    const draftPath = writeWorkspaceDraft(doc);
+
+    expect(findPlan(WORKSPACE_PATH)).toBe(draftPath);
+  });
+
+  it('ignores workspace drafts for a different issue', () => {
+    const doc = makePlanDoc([{ id: 'wrong-item' }]);
+    doc.plan.id = 'PAN-999';
+    writeWorkspaceDraft(doc);
+
+    expect(findPlan(WORKSPACE_PATH)).toBeNull();
   });
 
   it('returns null when workspace path does not match feature-<issue-id> pattern', () => {
@@ -111,6 +135,16 @@ describe('readWorkspacePlan', () => {
     const result = readWorkspacePlan(WORKSPACE_PATH);
     expect(result).not.toBeNull();
     expect(result!.plan.items[0].id).toBe('x');
+  });
+
+  it('reads the workspace draft when no canonical spec exists yet', () => {
+    const doc = makePlanDoc([{ id: 'draft-x' }]);
+    doc.plan.id = ISSUE_ID.toLowerCase();
+    writeWorkspaceDraft(doc);
+
+    const result = readWorkspacePlan(WORKSPACE_PATH);
+    expect(result).not.toBeNull();
+    expect(result!.plan.items[0].id).toBe('draft-x');
   });
 });
 

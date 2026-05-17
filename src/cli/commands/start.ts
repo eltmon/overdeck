@@ -499,12 +499,12 @@ import {
  * Uses `bd list` to query the beads database directly (storage-backend agnostic).
  * Exported for testing.
  */
-export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean {
+export function countBeadsTasks(workspacePath: string, issueId?: string): number {
   const label = issueId?.toLowerCase();
   try {
     const args = label
-      ? ['list', '--json', '-l', label, '--status', 'all', '--limit', '1']
-      : ['list', '--json', '--limit', '1'];
+      ? ['list', '--json', '-l', label, '--status', 'all', '--limit', '0']
+      : ['list', '--json', '--limit', '0'];
     const output = execFileSync('bd', args, {
       cwd: workspacePath,
       encoding: 'utf-8',
@@ -512,24 +512,29 @@ export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean 
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     const tasks = JSON.parse(output.trim() || '[]');
-    return tasks.length > 0;
+    return Array.isArray(tasks) ? tasks.length : 0;
   } catch {
     const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!existsSync(jsonlPath)) return false;
-    if (!label) return readFileSync(jsonlPath, 'utf-8').trim().length > 0;
+    if (!existsSync(jsonlPath)) return 0;
+    if (!label) return readFileSync(jsonlPath, 'utf-8').split('\n').filter((line) => line.trim()).length;
 
+    let count = 0;
     for (const line of readFileSync(jsonlPath, 'utf-8').split('\n')) {
       if (!line.trim()) continue;
       try {
         const entry = JSON.parse(line);
         const labels: string[] = Array.isArray(entry.labels) ? entry.labels : [];
         if (labels.some((candidate) => candidate.toLowerCase() === label || candidate.toLowerCase() === `workspace:${label}`)) {
-          return true;
+          count += 1;
         }
       } catch { /* skip malformed lines */ }
     }
-    return false;
+    return count;
   }
+}
+
+export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean {
+  return countBeadsTasks(workspacePath, issueId) > 0;
 }
 
 /**
@@ -556,6 +561,22 @@ function validatePlanMatchesIssue(workspacePath: string, issueId: string): { val
   }
 
   return { valid: true };
+}
+
+export function validateBeadsMatchPlan(workspacePath: string, issueId: string): { valid: boolean; beadCount: number; planItemCount: number } {
+  const planPath = findPlan(workspacePath);
+  const beadCount = countBeadsTasks(workspacePath, issueId);
+  if (!planPath) return { valid: true, beadCount, planItemCount: 0 };
+
+  try {
+    const raw = readFileSync(planPath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    const planItemCount = Array.isArray(parsed?.plan?.items) ? parsed.plan.items.length : 0;
+    if (planItemCount === 0) return { valid: true, beadCount, planItemCount };
+    return { valid: beadCount === planItemCount, beadCount, planItemCount };
+  } catch {
+    return { valid: true, beadCount, planItemCount: 0 };
+  }
 }
 
 /**
@@ -926,6 +947,22 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           });
         }
       }
+    }
+
+    const beadCoverage = validateBeadsMatchPlan(workspace, id);
+    if (!beadCoverage.valid) {
+      await failPostCreateValidation({
+        spinner,
+        issueId: id,
+        projectRoot,
+        workspaceCreatedThisRun,
+        message: `Beads count (${beadCoverage.beadCount}) does not match vBRIEF plan items (${beadCoverage.planItemCount}) for ${id}`,
+        printDetails: () => {
+          console.log('');
+          console.log(chalk.red('Work agents require one bead per vBRIEF plan item.'));
+          console.log(chalk.dim('Re-run planning finalization so beads are materialized from the current vBRIEF before starting work.'));
+        },
+      });
     }
 
     spinner.text = 'Building agent prompt with planning context...';

@@ -38,10 +38,10 @@ import { withBdMutex } from '../../../lib/bd-mutex.js';
  *   POST   /api/agents
  */
 
-import { exec, spawn } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
 import { timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat, symlink, lstat, writeFile } from 'node:fs/promises';
+import { appendFile, cp, mkdir, open, readdir, readFile, rename, rm, stat, symlink, lstat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -88,11 +88,11 @@ import { canUseHarness } from '../../../lib/harness-policy.js';
 import { getProviderForModel } from '../../../lib/providers.js';
 import { validateProviderHealth, ProviderHealthError } from '../../../lib/provider-health.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { findPlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { findPlanAsync, readPlanAsync } from '../../../lib/vbrief/io.js';
 import { writeAutoStartVBrief } from '../../../lib/vbrief/auto-synthesize.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
 import type { ContinueState } from '../../../lib/vbrief/continue-state.js';
-import { extractPrefix } from '../../../lib/issue-id.js';
+import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
@@ -122,6 +122,7 @@ import { normalizeAwaitingInputPrompt } from '../../../lib/agent-input-detection
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessionAsync, listSessionsAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
   if (!provided) return false;
@@ -1791,6 +1792,17 @@ const postAgentsRoute = HttpRouter.add(
       );
     }
 
+    const parsedIssueId = parseIssueId(String(issueId));
+    if (!parsedIssueId) {
+      return jsonResponse(
+        {
+          error: `Invalid issueId "${issueId}": issue IDs must use a supported project format (e.g. PAN-484, MIN-123).`,
+          hint: 'Issue IDs must include a project prefix and numeric identifier.',
+        },
+        { status: 422 },
+      );
+    }
+
     // Guard: reject starting agents for already-closed issues
     const issueDataService = getIssueDataService();
     const cachedIssues = issueDataService.getIssues();
@@ -1807,7 +1819,7 @@ const postAgentsRoute = HttpRouter.add(
       );
     }
 
-    const issueLower = issueId.toLowerCase();
+    const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
 
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
@@ -1840,12 +1852,12 @@ const postAgentsRoute = HttpRouter.add(
       const projectRootBeadsDir = join(projectPath, '.beads');
       if (existsSync(projectRootBeadsDir)) {
         try {
-          yield* Effect.promise(() => execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, { encoding: 'utf-8' }));
+          yield* Effect.promise(() => cp(projectRootBeadsDir, workspaceBeadsDir, { recursive: true }));
         } catch {}
       }
     }
 
-    let planPath = findPlan(workspacePath);
+    let planPath = yield* Effect.promise(() => findPlanAsync(workspacePath));
     if (autoStart && !planPath) {
       const issueTitle = cachedIssue?.title || issueId;
       const issueBody = cachedIssue?.description || '';
@@ -1855,51 +1867,61 @@ const postAgentsRoute = HttpRouter.add(
         body: issueBody,
         url: cachedIssue?.url,
       }));
-      planPath = findPlan(workspacePath);
+      planPath = yield* Effect.promise(() => findPlanAsync(workspacePath));
     }
-    const hasPlan = planPath !== null;
-    // Planning has finished when plan.status is any of:
-    // proposed/approved/pending/running/completed/blocked.
-    const isComplete = isPlanningComplete(workspacePath);
+    if (!planPath) {
+      return jsonResponse({
+        error: `No workspace vBRIEF found for ${issueId}. Work agents require a finalized plan with matching beads.`,
+        hint: 'Run planning first, or use auto-start to synthesize a plan before starting the work agent.',
+        issueId,
+      }, { status: 422 });
+    }
 
-    // vBRIEF no longer blocks agent start — agents can begin without a plan.
-    void hasPlan;
-    void isComplete;
-
+    let planDoc;
     try {
-      const { readPlan } = yield* Effect.promise(() => import('../../../lib/vbrief/io.js'));
-      if (!planPath) {
-        throw new Error('No workspace vBRIEF found');
-      }
-      const planDoc = readPlan(planPath);
-      const planIssueId = planDoc?.plan?.id;
-      if (planIssueId && planIssueId.toLowerCase() !== issueLower) {
-        return jsonResponse({
-          error: `Plan in workspace is for ${planIssueId.toUpperCase()}, not ${issueId}. The workspace contains stale planning artifacts from a different issue.`,
-          hint: 'Run planning for this issue first, or clean the workspace planning artifacts.',
-          issueId,
-          expectedIssue: issueId,
-          actualIssue: planIssueId.toUpperCase(),
-        }, { status: 422 });
-      }
-      const itemCount = planDoc?.plan?.items?.length ?? 0;
-      if (itemCount === 0) {
-        return jsonResponse({
-          error: 'Plan exists but contains no items. Planning may have failed or produced an empty plan.',
-          hint: 'Re-run planning to produce a plan with tasks and acceptance criteria.',
-          issueId,
-        }, { status: 422 });
-      }
-    } catch {}
+      planDoc = yield* Effect.promise(() => readPlanAsync(planPath));
+    } catch (planErr: any) {
+      return jsonResponse({
+        error: `Could not read workspace vBRIEF for ${issueId}: ${planErr?.message ?? String(planErr)}`,
+        hint: 'Re-run planning to produce a readable vBRIEF before starting the work agent.',
+        issueId,
+      }, { status: 422 });
+    }
+
+    const planIssueId = planDoc?.plan?.id;
+    if (planIssueId && planIssueId.toLowerCase() !== issueLower) {
+      return jsonResponse({
+        error: `Plan in workspace is for ${planIssueId.toUpperCase()}, not ${issueId}. The workspace contains stale planning artifacts from a different issue.`,
+        hint: 'Run planning for this issue first, or clean the workspace planning artifacts.',
+        issueId,
+        expectedIssue: issueId,
+        actualIssue: planIssueId.toUpperCase(),
+      }, { status: 422 });
+    }
+
+    const planItemCount = planDoc?.plan?.items?.length ?? 0;
+    if (planItemCount === 0) {
+      return jsonResponse({
+        error: 'Plan exists but contains no items. Planning may have failed or produced an empty plan.',
+        hint: 'Re-run planning to produce a plan with tasks and acceptance criteria.',
+        issueId,
+      }, { status: 422 });
+    }
 
     let hasBeads = false;
+    let beadCount = 0;
     try {
-      const { stdout: bdOutput } = yield* Effect.promise(() => withBdMutex(() => execAsync(
-        `bd list --json -l ${issueId.toLowerCase()} --status all --limit 1`,
-        { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+      const { stdout: bdOutput } = yield* Effect.promise(() => withBdMutex(() => execFileAsync(
+        'bd',
+        ['list', '--json', '-l', issueLower, '--status', 'all', '--limit', '0'],
+        { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 },
       )));
       const bdTasks = JSON.parse(bdOutput.trim() || '[]');
-      hasBeads = bdTasks.length > 0;
+      beadCount = Array.isArray(bdTasks) ? bdTasks.length : 0;
+      hasBeads = beadCount > 0;
+      if (planItemCount !== null && planItemCount > 0 && beadCount !== planItemCount) {
+        hasBeads = false;
+      }
     } catch {}
 
     let recoveryError: string | null = null;
@@ -1910,9 +1932,12 @@ const postAgentsRoute = HttpRouter.add(
       try {
         const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
         const recovery = yield* Effect.promise(() => createBeadsFromVBrief(workspacePath));
-        hasBeads = recovery.created.length > 0;
+        beadCount = recovery.created.length;
+        hasBeads = recovery.created.length > 0 && (planItemCount === null || recovery.created.length === planItemCount);
         if (hasBeads) {
           console.log(`[agents] Auto-recovery created ${recovery.created.length} beads for ${issueId}`);
+        } else if (recovery.created.length > 0 && planItemCount !== null) {
+          recoveryError = `created ${recovery.created.length} beads, but vBRIEF has ${planItemCount} plan items`;
         } else if (recovery.errors.length > 0) {
           recoveryError = recovery.errors[0] ?? 'Unknown error during beads creation';
           console.warn(`[agents] Auto-recovery errors: ${recovery.errors.join(', ')}`);

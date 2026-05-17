@@ -39,18 +39,18 @@ optional:
 - Explore the codebase to understand context (read files, grep)
 - Generate planning artifacts:
   - **continue.json** at `.pan/continue.json` — structured decisions, hazards, and approach context (see format below). Replaces the old STATE.md.
-  - **vBRIEF plan** at `.pan/spec.vbrief.json` (workspace working copy — `plan-finalize` promotes it to main's `.pan/specs/`)
+  - **vBRIEF plan** at `.pan/spec.vbrief.json` (workspace working copy — `plan finalize` promotes it to main's `.pan/specs/`)
 - Present options and tradeoffs for the user to decide
 
 **Finalizing the session:** When your vBRIEF is written and you're ready to hand off, run:
 
 ```
-pan plan-finalize
+pan plan finalize
 ```
 
-This converts your `.pan/spec.vbrief.json` into beads tasks and marks the workspace spec as `plan.status = "proposed"`, which lets the dashboard show the **Done** button. Do NOT run `bd create` yourself — `pan plan-finalize` does it deterministically from the vBRIEF.
+This converts your `.pan/spec.vbrief.json` into beads tasks and marks the workspace spec as `plan.status = "proposed"`, which lets the dashboard show the **Done** button. Do NOT run `bd create` yourself — `pan plan finalize` does it deterministically from the vBRIEF.
 
-After `pan plan-finalize` succeeds, STOP. Tell the user: "Planning finalized — click Done in the dashboard to hand off to the implementation agent." Do not kill the tmux session yourself; the Stop button handles that if needed.
+After `pan plan finalize` succeeds, STOP. Tell the user: "Planning finalized — click Done in the dashboard to hand off to the implementation agent." Do not kill the tmux session yourself; the Stop button handles that if needed.
 
 ## Panopticon Agent Taxonomy
 
@@ -83,7 +83,7 @@ The review convoy sub-roles (`review.security`, `review.correctness`, `review.pe
 
 ### What happens after you finalize
 
-After `pan plan-finalize` and the user clicks **Done**, the pipeline runs without you: `work` → optional `work.inspect`/`work.inspect-deep` on flagged beads → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your vBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.
+After `pan plan finalize` and the user clicks **Done**, the pipeline runs without you: `work` → optional `work.inspect`/`work.inspect-deep` on flagged beads → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your vBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.
 
 ---
 {{EFFORT_SECTION}}{{AUTO_SECTION}}
@@ -196,10 +196,10 @@ When `requiresInspection` is `true`, set `metadata.inspectionDepth` to `"fast"` 
 When discovery is complete:
 1. Create **continue.json** at `.pan/continue.json` with decisions, hazards, and approach context (see format below).
 2. Create a **vBRIEF plan** at `.pan/spec.vbrief.json` — **MUST follow the exact format below**.
-3. Run `pan plan-finalize` from the workspace root. This creates beads tasks from your vBRIEF and sets `plan.status` to `proposed`.
+3. Run `pan plan finalize` from the workspace root. This creates beads tasks from your vBRIEF and sets `plan.status` to `proposed`.
 4. Summarize the plan and STOP
 
-**DO NOT run `bd create` commands directly.** `pan plan-finalize` is the only sanctioned way to materialize beads from a workspace vBRIEF plan — it's deterministic and idempotent.
+**DO NOT run `bd create` commands directly.** `pan plan finalize` is the only sanctioned way to materialize beads from a workspace vBRIEF plan — it's deterministic and idempotent.
 
 ### vBRIEF Plan Format (REQUIRED)
 
@@ -279,7 +279,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 ### continue.vbrief.json Format
 
-The continue file is a **structured replacement for STATE.md**. It lives at `.pan/continue.json` in the workspace; the pipeline mirrors a project-level continue file on main as part of plan finalization. You do not write that mirror yourself — `pan plan-finalize` handles it.
+The continue file is a **structured replacement for STATE.md**. It lives at `.pan/continue.json` in the workspace; the pipeline mirrors a project-level continue file on main as part of plan finalization. You do not write that mirror yourself — `pan plan finalize` handles it.
 
 ```json
 {
@@ -309,7 +309,7 @@ The continue file is a **structured replacement for STATE.md**. It lives at `.pa
 - `decisions` — every architectural or scope decision you make goes here. Future agents (work, review, merge) read these.
 - `hazards` — risks, edge cases, and gotchas the work agent should watch for.
 - `resumePoint` — leave as `null` during planning; the work agent will populate it.
-- `beadsMapping` — leave as `{}`; `pan plan-finalize` populates it when creating beads.
+- `beadsMapping` — leave as `{}`; `pan plan finalize` populates it when creating beads.
 - `sessionHistory` — start with one entry for this planning session.
 
 **Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.

@@ -80,6 +80,10 @@ export function asPanSpecDocument(doc: VBriefDocument, status: PanSpecStatus): P
   return {
     ...doc,
     status,
+    plan: {
+      ...doc.plan,
+      status,
+    },
   }
 }
 
