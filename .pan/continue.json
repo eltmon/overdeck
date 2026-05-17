@@ -1,0 +1,143 @@
+{
+  "version": "1",
+  "issueId": "PAN-1141",
+  "created": "2026-05-17T14:06:59.650Z",
+  "updated": "2026-05-17T14:25:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1141",
+    "sha": "0668a271c",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Gating state (paused / troubled / failure-tracking) is persisted on the per-agent JSON state file at ~/.panopticon/agents/<id>/state.json — NOT in SQLite review_status. Rationale: agent runtime state already lives in this JSON file (see AgentState in src/lib/agents.ts:525); SQLite holds review/cost/health events but not runtime state. Persistence-across-restart is already satisfied by the file (it survives reboots). Adding columns to review_status would split the source-of-truth for 'what is the state of this agent' across two stores. The issue body's phrase 'SQLite state DB' is treated as 'wherever Panopticon already persists agent state' rather than a literal mandate, because the architecture has evolved.",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "New CLI verbs: `pan pause` / `pan unpause` / `pan untroubled`. Did NOT reuse `pan resume` because src/cli/commands/resume.ts already binds that verb to a different operation (manually resume a stopped Claude Code session).",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "`pan pause <id>` stops a currently-running agent in addition to setting the persistent flag. Rationale: the issue framing ('useful when an agent is misbehaving') implies the user wants the live agent halted immediately, not just blocked from future auto-resume.",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "`pan unpause <id>` and `pan untroubled <id>` do NOT auto-spawn the agent. They only clear the gate. The Cloister's next patrol picks up newly-eligible agents; the user can also run `pan start <id>` explicitly. Spawning on unpause would surprise a user who paused to inspect.",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "`PANOPTICON_NO_RESUME=1` (and the equivalent `pan dev --no-resume` / `pan up --no-resume` flag) is per-boot scope only, surfaced as an env var that the CLI injects into the dashboard child process. It is NOT a persistent SQLite flag. Rationale: a persistent flag would silently disable resume forever after one inspection session — a foot-gun. Per-boot scope matches PANOPTICON_DISABLE_DEACON precedent.",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "`PANOPTICON_NO_RESUME=1` gates BOTH `recoverOrphanedAgents()` and `autoResumeStoppedWorkAgents()` at the top of each function. Gating only the latter would still let orphan recovery reset every dead tmux session to `stopped`, destroying the inspection state the user wanted to preserve.",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Default troubled threshold: 3 consecutive failures within 10 minutes. Default backoff: 5s, 30s, 120s (verbatim from the issue body). Plateau at 120s for failure_count >= 3 (relevant only when threshold overrides allow higher counts).",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Per-project threshold/backoff overrides live in projects.yaml under a new optional `autoResume:` block (maxConsecutiveFailures, troubledWindowMs, failureBackoffSchedule). Per-issue overrides are NOT shipped in v1 — the schema is reserved at the project level only.",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "`pan start <id>` refuses (exits non-zero) on paused issues. `--force` overrides AND clears the paused flag as a side effect (otherwise the next patrol would re-pause the agent). Issue body's 'warn (or refuse with --force)' is treated as refuse-by-default because the user paused for a reason.",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "Failure counter resets when the agent reaches `running` status (clean spawn success), NOT on every respawn attempt. Resetting on respawn would defeat the troubled-threshold mechanism — a broken agent would never accumulate enough failures to trip.",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D11",
+      "summary": "Work-agent failure tracking on state.json is SEPARATE from the existing specialist consecutiveFailures counter in ~/.panopticon/deacon/health-state.json. The specialist counter has a different lifecycle (per-ephemeral-specialist, used for force-kill / restart logic) and overloading it would be incorrect.",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D12",
+      "summary": "Wrapper skills will be created for pan-pause, pan-unpause, pan-untroubled (skills/pan-<verb>/SKILL.md). These are new lifecycle verbs with non-trivial semantics (persistence, --force escape hatches, interaction with deacon) — they do NOT belong on the SKILLS-CONVENTION exclusion list.",
+      "recordedAt": "2026-05-17T14:25:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Cloister patrol runs every 60s on top of pipeline-event triggers. Adding gating checks to autoResumeStoppedWorkAgents() and recoverOrphanedAgents() must remain cheap (single state.json read per candidate agent, no new fs scans).",
+      "mitigation": "Reuse existing `getAgentState(agentId)` which is already called in the loop. The new helpers (`isAgentPaused`, `isAgentTroubled`) are tiny wrappers around the same read."
+    },
+    {
+      "id": "H2",
+      "summary": "Double-counting failures in a single patrol cycle. If `recoverOrphanedAgents()` marks an agent stopped (incrementing the counter) and then `autoResumeStoppedWorkAgents()` immediately tries to resume it (failing again, incrementing again), one real crash would count as two.",
+      "mitigation": "Increment in `recoverOrphanedAgents()` only when the orphan is freshly detected (not already in `stopped` state). Increment in `autoResumeStoppedWorkAgents()` only when `resumeAgent()` actually returns failure / throws — not on the orphan-recovery path. Cover with an explicit test (failure-tracking.test.ts ac2: 'increments exactly ONCE per detected crash')."
+    },
+    {
+      "id": "H3",
+      "summary": "Counter reset semantics: resetting on `resumeAgent` success alone is wrong because the spawn pipeline may still fail mid-way (tmux session created but agent crashes during init). The reset must wait for the agent to actually reach `running` status.",
+      "mitigation": "Reset is wired to the status transition to `running` (where the state file is updated by the spawn lifecycle), not to the resumeAgent return value. Acceptance criteria failure-counter.ac3 captures this."
+    },
+    {
+      "id": "H4",
+      "summary": "`PANOPTICON_NO_RESUME` env var must reach the dashboard process via `pan dev` / `pan up`, but the dashboard server may itself spawn subprocesses (e.g., agent processes) that should NOT inherit the flag (otherwise it would cascade). Conversely, internal deacon code paths inside the dashboard MUST see the flag.",
+      "mitigation": "Read the env var once at server boot into a module-level boolean exposed via the new `GET /api/no-resume-mode` endpoint. Use that boolean for in-process gating instead of re-reading process.env in every patrol cycle (also avoids race conditions if env is later mutated). Do NOT pass PANOPTICON_NO_RESUME into spawned agent processes — they don't need it."
+    },
+    {
+      "id": "H5",
+      "summary": "Contracts package (packages/contracts) must be rebuilt after adding the ten new AgentState fields to the snapshot shape — otherwise the frontend will receive raw fields without typing.",
+      "mitigation": "Bead `dashboard-api` includes contracts rebuild in ac5. Work agent must run `cd packages/contracts && npm run build` after touching contracts schemas."
+    },
+    {
+      "id": "H6",
+      "summary": "No blocking-FS calls in dashboard server code (CLAUDE.md rule, PAN-446). The new pause/unpause/untroubled endpoints must use fs/promises or Effect FileSystem, never readFileSync/writeFileSync.",
+      "mitigation": "Bead `dashboard-api` ac7 explicitly requires execAsync / fs/promises only. Existing `getAgentState` / `saveAgentState` helpers must be audited — if they use sync FS, the route handler must call them via a worker or the helpers themselves must gain async variants."
+    },
+    {
+      "id": "H7",
+      "summary": "`pan start <id> --force` on a paused agent must clear the paused flag BEFORE spawning. If the spawn succeeds but the flag stays set, the next Cloister patrol would treat the running agent as a candidate-to-stop or skip it on next resume.",
+      "mitigation": "cli-start-refuse-paused bead ac2 makes the clear-then-spawn ordering explicit."
+    },
+    {
+      "id": "H8",
+      "summary": "Time-dependent tests (backoff windows, troubled-flip 10-minute window) are notoriously flaky if they use real timers.",
+      "mitigation": "tests-failure-tracking ac2 requires Vitest's `vi.useFakeTimers()` for all time-dependent assertions."
+    },
+    {
+      "id": "H9",
+      "summary": "Schema linter (`scripts/lint-skills.sh` via `npm run lint`) cross-checks every flag mentioned in a wrapper SKILL.md against the actual CLI --help output. New SKILLs that mention `--reason` or `--force` will break the lint if the CLI command doesn't yet expose those flags.",
+      "mitigation": "Wrapper-skills bead (`wrapper-skills`) is correctly placed AFTER the CLI command beads in the edge graph. Work agent must complete CLI beads before authoring/landing the SKILL.md files."
+    },
+    {
+      "id": "H10",
+      "summary": "Bidirectional interaction between PANOPTICON_NO_RESUME and the existing isDeaconGloballyPaused() flag (deacon.globally_paused in app_settings). Both gates may be active simultaneously.",
+      "mitigation": "Treat them as orthogonal — no-resume short-circuits per-process at boot; global-pause short-circuits per-patrol via DB read. Both can coexist; user clears each independently. No special-case logic needed; document in CLAUDE.md (docs-updates bead)."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "<!-- panopticon:orchestration-context-start -->\n<!-- This is Panopticon orchestration context injected automatically.\n     It contains planning session setup instructions, not agent reasoning.\n     Session summarizers should SKIP this block and focus on the agent's\n     actual work, decisions, and tradeoffs that follow. -->\n\n# Planning Session: PAN-1141\n\n[orchestration context preserved — original prompt is in the prior continue.json git history]\n\n<!-- panopticon:orchestration-context-end -->\n",
+      "note": "Planning session started for PAN-1141: Agent auto-resume controls",
+      "timestamp": "2026-05-17T14:06:59.650Z"
+    },
+    {
+      "timestamp": "2026-05-17T14:25:00.000Z",
+      "reason": "planning",
+      "note": "Auto-mode planning resumed. Prior planning attempt left a substantive 21-bead spec.vbrief.json (2026-05-16T22:05) with sound architectural choices (JSON state-file storage, --no-resume as env var, pause/unpause/untroubled verbs avoiding pan resume conflict). Validated against codebase exploration: foundation bead correctly targets src/lib/agents.ts AgentState (line 525), cloister gating correctly targets autoResumeStoppedWorkAgents (deacon.ts:4767) and recoverOrphanedAgents (deacon.ts:4264), dashboard banner integration point is App.tsx (lines 32-34 region) alongside DeaconPauseToggle/StoppedAgentsBanner/CodexAuthBanner. Decisions and hazards (12 + 10 entries) recorded in this file. No contradictions in authoritative inputs warranting escalation. Plan kept as-is; running pan plan finalize.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
