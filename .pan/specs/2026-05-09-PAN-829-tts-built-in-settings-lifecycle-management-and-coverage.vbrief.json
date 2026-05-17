@@ -4,7 +4,7 @@
     "created": "2026-05-09T02:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-829: TTS: Built-in settings, lifecycle management, and coverage",
-    "updated": "2026-05-15T05:32:36.476Z"
+    "updated": "2026-05-16T10:25:44.418Z"
   },
   "plan": {
     "id": "pan-829",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "4917865d-21a9-46b0-90e8-064edf16721f",
     "author": "agent:claude-sonnet-4-6",
-    "sequence": 4,
+    "sequence": 128,
     "created": "2026-05-09T02:00:00.000Z",
-    "updated": "2026-05-15T05:32:36.476Z",
+    "updated": "2026-05-16T10:25:44.418Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/829",
@@ -1232,7 +1232,68 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-09-PAN-829-tts-built-in-settings-lifecycle-management-and-coverage.vbrief.json"
+      "canonicalFilename": "2026-05-09-PAN-829-tts-built-in-settings-lifecycle-management-and-coverage.vbrief.json",
+      "pipeline": {
+        "phase": "merge",
+        "issueId": "PAN-829",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-16T10:25:44.417Z",
+        "work": {
+          "updatedAt": "2026-05-16T10:25:44.417Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-16T10:25:44.417Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-16T10:25:44.417Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "passed",
+          "updatedAt": "2026-05-16T10:25:44.417Z",
+          "notes": "All 4 convoy reviewers passed; 74/74 requirements met; 3 non-blocking perf/security notes for future hardening",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-16T10:25:44.417Z",
+              "notes": "All 4 convoy reviewers passed; 74/74 requirements met; 3 non-blocking perf/security notes for future hardening"
+            }
+          ],
+          "approval": "approved"
+        },
+        "test": {
+          "status": "passed",
+          "updatedAt": "2026-05-16T10:25:44.417Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-16T10:25:44.417Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-16T10:25:44.417Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-16T10:25:44.417Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-16T10:25:44.417Z"
+            }
+          ],
+          "readyForMerge": true,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1138"
+        }
+      }
     }
   },
   "status": "active"

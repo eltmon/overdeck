@@ -1952,7 +1952,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // Claude Code to exit immediately (session-env directory created, then silent
   // death). Work agents avoid this by delivering the prompt via tmux send-keys
   // after Claude boots. Specialist roles now use the same delivery path.
-  const shouldDeliverPromptViaTmux = isSpecialistRole;
+  // Exception: review sub-roles use `--print` mode which requires the prompt
+  // as an argument — tmux send-keys delivery doesn't work with `--print`.
+  const usesPrintMode = role === 'review' && options.subRole;
+  const shouldDeliverPromptViaTmux = isSpecialistRole && !usesPrintMode;
 
   const launcherContent = generateLauncherScript({
     role,

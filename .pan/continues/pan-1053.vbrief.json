@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1053",
   "created": "2026-05-12T18:58:01.177Z",
-  "updated": "2026-05-15T06:27:33.692Z",
+  "updated": "2026-05-16T21:29:37.284Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -404,7 +404,95 @@
       "reason": "feedback",
       "note": "[2026-05-15T06:14Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-15T06:14:55.226Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-16T04:05:31.880Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-16T20:22:55.482Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-16T20:22:59.144Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T20:24Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-16T20:24:27.223Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-16T20:24:27.233Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T20:31Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T20:31:18.367Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-16T20:31:18.394Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T20:37Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T20:37:08.779Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T20:37Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-05-16T20:37:24.222Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T20:42Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T20:42:45.188Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T20:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T20:51:02.364Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T21:03Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T21:03:12.700Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T21:11Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T21:11:42.426Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T21:19Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T21:19:13.394Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T21:21Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-05-16T21:21:23.769Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-16T21:29Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-16T21:29:37.284Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-16T21:29:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1053\n\n# Review Synthesis — PAN-1053 — 2026-05-16T22:00:00Z\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n- Manifest: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/.pan/review/agent-pan-1053-review-816d1c2c/context.json\n- Branch: feature/pan-1053\n- Workspace: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/.panopticon/agents/agent-pan-1053-review-security/review-security.md | 0 |\n| correctness | ready | /home/eltmon/.panopticon/agents/agent-pan-1053-review-correctness/review-correctness.md | 1 |\n| performance | ready | /home/eltmon/.panopticon/agents/agent-pan-1053-review-performance/review-performance.md | 1 |\n| requirements | ready | /home/eltmon/.panopticon/agents/agent-pan-1053-review-requirements/review-requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Voice stop finalizes before the final transcript can be emitted — `src/dashboard/server/ws-voice.ts:134`\n**Tier 1 — Changed code.** The WebSocket stop handler calls `transcription.stop()` then unconditionally fires `finishStop` on a 500ms timer (`VOICE_STOP_FINALIZE_TIMEOUT_MS`). `finishStop()` sends `{ type: 'transcript:finalized' }` to the client.\n\n**Problem.** `transcription.stop()` is asynchronous for both providers. Moonshine only queues a `None` sentinel to the Python worker, which must still drain queued audio and run `transcribe(pcm)` before emitting `transcript:committed`. Google Cloud ends the stream and later emits final recognition results through the stream callback. The server does not wait for either provider's final committed event — after 500ms it tells the browser finalization is complete.\n\n**Runtime impact.** When a user stops voice input after speaking, any final transcription that takes longer than 500ms is dropped from the UI and AutoPreso. The client resolves `stopListening()` on `transcript:finalized` and closes `/ws/voice`; `closeTranscription()` then closes the turn queue and transcription manager, clearing callbacks before the late committed event can be delivered.\n\n**Fix.** Make `ITurnEmitter.stop()` provide a completion signal for finalization, or emit an explicit provider-level finalized event after final committed results are drained. Have `ws-voice.ts` send `transcript:finalized` only after that signal, with any timeout treated as an error/timeout path rather than success.\n\n---\n\n### [performance] Unbounded voice settings request body read — `src/dashboard/server/routes/voice.ts:34`\n**Tier 1 — HTTP request hot path.** `PUT /api/voice/settings` calls `readJsonBody` which runs `const text = yield* request.text()` before checking any content length or byte limit.\n\n**Problem.** The route accepts a client-controlled request body and materializes it fully in memory with no maximum size. This contrasts with the new AutoPreso start route, which bounds `content-length` and re-checks `Buffer.byteLength` after reading.\n\n**Runtime impact.** A large same-origin request to `/api/voice/settings` forces the Node dashboard server to allocate an arbitrarily large string before validation rejects the payload. Repeated large requests can cause memory pressure or process termination in the long-lived dashboard process.\n\n**Fix.** Add an explicit maximum for voice settings payloads. Check `content-length` before `request.text`, then verify `Buffer.byteLength(text, 'utf8')` after reading and return 413 when exceeded, matching the bounded pattern in `src/dashboard/server/routes/autopreso.ts:14`.\n\n## Non-blocking Findings\n\n### [correctness] ~ AutoPreso voice start leaks acquired resources if later setup fails — `src/dashboard/frontend/src/hooks/useAutoPresoWebSocket.ts:122`\n`startListening()` acquires microphone stream, constructs `AudioContext` and processor, and opens a WebSocket without a `try`/`catch`. If a later step throws, there is no cleanup path and the hook leaves microphone tracks or audio nodes open until page teardown. Mirror `useVoiceTranscription()` by wrapping startup in `try`/`catch` and calling `stopListening(false)` or direct resource cleanup on failure.\n\n## Clean Sub-roles\n- **security** — No blockers or advisories. Voice settings, voice/autopreso HTTP routes, WebSocket origin checks, sidecar spawning, and transcript/whiteboard processing are all security-clean.\n- **requirements** — All 93 requirements implemented. No partial or missing requirements.\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1053/.pan/review/agent-pan-1053-review-816d1c2c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1053 -m \"Fixed review issues\"`"
+    }
+  ]
 }
