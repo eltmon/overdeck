@@ -4886,6 +4886,14 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
+    if (state.lastFailureNextRetryAt !== undefined) {
+      const nextRetryMs = Date.parse(state.lastFailureNextRetryAt);
+      if (Number.isFinite(nextRetryMs) && nextRetryMs > Date.now()) {
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — backoff active (next retry at ${state.lastFailureNextRetryAt})`);
+        continue;
+      }
+    }
+
     const deliberatelyStopped = state.stoppedByUser === true;
     if (deliberatelyStopped) {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);

@@ -277,7 +277,7 @@
       {
         "id": "backoff-and-troubled-flip",
         "title": "Exponential backoff and threshold-based troubled flip",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -293,7 +293,7 @@
           {
             "id": "backoff-and-troubled-flip.ac1",
             "title": "After 1st failure, agent is skipped during the next 5 seconds and resumable after; after 2nd, 30s; after 3rd, 120s",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -301,7 +301,7 @@
           {
             "id": "backoff-and-troubled-flip.ac2",
             "title": "3 consecutive failures within 10 minutes (default config) flip `troubled = true` and stamp `troubledAt`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -309,7 +309,7 @@
           {
             "id": "backoff-and-troubled-flip.ac3",
             "title": "If failures span > 10 minutes (e.g. 1 failure now, 2 more 11 minutes later), no troubled-flip happens — `firstFailureInRunAt` slides to the failure that resets the window",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -317,7 +317,7 @@
           {
             "id": "backoff-and-troubled-flip.ac4",
             "title": "`AutoResumeConfig` interface and defaults exported from `src/lib/cloister/auto-resume-config.ts`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -325,7 +325,7 @@
           {
             "id": "backoff-and-troubled-flip.ac5",
             "title": "Skipping during backoff logs `autoResumeStoppedWorkAgents: <id> skipped — backoff active (next retry at <iso>)`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

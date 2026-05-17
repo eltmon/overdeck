@@ -128,9 +128,10 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-2mby (failure tracking increments on orphan recovery and auto-resume failures, with reset when agents reach running). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-2mby",
+    "description": "Completed bead workspace-kauw (default auto-resume config, backoff next-retry timestamps, troubled flip threshold/window, and backoff skip logging). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-kauw",
     "filesToRead": [
+      "src/lib/cloister/auto-resume-config.ts",
       "src/lib/agents.ts",
       "src/lib/cloister/deacon.ts",
       ".pan/spec.vbrief.json"
@@ -173,6 +174,12 @@
       "timestamp": "2026-05-17T15:07:11.889Z",
       "reason": "bead-complete",
       "note": "Implemented failure tracking at auto-resume failure and orphan-recovery crash sites, suppressed same-cycle orphan/resume double-counts, and reset failure fields from the running-state transition. npm run typecheck and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T15:10:56.199Z",
+      "reason": "bead-complete",
+      "note": "Implemented default auto-resume backoff config, next-retry timestamps, sliding troubled window, troubled marking after 3 failures within 10 minutes, and Deacon backoff skip logging. npm run typecheck and npm run lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],
