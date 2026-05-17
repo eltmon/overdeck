@@ -810,33 +810,15 @@ program
       }
     }
 
-    // Kill any existing dashboard processes before starting a new one.
-    // This prevents EADDRINUSE when pan up is run while a dashboard is already running.
-    // Uses fuser instead of lsof | xargs kill — busybox lsof on Alpine ignores -t/-i
-    // and lists ALL processes, which xargs then tries to kill (including PID 1).
-    try {
-      execSync(`fuser -k -TERM ${dashboardPort}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
-      execSync(`fuser -k -TERM ${dashboardApiPort}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
-    } catch {
-      // No existing processes — that's fine
-    }
-
-    const waitForPortToFree = async (port: number, timeoutMs = 5000): Promise<void> => {
-      const start = Date.now();
-      while (Date.now() - start < timeoutMs) {
-        try {
-          execSync(`bash -c 'echo >/dev/tcp/127.0.0.1/${port}'`, { encoding: 'utf8', stdio: 'pipe', timeout: 1000 });
-        } catch {
-          return;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    };
-
-    await Promise.all([
-      waitForPortToFree(dashboardPort),
-      waitForPortToFree(dashboardApiPort),
-    ]);
+    const { stopDashboard, readPlatformConfig } = await import('../lib/platform-lifecycle.js');
+    const platformConfig = readPlatformConfig();
+    await stopDashboard({
+      ...platformConfig,
+      dashboardPort,
+      dashboardApiPort,
+      traefikEnabled,
+      traefikDomain,
+    });
 
     // Start dashboard
     if (isProduction) {
