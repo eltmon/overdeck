@@ -6,6 +6,7 @@ import { VBriefMergeConflictError } from '../vbrief/io.js'
 import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'
 import { invalidateVBriefIndex } from '../vbrief/vbrief-index.js'
 import type { VBriefDocument } from '../vbrief/types.js'
+import { deriveProjectRoot, queueAutoCommit } from './auto-commit.js'
 import {
   PAN_DIRNAME,
   PAN_CONTINUES_DIRNAME,
@@ -115,6 +116,16 @@ export function writeSpec(path: string, doc: PanSpecDocument): void {
   const tmp = `${path}.tmp`
   writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8')
   renameSync(tmp, path)
+
+  const projectRoot = deriveProjectRoot(path)
+  if (projectRoot) {
+    const issueId = (doc as any)?.plan?.id ?? 'unknown'
+    queueAutoCommit({
+      projectRoot,
+      paths: [path],
+      subject: `chore(state): update spec for ${String(issueId).toUpperCase()} (status=${doc.status})`,
+    })
+  }
 }
 
 function entryFromFile(specsDir: string, filename: string): PanSpecEntry | null {
