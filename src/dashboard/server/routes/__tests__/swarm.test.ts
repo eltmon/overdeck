@@ -308,6 +308,7 @@ describe('swarm route helpers', () => {
       totalWaves: 2,
       model: 'kimi-k2.6',
       autoAdvance: true,
+      hostOverride: true,
       slots: [
         {
           slot: 1,
@@ -348,11 +349,15 @@ describe('swarm route helpers', () => {
     // PAN-977 blocker #4: prior slots are persisted cumulatively, so the new
     // dispatch appears alongside the prior completed slot.
     expect(nextState.autoAdvance).toBe(true);
+    expect(nextState.hostOverride).toBe(true);
     const newSlot = nextState.slots.find((s) => s.itemId === 'wave-1-item');
     expect(newSlot).toBeTruthy();
     expect(newSlot?.itemTitle).toBe('Dispatch next wave');
     expect(newSlot?.status).toBe('running');
     expect(agents.spawnAgent).toHaveBeenCalledTimes(1);
+    expect(agents.spawnAgent).toHaveBeenCalledWith(expect.objectContaining({
+      allowHost: true,
+    }));
   });
 
   // PAN-977 round-12 blocker #1: regression — onSlotMergeComplete must not
@@ -700,6 +705,8 @@ describe('swarm route helpers', () => {
       issueId: 'PAN-971',
       allowHost: true,
     }));
+    const state = await __testInternals.loadSwarmState('PAN-971');
+    expect(state?.hostOverride).toBe(true);
   });
 
   it('does not advance while current wave still has running slots', async () => {

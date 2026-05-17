@@ -74,6 +74,7 @@ interface SwarmState {
   totalWaves: number;
   model: string;
   autoAdvance?: boolean;
+  hostOverride?: boolean;
   autoAdvanceFailureCount?: number;
   autoAdvanceRetryAfter?: string;
   lastAutoAdvanceError?: string;
@@ -262,6 +263,7 @@ function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
     totalWaves: runtime.totalWaves ?? 0,
     model: runtime.model,
     autoAdvance: runtime.autoAdvance,
+    hostOverride: runtime.hostOverride,
     autoAdvanceFailureCount: runtime.autoAdvanceFailureCount,
     autoAdvanceRetryAfter: runtime.autoAdvanceRetryAfter,
     lastAutoAdvanceError: runtime.lastAutoAdvanceError,
@@ -295,6 +297,7 @@ function runtimeFromState(state: SwarmState, existing?: SwarmRuntime): SwarmRunt
     currentWave: state.currentWave,
     totalWaves: state.totalWaves,
     autoAdvance: state.autoAdvance,
+    hostOverride: state.hostOverride,
     autoAdvanceFailureCount: state.autoAdvanceFailureCount,
     autoAdvanceRetryAfter: state.autoAdvanceRetryAfter,
     lastAutoAdvanceError: state.lastAutoAdvanceError,
@@ -1089,6 +1092,7 @@ async function dispatchSwarmWave(
     totalWaves: waves.length,
     model: swarmModel,
     autoAdvance: autoAdvance ?? existingState?.autoAdvance ?? false,
+    hostOverride: allowHost || existingState?.hostOverride || false,
     autoAdvanceFailureCount: 0,
     autoAdvanceRetryAfter: undefined,
     lastAutoAdvanceError: undefined,
@@ -1305,7 +1309,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
       // dispatchSwarmWave with an undefined `wave` falls through to
       // getDispatchableItems(), which reflects the durable mutation we just
       // applied above.
-      const result = await dispatchSwarmWave({ issueId: issueUpper, model: nextState.model, autoAdvance: true });
+      const result = await dispatchSwarmWave({ issueId: issueUpper, model: nextState.model, autoAdvance: true, allowHost: nextState.hostOverride });
       if (result.status >= 400) ensureSwarmAutoAdvanceLoop();
       else dispatched = true;
     }
@@ -1518,6 +1522,7 @@ async function pollSwarmAutoAdvance(): Promise<void> {
         issueId: state.issueId,
         model: state.model,
         autoAdvance: true,
+        allowHost: state.hostOverride,
       });
       if (result.status >= 400) {
         const error = result.body.error ?? 'unknown error';

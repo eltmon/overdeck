@@ -2961,10 +2961,24 @@ const postAgentResetSessionRoute = HttpRouter.add(
 // ─── Route: POST /api/agents/:id/delivery-method ─────────────────────────────
 // Updates the agent's delivery method (auto | channels | tmux) in state.json.
 
+export function validateAgentDeliveryMethodOrigin(
+  request: HttpServerRequest.HttpServerRequest,
+): { ok: true } | { ok: false; status: 403; body: { error: 'forbidden' } } {
+  const originCheck = validateOrigin(request);
+  if (originCheck.ok) return { ok: true };
+  return { ok: false, status: 403, body: { error: 'forbidden' } };
+}
+
 const postAgentDeliveryMethodRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/delivery-method',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originDecision = validateAgentDeliveryMethodOrigin(request);
+    if (!originDecision.ok) {
+      return jsonResponse(originDecision.body, { status: originDecision.status });
+    }
+
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;

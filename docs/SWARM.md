@@ -29,7 +29,7 @@ When a slot branch merges into the feature branch, the merge-agent fires a loopb
 
 ## CLI
 
-All swarm operations go through `pan swarm <id>`. Mutating operations forward to the dashboard's `POST /api/swarm` endpoint over the internal-token authenticated path; read-only and task-mutation operations resolve the workspace directly.
+All swarm operations go through `pan swarm <id>`. Mutating operations forward to the dashboard's `POST /api/swarm` endpoint over the internal-token authenticated path; read-only and task-mutation operations resolve the workspace directly. `--host` is a confirmed break-glass path for unhealthy Docker-backed workspace stacks; with `--auto-advance`, the confirmed override is persisted in swarm runtime state so later auto-dispatched slots use the same operator decision.
 
 ### Dispatch
 
@@ -41,6 +41,8 @@ pan swarm <id> --max-slots <n>       # Cap concurrency
 pan swarm <id> --model <model>       # Override slot-agent model (default kimi-k2.6)
 pan swarm <id> --auto-advance        # Auto-dispatch newly-ready items as slots merge
 pan swarm <id> --no-auto-advance     # Manual mode; explicit `pan swarm <id>` per wave
+pan swarm <id> --host                # Confirmed break-glass: bypass workspace stack-health gate
+pan swarm <id> --host --yes          # Non-interactive host override confirmation
 ```
 
 ### Task operations (vBRIEF item state)

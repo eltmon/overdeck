@@ -19,12 +19,15 @@ If `allowHost` is true, the gate emits `agent-spawn-host-override` and persists 
 - `src/cli/index.ts:413` adds `--host`; `src/cli/index.ts:414` adds `--yes` for non-interactive confirmation.
 - `src/cli/commands/start.ts:124` prompts `Are you sure? This bypasses workspace isolation. (y/N)` for interactive `--host` and requires `--yes` when stdin is not a TTY.
 - `src/cli/commands/start.ts:1009` passes `allowHost` into `spawnAgent()`.
+- `src/cli/index.ts:418` registers `pan swarm <id>`.
+- `src/cli/index.ts:426` adds `--host`; `src/cli/index.ts:427` adds `--yes` for non-interactive confirmation.
+- `src/cli/commands/swarm.ts:89` prompts with the same interactive `--host` confirmation, requires `--yes` when stdin is not a TTY, and `src/cli/commands/swarm.ts:144` sends the server confirmation phrase to `POST /api/swarm`.
 - `src/dashboard/server/routes/agents.ts:1818` accepts an explicit dashboard host override request after origin validation and confirmation phrase validation.
 - `src/dashboard/server/routes/agents.ts:2652` and `src/dashboard/server/routes/agents.ts:2712` pass `--host --yes` to the `pan start` child only when the request explicitly set and confirmed `host` or `allowHost`.
 - `src/dashboard/server/services/agent-spawner.ts:172` passes `allowHost` through its direct `spawnAgent()` service path.
-- `src/dashboard/server/routes/swarm.ts:1743` requires the same confirmation phrase before `POST /api/swarm` accepts `host` or `allowHost`, and `src/dashboard/server/routes/swarm.ts:1014` passes `allowHost` into each swarm slot spawn only after confirmation.
+- `src/dashboard/server/routes/swarm.ts:1749` requires the same confirmation phrase before `POST /api/swarm` accepts `host` or `allowHost`, `src/dashboard/server/routes/swarm.ts:1095` persists the confirmed host override in swarm runtime state, and `src/dashboard/server/routes/swarm.ts:1020` passes `allowHost` into each swarm slot spawn only after confirmation.
 
-There is no `pan work` spawn command today; the CLI audit found only `pan start <id>` as the direct work-agent start surface.
+There is no `pan work` spawn command today; the CLI audit found `pan start <id>` and `pan swarm <id>` as direct work-agent start surfaces.
 
 ## Spawn entrypoint audit
 
@@ -36,6 +39,7 @@ There is no `pan work` spawn command today; the CLI audit found only `pan start 
 - `src/lib/cloister/service.ts:350` starts reactive lifecycle roles through `spawnRun()`.
 - `src/dashboard/server/services/agent-spawner.ts:166`, `src/dashboard/server/routes/workspaces.ts:267`, `src/dashboard/server/routes/swarm.ts:1009`, and `src/lib/cloister/handoff.ts:136` start work agents through `spawnAgent()`.
 - `src/dashboard/server/routes/agents.ts:2649` and `src/dashboard/server/routes/agents.ts:2709` shell out to `pan start`, which reaches `spawnAgent()`.
+- `src/cli/commands/swarm.ts:121` calls `POST /api/swarm`, which reaches `spawnAgent()` for each slot.
 
 ## Non-agent tmux sessions
 
