@@ -525,13 +525,32 @@ describe('convoy orchestration', () => {
     expect(prompt).not.toContain('.claude/reviews/');
   });
 
+  it('uses run-scoped output paths by default', async () => {
+    const result = await spawnReviewSubRoleForIssue({
+      issueId: 'PAN-1059',
+      workspace: '/tmp/pan-review-agent-default',
+      subRole: 'security',
+      runId: 'agent-pan-1059-review-abcdef12',
+      contextManifestPath: '/tmp/pan-review-agent-default/.pan/review/agent-pan-1059-review-abcdef12/context.json',
+    });
+
+    expect(result.success).toBe(true);
+    const expectedOutput = '/tmp/pan-review-agent-default/.pan/review/agent-pan-1059-review-abcdef12/security.md';
+    expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
+      reviewOutputPath: expectedOutput,
+    }));
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      reviewOutputPath: expectedOutput,
+    }));
+  });
+
   it('spawns a reviewer as a review sub-role session with the resolved model', async () => {
     const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: '/workspace',
       subRole: 'security',
       runId: 'agent-pan-1059-review-abcdef12',
-      outputPath: '/workspace/.pan/review/agent-pan-1059-review-abcdef12/security.md',
+      outputPath: '/tmp/pan-review-agent-test-security.md',
       contextManifestPath: '/workspace/.pan/review/agent-pan-1059-review-abcdef12/context.json',
     });
 
@@ -549,7 +568,7 @@ describe('convoy orchestration', () => {
       id: 'agent-pan-1059-review-security',
       reviewSubRole: 'security',
       reviewRunId: 'agent-pan-1059-review-abcdef12',
-      reviewOutputPath: '/workspace/.pan/review/agent-pan-1059-review-abcdef12/security.md',
+      reviewOutputPath: '/tmp/pan-review-agent-test-security.md',
       reviewSynthesisAgentId: 'agent-pan-1059-review',
       reviewDeadlineAt: expect.any(String),
     }));
