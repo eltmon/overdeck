@@ -107,6 +107,24 @@ describe('enrichAction', () => {
     expect(secondCall.force).toBe(true);
   });
 
+  it.each([
+    [{ deep: true }, 3, true],
+    [{ upgrade: true }, 1, false],
+    [{ deep: true, upgrade: true }, 2, false],
+  ])('maps enrichment flags %o to tier L%s', async (opts, expectedTier, expectedSkip) => {
+    mockEnrichSessions.mockResolvedValue({ enriched: 1, skipped: 0, errors: 0, durationMs: 100 });
+
+    const { enrichAction } = await import('../enrich.js');
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await enrichAction([], opts);
+
+    expect(mockEnrichSessions).toHaveBeenCalledWith(expect.objectContaining({
+      tier: expectedTier,
+      skipAlreadyEnriched: expectedSkip,
+    }));
+  });
+
   it('--with plus --full requests L3 full-transcript enrichment for explicit sessions', async () => {
     mockEnrichSessions.mockResolvedValue({ enriched: 1, skipped: 0, errors: 0, durationMs: 100 });
 

@@ -36,12 +36,12 @@ interface Props {
 }
 
 interface EnrichRequest {
-  tier: 1 | 2;
+  tier: 1 | 2 | 3;
   confirmed?: boolean;
 }
 
 interface CostThresholdDetails {
-  tier: 1 | 2;
+  tier: 1 | 2 | 3;
   estimatedCost: number;
   threshold: number;
   sessionCount: number;
@@ -57,7 +57,15 @@ async function enrichSession(sessionId: number, request: EnrichRequest): Promise
   );
 }
 
-function parseCostThreshold(err: unknown, tier: 1 | 2): CostThresholdDetails | null {
+async function embedSession(sessionId: number): Promise<void> {
+  await getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.embedSessions]({
+      ids: [sessionId],
+    }),
+  );
+}
+
+function parseCostThreshold(err: unknown, tier: 1 | 2 | 3): CostThresholdDetails | null {
   const code = typeof err === 'object' && err !== null && 'code' in err
     ? String((err as { code?: unknown }).code ?? '')
     : '';
@@ -90,18 +98,27 @@ export function SessionDetail({ session, onClose }: Props) {
   });
   const displaySession = freshSession ?? session;
 
+  const invalidateSessionQueries = () => {
+    void queryClient.invalidateQueries({ queryKey: ['discovered-session', session.id] });
+    void queryClient.invalidateQueries({ queryKey: ['discovered-sessions'] });
+    void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-search'] });
+    void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-stats'] });
+  };
+
   const enrichMutation = useMutation({
     mutationFn: (request: EnrichRequest) => enrichSession(session.id, request),
     onSuccess: () => {
       setPendingCost(null);
-      void queryClient.invalidateQueries({ queryKey: ['discovered-session', session.id] });
-      void queryClient.invalidateQueries({ queryKey: ['discovered-sessions'] });
-      void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-search'] });
-      void queryClient.invalidateQueries({ queryKey: ['discovered-sessions-stats'] });
+      invalidateSessionQueries();
     },
     onError: (err, request) => {
       setPendingCost(parseCostThreshold(err, request.tier));
     },
+  });
+
+  const embedMutation = useMutation({
+    mutationFn: () => embedSession(session.id),
+    onSuccess: invalidateSessionQueries,
   });
 
   const field = (label: string, value: string | number | null | undefined) => (
@@ -204,59 +221,87 @@ export function SessionDetail({ session, onClose }: Props) {
       </div>
 
       {/* Enrichment controls */}
-      {displaySession.enrichmentLevel < 2 && (
-        <div className="px-3 py-2 border-t border-gray-800 shrink-0">
-          <div className="text-[10px] text-gray-500 mb-1.5">
-            {displaySession.enrichmentFailed ? 'Enrichment failed — retry:' : 'Enrich this session'}
-          </div>
-          <div className="text-[10px] text-amber-500/80 mb-1.5">
-            Sends redacted conversation excerpts to the configured enrichment provider.
-          </div>
-          <div className="flex gap-2">
-            {displaySession.enrichmentLevel < 1 && (
+      <div className="px-3 py-2 border-t border-gray-800 shrink-0">
+        {displaySession.enrichmentLevel < 3 && (
+          <>
+            <div className="text-[10px] text-gray-500 mb-1.5">
+              {displaySession.enrichmentFailed ? 'Enrichment failed — retry:' : 'Enrich this session'}
+            </div>
+            <div className="text-[10px] text-amber-500/80 mb-1.5">
+              Sends redacted conversation excerpts to the configured enrichment provider.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {displaySession.enrichmentLevel < 1 && (
+                <button
+                  onClick={() => enrichMutation.mutate({ tier: 1 })}
+                  disabled={enrichMutation.isPending}
+                  className="flex items-center gap-1 px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs transition-colors disabled:opacity-50"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Quick (L1)
+                </button>
+              )}
+              {displaySession.enrichmentLevel < 2 && (
+                <button
+                  onClick={() => enrichMutation.mutate({ tier: 2 })}
+                  disabled={enrichMutation.isPending}
+                  className="flex items-center gap-1 px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs transition-colors disabled:opacity-50"
+                >
+                  <Sparkles className="h-3 w-3 text-yellow-400" />
+                  Detailed (L2)
+                </button>
+              )}
               <button
-                onClick={() => enrichMutation.mutate({ tier: 1 })}
+                onClick={() => enrichMutation.mutate({ tier: 3 })}
                 disabled={enrichMutation.isPending}
                 className="flex items-center gap-1 px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs transition-colors disabled:opacity-50"
               >
-                <Sparkles className="h-3 w-3" />
-                Quick (L1)
+                <Sparkles className="h-3 w-3 text-purple-400" />
+                Deep (L3)
               </button>
-            )}
+            </div>
+          </>
+        )}
+        {enrichMutation.isPending && (
+          <div className="text-[10px] text-blue-400 mt-1">Enriching…</div>
+        )}
+        {enrichProgress && (
+          <div className={enrichProgress.success ? 'text-[10px] text-green-400 mt-1' : 'text-[10px] text-red-400 mt-1'}>
+            L{enrichProgress.level} {enrichProgress.success ? 'complete' : `failed: ${enrichProgress.error ?? 'unknown error'}`} · {enrichProgress.model}
+          </div>
+        )}
+        {pendingCost && (
+          <div className="mt-2 rounded border border-amber-700/60 bg-amber-950/30 p-2 text-[10px] text-amber-200">
+            Estimated cost ${pendingCost.estimatedCost.toFixed(4)} exceeds threshold ${pendingCost.threshold.toFixed(2)} for {pendingCost.sessionCount} session{pendingCost.sessionCount === 1 ? '' : 's'}.
             <button
-              onClick={() => enrichMutation.mutate({ tier: 2 })}
+              onClick={() => enrichMutation.mutate({ tier: pendingCost.tier, confirmed: true })}
               disabled={enrichMutation.isPending}
-              className="flex items-center gap-1 px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs transition-colors disabled:opacity-50"
+              className="ml-2 rounded bg-amber-700 px-1.5 py-0.5 text-amber-50 disabled:opacity-50"
             >
-              <Sparkles className="h-3 w-3 text-yellow-400" />
-              Detailed (L2)
+              Confirm
             </button>
           </div>
-          {enrichMutation.isPending && (
-            <div className="text-[10px] text-blue-400 mt-1">Enriching…</div>
-          )}
-          {enrichProgress && (
-            <div className={enrichProgress.success ? 'text-[10px] text-green-400 mt-1' : 'text-[10px] text-red-400 mt-1'}>
-              L{enrichProgress.level} {enrichProgress.success ? 'complete' : `failed: ${enrichProgress.error ?? 'unknown error'}`} · {enrichProgress.model}
-            </div>
-          )}
-          {pendingCost && (
-            <div className="mt-2 rounded border border-amber-700/60 bg-amber-950/30 p-2 text-[10px] text-amber-200">
-              Estimated cost ${pendingCost.estimatedCost.toFixed(4)} exceeds threshold ${pendingCost.threshold.toFixed(2)} for {pendingCost.sessionCount} session{pendingCost.sessionCount === 1 ? '' : 's'}.
-              <button
-                onClick={() => enrichMutation.mutate({ tier: pendingCost.tier, confirmed: true })}
-                disabled={enrichMutation.isPending}
-                className="ml-2 rounded bg-amber-700 px-1.5 py-0.5 text-amber-50 disabled:opacity-50"
-              >
-                Confirm
-              </button>
-            </div>
-          )}
-          {enrichMutation.isError && !pendingCost && (
-            <div className="text-[10px] text-red-400 mt-1">Enrichment failed</div>
-          )}
+        )}
+        {enrichMutation.isError && !pendingCost && (
+          <div className="text-[10px] text-red-400 mt-1">Enrichment failed</div>
+        )}
+        <div className="mt-3 flex items-center justify-between border-t border-gray-900 pt-2">
+          <div>
+            <div className="text-[10px] text-gray-500">Semantic embedding</div>
+            <div className="text-[10px] text-gray-600">Generate or refresh this session's vector index.</div>
+          </div>
+          <button
+            onClick={() => embedMutation.mutate()}
+            disabled={embedMutation.isPending}
+            className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded text-xs transition-colors disabled:opacity-50"
+          >
+            Embed
+          </button>
         </div>
-      )}
+        {embedMutation.isPending && <div className="text-[10px] text-blue-400 mt-1">Embedding…</div>}
+        {embedMutation.isSuccess && <div className="text-[10px] text-green-400 mt-1">Embedding complete</div>}
+        {embedMutation.isError && <div className="text-[10px] text-red-400 mt-1">Embedding failed</div>}
+      </div>
     </div>
   );
 }

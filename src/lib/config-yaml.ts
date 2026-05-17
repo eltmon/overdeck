@@ -9,6 +9,7 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 'fs';
+import { readFile as readFileAsync, stat as statAsync } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
@@ -520,7 +521,11 @@ export function getConversationsConfig(): RuntimeConversationsConfig {
 }
 
 export async function getConversationsConfigAsync(): Promise<RuntimeConversationsConfig> {
-  return getConversationsConfig();
+  const { config } = await loadConfigAsyncNoMigration();
+  return resolveConversationWatchDirs({
+    ...config.conversations,
+    apiKeys: config.apiKeys,
+  });
 }
 
 export interface MigrationResult {
@@ -728,6 +733,64 @@ function loadProjectConfig(): YamlConfig | null {
  */
 function loadGlobalConfig(): YamlConfig | null {
   return loadYamlFile(GLOBAL_CONFIG_PATH);
+}
+
+async function loadYamlFileAsync(filePath: string): Promise<YamlConfig | null> {
+  try {
+    const content = await readFileAsync(filePath, 'utf-8');
+    const parsed = yaml.load(content) as YamlConfig;
+    return parsed || {};
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') return null;
+    console.error(`Error loading YAML config from ${filePath}:`, error);
+    return null;
+  }
+}
+
+async function findProjectRootAsync(startDir: string = process.cwd()): Promise<string | null> {
+  let currentDir = startDir;
+
+  while (currentDir !== '/') {
+    try {
+      await statAsync(join(currentDir, '.git'));
+      return currentDir;
+    } catch { /* keep walking */ }
+    currentDir = join(currentDir, '..');
+  }
+
+  return null;
+}
+
+async function loadProjectConfigAsync(): Promise<YamlConfig | null> {
+  const projectRoot = await findProjectRootAsync();
+  if (!projectRoot) return null;
+
+  const newConfigPath = join(projectRoot, '.pan.yaml');
+  if (await pathExistsAsync(newConfigPath)) return loadYamlFileAsync(newConfigPath);
+
+  const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
+  if (await pathExistsAsync(legacyConfigPath)) {
+    process.stderr.write(
+      `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
+    );
+    return loadYamlFileAsync(legacyConfigPath);
+  }
+
+  return null;
+}
+
+async function loadGlobalConfigAsync(): Promise<YamlConfig | null> {
+  return loadYamlFileAsync(GLOBAL_CONFIG_PATH);
+}
+
+async function pathExistsAsync(filePath: string): Promise<boolean> {
+  try {
+    await statAsync(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -1349,6 +1412,52 @@ export function clearConfigCache(): void {
   configCache = null;
 }
 
+function applyEnvironmentFallbacks(config: NormalizedConfig, explicitlyDisabled: Set<ModelProvider>): void {
+  if (process.env.OPENAI_API_KEY && !config.apiKeys.openai) {
+    config.apiKeys.openai = process.env.OPENAI_API_KEY;
+    if (!explicitlyDisabled.has('openai')) config.enabledProviders.add('openai');
+  }
+  if (process.env.VOYAGE_API_KEY && !config.apiKeys.voyage) {
+    config.apiKeys.voyage = process.env.VOYAGE_API_KEY;
+  }
+  if (process.env.GOOGLE_API_KEY && !config.apiKeys.google) {
+    config.apiKeys.google = process.env.GOOGLE_API_KEY;
+    if (!explicitlyDisabled.has('google')) config.enabledProviders.add('google');
+  }
+  if (process.env.MINIMAX_API_KEY && !config.apiKeys.minimax) {
+    config.apiKeys.minimax = process.env.MINIMAX_API_KEY;
+    if (!explicitlyDisabled.has('minimax')) config.enabledProviders.add('minimax');
+  }
+  if (process.env.ZAI_API_KEY && !config.apiKeys.zai) {
+    config.apiKeys.zai = process.env.ZAI_API_KEY;
+    if (!explicitlyDisabled.has('zai')) config.enabledProviders.add('zai');
+  }
+  const kimiKey = process.env.KIMI_CODING_API_KEY || process.env.KIMI_API_KEY;
+  if (kimiKey && !config.apiKeys.kimi) {
+    config.apiKeys.kimi = kimiKey;
+    if (!explicitlyDisabled.has('kimi')) config.enabledProviders.add('kimi');
+  }
+  if (process.env.OPENROUTER_API_KEY && !config.apiKeys.openrouter) {
+    config.apiKeys.openrouter = process.env.OPENROUTER_API_KEY;
+    if (!explicitlyDisabled.has('openrouter')) config.enabledProviders.add('openrouter');
+  }
+  if (process.env.MIMO_API_KEY && !config.apiKeys.mimo) {
+    config.apiKeys.mimo = process.env.MIMO_API_KEY;
+    if (!explicitlyDisabled.has('mimo')) config.enabledProviders.add('mimo');
+  }
+  if (process.env.NOUS_API_KEY && !config.apiKeys.nous) {
+    config.apiKeys.nous = process.env.NOUS_API_KEY;
+    if (!explicitlyDisabled.has('nous')) config.enabledProviders.add('nous');
+  }
+  if (process.env.LINEAR_API_KEY && !config.trackerKeys.linear) config.trackerKeys.linear = process.env.LINEAR_API_KEY;
+  if (process.env.GITHUB_TOKEN && !config.trackerKeys.github) config.trackerKeys.github = process.env.GITHUB_TOKEN;
+  if (process.env.GITLAB_TOKEN && !config.trackerKeys.gitlab) config.trackerKeys.gitlab = process.env.GITLAB_TOKEN;
+  if (process.env.RALLY_API_KEY && !config.trackerKeys.rally) config.trackerKeys.rally = process.env.RALLY_API_KEY;
+  if (process.env.SHADOW_MODE !== undefined) {
+    config.shadow.enabled = ['true', '1', 'yes'].includes(process.env.SHADOW_MODE.toLowerCase());
+  }
+}
+
 function getConfigMtimes(): { global: number; project: number } {
   let globalMtime = 0;
   let projectMtime = 0;
@@ -1373,6 +1482,56 @@ function getConfigMtimes(): { global: number; project: number } {
   }
 
   return { global: globalMtime, project: projectMtime };
+}
+
+async function getConfigMtimesAsync(): Promise<{ global: number; project: number }> {
+  const globalMtime = await getMtimeAsync(GLOBAL_CONFIG_PATH);
+  let projectMtime = 0;
+
+  const projectRoot = await findProjectRootAsync();
+  if (projectRoot) {
+    for (const name of ['.pan.yaml', '.panopticon.yaml']) {
+      projectMtime = await getMtimeAsync(join(projectRoot, name));
+      if (projectMtime > 0) break;
+    }
+  }
+
+  return { global: globalMtime, project: projectMtime };
+}
+
+async function getMtimeAsync(filePath: string): Promise<number> {
+  try {
+    return (await statAsync(filePath)).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+async function loadConfigAsyncNoMigration(): Promise<ConfigLoadResult> {
+  const mtimes = await getConfigMtimesAsync();
+  if (
+    configCache &&
+    configCache.globalMtime === mtimes.global &&
+    configCache.projectMtime === mtimes.project
+  ) {
+    return configCache.result;
+  }
+
+  const [globalConfig, projectConfig] = await Promise.all([
+    loadGlobalConfigAsync(),
+    loadProjectConfigAsync(),
+  ]);
+  const { config, explicitlyDisabled } = mergeConfigs(projectConfig, globalConfig);
+  applyEnvironmentFallbacks(config, explicitlyDisabled);
+
+  const result: ConfigLoadResult = { config };
+  const freshMtimes = await getConfigMtimesAsync();
+  configCache = {
+    globalMtime: freshMtimes.global,
+    projectMtime: freshMtimes.project,
+    result,
+  };
+  return result;
 }
 
 /**

@@ -209,7 +209,7 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
     });
     const queryEmbedding = embedResult.embedding;
     const filter = normalizeFilter(query.filter, undefined, undefined);
-    const ranked = topKCosine(queryEmbedding, embeddingModel, filter, limit, offset, semanticCandidateWindow(limit, offset));
+    const ranked = topKCosine(queryEmbedding, embeddingModel, filter, limit, offset);
     return {
       sessions: ranked.results.map((x) => x.session),
       total: ranked.total,
@@ -263,8 +263,7 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
       return { sessions: [], total: 0, mode: 'semantic', durationMs: Date.now() - start };
     }
     const filter = normalizeFilter(query.filter, undefined, undefined);
-    const candidateWindow = semanticCandidateWindow(limit + 1, offset);
-    const ranked = topKCosine(refEmbedding, embeddingModel, filter, offset + limit + 1, 0, candidateWindow);
+    const ranked = topKCosine(refEmbedding, embeddingModel, filter, offset + limit + 1, 0);
     const filtered = ranked.results
       .map((x) => x.session)
       .filter((s) => s.id !== query.similarTo);

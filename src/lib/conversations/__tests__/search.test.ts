@@ -349,6 +349,32 @@ describe('FTS pagination with non-zero offset', () => {
 describe('similar-session search paginates after excluding the reference session', () => {
   const MODEL = 'text-embedding-3-small';
 
+  function seedEmbeddedSession(index: number, vector: number[], lastTs: string) {
+    const s = upsertDiscoveredSession({
+      jsonlPath: `/semantic-window/${index}.jsonl`,
+      workspacePath: '/home/user/Projects/semantic-window',
+      workspaceHash: `hsemanticwindow${index}`,
+      messageCount: 2,
+      firstTs: '2025-01-01T00:00:00Z',
+      lastTs,
+      modelsUsed: ['claude-sonnet-4-6'],
+      primaryModel: 'claude-sonnet-4-6',
+      tokenInput: 50,
+      tokenOutput: 100,
+      estimatedCost: 0.005,
+      toolsUsed: [],
+      filesTouched: [],
+      panopticonManaged: false,
+      panIssueId: null,
+      panAgentId: null,
+      fileSize: 512,
+      fileMtime: '2025-01-01T00:00:00Z',
+      tags: [],
+    });
+    insertEmbedding(s.id, MODEL, new Float32Array(vector));
+    return s;
+  }
+
   beforeEach(async () => {
     const vectors = [
       [1, 0],
@@ -394,6 +420,26 @@ describe('similar-session search paginates after excluding the reference session
     expect(page2.sessions.every((s) => s.id !== 1)).toBe(true);
     const ids1 = new Set(page1.sessions.map((s) => s.id));
     expect(page2.sessions.some((s) => ids1.has(s.id))).toBe(false);
+  });
+
+  it('ranks semantic matches across the full filtered corpus, not a recency window', async () => {
+    await resetDb();
+    const reference = seedEmbeddedSession(10_000, [1, 0], '2025-06-01T00:00:00Z');
+    const bestOlderMatch = seedEmbeddedSession(20_000, [0.999, 0.001], '2024-01-01T00:00:00Z');
+
+    for (let i = 0; i < 205; i++) {
+      const day = String((i % 28) + 1).padStart(2, '0');
+      seedEmbeddedSession(i, [0, 1], `2025-05-${day}T00:00:00Z`);
+    }
+
+    const result = await searchSessions({
+      similarTo: reference.id,
+      embeddingModel: MODEL,
+      filter: { workspacePath: '/home/user/Projects/semantic-window' },
+      limit: 1,
+    });
+
+    expect(result.sessions[0]?.id).toBe(bestOlderMatch.id);
   });
 });
 

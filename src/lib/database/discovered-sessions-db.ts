@@ -669,17 +669,12 @@ export function topKCosine(
   filter: ConversationFilter = {},
   limit = 50,
   offset = 0,
-  maxCandidates?: number,
 ): { results: CosineSearchResult[]; total: number } {
   const db = getDatabase();
   const { where, params } = buildFilterSql({ ...filter, limit: undefined, offset: undefined }, 'ds');
   const modelClause = where ? `${where} AND se.model = ?` : 'WHERE se.model = ?';
   const safeLimit = Number.isFinite(limit) && limit >= 0 ? limit : 50;
   const safeOffset = Number.isFinite(offset) && offset >= 0 ? offset : 0;
-  const candidateLimit = maxCandidates !== undefined && Number.isFinite(maxCandidates) && maxCandidates > 0
-    ? Math.max(maxCandidates, safeOffset + safeLimit)
-    : undefined;
-  const limitClause = candidateLimit !== undefined ? 'LIMIT ?' : '';
   const countRow = db
     .prepare(
       `SELECT COUNT(*) AS cnt
@@ -693,11 +688,9 @@ export function topKCosine(
       `SELECT ds.*, se.dim AS embedding_dim, se.embedding AS embedding_blob
        FROM session_embeddings se
        JOIN discovered_sessions ds ON ds.id = se.session_id
-       ${modelClause}
-       ORDER BY COALESCE(ds.last_ts, ds.first_ts, '') DESC, ds.id DESC
-       ${limitClause}`,
+       ${modelClause}`,
     )
-    .all(...params, model, ...(candidateLimit !== undefined ? [candidateLimit] : [])) as Array<Record<string, unknown> & { embedding_dim: number; embedding_blob: Buffer }>;
+    .all(...params, model) as Array<Record<string, unknown> & { embedding_dim: number; embedding_blob: Buffer }>;
 
   const scored = rows
     .map((row) => ({

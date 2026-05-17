@@ -26,6 +26,18 @@ Using Playwright against the built Node 22 dashboard:
 - Detail flow: clicking a session row opened `Session #9041` detail panel.
 - Enrichment flow UI: detail panel rendered `Enrich this session` with provider disclosure text: `Sends redacted conversation excerpts to the configured enrichment provider.` I did not click the enrichment action because it would intentionally call the configured provider and spend credentials.
 
+## Browser UAT — safe enrichment and embedding dispatch
+
+Using a temporary isolated `PANOPTICON_HOME=/tmp/pan-457-uat-1778983666-1052` and built Node 22 dashboard on `http://127.0.0.1:4312/sessions`:
+
+- Seeded one discovered session whose JSONL path intentionally did not exist, so enrichment request dispatch would exercise the backend path and progress events without sending any prompt to a paid provider.
+- Sessions page loaded with `1 indexed`, `0 enriched`, `0 managed`, and the seeded row for `/tmp/pan-457-uat-workspace`.
+- Clicking the row opened `Session #1` detail drawer.
+- Detail drawer rendered `Quick (L1)`, `Detailed (L2)`, new `Deep (L3)`, and new `Embed` controls.
+- Clicking `Deep (L3)` dispatched the enrichment flow through the dashboard RPC/backend path and rendered live progress failure text: `L3 failed: No readable messages in JSONL · claude-sonnet-4-6`.
+- Clicking `Embed` dispatched embedding generation through the dashboard RPC/backend path and rendered `Embedding complete`.
+- Network panel showed follow-up session/list/stats refreshes after both actions, confirming store/query invalidation and UI refresh behavior.
+
 ## Security UAT note
 
 Semantic search origin hardening is covered by `src/dashboard/server/routes/__tests__/discovered-sessions.test.ts`:

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -221,6 +221,56 @@ describe('embedSessions', () => {
     });
 
     expect(result2.embedded).toBe(0);
+  });
+
+  it('stores OpenAI text-embedding-3-small embeddings as 1536 dimensions', async () => {
+    const session = seedEnrichedSession(1);
+    const embedFn = vi.fn(async (_provider: unknown, opts: { model: string }): Promise<EmbeddingResult> => ({
+      embedding: new Float32Array(1536).fill(0.1),
+      model: opts.model,
+    }));
+
+    const result = await embedSessions({
+      model: 'text-embedding-3-small',
+      provider: 'openai',
+      embedFn: embedFn as typeof import('../embeddings/providers.js').embed,
+      maxParallel: 1,
+    });
+
+    expect(result.embedded).toBe(1);
+    expect(embedFn).toHaveBeenCalledWith('openai', expect.objectContaining({ model: 'text-embedding-3-small' }));
+    expect(getEmbedding(session!.id, 'text-embedding-3-small')?.length).toBe(1536);
+  });
+
+  it('stores Voyage voyage-code-3 embeddings as 1024 dimensions', async () => {
+    const session = seedEnrichedSession(1);
+    const embedFn = vi.fn(async (_provider: unknown, opts: { model: string }): Promise<EmbeddingResult> => ({
+      embedding: new Float32Array(1024).fill(0.1),
+      model: opts.model,
+    }));
+
+    const result = await embedSessions({
+      provider: 'voyage',
+      embedFn: embedFn as typeof import('../embeddings/providers.js').embed,
+      maxParallel: 1,
+      config: {
+        compactionModel: 'claude-haiku-4-5',
+        manualCompactMode: 'claude-code',
+        richCompaction: true,
+        titleModel: 'claude-haiku-4-5',
+        watchDirs: [],
+        scanMaxParallel: null,
+        embeddings: true,
+        embeddingProvider: 'voyage',
+        embeddingModel: 'voyage-code-3',
+        embeddingAutoOnDeep: false,
+        enrichment: { quickModel: null, deepModel: null, maxParallel: 1, costConfirmThreshold: 1 },
+      },
+    });
+
+    expect(result.embedded).toBe(1);
+    expect(embedFn).toHaveBeenCalledWith('voyage', expect.objectContaining({ model: 'voyage-code-3' }));
+    expect(getEmbedding(session!.id, 'voyage-code-3')?.length).toBe(1024);
   });
 
   it('fires progress callbacks', async () => {

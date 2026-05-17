@@ -10,6 +10,19 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionDetail } from '../SessionDetail';
 
+const rpcMocks = vi.hoisted(() => ({
+  enrich: vi.fn().mockResolvedValue({ processed: 1, totalCost: 0, failures: 0 }),
+  embed: vi.fn().mockResolvedValue({ total: 1, embedded: 1, model: 'text-embedding-3-small' }),
+  request: vi.fn((fn: (client: Record<string, unknown>) => unknown) => fn({
+    'pan.enrichSessions': rpcMocks.enrich,
+    'pan.embedSessions': rpcMocks.embed,
+  })),
+}));
+
+vi.mock('../../../lib/wsTransport', () => ({
+  getTransport: () => ({ request: rpcMocks.request }),
+}));
+
 const BASE_SESSION = {
   id: 42,
   jsonlPath: '/fake/42.jsonl',
@@ -58,6 +71,11 @@ function renderDetail(
 }
 
 describe('SessionDetail', () => {
+  beforeEach(() => {
+    rpcMocks.enrich.mockResolvedValue({ processed: 1, totalCost: 0, failures: 0 });
+    rpcMocks.embed.mockResolvedValue({ total: 1, embedded: 1, model: 'text-embedding-3-small' });
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.clearAllMocks();
@@ -81,22 +99,35 @@ describe('SessionDetail', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('shows both Quick and Detailed enrich buttons when enrichmentLevel is 0', () => {
+  it('shows Quick, Detailed, Deep, and Embed controls when enrichmentLevel is 0', () => {
     renderDetail(BASE_SESSION);
     expect(screen.getByText('Quick (L1)')).toBeInTheDocument();
     expect(screen.getByText('Detailed (L2)')).toBeInTheDocument();
+    expect(screen.getByText('Deep (L3)')).toBeInTheDocument();
+    expect(screen.getByText('Embed')).toBeInTheDocument();
   });
 
   it('hides Quick (L1) button when enrichmentLevel is 1', () => {
     renderDetail({ ...BASE_SESSION, enrichmentLevel: 1 as const });
     expect(screen.queryByText('Quick (L1)')).not.toBeInTheDocument();
     expect(screen.getByText('Detailed (L2)')).toBeInTheDocument();
+    expect(screen.getByText('Deep (L3)')).toBeInTheDocument();
   });
 
-  it('hides enrichment controls entirely when enrichmentLevel is 2', () => {
+  it('shows only Deep (L3) enrichment when enrichmentLevel is 2', () => {
     renderDetail({ ...BASE_SESSION, enrichmentLevel: 2 as const });
     expect(screen.queryByText('Quick (L1)')).not.toBeInTheDocument();
     expect(screen.queryByText('Detailed (L2)')).not.toBeInTheDocument();
+    expect(screen.getByText('Deep (L3)')).toBeInTheDocument();
+    expect(screen.getByText('Embed')).toBeInTheDocument();
+  });
+
+  it('hides enrichment actions after L3 but keeps embedding available', () => {
+    renderDetail({ ...BASE_SESSION, enrichmentLevel: 3 as const });
+    expect(screen.queryByText('Quick (L1)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Detailed (L2)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Deep (L3)')).not.toBeInTheDocument();
+    expect(screen.getByText('Embed')).toBeInTheDocument();
   });
 
   it('still shows enrichment controls when enrichmentFailed is true (retry path)', () => {
@@ -111,16 +142,31 @@ describe('SessionDetail', () => {
   });
 
   it('shows enrichment error after failed mutation', async () => {
-    const fetchMock = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/enrich')) {
-        return Promise.resolve({ ok: false, json: () => Promise.resolve({ error: 'fail' }) });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(BASE_SESSION) });
-    });
-    renderDetail(BASE_SESSION, vi.fn(), fetchMock);
+    rpcMocks.enrich.mockRejectedValueOnce(new Error('fail'));
+    renderDetail(BASE_SESSION);
 
     fireEvent.click(screen.getByText('Quick (L1)'));
     await waitFor(() => expect(screen.getByText('Enrichment failed')).toBeInTheDocument());
+  });
+
+  it('dispatches L3 enrichment from the Deep control', async () => {
+    renderDetail({ ...BASE_SESSION, enrichmentLevel: 2 as const });
+
+    fireEvent.click(screen.getByText('Deep (L3)'));
+
+    await waitFor(() => expect(rpcMocks.enrich).toHaveBeenCalledWith({
+      ids: [42],
+      level: 3,
+      confirmed: undefined,
+    }));
+  });
+
+  it('dispatches embedding generation from the Embed control', async () => {
+    renderDetail(BASE_SESSION);
+
+    fireEvent.click(screen.getByText('Embed'));
+
+    await waitFor(() => expect(rpcMocks.embed).toHaveBeenCalledWith({ ids: [42] }));
   });
 
   it('renders tags when present', () => {
