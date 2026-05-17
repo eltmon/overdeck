@@ -2088,29 +2088,31 @@ const postAgentsRoute = HttpRouter.add(
       throw err;
     }
 
-    const stackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, workspacePath }));
-    if (!stackHealth.healthy) {
-      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_stack_unhealthy', {
-        issueId,
-        reasons: stackHealth.reasons,
-        lastObserved: stackHealth.lastObserved,
-      }));
-      if (!allowHost) {
-        emitActivityEntry({
-          source: 'dashboard',
-          level: 'error',
-          issueId: issueId.toUpperCase(),
-          message: `agent-spawn-blocked-stack-unhealthy: ${issueId.toUpperCase()}`,
-          details: stackHealth.reasons.join('; '),
-        });
-        return jsonResponse({
-          success: false,
-          blocked: true,
-          skipped: true,
-          error: `Workspace docker stack for ${issueId} is not healthy: ${stackHealth.reasons.join('; ')}`,
-          hint: `Run 'pan workspace rebuild ${issueId}' or use the CLI break-glass path: pan start ${issueId} --host.`,
-          stackHealth,
-        }, { status: 422 });
+    if (!isRemote) {
+      const stackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, workspacePath }));
+      if (!stackHealth.healthy) {
+        yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_stack_unhealthy', {
+          issueId,
+          reasons: stackHealth.reasons,
+          lastObserved: stackHealth.lastObserved,
+        }));
+        if (!allowHost) {
+          emitActivityEntry({
+            source: 'dashboard',
+            level: 'error',
+            issueId: issueId.toUpperCase(),
+            message: `agent-spawn-blocked-stack-unhealthy: ${issueId.toUpperCase()}`,
+            details: stackHealth.reasons.join('; '),
+          });
+          return jsonResponse({
+            success: false,
+            blocked: true,
+            skipped: true,
+            error: `Workspace docker stack for ${issueId} is not healthy: ${stackHealth.reasons.join('; ')}`,
+            hint: `Run 'pan workspace rebuild ${issueId}' or use the CLI break-glass path: pan start ${issueId} --host.`,
+            stackHealth,
+          }, { status: 422 });
+        }
       }
     }
 

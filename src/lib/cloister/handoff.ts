@@ -152,6 +152,7 @@ async function performKillAndSpawn(
       model: options.targetModel,
       role: 'work',
       prompt,
+      allowHost: state.hostOverride === true,
     });
 
     // Preserve accumulated cost without reintroducing legacy phase/complexity routing fields.

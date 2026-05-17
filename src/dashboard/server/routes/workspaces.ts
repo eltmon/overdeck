@@ -121,6 +121,7 @@ const execFileAsync = promisify(execFile);
 const MAX_PROBED_PORTS = 5;
 const MAX_PROBED_CONTAINERS = 10;
 const PROBE_CACHE_TTL_MS = 30_000;
+const PROBE_CACHE_MAX_ENTRIES = MAX_PROBED_CONTAINERS * MAX_PROBED_PORTS * 20;
 
 function safeToISOString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -136,18 +137,45 @@ interface ProbeCacheEntry {
 
 const probeCache = new Map<string, ProbeCacheEntry>();
 
+function pruneProbeCache(
+  now = Date.now(),
+  runningNames?: Set<string>,
+  shouldPruneContainer?: (containerName: string) => boolean,
+): void {
+  for (const [key, entry] of probeCache) {
+    const containerName = key.split('::', 1)[0] ?? '';
+    const expired = now - entry.cachedAt > PROBE_CACHE_TTL_MS;
+    const absent = runningNames && shouldPruneContainer?.(containerName) === true && !runningNames.has(containerName);
+    if (expired || absent) {
+      probeCache.delete(key);
+    }
+  }
+
+  while (probeCache.size > PROBE_CACHE_MAX_ENTRIES) {
+    const oldestKey = probeCache.keys().next().value;
+    if (typeof oldestKey !== 'string') break;
+    probeCache.delete(oldestKey);
+  }
+}
+
 function getCachedProbe(key: string): { healthy: boolean; reason?: string } | undefined {
   const entry = probeCache.get(key);
   if (!entry) return undefined;
-  if (Date.now() - entry.cachedAt > PROBE_CACHE_TTL_MS) {
+  const now = Date.now();
+  if (now - entry.cachedAt > PROBE_CACHE_TTL_MS) {
     probeCache.delete(key);
     return undefined;
   }
+  probeCache.delete(key);
+  probeCache.set(key, entry);
   return entry.result;
 }
 
 function setCachedProbe(key: string, result: { healthy: boolean; reason?: string }): void {
-  probeCache.set(key, { result, cachedAt: Date.now() });
+  const now = Date.now();
+  pruneProbeCache(now);
+  probeCache.set(key, { result, cachedAt: now });
+  pruneProbeCache(now);
 }
 
 export function getWorkspacePathForIssue(projectPath: string, rawIssueId: string): { parsedIssueId: string; workspacePath: string } {
@@ -709,6 +737,11 @@ async function getContainerStatusAsync(
     const runningNames = Object.entries(result)
       .filter(([, info]) => info.running)
       .map(([name]) => name);
+    pruneProbeCache(
+      Date.now(),
+      new Set(runningNames),
+      (containerName) => containerName.toLowerCase().includes(search),
+    );
 
     if (runningNames.length > 0) {
       let inspectByName = new Map<string, any>();
