@@ -1898,11 +1898,16 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     ? await getPiLauncherFields(agentId, selectedModel)
     : {};
 
-  // Create a conversation record for specialist roles so their JSONL sessions
-  // are persisted and viewable in the dashboard. The orchestrator (review
-  // without subRole) does not get a conversation — it manages sub-role
-  // reviewers and its output is visible through the work agent's panel.
-  const isSpecialistRole = (role === 'review' && options.subRole) || role === 'test' || role === 'ship';
+  // Create a conversation record for every specialist role — sub-role reviewers,
+  // the review orchestrator/synthesizer, test, and ship. The row is the index
+  // the dashboard reads to (a) locate the JSONL via claude_session_id, (b) carry
+  // pre-JSONL state (spawn_error, fork_status), and (c) let the
+  // conversation-lifecycle service compute sessionAlive from real tmux liveness
+  // instead of from the agent state machine's status field, which can lag.
+  // Excluding the orchestrator here previously forced AgentOutputPanel to
+  // synthesize a Conversation whose sessionAlive came from `agent.status`, and
+  // stale snapshots made active synthesizers render as "Starting…".
+  const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
   let sessionId: string | undefined;
   if (isSpecialistRole) {
     sessionId = randomUUID();

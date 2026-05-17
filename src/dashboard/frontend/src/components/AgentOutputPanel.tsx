@@ -9,10 +9,11 @@
  */
 
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { XTerminal } from './XTerminal';
 import { ActivityView } from './CommandDeck/ActivityView';
 import { ConversationPanel } from './chat/ConversationPanel';
-import type { Conversation } from './CommandDeck/ConversationList';
+import { fetchConversations, type Conversation } from './CommandDeck/ConversationList';
 import { useDashboardStore, selectAgentById } from '../lib/store';
 import styles from './CommandDeck/styles/command-deck.module.css';
 
@@ -70,13 +71,39 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
     setTerminalFailed(false);
   }
 
-  // Determine specialist running state from agent snapshot status
-  // (the old /api/specialists/:project/:issueId/:type/status endpoint was retired in PAN-1048)
-  const specialistIsRunning = specialist && agent?.status === 'running';
+  // Liveness for specialist agents must come from the conversation-lifecycle
+  // service's tmux poll (the ground-truth probe), NOT from `agent.status` —
+  // the latter is a state-machine field that lags during dashboard restarts,
+  // snapshot refresh gaps, and recovery cycles, and made active synthesizers
+  // render as "Starting…" when the snapshot was stale.
+  //
+  // Every specialist role now gets a row in the conversations table at spawn
+  // time (see src/lib/agents.ts spawnRun), so we pull the real row from the
+  // shared `['conversations']` cache that ConversationList already maintains.
+  const { data: conversations = [] } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: fetchConversations,
+    enabled: !!specialist,
+  });
+  const realConversation = useMemo<Conversation | null>(() => {
+    if (!specialist) return null;
+    return conversations.find(c => c.name === agentId) ?? null;
+  }, [specialist, conversations, agentId]);
 
-  // Build a Conversation object for specialists so ConversationPanel can fetch the JSONL
+  // If the row hasn't appeared yet (brief race after spawn, or pre-fix
+  // orchestrator agents that were spawned before this code shipped), fall
+  // back to a presence signal that's stronger than `agent.status`: the
+  // snapshot knowing about the agent at all is evidence the spawn happened.
+  const specialistIsRunning = specialist && (
+    realConversation ? realConversation.sessionAlive : !!agent
+  );
+
+  // Build a Conversation object for ConversationPanel. Prefer the real row;
+  // synthesize only when we have no row yet so the JSONL replay path still has
+  // something to render.
   const specialistConversation = useMemo<Conversation | null>(() => {
     if (!specialist) return null;
+    if (realConversation) return realConversation;
     return {
       id: 0,
       name: agentId,
@@ -87,10 +114,10 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
       createdAt: new Date().toISOString(),
       endedAt: specialistIsRunning ? null : new Date().toISOString(),
       lastAttachedAt: null,
-      sessionAlive: specialistIsRunning ?? false,
-      sessionFile: null, // Backend resolves this from the specialist .session file
+      sessionAlive: !!specialistIsRunning,
+      sessionFile: null,
     };
-  }, [specialist, agentId, specialistIsRunning]);
+  }, [specialist, agentId, realConversation, specialistIsRunning]);
 
   // Role runs are identified by the persisted role field; the planning- prefix is
   // retained only as a fallback for sessions missing from the dashboard store.
