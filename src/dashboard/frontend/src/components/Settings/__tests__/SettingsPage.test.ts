@@ -86,7 +86,16 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('ttsSaveInFlightRef');
     expect(SETTINGS_PAGE_SOURCE).toContain('const latest = await fetchSettings()');
     expect(SETTINGS_PAGE_SOURCE).toContain('saveMutation.mutateAsync(buildTtsAutosavePayload(latest, snapshot))');
-    expect(SETTINGS_PAGE_SOURCE).toContain('queueTtsSave(nextTts)');
+    expect(SETTINGS_PAGE_SOURCE).toContain('scheduleTtsSave(nextTts, options.debounce === true)');
+  });
+
+  it('debounces high-frequency TTS autosaves', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('const TTS_AUTOSAVE_DEBOUNCE_MS = 400');
+    expect(SETTINGS_PAGE_SOURCE).toContain('ttsSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)');
+    expect(SETTINGS_PAGE_SOURCE).toContain('setTimeout(() => {');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })');
   });
 });
 

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { chmod, mkdir, readFile, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { getPanopticonHome } from './paths.js';
 
@@ -33,7 +33,8 @@ export async function loadVoices(): Promise<TtsVoice[]> {
 export async function saveVoices(voices: TtsVoice[]): Promise<void> {
   const filePath = getTtsVoicesPath();
   await mkdir(dirname(filePath), { recursive: true });
-  await writeFile(filePath, `${JSON.stringify(voices, null, 2)}\n`, 'utf-8');
+  await writeFile(filePath, `${JSON.stringify(voices, null, 2)}\n`, { encoding: 'utf-8', mode: 0o600 });
+  await chmod(filePath, 0o600);
 }
 
 export async function addVoice(voice: Omit<TtsVoice, 'id' | 'createdAt'>): Promise<TtsVoice> {
@@ -53,6 +54,13 @@ export async function deleteVoice(id: string): Promise<boolean> {
   if (remaining.length === voices.length) return false;
   await saveVoices(remaining);
   return true;
+}
+
+export async function clearVoices(): Promise<number> {
+  const voices = await loadVoices();
+  if (voices.length === 0) return 0;
+  await saveVoices([]);
+  return voices.length;
 }
 
 export async function findVoiceById(id: string): Promise<TtsVoice | undefined> {

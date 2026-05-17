@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   checkTtsHealth,
+  clearTtsVoices,
   createTtsVoice,
   EXTRACT_EMBEDDING_TIMEOUT_MS,
   extractTtsEmbedding,
@@ -164,6 +165,13 @@ describe('TTS voice routes helpers', () => {
     await expect(removeTtsVoice('missing', { deleteVoice })).resolves.toBe(false);
     expect(deleteVoice).toHaveBeenNthCalledWith(1, 'voice-1');
     expect(deleteVoice).toHaveBeenNthCalledWith(2, 'missing');
+  });
+
+  it('clears all voices in one store operation', async () => {
+    const clearVoices = vi.fn(async () => 2);
+
+    await expect(clearTtsVoices({ clearVoices })).resolves.toBe(2);
+    expect(clearVoices).toHaveBeenCalledTimes(1);
   });
 });
 

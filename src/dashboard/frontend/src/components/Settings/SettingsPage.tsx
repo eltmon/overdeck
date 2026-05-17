@@ -241,6 +241,8 @@ const TTS_EVENT_KEYS = [
   'readyForMerge',
 ] as const;
 
+const TTS_AUTOSAVE_DEBOUNCE_MS = 400;
+
 const ACTIVITY_SOURCE_OPTIONS = [
   'merge-agent',
   'review-specialist',
@@ -320,6 +322,7 @@ export function SettingsPage() {
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
   const pendingTtsSaveRef = useRef<TtsConfig | null>(null);
   const ttsSaveInFlightRef = useRef(false);
+  const ttsSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollToSection = useCallback((id: string) => {
     setActiveSection(id);
@@ -417,6 +420,29 @@ export function SettingsPage() {
     })();
   }, [saveMutation]);
 
+  const scheduleTtsSave = useCallback((next: TtsConfig, debounce = false) => {
+    if (ttsSaveDebounceRef.current) {
+      clearTimeout(ttsSaveDebounceRef.current);
+      ttsSaveDebounceRef.current = null;
+    }
+
+    if (!debounce) {
+      queueTtsSave(next);
+      return;
+    }
+
+    pendingTtsSaveRef.current = next;
+    ttsSaveDebounceRef.current = setTimeout(() => {
+      ttsSaveDebounceRef.current = null;
+      const snapshot = pendingTtsSaveRef.current;
+      if (snapshot) queueTtsSave(snapshot);
+    }, TTS_AUTOSAVE_DEBOUNCE_MS);
+  }, [queueTtsSave]);
+
+  useEffect(() => () => {
+    if (ttsSaveDebounceRef.current) clearTimeout(ttsSaveDebounceRef.current);
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -479,7 +505,7 @@ export function SettingsPage() {
     });
   };
 
-  const handleTtsConfigChange = (patch: Partial<TtsConfig>) => {
+  const handleTtsConfigChange = (patch: Partial<TtsConfig>, options: { debounce?: boolean } = {}) => {
     const nextTts = {
       ...formData.tts,
       ...patch,
@@ -489,7 +515,7 @@ export function SettingsPage() {
       tts: nextTts,
     };
     setFormData(next);
-    queueTtsSave(nextTts);
+    scheduleTtsSave(nextTts, options.debounce === true);
   };
 
   const handleTtsVoiceMapChange = (eventKey: string, voiceId: string) => {
@@ -1270,7 +1296,7 @@ export function SettingsPage() {
             max={1}
             step={0.05}
             value={ttsVolume}
-            onChange={(e) => handleTtsConfigChange({ volume: Number(e.target.value) })}
+            onChange={(e) => handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })}
             disabled={saveMutation.isPending}
             className="w-40 accent-primary disabled:opacity-50"
           />
@@ -1288,7 +1314,7 @@ export function SettingsPage() {
             min={0.1}
             step={0.1}
             value={ttsRate}
-            onChange={(e) => handleTtsConfigChange({ rate: Number(e.target.value) })}
+            onChange={(e) => handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })}
             disabled={saveMutation.isPending}
             className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
           />
@@ -1303,7 +1329,7 @@ export function SettingsPage() {
             min={1}
             step={1}
             value={ttsMaxChars}
-            onChange={(e) => handleTtsConfigChange({ maxChars: Number(e.target.value) })}
+            onChange={(e) => handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })}
             disabled={saveMutation.isPending}
             className="w-24 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary disabled:opacity-50"
           />

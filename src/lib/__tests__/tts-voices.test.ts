@@ -1,9 +1,10 @@
-import { mkdtemp, readFile, rm } from 'fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   addVoice,
+  clearVoices,
   deleteVoice,
   findVoiceById,
   findVoiceByName,
@@ -63,6 +64,15 @@ describe('tts voices library', () => {
     await expect(loadVoices()).resolves.toEqual([second]);
   });
 
+  it('clears all voices with one library rewrite', async () => {
+    await addVoice({ name: 'First', kind: 'preset', presetName: 'vivian' });
+    await addVoice({ name: 'Second', kind: 'clone', embedding: [0.1, 0.2] });
+
+    await expect(clearVoices()).resolves.toBe(2);
+    await expect(clearVoices()).resolves.toBe(0);
+    await expect(loadVoices()).resolves.toEqual([]);
+  });
+
   it('finds voices by id and name after addVoice', async () => {
     const voice = await addVoice({ name: 'Status', kind: 'clone', embedding: [1, 2, 3] });
 
@@ -72,7 +82,7 @@ describe('tts voices library', () => {
     await expect(findVoiceByName('Missing')).resolves.toBeUndefined();
   });
 
-  it('saves embeddings in the separate voice library file', async () => {
+  it('saves embeddings in the separate voice library file with owner-only permissions', async () => {
     await saveVoices([
       {
         id: 'voice-id',
@@ -84,7 +94,9 @@ describe('tts voices library', () => {
     ]);
 
     const written = await readFile(getTtsVoicesPath(), 'utf-8');
+    const mode = (await stat(getTtsVoicesPath())).mode & 0o777;
     expect(written).toContain('"embedding"');
     expect(written).toContain('0.2');
+    expect(mode).toBe(0o600);
   });
 });

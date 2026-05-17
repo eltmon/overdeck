@@ -27,6 +27,14 @@ async function deleteTtsVoice(id: string): Promise<void> {
   }
 }
 
+async function clearTtsVoices(): Promise<void> {
+  const res = await fetch('/api/tts/voices', { method: 'DELETE' });
+  if (!res.ok) {
+    const message = await res.text().catch(() => 'Failed to clear TTS voices');
+    throw new Error(message || 'Failed to clear TTS voices');
+  }
+}
+
 async function requireTtsSpoken(res: Response, fallback: string): Promise<void> {
   const body = await res.json().catch(() => undefined) as { spoken?: unknown; result?: unknown; error?: unknown } | undefined;
   const error = typeof body?.error === 'string' ? body.error : undefined;
@@ -79,9 +87,7 @@ export function SavedVoicesTab() {
   });
 
   const clearMutation = useMutation({
-    mutationFn: async (voiceIds: string[]) => {
-      for (const voiceId of voiceIds) await deleteTtsVoice(voiceId);
-    },
+    mutationFn: clearTtsVoices,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['tts-voices'] });
       toast.success('Saved voices cleared');
@@ -105,7 +111,7 @@ export function SavedVoicesTab() {
       variant: 'destructive',
       confirmLabel: 'Clear All',
     });
-    if (confirmed) clearMutation.mutate(voices.map((voice) => voice.id));
+    if (confirmed) clearMutation.mutate();
   };
 
   return (

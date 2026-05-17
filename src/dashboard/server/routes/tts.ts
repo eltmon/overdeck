@@ -5,6 +5,7 @@ import { getTtsRuntimeConfig } from '../services/tts-runtime-config.js';
 import { validateOrigin } from './origin-validation.js';
 import {
   addVoice as addStoredVoice,
+  clearVoices as clearStoredVoices,
   deleteVoice as deleteStoredVoice,
   loadVoices as loadStoredVoices,
   type TtsVoice,
@@ -61,6 +62,7 @@ export interface TtsVoiceStore {
   loadVoices?: () => Promise<TtsVoice[]>;
   addVoice?: (voice: CreateTtsVoiceInput) => Promise<TtsVoice>;
   deleteVoice?: (id: string) => Promise<boolean>;
+  clearVoices?: () => Promise<number>;
 }
 
 export interface SpeakTtsResponse {
@@ -194,6 +196,11 @@ export async function removeTtsVoice(id: string, store: TtsVoiceStore = {}): Pro
   return deleteVoice(id);
 }
 
+export async function clearTtsVoices(store: TtsVoiceStore = {}): Promise<number> {
+  const clearVoices = store.clearVoices ?? clearStoredVoices;
+  return clearVoices();
+}
+
 export async function speakTts(input: ResolveAndSpeakOptions, deps: SpeakTtsDeps = {}): Promise<SpeakTtsResponse> {
   const result = deps.resolveAndSpeak
     ? await deps.resolveAndSpeak(input)
@@ -291,6 +298,19 @@ const postTtsVoiceRoute = HttpRouter.add(
   }),
 );
 
+const deleteTtsVoicesRoute = HttpRouter.add(
+  'DELETE',
+  '/api/tts/voices',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = originErrorResponse(request);
+    if (originError) return originError;
+
+    const deleted = yield* Effect.promise(() => clearTtsVoices());
+    return jsonResponse({ deleted });
+  }),
+);
+
 const deleteTtsVoiceRoute = HttpRouter.add(
   'DELETE',
   '/api/tts/voices/:id',
@@ -348,6 +368,7 @@ export const ttsRouteLayer = Layer.mergeAll(
   getTtsHealthRoute,
   getTtsVoicesRoute,
   postTtsVoiceRoute,
+  deleteTtsVoicesRoute,
   deleteTtsVoiceRoute,
   postTtsSpeakRoute,
   postExtractEmbeddingRoute,

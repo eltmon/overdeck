@@ -37,6 +37,9 @@ describe('SavedVoicesTab', () => {
           ]),
         } as Response);
       }
+      if (url === '/api/tts/voices' && init?.method === 'DELETE') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ deleted: 2 }) } as Response);
+      }
       if (url === '/api/tts/voices/voice-preset' || url === '/api/tts/voices/voice-design') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ deleted: true }) } as Response);
       }
@@ -111,7 +114,7 @@ describe('SavedVoicesTab', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to play voice: TTS did not speak (muted)'));
   });
 
-  it('confirms before clearing all saved voices', async () => {
+  it('confirms before clearing all saved voices in one request', async () => {
     const user = userEvent.setup();
     renderTab();
 
@@ -120,8 +123,9 @@ describe('SavedVoicesTab', () => {
     await user.click(screen.getByRole('button', { name: 'Clear All' }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/tts/voices/voice-preset', { method: 'DELETE' });
-      expect(global.fetch).toHaveBeenCalledWith('/api/tts/voices/voice-design', { method: 'DELETE' });
+      expect(global.fetch).toHaveBeenCalledWith('/api/tts/voices', { method: 'DELETE' });
     });
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/tts/voices/voice-preset', { method: 'DELETE' });
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/tts/voices/voice-design', { method: 'DELETE' });
   });
 });
