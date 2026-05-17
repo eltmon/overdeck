@@ -180,6 +180,7 @@ Skips the planning agent entirely. Synthesizes a minimal vBRIEF from the issue t
     1. **node-pty** (`@homebridge/node-pty-prebuilt-multiarch`) is a native Node addon. Under Bun's addon compat layer the PTY spawns but exits with code 0 immediately, breaking `/ws/terminal` for all workspaces.
     2. **Circular ESM deps** — the dashboard source has circular imports that Bun tolerates but Node.js strict ESM rejects, so tsx/source-mode also fails under Node.
   - `pan up` handles this automatically — it runs `dist/dashboard/server.js` under Node 22. Run `npm run build` first if the dist is stale.
+  - See [docs/PANOPTICON_DEV_SOP.md](docs/PANOPTICON_DEV_SOP.md) for startup, mode switching, restart guarantees, and failure triage.
 - **Issue tracking**: GitHub Issues (PAN-XXX prefix), NOT Linear
 - **Package manager**: Bun (bun.lock, `bun install`, `bun add`)
 - **Workspaces**: Bun workspaces — `packages/contracts`, `src/dashboard/server`, `src/dashboard/frontend`
