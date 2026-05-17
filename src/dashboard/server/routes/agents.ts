@@ -2450,7 +2450,7 @@ const postAgentsRoute = HttpRouter.add(
           containersReady,
         }));
 
-        if (!containersReady) {
+        if (!containersReady && !allowHost) {
           const earlyAgentId = agentSessionName;
           const earlyStateDir = join(homedir(), '.panopticon', 'agents', earlyAgentId);
           yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));

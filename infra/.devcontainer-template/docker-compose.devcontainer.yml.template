@@ -19,7 +19,7 @@ services:
       - devnet
       - panopticon
 
-  # Init service: runs bun install + server build once for all workspaces
+  # Init service: runs filtered bun install + server build once for all workspaces
   # Frontend and server depend on this completing successfully
   init:
     build:
@@ -33,7 +33,7 @@ services:
     command: >
       sh -c "
         echo 'Installing dependencies...' &&
-        bun install &&
+        bun install --filter '@panctl/cli' --filter '@panctl/contracts' --filter '@panopticon/pi-extension' --filter 'panopticon-server' --filter 'panopticon-dashboard' &&
         echo 'Rebuilding native Node.js addons...' &&
         npm rebuild better-sqlite3 2>&1 &&
         echo 'Building contracts...' &&
