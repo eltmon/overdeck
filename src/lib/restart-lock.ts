@@ -63,6 +63,40 @@ function writeLockFile(path: string, holder: RestartLockHolder): void {
   }
 }
 
+function acquireStaleBreaker(path: string): RestartLockHandle | null {
+  const breakerPath = `${path}.break`;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const holder = { pid: process.pid, ts: Date.now(), caller: 'stale restart lock breaker' };
+    try {
+      writeLockFile(breakerPath, holder);
+      let released = false;
+      return {
+        release() {
+          if (released) return;
+          released = true;
+          try {
+            if (matchesHolder(readHolderFromPath(breakerPath), holder)) {
+              unlinkSync(breakerPath);
+            }
+          } catch (error) {
+            if (!isErrnoException(error) || error.code !== 'ENOENT') throw error;
+          }
+        },
+      };
+    } catch (error) {
+      if (!isErrnoException(error) || error.code !== 'EEXIST') throw error;
+      const existing = readHolderFromPath(breakerPath);
+      if (!existing || !isStale(existing, Date.now())) return null;
+      try {
+        unlinkSync(breakerPath);
+      } catch (unlinkError) {
+        if (!isErrnoException(unlinkError) || unlinkError.code !== 'ENOENT') throw unlinkError;
+      }
+    }
+  }
+  return null;
+}
+
 function matchesHolder(actual: RestartLockHolder | null, expected: RestartLockHolder): boolean {
   return actual?.pid === expected.pid && actual.ts === expected.ts && actual.caller === expected.caller;
 }
@@ -95,12 +129,20 @@ export function acquireRestartLock(caller: string): RestartLockHandle | null {
       };
     } catch (error) {
       if (!isErrnoException(error) || error.code !== 'EEXIST') throw error;
-      const existing = readHolderFromPath(path);
-      if (existing && !isStale(existing, Date.now())) return null;
+      const breaker = acquireStaleBreaker(path);
+      if (!breaker) return null;
       try {
-        unlinkSync(path);
-      } catch (unlinkError) {
-        if (!isErrnoException(unlinkError) || unlinkError.code !== 'ENOENT') throw unlinkError;
+        const existing = readHolderFromPath(path);
+        if (existing && !isStale(existing, Date.now())) return null;
+        if (existing) {
+          try {
+            unlinkSync(path);
+          } catch (unlinkError) {
+            if (!isErrnoException(unlinkError) || unlinkError.code !== 'ENOENT') throw unlinkError;
+          }
+        }
+      } finally {
+        breaker.release();
       }
     }
   }

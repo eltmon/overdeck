@@ -851,6 +851,8 @@ program
             env: {
               ...process.env,
               DASHBOARD_PORT: String(dashboardPort),
+              API_PORT: String(dashboardApiPort),
+              PORT: String(dashboardApiPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
             },
@@ -906,6 +908,8 @@ program
             env: {
               ...process.env,
               DASHBOARD_PORT: String(dashboardPort),
+              API_PORT: String(dashboardApiPort),
+              PORT: String(dashboardApiPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
             },

@@ -21,8 +21,9 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../lib/restart-lock.js';
 import { readPlatformConfig } from '../lib/platform-lifecycle.js';
-import { readWatchdogConfig, SupervisorWatchdog } from './watchdog.js';
+import { readWatchdogConfig, SupervisorWatchdog, type SpawnRestartResult } from './watchdog.js';
 
 const SUPERVISOR_PORT = Number(process.env.PANOPTICON_SUPERVISOR_PORT || 3012);
 const PAN_BINARY = process.env.PANOPTICON_PAN_BINARY || 'pan';
@@ -40,27 +41,88 @@ function log(msg: string): void {
   }
 }
 
-function sendJson(res: http.ServerResponse, status: number, body: unknown): void {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+function allowedOrigin(req: http.IncomingMessage): string | null {
+  const origin = req.headers.origin;
+  if (typeof origin !== 'string') return null;
+  const allowed = new Set([
+    `http://localhost:${platformConfig.dashboardPort}`,
+    `http://127.0.0.1:${platformConfig.dashboardPort}`,
+    `https://${platformConfig.traefikDomain}`,
+  ]);
+  return allowed.has(origin) ? origin : null;
+}
+
+function applyCors(req: http.IncomingMessage, res: http.ServerResponse): void {
+  const origin = allowedOrigin(req);
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'content-type');
+}
+
+function sendJson(req: http.IncomingMessage, res: http.ServerResponse, status: number, body: unknown): void {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json');
+  applyCors(req, res);
   res.end(JSON.stringify(body));
 }
 
-function spawnRestart(): { pid: number | null; error: string | null } {
+function heldRestartMessage(): string {
+  const holder = readRestartLockHolder();
+  const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
+  return `restart in progress (${heldBy})`;
+}
+
+async function spawnRestart(options: { restartLockHeld?: boolean } = {}): Promise<SpawnRestartResult> {
+  let lock: RestartLockHandle | null = null;
+  if (!options.restartLockHeld) {
+    lock = acquireRestartLock('supervisor restart');
+    if (!lock) return { pid: null, error: heldRestartMessage() };
+  }
+
+  const release = () => {
+    lock?.release();
+    lock = null;
+  };
+
   try {
     const child = spawn(PAN_BINARY, ['restart', '--dashboard'], {
       detached: true,
       stdio: 'ignore',
+      env: {
+        ...process.env,
+        PANOPTICON_RESTART_LOCK_HELD: '1',
+        PANOPTICON_SKIP_SUPERVISOR_CYCLE: '1',
+      },
     });
-    child.on('error', (err) => {
-      log(`spawn error: ${err.message}`);
+
+    let spawnErrorMessage: string | null = null;
+    const done = new Promise<void>((resolve, reject) => {
+      child.once('error', (err) => {
+        spawnErrorMessage = err.message;
+        log(`spawn error: ${err.message}`);
+        release();
+        reject(err);
+      });
+      child.once('close', (code, signal) => {
+        release();
+        if (code === 0) {
+          resolve();
+          return;
+        }
+        reject(new Error(`pan restart --dashboard exited ${code ?? `via signal ${signal ?? 'unknown'}`}`));
+      });
     });
+    done.catch(() => {});
+
+    await new Promise((resolve) => setImmediate(resolve));
+    if (spawnErrorMessage) return { pid: null, error: spawnErrorMessage };
     child.unref();
-    return { pid: child.pid ?? null, error: null };
+    return { pid: child.pid ?? null, error: null, done };
   } catch (err) {
+    release();
     const msg = err instanceof Error ? err.message : String(err);
     return { pid: null, error: msg };
   }
@@ -73,38 +135,37 @@ const watchdog = new SupervisorWatchdog({
 });
 
 const server = http.createServer((req, res) => {
-  // CORS preflight — the supervisor lives on a different origin than the dashboard
   if (req.method === 'OPTIONS') {
     res.statusCode = 204;
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'content-type');
+    applyCors(req, res);
     res.end();
     return;
   }
 
   if (req.method === 'GET' && req.url === '/health') {
-    sendJson(res, 200, { ok: true, port: SUPERVISOR_PORT });
+    sendJson(req, res, 200, { ok: true, port: SUPERVISOR_PORT });
     return;
   }
 
   if (req.method === 'GET' && req.url === '/status') {
-    sendJson(res, 200, watchdog.status());
+    sendJson(req, res, 200, watchdog.status());
     return;
   }
 
   if (req.method === 'POST' && req.url === '/restart-dashboard') {
-    log('received restart-dashboard request');
-    const result = spawnRestart();
-    if (result.error) {
-      sendJson(res, 500, { error: result.error });
-      return;
-    }
-    sendJson(res, 202, { ok: true, pid: result.pid });
+    void (async () => {
+      log('received restart-dashboard request');
+      const result = await spawnRestart();
+      if (result.error) {
+        sendJson(req, res, 500, { error: result.error });
+        return;
+      }
+      sendJson(req, res, 202, { ok: true, pid: result.pid });
+    })();
     return;
   }
 
-  sendJson(res, 404, { error: 'not found' });
+  sendJson(req, res, 404, { error: 'not found' });
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {

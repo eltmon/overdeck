@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { acquireRestartLock } from '../lib/restart-lock.js';
 import { writeRestartStatus } from '../lib/restart-status.js';
@@ -23,7 +24,8 @@ export interface SupervisorWatchdogStatus {
   lastError: string | null;
 }
 
-export type SpawnRestart = () => { pid: number | null; error: string | null };
+export type SpawnRestartResult = { pid: number | null; error: string | null; done?: Promise<void> };
+export type SpawnRestart = (options?: { restartLockHeld?: boolean }) => SpawnRestartResult | Promise<SpawnRestartResult>;
 export type LogFn = (msg: string) => void;
 
 type FetchFn = (input: string, init: { signal: AbortSignal }) => Promise<{ ok: boolean; status: number; statusText: string }>;
@@ -71,12 +73,12 @@ function readWatchdogPersistentState(): WatchdogPersistentState {
   }
 }
 
-function writeWatchdogPersistentState(state: WatchdogPersistentState): void {
+async function writeWatchdogPersistentState(state: WatchdogPersistentState): Promise<void> {
   const path = watchdogStatePath();
-  mkdirSync(dirname(path), { recursive: true });
+  await mkdir(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
-  renameSync(tmp, path);
+  await writeFile(tmp, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  await rename(tmp, path);
 }
 
 export function parsePositiveIntEnv(value: string | undefined, fallback: number): number {
@@ -171,13 +173,16 @@ export class SupervisorWatchdog {
       if (!response.ok) {
         throw new Error(`health check returned ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`);
       }
+      const shouldPersistClear = this.state.restartAttempts.length > 0 || this.state.gaveUp;
       this.state.healthy = true;
       this.state.lastCheck = checkedAt;
       this.state.consecutiveFailures = 0;
       this.state.restartAttempts = [];
       this.state.gaveUp = false;
       this.state.lastError = null;
-      this.persistState();
+      if (shouldPersistClear) {
+        await this.persistState();
+      }
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -189,12 +194,12 @@ export class SupervisorWatchdog {
 
     if (this.state.consecutiveFailures < this.config.failThreshold) return;
     this.pruneRestartAttempts(startedAt);
-    this.persistState();
+    await this.persistState();
     if (this.state.gaveUp) return;
 
     if (this.state.restartAttempts.length >= this.config.maxRestarts) {
       this.state.gaveUp = true;
-      this.persistState();
+      await this.persistState();
       const error = `WATCHDOG GIVING UP — manual intervention required: ${this.state.lastError ?? 'dashboard health check failed'}`;
       this.log(error);
       writeRestartStatus({
@@ -214,24 +219,38 @@ export class SupervisorWatchdog {
       this.log('watchdog restart skipped: restart lock held');
       return;
     }
-    lock.release();
 
     this.state.restartAttempts.push(startedAt);
-    this.persistState();
+    await this.persistState();
     this.log(`watchdog triggering dashboard restart after ${this.state.consecutiveFailures} consecutive failures`);
-    const result = this.spawnRestart();
+
+    let restartError: string | null = null;
+    try {
+      const result = await this.spawnRestart({ restartLockHeld: true });
+      if (result.error) {
+        restartError = result.error;
+      } else {
+        this.log(`watchdog spawned pan restart --dashboard${result.pid ? ` (pid ${result.pid})` : ''}`);
+        if (result.done) {
+          await result.done;
+        }
+      }
+    } catch (error) {
+      restartError = error instanceof Error ? error.message : String(error);
+    } finally {
+      lock.release();
+    }
+
     writeRestartStatus({
       ts: new Date(startedAt).toISOString(),
       trigger: 'watchdog',
-      success: result.error === null,
-      error: result.error ?? undefined,
+      success: restartError === null,
+      error: restartError ?? undefined,
       durationMs: this.now() - startedAt,
       attempts: this.state.restartAttempts.length,
     });
-    if (result.error) {
-      this.log(`watchdog restart spawn failed: ${result.error}`);
-    } else {
-      this.log(`watchdog spawned pan restart --dashboard${result.pid ? ` (pid ${result.pid})` : ''}`);
+    if (restartError) {
+      this.log(`watchdog restart failed: ${restartError}`);
     }
   }
 
@@ -240,8 +259,8 @@ export class SupervisorWatchdog {
     this.state.restartAttempts = this.state.restartAttempts.filter((ts) => ts >= cutoff);
   }
 
-  private persistState(): void {
-    writeWatchdogPersistentState({
+  private async persistState(): Promise<void> {
+    await writeWatchdogPersistentState({
       restartAttempts: this.state.restartAttempts,
       gaveUp: this.state.gaveUp,
     });

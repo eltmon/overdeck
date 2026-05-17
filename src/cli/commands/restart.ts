@@ -22,6 +22,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
 
+import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../../lib/restart-lock.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
 
 import {
@@ -92,6 +93,8 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: { disableD
     env: {
       ...process.env,
       DASHBOARD_PORT: String(config.dashboardPort),
+      API_PORT: String(config.dashboardApiPort),
+      PORT: String(config.dashboardApiPort),
       PANOPTICON_MODE: 'production',
       ...(opts?.disableDeacon ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
     },
@@ -110,6 +113,15 @@ function recordRestartStatus(startedAt: number, success: boolean, error?: string
   });
 }
 
+function reportHeldRestartLock(startedAt: number): void {
+  const holder = readRestartLockHolder();
+  const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
+  const error = `restart in progress (${heldBy})`;
+  console.error(chalk.yellow(error));
+  recordRestartStatus(startedAt, false, error);
+  process.exitCode = 2;
+}
+
 export async function restartCommand(options: RestartOptions): Promise<void> {
   const startedAt = Date.now();
   const scope = resolveScope(options);
@@ -125,15 +137,27 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
   console.log(chalk.bold(`Restarting Panopticon (${scope})...\n`));
 
+  const lockInherited = process.env.PANOPTICON_RESTART_LOCK_HELD === '1';
+  const needsRestartLock = (scope === 'dashboard' || scope === 'full') && !lockInherited;
+  let restartLock: RestartLockHandle | null = null;
+  if (needsRestartLock) {
+    restartLock = acquireRestartLock('pan restart');
+    if (!restartLock) {
+      reportHeldRestartLock(startedAt);
+      return;
+    }
+  }
+
   try {
     switch (scope) {
       case 'dashboard': {
-        // Cycle the supervisor so it picks up the latest bundle.
-        try {
-          const { stopSupervisorProcess, startSupervisorProcess } = await import('../../lib/supervisor.js');
-          stopSupervisorProcess();
-          startSupervisorProcess();
-        } catch { /* non-fatal */ }
+        if (process.env.PANOPTICON_SKIP_SUPERVISOR_CYCLE !== '1') {
+          try {
+            const { stopSupervisorProcess, startSupervisorProcess } = await import('../../lib/supervisor.js');
+            stopSupervisorProcess();
+            startSupervisorProcess();
+          } catch { /* non-fatal */ }
+        }
 
         await restartDashboard(config, () => spawnDashboardDetached(config, { disableDeacon }), {
           healthTimeoutMs,
@@ -184,6 +208,8 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       console.error(chalk.red('✗ Restart failed:'), message);
     }
     process.exit(1);
+  } finally {
+    restartLock?.release();
   }
 }
 
