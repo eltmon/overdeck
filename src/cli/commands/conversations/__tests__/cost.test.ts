@@ -150,6 +150,33 @@ describe('costAction', () => {
     }
   });
 
+  it('dashboard workspace aggregate matches CLI workspace JSON semantics', async () => {
+    await seedSessions();
+    const { costAction } = await import('../cost.js');
+    const { aggregateDiscoveredSessionCostBy } = await import('../../../../lib/database/discovered-sessions-db.js');
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg) => logs.push(String(msg ?? '')));
+
+    await costAction({ json: true, by: 'workspace' });
+
+    const cliRows = JSON.parse(logs.join('')) as Array<{
+      key: string;
+      sessions: number;
+      inputTokens: number;
+      outputTokens: number;
+      estimatedCost: number;
+    }>;
+    const dashboardRows = aggregateDiscoveredSessionCostBy('workspace').entries.map((entry) => ({
+      key: entry.key,
+      sessions: entry.sessionCount,
+      inputTokens: entry.totalTokensIn,
+      outputTokens: entry.totalTokensOut,
+      estimatedCost: entry.totalCost,
+    }));
+
+    expect(dashboardRows).toEqual(cliRows);
+  });
+
   it('total row matches sum of all session costs', async () => {
     await seedSessions();
     const { costAction } = await import('../cost.js');

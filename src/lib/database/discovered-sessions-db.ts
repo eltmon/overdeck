@@ -377,27 +377,45 @@ export function aggregateDiscoveredSessionCost(filter: ConversationFilter = {}):
   return row;
 }
 
-export function aggregateDiscoveredSessionCostBy(groupBy: 'workspace' | 'model'): {
-  entries: Array<{ key: string; totalCost: number; sessionCount: number }>;
+export function aggregateDiscoveredSessionCostBy(groupBy: 'workspace' | 'model' | 'day' | 'month', filter: ConversationFilter = {}): {
+  groupBy: 'workspace' | 'model' | 'day' | 'month';
+  entries: Array<{ key: string; totalCost: number; sessionCount: number; totalTokensIn: number; totalTokensOut: number }>;
   grandTotal: number;
+  totalTokensIn: number;
+  totalTokensOut: number;
 } {
   const db = getDatabase();
-  const column = groupBy === 'workspace' ? 'workspace_path' : 'primary_model';
+  const { where, params } = buildFilterSql({ ...filter, limit: undefined, offset: undefined });
+  const keyExpr = (() => {
+    switch (groupBy) {
+      case 'workspace': return `COALESCE(workspace_path, '(unknown)')`;
+      case 'model': return `COALESCE(primary_model, '(unknown)')`;
+      case 'day': return `COALESCE(substr(last_ts, 1, 10), '(unknown)')`;
+      case 'month': return `COALESCE(substr(last_ts, 1, 7), '(unknown)')`;
+    }
+  })();
   const rows = db
     .prepare(
       `SELECT
-         COALESCE(${column}, 'unknown') AS key,
+         ${keyExpr} AS key,
          COALESCE(SUM(estimated_cost), 0) AS totalCost,
-         COUNT(*) AS sessionCount
+         COUNT(*) AS sessionCount,
+         COALESCE(SUM(token_input), 0) AS totalTokensIn,
+         COALESCE(SUM(token_output), 0) AS totalTokensOut
        FROM discovered_sessions
-       GROUP BY COALESCE(${column}, 'unknown')
+       ${where}
+       GROUP BY ${keyExpr}
        ORDER BY totalCost DESC`,
     )
-    .all() as Array<{ key: string; totalCost: number; sessionCount: number }>;
-  const total = db
-    .prepare(`SELECT COALESCE(SUM(estimated_cost), 0) AS grandTotal FROM discovered_sessions`)
-    .get() as { grandTotal: number };
-  return { entries: rows, grandTotal: total.grandTotal };
+    .all(...params) as Array<{ key: string; totalCost: number; sessionCount: number; totalTokensIn: number; totalTokensOut: number }>;
+  const total = aggregateDiscoveredSessionCost(filter);
+  return {
+    groupBy,
+    entries: rows,
+    grandTotal: total.totalCost,
+    totalTokensIn: total.totalTokensIn,
+    totalTokensOut: total.totalTokensOut,
+  };
 }
 
 // ─── Write operations ─────────────────────────────────────────────────────────

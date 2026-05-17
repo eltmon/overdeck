@@ -325,7 +325,8 @@ const searchRoute = HttpRouter.add(
     const config = yield* Effect.promise(() => getConversationsConfigAsync());
     return yield* Effect.promise(async () => {
       try {
-        const result = await runDashboardDbJob<SearchResult>('searchSessions', {
+        const operation = semantic ? 'searchSessionsSemantic' : 'searchSessions';
+        const result = await runDashboardDbJob<SearchResult>(operation, {
           q: semantic ? undefined : q,
           semanticQuery: semantic ? q : undefined,
           similarTo,

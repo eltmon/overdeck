@@ -25,6 +25,7 @@ import {
   DASHBOARD_SESSION_COOKIE,
   _resetDashboardSessionTokenForTests,
   dashboardSessionCookieHeader,
+  hasDashboardAuthHeaders,
   hasDashboardInternalToken,
   rejectUnauthorizedDashboardRequest,
   rejectUnauthorizedDashboardSessionMintRequest,
@@ -219,6 +220,12 @@ describe('dashboard conversation route guards', () => {
   it('allows discovered-session requests with dashboard session cookie', () => {
     const response = rejectUnauthorizedDashboardRequest(request({ cookie: `${DASHBOARD_SESSION_COOKIE}=test-browser-session-token` }));
     expect(response).toBeNull();
+  });
+
+  it('allows raw WebSocket header auth with dashboard session cookie or internal token', () => {
+    expect(hasDashboardAuthHeaders({ cookie: `${DASHBOARD_SESSION_COOKIE}=test-browser-session-token` })).toBe(true);
+    expect(hasDashboardAuthHeaders({ [INTERNAL_TOKEN_HEADER]: 'test-dashboard-token' })).toBe(true);
+    expect(hasDashboardAuthHeaders({ cookie: `${DASHBOARD_SESSION_COOKIE}=wrong` })).toBe(false);
   });
 
   it('does not treat dashboard session cookies as internal-token proof', () => {

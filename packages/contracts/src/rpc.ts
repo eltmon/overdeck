@@ -4,6 +4,7 @@ import * as RpcGroup from "effect/unstable/rpc/RpcGroup"
 import { DomainEvent } from "./events"
 import {
   AgentStatus,
+  ConversationCostSummary,
   ConversationFilter,
   DashboardSnapshot,
   DiscoveredSessionSnapshot,
@@ -26,6 +27,7 @@ export const WS_METHODS = {
   enrichSessions: "pan.enrichSessions",
   embedSessions: "pan.embedSessions",
   getConversationCost: "pan.getConversationCost",
+  getConversationCostByWorkspace: "pan.getConversationCostByWorkspace",
   getConversationStats: "pan.getConversationStats",
 
   // Streaming subscriptions
@@ -415,6 +417,13 @@ export const GetConversationCostRpc = Rpc.make(WS_METHODS.getConversationCost, {
   error: PanRpcError,
 })
 
+/** Aggregate workspace cost totals for the full filtered corpus */
+export const GetConversationCostByWorkspaceRpc = Rpc.make(WS_METHODS.getConversationCostByWorkspace, {
+  payload: ConversationFilter,
+  success: ConversationCostSummary,
+  error: PanRpcError,
+})
+
 /** Discovery index statistics */
 export const GetConversationStatsRpc = Rpc.make(WS_METHODS.getConversationStats, {
   payload: Schema.Struct({}),
@@ -452,6 +461,7 @@ export const PanRpcGroup = RpcGroup.make(
   EnrichSessionsRpc,
   EmbedSessionsRpc,
   GetConversationCostRpc,
+  GetConversationCostByWorkspaceRpc,
   GetConversationStatsRpc,
 )
 export type PanRpcGroup = typeof PanRpcGroup

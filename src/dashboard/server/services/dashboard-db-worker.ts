@@ -24,6 +24,7 @@ type DashboardDbOperation =
   | 'aggregateDiscoveredSessionCost'
   | 'aggregateDiscoveredSessionCostBy'
   | 'searchSessions'
+  | 'searchSessionsSemantic'
   | 'scanConversations'
   | 'enrichSessions'
   | 'embedSessions';
@@ -32,6 +33,14 @@ interface DashboardDbRequest {
   id: string;
   operation: DashboardDbOperation;
   payload: unknown;
+}
+
+function aggregateDiscoveredSessionCostByPayload(payload: unknown) {
+  if (typeof payload === 'string') {
+    return aggregateDiscoveredSessionCostBy(payload as 'workspace' | 'model' | 'day' | 'month');
+  }
+  const input = payload as { groupBy?: 'workspace' | 'model' | 'day' | 'month'; filter?: ConversationFilter } | undefined;
+  return aggregateDiscoveredSessionCostBy(input?.groupBy ?? 'workspace', input?.filter ?? {});
 }
 
 async function runJob(
@@ -58,8 +67,9 @@ async function runJob(
     case 'aggregateDiscoveredSessionCost':
       return aggregateDiscoveredSessionCost(payload as ConversationFilter);
     case 'aggregateDiscoveredSessionCostBy':
-      return aggregateDiscoveredSessionCostBy(payload as 'workspace' | 'model' | 'day' | 'tier');
+      return aggregateDiscoveredSessionCostByPayload(payload);
     case 'searchSessions':
+    case 'searchSessionsSemantic':
       return searchSessions(payload as SearchQuery);
     case 'scanConversations':
       return scan({ ...(payload as ScanOptions), onProgress: emitProgress });

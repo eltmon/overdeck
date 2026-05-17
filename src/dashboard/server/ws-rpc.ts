@@ -586,7 +586,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           const pagination = normalizeConversationPagination(input.limit, input.offset);
           const filter = { ...normalizeConversationFilter(input), ...pagination };
           try {
-            const result = await runDashboardDbJob<SearchResult>('searchSessions', {
+            const operation = input.semantic === true ? 'searchSessionsSemantic' : 'searchSessions';
+            const result = await runDashboardDbJob<SearchResult>(operation, {
               q: input.semantic === true ? undefined : input.query,
               semanticQuery: input.semantic === true ? input.query : undefined,
               similarTo: input.similarTo,
@@ -717,6 +718,12 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
       [WS_METHODS.getConversationCost]: (input) =>
         Effect.promise(async () => runDashboardDbJob('aggregateDiscoveredSessionCost', normalizeConversationFilter(input))),
+
+      [WS_METHODS.getConversationCostByWorkspace]: (input) =>
+        Effect.promise(async () => runDashboardDbJob('aggregateDiscoveredSessionCostBy', {
+          groupBy: 'workspace',
+          filter: normalizeConversationFilter(input),
+        })),
 
       [WS_METHODS.getConversationStats]: () =>
         Effect.promise(async () => runDashboardDbJob('getDiscoveredStats')),

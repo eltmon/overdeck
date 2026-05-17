@@ -25,21 +25,26 @@ export type DashboardDbOperation =
   | 'aggregateDiscoveredSessionCost'
   | 'aggregateDiscoveredSessionCostBy'
   | 'searchSessions'
+  | 'searchSessionsSemantic'
   | 'scanConversations'
   | 'enrichSessions'
   | 'embedSessions';
 
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
-type WorkerLane = 'read' | 'long';
+type WorkerLane = 'read' | 'long' | 'semantic';
 
 interface PendingJob {
+  lane: WorkerLane;
+  operation: DashboardDbOperation;
   resolve: (value: unknown) => void;
   reject: (err: Error) => void;
   progressListeners: Set<ProgressHandler>;
   progressChain: Promise<void>;
+  timeout: NodeJS.Timeout | null;
 }
 
 interface SharedJob {
+  lane: WorkerLane;
   promise: Promise<unknown>;
   progressListeners: Set<ProgressHandler>;
 }
@@ -60,15 +65,18 @@ interface WorkerResponse {
 }
 
 const MAX_PENDING_JOBS = 32;
+const SEMANTIC_SEARCH_TIMEOUT_MS = Number.parseInt(process.env['PANOPTICON_SEMANTIC_SEARCH_TIMEOUT_MS'] ?? '15000', 10);
 const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
   'scanConversations',
   'enrichSessions',
   'embedSessions',
+  'searchSessionsSemantic',
 ]);
 
-const workers: Record<WorkerLane, Worker | null> = { read: null, long: null };
+const workers: Record<WorkerLane, Worker | null> = { read: null, long: null, semantic: null };
 const pending = new Map<string, PendingJob>();
 const sharedJobs = new Map<string, SharedJob>();
+let latestSemanticJobId: string | null = null;
 
 function workerScriptUrl(): URL {
   return import.meta.url.endsWith('.ts')
@@ -76,10 +84,17 @@ function workerScriptUrl(): URL {
     : new URL('./dashboard-db-worker.js', import.meta.url);
 }
 
-function failPending(err: Error): void {
-  for (const job of pending.values()) job.reject(err);
-  pending.clear();
-  sharedJobs.clear();
+function failPendingForLane(lane: WorkerLane, err: Error): void {
+  for (const [id, job] of pending.entries()) {
+    if (job.lane !== lane) continue;
+    if (job.timeout) clearTimeout(job.timeout);
+    job.reject(err);
+    pending.delete(id);
+  }
+  for (const [key, job] of sharedJobs.entries()) {
+    if (job.lane === lane) sharedJobs.delete(key);
+  }
+  if (lane === 'semantic') latestSemanticJobId = null;
 }
 
 function stableStringify(value: unknown): string {
@@ -97,7 +112,23 @@ function coalescingKey(operation: DashboardDbOperation, payload: unknown): strin
 }
 
 function workerLane(operation: DashboardDbOperation): WorkerLane {
+  if (operation === 'searchSessionsSemantic') return 'semantic';
   return COALESCED_OPERATIONS.has(operation) ? 'long' : 'read';
+}
+
+function cancelOlderSemanticSearches(): void {
+  if (!latestSemanticJobId && !workers.semantic) return;
+  failPendingForLane('semantic', new Error('Superseded by a newer semantic search'));
+  void workers.semantic?.terminate();
+  workers.semantic = null;
+}
+
+function aggregateDiscoveredSessionCostByPayload(payload: unknown) {
+  if (typeof payload === 'string') {
+    return aggregateDiscoveredSessionCostBy(payload as 'workspace' | 'model' | 'day' | 'month');
+  }
+  const input = payload as { groupBy?: 'workspace' | 'model' | 'day' | 'month'; filter?: ConversationFilter } | undefined;
+  return aggregateDiscoveredSessionCostBy(input?.groupBy ?? 'workspace', input?.filter ?? {});
 }
 
 function getWorker(lane: WorkerLane): Worker {
@@ -124,6 +155,8 @@ function getWorker(lane: WorkerLane): Worker {
     }
 
     pending.delete(message.id);
+    if (job.timeout) clearTimeout(job.timeout);
+    if (job.lane === 'semantic' && latestSemanticJobId === message.id) latestSemanticJobId = null;
 
     if (message.ok) {
       job.progressChain.then(() => job.resolve(message.result), job.reject);
@@ -143,13 +176,13 @@ function getWorker(lane: WorkerLane): Worker {
   });
 
   worker.on('error', (err) => {
-    failPending(err);
-    workers[lane] = null;
+    failPendingForLane(lane, err);
+    if (workers[lane] === worker) workers[lane] = null;
   });
 
   worker.on('exit', (code) => {
-    if (code !== 0) failPending(new Error(`Dashboard database ${lane} worker exited with code ${code}`));
-    workers[lane] = null;
+    if (code !== 0) failPendingForLane(lane, new Error(`Dashboard database ${lane} worker exited with code ${code}`));
+    if (workers[lane] === worker) workers[lane] = null;
   });
 
   return worker;
@@ -175,8 +208,9 @@ async function runInline(
     case 'aggregateDiscoveredSessionCost':
       return aggregateDiscoveredSessionCost(payload as ConversationFilter);
     case 'aggregateDiscoveredSessionCostBy':
-      return aggregateDiscoveredSessionCostBy(payload as 'workspace' | 'model' | 'day' | 'tier');
+      return aggregateDiscoveredSessionCostByPayload(payload);
     case 'searchSessions':
+    case 'searchSessionsSemantic':
       return searchSessions(payload as SearchQuery);
     case 'scanConversations':
       return scan({ ...(payload as ScanOptions), onProgress });
@@ -209,21 +243,42 @@ export function runDashboardDbJob<T>(
 
   const id = randomUUID();
   const lane = workerLane(operation);
+  if (operation === 'searchSessionsSemantic') {
+    cancelOlderSemanticSearches();
+    latestSemanticJobId = id;
+  }
   const progressListeners = new Set<ProgressHandler>();
   if (onProgress) progressListeners.add(onProgress);
 
   const promise = new Promise<T>((resolve, reject) => {
+    const timeout = operation === 'searchSessionsSemantic'
+      ? setTimeout(() => {
+          const job = pending.get(id);
+          if (!job) return;
+          pending.delete(id);
+          for (const [sharedKey, sharedJob] of sharedJobs.entries()) {
+            if (sharedJob.promise === promise) sharedJobs.delete(sharedKey);
+          }
+          if (latestSemanticJobId === id) latestSemanticJobId = null;
+          reject(new Error('Semantic search timed out'));
+          void workers.semantic?.terminate();
+          workers.semantic = null;
+        }, Number.isFinite(SEMANTIC_SEARCH_TIMEOUT_MS) ? SEMANTIC_SEARCH_TIMEOUT_MS : 15000)
+      : null;
     pending.set(id, {
+      lane,
+      operation,
       resolve: resolve as (value: unknown) => void,
       reject,
       progressListeners,
       progressChain: Promise.resolve(),
+      timeout,
     });
     getWorker(lane).postMessage({ id, operation, payload });
   });
 
   if (key) {
-    sharedJobs.set(key, { promise, progressListeners });
+    sharedJobs.set(key, { lane, promise, progressListeners });
     promise.then(
       () => sharedJobs.delete(key),
       () => sharedJobs.delete(key),

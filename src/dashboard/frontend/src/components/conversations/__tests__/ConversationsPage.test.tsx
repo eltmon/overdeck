@@ -12,12 +12,14 @@ const rpcMocks = vi.hoisted(() => ({
   search: vi.fn(),
   stats: vi.fn(),
   cost: vi.fn(),
+  costByWorkspace: vi.fn(),
   scan: vi.fn(),
   request: vi.fn((fn: (client: Record<string, unknown>) => unknown) => fn({
     'pan.listDiscoveredSessions': rpcMocks.list,
     'pan.searchConversations': rpcMocks.search,
     'pan.getConversationStats': rpcMocks.stats,
     'pan.getConversationCost': rpcMocks.cost,
+    'pan.getConversationCostByWorkspace': rpcMocks.costByWorkspace,
     'pan.scanConversations': rpcMocks.scan,
   })),
 }));
@@ -77,6 +79,16 @@ const LIST_RESPONSE = { sessions: [SESSION_STUB], count: 1, total: 1 };
 const SEARCH_RESPONSE = { sessions: [SESSION_STUB], total: 1, mode: 'fts', durationMs: 2 };
 const STATS_RESPONSE = { total: 10, enriched: 5, embedded: 2, managedCount: 3 };
 const COST_RESPONSE = { sessionCount: 10, totalCost: 0.25, totalTokensIn: 1000, totalTokensOut: 2000 };
+const WORKSPACE_COST_RESPONSE = {
+  groupBy: 'workspace' as const,
+  entries: [
+    { key: '/home/user/Projects/alpha', totalCost: 0.20, sessionCount: 8, totalTokensIn: 800, totalTokensOut: 1600 },
+    { key: '/home/user/Projects/beta', totalCost: 0.05, sessionCount: 2, totalTokensIn: 200, totalTokensOut: 400 },
+  ],
+  grandTotal: 0.25,
+  totalTokensIn: 1000,
+  totalTokensOut: 2000,
+};
 
 function makeClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -99,6 +111,7 @@ describe('ConversationsPage endpoint selection', () => {
     rpcMocks.search.mockResolvedValue(SEARCH_RESPONSE);
     rpcMocks.stats.mockResolvedValue(STATS_RESPONSE);
     rpcMocks.cost.mockResolvedValue(COST_RESPONSE);
+    rpcMocks.costByWorkspace.mockResolvedValue(WORKSPACE_COST_RESPONSE);
     rpcMocks.scan.mockResolvedValue({ inserted: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0 });
   });
 
@@ -113,6 +126,16 @@ describe('ConversationsPage endpoint selection', () => {
 
     expect(rpcMocks.list).toHaveBeenCalledWith({ limit: 50, offset: 0 });
     expect(rpcMocks.search).not.toHaveBeenCalled();
+  });
+
+  it('renders workspace cost aggregates from the backend full-corpus RPC', async () => {
+    renderPage(makeClient());
+
+    await waitFor(() => expect(screen.getByTestId('workspace-cost-breakdown')).toBeInTheDocument());
+
+    expect(rpcMocks.costByWorkspace).toHaveBeenCalledWith({});
+    expect(screen.getByTestId('workspace-cost-breakdown')).toHaveTextContent('/home/user/Projects/alpha $0.2000');
+    expect(screen.getByTestId('workspace-cost-breakdown')).toHaveTextContent('/home/user/Projects/beta $0.0500');
   });
 
   it('calls the search RPC when query is typed', async () => {

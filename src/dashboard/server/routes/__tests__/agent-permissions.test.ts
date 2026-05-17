@@ -24,6 +24,9 @@ describe('agent permission helpers', () => {
     delete process.env.DASHBOARD_URL;
     delete process.env.API_PORT;
     delete process.env.PORT;
+    delete process.env.PANOPTICON_TRUSTED_ORIGINS;
+    delete process.env.PANOPTICON_TRAEFIK_ENABLED;
+    delete process.env.PANOPTICON_TRAEFIK_DOMAIN;
     _resetTrustedOriginsForTests();
   });
 
@@ -36,6 +39,30 @@ describe('agent permission helpers', () => {
       },
     } as any);
     expect(result).toEqual({ ok: false, error: 'Invalid origin' });
+  });
+
+  it('trusts the configured Traefik dashboard origin', () => {
+    process.env.PORT = '3011';
+    process.env.PANOPTICON_TRAEFIK_ENABLED = '1';
+    process.env.PANOPTICON_TRAEFIK_DOMAIN = 'pan.localhost';
+    _resetTrustedOriginsForTests();
+
+    const result = validateOrigin({
+      method: 'POST',
+      headers: {
+        origin: 'https://pan.localhost',
+      },
+    } as any);
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('trusts explicit comma-separated dashboard origins', () => {
+    process.env.PANOPTICON_TRUSTED_ORIGINS = 'https://pan.localhost, https://admin.pan.localhost/path';
+    _resetTrustedOriginsForTests();
+
+    expect(validateOrigin({ method: 'POST', headers: { origin: 'https://pan.localhost' } } as any)).toEqual({ ok: true });
+    expect(validateOrigin({ method: 'POST', headers: { origin: 'https://admin.pan.localhost' } } as any)).toEqual({ ok: true });
   });
 
   it('normalizes null inputPreview and rejects oversized permission payloads', () => {

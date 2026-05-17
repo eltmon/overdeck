@@ -116,21 +116,18 @@ async function sampleJsonlLines(filePath: string, tier: EnrichmentTier, options:
     rl.on('line', (line) => {
       const trimmed = line.trim();
       if (!trimmed || capped) return;
-      if (options.fullTranscript) {
-        l3Lines.push(trimmed);
-        return;
-      }
       const sampled = boundedLine(trimmed);
       seen++;
 
-      if (tier === 3) {
-        bytes += Buffer.byteLength(trimmed, 'utf8');
-        if (l3Lines.length >= L3_MAX_LINES || bytes > L3_MAX_BYTES) {
+      if (tier === 3 || options.fullTranscript) {
+        const nextBytes = bytes + Buffer.byteLength(sampled, 'utf8');
+        if (l3Lines.length >= L3_MAX_LINES || nextBytes > L3_MAX_BYTES) {
           capped = true;
           rl.close();
           stream.destroy();
           return;
         }
+        bytes = nextBytes;
         l3Lines.push(sampled);
         return;
       }

@@ -133,6 +133,52 @@ describe('discovered-sessions-db', () => {
     expect(expensive[0].jsonlPath).toBe('/expensive.jsonl');
   });
 
+  it('aggregateDiscoveredSessionCostBy groups the full filtered corpus by workspace', async () => {
+    const { upsertDiscoveredSession, aggregateDiscoveredSessionCostBy } = await import(
+      '../discovered-sessions-db.js'
+    );
+    upsertDiscoveredSession({
+      jsonlPath: '/alpha-1.jsonl',
+      workspacePath: '/work/alpha',
+      estimatedCost: 0.04,
+      tokenInput: 100,
+      tokenOutput: 20,
+      lastTs: '2026-01-10T00:00:00Z',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: '/alpha-2.jsonl',
+      workspacePath: '/work/alpha',
+      estimatedCost: 0.03,
+      tokenInput: 50,
+      tokenOutput: 10,
+      lastTs: '2026-01-11T00:00:00Z',
+    });
+    upsertDiscoveredSession({
+      jsonlPath: '/beta.jsonl',
+      workspacePath: '/work/beta',
+      estimatedCost: 0.20,
+      tokenInput: 500,
+      tokenOutput: 200,
+      lastTs: '2025-12-01T00:00:00Z',
+    });
+
+    const summary = aggregateDiscoveredSessionCostBy('workspace', { since: '2026-01-01T00:00:00Z' });
+
+    expect(summary.groupBy).toBe('workspace');
+    expect(summary.grandTotal).toBeCloseTo(0.07);
+    expect(summary.totalTokensIn).toBe(150);
+    expect(summary.totalTokensOut).toBe(30);
+    expect(summary.entries).toEqual([
+      {
+        key: '/work/alpha',
+        totalCost: 0.07,
+        sessionCount: 2,
+        totalTokensIn: 150,
+        totalTokensOut: 30,
+      },
+    ]);
+  });
+
   it('findDiscoveredSessions filters by tags', async () => {
     const { upsertDiscoveredSession, updateEnrichment, findDiscoveredSessions } = await import(
       '../discovered-sessions-db.js'

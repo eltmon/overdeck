@@ -60,6 +60,22 @@ interface CostResponse {
   totalTokensOut: number;
 }
 
+interface WorkspaceCostEntry {
+  key: string;
+  totalCost: number;
+  sessionCount: number;
+  totalTokensIn: number;
+  totalTokensOut: number;
+}
+
+interface WorkspaceCostResponse {
+  groupBy: 'workspace' | 'model' | 'day' | 'month';
+  entries: readonly WorkspaceCostEntry[];
+  grandTotal: number;
+  totalTokensIn: number;
+  totalTokensOut: number;
+}
+
 interface SearchResponse {
   sessions: DiscoveredSession[];
   total: number;
@@ -277,6 +293,12 @@ async function fetchCost(params: URLSearchParams): Promise<CostResponse> {
   );
 }
 
+async function fetchWorkspaceCost(params: URLSearchParams): Promise<WorkspaceCostResponse> {
+  return getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.getConversationCostByWorkspace](filterPayload(params)),
+  );
+}
+
 async function triggerScan(): Promise<ScanResult> {
   return getTransport().request((client) =>
     (client as PanRpcProtocolClient)[WS_METHODS.scanConversations]({ mode: 'system' }),
@@ -352,6 +374,12 @@ export function ConversationsPage() {
     staleTime: 30_000,
   });
 
+  const { data: workspaceCost } = useQuery({
+    queryKey: ['discovered-sessions-cost-workspace', filterParams.toString()],
+    queryFn: () => fetchWorkspaceCost(filterParams),
+    staleTime: 30_000,
+  });
+
   const scanMutation = useMutation({
     mutationFn: triggerScan,
     onSuccess: () => {
@@ -366,9 +394,12 @@ export function ConversationsPage() {
     : (listData?.sessions ?? []);
 
   const selected = selectedId != null ? sessions.find((s) => s.id === selectedId) ?? null : null;
+  const workspaceCostEntries = workspaceCost?.entries ?? [];
   const facetOptions = {
     models: countFacetValues(sessions.map((s) => s.primaryModel)),
-    workspaces: countFacetValues(sessions.map((s) => s.workspacePath), sessions.map((s) => s.estimatedCost)),
+    workspaces: workspaceCostEntries.length > 0
+      ? workspaceCostEntries.map((entry) => ({ value: entry.key, count: entry.sessionCount, cost: entry.totalCost }))
+      : countFacetValues(sessions.map((s) => s.workspacePath), sessions.map((s) => s.estimatedCost)),
     tags: countFacetValues(sessions.flatMap((s) => s.tags)),
     tools: countFacetValues(sessions.flatMap((s) => s.toolsUsed)),
     files: countFacetValues(sessions.flatMap((s) => s.filesTouched)),
@@ -413,6 +444,17 @@ export function ConversationsPage() {
             <span><span className="text-green-400 font-mono">{stats.enriched}</span> enriched</span>
             <span><span className="text-blue-400 font-mono">{stats.managedCount}</span> managed</span>
             <span><span className="text-amber-300 font-mono">${(cost?.totalCost ?? 0).toFixed(4)}</span> est. cost</span>
+            {workspaceCostEntries.length > 0 && (
+              <span data-testid="workspace-cost-breakdown" className="text-gray-500">
+                Workspace costs:{' '}
+                {workspaceCostEntries.slice(0, 3).map((entry) => (
+                  <span key={entry.key} className="mr-2">
+                    <span className="text-gray-300">{entry.key}</span>{' '}
+                    <span className="text-amber-300 font-mono">${entry.totalCost.toFixed(4)}</span>
+                  </span>
+                ))}
+              </span>
+            )}
           </div>
         )}
 

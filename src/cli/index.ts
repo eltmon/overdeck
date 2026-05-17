@@ -859,6 +859,15 @@ program
       return 'node'; // fall back to PATH
     })();
 
+    const dashboardOriginEnv = traefikEnabled
+      ? {
+          DASHBOARD_URL: `https://${traefikDomain}`,
+          PANOPTICON_TRAEFIK_ENABLED: '1',
+          PANOPTICON_TRAEFIK_DOMAIN: traefikDomain,
+          PANOPTICON_TRUSTED_ORIGINS: [process.env.PANOPTICON_TRUSTED_ORIGINS, `https://${traefikDomain}`].filter(Boolean).join(','),
+        }
+      : {};
+
     if (options.detach) {
       // Run in background
       const { openDashboardLogStdio } = await import('../lib/platform-lifecycle.js');
@@ -867,6 +876,7 @@ program
             stdio: openDashboardLogStdio(),
             env: {
               ...process.env,
+              ...dashboardOriginEnv,
               DASHBOARD_PORT: String(dashboardPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
@@ -922,6 +932,7 @@ program
             stdio: 'inherit',
             env: {
               ...process.env,
+              ...dashboardOriginEnv,
               DASHBOARD_PORT: String(dashboardPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
@@ -1164,7 +1175,8 @@ program
   .description('Start the dashboard server and open it in the default browser (npx launcher)')
   .option('--port <port>', 'Port to listen on', '3011')
   .action(async (options: { port: string }) => {
-    const { spawn, execSync } = await import('child_process');
+    const { spawn } = await import('child_process');
+    const { randomBytes } = await import('crypto');
     const { join, dirname } = await import('path');
     const { fileURLToPath } = await import('url');
     const { existsSync } = await import('fs');
@@ -1188,6 +1200,8 @@ program
     const bundledFrontendIndex = join(__dirname, '..', 'dashboard', 'public', 'index.html');
     const port = parseInt(options.port, 10) || 3011;
     const url = `http://localhost:${port}`;
+    const internalToken = process.env.PANOPTICON_INTERNAL_TOKEN || randomBytes(32).toString('hex');
+    const browserUrl = `${url}#panopticon_token=${encodeURIComponent(internalToken)}`;
 
     if (!existsSync(bundledServer) || !existsSync(bundledFrontendIndex)) {
       console.error(chalk.red('Error: Dashboard bundle not found.'));
@@ -1200,7 +1214,7 @@ program
 
     const server = spawn(process.execPath, [bundledServer], {
       stdio: 'inherit',
-      env: { ...process.env, PORT: String(port) },
+      env: { ...process.env, PORT: String(port), PANOPTICON_INTERNAL_TOKEN: internalToken },
     });
 
     server.on('error', (err) => {
@@ -1213,10 +1227,10 @@ program
       console.log(`  ${chalk.cyan(url)}`);
       try {
         const { openBrowser } = await import('../lib/browser.js');
-        await openBrowser(url);
+        await openBrowser(browserUrl);
       } catch {
         // If openBrowser fails, show URL for manual opening
-        console.log(chalk.dim(`  Open your browser to: ${url}`));
+        console.log(chalk.dim(`  Open your browser to: ${browserUrl}`));
       }
     }, 1_500);
   });

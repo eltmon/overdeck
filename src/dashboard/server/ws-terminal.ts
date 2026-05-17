@@ -22,7 +22,10 @@ import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 import { buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
 import { getReauthSessionToken, invalidateReauthToken } from './routes/codex-auth.js';
+import { hasDashboardAuthHeaders } from './routes/dashboard-auth.js';
+import { validateOriginHeaders } from './routes/origin-validation.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
+import { getInternalToken } from '../../lib/internal-token.js';
 
 type ClientControlMessage =
   | { type: 'attach'; cols: number; rows: number }
@@ -94,6 +97,28 @@ function sendControl(ws: WebSocket, payload: unknown): void {
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(`\u0000${JSON.stringify(payload)}`);
   }
+}
+
+function rejectUpgrade(socket: import('net').Socket, status: number, message: string): void {
+  socket.write(`HTTP/1.1 ${status} ${message}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+  socket.destroy();
+}
+
+function authorizeTerminalUpgrade(request: http.IncomingMessage): { ok: true } | { ok: false; status: number; message: string } {
+  const originCheck = validateOriginHeaders(request.headers, request.method ?? 'GET');
+  if (!originCheck.ok) {
+    return { ok: false, status: 403, message: originCheck.error };
+  }
+
+  if (!getInternalToken()) {
+    return { ok: false, status: 503, message: 'dashboard session token not configured' };
+  }
+
+  if (!hasDashboardAuthHeaders(request.headers)) {
+    return { ok: false, status: 401, message: 'unauthorized' };
+  }
+
+  return { ok: true };
 }
 
 // Fresh-attach snapshot cap. 5000 lines with escape sequences was several megabytes
@@ -182,6 +207,11 @@ export function setupTerminalWebSocket(server: http.Server): void {
     const url = new URL(request.url || '', `http://${request.headers.host}`);
 
     if (url.pathname === '/ws/terminal') {
+      const auth = authorizeTerminalUpgrade(request);
+      if (!auth.ok) {
+        rejectUpgrade(socket, auth.status, auth.message);
+        return;
+      }
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
       });

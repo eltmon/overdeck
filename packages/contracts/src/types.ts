@@ -588,13 +588,17 @@ export type ConversationFilter = typeof ConversationFilter.Type
 
 /** Aggregate cost breakdown for conversations */
 export const ConversationCostSummary = Schema.Struct({
-  groupBy: Schema.Literals(['workspace', 'model']),
+  groupBy: Schema.Literals(['workspace', 'model', 'day', 'month']),
   entries: Schema.Array(Schema.Struct({
     key: Schema.String,
     totalCost: Schema.Number,
     sessionCount: Schema.Number,
+    totalTokensIn: Schema.Number,
+    totalTokensOut: Schema.Number,
   })),
   grandTotal: Schema.Number,
+  totalTokensIn: Schema.Number,
+  totalTokensOut: Schema.Number,
 })
 export type ConversationCostSummary = typeof ConversationCostSummary.Type
 

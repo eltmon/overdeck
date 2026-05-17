@@ -4,6 +4,7 @@ import { HttpServerRequest } from 'effect/unstable/http';
 
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { jsonResponse } from '../http-helpers.js';
+import { getHeaderFromMap, type HeaderMap } from './origin-validation.js';
 
 export const DASHBOARD_SESSION_COOKIE = 'panopticon_session';
 
@@ -22,17 +23,7 @@ function getHeader(
   request: HttpServerRequest.HttpServerRequest,
   name: string,
 ): string | undefined {
-  const headers = request.headers as Record<string, string | string[] | undefined>;
-  const direct = headers[name];
-  if (Array.isArray(direct)) return direct[0];
-  if (direct) return direct;
-
-  const lowerName = name.toLowerCase();
-  for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() !== lowerName) continue;
-    return Array.isArray(value) ? value[0] : value;
-  }
-  return undefined;
+  return getHeaderFromMap(request.headers as HeaderMap, name);
 }
 
 function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
@@ -62,14 +53,14 @@ export function dashboardSessionCookieHeader(options: { secure?: boolean } = {})
   return `${DASHBOARD_SESSION_COOKIE}=${encodeURIComponent(getDashboardSessionToken())}; Path=/; HttpOnly; SameSite=Strict${secure}`;
 }
 
-export function hasDashboardInternalToken(request: HttpServerRequest.HttpServerRequest): boolean {
+export function hasDashboardInternalTokenHeaders(headers: HeaderMap): boolean {
   const expected = getInternalToken();
   if (!expected) return false;
 
-  const internalHeader = getHeader(request, INTERNAL_TOKEN_HEADER);
+  const internalHeader = getHeaderFromMap(headers, INTERNAL_TOKEN_HEADER);
   if (constantTimeTokenEqual(internalHeader, expected)) return true;
 
-  const authorization = getHeader(request, 'authorization');
+  const authorization = getHeaderFromMap(headers, 'authorization');
   if (authorization) {
     const [scheme, token] = authorization.split(/\s+/);
     if (scheme?.toLowerCase() === 'bearer' && constantTimeTokenEqual(token, expected)) return true;
@@ -78,8 +69,16 @@ export function hasDashboardInternalToken(request: HttpServerRequest.HttpServerR
   return false;
 }
 
+export function hasDashboardInternalToken(request: HttpServerRequest.HttpServerRequest): boolean {
+  return hasDashboardInternalTokenHeaders(request.headers as HeaderMap);
+}
+
+export function hasDashboardAuthHeaders(headers: HeaderMap): boolean {
+  return hasDashboardInternalTokenHeaders(headers) || constantTimeTokenEqual(cookieValue(getHeaderFromMap(headers, 'cookie'), DASHBOARD_SESSION_COOKIE), getDashboardSessionToken());
+}
+
 export function hasDashboardAuth(request: HttpServerRequest.HttpServerRequest): boolean {
-  return hasDashboardInternalToken(request) || constantTimeTokenEqual(cookieValue(getHeader(request, 'cookie'), DASHBOARD_SESSION_COOKIE), getDashboardSessionToken());
+  return hasDashboardAuthHeaders(request.headers as HeaderMap);
 }
 
 export function rejectUnauthorizedDashboardSessionMintRequest(
