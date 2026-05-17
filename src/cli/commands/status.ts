@@ -9,6 +9,7 @@ import {
   getWorkspaceStackHealth,
   inferIssueIdFromStackContainerName,
 } from '../../lib/workspace/stack-health.js';
+import { readRestartStatus, type RestartStatus } from '../../lib/restart-status.js';
 
 interface StatusOptions {
   json?: boolean;
@@ -18,6 +19,31 @@ interface StatusOptions {
 
 function issueKey(issueId: string): string {
   return issueId.toUpperCase();
+}
+
+function formatRestartAge(ts: string): string {
+  const ageMs = Date.now() - new Date(ts).getTime();
+  if (!Number.isFinite(ageMs) || ageMs < 0) return 'unknown age';
+  if (ageMs < 60_000) return `${Math.floor(ageMs / 1000)}s ago`;
+  if (ageMs < 3_600_000) return `${Math.floor(ageMs / 60_000)}m ago`;
+  if (ageMs < 86_400_000) return `${Math.floor(ageMs / 3_600_000)}h ago`;
+  return `${Math.floor(ageMs / 86_400_000)}d ago`;
+}
+
+function formatRestartDuration(durationMs: number): string {
+  if (durationMs < 1000) return `${durationMs}ms`;
+  return `${(durationMs / 1000).toFixed(1)}s`;
+}
+
+function renderRestartStatus(status: RestartStatus | null): void {
+  if (!status) return;
+  const marker = status.success ? chalk.green('✓ ok') : chalk.red(status.gaveUp ? '⚠ FAILED — watchdog gave up' : '⚠ FAILED');
+  const base = `Last dashboard restart: ${marker} (${status.trigger}, ${formatRestartAge(status.ts)}, ${formatRestartDuration(status.durationMs)})`;
+  console.log(base);
+  if (status.error) {
+    console.log(`  ${chalk.dim(status.error)}`);
+  }
+  console.log('');
 }
 
 export function readContextPercent(agentId: string): number | null {
@@ -38,6 +64,8 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     await tldrIndexStatusCommand();
     return;
   }
+
+  const restartStatus = readRestartStatus();
 
   // Filter out invalid agent states (missing required fields)
   const agents = listRunningAgents().filter(agent =>
@@ -82,6 +110,8 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     console.log(JSON.stringify(agentsWithShadow, null, 2));
     return;
   }
+
+  renderRestartStatus(restartStatus);
 
   if (agents.length === 0 && brokenStacksWithoutAgent.length === 0) {
     console.log(chalk.dim('No running agents.'));

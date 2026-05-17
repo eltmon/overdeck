@@ -21,10 +21,14 @@ vi.mock('../../../lib/workspace/stack-health.js', () => ({
     return match?.[1]?.toUpperCase() ?? null
   }),
 }))
+vi.mock('../../../lib/restart-status.js', () => ({
+  readRestartStatus: vi.fn(() => null),
+}))
 
 import { statusCommand } from '../status.js'
 import { listRunningAgents } from '../../../lib/agents.js'
 import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js'
+import { readRestartStatus } from '../../../lib/restart-status.js'
 
 describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   let logSpy: ReturnType<typeof vi.spyOn>
@@ -32,6 +36,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([])
+    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(null)
     ;(getWorkspaceStackHealth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       healthy: true,
       reasons: [],
@@ -103,6 +108,44 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
     const out = logSpy.mock.calls.map(c => String(c[0])).join('\n')
     // The first call is the JSON dump — it must contain `"harness":"pi"`.
     expect(out).toMatch(/"harness":\s*"pi"/)
+  })
+
+  it('prints the latest dashboard restart status', async () => {
+    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
+    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      ts: new Date().toISOString(),
+      trigger: 'pan reload',
+      success: false,
+      error: '[dashboard] health check failed',
+      durationMs: 2400,
+      attempts: 1,
+    })
+
+    await statusCommand({} as any)
+
+    const out = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(out).toContain('Last dashboard restart:')
+    expect(out).toContain('pan reload')
+    expect(out).toContain('[dashboard] health check failed')
+  })
+
+  it('shows a prominent marker when the watchdog gave up', async () => {
+    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
+    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      ts: new Date().toISOString(),
+      trigger: 'watchdog',
+      success: false,
+      error: 'restart cap reached',
+      durationMs: 0,
+      attempts: 3,
+      gaveUp: true,
+    })
+
+    await statusCommand({} as any)
+
+    const out = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(out).toContain('⚠ FAILED — watchdog gave up')
+    expect(out).toContain('restart cap reached')
   })
 
   it('prints broken Docker workspace stacks without agent state', async () => {

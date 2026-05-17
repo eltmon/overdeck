@@ -22,6 +22,8 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
 
+import { writeRestartStatus } from '../../lib/restart-status.js';
+
 import {
   openDashboardLogStdio,
   readPlatformConfig,
@@ -97,7 +99,19 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: { disableD
   child.unref();
 }
 
+function recordRestartStatus(startedAt: number, success: boolean, error?: string): void {
+  writeRestartStatus({
+    ts: new Date().toISOString(),
+    trigger: 'pan restart',
+    success,
+    error,
+    durationMs: Date.now() - startedAt,
+    attempts: 1,
+  });
+}
+
 export async function restartCommand(options: RestartOptions): Promise<void> {
+  const startedAt = Date.now();
   const scope = resolveScope(options);
   const config = readPlatformConfig();
   const healthTimeoutMs = options.healthTimeout
@@ -124,6 +138,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
         await restartDashboard(config, () => spawnDashboardDetached(config, { disableDeacon }), {
           healthTimeoutMs,
         });
+        recordRestartStatus(startedAt, true);
         console.log(chalk.green('✓ Dashboard restarted and healthy'));
         console.log(chalk.dim('  CLIProxy, Traefik, and TLDR were left running.'));
         break;
@@ -151,8 +166,14 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       }
     }
   } catch (err) {
+    const message = err instanceof StageError
+      ? `[${err.failure.stage}] ${err.failure.reason}`
+      : (err as Error)?.message || String(err);
+    if (scope === 'dashboard') {
+      recordRestartStatus(startedAt, false, message);
+    }
     if (err instanceof StageError) {
-      console.error(chalk.red(`✗ [${err.failure.stage}] ${err.failure.reason}`));
+      console.error(chalk.red(`✗ ${message}`));
       console.error(
         chalk.dim(
           '  Other components were left in their prior state. ' +
@@ -160,7 +181,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
         ),
       );
     } else {
-      console.error(chalk.red('✗ Restart failed:'), (err as Error)?.message || err);
+      console.error(chalk.red('✗ Restart failed:'), message);
     }
     process.exit(1);
   }
