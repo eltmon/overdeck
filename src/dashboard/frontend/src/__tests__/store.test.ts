@@ -17,6 +17,9 @@ import {
   selectResources,
   selectIssues,
   selectIssuesByCycle,
+  selectMemoryObservations,
+  selectMemoryStatus,
+  selectResetMarkersByScope,
   useDashboardStore,
   type DashboardState,
 } from '../lib/store'
@@ -67,6 +70,11 @@ const emptyState: DashboardState = {
   shadowInferenceByIssueId: {},
   turnDiffSummariesByAgentId: {},
   channelPermissionRequestsById: {},
+  observationsByIssueId: {},
+  statusByIssueId: {},
+  rollupsByIssueId: {},
+  resetMarkersByScopeId: {},
+  healthByIssueId: {},
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -98,6 +106,52 @@ function makeSnapshot(seq = 5): DashboardSnapshot {
 function makeEvent(type: DomainEvent['type'], seq: number, payload: Record<string, unknown> = {}): DomainEvent {
   return { type, sequence: seq, timestamp: new Date().toISOString(), payload } as DomainEvent
 }
+
+function makeObservation(id: string) {
+  return {
+    id,
+    timestamp: '2026-05-16T12:00:00.000Z',
+    projectId: 'panopticon-cli',
+    workspaceId: 'feature-pan-1052',
+    issueId: 'PAN-1052',
+    runId: 'run-1',
+    sessionId: 'session-1',
+    agentRole: 'work',
+    agentHarness: 'claude-code',
+    sourceTranscriptOffset: 1,
+    actionStatus: `Completed ${id}`,
+    narrative: `Narrative ${id}`,
+    summary: `Summary ${id}`,
+    files: [],
+    tags: [],
+    tokens: { prompt: 1, completion: 1, total: 2 },
+    model: 'stub-model',
+  }
+}
+
+const memoryStatus = {
+  name: 'PAN-1052 memory status',
+  headline: 'Memory status updated',
+  summary: 'Memory status summary',
+  goal: 'Exercise memory store slices',
+  phase: 'verifying',
+  accomplished: ['observations'],
+  decided: [],
+  open: [],
+  nextSteps: ['continue'],
+  confidence: 0.9,
+  workingSet: ['src/dashboard/frontend/src/lib/store.ts'],
+  tags: ['memory'],
+} as const
+
+const resetMarker = {
+  id: 'reset-1',
+  scope: 'workspace',
+  scopeId: 'feature-pan-1052',
+  reason: 'reset test',
+  fromTimestamp: '2026-05-16T12:00:00.000Z',
+  createdAt: '2026-05-16T12:00:00.000Z',
+} as const
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/')
@@ -312,6 +366,52 @@ describe('applyEventReducer — resources and activity', () => {
   })
 })
 
+// ─── Memory reducers ──────────────────────────────────────────────────────────
+
+describe('applyEventReducer — memory events', () => {
+  it('stores memory observations by issue through the shared reducer', () => {
+    const observation = makeObservation('obs-1')
+    const next = applyEventReducer(
+      emptyState,
+      makeEvent('memory.observation_created', 11, { observation }),
+    )
+
+    expect(next.observationsByIssueId['PAN-1052']).toEqual([observation])
+    expect(next.sequence).toBe(11)
+  })
+
+  it('caps memory observations at 50 per issue', () => {
+    const events = Array.from({ length: 51 }, (_, index) => makeEvent(
+      'memory.observation_created',
+      index + 1,
+      { observation: makeObservation(`obs-${index}`) },
+    ))
+
+    const next = applyEventsReducer(emptyState, events)
+
+    expect(next.observationsByIssueId['PAN-1052']).toHaveLength(50)
+    expect(next.observationsByIssueId['PAN-1052']?.[0]?.id).toBe('obs-1')
+    expect(next.observationsByIssueId['PAN-1052']?.[49]?.id).toBe('obs-50')
+  })
+
+  it('stores memory status and reset markers by key', () => {
+    const withStatus = applyEventReducer(
+      emptyState,
+      makeEvent('memory.status_updated', 12, {
+        identity: { projectId: 'panopticon-cli', workspaceId: 'feature-pan-1052', issueId: 'PAN-1052' },
+        status: memoryStatus,
+      }),
+    )
+    const next = applyEventReducer(
+      withStatus,
+      makeEvent('memory.reset_marker_created', 13, { marker: resetMarker }),
+    )
+
+    expect(next.statusByIssueId['PAN-1052']).toEqual(memoryStatus)
+    expect(next.resetMarkersByScopeId['workspace:feature-pan-1052']).toEqual([resetMarker])
+  })
+})
+
 // ─── applyEventsReducer ───────────────────────────────────────────────────────
 
 describe('applyEventsReducer', () => {
@@ -381,6 +481,37 @@ describe('selectors', () => {
 
   it('selectResources returns resource stats', () => {
     expect(selectResources(state)).toEqual({ containers: 5, networks: 3 })
+  })
+
+  it('selectMemoryObservations returns observations for an issue', () => {
+    const observation = makeObservation('obs-selector')
+    const withMemory: DashboardState = {
+      ...state,
+      observationsByIssueId: { 'PAN-1052': [observation] },
+    }
+
+    expect(selectMemoryObservations('PAN-1052')(withMemory)).toEqual([observation])
+    expect(selectMemoryObservations('PAN-404')(withMemory)).toEqual([])
+  })
+
+  it('selectMemoryStatus returns status for an issue', () => {
+    const withMemory: DashboardState = {
+      ...state,
+      statusByIssueId: { 'PAN-1052': memoryStatus },
+    }
+
+    expect(selectMemoryStatus('PAN-1052')(withMemory)).toEqual(memoryStatus)
+    expect(selectMemoryStatus('PAN-404')(withMemory)).toBeUndefined()
+  })
+
+  it('selectResetMarkersByScope returns markers for a scope key', () => {
+    const withMemory: DashboardState = {
+      ...state,
+      resetMarkersByScopeId: { 'workspace:feature-pan-1052': [resetMarker] },
+    }
+
+    expect(selectResetMarkersByScope('workspace', 'feature-pan-1052')(withMemory)).toEqual([resetMarker])
+    expect(selectResetMarkersByScope('issue', 'PAN-404')(withMemory)).toEqual([])
   })
 
   it('selectChannelPermissionRequests returns pending requests oldest first', () => {
