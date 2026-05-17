@@ -1,4 +1,4 @@
-import { constants, closeSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdir, open, readFile, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { getPanopticonHome } from './paths.js';
 
@@ -9,7 +9,7 @@ export type RestartLockHolder = {
 };
 
 export type RestartLockHandle = {
-  release(): void;
+  release(): Promise<void>;
 };
 
 const STALE_LOCK_MS = 5 * 60 * 1000;
@@ -22,9 +22,9 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
 }
 
-function readHolderFromPath(path: string): RestartLockHolder | null {
+async function readHolderFromPath(path: string): Promise<RestartLockHolder | null> {
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<RestartLockHolder>;
+    const parsed = JSON.parse(await readFile(path, 'utf8')) as Partial<RestartLockHolder>;
     if (
       typeof parsed.pid !== 'number' ||
       !Number.isFinite(parsed.pid) ||
@@ -54,95 +54,85 @@ function isStale(holder: RestartLockHolder, now: number): boolean {
   return now - holder.ts > STALE_LOCK_MS || !isProcessAlive(holder.pid);
 }
 
-function writeLockFile(path: string, holder: RestartLockHolder): void {
-  const fd = openSync(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY, 0o600);
+async function writeLockFile(path: string, holder: RestartLockHolder): Promise<void> {
+  const file = await open(path, 'wx', 0o600);
   try {
-    writeFileSync(fd, `${JSON.stringify(holder)}\n`, 'utf8');
+    await file.writeFile(`${JSON.stringify(holder)}\n`, 'utf8');
   } finally {
-    closeSync(fd);
+    await file.close();
   }
 }
 
-function acquireStaleBreaker(path: string): RestartLockHandle | null {
-  const breakerPath = `${path}.break`;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const holder = { pid: process.pid, ts: Date.now(), caller: 'stale restart lock breaker' };
-    try {
-      writeLockFile(breakerPath, holder);
-      let released = false;
-      return {
-        release() {
-          if (released) return;
-          released = true;
-          try {
-            if (matchesHolder(readHolderFromPath(breakerPath), holder)) {
-              unlinkSync(breakerPath);
-            }
-          } catch (error) {
-            if (!isErrnoException(error) || error.code !== 'ENOENT') throw error;
-          }
-        },
-      };
-    } catch (error) {
-      if (!isErrnoException(error) || error.code !== 'EEXIST') throw error;
-      const existing = readHolderFromPath(breakerPath);
-      if (!existing || !isStale(existing, Date.now())) return null;
-      try {
-        unlinkSync(breakerPath);
-      } catch (unlinkError) {
-        if (!isErrnoException(unlinkError) || unlinkError.code !== 'ENOENT') throw unlinkError;
-      }
-    }
+async function unlinkIfExists(path: string): Promise<void> {
+  try {
+    await unlink(path);
+  } catch (error) {
+    if (!isErrnoException(error) || error.code !== 'ENOENT') throw error;
   }
-  return null;
 }
 
 function matchesHolder(actual: RestartLockHolder | null, expected: RestartLockHolder): boolean {
   return actual?.pid === expected.pid && actual.ts === expected.ts && actual.caller === expected.caller;
 }
 
-export function readRestartLockHolder(): RestartLockHolder | null {
-  return readHolderFromPath(restartLockPath());
-}
-
-export function acquireRestartLock(caller: string): RestartLockHandle | null {
-  const path = restartLockPath();
-  mkdirSync(dirname(path), { recursive: true });
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const holder = { pid: process.pid, ts: Date.now(), caller };
+async function acquireStaleBreaker(path: string): Promise<RestartLockHandle | null> {
+  const breakerPath = `${path}.break`;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const holder = { pid: process.pid, ts: Date.now(), caller: 'stale restart lock breaker' };
     try {
-      writeLockFile(path, holder);
+      await writeLockFile(breakerPath, holder);
       let released = false;
       return {
-        release() {
+        async release() {
           if (released) return;
           released = true;
-          try {
-            if (matchesHolder(readHolderFromPath(path), holder)) {
-              unlinkSync(path);
-            }
-          } catch (error) {
-            if (!isErrnoException(error) || error.code !== 'ENOENT') throw error;
+          if (matchesHolder(await readHolderFromPath(breakerPath), holder)) {
+            await unlinkIfExists(breakerPath);
           }
         },
       };
     } catch (error) {
       if (!isErrnoException(error) || error.code !== 'EEXIST') throw error;
-      const breaker = acquireStaleBreaker(path);
+      const existing = await readHolderFromPath(breakerPath);
+      if (!existing || !isStale(existing, Date.now())) return null;
+      await unlinkIfExists(breakerPath);
+    }
+  }
+  return null;
+}
+
+export async function readRestartLockHolder(): Promise<RestartLockHolder | null> {
+  return readHolderFromPath(restartLockPath());
+}
+
+export async function acquireRestartLock(caller: string): Promise<RestartLockHandle | null> {
+  const path = restartLockPath();
+  await mkdir(dirname(path), { recursive: true });
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const holder = { pid: process.pid, ts: Date.now(), caller };
+    try {
+      await writeLockFile(path, holder);
+      let released = false;
+      return {
+        async release() {
+          if (released) return;
+          released = true;
+          if (matchesHolder(await readHolderFromPath(path), holder)) {
+            await unlinkIfExists(path);
+          }
+        },
+      };
+    } catch (error) {
+      if (!isErrnoException(error) || error.code !== 'EEXIST') throw error;
+      const breaker = await acquireStaleBreaker(path);
       if (!breaker) return null;
       try {
-        const existing = readHolderFromPath(path);
+        const existing = await readHolderFromPath(path);
         if (existing && !isStale(existing, Date.now())) return null;
-        if (existing) {
-          try {
-            unlinkSync(path);
-          } catch (unlinkError) {
-            if (!isErrnoException(unlinkError) || unlinkError.code !== 'ENOENT') throw unlinkError;
-          }
-        }
+        await unlinkIfExists(path);
       } finally {
-        breaker.release();
+        await breaker.release();
       }
     }
   }

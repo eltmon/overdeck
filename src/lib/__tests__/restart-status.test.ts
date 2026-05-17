@@ -22,12 +22,12 @@ describe('restart status', () => {
     rmSync(testHome, { recursive: true, force: true });
   });
 
-  it('returns null when the status file is missing', () => {
-    expect(readRestartStatus()).toBeNull();
+  it('returns null when the status file is missing', async () => {
+    expect(await readRestartStatus()).toBeNull();
   });
 
-  it('writes and reads the latest restart status', () => {
-    writeRestartStatus({
+  it('writes and reads the latest restart status', async () => {
+    await writeRestartStatus({
       ts: '2026-05-17T15:00:00.000Z',
       trigger: 'watchdog',
       success: false,
@@ -37,7 +37,7 @@ describe('restart status', () => {
       gaveUp: true,
     });
 
-    expect(readRestartStatus()).toEqual({
+    expect(await readRestartStatus()).toEqual({
       ts: '2026-05-17T15:00:00.000Z',
       trigger: 'watchdog',
       success: false,

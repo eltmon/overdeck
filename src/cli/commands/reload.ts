@@ -43,8 +43,8 @@ function runBuild(): Promise<number> {
   });
 }
 
-function recordReloadStatus(startedAt: number, success: boolean, error?: string): void {
-  writeRestartStatus({
+async function recordReloadStatus(startedAt: number, success: boolean, error?: string): Promise<void> {
+  await writeRestartStatus({
     ts: new Date().toISOString(),
     trigger: 'pan reload',
     success,
@@ -65,13 +65,13 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     return;
   }
 
-  const lock = acquireRestartLock('pan reload');
+  const lock = await acquireRestartLock('pan reload');
   if (!lock) {
-    const holder = readRestartLockHolder();
+    const holder = await readRestartLockHolder();
     const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
     const error = `restart in progress (${heldBy})`;
     console.error(chalk.yellow(error));
-    recordReloadStatus(startedAt, false, error);
+    await recordReloadStatus(startedAt, false, error);
     process.exitCode = 2;
     return;
   }
@@ -86,7 +86,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       if (exitCode !== 0) {
         const error = 'Build failed — old dashboard left running';
         console.error(chalk.red(error));
-        recordReloadStatus(startedAt, false, error);
+        await recordReloadStatus(startedAt, false, error);
         process.exitCode = 1;
         return;
       }
@@ -95,7 +95,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       if (afterMtime <= beforeMtime) {
         const error = `Build did not refresh ${resolveBundledServerPath()} — old dashboard left running`;
         console.error(chalk.red(error));
-        recordReloadStatus(startedAt, false, error);
+        await recordReloadStatus(startedAt, false, error);
         process.exitCode = 1;
         return;
       }
@@ -104,7 +104,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     await restartDashboard(config, () => spawnDashboardDetached(config, { disableDeacon }), {
       healthTimeoutMs,
     });
-    recordReloadStatus(startedAt, true);
+    await recordReloadStatus(startedAt, true);
     console.log(chalk.green('✓ Dashboard reloaded and healthy'));
   } catch (error) {
     const message = error instanceof StageError
@@ -115,9 +115,9 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     } else {
       console.error(chalk.red('✗ Reload failed:'), message);
     }
-    recordReloadStatus(startedAt, false, message);
+    await recordReloadStatus(startedAt, false, message);
     process.exitCode = 1;
   } finally {
-    lock.release();
+    await lock.release();
   }
 }

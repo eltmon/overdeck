@@ -65,7 +65,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     return;
   }
 
-  const restartStatus = readRestartStatus();
+  const restartStatus = await readRestartStatus();
 
   // Filter out invalid agent states (missing required fields)
   const agents = listRunningAgents().filter(agent =>

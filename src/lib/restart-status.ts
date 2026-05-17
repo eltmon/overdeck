@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { getPanopticonHome } from './paths.js';
 
@@ -22,17 +22,17 @@ function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
 }
 
-export function writeRestartStatus(entry: RestartStatus): void {
+export async function writeRestartStatus(entry: RestartStatus): Promise<void> {
   const path = restartStatusPath();
-  mkdirSync(dirname(path), { recursive: true });
+  await mkdir(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
-  renameSync(tmp, path);
+  await writeFile(tmp, `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
+  await rename(tmp, path);
 }
 
-export function readRestartStatus(): RestartStatus | null {
+export async function readRestartStatus(): Promise<RestartStatus | null> {
   try {
-    const parsed = JSON.parse(readFileSync(restartStatusPath(), 'utf8')) as Partial<RestartStatus>;
+    const parsed = JSON.parse(await readFile(restartStatusPath(), 'utf8')) as Partial<RestartStatus>;
     if (
       typeof parsed.ts !== 'string' ||
       (parsed.trigger !== 'pan reload' && parsed.trigger !== 'pan restart' && parsed.trigger !== 'watchdog') ||

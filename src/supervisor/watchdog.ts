@@ -26,7 +26,7 @@ export interface SupervisorWatchdogStatus {
 
 export type SpawnRestartResult = { pid: number | null; error: string | null; done?: Promise<void> };
 export type SpawnRestart = (options?: { restartLockHeld?: boolean }) => SpawnRestartResult | Promise<SpawnRestartResult>;
-export type LogFn = (msg: string) => void;
+export type LogFn = (msg: string) => void | Promise<void>;
 
 type FetchFn = (input: string, init: { signal: AbortSignal }) => Promise<{ ok: boolean; status: number; statusText: string }>;
 
@@ -201,8 +201,8 @@ export class SupervisorWatchdog {
       this.state.gaveUp = true;
       await this.persistState();
       const error = `WATCHDOG GIVING UP — manual intervention required: ${this.state.lastError ?? 'dashboard health check failed'}`;
-      this.log(error);
-      writeRestartStatus({
+      await this.log(error);
+      await writeRestartStatus({
         ts: new Date(startedAt).toISOString(),
         trigger: 'watchdog',
         success: false,
@@ -214,15 +214,15 @@ export class SupervisorWatchdog {
       return;
     }
 
-    const lock = acquireRestartLock('supervisor watchdog');
+    const lock = await acquireRestartLock('supervisor watchdog');
     if (!lock) {
-      this.log('watchdog restart skipped: restart lock held');
+      await this.log('watchdog restart skipped: restart lock held');
       return;
     }
 
     this.state.restartAttempts.push(startedAt);
     await this.persistState();
-    this.log(`watchdog triggering dashboard restart after ${this.state.consecutiveFailures} consecutive failures`);
+    await this.log(`watchdog triggering dashboard restart after ${this.state.consecutiveFailures} consecutive failures`);
 
     let restartError: string | null = null;
     try {
@@ -230,7 +230,7 @@ export class SupervisorWatchdog {
       if (result.error) {
         restartError = result.error;
       } else {
-        this.log(`watchdog spawned pan restart --dashboard${result.pid ? ` (pid ${result.pid})` : ''}`);
+        await this.log(`watchdog spawned pan restart --dashboard${result.pid ? ` (pid ${result.pid})` : ''}`);
         if (result.done) {
           await result.done;
         }
@@ -238,10 +238,10 @@ export class SupervisorWatchdog {
     } catch (error) {
       restartError = error instanceof Error ? error.message : String(error);
     } finally {
-      lock.release();
+      await lock.release();
     }
 
-    writeRestartStatus({
+    await writeRestartStatus({
       ts: new Date(startedAt).toISOString(),
       trigger: 'watchdog',
       success: restartError === null,
@@ -250,7 +250,7 @@ export class SupervisorWatchdog {
       attempts: this.state.restartAttempts.length,
     });
     if (restartError) {
-      this.log(`watchdog restart failed: ${restartError}`);
+      await this.log(`watchdog restart failed: ${restartError}`);
     }
   }
 

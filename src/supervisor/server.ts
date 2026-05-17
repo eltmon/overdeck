@@ -20,7 +20,7 @@ import { spawn } from 'node:child_process';
 import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
+import { appendFile } from 'node:fs/promises';
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../lib/restart-lock.js';
 import { readPlatformConfig } from '../lib/platform-lifecycle.js';
 import { readWatchdogConfig, SupervisorWatchdog, type SpawnRestartResult } from './watchdog.js';
@@ -31,11 +31,11 @@ const LOG_FILE = path.join(os.homedir(), '.panopticon', 'logs', 'supervisor.log'
 const platformConfig = readPlatformConfig();
 const watchdogConfig = readWatchdogConfig(process.env, platformConfig.dashboardApiPort);
 
-function log(msg: string): void {
+async function log(msg: string): Promise<void> {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
   process.stdout.write(line);
   try {
-    fs.appendFileSync(LOG_FILE, line);
+    await appendFile(LOG_FILE, line);
   } catch {
     // best-effort logging
   }
@@ -69,8 +69,8 @@ function sendJson(req: http.IncomingMessage, res: http.ServerResponse, status: n
   res.end(JSON.stringify(body));
 }
 
-function heldRestartMessage(): string {
-  const holder = readRestartLockHolder();
+async function heldRestartMessage(): Promise<string> {
+  const holder = await readRestartLockHolder();
   const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
   return `restart in progress (${heldBy})`;
 }
@@ -78,13 +78,15 @@ function heldRestartMessage(): string {
 async function spawnRestart(options: { restartLockHeld?: boolean } = {}): Promise<SpawnRestartResult> {
   let lock: RestartLockHandle | null = null;
   if (!options.restartLockHeld) {
-    lock = acquireRestartLock('supervisor restart');
-    if (!lock) return { pid: null, error: heldRestartMessage() };
+    lock = await acquireRestartLock('supervisor restart');
+    if (!lock) return { pid: null, error: await heldRestartMessage() };
   }
 
-  const release = () => {
-    lock?.release();
+  const release = async () => {
+    const current = lock;
+    if (!current) return;
     lock = null;
+    await current.release();
   };
 
   try {
@@ -101,18 +103,22 @@ async function spawnRestart(options: { restartLockHeld?: boolean } = {}): Promis
     let spawnErrorMessage: string | null = null;
     const done = new Promise<void>((resolve, reject) => {
       child.once('error', (err) => {
-        spawnErrorMessage = err.message;
-        log(`spawn error: ${err.message}`);
-        release();
-        reject(err);
+        void (async () => {
+          spawnErrorMessage = err.message;
+          await log(`spawn error: ${err.message}`);
+          await release();
+          reject(err);
+        })();
       });
       child.once('close', (code, signal) => {
-        release();
-        if (code === 0) {
-          resolve();
-          return;
-        }
-        reject(new Error(`pan restart --dashboard exited ${code ?? `via signal ${signal ?? 'unknown'}`}`));
+        void (async () => {
+          await release();
+          if (code === 0) {
+            resolve();
+            return;
+          }
+          reject(new Error(`pan restart --dashboard exited ${code ?? `via signal ${signal ?? 'unknown'}`}`));
+        })();
       });
     });
     done.catch(() => {});
@@ -122,7 +128,7 @@ async function spawnRestart(options: { restartLockHeld?: boolean } = {}): Promis
     child.unref();
     return { pid: child.pid ?? null, error: null, done };
   } catch (err) {
-    release();
+    await release();
     const msg = err instanceof Error ? err.message : String(err);
     return { pid: null, error: msg };
   }
@@ -154,7 +160,7 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && req.url === '/restart-dashboard') {
     void (async () => {
-      log('received restart-dashboard request');
+      await log('received restart-dashboard request');
       const result = await spawnRestart();
       if (result.error) {
         sendJson(req, res, 500, { error: result.error });
@@ -170,27 +176,30 @@ const server = http.createServer((req, res) => {
 
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
-    log(`port ${SUPERVISOR_PORT} already in use — supervisor exiting`);
-    process.exit(2);
+    void log(`port ${SUPERVISOR_PORT} already in use — supervisor exiting`).finally(() => process.exit(2));
+    return;
   }
-  log(`server error: ${err.message}`);
-  process.exit(1);
+  void log(`server error: ${err.message}`).finally(() => process.exit(1));
 });
 
 server.listen(SUPERVISOR_PORT, '127.0.0.1', () => {
-  log(`supervisor listening on http://127.0.0.1:${SUPERVISOR_PORT}`);
-  if (watchdogConfig.enabled) {
-    watchdog.start();
-    log(`watchdog polling http://127.0.0.1:${watchdogConfig.dashboardApiPort}/api/health every ${watchdogConfig.pollMs}ms`);
-  } else {
-    log('watchdog disabled by PANOPTICON_SUPERVISOR_WATCHDOG=0');
-  }
+  void (async () => {
+    await log(`supervisor listening on http://127.0.0.1:${SUPERVISOR_PORT}`);
+    if (watchdogConfig.enabled) {
+      watchdog.start();
+      await log(`watchdog polling http://127.0.0.1:${watchdogConfig.dashboardApiPort}/api/health every ${watchdogConfig.pollMs}ms`);
+    } else {
+      await log('watchdog disabled by PANOPTICON_SUPERVISOR_WATCHDOG=0');
+    }
+  })();
 });
 
 const shutdown = (): void => {
   watchdog.stop();
-  log('shutting down');
-  server.close(() => process.exit(0));
+  void (async () => {
+    await log('shutting down');
+    server.close(() => process.exit(0));
+  })();
 };
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
