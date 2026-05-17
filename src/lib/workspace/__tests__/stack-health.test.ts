@@ -88,6 +88,13 @@ describe('evaluateWorkspaceStackHealth', () => {
     expect(health.reasons).toEqual([]);
   });
 
+  it('marks a Docker workspace unhealthy when no stack containers are observed', () => {
+    const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [], { now });
+
+    expect(health.healthy).toBe(false);
+    expect(health.reasons).toEqual(['No Docker containers found for workspace stack pan-1140']);
+  });
+
   it('does not match overlapping issue IDs by substring', () => {
     const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [
       container({
@@ -97,8 +104,8 @@ describe('evaluateWorkspaceStackHealth', () => {
       }),
     ], { now });
 
-    expect(health.healthy).toBe(true);
-    expect(health.reasons).toEqual([]);
+    expect(health.healthy).toBe(false);
+    expect(health.reasons).toEqual(['No Docker containers found for workspace stack pan-1140']);
   });
 
   it('infers issue IDs from workspace stack container names', () => {

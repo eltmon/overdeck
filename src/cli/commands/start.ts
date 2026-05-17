@@ -79,6 +79,7 @@ import { isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
 import { assertCanStartFresh } from '../../lib/work-agent-lifecycle.js';
+import { normalizeModelOverride } from '../../lib/model-validation.js';
 
 interface IssueOptions {
   model: string;
@@ -669,6 +670,14 @@ async function failPostCreateValidation(options: PostCreateValidationFailureOpti
 }
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
+  try {
+    const model = normalizeModelOverride(options.model);
+    if (model) options.model = model;
+  } catch (err) {
+    process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(1);
+  }
+
   if (!(await confirmHostOverride(options))) {
     process.exit(1);
   }

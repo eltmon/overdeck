@@ -29,6 +29,7 @@ import { readContinueStateAsync, writeContinueStateAsync, type ContinueState, ty
 import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, compileGlob, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
 import type { VBriefDocument, VBriefItem } from '../../../lib/vbrief/types.js';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
+import { normalizeModelOverride } from '../../../lib/model-validation.js';
 import { listSessionNamesAsync, isPaneDeadAsync, killSessionAsync, listPaneValuesAsync } from '../../../lib/tmux.js';
 
 const execFileAsync = promisify(execFile);
@@ -96,11 +97,6 @@ interface SwarmDispatchRequest {
 }
 
 const ISSUE_KEY_PATTERN = /^[A-Z][A-Z0-9]*-\d+$/;
-// Strict, conservative grammar for model identifiers passed to runtime launchers.
-// Runtime launchers (claude/pi/codex) interpolate `model` into shell command strings,
-// so we MUST refuse anything outside this safe alphabet at the API boundary to defeat
-// command injection. This is the only place model strings cross the dashboard API.
-const MODEL_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,63})$/;
 
 function canonicalIssueId(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -113,14 +109,11 @@ function buildHostOverrideConfirmation(issueId: string): string {
 }
 
 function validateModelId(value: unknown): { ok: true; value: string | undefined } | { ok: false; error: string } {
-  if (value === undefined) return { ok: true, value: undefined };
-  if (typeof value !== 'string') return { ok: false, error: 'model must be a string.' };
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return { ok: true, value: undefined };
-  if (!MODEL_ID_PATTERN.test(trimmed)) {
-    return { ok: false, error: 'model must match [A-Za-z0-9._-]{1,64} (no whitespace, slashes, or shell metacharacters).' };
+  try {
+    return { ok: true, value: normalizeModelOverride(value) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
-  return { ok: true, value: trimmed };
 }
 
 function assertPathInside(parent: string, child: string): void {

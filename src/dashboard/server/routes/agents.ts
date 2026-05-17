@@ -90,6 +90,7 @@ import { validateProviderHealth, ProviderHealthError } from '../../../lib/provid
 import { getProject, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { findPlanAsync, readPlanAsync } from '../../../lib/vbrief/io.js';
 import { getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
+import { normalizeModelOverride, requireModelOverride } from '../../../lib/model-validation.js';
 import { writeAutoStartVBrief } from '../../../lib/vbrief/auto-synthesize.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
 import type { ContinueState } from '../../../lib/vbrief/continue-state.js';
@@ -1360,6 +1361,12 @@ const postAgentResumeRoute = HttpRouter.add(
     const body = yield* readJsonBody;
 
     const { message, model } = body as any;
+    let resumeModel: string | undefined;
+    try {
+      resumeModel = normalizeModelOverride(model);
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+    }
     const eventStore = yield* EventStoreService;
     // Snapshot lifecycle state BEFORE taking any action so callers can see the
     // temporal context (why was this resume allowed) without recomputing state.
@@ -1373,10 +1380,10 @@ const postAgentResumeRoute = HttpRouter.add(
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_requested', {
       hasMessage: !!message,
-      model: model || undefined,
+      model: resumeModel || undefined,
       lifecycle: lifecycleBefore,
     }));
-    const result = yield* Effect.promise(() => resumeAgent(id, message, model ? { model } : undefined));
+    const result = yield* Effect.promise(() => resumeAgent(id, message, resumeModel ? { model: resumeModel } : undefined));
     if (result.success) {
       // Emit agent.started event so the read model transitions agent status
       // from 'stopped' → 'running' and the frontend updates immediately.
@@ -1446,6 +1453,12 @@ const postAgentRestartRoute = HttpRouter.add(
       graceful?: boolean;
       message?: string;
     };
+    let restartModel: string | undefined;
+    try {
+      restartModel = normalizeModelOverride(model);
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+    }
 
     const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
     if (!agentState) {
@@ -1453,7 +1466,7 @@ const postAgentRestartRoute = HttpRouter.add(
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.restart_requested', {
-      model: model || agentState.model,
+      model: restartModel || agentState.model,
       graceful,
       hasMessage: !!message,
     }));
@@ -1468,7 +1481,7 @@ const postAgentRestartRoute = HttpRouter.add(
             payload: { agentId: id, issueId: agentState.issueId },
           }));
 
-          const result = await restartAgent(id, { model, harness, graceful: true, message });
+          const result = await restartAgent(id, { model: restartModel, harness, graceful: true, message });
 
           if (result.success) {
             const updatedState = getAgentState(id);
@@ -1487,7 +1500,7 @@ const postAgentRestartRoute = HttpRouter.add(
                   // below — surface the actual harness so Pi agents do not
                   // get mis-labelled as Claude Code on graceful restart.
                   runtime: updatedState?.harness ?? agentState.harness ?? 'claude-code',
-                  model: model || updatedState?.model || agentState.model,
+                  model: restartModel || updatedState?.model || agentState.model,
                   status: 'running',
                   startedAt: updatedState?.startedAt || agentState.startedAt,
                   lastActivity: new Date().toISOString(),
@@ -1512,7 +1525,7 @@ const postAgentRestartRoute = HttpRouter.add(
     }
 
     // Quick restart — synchronous
-    const result = yield* Effect.promise(() => restartAgent(id, { model, graceful: false, message }));
+    const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, graceful: false, message }));
 
     if (result.success) {
       const updatedState = yield* Effect.promise(() => getAgentStateAsync(id));
@@ -1537,7 +1550,7 @@ const postAgentRestartRoute = HttpRouter.add(
             // is what getHarness() reads, so a Pi agent restarted through
             // this path was being mis-labelled as Claude Code.
             runtime: updatedState?.harness ?? agentState.harness ?? 'claude-code',
-            model: model || updatedState?.model || agentState.model,
+            model: restartModel || updatedState?.model || agentState.model,
             status: 'running',
             startedAt: updatedState?.startedAt || agentState.startedAt,
             lastActivity: new Date().toISOString(),
@@ -1546,7 +1559,7 @@ const postAgentRestartRoute = HttpRouter.add(
         },
       })));
       invalidateAgentsCache();
-      return jsonResponse({ success: true, restarted: true, agentId: id, model: model || agentState.model });
+      return jsonResponse({ success: true, restarted: true, agentId: id, model: restartModel || agentState.model });
     }
 
     return jsonResponse({ error: result.error }, { status: 500 });
@@ -1632,12 +1645,15 @@ const postAgentHandoffRoute = HttpRouter.add(
     const body = yield* readJsonBody;
 
     const { toModel, reason } = body as any;
-    if (!toModel) {
-      return jsonResponse({ error: 'toModel is required' }, { status: 400 });
+    let targetModel: string;
+    try {
+      targetModel = requireModelOverride(toModel);
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
     const result = yield* Effect.promise(() => performHandoff(id, {
-      targetModel: toModel,
+      targetModel,
       reason: reason || 'Manual handoff from dashboard',
     }));
 
@@ -2022,10 +2038,15 @@ const postAgentsRoute = HttpRouter.add(
       }, { status: spawnGuardrails.status });
     }
 
-    const spawnModel = determineModel({
-      model: (body as any).model,
-      role,
-    });
+    let spawnModel: string;
+    try {
+      spawnModel = determineModel({
+        model: (body as any).model,
+        role,
+      });
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
+    }
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
       const codexAuth = yield* Effect.promise(() => checkCodexAuthStatus());
@@ -2087,7 +2108,7 @@ const postAgentsRoute = HttpRouter.add(
           blocked: true,
           skipped: true,
           error: `Workspace docker stack for ${issueId} is not healthy: ${stackHealth.reasons.join('; ')}`,
-          hint: `Run 'pan workspace rebuild ${issueId}' or retry with a confirmed host override.`,
+          hint: `Run 'pan workspace rebuild ${issueId}' or use the CLI break-glass path: pan start ${issueId} --host.`,
           stackHealth,
         }, { status: 422 });
       }
@@ -2730,7 +2751,7 @@ const postAgentsRoute = HttpRouter.add(
           error: failedStackHealth.reasons.length > 0
             ? `Workspace docker stack for ${issueId} is not healthy: ${failedStackHealth.reasons.join('; ')}`
             : output.trim(),
-          hint: `Run 'pan workspace rebuild ${issueId}' or retry with a confirmed host override.`,
+          hint: `Run 'pan workspace rebuild ${issueId}' or use the CLI break-glass path: pan start ${issueId} --host.`,
           stackHealth: failedStackHealth,
           activityId: error?.activityId,
         }, { status: 422 });
@@ -3014,9 +3035,12 @@ const postAgentSwitchModelRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
-    const { model: newModel } = body as { model?: string; message?: string };
-    if (!newModel || typeof newModel !== 'string' || !newModel.trim()) {
-      return jsonResponse({ error: 'model is required' }, { status: 400 });
+    const { model: rawNewModel } = body as { model?: string; message?: string };
+    let newModel: string;
+    try {
+      newModel = requireModelOverride(rawNewModel);
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
     const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
@@ -3063,7 +3087,7 @@ const postAgentSwitchModelRoute = HttpRouter.add(
       try {
         const stateContent = yield* Effect.promise(() => readFile(stateFile, 'utf-8'));
         const state = JSON.parse(stateContent);
-        state.model = newModel.trim();
+        state.model = newModel;
         yield* Effect.promise(() => writeFile(stateFile, JSON.stringify(state, null, 2)));
       } catch { /* non-fatal */ }
     }

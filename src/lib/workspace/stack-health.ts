@@ -122,6 +122,10 @@ export function evaluateWorkspaceStackHealth(
   const stackContainers = containers.filter((container) => isStackContainer(container, issueId));
   const reasons: string[] = [];
 
+  if (stackContainers.length === 0) {
+    reasons.push(`No Docker containers found for workspace stack ${normalizeIssue(issueId)}`);
+  }
+
   for (const container of stackContainers) {
     const exitCode = parseExitCode(container.status);
     if (isExited(container) && exitCode !== null && exitCode !== 0) {

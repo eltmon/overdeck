@@ -368,10 +368,14 @@ export interface WorkspaceData {
   corrupted?: boolean;
 }
 
-export function useWorkspaceQuery(issueId: string): UseQueryResult<WorkspaceData> {
+export function useWorkspaceQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<WorkspaceData>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<WorkspaceData> {
   return useQuery({
     queryKey: ['workspace', issueId],
     queryFn: () => fetchJson<WorkspaceData>(`/api/workspaces/${issueId}`),
     refetchInterval: 30_000,
+    ...options,
   });
 }

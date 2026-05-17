@@ -548,6 +548,7 @@ describe('IssueCard', () => {
       isSelected: false,
       onSelect: vi.fn(),
       onPlan: vi.fn(),
+      workspace: { exists: false, issueId: 'TEST-123' },
       ...props,
     };
 
@@ -593,6 +594,24 @@ describe('IssueCard', () => {
       expect(startCall).toBeTruthy();
       expect(JSON.parse((startCall?.[1] as RequestInit).body as string)).toMatchObject({ auto: true });
     });
+  });
+
+  it('shows unhealthy workspace stack state on the card', () => {
+    renderIssueCard({
+      workspace: {
+        exists: true,
+        issueId: 'TEST-123',
+        stackHealth: {
+          healthy: false,
+          reasons: ['test-stack-server stuck Created for 120s'],
+          lastObserved: new Date().toISOString(),
+        },
+      },
+    });
+
+    const badge = screen.getByTestId('card-stack-health-TEST-123');
+    expect(badge).toHaveTextContent('Workspace unhealthy');
+    expect(badge).toHaveAttribute('title', 'test-stack-server stuck Created for 120s');
   });
 
   it('opens the inspector rather than the planning dialog for planning-only input', () => {

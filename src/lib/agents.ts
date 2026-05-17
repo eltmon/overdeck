@@ -38,6 +38,7 @@ import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtimes/pi-fifo.js';
 import { assertIssueHasBeads } from './beads-query.js';
 import { getWorkspaceStackHealth } from './workspace/stack-health.js';
+import { normalizeModelOverride, requireModelOverride, shellQuoteModelId } from './model-validation.js';
 
 const execAsync = promisify(exec);
 
@@ -212,12 +213,14 @@ export async function getAgentRuntimeBaseCommand(
   agentDefinition?: string,
   harness: 'claude-code' | 'pi' = 'claude-code',
 ): Promise<string> {
+  const validatedModel = requireModelOverride(model);
+  const quotedModel = shellQuoteModelId(validatedModel);
   if (harness === 'pi') {
-    return `pi --mode rpc --model ${model}`;
+    return `pi --mode rpc --model ${quotedModel}`;
   }
 
 
-  const provider = getProviderForModel(model);
+  const provider = getProviderForModel(validatedModel);
   const permissionFlags = getClaudePermissionFlagsString();
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`.
@@ -240,14 +243,14 @@ export async function getAgentRuntimeBaseCommand(
   // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
   // gpt-* models directly via ANTHROPIC_BASE_URL (no wrapper process).
   // The provider env vars are injected separately by getProviderEnvForModel.
-  if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
+  if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
-    const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
+    const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
     if (agentDefinition) {
       // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${bypassWithAgent}${agentFlag} --model ${resolvedModel}${nameFlag}`;
+      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelId(resolvedModel)}${nameFlag}`;
     }
-    return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
+    return `claude ${permissionFlags} --model ${shellQuoteModelId(resolvedModel)}${nameFlag}`;
   }
 
   if (agentDefinition) {
@@ -257,9 +260,9 @@ export async function getAgentRuntimeBaseCommand(
     // launches silently fall back to the frontmatter model and ignore the
     // user's selection — observed when switching PAN-977 to Opus 4.7 left
     // the launcher running Sonnet.
-    return `claude${bypassWithAgent}${agentFlag} --model ${model}${nameFlag}`;
+    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${nameFlag}`;
   }
-  return `claude ${permissionFlags} --model ${model}${nameFlag}`;
+  return `claude ${permissionFlags} --model ${quotedModel}${nameFlag}`;
 }
 
 /**
@@ -296,11 +299,13 @@ export async function getRoleRuntimeBaseCommand(
   harness: 'claude-code' | 'pi' = 'claude-code',
   subRole?: string,
 ): Promise<string> {
+  const validatedModel = requireModelOverride(model);
+  const quotedModel = shellQuoteModelId(validatedModel);
   if (harness === 'pi') {
-    return `pi --mode rpc --model ${model}`;
+    return `pi --mode rpc --model ${quotedModel}`;
   }
 
-  const provider = getProviderForModel(model);
+  const provider = getProviderForModel(validatedModel);
   const definitionPath = roleAgentDefinitionPath(role, subRole);
   const agentFlag = definitionPath ? ` --agent ${definitionPath}` : '';
   const nameFlag = ` --name ${agentName}`;
@@ -313,12 +318,12 @@ export async function getRoleRuntimeBaseCommand(
 
   const printFlag = role === 'review' && subRole ? ' --print' : '';
 
-  if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
-    const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
-    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${resolvedModel}${nameFlag}`;
+  if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
+    const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
+    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${shellQuoteModelId(resolvedModel)}${nameFlag}`;
   }
 
-  return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${model}${nameFlag}`;
+  return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${quotedModel}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -1537,11 +1542,12 @@ export async function buildCavemanExports(
  * is a real configuration bug the user must see.
  */
 export function determineModel(options: { model?: string; role?: Role } = {}): string {
-  if (options.model) {
-    return options.model;
+  const modelOverride = normalizeModelOverride(options.model);
+  if (modelOverride) {
+    return modelOverride;
   }
 
-  return resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config);
+  return requireModelOverride(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config));
 }
 
 /**
@@ -1662,7 +1668,7 @@ export async function buildAgentLaunchConfig(opts: {
    */
   harness?: 'claude-code' | 'pi';
 }): Promise<AgentLaunchConfig> {
-  const model = opts.model;
+  const model = requireModelOverride(opts.model);
 
   // Substrate guard: inject permission deny rules for Panopticon infrastructure
   // paths (.claude/agents/, .claude/hooks/, ~/.panopticon/, JSONL session dirs)
@@ -1843,13 +1849,14 @@ export async function assertWorkspaceStackHealthyForSpawn(
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
+  const selectedModel = determineModel({ model: options.model, role });
 
   if (role === 'work') {
     return spawnAgent({
       issueId,
       workspace,
       harness: options.harness,
-      model: options.model,
+      model: selectedModel,
       prompt: options.prompt,
       role: 'work',
       allowHost: options.allowHost,
@@ -1864,7 +1871,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost);
 
   initHook(agentId);
-  const selectedModel = determineModel({ model: options.model, role });
 
   // PAN-1048 C5: Resolve the harness for this role from config.roles[role].harness
   // before falling back to claude-code. Explicit options.harness takes precedence
@@ -2830,6 +2836,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
  */
 export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
+  const requestedModel = normalizeModelOverride(opts?.model);
   logAgentLifecycle(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'})`);
 
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
@@ -2922,9 +2929,9 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
-    const model = opts?.model || agentState.model || 'claude-sonnet-4-6';
-    if (opts?.model && opts.model !== agentState.model) {
-      agentState.model = opts.model;
+    const model = requestedModel || requireModelOverride(agentState.model || 'claude-sonnet-4-6');
+    if (requestedModel && requestedModel !== agentState.model) {
+      agentState.model = requestedModel;
       saveAgentState(agentState);
     }
     const effectiveHarness = await resolveEffectiveHarness(agentState.harness, model);
@@ -3024,7 +3031,8 @@ export async function restartAgent(
   opts: RestartAgentOptions = {},
 ): Promise<{ success: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
-  const { graceful = true, model: newModel, harness: newHarness, message } = opts;
+  const { graceful = true, model: rawNewModel, harness: newHarness, message } = opts;
+  const newModel = normalizeModelOverride(rawNewModel);
 
   const agentState = getAgentState(normalizedId);
   if (!agentState) {
@@ -3068,7 +3076,7 @@ export async function restartAgent(
 
   await stopAgentAsync(normalizedId);
 
-  const effectiveModel = newModel || agentState.model || 'claude-sonnet-4-6';
+  const effectiveModel = newModel || requireModelOverride(agentState.model || 'claude-sonnet-4-6');
   const requestedHarness = newHarness ?? agentState.harness;
   const effectiveHarness = await resolveEffectiveHarness(requestedHarness, effectiveModel);
   if (newModel && newModel !== agentState.model) {
@@ -3189,9 +3197,10 @@ export async function recoverAgent(
 
   // Runtime state files may lack required fields (PAN-150)
   if (!state.id) state.id = normalizedId;
-  if (opts.modelOverride) {
-    state.model = opts.modelOverride;
-    logAgentLifecycle(normalizedId, `recoverAgent: model overridden → ${opts.modelOverride}`);
+  const modelOverride = normalizeModelOverride(opts.modelOverride);
+  if (modelOverride) {
+    state.model = modelOverride;
+    logAgentLifecycle(normalizedId, `recoverAgent: model overridden → ${modelOverride}`);
   }
   if (!state.workspace || !state.model) {
     const reason = `[agents] Cannot recover ${normalizedId}: state.json missing workspace or model`;
