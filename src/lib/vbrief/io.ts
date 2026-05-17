@@ -367,7 +367,11 @@ export function updateSubItemStatus(
   };
 
   const overrides = { ...continueState.statusOverrides };
-  overrides[`${itemId}.${subItemId}`] = status;
+  // SubItem IDs use format "parentId.subId" (e.g. "item-1.ac1").
+  // subItemId may be passed in full format ("item-1.ac1") or just the child part
+  // ("ac1"). Store only once — use the full form directly when subItemId has a dot.
+  const key = subItemId.includes('.') ? subItemId : `${itemId}.${subItemId}`;
+  overrides[key] = status;
   continueState.statusOverrides = overrides;
 
   writeWorkspaceContinue(workspacePath, continueState);
