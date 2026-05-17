@@ -545,6 +545,16 @@ export interface AgentState {
    *  resume. Read by deacon's autoResumeStoppedWorkAgents to distinguish a
    *  deliberate stop from a crash/orphan. */
   stoppedByUser?: boolean;
+  paused?: boolean;
+  pausedReason?: string;
+  pausedAt?: string;
+  troubled?: boolean;
+  troubledAt?: string;
+  consecutiveFailures?: number;
+  firstFailureInRunAt?: string;
+  lastFailureAt?: string;
+  lastFailureReason?: string;
+  lastFailureNextRetryAt?: string;
   branch?: string; // Git branch name for this agent
   costSoFar?: number;
   sessionId?: string; // For resuming sessions after handoff
@@ -611,6 +621,16 @@ function cleanAgentState(raw: AgentState): AgentState {
     lastActivity: raw.lastActivity,
     stoppedAt: raw.stoppedAt,
     stoppedByUser: raw.stoppedByUser,
+    paused: raw.paused,
+    pausedReason: raw.pausedReason,
+    pausedAt: raw.pausedAt,
+    troubled: raw.troubled,
+    troubledAt: raw.troubledAt,
+    consecutiveFailures: raw.consecutiveFailures,
+    firstFailureInRunAt: raw.firstFailureInRunAt,
+    lastFailureAt: raw.lastFailureAt,
+    lastFailureReason: raw.lastFailureReason,
+    lastFailureNextRetryAt: raw.lastFailureNextRetryAt,
     branch: raw.branch,
     costSoFar: raw.costSoFar,
     sessionId: raw.sessionId,
@@ -717,6 +737,106 @@ export async function saveAgentStateAsync(state: AgentState): Promise<void> {
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateAsync)`);
   }
+}
+
+function clearFailureTrackingFields(state: AgentState): void {
+  state.consecutiveFailures = 0;
+  delete state.firstFailureInRunAt;
+  delete state.lastFailureAt;
+  delete state.lastFailureReason;
+  delete state.lastFailureNextRetryAt;
+}
+
+/** Sets the persistent manual pause gate used before stopping or suppressing resume. */
+export function setAgentPaused(agentId: string, reason?: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+
+  if (!state.paused) {
+    state.pausedAt = new Date().toISOString();
+  }
+  state.paused = true;
+  if (reason === undefined) {
+    delete state.pausedReason;
+  } else {
+    state.pausedReason = reason;
+  }
+  saveAgentState(state);
+  return true;
+}
+
+/** Clears the persistent manual pause gate without spawning the agent. */
+export function clearAgentPaused(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+  if (!state.paused && state.pausedReason === undefined && state.pausedAt === undefined) return true;
+
+  delete state.paused;
+  delete state.pausedReason;
+  delete state.pausedAt;
+  saveAgentState(state);
+  return true;
+}
+
+/** Marks an agent as troubled after repeated resume failures. */
+export function markAgentTroubled(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+
+  if (!state.troubled) {
+    state.troubledAt = new Date().toISOString();
+  }
+  state.troubled = true;
+  saveAgentState(state);
+  return true;
+}
+
+/** Clears the troubled gate and its accumulated failure state. */
+export function clearAgentTroubled(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+  if (!state.troubled && state.troubledAt === undefined && (state.consecutiveFailures ?? 0) === 0 && state.firstFailureInRunAt === undefined && state.lastFailureAt === undefined && state.lastFailureReason === undefined && state.lastFailureNextRetryAt === undefined) return true;
+
+  delete state.troubled;
+  delete state.troubledAt;
+  clearFailureTrackingFields(state);
+  saveAgentState(state);
+  return true;
+}
+
+/** Records one failed resume/crash observation for later backoff and troubled gating. */
+export function recordAgentFailure(agentId: string, reason: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+
+  const now = new Date().toISOString();
+  state.consecutiveFailures = (state.consecutiveFailures ?? 0) + 1;
+  state.firstFailureInRunAt ??= now;
+  state.lastFailureAt = now;
+  state.lastFailureReason = reason;
+  saveAgentState(state);
+  return true;
+}
+
+/** Resets failure tracking after an agent reaches running state. */
+export function resetAgentFailureCount(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+  if ((state.consecutiveFailures ?? 0) === 0 && state.firstFailureInRunAt === undefined && state.lastFailureAt === undefined && state.lastFailureReason === undefined && state.lastFailureNextRetryAt === undefined) return true;
+
+  clearFailureTrackingFields(state);
+  saveAgentState(state);
+  return true;
+}
+
+/** Reports whether the manual pause gate is set for this agent. */
+export function isAgentPaused(agentId: string): boolean {
+  return getAgentState(agentId)?.paused === true;
+}
+
+/** Reports whether the troubled gate is set for this agent. */
+export function isAgentTroubled(agentId: string): boolean {
+  return getAgentState(agentId)?.troubled === true;
 }
 
 /** Update just the delivery method on an agent's state file. */
