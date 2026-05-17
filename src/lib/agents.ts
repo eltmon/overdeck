@@ -1923,7 +1923,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   await saveAgentStateAsync(state);
 
   const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
-  const shouldDeliverPromptViaTmux = isSpecialistRole;
+  const isReviewSubRole = role === 'review' && !!options.subRole;
+  const shouldDeliverPromptViaTmux = isSpecialistRole && !isReviewSubRole;
 
   let promptFile: string | undefined;
   if (options.prompt && !shouldDeliverPromptViaTmux) {
@@ -2000,10 +2001,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
-  // PAN-1059 / PAN-977: specialist roles (review sub-roles, test, ship) must not
-  // pass the prompt as a positional argument or prompt-file redirect to Claude Code.
-  // Work agents avoid this by delivering the prompt via tmux send-keys after Claude boots;
-  // specialist roles use the same delivery path.
+  // PAN-1059 / PAN-977: test/ship/top-level review runs use the interactive tmux
+  // delivery path. Review sub-roles run headless via `claude --print`, so the
+  // launcher passes their prompt file as the process argument.
 
   const launcherContent = generateLauncherScript({
     role,
