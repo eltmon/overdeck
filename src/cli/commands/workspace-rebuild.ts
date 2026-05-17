@@ -17,19 +17,28 @@ const COMPOSE_FILES = [
   'compose.yaml',
 ];
 
+function declaredComposeProjectName(content: string, featureFolder: string): string | null {
+  const templatedMatch = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
+  if (templatedMatch) return `${templatedMatch[1]}${featureFolder}`;
+  const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
+  return literalMatch?.[1] ?? null;
+}
+
 export function composeProjectNameForWorkspace(workspacePath: string, issueId: string): string {
   const featureFolder = `feature-${issueId.toLowerCase()}`;
+  const expected = `panopticon-${featureFolder}`;
   for (const devPath of [join(workspacePath, '.devcontainer', 'dev'), join(workspacePath, 'dev')]) {
     if (!existsSync(devPath)) continue;
     try {
-      const content = readFileSync(devPath, 'utf-8');
-      const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-      if (match) return `${match[1]}${featureFolder}`;
-      const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
-      if (literalMatch) return literalMatch[1];
-    } catch {}
+      const declared = declaredComposeProjectName(readFileSync(devPath, 'utf-8'), featureFolder);
+      if (declared && declared !== expected) {
+        throw new Error(`Refusing workspace rebuild: ${devPath} declares COMPOSE_PROJECT_NAME=${declared}, expected ${expected}`);
+      }
+    } catch (err: any) {
+      if (err?.message?.startsWith('Refusing workspace rebuild:')) throw err;
+    }
   }
-  return `panopticon-${featureFolder}`;
+  return expected;
 }
 
 function findDevcontainerComposeFile(workspacePath: string): string | null {

@@ -1327,30 +1327,25 @@ export async function stopWorkspaceDocker(
     }
   }
 
-  // Derive compose project name from the dev script (same logic as dashboard)
-  // or fall back to "{projectName}-feature-{featureName}" convention.
-  let composeProjectName = `${projectName}-feature-${featureName}`;
+  const composeProjectName = `${projectName}-feature-${featureName}`;
   const devScriptPaths = [
     join(workspacePath, DEVCONTAINER_DIRNAME, 'dev'),
     join(workspacePath, 'dev'),
   ];
   for (const devPath of devScriptPaths) {
     try {
-      if (existsSync(devPath)) {
-        const content = readFileSync(devPath, 'utf-8');
-        const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-        if (match) {
-          composeProjectName = `${match[1]}feature-${featureName}`;
-          break;
-        }
-        const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
-        if (literalMatch) {
-          composeProjectName = literalMatch[1];
-          break;
-        }
+      if (!existsSync(devPath)) continue;
+      const content = readFileSync(devPath, 'utf-8');
+      const featureFolder = `feature-${featureName}`;
+      const templatedMatch = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
+      const declared = templatedMatch
+        ? `${templatedMatch[1]}${featureFolder}`
+        : content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/)?.[1];
+      if (declared && declared !== composeProjectName) {
+        throw new Error(`${devPath} declares COMPOSE_PROJECT_NAME=${declared}, expected ${composeProjectName}`);
       }
-    } catch {
-      // Fall through to default
+    } catch (error: any) {
+      if (error?.message?.includes('declares COMPOSE_PROJECT_NAME=')) throw error;
     }
   }
 
