@@ -41,6 +41,7 @@ import { issueCommand as startCommand } from './commands/start.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
 import { pauseCommand } from './commands/pause.js';
+import { unpauseCommand } from './commands/unpause.js';
 import { forkCommand } from './commands/fork.js';
 import { unarchiveConversationCommand } from './commands/unarchive-conversation.js';
 import { resumeCommand } from './commands/resume.js';
@@ -333,6 +334,11 @@ program
   .description('Persistently pause an agent and stop it if running')
   .option('--reason <reason>', 'Reason to store with the pause gate')
   .action(pauseCommand);
+
+program
+  .command('unpause <id>')
+  .description('Clear an agent pause gate without spawning it')
+  .action(unpauseCommand);
 
 program
   .command('fork <conv>')

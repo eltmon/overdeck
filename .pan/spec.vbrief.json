@@ -390,7 +390,7 @@
       {
         "id": "cli-unpause",
         "title": "Add `pan unpause <id>` command",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -406,28 +406,32 @@
           {
             "id": "cli-unpause.ac1",
             "title": "`pan unpause <id>` clears `paused`, `pausedReason`, `pausedAt` from state.json",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:05:59.072Z"
           },
           {
             "id": "cli-unpause.ac2",
             "title": "Unpausing a non-paused agent is a successful no-op with a dim 'already unpaused' message",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:05:59.072Z"
           },
           {
             "id": "cli-unpause.ac3",
             "title": "Does NOT spawn or resume the agent; output includes the hint to run `pan start` if desired",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:05:59.072Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T16:05:59.072Z"
       },
       {
         "id": "cli-untroubled",
