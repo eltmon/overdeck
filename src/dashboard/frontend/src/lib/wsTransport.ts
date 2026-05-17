@@ -22,20 +22,46 @@ export type PanRpcProtocolClient = RpcClientFactory extends Effect.Effect<infer 
   ? C
   : never
 
+function resolveRpcUrl(url?: string): string {
+  if (url) return url
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  // Use VITE_API_URL when available — frontend and API are on different subdomains
+  // (e.g. feature-pan-428.pan.localhost vs api-feature-pan-428.pan.localhost)
+  const apiUrl = import.meta.env.VITE_API_URL
+  if (apiUrl) {
+    const apiHost = new URL(apiUrl).host
+    return `${proto}://${apiHost}/ws/rpc`
+  }
+  return `${proto}://${window.location.host}/ws/rpc`
+}
+
+function dashboardSessionUrl(url?: string): string {
+  const rpcUrl = new URL(resolveRpcUrl(url))
+  rpcUrl.protocol = rpcUrl.protocol === 'wss:' ? 'https:' : 'http:'
+  rpcUrl.pathname = '/api/dashboard/session'
+  rpcUrl.search = ''
+  rpcUrl.hash = ''
+  return rpcUrl.toString()
+}
+
+let dashboardSessionPromise: Promise<void> | null = null
+
+export function ensureDashboardSession(url?: string): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve()
+  dashboardSessionPromise ??= fetch(dashboardSessionUrl(url), {
+    method: 'POST',
+    credentials: 'include',
+  }).then((response) => {
+    if (!response.ok) throw new Error(`Dashboard session bootstrap failed: HTTP ${response.status}`)
+  }).catch((err) => {
+    dashboardSessionPromise = null
+    throw err
+  })
+  return dashboardSessionPromise
+}
+
 function createPanRpcProtocolLayer(url?: string) {
-  const resolvedUrl =
-    url ??
-    (() => {
-      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      // Use VITE_API_URL when available — frontend and API are on different subdomains
-      // (e.g. feature-pan-428.pan.localhost vs api-feature-pan-428.pan.localhost)
-      const apiUrl = import.meta.env.VITE_API_URL
-      if (apiUrl) {
-        const apiHost = new URL(apiUrl).host
-        return `${proto}://${apiHost}/ws/rpc`
-      }
-      return `${proto}://${window.location.host}/ws/rpc`
-    })()
+  const resolvedUrl = resolveRpcUrl(url)
 
   const socketLayer = Socket.layerWebSocket(resolvedUrl).pipe(
     Layer.provide(Socket.layerWebSocketConstructorGlobal),
@@ -71,8 +97,10 @@ export class WsTransport {
   constructor(url?: string) {
     this.runtime = ManagedRuntime.make(createPanRpcProtocolLayer(url))
     this.clientScope = this.runtime.runSync(Scope.make())
-    this.clientPromise = this.runtime.runPromise(
-      Scope.provide(this.clientScope)(makePanRpcClient),
+    this.clientPromise = ensureDashboardSession(url).then(() =>
+      this.runtime.runPromise(
+        Scope.provide(this.clientScope)(makePanRpcClient),
+      ),
     )
   }
 

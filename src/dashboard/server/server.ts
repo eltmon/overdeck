@@ -55,6 +55,8 @@ import { diffsRouteLayer } from './routes/diffs.js';
 import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { swarmRouteLayer } from './routes/swarm.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
+import { dashboardSessionCookieHeader } from './routes/dashboard-auth.js';
+import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -94,6 +96,53 @@ const healthRouteLayer = HttpRouter.add(
   'GET',
   '/api/health',
   jsonResponse({ status: 'ok' }),
+);
+
+function requestHeader(request: HttpServerRequest.HttpServerRequest, name: string): string | undefined {
+  const value = (request.headers as Record<string, string | string[] | undefined>)[name];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function allowDashboardSessionCors(
+  response: typeof HttpServerResponse.Type,
+  request: HttpServerRequest.HttpServerRequest,
+): typeof HttpServerResponse.Type {
+  const origin = requestHeader(request, 'origin');
+  if (!origin) return response;
+  return HttpServerResponse.setHeader(
+    HttpServerResponse.setHeader(
+      HttpServerResponse.setHeader(response, 'Access-Control-Allow-Origin', origin),
+      'Access-Control-Allow-Credentials',
+      'true',
+    ),
+    'Vary',
+    'Origin',
+  );
+}
+
+const dashboardSessionRouteLayer = HttpRouter.add(
+  'POST',
+  '/api/dashboard/session',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+
+    return allowDashboardSessionCors(
+      HttpServerResponse.setHeader(
+        HttpServerResponse.setHeader(
+          jsonResponse({ ok: true }),
+          'Set-Cookie',
+          dashboardSessionCookieHeader(),
+        ),
+        'Cache-Control',
+        'no-store',
+      ),
+      request,
+    );
+  }),
 );
 
 // ─── Static file route ────────────────────────────────────────────────────────
@@ -197,6 +246,7 @@ const staticRouteLayer = HttpRouter.add(
 
 export const makeRoutesLayer = Layer.mergeAll(
   healthRouteLayer,
+  dashboardSessionRouteLayer,
   websocketRpcRouteLayer,
   issuesRouteLayer,
   agentsRouteLayer,

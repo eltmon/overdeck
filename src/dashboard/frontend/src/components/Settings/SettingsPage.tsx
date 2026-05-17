@@ -48,6 +48,7 @@ import {
   SettingsSidebarNav,
   type NavItem,
 } from './primitives';
+import { ensureDashboardSession } from '../../lib/wsTransport';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -286,7 +287,8 @@ export function SettingsPage() {
   useEffect(() => { void fetchClaudeAuth(); }, []);
 
   useEffect(() => {
-    fetch('/api/discovered-sessions/config')
+    ensureDashboardSession()
+      .then(() => fetch('/api/discovered-sessions/config', { credentials: 'include' }))
       .then((r) => r.ok ? r.json() : null)
       .then((d) => { if (d) setConvConfig(d); })
       .catch(() => undefined);
@@ -302,8 +304,10 @@ export function SettingsPage() {
     if (!convConfig) return;
     setConvConfigSaving(true);
     try {
+      await ensureDashboardSession();
       const res = await fetch('/api/discovered-sessions/config', {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(convConfig),
       });
@@ -335,8 +339,10 @@ export function SettingsPage() {
     setTestingEmbedding(true);
     setEmbeddingTestResult(null);
     try {
+      await ensureDashboardSession();
       const res = await fetch('/api/discovered-sessions/test-connection', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: convConfig.embeddingProvider,

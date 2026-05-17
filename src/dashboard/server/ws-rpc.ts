@@ -73,6 +73,24 @@ function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
   };
 }
 
+const DEFAULT_CONVERSATION_LIMIT = 50;
+const MAX_CONVERSATION_LIMIT = 500;
+
+function normalizeConversationPagination(limit: number | undefined, offset: number | undefined): { limit: number; offset: number } {
+  const normalizedLimit = limit ?? DEFAULT_CONVERSATION_LIMIT;
+  const normalizedOffset = offset ?? 0;
+  if (!Number.isFinite(normalizedLimit) || normalizedLimit < 0) {
+    throw new PanRpcError({ message: 'Invalid limit', code: 'INVALID_LIMIT' });
+  }
+  if (!Number.isFinite(normalizedOffset) || normalizedOffset < 0) {
+    throw new PanRpcError({ message: 'Invalid offset', code: 'INVALID_OFFSET' });
+  }
+  return {
+    limit: Math.min(normalizedLimit, MAX_CONVERSATION_LIMIT),
+    offset: normalizedOffset,
+  };
+}
+
 function normalizeConversationFilter(input: {
   workspacePath?: string;
   primaryModel?: string;
@@ -565,15 +583,16 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       [WS_METHODS.searchConversations]: (input) =>
         Effect.promise(async () => {
           const config = await getConversationsConfigAsync();
-          const filter = normalizeConversationFilter(input);
+          const pagination = normalizeConversationPagination(input.limit, input.offset);
+          const filter = { ...normalizeConversationFilter(input), ...pagination };
           try {
             const result = await runDashboardDbJob<SearchResult>('searchSessions', {
               q: input.semantic === true ? undefined : input.query,
               semanticQuery: input.semantic === true ? input.query : undefined,
               similarTo: input.similarTo,
               filter,
-              limit: input.limit,
-              offset: input.offset,
+              limit: pagination.limit,
+              offset: pagination.offset,
               config,
             });
             return {
@@ -596,7 +615,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
       [WS_METHODS.listDiscoveredSessions]: (input) =>
         Effect.promise(async () => {
-          const filter = normalizeConversationFilter(input);
+          const filter = {
+            ...normalizeConversationFilter(input),
+            ...normalizeConversationPagination(input.limit, input.offset),
+          };
           const { sessions, total } = await runDashboardDbJob<{ sessions: DiscoveredSession[]; total: number }>('listDiscoveredSessions', filter);
           return { sessions: sessions.map(toDiscoveredSessionSnapshot), count: sessions.length, total };
         }),
