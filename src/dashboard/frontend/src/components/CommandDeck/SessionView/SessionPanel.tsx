@@ -157,6 +157,15 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
     const fallbackModel = !actualModel
       ? (resolvedModels[resolveWorkTypeKey(session) ?? ''] ?? undefined)
       : undefined;
+    // Defensive: an ended session MUST report a non-null endedAt, or
+    // ConversationPanel will read `!sessionAlive && !endedAt` as "still
+    // spawning" and render a "Starting…" placeholder over the JSONL. When the
+    // backend hasn't supplied one (e.g. a sub-reviewer that finished while its
+    // parent's endedAt is still null), fall back to startedAt so the panel
+    // takes the orphaned/message-history branch instead.
+    const endedAt = session.presence === 'ended'
+      ? (session.endedAt ?? session.startedAt ?? new Date().toISOString())
+      : (session.endedAt ?? null);
     return {
       id: -1,
       name: session.sessionId,
@@ -165,7 +174,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
       cwd: '',
       issueId: issueId || null,
       createdAt: session.startedAt,
-      endedAt: session.endedAt || null,
+      endedAt,
       lastAttachedAt: null,
       sessionAlive: session.presence !== 'ended',
       sessionFile: session.sessionId,
