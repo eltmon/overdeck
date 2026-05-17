@@ -9,6 +9,7 @@
  *
  * Endpoints:
  *   GET  /health             → 200 OK; lightweight liveness probe
+ *   GET  /status             → current dashboard watchdog state
  *   POST /restart-dashboard  → 202 Accepted; spawns `pan restart --dashboard`
  *
  * Started by `pan up` via `startSupervisorProcess()` in `src/lib/supervisor.ts`.
@@ -20,10 +21,14 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import { readPlatformConfig } from '../lib/platform-lifecycle.js';
+import { readWatchdogConfig, SupervisorWatchdog } from './watchdog.js';
 
 const SUPERVISOR_PORT = Number(process.env.PANOPTICON_SUPERVISOR_PORT || 3012);
 const PAN_BINARY = process.env.PANOPTICON_PAN_BINARY || 'pan';
 const LOG_FILE = path.join(os.homedir(), '.panopticon', 'logs', 'supervisor.log');
+const platformConfig = readPlatformConfig();
+const watchdogConfig = readWatchdogConfig(process.env, platformConfig.dashboardApiPort);
 
 function log(msg: string): void {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
@@ -61,6 +66,12 @@ function spawnRestart(): { pid: number | null; error: string | null } {
   }
 }
 
+const watchdog = new SupervisorWatchdog({
+  config: watchdogConfig,
+  spawnRestart,
+  log,
+});
+
 const server = http.createServer((req, res) => {
   // CORS preflight — the supervisor lives on a different origin than the dashboard
   if (req.method === 'OPTIONS') {
@@ -74,6 +85,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'GET' && req.url === '/health') {
     sendJson(res, 200, { ok: true, port: SUPERVISOR_PORT });
+    return;
+  }
+
+  if (req.method === 'GET' && req.url === '/status') {
+    sendJson(res, 200, watchdog.status());
     return;
   }
 
@@ -102,9 +118,16 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 
 server.listen(SUPERVISOR_PORT, '127.0.0.1', () => {
   log(`supervisor listening on http://127.0.0.1:${SUPERVISOR_PORT}`);
+  if (watchdogConfig.enabled) {
+    watchdog.start();
+    log(`watchdog polling http://127.0.0.1:${watchdogConfig.dashboardApiPort}/api/health every ${watchdogConfig.pollMs}ms`);
+  } else {
+    log('watchdog disabled by PANOPTICON_SUPERVISOR_WATCHDOG=0');
+  }
 });
 
 const shutdown = (): void => {
+  watchdog.stop();
   log('shutting down');
   server.close(() => process.exit(0));
 };
