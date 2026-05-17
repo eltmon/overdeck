@@ -8,8 +8,8 @@
  */
 
 import {
-  findDiscoveredSessions,
-  findEnrichedSessionsMissingEmbedding,
+  findDiscoveredSessionIds,
+  findEnrichedSessionIdsMissingEmbedding,
   getDiscoveredSessionById,
   insertEmbedding,
 } from '../../database/discovered-sessions-db.js';
@@ -85,19 +85,15 @@ export function buildEmbeddingText(session: DiscoveredSession): string {
 
 // ─── Session selection ────────────────────────────────────────────────────────
 
-function selectSessionsForEmbedding(
+function selectSessionIdsForEmbedding(
   sessionIds: number[] | undefined,
   model: string,
   regenerate: boolean,
-): DiscoveredSession[] {
-  if (sessionIds && sessionIds.length > 0) {
-    return sessionIds
-      .map((id) => getDiscoveredSessionById(id))
-      .filter((s): s is DiscoveredSession => s != null);
-  }
+): number[] {
+  if (sessionIds && sessionIds.length > 0) return sessionIds;
 
-  if (regenerate) return findDiscoveredSessions({ enriched: true });
-  return findEnrichedSessionsMissingEmbedding(model);
+  if (regenerate) return findDiscoveredSessionIds({ enriched: true });
+  return findEnrichedSessionIdsMissingEmbedding(model);
 }
 
 // ─── Main embed function ──────────────────────────────────────────────────────
@@ -122,17 +118,17 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
   const maxParallel = opts.maxParallel ?? config.enrichment.maxParallel;
   const embedFn = opts.embedFn ?? embed;
 
-  const sessions = selectSessionsForEmbedding(opts.sessionIds, model, opts.regenerate === true);
+  const sessionIds = selectSessionIdsForEmbedding(opts.sessionIds, model, opts.regenerate === true);
 
-  if (sessions.length === 0) {
+  if (sessionIds.length === 0) {
     result.durationMs = Date.now() - startTs;
     return result;
   }
 
   let processed = 0;
-  const total = sessions.length;
+  const total = sessionIds.length;
 
-  const tasks = sessions.map((session) => async () => {
+  const tasks = sessionIds.map((sessionId) => async () => {
     const emitProgress = (success: boolean, error?: string) => {
       processed++;
       opts.onProgress?.({
@@ -141,13 +137,20 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
         errors: result.errors,
         elapsedMs: Date.now() - startTs,
         session: {
-          sessionId: session.id,
+          sessionId,
           model,
           success,
           error,
         },
       });
     };
+
+    const session = getDiscoveredSessionById(sessionId);
+    if (!session) {
+      result.skipped++;
+      emitProgress(false, 'Session not found');
+      return;
+    }
 
     const text = buildEmbeddingText(session);
     if (!text.trim()) {

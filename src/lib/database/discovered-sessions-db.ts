@@ -355,6 +355,25 @@ export function findDiscoveredSessions(filter: ConversationFilter = {}): Discove
   return rows.map(rowToSession);
 }
 
+export function findDiscoveredSessionIds(filter: ConversationFilter = {}): number[] {
+  const db = getDatabase();
+  const { where, params } = buildFilterSql(filter);
+  const safeLimit = Number.isFinite(filter.limit) && filter.limit! >= 0 ? filter.limit! : undefined;
+  const safeOffset = Number.isFinite(filter.offset) && filter.offset! >= 0 ? filter.offset! : undefined;
+  const limit = safeLimit !== undefined ? `LIMIT ${safeLimit}` : '';
+  const offset = safeOffset !== undefined ? `OFFSET ${safeOffset}` : '';
+
+  const rows = db
+    .prepare(
+      `SELECT id FROM discovered_sessions
+       ${where}
+       ORDER BY last_ts DESC NULLS LAST
+       ${limit} ${offset}`,
+    )
+    .all(...params) as Array<{ id: number }>;
+  return rows.map((row) => row.id);
+}
+
 export const findByFilters = findDiscoveredSessions;
 
 export function findEnrichedSessionsMissingEmbedding(model: string): DiscoveredSession[] {
@@ -372,6 +391,23 @@ export function findEnrichedSessionsMissingEmbedding(model: string): DiscoveredS
     )
     .all(model) as Record<string, unknown>[];
   return rows.map(rowToSession);
+}
+
+export function findEnrichedSessionIdsMissingEmbedding(model: string): number[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT ds.id
+       FROM discovered_sessions ds
+       WHERE ds.enrichment_level > 0
+         AND NOT EXISTS (
+           SELECT 1 FROM session_embeddings se
+           WHERE se.session_id = ds.id AND se.model = ?
+         )
+       ORDER BY ds.last_ts DESC NULLS LAST`,
+    )
+    .all(model) as Array<{ id: number }>;
+  return rows.map((row) => row.id);
 }
 
 /**

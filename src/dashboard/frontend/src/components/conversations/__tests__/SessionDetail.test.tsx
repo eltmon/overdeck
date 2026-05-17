@@ -95,6 +95,18 @@ describe('SessionDetail', () => {
     expect(screen.getByText('Fixed the authentication bug')).toBeInTheDocument();
   });
 
+  it('shows ad-hoc and managed badges in the header', () => {
+    const { rerender } = renderDetail(BASE_SESSION);
+    expect(screen.getByText('Ad-hoc')).toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider client={makeClient()}>
+        <SessionDetail session={{ ...BASE_SESSION, panopticonManaged: true, panIssueId: 'PAN-457' }} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText('Managed · PAN-457')).toBeInTheDocument();
+  });
+
   it('calls onClose when close button is clicked', () => {
     const onClose = vi.fn();
     renderDetail(BASE_SESSION, onClose);

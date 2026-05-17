@@ -122,10 +122,15 @@ async function sampleJsonlLines(filePath: string, tier: EnrichmentTier, options:
     rl.on('line', (line) => {
       const trimmed = line.trim();
       if (!trimmed || capped) return;
-      const sampled = boundedLine(trimmed);
       seen++;
 
-      if (tier === 3 || options.fullTranscript) {
+      if (options.fullTranscript) {
+        l3Lines.push(trimmed);
+        return;
+      }
+
+      const sampled = boundedLine(trimmed);
+      if (tier === 3) {
         const nextBytes = bytes + Buffer.byteLength(sampled, 'utf8');
         if (l3Lines.length >= L3_MAX_LINES || nextBytes > L3_MAX_BYTES) {
           capped = true;
@@ -167,8 +172,10 @@ async function sampleJsonlLines(filePath: string, tier: EnrichmentTier, options:
  * Parse JSONL lines into a human-readable conversation excerpt for the prompt.
  * Extracts role + text content from each line.
  */
-function buildConversationExcerpt(lines: string[]): string {
+function buildConversationExcerpt(lines: string[], options: { fullTranscript?: boolean } = {}): string {
   const parts: string[] = [];
+  const limitText = (text: string) => options.fullTranscript ? text : text.slice(0, 500);
+
   for (const line of lines) {
     try {
       const msg = JSON.parse(line) as {
@@ -180,9 +187,9 @@ function buildConversationExcerpt(lines: string[]): string {
       const content = msg.message?.content ?? msg.content;
       let text = '';
       if (typeof content === 'string') {
-        text = redactSensitiveText(content).slice(0, 500);
+        text = limitText(redactSensitiveText(content));
       } else if (Array.isArray(content)) {
-        text = content
+        text = limitText(content
           .map((b: unknown) => {
             const block = b as { type?: string; text?: string; name?: string };
             if (block.type === 'text') return redactSensitiveText(block.text ?? '');
@@ -190,8 +197,7 @@ function buildConversationExcerpt(lines: string[]): string {
             return '';
           })
           .filter(Boolean)
-          .join(' ')
-          .slice(0, 500);
+          .join(' '));
       }
       if (text) {
         parts.push(`[${role}]: ${text}`);
@@ -372,7 +378,7 @@ export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichS
     }
 
     // Build conversation excerpt
-    const excerpt = buildConversationExcerpt(lines);
+    const excerpt = buildConversationExcerpt(lines, { fullTranscript: opts.fullTranscript });
     if (!excerpt.trim()) {
       return { sessionId, tier, model, error: 'No text content extractable from JSONL' };
     }

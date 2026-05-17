@@ -38,6 +38,19 @@ Using a temporary isolated `PANOPTICON_HOME=/tmp/pan-457-uat-1778983666-1052` an
 - Clicking `Embed` dispatched embedding generation through the dashboard RPC/backend path and rendered `Embedding complete`.
 - Network panel showed follow-up session/list/stats refreshes after both actions, confirming store/query invalidation and UI refresh behavior.
 
+## Browser UAT — scan click-through
+
+Using a temporary isolated `HOME=/tmp/pan-457-scan-uat-Hok5Ip/home` and `PANOPTICON_HOME=/tmp/pan-457-scan-uat-Hok5Ip/panhome` with a single fixture JSONL, built Node 22 dashboard on `http://127.0.0.1:4316/sessions`:
+
+- Sessions page initially rendered `0 indexed`, `0 enriched`, `0 managed`, and the empty state `Run a scan to discover Claude Code sessions`.
+- Clicked the actual `Scan` button in the Sessions header.
+- Scan domain events recorded progress and completion for the browser-triggered run:
+  - `scan.progress`: `dirsProcessed=1`, `dirsTotal=1`, `sessionsFound=1`, `elapsedMs=22`.
+  - `scan.complete`: `inserted=1`, `updated=0`, `skipped=0`, `errors=0`, `durationMs=22`.
+- The ScanButton rendered the final result `+1 ↑0 ·0.0s` after completion.
+- The refreshed table rendered the discovered fixture row `-tmp-pan-457-uat-workspace/scan-uat-session.jsonl` with `2` messages and `today` last active.
+- Clicking the refreshed row opened `Session #1`; the detail drawer showed the new `Ad-hoc` badge and the fixture JSONL path.
+
 ## Security UAT note
 
 Semantic search origin hardening is covered by `src/dashboard/server/routes/__tests__/discovered-sessions.test.ts`:

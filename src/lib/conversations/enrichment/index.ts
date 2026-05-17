@@ -8,8 +8,8 @@
  *   - Reports progress via optional callback
  */
 
-import { findDiscoveredSessions, getDiscoveredSessionById } from '../../database/discovered-sessions-db.js';
-import type { ConversationFilter, DiscoveredSession } from '../../database/discovered-sessions-db.js';
+import { findDiscoveredSessionIds, getDiscoveredSessionById } from '../../database/discovered-sessions-db.js';
+import type { ConversationFilter } from '../../database/discovered-sessions-db.js';
 import { runWithPool } from '../work-pool.js';
 import { createConfiguredClaudeApi, enrichSession, resolveEnrichmentModel } from './enrich-session.js';
 import { embedSessions } from '../embeddings/index.js';
@@ -93,27 +93,17 @@ export function estimateEnrichmentCost(sessionCount: number, tier: EnrichmentTie
 
 // ─── Session selection ────────────────────────────────────────────────────────
 
-function selectSessionsForEnrichment(
+function selectSessionIdsForEnrichment(
   opts: EnrichOptions,
   tier: EnrichmentTier,
-): DiscoveredSession[] {
-  if (opts.sessionIds && opts.sessionIds.length > 0) {
-    // Explicit session list
-    return opts.sessionIds
-      .map((id) => getDiscoveredSessionById(id))
-      .filter((s): s is DiscoveredSession => s != null);
-  }
+): number[] {
+  if (opts.sessionIds && opts.sessionIds.length > 0) return opts.sessionIds;
 
-  const baseFilter = opts.filter ?? {};
-  const limited = (sessions: DiscoveredSession[]) =>
-    opts.limit !== undefined ? sessions.slice(0, Math.max(0, opts.limit)) : sessions;
-
+  const baseFilter = { ...(opts.filter ?? {}), limit: opts.limit };
   const skipAlready = opts.skipAlreadyEnriched !== false; // default true
-  if (skipAlready) {
-    return limited(findDiscoveredSessions({ ...baseFilter, enrichmentLevelLessThan: tier }));
-  }
+  if (skipAlready) return findDiscoveredSessionIds({ ...baseFilter, enrichmentLevelLessThan: tier });
 
-  return limited(findDiscoveredSessions(baseFilter));
+  return findDiscoveredSessionIds(baseFilter);
 }
 
 // ─── Main bulk enrichment ─────────────────────────────────────────────────────
@@ -144,33 +134,44 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
   });
   const resolveModel = opts.callApi ? undefined : (model: string) => resolveEnrichmentModel(model, config.enabledProviders);
 
-  // Select sessions to enrich
-  const sessions = selectSessionsForEnrichment(opts, tier);
+  const sessionIds = selectSessionIdsForEnrichment(opts, tier);
 
-  if (sessions.length === 0) {
+  if (sessionIds.length === 0) {
     result.durationMs = Date.now() - startTs;
     return result;
   }
 
   // Cost gate: check against threshold
-  const estimatedCost = estimateEnrichmentCost(sessions.length, tier);
+  const estimatedCost = estimateEnrichmentCost(sessionIds.length, tier);
   result.estimatedCost = estimatedCost;
   const threshold = config.enrichment.costConfirmThreshold;
   if (estimatedCost > threshold && !opts.force) {
     // Callers can check the threshold themselves before calling.
     // We throw to make the gate explicit — CLI will catch and prompt user.
-    throw new CostThresholdError(estimatedCost, threshold, sessions.length);
+    throw new CostThresholdError(estimatedCost, threshold, sessionIds.length);
   }
 
   let processed = 0;
   let actualCost = 0;
   let actualCostCount = 0;
-  const total = sessions.length;
+  const total = sessionIds.length;
   const enrichedIds: number[] = [];
 
-  const taskStates = sessions.map((session) => ({ session, accounted: false }));
+  const taskStates = sessionIds.map((sessionId) => ({ sessionId, accounted: false }));
   const tasks = taskStates.map((state) => async () => {
-    const { session } = state;
+    const session = getDiscoveredSessionById(state.sessionId);
+    if (!session) {
+      processed++;
+      state.accounted = true;
+      result.skipped++;
+      await opts.onProgress?.({
+        processed,
+        total,
+        errors: result.errors,
+        elapsedMs: Date.now() - startTs,
+      });
+      return;
+    }
     const sessionResult = await enrichSession({
       sessionId: session.id,
       jsonlPath: session.jsonlPath,

@@ -272,10 +272,15 @@ describe('enrichSession', () => {
     expect(capturedPrompt.length).toBeLessThan(2_800_000);
   });
 
-  it('full-transcript enrichment still honors L3 line caps', async () => {
+  it('full-transcript enrichment sends every JSONL line without L3 caps', async () => {
     const largePath = join(TEST_HOME, 'full-l3.jsonl');
     const lines = Array.from({ length: 5_050 }, (_, i) => JSON.stringify({
-      message: { role: 'user', content: `literal full transcript line ${i}` },
+      message: {
+        role: 'user',
+        content: i === 5_049
+          ? `literal full transcript line ${i} ${'x'.repeat(520)} full-transcript-tail-sentinel`
+          : `literal full transcript line ${i}`,
+      },
     }));
     writeFileSync(largePath, lines.join('\n') + '\n', 'utf8');
     const session = upsertDiscoveredSession({ jsonlPath: largePath, messageCount: lines.length });
@@ -293,9 +298,11 @@ describe('enrichSession', () => {
       },
     });
 
+    expect(capturedPrompt).toContain('literal full transcript line 0');
     expect(capturedPrompt).toContain('literal full transcript line 4999');
-    expect(capturedPrompt).not.toContain('literal full transcript line 5000');
-    expect(capturedPrompt).not.toContain('literal full transcript line 5049');
+    expect(capturedPrompt).toContain('literal full transcript line 5000');
+    expect(capturedPrompt).toContain('literal full transcript line 5049');
+    expect(capturedPrompt).toContain('full-transcript-tail-sentinel');
   });
 
   it('omits raw tool inputs and redacts secrets before sending enrichment prompts', async () => {
