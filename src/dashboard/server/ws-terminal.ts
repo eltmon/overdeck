@@ -20,61 +20,14 @@ import { homedir } from 'node:os';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
-import { buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
-import { getReauthSessionToken, invalidateReauthToken } from './routes/codex-auth.js';
+import { buildTmuxCommandString, buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
+import { consumeReauthTerminalToken } from './routes/codex-auth.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 
 type ClientControlMessage =
   | { type: 'attach'; cols: number; rows: number }
   | { type: 'ready' }
   | { type: 'resize'; cols: number; rows: number };
-
-// Optional /ws/terminal cold-path + accumulation profiling. Enable with
-// PANOPTICON_TERMINAL_PROFILE=1. Per-connection phase timings + a periodic
-// snapshot (heap / hub-count / upgrade-listener / event-loop lag) so a
-// slow-over-time regression can be triaged from the dashboard log alone.
-const TERMINAL_PROFILE_ENABLED = process.env.PANOPTICON_TERMINAL_PROFILE === '1';
-
-function profMark(sessionName: string, t0: bigint, label: string, extra?: string): void {
-  if (!TERMINAL_PROFILE_ENABLED) return;
-  const ms = Number(process.hrtime.bigint() - t0) / 1e6;
-  console.log(`[ws-terminal-prof] ${sessionName} +${ms.toFixed(1)}ms ${label}${extra ? ' ' + extra : ''}`);
-}
-
-async function profStep<T>(sessionName: string, t0: bigint, label: string, fn: () => Promise<T>): Promise<T> {
-  if (!TERMINAL_PROFILE_ENABLED) return fn();
-  const start = process.hrtime.bigint();
-  try {
-    const result = await fn();
-    const dur = Number(process.hrtime.bigint() - start) / 1e6;
-    const elapsed = Number(process.hrtime.bigint() - t0) / 1e6;
-    console.log(`[ws-terminal-prof] ${sessionName} +${elapsed.toFixed(1)}ms ${label} took=${dur.toFixed(1)}ms`);
-    return result;
-  } catch (err) {
-    const dur = Number(process.hrtime.bigint() - start) / 1e6;
-    console.log(`[ws-terminal-prof] ${sessionName} ${label} FAILED after ${dur.toFixed(1)}ms: ${err}`);
-    throw err;
-  }
-}
-
-const PROF_DASHBOARD_START = Date.now();
-let PROF_CONNECTION_COUNT = 0;
-let PROF_LAST_EL_LAG_MS = 0;
-function measureEventLoopLag(): void {
-  if (!TERMINAL_PROFILE_ENABLED) return;
-  const t = process.hrtime.bigint();
-  setImmediate(() => {
-    PROF_LAST_EL_LAG_MS = Number(process.hrtime.bigint() - t) / 1e6;
-  });
-}
-function getAccumStateLine(httpServer: http.Server): string {
-  const heap = process.memoryUsage();
-  const heapMB = (heap.heapUsed / 1024 / 1024).toFixed(1);
-  const rssMB = (heap.rss / 1024 / 1024).toFixed(1);
-  const upMin = ((Date.now() - PROF_DASHBOARD_START) / 60000).toFixed(1);
-  const upgradeListeners = httpServer.listenerCount('upgrade');
-  return `up=${upMin}min conns=${PROF_CONNECTION_COUNT} hubs=${activePtyHubs.size} heap=${heapMB}MB rss=${rssMB}MB upListeners=${upgradeListeners} elLag=${PROF_LAST_EL_LAG_MS.toFixed(1)}ms`;
-}
 
 function parseControlMessage(message: string): ClientControlMessage | null {
   if (!message.startsWith('{')) return null;
@@ -124,19 +77,11 @@ async function captureFreshSnapshot(
   requestedCols: number,
   requestedRows: number,
 ): Promise<{ cols: number; rows: number; data: string }> {
-  // Dimensions and pane content are independent reads — run in parallel so the
-  // snapshot's wall-time is max(getWindowDimensions, capturePane), not sum.
-  const tPar = TERMINAL_PROFILE_ENABLED ? process.hrtime.bigint() : 0n;
-  const [dims, data] = await Promise.all([
-    getWindowDimensionsAsync(sessionName),
-    capturePaneAsync(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true }),
-  ]);
-  if (TERMINAL_PROFILE_ENABLED) {
-    console.log(`[ws-terminal-prof] ${sessionName}   parallel(dims+capture lines=${SNAPSHOT_SCROLLBACK_LINES},esc) took=${(Number(process.hrtime.bigint() - tPar) / 1e6).toFixed(1)}ms bytes=${data.length}`);
-  }
+  const dims = await getWindowDimensionsAsync(sessionName);
   if (!dims) {
     return { cols: requestedCols, rows: requestedRows, data: '' };
   }
+  const data = await capturePaneAsync(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true });
   return { cols: dims.cols, rows: dims.rows, data };
 }
 
@@ -188,16 +133,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
     }
   });
 
-  // Periodic accumulation snapshot — opt-in via PANOPTICON_TERMINAL_PROFILE=1.
-  if (TERMINAL_PROFILE_ENABLED) {
-    setInterval(() => {
-      measureEventLoopLag();
-      console.log(`[ws-terminal-accum] ${getAccumStateLine(server)}`);
-    }, 30000);
-  }
-
   wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
-    const tProf = process.hrtime.bigint();
     const url = new URL(req.url || '', `http://${req.headers.host}`);
     const sessionName = url.searchParams.get('session');
 
@@ -206,24 +142,28 @@ export function setupTerminalWebSocket(server: http.Server): void {
       return;
     }
 
-    // Re-auth sessions require a valid one-time token to prevent hijacking.
+    // Re-auth sessions require a server-issued one-time terminal token to prevent hijacking.
     if (sessionName.startsWith('reauth-')) {
-      const token = url.searchParams.get('token');
-      const expected = getReauthSessionToken(sessionName);
-      if (!token || !expected || expected !== token) {
+      const cookie = req.headers.cookie ?? '';
+      const token = cookie
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.startsWith('pan_codex_reauth='))
+        ?.slice('pan_codex_reauth='.length);
+      let decodedToken = '';
+      try {
+        decodedToken = token ? decodeURIComponent(token) : '';
+      } catch {
+        decodedToken = '';
+      }
+      const [cookieSessionName, terminalToken] = decodedToken.split(':');
+      if (cookieSessionName !== sessionName || !consumeReauthTerminalToken(sessionName, terminalToken)) {
         ws.close(1008, 'Invalid or missing re-auth token');
         return;
       }
-      invalidateReauthToken(sessionName);
     }
 
     console.log(`[ws-terminal] WebSocket connected for session: ${sessionName}`);
-    if (TERMINAL_PROFILE_ENABLED) {
-      PROF_CONNECTION_COUNT += 1;
-      measureEventLoopLag();
-      console.log(`[ws-terminal-accum] @connect ${sessionName} ${getAccumStateLine(server)}`);
-    }
-    profMark(sessionName, tProf, 'connection');
 
     // Buffer messages immediately to avoid losing them during async setup.
     // The client sends resize dimensions immediately on connect, but we have async
@@ -249,18 +189,16 @@ export function setupTerminalWebSocket(server: http.Server): void {
       }
     });
 
-    // Check if tmux session exists and set up PTY (async).
-    // Use a targeted `has-session` (sessionExistsAsync) instead of listing all
-    // sessions — same answer, one short tmux call vs. enumerating every session.
+    // Check if tmux session exists and set up PTY (async)
     (async () => {
       try {
-        const exists = await profStep(sessionName, tProf, 'sessionExistsAsync', () => sessionExistsAsync(sessionName));
-        if (!exists) {
+        const sessions = await listSessionNamesAsync();
+        if (!sessions.includes(sessionName)) {
           ws.close(4404, 'session-not-found');
           return;
         }
       } catch (err) {
-        ws.close(1008, `Failed to check tmux session: ${err}`);
+        ws.close(1008, `Failed to list tmux sessions: ${err}`);
         return;
       }
 
@@ -297,7 +235,6 @@ export function setupTerminalWebSocket(server: http.Server): void {
       if (!attachMessage) {
         return;
       }
-      profMark(sessionName, tProf, 'attach received', `cols=${attachMessage.cols} rows=${attachMessage.rows}`);
 
       const requestedCols = attachMessage.cols;
       const requestedRows = attachMessage.rows;
@@ -305,7 +242,6 @@ export function setupTerminalWebSocket(server: http.Server): void {
       const existingHub = activePtyHubs.get(sessionName);
       if (existingHub) {
         console.log(`[ws-terminal] Joining existing PTY hub for ${sessionName} (${existingHub.clients.size} existing clients)`);
-        profMark(sessionName, tProf, 'existing-hub branch', `clients=${existingHub.clients.size}`);
         addClientToHub(existingHub, ws, false);
         existingHub.inputClient = ws;
 
@@ -316,8 +252,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
           // content and hand it to the new client directly. The captured
           // content is valid at both the hub and the client's dims (same
           // number), so it paints cleanly and no resize dance is needed.
-          const snapshot = await profStep(sessionName, tProf, 'captureViewportSnapshot', () => captureViewportSnapshot(sessionName));
-          profMark(sessionName, tProf, 'sending snapshot (hub-join)', `bytes=${snapshot.length}`);
+          const snapshot = await captureViewportSnapshot(sessionName);
           sendControl(ws, { type: 'snapshot', cols: existingHub.cols, rows: existingHub.rows, data: snapshot });
         } else {
           // Hub is at different dims than the new client needs. Sending the
@@ -424,13 +359,24 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
       const startLocalPty = async () => {
         if (ptyStarted) return;
-        // The session-exists check at the top of the connection handler already
-        // verified the session is present. A second `has-session` here was pure
-        // duplication. If the session vanished between the two checks, the PTY
-        // spawn will fail immediately and `onExit` cleans up.
+        try {
+          const exists = await sessionExistsAsync(sessionName);
+          if (!exists) {
+            console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
+            // Use 4404 (private-use range) so the client can distinguish
+            // "session doesn't exist" from "normal disconnect". The client
+            // should NOT retry on 4404 — the session is gone.
+            ws.close(4404, 'session-not-found');
+            return;
+          }
+        } catch {
+          console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
+          ws.close(4404, 'session-not-found');
+          return;
+        }
+
         ptyStarted = true;
         console.log(`[ws-terminal] Starting local PTY for ${sessionName} at ${hub.cols}x${hub.rows}`);
-        profMark(sessionName, tProf, 'pty.spawn begin');
         // Strip TMUX/TMUX_PANE from inherited env so `tmux attach-session` doesn't refuse
         // with "sessions should be nested with care, unset $TMUX to force" when the
         // dashboard server itself was launched from inside a tmux pane.
@@ -448,11 +394,9 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
         hub.pty = ptyProcess;
         activePtyHubs.set(sessionName, hub);
-        profMark(sessionName, tProf, 'pty.spawn complete');
 
         let ptyChunks = 0;
         let ptyBytes = 0;
-        let firstByteLogged = false;
         const ptyDiagInterval = setInterval(() => {
           if (ptyChunks === 0) return;
           const maxBuf = Math.max(...[...hub.clients].map(c => c.bufferedAmount));
@@ -462,10 +406,6 @@ export function setupTerminalWebSocket(server: http.Server): void {
         }, 5000);
 
         ptyProcess.onData((data) => {
-          if (!firstByteLogged) {
-            firstByteLogged = true;
-            profMark(sessionName, tProf, 'first PTY data byte', `len=${data.length}`);
-          }
           ptyChunks++;
           ptyBytes += data.length;
           broadcastToHub(hub, data);
@@ -490,8 +430,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
         pendingInput.length = 0;
       };
 
-      const snapshot = await profStep(sessionName, tProf, 'captureFreshSnapshot', () => captureFreshSnapshot(sessionName, requestedCols, requestedRows));
-      profMark(sessionName, tProf, 'sending snapshot (fresh)', `bytes=${snapshot.data.length}`);
+      const snapshot = await captureFreshSnapshot(sessionName, requestedCols, requestedRows);
       sendControl(ws, { type: 'snapshot', cols: snapshot.cols, rows: snapshot.rows, data: snapshot.data });
       // Start PTY immediately — don't wait for client 'ready'. The hub buffers
       // live data for not-yet-ready clients (pty-hub.ts broadcastToHub), so data
