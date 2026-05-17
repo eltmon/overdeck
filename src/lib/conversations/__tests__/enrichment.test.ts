@@ -236,6 +236,52 @@ describe('enrichSession', () => {
     expect(capturedPrompt.length).toBeLessThan(2_800_000);
   });
 
+  it('omits raw tool inputs and redacts secrets before sending enrichment prompts', async () => {
+    const secretPath = join(TEST_HOME, 'secret-tool-use.jsonl');
+    const lines = [
+      JSON.stringify({
+        message: {
+          role: 'assistant',
+          content: [{
+            type: 'tool_use',
+            name: 'Bash',
+            input: {
+              command: 'DATABASE_URL=postgres://user:pass@db/app npm_TOKEN=npm_abcdefghijklmnopqrstuvwxyz1234567890',
+            },
+          }],
+        },
+      }),
+      JSON.stringify({
+        message: {
+          role: 'user',
+          content: 'Here is a jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature and api_key=sk-proj-secret1234567890',
+        },
+      }),
+    ];
+    writeFileSync(secretPath, lines.join('\n') + '\n', 'utf8');
+    const session = upsertDiscoveredSession({ jsonlPath: secretPath, messageCount: lines.length });
+    let capturedPrompt = '';
+
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: secretPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_model, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Redacted.', tags: ['security'] };
+      },
+    });
+
+    expect(capturedPrompt).toContain('[tool_use:Bash]');
+    expect(capturedPrompt).not.toContain('DATABASE_URL=postgres://user:pass@db/app');
+    expect(capturedPrompt).not.toContain('npm_abcdefghijklmnopqrstuvwxyz1234567890');
+    expect(capturedPrompt).not.toContain('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature');
+    expect(capturedPrompt).not.toContain('sk-proj-secret1234567890');
+    expect(capturedPrompt).toContain('[REDACTED_JWT]');
+    expect(capturedPrompt).toContain('api_key=[REDACTED]');
+  });
+
   it('marks session as failed when API throws', async () => {
     seedSession();
     const sessions = findDiscoveredSessions({});

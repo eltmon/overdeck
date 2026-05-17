@@ -23,7 +23,7 @@ import type { AgentStatus, ConversationEvent, DomainEvent, EnrichCompleteEvent, 
 import type { StoredEvent } from './event-store.js';
 import type { SearchResult } from '../../lib/conversations/search.js';
 import { CostThresholdError } from '../../lib/conversations/enrichment/index.js';
-import { getConversationsConfigAsync } from '../../lib/config.js';
+import { getConversationsConfigAsync } from '../../lib/config-yaml.js';
 import type { DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { jsonResponse } from './http-helpers.js';
@@ -520,7 +520,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         Effect.promise(async () => {
           const config = await getConversationsConfigAsync();
           const result = await runDashboardDbJob<SearchResult>('searchSessions', {
-            q: input.query,
+            q: input.semantic === true ? undefined : input.query,
+            semanticQuery: input.semantic === true ? input.query : undefined,
             similarTo: input.similarTo,
             filter: input,
             limit: input.limit,

@@ -150,7 +150,9 @@ export async function openEventDb(): Promise<DbAdapter> {
   } else {
     // Node.js: use shared database connection — migrations run there
     const { getDatabase } = await import('../../lib/database/index.js');
-    return getDatabase() as unknown as DbAdapter;
+    const db = getDatabase();
+    initWorkspaceDiscoveredSessionsSchema(db);
+    return db as unknown as DbAdapter;
   }
 }
 

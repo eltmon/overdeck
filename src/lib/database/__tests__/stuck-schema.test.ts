@@ -67,6 +67,16 @@ describe('stuck state schema (PAN-653)', () => {
     }
   });
 
+  it('dashboard startup database opener wires the workspace discovered-session schema', async () => {
+    const { openEventDb } = await import('../../../dashboard/server/event-store.js');
+    const db = await openEventDb();
+    const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type IN ('table', 'virtual')`).all() as Array<{ name: string }>;
+    const names = tables.map((t) => t.name);
+    expect(names).toContain('discovered_sessions');
+    expect(names).toContain('sessions_fts');
+    expect(names).toContain('session_embeddings');
+  });
+
   it('markWorkspaceStuck persists across a read', async () => {
     const { markWorkspaceStuck } = await import('../../review-status.js');
     const { getReviewStatusFromDb } = await import('../review-status-db.js');

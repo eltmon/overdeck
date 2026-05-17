@@ -14,8 +14,8 @@ import { runWithPool } from '../work-pool.js';
 import { enrichSession } from './enrich-session.js';
 import { embedSessions } from '../embeddings/index.js';
 import type { EnrichSessionOptions } from './enrich-session.js';
-import { getConversationsConfig } from '../../config.js';
-import type { ConversationsConfig } from '../../config.js';
+import { getConversationsConfig } from '../../config-yaml.js';
+import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EnrichmentTier } from './model-fallback.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ export interface EnrichOptions {
   /** Injected API caller for testing */
   callApi?: EnrichSessionOptions['callApi'];
   /** Preloaded conversations config for dashboard callers */
-  config?: ConversationsConfig;
+  config?: RuntimeConversationsConfig;
   /** Progress callback */
   onProgress?: (progress: EnrichProgress) => void | Promise<void>;
 }

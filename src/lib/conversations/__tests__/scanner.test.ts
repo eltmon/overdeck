@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { parseSessionJsonl } from '../jsonl-async.js';
-import { scan } from '../scanner.js';
+import { scan, validateEstimatedCost } from '../scanner.js';
 
 // Allow individual tests to inject a parse failure for a specific file path
 let failParseForPath: string | null = null;
@@ -219,6 +219,16 @@ describe('scanner', () => {
     expect(result.inserted + result.updated).toBe(1);
     expect(parser).toHaveBeenCalledTimes(1);
     expect(parser).toHaveBeenCalledWith(target);
+  });
+
+  it('uses a 20% tolerance when validating estimated scan cost', () => {
+    const warningsAtBoundary: string[] = [];
+    validateEstimatedCost('/tmp/session.jsonl', 1.20, 1.00, warningsAtBoundary);
+    expect(warningsAtBoundary).toHaveLength(0);
+
+    const warningsPastBoundary: string[] = [];
+    validateEstimatedCost('/tmp/session.jsonl', 1.21, 1.00, warningsPastBoundary);
+    expect(warningsPastBoundary).toHaveLength(1);
   });
 
   it('validates estimated scan cost against matching cost_events records', async () => {

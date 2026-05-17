@@ -284,15 +284,19 @@ export function SettingsPage() {
     if (!convConfig) return;
     setConvConfigSaving(true);
     try {
-      await fetch('/api/discovered-sessions/config', {
+      const res = await fetch('/api/discovered-sessions/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(convConfig),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
       setConvConfigDirty(false);
       toast.success('Embedding settings saved');
-    } catch {
-      toast.error('Failed to save embedding settings');
+    } catch (err) {
+      toast.error(`Failed to save embedding settings: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setConvConfigSaving(false);
     }

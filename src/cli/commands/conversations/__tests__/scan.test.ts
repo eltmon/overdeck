@@ -15,13 +15,15 @@ import { tmpdir } from 'os';
 
 const mockWatchDirs: string[] = [];
 
-vi.mock('../../../../lib/config.js', () => ({
+vi.mock('../../../../lib/config-yaml.js', () => ({
   getConversationsConfig: () => ({
     watchDirs: mockWatchDirs,
-    defaultEnrichmentTier: 1,
-    autoEnrich: false,
-    scanOnStartup: false,
-    enrichmentCostLimit: 1,
+    scanMaxParallel: null,
+    embeddings: false,
+    embeddingProvider: 'openai',
+    embeddingModel: 'text-embedding-3-small',
+    embeddingAutoOnDeep: false,
+    enrichment: { quickModel: null, deepModel: null, maxParallel: 2, costConfirmThreshold: 1 },
   }),
 }));
 

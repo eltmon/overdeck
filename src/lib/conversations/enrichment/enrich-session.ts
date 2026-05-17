@@ -54,10 +54,16 @@ export interface EnrichSessionResult {
 
 function redactSensitiveText(text: string): string {
   return text
-    .replace(/\b(?:sk-ant|sk-proj|sk-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]+\b/g, '[REDACTED_API_KEY]')
-    .replace(/\b(?:ghp|github_pat|glpat|xox[baprs])-?[A-Za-z0-9_\-]{20,}\b/g, '[REDACTED_TOKEN]')
-    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[REDACTED_AWS_KEY]')
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '[REDACTED_PRIVATE_KEY]')
+    .replace(/\b(?:sk-ant|sk-proj|sk-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]+\b/g, '[REDACTED_API_KEY]')
+    .replace(/\b(?:ghp|github_pat|glpat|xox[baprs]|npm)_[A-Za-z0-9_\-]{20,}\b/g, '[REDACTED_TOKEN]')
+    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[REDACTED_AWS_KEY]')
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[REDACTED_JWT]')
+    .replace(/\b(?:DATABASE_URL|[A-Z0-9_]*(?:PASSWORD|PASSWD|API_KEY|SECRET|TOKEN)[A-Z0-9_]*)\s*=\s*[^\s,;]+/g, (match) => {
+      const [key] = match.split('=', 1);
+      return `${key}=[REDACTED]`;
+    })
+    .replace(/\b(?:postgres(?:ql)?|mysql|mongodb|redis):\/\/[^\s,;@]+:[^\s,;@]+@[^\s,;]+/gi, '[REDACTED_DATABASE_URL]')
     .replace(/\b(password|passwd|api[_-]?key|secret|token)\s*[:=]\s*[^\s,;]+/gi, '$1=[REDACTED]');
 }
 
@@ -165,13 +171,13 @@ function buildConversationExcerpt(lines: string[]): string {
       const content = msg.message?.content ?? msg.content;
       let text = '';
       if (typeof content === 'string') {
-        text = content.slice(0, 500);
+        text = redactSensitiveText(content).slice(0, 500);
       } else if (Array.isArray(content)) {
         text = content
           .map((b: unknown) => {
-            const block = b as { type?: string; text?: string; name?: string; input?: unknown };
-            if (block.type === 'text') return block.text ?? '';
-            if (block.type === 'tool_use') return `[tool_use:${block.name ?? 'unknown'}] ${JSON.stringify(block.input ?? {}).slice(0, 200)}`;
+            const block = b as { type?: string; text?: string; name?: string };
+            if (block.type === 'text') return redactSensitiveText(block.text ?? '');
+            if (block.type === 'tool_use') return `[tool_use:${block.name ?? 'unknown'}]`;
             return '';
           })
           .filter(Boolean)
@@ -179,7 +185,7 @@ function buildConversationExcerpt(lines: string[]): string {
           .slice(0, 500);
       }
       if (text) {
-        parts.push(`[${role}]: ${redactSensitiveText(text)}`);
+        parts.push(`[${role}]: ${text}`);
       }
     } catch {
       // skip malformed lines

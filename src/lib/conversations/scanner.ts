@@ -336,14 +336,14 @@ function estimateCost(
   }
 }
 
-function validateEstimatedCost(
+export function validateEstimatedCost(
   jsonlPath: string,
   estimatedCost: number,
   actualCost: number,
   warnings: string[],
 ): void {
   const delta = Math.abs(estimatedCost - actualCost);
-  const tolerance = Math.max(0.01, actualCost * 0.25);
+  const tolerance = Math.max(0.01, actualCost * 0.20);
   if (delta > tolerance) {
     warnings.push(
       `Estimated cost for ${jsonlPath} differs from cost_events by $${delta.toFixed(4)} ` +

@@ -29,8 +29,8 @@ import {
 import type { DiscoveredSession, ConversationFilter } from '../database/discovered-sessions-db.js';
 import { embed } from './embeddings/providers.js';
 import type { EmbeddingProviderName } from './embeddings/providers.js';
-import { getConversationsConfig } from '../config.js';
-import type { ConversationsConfig } from '../config.js';
+import { getConversationsConfig } from '../config-yaml.js';
+import type { RuntimeConversationsConfig } from '../config-yaml.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ export interface SearchQuery {
   /** Output format (for CLI callers) */
   format?: 'table' | 'json' | 'brief' | 'ids';
   /** Preloaded conversations config for dashboard callers */
-  config?: ConversationsConfig;
+  config?: RuntimeConversationsConfig;
 }
 
 /**
@@ -202,7 +202,11 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
   // ── Semantic free-text query path ─────────────────────────────────────────
   if (query.semanticQuery?.trim()) {
     const provider = (query.semanticProvider ?? config.embeddingProvider ?? 'openai') as EmbeddingProviderName;
-    const embedResult = await embed(provider, { text: query.semanticQuery.trim(), model: embeddingModel });
+    const embedResult = await embed(provider, {
+      text: query.semanticQuery.trim(),
+      model: embeddingModel,
+      apiKey: provider === 'ollama' ? undefined : config.apiKeys?.[provider],
+    });
     const queryEmbedding = embedResult.embedding;
     const filter = normalizeFilter(query.filter, undefined, undefined);
     const ranked = topKCosine(queryEmbedding, embeddingModel, filter, limit, offset, semanticCandidateWindow(limit, offset));

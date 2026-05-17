@@ -33,7 +33,8 @@ import type { ConversationFilter, DiscoveredSession } from '../../../lib/databas
 import type { SearchResult } from '../../../lib/conversations/search.js';
 import { CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
-import { getConversationsConfigAsync, loadConfigAsync, saveConfigAsync } from '../../../lib/config.js';
+import { getConversationsConfigAsync } from '../../../lib/config-yaml.js';
+import { updateSettingsApi } from '../../../lib/settings-api.js';
 import { embed } from '../../../lib/conversations/embeddings/providers.js';
 import { validateOrigin } from './origin-validation.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
@@ -619,16 +620,14 @@ const putConvConfigRoute = HttpRouter.add(
     if (!parsedBody.ok) return parsedBody.response;
     const body = parsedBody.body;
 
-    yield* Effect.promise(async () => {
-      const cfg = await loadConfigAsync();
-      if (!cfg.conversations) cfg.conversations = {} as typeof cfg.conversations;
-      const conv = cfg.conversations!;
-      if (body.embeddings !== undefined) conv.embeddings = body.embeddings;
-      if (body.embeddingProvider !== undefined) conv.embeddingProvider = body.embeddingProvider as typeof conv.embeddingProvider;
-      if (body.embeddingModel !== undefined) conv.embeddingModel = body.embeddingModel;
-      if (body.embeddingAutoOnDeep !== undefined) conv.embeddingAutoOnDeep = body.embeddingAutoOnDeep;
-      await saveConfigAsync(cfg);
-    });
+    yield* Effect.promise(() => updateSettingsApi({
+      conversations: {
+        embeddings: body.embeddings,
+        embedding_provider: body.embeddingProvider as 'openai' | 'voyage' | 'ollama' | undefined,
+        embedding_model: body.embeddingModel,
+        embedding_auto_on_deep: body.embeddingAutoOnDeep,
+      },
+    }));
 
     return jsonResponse({ ok: true });
   })),

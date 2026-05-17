@@ -16,8 +16,8 @@ import {
 import type { DiscoveredSession } from '../../database/discovered-sessions-db.js';
 import { runWithPool } from '../work-pool.js';
 import { embed } from './providers.js';
-import { getConversationsConfig } from '../../config.js';
-import type { ConversationsConfig } from '../../config.js';
+import { getConversationsConfig } from '../../config-yaml.js';
+import type { RuntimeConversationsConfig } from '../../config-yaml.js';
 import type { EmbeddingProviderName } from './providers.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ export interface EmbedSessionsOptions {
   /** Replace existing embeddings instead of selecting only missing ones */
   regenerate?: boolean;
   /** Preloaded conversations config for dashboard callers */
-  config?: ConversationsConfig;
+  config?: RuntimeConversationsConfig;
   /** Injected embed function for testing */
   embedFn?: typeof embed;
   /** Progress callback */
@@ -139,6 +139,7 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
         text,
         model,
         baseUrl: opts.ollamaBaseUrl,
+        apiKey: provider === 'ollama' ? undefined : config.apiKeys?.[provider],
       });
 
       insertEmbedding(session.id, model, embedResult.embedding);

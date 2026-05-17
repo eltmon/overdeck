@@ -135,6 +135,7 @@ interface PlanningStateCacheEntry {
 const planningStateCache = new Map<string, PlanningStateCacheEntry>();
 
 const planningStateRefreshInFlight = new Set<string>();
+const PLANNING_REFRESH_CONCURRENCY = 4;
 const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
 
 function getCachedPlanningState(identifier: string): {
@@ -229,6 +230,9 @@ export class IssueDataService {
   private shadowStatesCache: Map<string, any> = new Map();
   private _onIssuesChanged: ((issues: unknown[]) => void) | null = null;
   private planningSnapshotQueued = false;
+  private planningRefreshQueue: string[] = [];
+  private planningRefreshQueued = new Set<string>();
+  private planningRefreshActive = 0;
 
   /** Register a callback invoked whenever issue data changes (PAN-433). */
   onIssuesChanged(fn: (issues: unknown[]) => void): void {
@@ -405,12 +409,9 @@ export class IssueDataService {
       // review-status.json may not exist yet
     }
 
-    // Enrich with cached planning-state; async refreshes update the snapshot when files change.
+    // Enrich with cached planning-state only. Refresh work is scheduled by tracker updates.
     allIssues = allIssues.map(issue => {
       const ps = getCachedPlanningState(issue.identifier);
-      void refreshPlanningState(issue.identifier).then((changed) => {
-        if (changed) this.queuePlanningSnapshot();
-      });
       return {
         ...issue,
         hasPlan: ps.hasPlan,
@@ -620,6 +621,7 @@ export class IssueDataService {
         this.trackers[tracker].lastFetchedAt = cached.lastFetchedAt;
       }
     }
+    this.schedulePlanningRefreshForIssues(this.getCachedTrackerIssues());
   }
 
   private pushSnapshot(): void {
@@ -627,7 +629,40 @@ export class IssueDataService {
   }
 
   private pushUpdated(): void {
+    this.schedulePlanningRefreshForIssues(this.getCachedTrackerIssues());
     this._onIssuesChanged?.(this.getIssues());
+  }
+
+  private getCachedTrackerIssues(): any[] {
+    return [
+      ...this.trackers.github.lastFetchedIssues,
+      ...this.trackers.linear.lastFetchedIssues,
+      ...this.trackers.rally.lastFetchedIssues,
+    ];
+  }
+
+  private schedulePlanningRefreshForIssues(issues: any[]): void {
+    for (const issue of issues) {
+      const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
+      if (!identifier || this.planningRefreshQueued.has(identifier) || planningStateRefreshInFlight.has(identifier)) continue;
+      this.planningRefreshQueued.add(identifier);
+      this.planningRefreshQueue.push(identifier);
+    }
+    this.drainPlanningRefreshQueue();
+  }
+
+  private drainPlanningRefreshQueue(): void {
+    while (this.planningRefreshActive < PLANNING_REFRESH_CONCURRENCY && this.planningRefreshQueue.length > 0) {
+      const identifier = this.planningRefreshQueue.shift()!;
+      this.planningRefreshQueued.delete(identifier);
+      this.planningRefreshActive++;
+      void refreshPlanningState(identifier).then((changed) => {
+        if (changed) this.queuePlanningSnapshot();
+      }).finally(() => {
+        this.planningRefreshActive--;
+        this.drainPlanningRefreshQueue();
+      });
+    }
   }
 
   private queuePlanningSnapshot(): void {

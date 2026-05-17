@@ -214,6 +214,7 @@ export interface YamlConfig {
   /** Legacy API keys (for backward compatibility) */
   api_keys?: {
     openai?: string;
+    voyage?: string;
     google?: string;
     minimax?: string;
     zai?: string;
@@ -374,6 +375,7 @@ export interface NormalizedConfig {
   /** API keys by provider */
   apiKeys: {
     openai?: string;
+    voyage?: string;
     google?: string;
     minimax?: string;
     zai?: string;
@@ -496,6 +498,31 @@ export interface NormalizedCavemanConfig {
  * Returned when deprecated model IDs are automatically migrated
  * during config load.
  */
+export type RuntimeConversationsConfig = NormalizedConfig['conversations'] & {
+  apiKeys?: NormalizedConfig['apiKeys'];
+};
+
+export function resolveConversationWatchDirs(config: RuntimeConversationsConfig): RuntimeConversationsConfig {
+  return {
+    ...config,
+    watchDirs: config.watchDirs.map((dir) =>
+      dir.startsWith('~/') ? join(homedir(), dir.slice(2)) : dir,
+    ),
+  };
+}
+
+export function getConversationsConfig(): RuntimeConversationsConfig {
+  const { config } = loadConfig();
+  return resolveConversationWatchDirs({
+    ...config.conversations,
+    apiKeys: config.apiKeys,
+  });
+}
+
+export async function getConversationsConfigAsync(): Promise<RuntimeConversationsConfig> {
+  return getConversationsConfig();
+}
+
 export interface MigrationResult {
   /** List of migrated model IDs */
   migrated: Array<{
@@ -1092,6 +1119,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
           result.enabledProviders.add('openai');
         }
       }
+      if (config.api_keys.voyage) {
+        result.apiKeys.voyage = resolveEnvVar(config.api_keys.voyage);
+      }
       if (config.api_keys.google) {
         result.apiKeys.google = resolveEnvVar(config.api_keys.google);
         if (!explicitlyDisabled.has('google')) {
@@ -1401,6 +1431,9 @@ export function loadConfig(): ConfigLoadResult {
     if (!explicitlyDisabled.has('openai')) {
       config.enabledProviders.add('openai');
     }
+  }
+  if (process.env.VOYAGE_API_KEY && !config.apiKeys.voyage) {
+    config.apiKeys.voyage = process.env.VOYAGE_API_KEY;
   }
   if (process.env.GOOGLE_API_KEY && !config.apiKeys.google) {
     config.apiKeys.google = process.env.GOOGLE_API_KEY;
