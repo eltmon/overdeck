@@ -218,6 +218,7 @@ function buildAgentControlEventPayload(state: AgentState, previousStatus?: Agent
     issueId: state.issueId,
     status: toAgentStatusPayload(state.status),
     previousStatus,
+    stoppedByUser: state.stoppedByUser === true,
     paused: state.paused === true,
     pausedReason: state.pausedReason ?? null,
     pausedAt: state.pausedAt ?? null,
@@ -233,6 +234,7 @@ function buildAgentControlEventPayload(state: AgentState, previousStatus?: Agent
 
 function buildAgentGateFailureSnapshot(state: Partial<AgentState>) {
   return {
+    stoppedByUser: state.stoppedByUser === true,
     paused: state.paused === true,
     pausedReason: state.pausedReason ?? null,
     pausedAt: state.pausedAt ?? null,

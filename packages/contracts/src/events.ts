@@ -83,6 +83,7 @@ export const AgentStatusChangedEvent = Schema.Struct({
     issueId: Schema.optional(IssueId),
     status: AgentStatus,
     previousStatus: Schema.optional(AgentStatus),
+    stoppedByUser: Schema.optional(Schema.Boolean),
     paused: Schema.optional(Schema.Boolean),
     pausedReason: Schema.optional(Schema.NullOr(Schema.String)),
     pausedAt: Schema.optional(Schema.NullOr(Schema.String)),

@@ -18,6 +18,7 @@ export interface IssueAgent {
   model: string;
   startedAt: string;
   consecutiveFailures: number;
+  stoppedByUser?: boolean;
   paused?: boolean;
   pausedReason?: string;
   pausedAt?: string;
@@ -433,7 +434,9 @@ export function IssueAgentCard({
         ? `Troubled (${agent.consecutiveFailures} failure${agent.consecutiveFailures === 1 ? '' : 's'})`
         : noResumeMode?.active === true
           ? 'Boot --no-resume'
-          : undefined
+          : agent.stoppedByUser === true
+            ? 'Manual'
+            : undefined
     : undefined;
   const gatingTitle = gatingReason === 'Boot --no-resume' && noResumeMode?.since
     ? `No-resume mode active since ${formatRelativeTime(noResumeMode.since, now)}`

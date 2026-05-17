@@ -310,6 +310,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         : state.turnDiffSummariesByAgentId
       const nextAgent: AgentSnapshot = { ...agent, status: event.payload.status }
 
+      if ('stoppedByUser' in event.payload) nextAgent.stoppedByUser = event.payload.stoppedByUser
       if ('paused' in event.payload) nextAgent.paused = event.payload.paused
       if ('pausedReason' in event.payload) {
         if (event.payload.pausedReason === null || event.payload.pausedReason === undefined) delete nextAgent.pausedReason

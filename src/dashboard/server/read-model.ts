@@ -339,6 +339,7 @@ export const ReadModelServiceLive = Layer.effect(
               costSoFar: a.costSoFar,
               sessionId: a.sessionId || undefined,
               role: toRole((a as { role?: unknown }).role),
+              stoppedByUser: a.stoppedByUser,
               paused: a.paused,
               pausedReason: a.pausedReason,
               pausedAt: a.pausedAt,

@@ -89,6 +89,7 @@ export interface Agent {
   pid?: number;
   startedAt: string;
   lastActivity?: string;
+  stoppedByUser?: boolean;
   paused?: boolean;
   pausedReason?: string;
   pausedAt?: string;

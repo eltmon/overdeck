@@ -1381,7 +1381,28 @@ export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
   console.log(`[${agentId}] channels:dismiss:dialog-not-detected`);
 }
 
+function getAgentResumeGateBlockReason(state: Pick<AgentState, 'paused' | 'pausedReason' | 'troubled' | 'consecutiveFailures'>): string | undefined {
+  if (state.paused === true) {
+    return state.pausedReason
+      ? `agent is paused (${state.pausedReason})`
+      : 'agent is paused';
+  }
+  if (state.troubled === true) {
+    const failures = state.consecutiveFailures ?? 0;
+    return `agent is troubled (${failures} failure${failures === 1 ? '' : 's'})`;
+  }
+  return undefined;
+}
+
+function assertAgentCanTransitionToRunning(state: AgentState): void {
+  const reason = getAgentResumeGateBlockReason(state);
+  if (reason) {
+    throw new Error(`Cannot run ${state.id}: ${reason}. Clear the gate before resuming.`);
+  }
+}
+
 function markAgentRunning(state: AgentState): void {
+  assertAgentCanTransitionToRunning(state);
   const oldStatus = state.status;
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
@@ -2851,8 +2872,26 @@ export async function stopAgentAsync(agentId: string): Promise<void> {
   });
 }
 
+function queueAgentMail(agentId: string, message: string): void {
+  const mailDir = join(getAgentDir(agentId), 'mail');
+  mkdirSync(mailDir, { recursive: true });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  writeFileSync(
+    join(mailDir, `${timestamp}.md`),
+    `# Message\n\n${message}\n`
+  );
+}
+
 export async function messageAgent(agentId: string, message: string): Promise<void> {
   const normalizedId = normalizeAgentId(agentId);
+  const agentState = getAgentState(normalizedId);
+  const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+  if (gateBlockReason) {
+    queueAgentMail(normalizedId, message);
+    logAgentLifecycle(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
+    console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
+    return;
+  }
 
   // Check if agent is suspended - auto-resume if so (PAN-80)
   const runtimeState = getAgentRuntimeState(normalizedId);
@@ -2882,20 +2921,13 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   // `remain-on-exit on` so the shell persists after the agent process exits, and
   // sessionExists() returns true for that dead shell. resumeAgent() kills the zombie
   // session before re-creating it.
-  const agentState = getAgentState(normalizedId);
   if (agentState && agentState.status === 'stopped') {
     console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${await sessionExistsAsync(normalizedId)})`);
 
     const resumeResult = await resumeAgent(normalizedId, message);
 
     // Save to mail queue regardless so the agent can re-read feedback if needed
-    const mailDir = join(getAgentDir(normalizedId), 'mail');
-    mkdirSync(mailDir, { recursive: true });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    writeFileSync(
-      join(mailDir, `${timestamp}.md`),
-      `# Message\n\n${message}\n`
-    );
+    queueAgentMail(normalizedId, message);
 
     if (resumeResult.success && resumeResult.messageDelivered !== false) {
       console.log(`[agents] Resumed ${normalizedId} and delivered feedback`);
@@ -2999,13 +3031,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     await sendToRemoteAgent(normalizedId, remoteState.vmName, message);
 
     // Also save to mail queue for persistence
-    const mailDir = join(getAgentDir(normalizedId), 'mail');
-    mkdirSync(mailDir, { recursive: true });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    writeFileSync(
-      join(mailDir, `${timestamp}.md`),
-      `# Message\n\n${message}\n`
-    );
+    queueAgentMail(normalizedId, message);
     return;
   }
 
@@ -3041,14 +3067,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   await deliverAgentMessage(normalizedId, message, 'messageAgent:pan-tell', deliveryMethod);
 
   // Also save to mail queue
-  const mailDir = join(getAgentDir(normalizedId), 'mail');
-  mkdirSync(mailDir, { recursive: true });
-
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  writeFileSync(
-    join(mailDir, `${timestamp}.md`),
-    `# Message\n\n${message}\n`
-  );
+  queueAgentMail(normalizedId, message);
 }
 
 /**
@@ -3069,6 +3088,12 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
   const runtimeState = getAgentRuntimeState(normalizedId);
   const agentState = getAgentState(normalizedId);
+  const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+  if (gateBlockReason) {
+    const reason = `Cannot resume ${normalizedId}: ${gateBlockReason}. Clear the gate before resuming.`;
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+    return { success: false, error: reason };
+  }
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
   const isPlaceholder = !!agentState && agentState.status === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
   const allowedRuntimeStates = ['suspended', 'idle'];
@@ -3266,6 +3291,12 @@ export async function restartAgent(
   if (!agentState) {
     return { success: false, error: `Agent ${normalizedId} not found` };
   }
+  const gateBlockReason = getAgentResumeGateBlockReason(agentState);
+  if (gateBlockReason) {
+    const reason = `Cannot restart ${normalizedId}: ${gateBlockReason}. Clear the gate before restarting.`;
+    logAgentLifecycle(normalizedId, `restartAgent BLOCKED: ${reason}`);
+    return { success: false, error: reason };
+  }
   if (!agentState.workspace || !existsSync(agentState.workspace)) {
     return { success: false, error: `Agent workspace missing: ${agentState.workspace}` };
   }
@@ -3426,6 +3457,11 @@ export async function recoverAgent(
 
   // Runtime state files may lack required fields (PAN-150)
   if (!state.id) state.id = normalizedId;
+  const gateBlockReason = getAgentResumeGateBlockReason(state);
+  if (gateBlockReason) {
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: Cannot recover ${normalizedId}: ${gateBlockReason}. Clear the gate before recovering.`);
+    return null;
+  }
   const modelOverride = normalizeModelOverride(opts.modelOverride);
   if (modelOverride) {
     state.model = modelOverride;

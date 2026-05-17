@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -276,6 +276,34 @@ describe('auto-resume gates', () => {
     const state = agents.getAgentState(agentId);
     expect(state?.status).toBe('stopped');
     expect(state?.consecutiveFailures).toBe(1);
+  });
+
+  it('queues feedback without resuming paused agents', async () => {
+    const agentId = 'agent-pan-1141-feedback-paused';
+    const { agents } = await loadDeaconWithResumeMock();
+    agents.saveAgentState({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: workspaceFor(agentId),
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: BASE_TIME.toISOString(),
+      paused: true,
+      pausedReason: 'manual inspection',
+      pausedAt: BASE_TIME.toISOString(),
+    });
+
+    await agents.messageAgent(agentId, 'review feedback');
+
+    const state = agents.getAgentState(agentId);
+    expect(state?.status).toBe('stopped');
+    expect(state?.paused).toBe(true);
+    const mailDir = join(agents.getAgentDir(agentId), 'mail');
+    const mailFiles = readdirSync(mailDir);
+    expect(mailFiles).toHaveLength(1);
+    expect(readFileSync(join(mailDir, mailFiles[0]), 'utf-8')).toContain('review feedback');
   });
 
   it('auto-resumes unpaused agents stopped by pause', async () => {

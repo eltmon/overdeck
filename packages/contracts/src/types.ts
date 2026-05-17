@@ -269,6 +269,7 @@ export const AgentSnapshot = Schema.Struct({
   costSoFar: Schema.optional(Schema.Number),
   sessionId: Schema.optional(Schema.String),
   role: Schema.optional(Role),
+  stoppedByUser: Schema.optional(Schema.Boolean),
   paused: Schema.optional(Schema.Boolean),
   pausedReason: Schema.optional(Schema.String),
   pausedAt: Schema.optional(Schema.String),
