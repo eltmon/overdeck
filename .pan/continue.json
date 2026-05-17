@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T17:18:30.000Z",
+  "updated": "2026-05-17T17:22:00.000Z",
   "gitState": {
     "branch": "feature/pan-1141",
     "sha": "a8e07d4f5920249258c39daeb7923de960422af4",
@@ -128,11 +128,10 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-y8vc (pan status now prints a Gate line for non-running paused, troubled, boot no-resume, and manually stopped agents, leaves running/mid-pipeline agents without a gate, and includes gatingReason in JSON output; targeted status harness test/typecheck/lint passed). Next agent should run bd ready -l pan-1141 and claim the next ready PAN-1141 bead.",
-    "beadId": "workspace-y8vc",
+    "description": "Completed bead workspace-y3ro (pan up now accepts --no-resume, prints the no-resume startup banner, and injects PANOPTICON_NO_RESUME=1 into the dashboard/Electron child environment only when requested; source help check/typecheck/lint passed). PAN-1141 bead queue should now be checked with bd ready -l pan-1141.",
+    "beadId": "workspace-y3ro",
     "filesToRead": [
-      "src/cli/commands/status.ts",
-      "src/cli/commands/__tests__/status-harness.test.ts",
+      "src/cli/index.ts",
       ".pan/spec.vbrief.json",
       ".pan/continue.json"
     ]
@@ -276,6 +275,12 @@
       "timestamp": "2026-05-17T17:18:30.000Z",
       "reason": "bead-complete",
       "note": "Updated pan status to compute gating reasons for non-running agents: Paused (reason), Troubled (N failures), Boot --no-resume from env or dashboard /api/no-resume-mode, and Manual for user-stopped agents, while omitting the Gate line for running and ungated mid-pipeline agents. npm test -- src/cli/commands/__tests__/status-harness.test.ts, npm run typecheck, and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T17:22:00.000Z",
+      "reason": "bead-complete",
+      "note": "Implemented pan up --no-resume by registering the CLI flag, printing the startup [no-resume mode active] line, and passing PANOPTICON_NO_RESUME=1 to the dashboard server child in both foreground and detach paths plus the Electron launch path. npx tsx src/cli/index.ts up --help | grep -- --no-resume, npm run typecheck, and npm run lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],

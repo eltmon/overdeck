@@ -497,6 +497,7 @@ program
   .option('--detach', 'Run in background')
   .option('--skip-traefik', 'Skip Traefik startup')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
+  .option('--no-resume', 'Start dashboard with agent auto-resume disabled for this boot')
   .action(async (options) => {
     const { spawn, execSync } = await import('child_process');
     const { join, dirname } = await import('path');
@@ -531,6 +532,9 @@ program
     }
 
     console.log(chalk.bold('Starting Panopticon...\n'));
+    if (options.noResume) {
+      console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
+    }
 
     // Auto-sync skills, hooks, and MCP config on every startup
     {
@@ -803,7 +807,10 @@ program
       const child = spawn(electronAppPath, [], {
         detached: true,
         stdio: 'ignore',
-        env: process.env,
+        env: {
+          ...process.env,
+          ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+        },
       });
 
       const launchSucceeded = await new Promise<boolean>((resolve) => {
@@ -891,6 +898,7 @@ program
               DASHBOARD_PORT: String(dashboardPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
+              ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
             },
           });
 
@@ -946,6 +954,7 @@ program
               DASHBOARD_PORT: String(dashboardPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
+              ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
             },
           });
 
