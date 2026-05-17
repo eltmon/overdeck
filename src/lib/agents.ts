@@ -1870,8 +1870,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // so we never block the Node event loop.
   await saveAgentStateAsync(state);
 
+  const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
+  const shouldDeliverPromptViaTmux = isSpecialistRole;
+
   let promptFile: string | undefined;
-  if (options.prompt) {
+  if (options.prompt && !shouldDeliverPromptViaTmux) {
     promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
     await writeFileAsync(promptFile, options.prompt);
   }
@@ -1907,7 +1910,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // Excluding the orchestrator here previously forced AgentOutputPanel to
   // synthesize a Conversation whose sessionAlive came from `agent.status`, and
   // stale snapshots made active synthesizers render as "Starting…".
-  const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
   let sessionId: string | undefined;
   if (isSpecialistRole) {
     sessionId = randomUUID();
@@ -1947,15 +1949,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
   // PAN-1059 / PAN-977: specialist roles (review sub-roles, test, ship) must not
-  // pass the prompt as a positional argument to Claude Code. Inside a detached
-  // tmux session, `--session-id` combined with a large positional prompt causes
-  // Claude Code to exit immediately (session-env directory created, then silent
-  // death). Work agents avoid this by delivering the prompt via tmux send-keys
-  // after Claude boots. Specialist roles now use the same delivery path.
-  // Exception: review sub-roles use `--print` mode which requires the prompt
-  // as an argument — tmux send-keys delivery doesn't work with `--print`.
-  const usesPrintMode = role === 'review' && options.subRole;
-  const shouldDeliverPromptViaTmux = isSpecialistRole && !usesPrintMode;
+  // pass the prompt as a positional argument or prompt-file redirect to Claude Code.
+  // Work agents avoid this by delivering the prompt via tmux send-keys after Claude boots;
+  // specialist roles use the same delivery path.
 
   const launcherContent = generateLauncherScript({
     role,
