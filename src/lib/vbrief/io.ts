@@ -178,7 +178,11 @@ export function applyStatusOverrides(doc: VBriefDocument, overrides: Record<stri
       const itemId = key.slice(0, dotIndex);
       const subId = key.slice(dotIndex + 1);
       const item = merged.plan.items.find(i => i.id === itemId);
-      const sub = item?.subItems?.find(s => s.id === subId);
+      // SubItem IDs use format "parentId.subId" (e.g. "auto-start.ac1"),
+      // but updateSubItemStatus passes only the subId portion. Reconstruct the full
+      // ID for the lookup.
+      const fullSubId = `${itemId}.${subId}`;
+      const sub = item?.subItems?.find(s => s.id === fullSubId);
       if (sub) {
         sub.status = status as VBriefItemStatus;
         if (status === 'completed' && !sub.completed) {
@@ -346,7 +350,9 @@ export function updateSubItemStatus(
   const item = doc.plan.items.find(i => i.id === itemId);
   if (!item?.subItems) return;
 
-  const subItem = item.subItems.find(s => s.id === subItemId);
+  // Normalize subItemId before validation — spec uses "parentId.subId" format
+  const fullSubId = subItemId.includes('.') ? subItemId : `${itemId}.${subItemId}`;
+  const subItem = item.subItems.find(s => s.id === subItemId || s.id === fullSubId);
   if (!subItem) return;
 
   const continueState = readWorkspaceContinue(workspacePath) ?? {
@@ -363,7 +369,7 @@ export function updateSubItemStatus(
   };
 
   const overrides = { ...continueState.statusOverrides };
-  overrides[`${itemId}.${subItemId}`] = status;
+  overrides[fullSubId] = status;
   continueState.statusOverrides = overrides;
 
   writeWorkspaceContinue(workspacePath, continueState);
