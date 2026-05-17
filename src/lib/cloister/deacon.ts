@@ -41,7 +41,7 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent } from '../agents.js';
+import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent, recordAgentFailure } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, isPaneDeadAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
@@ -2167,6 +2167,7 @@ const mergeStuckCooldowns = new Map<string, number>();
 // Callback set by the server layer to emit domain events when agents are stopped.
 // Deacon is a library module and does not own the event store directly.
 let agentStoppedNotifier: ((agentId: string) => void) | null = null;
+const orphanFailureRecordedForAutoResume = new Set<string>();
 
 /**
  * Register a callback that deacon will call when it detects an orphaned agent
@@ -4335,6 +4336,9 @@ async function recoverOrphanedAgents(context?: string): Promise<string[]> {
       state.status = 'stopped';
       state.stoppedAt = new Date().toISOString();
       writeFileSync(stateFile, JSON.stringify(state, null, 2));
+      if (state.stoppedByUser !== true && recordAgentFailure(dir, `orphaned: tmux session missing (${context ?? 'patrol'})`)) {
+        orphanFailureRecordedForAutoResume.add(dir);
+      }
       const msg = `Recovered orphaned agent ${dir} (${oldStatus}→stopped)`;
       actions.push(msg);
       console.log(`[deacon] ${msg}`);
@@ -4776,15 +4780,22 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   const noResumeMode = getNoResumeMode();
   if (noResumeMode.active) {
     logDeaconEvent('PANOPTICON_NO_RESUME=1 — skipping autoResumeStoppedWorkAgents');
+    orphanFailureRecordedForAutoResume.clear();
     return resumed;
   }
 
-  if (!existsSync(AGENTS_DIR)) return resumed;
+  if (!existsSync(AGENTS_DIR)) {
+    orphanFailureRecordedForAutoResume.clear();
+    return resumed;
+  }
 
   let dirs: string[];
   try {
     dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
-  } catch { return resumed; }
+  } catch {
+    orphanFailureRecordedForAutoResume.clear();
+    return resumed;
+  }
 
   logDeaconEvent(`autoResumeStoppedWorkAgents started: scanning ${dirs.length} agent directorie(s)`);
 
@@ -4930,12 +4941,18 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
         });
       } else {
         const msg = `Failed to auto-resume ${agentId}: ${result.error}`;
+        if (!orphanFailureRecordedForAutoResume.has(agentId)) {
+          recordAgentFailure(agentId, msg);
+        }
         console.warn(`[deacon] ${msg}`);
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${msg}`);
         logAgentLifecycle(agentId, `auto-resume FAILED: ${result.error}`);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (!orphanFailureRecordedForAutoResume.has(agentId)) {
+        recordAgentFailure(agentId, `Auto-resume error for ${agentId}: ${msg}`);
+      }
       console.warn(`[deacon] Auto-resume error for ${agentId}: ${msg}`);
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} auto-resume threw: ${msg}`);
       logAgentLifecycle(agentId, `auto-resume threw exception: ${msg}`);
@@ -4947,6 +4964,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   } else {
     logDeaconEvent(`autoResumeStoppedWorkAgents completed: no agents resumed`);
   }
+  orphanFailureRecordedForAutoResume.clear();
   return resumed;
 }
 

@@ -128,12 +128,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-0qip (PANOPTICON_NO_RESUME boot gate short-circuits orphan recovery and auto-resume, with GET /api/no-resume-mode). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-0qip",
+    "description": "Completed bead workspace-2mby (failure tracking increments on orphan recovery and auto-resume failures, with reset when agents reach running). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-2mby",
     "filesToRead": [
-      "src/lib/cloister/no-resume-mode.ts",
+      "src/lib/agents.ts",
       "src/lib/cloister/deacon.ts",
-      "src/dashboard/server/routes/misc.ts",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -168,6 +167,12 @@
       "timestamp": "2026-05-17T15:00:22.927Z",
       "reason": "bead-complete",
       "note": "Implemented PANOPTICON_NO_RESUME boot-scoped gate for recoverOrphanedAgents and autoResumeStoppedWorkAgents, added shared truthy parser/state helper, and exposed GET /api/no-resume-mode. npm run typecheck and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T15:07:11.889Z",
+      "reason": "bead-complete",
+      "note": "Implemented failure tracking at auto-resume failure and orphan-recovery crash sites, suppressed same-cycle orphan/resume double-counts, and reset failure fields from the running-state transition. npm run typecheck and npm run lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],

@@ -1280,6 +1280,8 @@ function markAgentRunning(state: AgentState): void {
   const oldStatus = state.status;
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
+  resetAgentFailureCount(state.id);
+  clearFailureTrackingFields(state);
   delete state.stoppedAt;
   // Clear user-stop intent so a later crash/orphan can be auto-resumed. Without
   // this the flag is sticky across the stop→resume→crash sequence and autoResume
@@ -2197,8 +2199,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
-  state.status = 'running';
-  state.lastActivity = new Date().toISOString();
+  markAgentRunning(state);
 
   // Stamp the workspace HEAD this role run was launched against. The reactive
   // scheduler uses this to tell a still-relevant run from a zombie session

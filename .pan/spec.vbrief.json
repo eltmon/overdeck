@@ -235,7 +235,7 @@
       {
         "id": "failure-counter",
         "title": "Increment and reset the consecutive-failure counter at cloister failure sites",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -251,7 +251,7 @@
           {
             "id": "failure-counter.ac1",
             "title": "Failed auto-resume increments `consecutiveFailures` by 1 and stamps `lastFailureAt` / `lastFailureReason`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -259,7 +259,7 @@
           {
             "id": "failure-counter.ac2",
             "title": "Orphan-crash detection increments `consecutiveFailures` exactly once per detected crash (no double-count when orphan-recovery and auto-resume run in the same patrol cycle)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -267,7 +267,7 @@
           {
             "id": "failure-counter.ac3",
             "title": "Successful spawn (agent reaches `running`) resets `consecutiveFailures` to 0 and clears `firstFailureInRunAt`/`lastFailureAt`/`lastFailureReason`/`lastFailureNextRetryAt`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
