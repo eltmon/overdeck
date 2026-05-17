@@ -121,7 +121,7 @@ describe('removeLegacySkills070', () => {
     expect(existsSync(join(mockClaudeSkills, 'bug-fix'))).toBe(true);
   });
 
-  it('is idempotent — second call is a no-op after the first call removes everything', () => {
+  it('is idempotent — second call is a no-op after the first call removes legacy skills', () => {
     makeLegacySkill('pan-tldr');
     makeLegacySkill('pan-setup');
 

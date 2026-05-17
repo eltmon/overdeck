@@ -192,6 +192,9 @@ own `node_modules` created by `bun install` — **never symlink node_modules fro
 Symlinks break local workspace package resolution (e.g., `@panctl/contracts` would
 resolve to the main repo's stale build instead of the worktree's version).
 
+See [docs/WORKSPACE-CONTAINERS.md](docs/WORKSPACE-CONTAINERS.md) for the workspace
+container contract, stack-health surfaces, spawn gate, and recovery commands.
+
 **Before running builds or tests in a workspace:**
 1. Run `bun install` from the workspace root (creates correct workspace-aware node_modules)
 2. If you modified `packages/contracts/`, rebuild: `cd packages/contracts && npm run build`

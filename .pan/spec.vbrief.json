@@ -1,78 +1,376 @@
 {
   "vBRIEFInfo": {
     "version": "0.5",
-    "author": "agent:claude-code",
-    "description": "PAN-977: Durable vBRIEF task graph control plane",
-    "created": "2026-05-09T00:00:00Z",
-    "updated": "2026-05-09T19:15:00Z"
+    "created": "2026-05-16T22:05:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1140: Workspace init container fails on every workspace: husky + tsdown not found (exit 127)"
   },
   "plan": {
-    "id": "PAN-977",
-    "title": "Durable vBRIEF task graph control plane",
-    "status": "active",
-    "uid": "pan-977-durable-vbrief-task-graph",
-    "author": "agent:claude-code",
+    "id": "pan-1140",
+    "title": "Workspace init container fails on every workspace: husky + tsdown not found (exit 127)",
+    "status": "approved",
+    "uid": "c2a47e91-3d8f-4b6a-9c1e-2f5d8a3b6e9c",
+    "author": "agent:claude-opus-4-7",
     "sequence": 1,
-    "created": "2026-05-09T00:00:00Z",
-    "updated": "2026-05-09T19:15:00Z",
+    "created": "2026-05-16T22:05:00.000Z",
+    "updated": "2026-05-16T22:42:15.000Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/977", "label": "PAN-977", "type": "issue" }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/1140", "label": "PAN-1140", "type": "issue" },
+      { "uri": "infra/.devcontainer-template/docker-compose.devcontainer.yml.template", "label": "compose template", "type": "code" },
+      { "uri": "src/lib/agents.ts", "label": "spawnAgent / spawnRun", "type": "code" },
+      { "uri": "src/lib/cloister/deacon.ts", "label": "checkWorkspaceContainerHealth", "type": "code" },
+      { "uri": ".claude/rules/single-deacon-invariant.md", "label": "single-deacon invariant", "type": "doc" }
     ],
-    "tags": ["PAN-977", "vbrief", "swarm", "task-graph"],
-    "metadata": {
-      "pipeline": {
-        "phase": "phase-1-sqlite-authoritative",
-        "issueId": "PAN-977",
-        "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-09T19:15:00Z"
-      }
-    },
+    "tags": ["docker", "workspace", "container", "init", "spawn-gating", "isolation"],
     "narratives": {
-      "Problem": "Panopticon swarm execution needs a durable task graph rooted in vBRIEF so agents can answer next/show/claim/done/block without relying on Beads as the canonical source of truth.",
-      "Proposal": "Add vBRIEF-native dispatch helpers, bounded active slices, persisted task operations with CAS and atomic writes, continue-state swarm runtime persistence, and pipeline mirror metadata while keeping SQLite authoritative for Phase 1 live runtime state."
+      "Problem": "Every workspace docker stack built in the past ~4 weeks has an init container exiting code 127 because `bun install` inside the container runs the `prepare: husky` script while husky (and tsdown) live in devDependencies that aren't getting installed. The frontend and server services hard-depend on `init: service_completed_successfully` and stay stuck in `Created` state forever, while the host-side agent spawn path is completely unaware of this failure and keeps spawning agents on the host. The user perceived they had docker workspace isolation; they did not.",
+      "Proposal": "Three-part fix scoped to NOT refactor host-side workspace lifecycle: (1) Make the init container actually succeed by setting NODE_ENV=development + HUSKY=0 and dropping desktop-only devDeps from container installs. (2) Add a workspace-stack health surface so init failures are loudly visible in pan status and the dashboard, not silent. (3) Gate the host-side agent spawn on workspace stack health for any project that has a compose_template configured — refuse spawn with a clear error when the stack is broken, and provide a `--host` break-glass flag with interactive confirmation for the explicit override case. Complete the cleanup story with `pan workspace reap` (remove orphaned Created-state stacks) and verify `pan workspace rebuild` exists for resetting a single stuck stack."
     },
+    "autoDecisions": [
+      {
+        "summary": "Interpret 'no silent host fallback' as a spawn-gate, not a process-relocation.",
+        "rationale": "Issue 'Out of scope' explicitly excludes refactoring the host-side workspace lifecycle and replacing the devcontainer pattern. Moving agent tmux sessions into containers would touch both. Gating the existing host spawn on workspace stack health respects scope while satisfying the strengthened acceptance criterion ('agent must not be spawned on the host as a fallback' when the stack is broken). Host execution behind an explicit `--host` flag is the documented break-glass."
+      },
+      {
+        "summary": "Combine NODE_ENV=development + HUSKY=0 + drop-desktop-devdeps as defense-in-depth in the init service rather than picking one.",
+        "rationale": "Each fix addresses a distinct failure mode visible in the issue logs (prod-only install resolving 22 packages → NODE_ENV; husky exit 127 → HUSKY=0; @electron/get postinstall error → desktop deps audit). All three are cheap, additive, and verifiable in isolation, so there is no benefit to gambling on one."
+      },
+      {
+        "summary": "Place reap/rebuild under existing `pan workspace` subcommand group, not new top-level verbs.",
+        "rationale": "Matches CLAUDE.md's skills↔CLI convention (`pan <verb>` => `pan-<verb>` skill) and avoids inflating the top-level verb namespace for a maintenance operation."
+      },
+      {
+        "summary": "Use `workspace.docker.compose_template` presence in project config as the trigger for spawn gating — no new global toggle.",
+        "rationale": "Projects without docker compose templates (plain forks, simple repos) keep current host-only behavior unchanged. Adding a new toggle would be a footgun. Projects that opt into docker isolation get the gate automatically."
+      },
+      {
+        "summary": "Stack-health snapshot reuses the existing docker-stats poller rather than calling `docker ps` per spawn.",
+        "rationale": "docker-stats already polls container state on a cadence. Spawn-gate decision should be O(1) read of in-memory state, not a fresh process spawn — satisfies CLAUDE.md's 'No Blocking Calls in Dashboard Server Code' rule and keeps spawn latency unchanged for the happy path."
+      },
+      {
+        "summary": "`pan workspace reap` defaults to dry-run; `--apply` is required to actually `docker compose down -v`.",
+        "rationale": "Destructive container teardown should never run by default. The user's stash-hygiene policy in CLAUDE.md ('measure twice, cut once') is the same posture. A dry-run preview is also useful as a diagnostic."
+      }
+    ],
     "items": [
       {
-        "id": "pan-977-task-graph",
-        "title": "Add vBRIEF-native task graph and persisted task operations",
+        "id": "fix-init-script",
+        "title": "Fix workspace init container so bun install + builds succeed (exit 0)",
         "status": "completed",
-        "priority": "critical",
-        "metadata": { "difficulty": "complex", "issueLabel": "PAN-977", "files_scope": ["src/lib/vbrief/**"] },
-        "narrative": { "Action": "Implement next/show/claim/done/block semantics on vBRIEF items, including CAS, single-writer ownership, atomic write-back to .pan/spec.vbrief.json, and blocked-item dispatch exclusion." },
+        "priority": "high",
+        "created": "2026-05-16T22:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1140",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Edit `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` (and the rendered copy at `.devcontainer/docker-compose.devcontainer.yml` in this workspace, so the agent can verify against its own stack) to add `NODE_ENV=development` and `HUSKY=0` to the `init` service `environment:` block, and tighten the install command so the husky `prepare` script is a no-op inside the container. Inspect `scripts/postinstall.mjs` first to decide whether bun's `--ignore-scripts` is safe; if postinstall is needed, prefer HUSKY=0 alone over --ignore-scripts. Keep the existing `PANOPTICON_DISABLE_DEACON=1` and no-${HOME}/.panopticon-mount invariants on the `server` service untouched."
+        },
         "subItems": [
-          { "id": "pan-977-task-graph.ac1", "title": "getDispatchableItems and task graph views exclude running, completed, cancelled, and blocked items", "status": "completed", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "pan-977-task-graph.ac2", "title": "Task operations mutate plan item and subItem status durably with expected sequence checks", "status": "completed", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "pan-977-task-graph.ac3", "title": "Plan writes use temp-file then rename and enforce one writer per worktree", "status": "completed", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "fix-init-script.ac1",
+            "title": "Init container in a fresh workspace exits 0 within 5 minutes of `docker compose ... up -d --build` (verified in this workspace's own stack as the acceptance target).",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-init-script.ac2",
+            "title": "Frontend and server containers transition from `Created` to `Up` (Running) after init succeeds, confirmed via `docker compose ps`.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-init-script.ac3",
+            "title": "Template file (`infra/.devcontainer-template/docker-compose.devcontainer.yml.template`) and the rendered workspace copy both reflect the fix; no $HOME/.panopticon mount appears on the server service; PANOPTICON_DISABLE_DEACON=1 remains set on the server service.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-init-script.ac4",
+            "title": "Init logs no longer show `husky: command not found` or `tsdown: command not found`; `bun install` resolves significantly more than 22 packages (devDeps included).",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-init-script.ac5",
+            "title": "Host-side `bun install` in the worktree still works after the change (verified by running it and confirming the husky git hooks installed correctly on the host).",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
         ]
       },
       {
-        "id": "pan-977-active-slice",
-        "title": "Wire bounded active slices into work-agent prompts",
+        "id": "drop-desktop-devdeps-from-containers",
+        "title": "Stop installing desktop-only deps (electron family) inside workspace containers",
         "status": "completed",
-        "priority": "high",
-        "metadata": { "difficulty": "medium", "issueLabel": "PAN-977", "files_scope": ["src/lib/cloister/work-agent-prompt.ts", "src/lib/vbrief/**"] },
-        "narrative": { "Action": "Generate work-agent prompt context from active vBRIEF slices by default and verify large-plan prompt-size reduction." },
+        "priority": "medium",
+        "created": "2026-05-16T22:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1140",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Identify devDependencies that are only needed for `apps/desktop` (electron, @electron/get, electron-builder, etc.) and verify they are scoped to the `apps/desktop` workspace package, not the root. If they live at the root, move them into `apps/desktop/package.json` devDeps. Re-verify init container logs show no `@electron/get missing` / electron-postinstall errors."
+        },
         "subItems": [
-          { "id": "pan-977-active-slice.ac1", "title": "Prompt generation includes bounded target item, dependency, acceptance criteria, and synthesis context instead of full-plan payloads", "status": "completed", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "pan-977-active-slice.ac2", "title": "Large outlier plan verification proves active slice payloads stay substantially smaller than full plan JSON", "status": "completed", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "drop-desktop-devdeps-from-containers.ac1",
+            "title": "Workspace init container logs contain no electron-related install warnings or postinstall failures after the change.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "drop-desktop-devdeps-from-containers.ac2",
+            "title": "`apps/desktop` build still succeeds on host (electron deps remain available where they're needed).",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "drop-desktop-devdeps-from-containers.ac3",
+            "title": "Root `package.json` devDependencies no longer contain electron-family packages (if they were there to begin with).",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
         ]
       },
       {
-        "id": "pan-977-pipeline-mirror",
-        "title": "Mirror pipeline state into vBRIEF metadata with SQLite authority boundary",
+        "id": "surface-init-failures",
+        "title": "Surface workspace stack health (init failure, stuck Created) in pan status and dashboard",
         "status": "completed",
         "priority": "high",
-        "metadata": { "difficulty": "medium", "issueLabel": "PAN-977", "files_scope": ["src/lib/review-status.ts", "src/lib/vbrief/**"] },
-        "narrative": { "Action": "Write schema-conforming plan.metadata.pipeline mirrors on Cloister status transitions while documenting SQLite remains authoritative for live Phase 1 state." },
+        "created": "2026-05-16T22:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1140",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a `getWorkspaceStackHealth(issueId)` function (location: `src/lib/workspace/stack-health.ts` or co-located with `src/lib/docker-stats.ts`) that returns `{ healthy: boolean, reasons: string[], lastObserved: ISO8601 }`. Inputs: presence of `workspace.docker.compose_template` for the project, current docker-stats snapshot, and a stuck-Created threshold (default 120s). Outputs: healthy=false when init exited non-zero OR services are in Created/Exited state. Surface in (a) `pan status` text output (red line per broken workspace), (b) dashboard workspace card via a new field on the workspace snapshot RPC, and (c) activity stream as a single emit when health transitions from healthy → unhealthy."
+        },
         "subItems": [
-          { "id": "pan-977-pipeline-mirror.ac1", "title": "Nested pipeline mirror records verification, review, test, uat, merge, readyForMerge, and PR URL fields", "status": "completed", "metadata": { "kind": "acceptance_criterion" } },
-          { "id": "pan-977-pipeline-mirror.ac2", "title": "pan-oversee and dashboard readers can use the mirror as corroborating input without replacing SQLite", "status": "completed", "metadata": { "kind": "acceptance_criterion" } }
+          {
+            "id": "surface-init-failures.ac1",
+            "title": "`pan status` shows an explicit `STACK BROKEN` (or equivalent red) line for any workspace whose init exited non-zero or whose services are stuck in Created > 120s.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "surface-init-failures.ac2",
+            "title": "Dashboard workspace card shows a visible error state (red badge or banner) for broken stacks within 30s of the failure being observable to docker-stats.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "surface-init-failures.ac3",
+            "title": "Activity stream emits exactly one `workspace-stack-unhealthy` event per healthy→unhealthy transition (not on every poll cycle).",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "surface-init-failures.ac4",
+            "title": "No new execSync / readFileSync calls introduced into server-reachable code (lint passes; rule `no-execsync-server.md` honored).",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "surface-init-failures.ac5",
+            "title": "Unit test covers the threshold logic (Created < 120s = healthy, Created ≥ 120s = unhealthy, Exited non-zero = unhealthy, Up = healthy).",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "gate-agent-spawn-on-stack-health",
+        "title": "Gate agent spawn on workspace docker stack health; add --host break-glass flag",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-16T22:05:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1140",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "In `src/lib/agents.ts` `spawnAgent` AND `spawnRun`, before creating the tmux session: if the project for `options.issueId` has `workspace.docker.compose_template` configured and `options.allowHost !== true`, call `getWorkspaceStackHealth(issueId)`. If unhealthy, throw a clear error: `Workspace docker stack for ${issueId} is not healthy: ${reasons.join('; ')}. Run 'pan workspace rebuild ${issueId}' or retry with --host to override.` Add `--host` flag to the relevant CLI commands (`pan start`, `pan work`, and any direct spawn entrypoints) that maps to `allowHost: true` AND requires interactive confirmation (`Are you sure? This bypasses workspace isolation. (y/N)`); CI/non-TTY contexts also require `--yes`. Emit a `agent-spawn-blocked-stack-unhealthy` activity event when the gate blocks. Audit every call site that constructs an agent process (grep for `spawnAgent`, `spawnRun`, `createSessionAsync(.*agent-`) and document the audit result in a new `docs/SPAWN-GATING.md` note. Add a vitest case asserting that `spawnAgent` rejects when the stack is broken and the project has docker configured."
+        },
+        "subItems": [
+          {
+            "id": "gate-agent-spawn-on-stack-health.ac1",
+            "title": "`spawnAgent` and `spawnRun` reject (throw) when the project has compose_template configured AND `getWorkspaceStackHealth` returns unhealthy AND `allowHost` is not true.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "gate-agent-spawn-on-stack-health.ac2",
+            "title": "The rejection message names the issue ID, lists the unhealthy reasons, and tells the operator the exact next step (`pan workspace rebuild <id>` or `--host`).",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "gate-agent-spawn-on-stack-health.ac3",
+            "title": "`--host` flag is wired through every CLI surface that can spawn an agent (`pan start`, `pan work` if present, dashboard spawn endpoints). Interactive use requires y/N confirmation; non-TTY requires explicit `--yes`.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "gate-agent-spawn-on-stack-health.ac4",
+            "title": "Projects WITHOUT a `workspace.docker.compose_template` keep current behavior — no gate, no flag required, no regression in spawn latency.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "gate-agent-spawn-on-stack-health.ac5",
+            "title": "Audit doc (`docs/SPAWN-GATING.md`) lists every spawn entrypoint reachable today and states whether it goes through the gate, with file:line references.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "gate-agent-spawn-on-stack-health.ac6",
+            "title": "Vitest unit test asserts both branches: (a) stack unhealthy + docker project → spawn rejected; (b) stack unhealthy + `allowHost: true` → spawn proceeds with a logged warning.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "gate-agent-spawn-on-stack-health.ac7",
+            "title": "Activity stream emits `agent-spawn-blocked-stack-unhealthy` (or equivalent) when the gate blocks, observable in the dashboard activity feed.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "gate-agent-spawn-on-stack-health.ac8",
+            "title": "No code path inside `src/lib/agents.ts` calls `createSessionAsync(agentId, workspace, ...)` for a work/role agent without first either passing the gate or honoring `allowHost`; restartAgent and session-rotation paths are included in the audit.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "reap-stuck-workspace-stacks",
+        "title": "Add `pan workspace reap` to clean up orphaned Created-state workspace stacks",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-16T22:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1140",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a `pan workspace reap [--days N] [--apply] [--yes]` subcommand that lists workspace docker stacks (containers matching `panopticon-feature-*`) in `Created` or `Exited (non-zero)` state older than N days (default 7). Default behavior is dry-run; `--apply` actually runs `docker compose down -v --remove-orphans` against the matching stack. Skip any stack whose `issueId` has an active agent state file in `~/.panopticon/agents/`. Update the `pan-workspace` skill (or sub-wrapper) so `scripts/lint-skills.sh` continues to pass."
+        },
+        "subItems": [
+          {
+            "id": "reap-stuck-workspace-stacks.ac1",
+            "title": "`pan workspace reap` lists candidates without modifying anything when run without `--apply`.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "reap-stuck-workspace-stacks.ac2",
+            "title": "`pan workspace reap --apply` tears down each candidate via `docker compose down -v --remove-orphans` and prints success/failure per stack.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "reap-stuck-workspace-stacks.ac3",
+            "title": "Stacks whose `issueId` has an active agent state file are skipped (never reaped automatically); skipped stacks are listed with a reason.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "reap-stuck-workspace-stacks.ac4",
+            "title": "`pan workspace reap --help` is self-documenting and `scripts/lint-skills.sh` passes (skill ↔ CLI parity preserved).",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "verify-rebuild-cmd",
+        "title": "Verify (or add) `pan workspace rebuild <id>` for resetting a single stuck stack cleanly",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-16T22:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1140",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Inspect existing CLI for a `pan workspace rebuild` (or similarly named) verb. If it exists and works on a stuck stack, document it in the skill and reference it from the spawn-gate error message. If it does NOT exist, add a minimal command that: tears down the stack (`docker compose down -v --remove-orphans`), re-runs `ensureDevcontainer`, then `docker compose up -d --build` with the same compose file. Single-stack scope; not a bulk operation."
+        },
+        "subItems": [
+          {
+            "id": "verify-rebuild-cmd.ac1",
+            "title": "`pan workspace rebuild <issue-id>` exists, is documented in `pan-workspace` skill, and successfully resets a stuck stack to a healthy state in a manual test.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "verify-rebuild-cmd.ac2",
+            "title": "The spawn-gate rejection message from `gate-agent-spawn-on-stack-health` references this command by exact name.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "verify-rebuild-cmd.ac3",
+            "title": "`pan workspace rebuild --help` is accurate; `scripts/lint-skills.sh` passes.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "docs-workspace-containers",
+        "title": "Document the workspace container contract, failure surfaces, and break-glass flags",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-05-16T22:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1140",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add or update `docs/WORKSPACE-CONTAINERS.md` covering: the init→frontend/server dependency chain; HUSKY=0 + NODE_ENV=development requirement for the init service; the single-deacon invariant cross-link; how stack health is surfaced (pan status + dashboard); the spawn gate behavior and `--host` break-glass; `pan workspace reap` and `pan workspace rebuild` usage. Cross-link from CLAUDE.md's existing workspace section and from `.claude/rules/single-deacon-invariant.md`."
+        },
+        "subItems": [
+          {
+            "id": "docs-workspace-containers.ac1",
+            "title": "New doc `docs/WORKSPACE-CONTAINERS.md` exists and covers init contract, stack health surfacing, spawn gate + --host, and the reap/rebuild commands.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "docs-workspace-containers.ac2",
+            "title": "CLAUDE.md links to the new doc; `.claude/rules/single-deacon-invariant.md` cross-links to it.",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
         ]
       }
     ],
     "edges": [
-      { "from": "pan-977-task-graph", "to": "pan-977-active-slice", "type": "blocks" },
-      { "from": "pan-977-task-graph", "to": "pan-977-pipeline-mirror", "type": "blocks" }
+      { "from": "fix-init-script", "to": "surface-init-failures", "type": "blocks" },
+      { "from": "fix-init-script", "to": "gate-agent-spawn-on-stack-health", "type": "blocks" },
+      { "from": "fix-init-script", "to": "verify-rebuild-cmd", "type": "blocks" },
+      { "from": "fix-init-script", "to": "reap-stuck-workspace-stacks", "type": "blocks" },
+      { "from": "drop-desktop-devdeps-from-containers", "to": "fix-init-script", "type": "informs" },
+      { "from": "surface-init-failures", "to": "gate-agent-spawn-on-stack-health", "type": "blocks" },
+      { "from": "verify-rebuild-cmd", "to": "gate-agent-spawn-on-stack-health", "type": "informs" },
+      { "from": "gate-agent-spawn-on-stack-health", "to": "docs-workspace-containers", "type": "informs" },
+      { "from": "reap-stuck-workspace-stacks", "to": "docs-workspace-containers", "type": "informs" },
+      { "from": "verify-rebuild-cmd", "to": "docs-workspace-containers", "type": "informs" }
     ]
   }
 }

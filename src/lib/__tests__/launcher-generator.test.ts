@@ -66,7 +66,7 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
-      exec claude --agent pan-work-agent --resume 'sess-123' --model gpt-5.4
+      exec claude --agent pan-work-agent --resume 'sess-123' --model 'gpt-5.4'
       "
     `);
   });
@@ -152,7 +152,7 @@ describe('generateLauncherScript', () => {
       export ANTHROPIC_BASE_URL="http://proxy"
       export CAVEMAN_DEFAULT_MODE="active"
       prompt=$(cat '/tmp/prompt.md')
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-abc' --model claude-sonnet-4-6 "$prompt"
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-abc' --model 'claude-sonnet-4-6' "$prompt"
       "
     `);
   });
@@ -236,7 +236,7 @@ describe('generateLauncherScript', () => {
       unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
       export ANTHROPIC_BASE_URL="http://proxy"
       prompt=$(cat '/tmp/identity.md')
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-xyz' --model claude-sonnet-4-6 "$prompt"
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-xyz' --model 'claude-sonnet-4-6' "$prompt"
       "
     `);
   });
@@ -610,7 +610,7 @@ describe('generateLauncherWrapper', () => {
         channelsBridgeMcpConfig: '/tmp/agent-y/.mcp.json',
       });
       expect(script).toContain(
-        "claude --mcp-config '/tmp/agent-y/.mcp.json' --dangerously-load-development-channels server:panopticon-bridge --session-id 'sess-spec' --model claude-sonnet-4-6",
+        "claude --mcp-config '/tmp/agent-y/.mcp.json' --dangerously-load-development-channels server:panopticon-bridge --session-id 'sess-spec' --model 'claude-sonnet-4-6'",
       );
       expect(script).not.toContain('--strict-mcp-config');
     });
@@ -649,7 +649,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/prompt.txt')
-      exec pi --mode rpc --model anthropic/claude-sonnet-4-6 --session-dir '/home/u/.panopticon/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" <> '/home/u/.panopticon/agents/agent-pan-636/rpc.in'
+      exec pi --mode rpc --model 'anthropic/claude-sonnet-4-6' --session-dir '/home/u/.panopticon/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" <> '/home/u/.panopticon/agents/agent-pan-636/rpc.in'
       "
     `);
   });
@@ -685,7 +685,7 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
       resumeSessionId: 'sess-pi-123',
     });
     expect(script).toMatch(/--session 'sess-pi-123'/);
-    expect(script).toMatch(/exec pi --mode rpc --model gpt-5.4-mini/);
+    expect(script).toMatch(/exec pi --mode rpc --model 'gpt-5.4-mini'/);
   });
 
   it('throws when pi launcher is missing required path config', () => {

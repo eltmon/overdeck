@@ -40,8 +40,8 @@
  */
 
 import { exec } from 'child_process';
-import { readFile, rm } from 'fs/promises';
-import { join } from 'path';
+import { mkdir, readFile, rm } from 'fs/promises';
+import { dirname, join } from 'path';
 import { promisify } from 'util';
 import { killSessionAsync, listSessionNamesAsync, isPaneDeadAsync } from '../tmux.js';
 import { emitActivityEntry } from '../activity-logger.js';
@@ -76,8 +76,8 @@ function reviewerAgentId(issueId: string, subRole: ReviewSubRole): string {
   return `agent-${issueId.toLowerCase()}-review-${subRole}`;
 }
 
-function reviewerAgentOutputPath(issueId: string, subRole: ReviewSubRole): string {
-  return join(AGENTS_DIR, reviewerAgentId(issueId, subRole), `review-${subRole}.md`);
+function reviewerAgentOutputPath(workspace: string, runId: string, subRole: ReviewSubRole): string {
+  return join(workspace, PAN_DIRNAME, 'review', runId, `${subRole}.md`);
 }
 
 async function ensureReviewTempStash(issueId: string, workspace: string): Promise<{ ref: string; message: string; sequence: number } | null> {
@@ -218,7 +218,7 @@ function buildReviewRolePrompt(opts: {
   contextManifestPath?: string;
   tier1Summary?: string;
 }): string {
-  const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${join(AGENTS_DIR, `agent-${opts.issueId.toLowerCase()}-review-${r}`, `review-${r}.md`)}`).join('\n');
+  const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${join(opts.reviewDir, `${r}.md`)}`).join('\n');
   const expectedSignals = REVIEW_SUB_ROLES.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
   const synthesisPath = join(opts.reviewDir, 'synthesis.md');
   const prompt = [
@@ -306,11 +306,15 @@ export async function spawnReviewSubRoleForIssue(opts: {
   try {
     const { saveAgentStateAsync, spawnRun } = await import('../agents.js');
     const cfg = loadYamlConfig().config;
-    const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.issueId, opts.subRole);
+    const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.workspace, opts.runId, opts.subRole);
     const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
     const model = opts.model ?? resolveModel('review', opts.subRole, cfg);
+    const reviewerDir = join(AGENTS_DIR, reviewerAgentId(opts.issueId, opts.subRole));
 
+    await mkdir(dirname(outputPath), { recursive: true });
     await rm(outputPath, { force: true });
+    await rm(join(reviewerDir, 'reviewer-signaled'), { force: true });
+    await rm(join(reviewerDir, 'reviewer-launcher.pid'), { force: true });
 
     // Build Tier-1 inline summary from manifest when available (PAN-1125)
     let tier1Summary: string | undefined;
@@ -541,7 +545,7 @@ export async function spawnReviewRoleForIssue(
     emitActivityEntry({ source: 'review', level: 'info', message: `Review role spawned for ${opts.issueId}: ${run.id}`, issueId: opts.issueId });
 
     const reviewerResults = await Promise.all(REVIEW_SUB_ROLES.map(async (subRole) => {
-      const outputPath = reviewerAgentOutputPath(opts.issueId, subRole);
+      const outputPath = reviewerAgentOutputPath(opts.workspace, runId, subRole);
       const result = await spawnReviewSubRoleForIssue({
         issueId: opts.issueId,
         workspace: opts.workspace,

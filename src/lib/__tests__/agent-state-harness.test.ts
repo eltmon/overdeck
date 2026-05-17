@@ -31,12 +31,12 @@ describe('getAgentRuntimeBaseCommand harness routing (PAN-636)', () => {
 
   it('claude-code branch builds the legacy "claude --dangerously-skip-permissions ... --model X" command for an Anthropic model', async () => {
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', undefined, undefined, 'claude-code')
-    expect(cmd).toBe('claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6')
+    expect(cmd).toBe("claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'claude-sonnet-4-6'")
   })
 
   it('pi harness emits a `pi --mode rpc --model <model>` command (AC4)', async () => {
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', undefined, undefined, 'pi')
-    expect(cmd).toBe('pi --mode rpc --model claude-sonnet-4-6')
+    expect(cmd).toBe("pi --mode rpc --model 'claude-sonnet-4-6'")
   })
 
   it('pi harness emits no claude permission flags', async () => {
@@ -67,7 +67,7 @@ describe('getAgentRuntimeBaseCommand permission-mode integration', () => {
 
   it('production default emits --permission-mode auto for an Anthropic model', async () => {
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6')
-    expect(cmd).toBe('claude --permission-mode auto --model claude-sonnet-4-6')
+    expect(cmd).toBe("claude --permission-mode auto --model 'claude-sonnet-4-6'")
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
@@ -75,6 +75,6 @@ describe('getAgentRuntimeBaseCommand permission-mode integration', () => {
   it('PAN_YOLO=true produces the legacy bypass command', async () => {
     process.env.PAN_YOLO = 'true'
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6')
-    expect(cmd).toBe('claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6')
+    expect(cmd).toBe("claude --dangerously-skip-permissions --permission-mode bypassPermissions --model 'claude-sonnet-4-6'")
   })
 })
