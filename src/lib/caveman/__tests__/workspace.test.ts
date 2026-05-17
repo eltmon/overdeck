@@ -13,6 +13,7 @@ import { getCavemanHooksDir } from '../setup.js';
 import {
   determineCavemanVariant,
   injectCavemanSettings,
+  injectMemoryHookSettings,
   readCavemanVariant,
   type CavemanVariant,
 } from '../workspace.js';
@@ -81,6 +82,42 @@ describe('readCavemanVariant', () => {
     mkdirSync(join(workspaceDir, '.claude'), { recursive: true });
     writeFileSync(join(workspaceDir, '.claude', '.caveman-variant'), 'garbage-value\n');
     expect(await readCavemanVariant(workspaceDir)).toBe('off');
+  });
+});
+
+describe('injectMemoryHookSettings', () => {
+  it('installs Stop, SessionStart, and UserPromptSubmit memory hooks into fresh settings', async () => {
+    await injectMemoryHookSettings(workspaceDir);
+
+    const settings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf-8'));
+    expect(settings.hooks.Stop[0].hooks[0]).toMatchObject({ type: 'command', timeout: 1 });
+    expect(settings.hooks.Stop[0].hooks[0].command).toContain('panopticon-memory-hook.js" turn');
+    expect(settings.hooks.SessionStart[0].hooks[0].command).toContain('panopticon-memory-hook.js" session-start');
+    expect(settings.hooks.UserPromptSubmit[0].hooks[0]).toMatchObject({ type: 'command', timeout: 2 });
+    expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('panopticon-memory-hook.js" prompt-inject');
+
+    const script = readFileSync(join(workspaceDir, '.claude', 'hooks', 'panopticon-memory-hook.js'), 'utf-8');
+    expect(script).toContain('/api/memory/turn');
+    expect(script).toContain('/api/memory/session/start');
+    expect(script).toContain('/api/memory/inject');
+  });
+
+  it('preserves existing hooks and does not duplicate memory hooks on repeated setup', async () => {
+    mkdirSync(join(workspaceDir, '.claude'), { recursive: true });
+    writeFileSync(
+      join(workspaceDir, '.claude', 'settings.json'),
+      JSON.stringify({ hooks: { Stop: [{ matcher: '.*', hooks: [{ type: 'command', command: 'echo existing' }] }] } })
+    );
+
+    await injectMemoryHookSettings(workspaceDir);
+    await injectMemoryHookSettings(workspaceDir);
+
+    const settings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf-8'));
+    expect(settings.hooks.Stop).toHaveLength(2);
+    expect(settings.hooks.Stop[0].hooks[0].command).toBe('echo existing');
+    expect(settings.hooks.Stop[1].hooks[0].command).toContain('panopticon-memory-hook.js" turn');
+    expect(settings.hooks.SessionStart).toHaveLength(1);
+    expect(settings.hooks.UserPromptSubmit).toHaveLength(1);
   });
 });
 

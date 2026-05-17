@@ -1066,6 +1066,14 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     result.steps.push(`Panopticon settings copy skipped: ${settingsErr instanceof Error ? settingsErr.message : String(settingsErr)}`);
   }
 
+  try {
+    const { injectMemoryHookSettings } = await import('./caveman/workspace.js');
+    await injectMemoryHookSettings(workspacePath);
+    result.steps.push('Injected memory hooks into .claude/settings.json');
+  } catch (memoryHookErr: unknown) {
+    result.steps.push(`Memory hook setup skipped: ${memoryHookErr instanceof Error ? memoryHookErr.message : String(memoryHookErr)}`);
+  }
+
   result.success = result.errors.length === 0;
   return result;
 }
