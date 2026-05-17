@@ -29,11 +29,18 @@ export type DashboardDbOperation =
   | 'enrichSessions'
   | 'embedSessions';
 
+type ProgressHandler = (progress: unknown) => void | Promise<void>;
+
 interface PendingJob {
   resolve: (value: unknown) => void;
   reject: (err: Error) => void;
-  onProgress?: (progress: unknown) => void | Promise<void>;
+  progressListeners: Set<ProgressHandler>;
   progressChain: Promise<void>;
+}
+
+interface SharedJob {
+  promise: Promise<unknown>;
+  progressListeners: Set<ProgressHandler>;
 }
 
 interface WorkerResponse {
@@ -51,8 +58,16 @@ interface WorkerResponse {
   };
 }
 
+const MAX_PENDING_JOBS = 32;
+const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
+  'scanConversations',
+  'enrichSessions',
+  'embedSessions',
+]);
+
 let worker: Worker | null = null;
 const pending = new Map<string, PendingJob>();
+const sharedJobs = new Map<string, SharedJob>();
 
 function workerScriptUrl(): URL {
   return import.meta.url.endsWith('.ts')
@@ -63,6 +78,21 @@ function workerScriptUrl(): URL {
 function failPending(err: Error): void {
   for (const job of pending.values()) job.reject(err);
   pending.clear();
+  sharedJobs.clear();
+}
+
+function stableStringify(value: unknown): string {
+  if (value == null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => typeof v !== 'function' && v !== undefined)
+    .sort(([a], [b]) => a.localeCompare(b));
+  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`).join(',')}}`;
+}
+
+function coalescingKey(operation: DashboardDbOperation, payload: unknown): string | null {
+  if (!COALESCED_OPERATIONS.has(operation)) return null;
+  return `${operation}:${stableStringify(payload)}`;
 }
 
 function getWorker(): Worker {
@@ -78,9 +108,11 @@ function getWorker(): Worker {
     if (!job) return;
 
     if (message.progress !== undefined) {
-      if (job.onProgress) {
-        job.progressChain = job.progressChain.then(() => Promise.resolve(job.onProgress?.(message.progress)));
-      }
+      job.progressChain = job.progressChain.then(async () => {
+        for (const listener of job.progressListeners) {
+          await listener(message.progress);
+        }
+      });
       return;
     }
 
@@ -157,14 +189,38 @@ export function runDashboardDbJob<T>(
     return runInline(operation, payload, onProgress) as Promise<T>;
   }
 
+  const key = coalescingKey(operation, payload);
+  const existing = key ? sharedJobs.get(key) : undefined;
+  if (existing) {
+    if (onProgress) existing.progressListeners.add(onProgress);
+    return existing.promise as Promise<T>;
+  }
+
+  if (pending.size >= MAX_PENDING_JOBS) {
+    return Promise.reject(new Error('Dashboard database worker queue is full'));
+  }
+
   const id = randomUUID();
-  return new Promise<T>((resolve, reject) => {
+  const progressListeners = new Set<ProgressHandler>();
+  if (onProgress) progressListeners.add(onProgress);
+
+  const promise = new Promise<T>((resolve, reject) => {
     pending.set(id, {
       resolve: resolve as (value: unknown) => void,
       reject,
-      onProgress,
+      progressListeners,
       progressChain: Promise.resolve(),
     });
     getWorker().postMessage({ id, operation, payload });
   });
+
+  if (key) {
+    sharedJobs.set(key, { promise, progressListeners });
+    promise.then(
+      () => sharedJobs.delete(key),
+      () => sharedJobs.delete(key),
+    );
+  }
+
+  return promise;
 }

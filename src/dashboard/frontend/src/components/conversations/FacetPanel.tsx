@@ -10,17 +10,27 @@ interface Filters {
   model?: string;
   minCost?: string;
   maxCost?: string;
+  enrichmentLevel?: string;
 }
 
 interface FacetValue {
   value: string;
   count: number;
+  label?: string;
   cost?: number;
+  minCost?: string;
+  maxCost?: string;
 }
 
 interface Props {
   filters: Filters;
-  facets: { models: FacetValue[]; workspaces: FacetValue[]; enrichmentLevels: FacetValue[] };
+  facets: {
+    models: FacetValue[];
+    workspaces: FacetValue[];
+    timeRanges: FacetValue[];
+    costRanges: FacetValue[];
+    enrichmentLevels: FacetValue[];
+  };
   onChange: (key: string, value: string | boolean | undefined) => void;
 }
 
@@ -53,6 +63,21 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
             </option>
           ))}
         </select>
+        <div className="mt-2 flex flex-wrap gap-1">
+          {facets.timeRanges.map((range) => (
+            <button
+              key={range.value}
+              onClick={() => onChange('since', filters.since === range.value ? undefined : range.value)}
+              className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+                filters.since === range.value
+                  ? 'bg-blue-900 text-blue-100'
+                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              {range.label ?? range.value}: {range.count}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Workspace filter */}
@@ -81,6 +106,22 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
           <option value="">All models</option>
           {facets.models.map((model) => <option key={model.value} value={model.value}>{model.value} ({model.count})</option>)}
         </select>
+        <div className="mt-2 space-y-1 max-h-24 overflow-auto">
+          {facets.models.slice(0, 8).map((model) => (
+            <button
+              key={model.value}
+              onClick={() => onChange('model', filters.model === model.value ? undefined : model.value)}
+              className={`w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] transition-colors ${
+                filters.model === model.value
+                  ? 'bg-blue-900 text-blue-100'
+                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+              }`}
+              title={model.value}
+            >
+              {model.count} · {model.value}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="mb-4">
@@ -100,12 +141,44 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
       </div>
 
       <div className="mb-4">
+        <div className="text-xs text-gray-400 block mb-1">Cost ranges</div>
+        <div className="flex flex-wrap gap-1">
+          {facets.costRanges.map((range) => (
+            <button
+              key={range.value}
+              onClick={() => {
+                const active = filters.minCost === range.minCost && filters.maxCost === range.maxCost;
+                onChange('minCost', active ? undefined : range.minCost);
+                onChange('maxCost', active ? undefined : range.maxCost);
+              }}
+              className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+                filters.minCost === range.minCost && filters.maxCost === range.maxCost
+                  ? 'bg-blue-900 text-blue-100'
+                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+              }`}
+              title={`Estimated total $${(range.cost ?? 0).toFixed(4)}`}
+            >
+              {range.label ?? range.value}: {range.count}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4">
         <div className="text-xs text-gray-400 block mb-1">Enrichment levels</div>
         <div className="flex flex-wrap gap-1">
           {facets.enrichmentLevels.map((level) => (
-            <span key={level.value} className="rounded bg-gray-900 px-1.5 py-0.5 text-[10px] text-gray-400">
-              {level.value}: {level.count}
-            </span>
+            <button
+              key={level.value}
+              onClick={() => onChange('enrichmentLevel', filters.enrichmentLevel === level.value ? undefined : level.value)}
+              className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+                filters.enrichmentLevel === level.value
+                  ? 'bg-blue-900 text-blue-100'
+                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              L{level.value}: {level.count}
+            </button>
           ))}
         </div>
       </div>
@@ -167,6 +240,7 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
             onChange('model', undefined);
             onChange('minCost', undefined);
             onChange('maxCost', undefined);
+            onChange('enrichmentLevel', undefined);
           }}
           className="mt-4 text-[10px] text-gray-600 hover:text-gray-400 transition-colors"
         >

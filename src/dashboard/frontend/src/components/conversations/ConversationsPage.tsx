@@ -72,7 +72,10 @@ interface ScanResult {
 interface FacetValue {
   value: string;
   count: number;
+  label?: string;
   cost?: number;
+  minCost?: string;
+  maxCost?: string;
 }
 
 function countFacetValues(values: Array<string | null | undefined>, costs?: number[]): FacetValue[] {
@@ -87,6 +90,49 @@ function countFacetValues(values: Array<string | null | undefined>, costs?: numb
   return [...counts.values()].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 }
 
+function countTimeFacets(sessions: DiscoveredSession[]): FacetValue[] {
+  const now = Date.now();
+  const ranges = [
+    { value: 'today', label: 'Today', days: 1 },
+    { value: '7d', label: 'Last 7 days', days: 7 },
+    { value: '30d', label: 'Last 30 days', days: 30 },
+    { value: '90d', label: 'Last 90 days', days: 90 },
+  ];
+  return ranges.map((range) => {
+    const cutoff = now - range.days * 86_400_000;
+    const count = sessions.filter((session) => {
+      const ts = session.lastTs ? Date.parse(session.lastTs) : NaN;
+      return Number.isFinite(ts) && ts >= cutoff;
+    }).length;
+    return { value: range.value, label: range.label, count };
+  });
+}
+
+function countCostFacets(sessions: DiscoveredSession[]): FacetValue[] {
+  const ranges = [
+    { value: 'free', label: '$0', minCost: undefined, maxCost: '0' },
+    { value: 'low', label: '$0–$0.01', minCost: '0', maxCost: '0.01' },
+    { value: 'medium', label: '$0.01–$0.05', minCost: '0.01', maxCost: '0.05' },
+    { value: 'high', label: '$0.05+', minCost: '0.05', maxCost: undefined },
+  ];
+  return ranges.map((range) => {
+    const min = range.minCost === undefined ? undefined : Number(range.minCost);
+    const max = range.maxCost === undefined ? undefined : Number(range.maxCost);
+    const matching = sessions.filter((session) => {
+      const cost = session.estimatedCost;
+      return (min === undefined || cost >= min) && (max === undefined || cost <= max);
+    });
+    return {
+      value: range.value,
+      label: range.label,
+      count: matching.length,
+      cost: matching.reduce((sum, session) => sum + session.estimatedCost, 0),
+      minCost: range.minCost,
+      maxCost: range.maxCost,
+    };
+  });
+}
+
 function buildFilterParams(filters: {
   workspace?: string;
   since?: string;
@@ -95,6 +141,7 @@ function buildFilterParams(filters: {
   model?: string;
   minCost?: string;
   maxCost?: string;
+  enrichmentLevel?: string;
 }): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.workspace) params.set('workspace', filters.workspace);
@@ -104,6 +151,7 @@ function buildFilterParams(filters: {
   if (filters.model) params.set('model', filters.model);
   if (filters.minCost) params.set('min_cost', filters.minCost);
   if (filters.maxCost) params.set('max_cost', filters.maxCost);
+  if (filters.enrichmentLevel) params.set('enrichment_level', filters.enrichmentLevel);
   return params;
 }
 
@@ -169,6 +217,7 @@ export function ConversationsPage() {
     model?: string;
     minCost?: string;
     maxCost?: string;
+    enrichmentLevel?: string;
   }>({});
 
   const trimmedQuery = query.trim();
@@ -233,7 +282,9 @@ export function ConversationsPage() {
   const facetOptions = {
     models: countFacetValues(sessions.map((s) => s.primaryModel)),
     workspaces: countFacetValues(sessions.map((s) => s.workspacePath), sessions.map((s) => s.estimatedCost)),
-    enrichmentLevels: countFacetValues(sessions.map((s) => `L${s.enrichmentLevel}`)),
+    timeRanges: countTimeFacets(sessions),
+    costRanges: countCostFacets(sessions),
+    enrichmentLevels: countFacetValues(sessions.map((s) => String(s.enrichmentLevel))),
   };
   const activeFilterChips = [
     filters.workspace ? { key: 'workspace', label: `Workspace: ${filters.workspace}` } : null,
@@ -243,6 +294,7 @@ export function ConversationsPage() {
     filters.enriched ? { key: 'enriched', label: 'Enriched' } : null,
     filters.minCost ? { key: 'minCost', label: `Min cost: $${filters.minCost}` } : null,
     filters.maxCost ? { key: 'maxCost', label: `Max cost: $${filters.maxCost}` } : null,
+    filters.enrichmentLevel ? { key: 'enrichmentLevel', label: `Enrichment: L${filters.enrichmentLevel}` } : null,
   ].filter((chip): chip is { key: string; label: string } => chip !== null);
 
   const handleQueryChange = useCallback((value: string) => {
@@ -326,7 +378,11 @@ export function ConversationsPage() {
           {activeFilterChips.map((chip) => (
             <button
               key={chip.key}
-              onClick={() => handleFilterChange(chip.key, undefined)}
+              onClick={() => {
+              handleFilterChange(chip.key, undefined);
+              if (chip.key === 'minCost') handleFilterChange('maxCost', undefined);
+              if (chip.key === 'maxCost') handleFilterChange('minCost', undefined);
+            }}
               className="px-2 py-1 rounded-full bg-blue-950 text-blue-200 border border-blue-800 hover:bg-blue-900 transition-colors"
             >
               {chip.label} <span className="text-blue-400">×</span>

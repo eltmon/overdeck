@@ -8112,6 +8112,32 @@ function appendCostEvent(event) {
 * Manages llm-tldr daemon lifecycle for project root and workspaces.
 * Provides code analysis and summarization for token-efficient agent work.
 */
+function readMetricsCheckpoint(checkpointFile) {
+	if (!existsSync(checkpointFile)) return null;
+	try {
+		return JSON.parse(readFileSync(checkpointFile, "utf-8"));
+	} catch {
+		return null;
+	}
+}
+function readLogLines(logFile, startByte, startLine = 0) {
+	if (!existsSync(logFile)) return {
+		lines: [],
+		size: 0
+	};
+	const size = statSync(logFile).size;
+	if (startByte !== void 0) {
+		const safeStart = startByte <= size ? Math.max(0, startByte) : 0;
+		return {
+			lines: readFileSync(logFile).subarray(safeStart).toString("utf-8").split("\n").filter((l) => l.trim()),
+			size
+		};
+	}
+	return {
+		lines: readFileSync(logFile, "utf-8").split("\n").filter((l) => l.trim()).slice(startLine),
+		size
+	};
+}
 /**
 * Read TLDR session metrics for a workspace from log files.
 *
@@ -8123,14 +8149,12 @@ function getTldrMetrics(workspacePath, sinceCheckpoint = false) {
 	const interceptionsLog = join(tldrDir, "interceptions.log");
 	const bypassesLog = join(tldrDir, "bypasses.log");
 	const checkpointFile = join(tldrDir, "metrics-checkpoint.json");
-	let interceptionsStartLine = 0;
-	let bypassesStartLine = 0;
-	if (sinceCheckpoint && existsSync(checkpointFile)) try {
-		const checkpoint = JSON.parse(readFileSync(checkpointFile, "utf-8"));
-		interceptionsStartLine = checkpoint.interceptionsLine || 0;
-		bypassesStartLine = checkpoint.bypassesLine || 0;
-	} catch {}
-	const newInterceptions = (existsSync(interceptionsLog) ? readFileSync(interceptionsLog, "utf-8").split("\n").filter((l) => l.trim()) : []).slice(interceptionsStartLine);
+	const checkpoint = sinceCheckpoint ? readMetricsCheckpoint(checkpointFile) : null;
+	const interceptionsStartByte = checkpoint?.interceptionsByte;
+	const bypassesStartByte = checkpoint?.bypassesByte;
+	const interceptionsStartLine = checkpoint?.interceptionsLine ?? 0;
+	const bypassesStartLine = checkpoint?.bypassesLine ?? 0;
+	const newInterceptions = readLogLines(interceptionsLog, sinceCheckpoint ? interceptionsStartByte : void 0, sinceCheckpoint && interceptionsStartByte === void 0 ? interceptionsStartLine : 0).lines;
 	let estimatedTokensSaved = 0;
 	const filesAnalyzed = [];
 	for (const line of newInterceptions) {
@@ -8143,7 +8167,7 @@ function getTldrMetrics(workspacePath, sinceCheckpoint = false) {
 			if (relPath && !filesAnalyzed.includes(relPath)) filesAnalyzed.push(relPath);
 		}
 	}
-	const newBypasses = (existsSync(bypassesLog) ? readFileSync(bypassesLog, "utf-8").split("\n").filter((l) => l.trim()) : []).slice(bypassesStartLine);
+	const newBypasses = readLogLines(bypassesLog, sinceCheckpoint ? bypassesStartByte : void 0, sinceCheckpoint && bypassesStartByte === void 0 ? bypassesStartLine : 0).lines;
 	const bypassReasons = {};
 	for (const line of newBypasses) {
 		const parts = line.trim().split(" ");
@@ -8176,9 +8200,16 @@ function captureTldrMetrics(workspacePath) {
 	const interceptionsLog = join(tldrDir, "interceptions.log");
 	const bypassesLog = join(tldrDir, "bypasses.log");
 	const checkpointFile = join(tldrDir, "metrics-checkpoint.json");
+	const previous = readMetricsCheckpoint(checkpointFile);
+	const interceptionsByte = existsSync(interceptionsLog) ? statSync(interceptionsLog).size : 0;
+	const bypassesByte = existsSync(bypassesLog) ? statSync(bypassesLog).size : 0;
+	const previousInterceptionsLine = previous?.interceptionsByte !== void 0 && previous.interceptionsByte > interceptionsByte ? 0 : previous?.interceptionsLine ?? 0;
+	const previousBypassesLine = previous?.bypassesByte !== void 0 && previous.bypassesByte > bypassesByte ? 0 : previous?.bypassesLine ?? 0;
 	const checkpoint = {
-		interceptionsLine: existsSync(interceptionsLog) ? readFileSync(interceptionsLog, "utf-8").split("\n").filter((l) => l.trim()).length : 0,
-		bypassesLine: existsSync(bypassesLog) ? readFileSync(bypassesLog, "utf-8").split("\n").filter((l) => l.trim()).length : 0,
+		interceptionsLine: previousInterceptionsLine + metrics.interceptions,
+		bypassesLine: previousBypassesLine + metrics.bypasses,
+		interceptionsByte,
+		bypassesByte,
 		capturedAt: (/* @__PURE__ */ new Date()).toISOString()
 	};
 	try {

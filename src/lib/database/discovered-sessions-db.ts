@@ -86,6 +86,7 @@ export interface ConversationFilter {
   issueId?: string;
   enriched?: boolean;
   notEnriched?: boolean;
+  enrichmentLevel?: number;
   /** Select only sessions with enrichment_level strictly less than this value */
   enrichmentLevelLessThan?: number;
   limit?: number;
@@ -227,6 +228,10 @@ function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { wher
   }
   if (filter.notEnriched === true) {
     conditions.push(`${col('enrichment_level')} = 0`);
+  }
+  if (filter.enrichmentLevel !== undefined) {
+    conditions.push(`${col('enrichment_level')} = ?`);
+    params.push(filter.enrichmentLevel);
   }
   if (filter.enrichmentLevelLessThan !== undefined) {
     conditions.push(`${col('enrichment_level')} < ?`);

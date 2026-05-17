@@ -83,6 +83,7 @@ export interface RawFilter {
   issueId?: string;
   enriched?: boolean;
   notEnriched?: boolean;
+  enrichmentLevel?: number;
 }
 
 export type SearchMode = 'filter' | 'fts' | 'semantic' | 'fts+filter' | 'semantic+fts';

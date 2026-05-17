@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { parseSessionJsonl } from '../jsonl-async.js';
 import { scan } from '../scanner.js';
 
 // Allow individual tests to inject a parse failure for a specific file path
@@ -195,6 +196,29 @@ describe('scanner', () => {
 
     const result = await scan({ mode: 'targeted', dirs: ['/home/user/Projects'], watchDirs: [] });
     expect(result.inserted + result.updated).toBe(1);
+  });
+
+  it('targeted mode does not parse JSONL files outside requested project prefixes', async () => {
+    const target = join(fakeClaudeDir, '-home-user-Projects-myapp', 'targeted-prefilter.jsonl');
+    const outside = join(fakeClaudeDir, '-home-user-Projects-otherapp', 'outside-prefilter.jsonl');
+    writeFileSync(target, SESSION_JSONL, 'utf8');
+    writeFileSync(outside, SESSION_JSONL, 'utf8');
+
+    const parser = vi.fn(async (filePath: string) => {
+      if (filePath === outside) throw new Error('outside file should not be parsed');
+      return parseSessionJsonl(filePath);
+    });
+
+    const result = await scan({
+      mode: 'targeted',
+      dirs: ['/home/user/Projects/myapp'],
+      watchDirs: [],
+      parseJsonl: parser,
+    });
+
+    expect(result.inserted + result.updated).toBe(1);
+    expect(parser).toHaveBeenCalledTimes(1);
+    expect(parser).toHaveBeenCalledWith(target);
   });
 
   it('scan persists sessionId from JSONL into discovered_sessions', async () => {

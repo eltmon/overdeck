@@ -103,9 +103,10 @@ async function collectJsonlFiles(
  * Walk ~/.claude/projects/ and return all .jsonl files (including nested subagent transcripts).
  * Each entry is { projectDir, jsonlPath }.
  */
-async function discoverAllJsonlFiles(warnings: string[]): Promise<
-  Array<{ projectDir: string; jsonlPath: string }>
-> {
+async function discoverJsonlFiles(
+  warnings: string[],
+  targetEncodings?: string[],
+): Promise<Array<{ projectDir: string; jsonlPath: string }>> {
   const claudeProjectsDir = join(homedir(), '.claude', 'projects');
   const result: Array<{ projectDir: string; jsonlPath: string }> = [];
 
@@ -124,6 +125,7 @@ async function discoverAllJsonlFiles(warnings: string[]): Promise<
   }
 
   for (const projectDir of projectDirs) {
+    if (targetEncodings && !projectDirMatchesAnyTarget(projectDir, targetEncodings)) continue;
     await collectJsonlFiles(projectDir, projectDir, result, warnings);
   }
 
@@ -139,7 +141,10 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
   const parseJsonl = opts.parseJsonl ?? parseSessionJsonl;
 
   // 1. Discover JSONL candidates
-  const allFiles = await discoverAllJsonlFiles(result.warnings!);
+  const discoveryEncodings = targetEncodingsForMode(opts);
+  const allFiles = discoveryEncodings?.length === 0
+    ? []
+    : await discoverJsonlFiles(result.warnings!, discoveryEncodings ?? undefined);
 
   // 2. Filter by mode
   const filteredFiles = filterByMode(allFiles, opts);
@@ -332,30 +337,21 @@ function filterByMode(
   files: Array<{ projectDir: string; jsonlPath: string }>,
   opts: ScanOptions,
 ): Array<{ projectDir: string; jsonlPath: string }> {
-  if (opts.mode === 'system') {
-    return files;
-  }
+  const targetEncodings = targetEncodingsForMode(opts);
+  if (!targetEncodings) return files;
+  if (targetEncodings.length === 0) return [];
+  return files.filter(({ projectDir }) => projectDirMatchesAnyTarget(projectDir, targetEncodings));
+}
 
+function targetEncodingsForMode(opts: ScanOptions): string[] | null {
+  if (opts.mode === 'system') return null;
   const rawDirs = opts.mode === 'targeted' ? (opts.dirs ?? []) : (opts.watchDirs ?? []);
-  const targetDirs = rawDirs.map(normalizeDir);
+  return rawDirs.map(normalizeDir).map(encodeClaudeProjectDir);
+}
 
-  // watched/targeted with no configured dirs scans nothing (not everything)
-  if (targetDirs.length === 0) return [];
-
-  const targetEncodings = targetDirs.map(encodeClaudeProjectDir);
-
-  if (opts.mode === 'targeted') {
-    return files;
-  }
-
-  // watched: watchDirs are parent roots — include sessions whose workspace lives
-  // under any of the watched directories. Since Claude encodes the full path as a
-  // hash (replacing '/' with '-'), a child workspace hash always starts with the
-  // parent hash followed by '-' (the encoded path separator).
-  return files.filter(({ projectDir }) => {
-    const hash = basename(projectDir);
-    return targetEncodings.some((enc) => hash === enc || hash.startsWith(enc + '-'));
-  });
+function projectDirMatchesAnyTarget(projectDir: string, targetEncodings: string[]): boolean {
+  const hash = basename(projectDir);
+  return targetEncodings.some((enc) => hash === enc || hash.startsWith(enc + '-'));
 }
 
 function workspaceUnderAnyDir(workspacePath: string | null, dirs: string[]): boolean {

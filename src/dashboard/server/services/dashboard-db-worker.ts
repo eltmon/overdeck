@@ -70,7 +70,11 @@ async function runJob(
   }
 }
 
-parentPort?.on('message', async (message: DashboardDbRequest) => {
+const queue: DashboardDbRequest[] = [];
+let activeJobs = 0;
+const MAX_CONCURRENT_JOBS = 1;
+
+async function execute(message: DashboardDbRequest): Promise<void> {
   try {
     const result = await runJob(message.id, message.operation, message.payload);
     parentPort?.postMessage({ id: message.id, ok: true, result });
@@ -88,4 +92,21 @@ parentPort?.on('message', async (message: DashboardDbRequest) => {
       },
     });
   }
+}
+
+function drainQueue(): void {
+  while (activeJobs < MAX_CONCURRENT_JOBS) {
+    const next = queue.shift();
+    if (!next) return;
+    activeJobs++;
+    void execute(next).finally(() => {
+      activeJobs--;
+      drainQueue();
+    });
+  }
+}
+
+parentPort?.on('message', (message: DashboardDbRequest) => {
+  queue.push(message);
+  drainQueue();
 });

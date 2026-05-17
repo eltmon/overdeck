@@ -138,6 +138,10 @@ const listRoute = HttpRouter.add(
     if (params.has('managed')) filter.managed = params.get('managed') === 'true';
     if (params.has('enriched')) filter.enriched = true;
     if (params.has('not_enriched')) filter.notEnriched = true;
+    if (params.has('enrichment_level')) {
+      const v = parseInt(params.get('enrichment_level')!, 10);
+      if (Number.isFinite(v) && v >= 0) filter.enrichmentLevel = v;
+    }
     if (params.has('min_cost')) filter.minCost = parseFloat(params.get('min_cost')!);
     if (params.has('max_cost')) filter.maxCost = parseFloat(params.get('max_cost')!);
 
@@ -167,6 +171,10 @@ export function parseSearchParams(
   if (params.has('unmanaged')) filter.unmanaged = params.get('unmanaged') === 'true';
   if (params.has('enriched')) filter.enriched = true;
   if (params.has('not_enriched')) filter.notEnriched = true;
+  if (params.has('enrichment_level')) {
+    const v = parseInt(params.get('enrichment_level')!, 10);
+    if (Number.isFinite(v) && v >= 0) filter.enrichmentLevel = v;
+  }
   if (params.has('issue_id')) filter.issueId = params.get('issue_id')!;
   if (params.has('tags')) {
     const raw = params.get('tags')!;
