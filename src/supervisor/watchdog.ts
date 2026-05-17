@@ -174,9 +174,9 @@ export class SupervisorWatchdog {
       this.state.healthy = true;
       this.state.lastCheck = checkedAt;
       this.state.consecutiveFailures = 0;
+      this.state.restartAttempts = [];
       this.state.gaveUp = false;
       this.state.lastError = null;
-      this.pruneRestartAttempts(startedAt);
       this.persistState();
       return;
     } catch (error) {
