@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T14:53:55.187Z",
+  "updated": "2026-05-17T15:27:45.794Z",
   "gitState": {
     "branch": "feature/pan-1141",
-    "sha": "069a92280",
+    "sha": "c47e43985",
     "dirty": true
   },
   "decisions": [
@@ -128,12 +128,14 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-v1vk (projects.yaml autoResume overrides with validation and fallback warnings wired into recordAgentFailure). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-v1vk",
+    "description": "Completed bead workspace-8pog (dashboard backend pause/unpause/untroubled endpoints, agent snapshot fields, status_changed event payload propagation, and contracts rebuild). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-8pog",
     "filesToRead": [
-      "src/lib/projects.ts",
-      "src/lib/cloister/auto-resume-config.ts",
-      "src/lib/agents.ts",
+      "src/dashboard/server/routes/agents.ts",
+      "packages/contracts/src/types.ts",
+      "packages/contracts/src/events.ts",
+      "packages/contracts/src/event-reducers.ts",
+      "src/dashboard/server/read-model.ts",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -186,6 +188,12 @@
       "timestamp": "2026-05-17T15:15:05.816Z",
       "reason": "bead-complete",
       "note": "Added projects.yaml autoResume schema typing, validation with warning fallback for invalid overrides, and issue-to-project auto-resume config resolution in recordAgentFailure. npm run typecheck and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T15:27:45.794Z",
+      "reason": "bead-complete",
+      "note": "Implemented dashboard backend pause/unpause/untroubled endpoints with async agent-state helpers, tmux kill on pause, status_changed events carrying pause/troubled/failure fields, read-model snapshot propagation, and contracts rebuild. npm run typecheck, npm run lint, and npm --prefix packages/contracts run build passed.",
       "agentModel": "gpt-5.5"
     }
   ],

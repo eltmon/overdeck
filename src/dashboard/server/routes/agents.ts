@@ -49,7 +49,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer, Option, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { DomainEvent } from '@panctl/contracts';
-import type { Role } from '@panctl/contracts';
+import type { AgentStatus, Role } from '@panctl/contracts';
 import { bodyToEvent, decodeDomainEvent } from '../services/agent-event-utils.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
@@ -67,6 +67,11 @@ import {
   saveAgentRuntimeState,
   saveAgentState,
   saveAgentStateAsync,
+  setAgentPausedAsync,
+  clearAgentPausedAsync,
+  clearAgentTroubledAsync,
+  markAgentStoppedState,
+  type AgentState,
   getActivity,
   saveSessionId,
   getSessionId,
@@ -200,6 +205,40 @@ const readJsonBody = Effect.gen(function* () {
     return {};
   }
 });
+
+function toAgentStatusPayload(status: AgentState['status'] | undefined): AgentStatus {
+  return status === 'starting' || status === 'running' || status === 'stopped' || status === 'error'
+    ? status
+    : 'unknown';
+}
+
+function buildAgentControlEventPayload(state: AgentState, previousStatus?: AgentStatus) {
+  return {
+    agentId: state.id,
+    issueId: state.issueId,
+    status: toAgentStatusPayload(state.status),
+    previousStatus,
+    paused: state.paused === true,
+    pausedReason: state.pausedReason ?? null,
+    pausedAt: state.pausedAt ?? null,
+    troubled: state.troubled === true,
+    troubledAt: state.troubledAt ?? null,
+    consecutiveFailures: state.consecutiveFailures ?? 0,
+    firstFailureInRunAt: state.firstFailureInRunAt ?? null,
+    lastFailureAt: state.lastFailureAt ?? null,
+    lastFailureReason: state.lastFailureReason ?? null,
+    lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
+  };
+}
+
+async function captureAgentOutputBeforeKill(agentId: string): Promise<void> {
+  const output = await capturePaneAsync(agentId, 5000).catch(() => '');
+  if (!output) return;
+
+  const agentDir = getAgentDir(agentId);
+  await mkdir(agentDir, { recursive: true });
+  await writeFile(join(agentDir, 'output.log'), output);
+}
 
 function buildHostOverrideConfirmation(issueId: string): string {
   return `I understand this bypasses workspace isolation for ${issueId.toUpperCase()}`;
@@ -1347,6 +1386,124 @@ const postAgentSuspendRoute = HttpRouter.add(
 
     invalidateAgentsCache();
     return jsonResponse({ success: true });
+  })),
+);
+
+// ─── Route: POST /api/agents/:id/pause ────────────────────────────────────────
+
+const postAgentPauseRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/pause',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
+    const reason = (body as { reason?: unknown }).reason;
+
+    if (reason !== undefined && typeof reason !== 'string') {
+      return jsonResponse({ error: 'reason must be a string' }, { status: 400 });
+    }
+
+    const stateBeforePause = yield* Effect.promise(() => getAgentStateAsync(id));
+    if (!stateBeforePause) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    const previousStatus = toAgentStatusPayload(stateBeforePause.status);
+    let updatedState = yield* Effect.promise(() => setAgentPausedAsync(id, reason));
+    if (!updatedState) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    const hasLiveSession = yield* Effect.promise(() => sessionExistsAsync(id));
+    if (hasLiveSession) {
+      yield* Effect.promise(() => captureAgentOutputBeforeKill(id));
+      yield* Effect.promise(() => killSessionAsync(id));
+    }
+
+    if (hasLiveSession || updatedState.status === 'running' || updatedState.status === 'starting') {
+      updatedState = markAgentStoppedState(updatedState);
+      yield* Effect.promise(() => saveAgentStateAsync(updatedState));
+      yield* Effect.promise(() => saveAgentRuntimeState(id, {
+        state: 'stopped',
+        lastActivity: new Date().toISOString(),
+      }));
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.pause_requested', { reason }));
+    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+      type: 'agent.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: buildAgentControlEventPayload(updatedState, previousStatus),
+    })));
+
+    invalidateAgentsCache();
+    return jsonResponse({ success: true, agent: updatedState });
+  })),
+);
+
+// ─── Route: POST /api/agents/:id/unpause ──────────────────────────────────────
+
+const postAgentUnpauseRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/unpause',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const eventStore = yield* EventStoreService;
+
+    const stateBeforeUnpause = yield* Effect.promise(() => getAgentStateAsync(id));
+    if (!stateBeforeUnpause) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    const updatedState = yield* Effect.promise(() => clearAgentPausedAsync(id));
+    if (!updatedState) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.unpause_requested'));
+    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+      type: 'agent.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: buildAgentControlEventPayload(updatedState, toAgentStatusPayload(stateBeforeUnpause.status)),
+    })));
+
+    invalidateAgentsCache();
+    return jsonResponse({ success: true, agent: updatedState });
+  })),
+);
+
+// ─── Route: POST /api/agents/:id/untroubled ───────────────────────────────────
+
+const postAgentUntroubledRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/untroubled',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const eventStore = yield* EventStoreService;
+
+    const stateBeforeClear = yield* Effect.promise(() => getAgentStateAsync(id));
+    if (!stateBeforeClear) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    const updatedState = yield* Effect.promise(() => clearAgentTroubledAsync(id));
+    if (!updatedState) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.untroubled_requested'));
+    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+      type: 'agent.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: buildAgentControlEventPayload(updatedState, toAgentStatusPayload(stateBeforeClear.status)),
+    })));
+
+    invalidateAgentsCache();
+    return jsonResponse({ success: true, agent: updatedState });
   })),
 );
 
@@ -3135,6 +3292,9 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentFilesRoute,
   getAgentTimelineRoute,
   postAgentSuspendRoute,
+  postAgentPauseRoute,
+  postAgentUnpauseRoute,
+  postAgentUntroubledRoute,
   postAgentResumeRoute,
   postAgentRestartRoute,
   getAgentCloisterHealthRoute,

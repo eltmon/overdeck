@@ -749,10 +749,7 @@ function clearFailureTrackingFields(state: AgentState): void {
 }
 
 /** Sets the persistent manual pause gate used before stopping or suppressing resume. */
-export function setAgentPaused(agentId: string, reason?: string): boolean {
-  const state = getAgentState(agentId);
-  if (!state) return false;
-
+function applyAgentPaused(state: AgentState, reason?: string): void {
   if (!state.paused) {
     state.pausedAt = new Date().toISOString();
   }
@@ -762,21 +759,58 @@ export function setAgentPaused(agentId: string, reason?: string): boolean {
   } else {
     state.pausedReason = reason;
   }
+}
+
+/** Sets the persistent manual pause gate used before stopping or suppressing resume. */
+export function setAgentPaused(agentId: string, reason?: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+
+  applyAgentPaused(state, reason);
   saveAgentState(state);
   return true;
+}
+
+/** Sets the persistent manual pause gate using async filesystem operations. */
+export async function setAgentPausedAsync(agentId: string, reason?: string): Promise<AgentState | null> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return null;
+
+  applyAgentPaused(state, reason);
+  await saveAgentStateAsync(state);
+  return state;
+}
+
+function applyAgentUnpaused(state: AgentState): void {
+  delete state.paused;
+  delete state.pausedReason;
+  delete state.pausedAt;
+}
+
+function isAgentPauseClear(state: AgentState): boolean {
+  return !state.paused && state.pausedReason === undefined && state.pausedAt === undefined;
 }
 
 /** Clears the persistent manual pause gate without spawning the agent. */
 export function clearAgentPaused(agentId: string): boolean {
   const state = getAgentState(agentId);
   if (!state) return false;
-  if (!state.paused && state.pausedReason === undefined && state.pausedAt === undefined) return true;
+  if (isAgentPauseClear(state)) return true;
 
-  delete state.paused;
-  delete state.pausedReason;
-  delete state.pausedAt;
+  applyAgentUnpaused(state);
   saveAgentState(state);
   return true;
+}
+
+/** Clears the persistent manual pause gate using async filesystem operations. */
+export async function clearAgentPausedAsync(agentId: string): Promise<AgentState | null> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return null;
+  if (isAgentPauseClear(state)) return state;
+
+  applyAgentUnpaused(state);
+  await saveAgentStateAsync(state);
+  return state;
 }
 
 /** Marks an agent as troubled after repeated resume failures. */
@@ -792,17 +826,36 @@ export function markAgentTroubled(agentId: string): boolean {
   return true;
 }
 
+function isAgentTroubledClear(state: AgentState): boolean {
+  return !state.troubled && state.troubledAt === undefined && (state.consecutiveFailures ?? 0) === 0 && state.firstFailureInRunAt === undefined && state.lastFailureAt === undefined && state.lastFailureReason === undefined && state.lastFailureNextRetryAt === undefined;
+}
+
+function applyAgentUntroubled(state: AgentState): void {
+  delete state.troubled;
+  delete state.troubledAt;
+  clearFailureTrackingFields(state);
+}
+
 /** Clears the troubled gate and its accumulated failure state. */
 export function clearAgentTroubled(agentId: string): boolean {
   const state = getAgentState(agentId);
   if (!state) return false;
-  if (!state.troubled && state.troubledAt === undefined && (state.consecutiveFailures ?? 0) === 0 && state.firstFailureInRunAt === undefined && state.lastFailureAt === undefined && state.lastFailureReason === undefined && state.lastFailureNextRetryAt === undefined) return true;
+  if (isAgentTroubledClear(state)) return true;
 
-  delete state.troubled;
-  delete state.troubledAt;
-  clearFailureTrackingFields(state);
+  applyAgentUntroubled(state);
   saveAgentState(state);
   return true;
+}
+
+/** Clears the troubled gate and accumulated failure state using async filesystem operations. */
+export async function clearAgentTroubledAsync(agentId: string): Promise<AgentState | null> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return null;
+  if (isAgentTroubledClear(state)) return state;
+
+  applyAgentUntroubled(state);
+  await saveAgentStateAsync(state);
+  return state;
 }
 
 /** Records one failed resume/crash observation for later backoff and troubled gating. */

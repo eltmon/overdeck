@@ -637,7 +637,7 @@
       {
         "id": "dashboard-api",
         "title": "Dashboard backend: pause/unpause/untroubled endpoints and snapshot fields",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -653,60 +653,68 @@
           {
             "id": "dashboard-api.ac1",
             "title": "POST /api/agents/:id/pause sets the flag, kills running agent, returns 200 with updated state",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:27:45.794Z"
           },
           {
             "id": "dashboard-api.ac2",
             "title": "POST /api/agents/:id/unpause clears the flag and returns 200 (does not spawn)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:27:45.794Z"
           },
           {
             "id": "dashboard-api.ac3",
             "title": "POST /api/agents/:id/untroubled clears troubled + failure counters, returns 200",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:27:45.794Z"
           },
           {
             "id": "dashboard-api.ac4",
             "title": "GET /api/no-resume-mode returns `{ active: boolean, since: string|null }`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:27:45.794Z"
           },
           {
             "id": "dashboard-api.ac5",
             "title": "Agent snapshot shape includes the ten new fields; contracts package updated and rebuilt",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:27:45.794Z"
           },
           {
             "id": "dashboard-api.ac6",
             "title": "Each mutating endpoint emits a domain event so the frontend updates without polling",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:27:45.794Z"
           },
           {
             "id": "dashboard-api.ac7",
             "title": "All four endpoints use `execAsync` / `fs/promises` — no `execSync` or sync FS calls (CLAUDE.md rule)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:27:45.794Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T15:27:45.794Z"
       },
       {
         "id": "frontend-badges",
