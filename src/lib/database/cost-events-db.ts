@@ -182,6 +182,7 @@ export function queryCostEvents(opts: {
   const sql = `
     SELECT ts, agent_id, issue_id, session_type, provider, model,
            input, output, cache_read, cache_write, cost, request_id,
+           session_id,
            tldr_interceptions, tldr_bypasses, tldr_tokens_saved, tldr_bypass_reasons
     FROM cost_events
     ${where}
@@ -469,6 +470,7 @@ interface DbCostRow {
   cache_write: number;
   cost: number;
   request_id: string | null;
+  session_id: string | null;
   tldr_interceptions: number | null;
   tldr_bypasses: number | null;
   tldr_tokens_saved: number | null;
@@ -501,6 +503,7 @@ function rowToCostEvent(row: DbCostRow): CostEvent {
     cacheWrite: row.cache_write,
     cost: row.cost,
     requestId: row.request_id ?? undefined,
+    sessionId: row.session_id ?? undefined,
     tldrInterceptions: row.tldr_interceptions ?? undefined,
     tldrBypasses: row.tldr_bypasses ?? undefined,
     tldrTokensSaved: row.tldr_tokens_saved ?? undefined,

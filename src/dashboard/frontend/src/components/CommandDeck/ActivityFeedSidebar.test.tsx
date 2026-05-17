@@ -78,6 +78,23 @@ describe('ActivityFeedSidebar', () => {
     expect(within(bucket).getByText('30m ago')).toBeInTheDocument();
   });
 
+  it('renders the three most recent action statuses under Just Now in newest-first order', () => {
+    seedObservations({
+      'PAN-1052': [
+        observation('oldest', '2026-05-16T11:45:00.000Z', 'Completed turn 1'),
+        observation('newest', '2026-05-16T11:59:00.000Z', 'Completed turn 3'),
+        observation('middle', '2026-05-16T11:52:00.000Z', 'Completed turn 2'),
+        observation('hidden', '2026-05-16T11:58:00.000Z', null),
+      ],
+    });
+
+    render(<ActivityFeedSidebar issueId="PAN-1052" now={new Date('2026-05-16T12:00:00.000Z')} />);
+
+    const bucket = screen.getByTestId('activity-feed-bucket-justNow');
+    const statuses = within(bucket).getAllByText(/Completed turn/).map((node) => node.textContent);
+    expect(statuses).toEqual(['Completed turn 3', 'Completed turn 2', 'Completed turn 1']);
+  });
+
   it('keeps selector results stable when unrelated store state changes', () => {
     const source = [observation('recent', '2026-05-16T11:30:00.000Z', 'Stable selector result')];
     const selector = createActionStatusObservationSelector('PAN-1052');
