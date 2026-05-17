@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T15:55:12.498Z",
+  "updated": "2026-05-17T16:03:35.590Z",
   "gitState": {
     "branch": "feature/pan-1141",
     "sha": "dea74e98b42d8ddd3cb0c0ca7773b501ebbb3829",
@@ -128,10 +128,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-0pwp (IssueAgentCard paused/troubled badges, gating-reason pill, no-resume mode query, and browser verification with mocked paused/troubled/manual/boot/running/stopped cards). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-0pwp",
+    "description": "Completed bead workspace-8wc8 (pan start now refuses paused agents unless --force, clears the pause gate before forced starts, and documents the new flag in /pan-start). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-8wc8",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/IssueAgentCard.tsx",
+      "src/cli/commands/start.ts",
+      "src/cli/index.ts",
+      "skills/pan-start/SKILL.md",
       ".pan/spec.vbrief.json",
       ".pan/continue.json"
     ]
@@ -215,6 +217,12 @@
       "timestamp": "2026-05-17T15:55:12.498Z",
       "reason": "bead-complete",
       "note": "Implemented IssueAgentCard Paused and Troubled badges with tooltips, queried GET /api/no-resume-mode, and added a gating-reason pill for non-running non-completed agents: Paused, Troubled (N failures), Boot --no-resume, or Manual. npm run typecheck and npm run lint passed. Browser verification mounted mocked paused, troubled, manual, no-resume, stopped-completed, and running cards in Vite; badges/tooltips/pills appeared correctly and pills were hidden for running and completed-stopped cards.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T16:03:35.590Z",
+      "reason": "bead-complete",
+      "note": "Implemented pan start paused-agent refusal with a clear pan unpause/--force error path, --force pause clearing before normal start flow, CLI --force registration, /pan-start skill documentation, and a targeted unit test for the refusal path. npm run typecheck, npm run lint, and npm test -- src/cli/commands/__tests__/start-harness.test.ts passed.",
       "agentModel": "gpt-5.5"
     }
   ],

@@ -600,7 +600,7 @@
       {
         "id": "cli-start-refuse-paused",
         "title": "`pan start <id>` refuses paused issues unless `--force`",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -616,28 +616,32 @@
           {
             "id": "cli-start-refuse-paused.ac1",
             "title": "`pan start <id>` on a paused agent prints a clear error referencing `pan unpause` and the pause reason, then exits non-zero",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:03:35.590Z"
           },
           {
             "id": "cli-start-refuse-paused.ac2",
             "title": "`pan start <id> --force` on a paused agent clears the paused flag and spawns normally",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:03:35.590Z"
           },
           {
             "id": "cli-start-refuse-paused.ac3",
             "title": "`pan start <id>` on an unpaused agent is unchanged (no regression)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:03:35.590Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T16:03:35.590Z"
       },
       {
         "id": "dashboard-api",

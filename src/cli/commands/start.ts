@@ -9,7 +9,7 @@ import { exec, execFile, execFileSync } from 'child_process';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-import { spawnAgent } from '../../lib/agents.js';
+import { clearAgentPaused, getAgentState, spawnAgent } from '../../lib/agents.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
@@ -92,6 +92,7 @@ interface IssueOptions {
   auto?: boolean;
   host?: boolean;
   yes?: boolean;
+  force?: boolean;
 }
 
 /**
@@ -702,11 +703,25 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
   }
 
+  // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
+  const normalizedId = id.toLowerCase();
+  const agentId = `agent-${normalizedId}`;
+  const existingAgentState = getAgentState(agentId);
+  if (existingAgentState?.paused === true) {
+    if (!options.force) {
+      process.stderr.write(chalk.red(`Agent ${agentId} is paused and will not be started.\n`));
+      if (existingAgentState.pausedReason) {
+        process.stderr.write(chalk.red(`Pause reason: ${existingAgentState.pausedReason}\n`));
+      }
+      process.stderr.write(chalk.red(`Run pan unpause ${id} to clear the pause, or pan start ${id} --force to override.\n`));
+      process.exit(1);
+    }
+    clearAgentPaused(agentId);
+  }
+
   const spinner = ora(`Preparing workspace for ${id}...`).start();
 
   try {
-    // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
-    const normalizedId = id.toLowerCase();
 
     // Determine workspace location preference
     const locationPreference = determineWorkspaceLocation(options);
