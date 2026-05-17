@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T14:25:00.000Z",
+  "updated": "2026-05-17T14:48:18.271Z",
   "gitState": {
     "branch": "feature/pan-1141",
-    "sha": "0668a271c",
-    "dirty": false
+    "sha": "84f87caec",
+    "dirty": true
   },
   "decisions": [
     {
@@ -68,6 +68,11 @@
       "id": "D12",
       "summary": "Wrapper skills will be created for pan-pause, pan-unpause, pan-untroubled (skills/pan-<verb>/SKILL.md). These are new lifecycle verbs with non-trivial semantics (persistence, --force escape hatches, interaction with deacon) — they do NOT belong on the SKILLS-CONVENTION exclusion list.",
       "recordedAt": "2026-05-17T14:25:00.000Z"
+    },
+    {
+      "id": "D13",
+      "summary": "Agent-state helper mutators return boolean: false when state.json is missing, true when the state exists even if the operation is an idempotent no-op. This gives CLI and dashboard callers a simple existence check without throwing on absent agents.",
+      "recordedAt": "2026-05-17T14:48:18.271Z"
     }
   ],
   "hazards": [
@@ -122,7 +127,14 @@
       "mitigation": "Treat them as orthogonal — no-resume short-circuits per-process at boot; global-pause short-circuits per-patrol via DB read. Both can coexist; user clears each independently. No special-case logic needed; document in CLAUDE.md (docs-updates bead)."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "Completed bead workspace-3m2h (AgentState gating fields and helper API). Next agent should run bd ready -l pan-1141 and claim the next unblocked PAN-1141 bead.",
+    "beadId": "workspace-3m2h",
+    "filesToRead": [
+      "src/lib/agents.ts",
+      ".pan/spec.vbrief.json"
+    ]
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
   "sessionHistory": [
@@ -137,6 +149,12 @@
       "reason": "planning",
       "note": "Auto-mode planning resumed. Prior planning attempt left a substantive 21-bead spec.vbrief.json (2026-05-16T22:05) with sound architectural choices (JSON state-file storage, --no-resume as env var, pause/unpause/untroubled verbs avoiding pan resume conflict). Validated against codebase exploration: foundation bead correctly targets src/lib/agents.ts AgentState (line 525), cloister gating correctly targets autoResumeStoppedWorkAgents (deacon.ts:4767) and recoverOrphanedAgents (deacon.ts:4264), dashboard banner integration point is App.tsx (lines 32-34 region) alongside DeaconPauseToggle/StoppedAgentsBanner/CodexAuthBanner. Decisions and hazards (12 + 10 entries) recorded in this file. No contradictions in authoritative inputs warranting escalation. Plan kept as-is; running pan plan finalize.",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-17T14:48:18.271Z",
+      "reason": "bead-complete",
+      "note": "Implemented AgentState pause/troubled/failure-tracking fields, cleanAgentState round-trip preservation, and exported helper functions for pause/troubled/failure state. npm run typecheck and npm run lint passed.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []
