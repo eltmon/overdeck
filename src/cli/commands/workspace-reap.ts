@@ -160,9 +160,10 @@ export function collectWorkspaceReapCandidatesFromInspect(
     .sort((a, b) => b.ageDays - a.ageDays || a.project.localeCompare(b.project));
 }
 
-function hasActiveAgentForIssue(issueId: string): boolean {
+function collectActiveAgentIssueIds(): Set<string> {
+  const activeIssues = new Set<string>();
   const agentsDir = join(getPanopticonHome(), 'agents');
-  if (!existsSync(agentsDir)) return false;
+  if (!existsSync(agentsDir)) return activeIssues;
 
   for (const dir of readdirSync(agentsDir)) {
     const stateFile = join(agentsDir, dir, 'state.json');
@@ -172,14 +173,12 @@ function hasActiveAgentForIssue(issueId: string): boolean {
         issueId?: string;
         status?: string;
       };
-      if (!state.issueId || !state.status) continue;
-      if (normalizeIssueId(state.issueId) === issueId && ACTIVE_AGENT_STATUSES.has(state.status)) {
-        return true;
-      }
+      if (!state.issueId || !state.status || !ACTIVE_AGENT_STATUSES.has(state.status)) continue;
+      activeIssues.add(normalizeIssueId(state.issueId));
     } catch {}
   }
 
-  return false;
+  return activeIssues;
 }
 
 async function listMatchingContainerIds(): Promise<string[]> {
@@ -288,9 +287,10 @@ export async function workspaceReapCommand(options: WorkspaceReapOptions = {}): 
     process.exit(1);
   }
 
+  const activeAgentIssueIds = collectActiveAgentIssueIds();
   const candidates = collectWorkspaceReapCandidatesFromInspect(containers, cutoffMs)
     .filter(candidate => {
-      if (!hasActiveAgentForIssue(candidate.issueId)) return true;
+      if (!activeAgentIssueIds.has(candidate.issueId)) return true;
       console.log(chalk.yellow(`Skipping ${candidate.project}: active agent state exists for ${candidate.issueId.toUpperCase()}`));
       return false;
     });

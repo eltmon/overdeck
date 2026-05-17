@@ -9,7 +9,7 @@ import {
   type DockerContainerLifecycle,
 } from '../docker-stats.js';
 import { parseIssueId } from '../issue-id.js';
-import { findProjectByTeam } from '../projects.js';
+import { getProject, resolveProjectFromIssue } from '../projects.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -51,8 +51,8 @@ function normalizeIssue(issueId: string): string {
 }
 
 function resolveStackProject(issueId: string): WorkspaceStackProject | null {
-  const prefix = parseIssueId(issueId)?.prefix ?? issueId.split('-')[0];
-  return prefix ? findProjectByTeam(prefix) ?? null : null;
+  const resolved = resolveProjectFromIssue(issueId);
+  return resolved ? getProject(resolved.projectKey) : null;
 }
 
 function hasDockerWorkspace(projectConfig: WorkspaceStackProject | null | undefined): boolean {
@@ -177,6 +177,10 @@ export async function getWorkspaceStackHealth(
   options: WorkspaceStackHealthOptions = {},
 ): Promise<WorkspaceStackHealth> {
   const projectConfig = options.projectConfig ?? resolveStackProject(issueId);
+  if (!hasDockerWorkspace(projectConfig)) {
+    return { healthy: true, reasons: [], lastObserved: (options.now ?? new Date()).toISOString() };
+  }
+
   let observedAt: string | null = null;
   let containers = options.containers;
 

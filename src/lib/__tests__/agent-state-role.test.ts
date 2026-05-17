@@ -149,7 +149,13 @@ describe('AgentState role persistence', () => {
     const emitActivityEntry = vi.fn();
     vi.doMock('../projects.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../projects.js')),
-      findProjectByTeam: vi.fn(() => ({ workspace: { docker: { compose_template: 'infra/.devcontainer-template' } } })),
+      resolveProjectFromIssue: vi.fn(() => ({
+        projectKey: 'panopticon',
+        projectName: 'Panopticon',
+        projectPath: workspace,
+        linearTeam: 'PAN',
+      })),
+      getProject: vi.fn(() => ({ workspace: { docker: { compose_template: 'infra/.devcontainer-template' } } })),
     }));
     vi.doMock('../tmux.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../tmux.js')),

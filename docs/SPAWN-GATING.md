@@ -18,9 +18,9 @@ If `allowHost` is true, the gate emits `agent-spawn-host-override` and persists 
 - `src/cli/index.ts:410` registers `pan start <id>`.
 - `src/cli/index.ts:413` adds `--host`; `src/cli/index.ts:414` adds `--yes` for non-interactive confirmation.
 - `src/cli/commands/start.ts:124` prompts `Are you sure? This bypasses workspace isolation. (y/N)` for interactive `--host` and requires `--yes` when stdin is not a TTY.
-- `src/cli/commands/start.ts:972` passes `allowHost` into `spawnAgent()`.
-- `src/dashboard/server/routes/agents.ts:1765` accepts an explicit dashboard host override request.
-- `src/dashboard/server/routes/agents.ts:2554` and `src/dashboard/server/routes/agents.ts:2612` pass `--host --yes` to the detached `pan start` child only when the request explicitly set `host` or `allowHost`.
+- `src/cli/commands/start.ts:1009` passes `allowHost` into `spawnAgent()`.
+- `src/dashboard/server/routes/agents.ts:1818` accepts an explicit dashboard host override request after origin validation and confirmation phrase validation.
+- `src/dashboard/server/routes/agents.ts:2640` and `src/dashboard/server/routes/agents.ts:2698` pass `--host --yes` to the detached `pan start` child only when the request explicitly set and confirmed `host` or `allowHost`.
 - `src/dashboard/server/services/agent-spawner.ts:172` passes `allowHost` through its direct `spawnAgent()` service path.
 
 There is no `pan work` spawn command today; the CLI audit found only `pan start <id>` as the direct work-agent start surface.
@@ -34,7 +34,7 @@ There is no `pan work` spawn command today; the CLI audit found only `pan start 
 - `src/lib/cloister/merge-agent.ts:1149` starts ship roles through `spawnRun()`.
 - `src/lib/cloister/service.ts:350` starts reactive lifecycle roles through `spawnRun()`.
 - `src/dashboard/server/services/agent-spawner.ts:166`, `src/dashboard/server/routes/workspaces.ts:267`, `src/dashboard/server/routes/swarm.ts:1009`, and `src/lib/cloister/handoff.ts:136` start work agents through `spawnAgent()`.
-- `src/dashboard/server/routes/agents.ts:2551` and `src/dashboard/server/routes/agents.ts:2609` shell out to `pan start`, which reaches `spawnAgent()`.
+- `src/dashboard/server/routes/agents.ts:2637` and `src/dashboard/server/routes/agents.ts:2695` shell out to `pan start`, which reaches `spawnAgent()`.
 
 ## Non-agent tmux sessions
 

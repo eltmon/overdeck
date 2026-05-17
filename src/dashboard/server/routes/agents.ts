@@ -87,8 +87,9 @@ import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
 import { getProviderForModel } from '../../../lib/providers.js';
 import { validateProviderHealth, ProviderHealthError } from '../../../lib/provider-health.js';
-import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { getProject, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { findPlanAsync, readPlanAsync } from '../../../lib/vbrief/io.js';
+import { getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
 import { writeAutoStartVBrief } from '../../../lib/vbrief/auto-synthesize.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
 import type { ContinueState } from '../../../lib/vbrief/continue-state.js';
@@ -198,6 +199,10 @@ const readJsonBody = Effect.gen(function* () {
     return {};
   }
 });
+
+function buildHostOverrideConfirmation(issueId: string): string {
+  return `I understand this bypasses workspace isolation for ${issueId.toUpperCase()}`;
+}
 
 function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
   if (issuePrefix) {
@@ -1769,7 +1774,7 @@ const postAgentsRoute = HttpRouter.add(
     const { issueId, projectId } = body as any;
     const autoStart = (body as any).auto === true;
     const guardrailAcknowledged = (body as any).guardrailAcknowledged === true;
-    const allowHost = (body as any).host === true || (body as any).allowHost === true;
+    const requestedHostOverride = (body as any).host === true || (body as any).allowHost === true;
 
     if (!issueId) {
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
@@ -1810,6 +1815,18 @@ const postAgentsRoute = HttpRouter.add(
       );
     }
 
+    const hostOverrideConfirmation = buildHostOverrideConfirmation(String(issueId));
+    const allowHost = requestedHostOverride && (body as any).hostOverrideConfirmation === hostOverrideConfirmation;
+    if (requestedHostOverride && !allowHost) {
+      return jsonResponse({
+        success: false,
+        error: 'host_override_confirmation_required',
+        requiresHostConfirmation: true,
+        confirmation: hostOverrideConfirmation,
+        hint: `Host override bypasses workspace isolation. Retry only after explicitly confirming: ${hostOverrideConfirmation}`,
+      }, { status: 409 });
+    }
+
     // Guard: reject starting agents for already-closed issues
     const issueDataService = getIssueDataService();
     const cachedIssues = issueDataService.getIssues();
@@ -1833,7 +1850,9 @@ const postAgentsRoute = HttpRouter.add(
     const isRemote = workspaceMetadata?.location === 'remote';
 
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
-    const projectPath = getProjectPath(projectId, issuePrefix);
+    const resolvedProject = resolveProjectFromIssue(String(issueId));
+    const projectConfig = resolvedProject ? getProject(resolvedProject.projectKey) : null;
+    const projectPath = projectConfig?.path ?? getProjectPath(projectId, issuePrefix);
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
@@ -2046,6 +2065,42 @@ const postAgentsRoute = HttpRouter.add(
         }, { status: 429 });
       }
       throw err;
+    }
+
+    const stackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig }));
+    if (!stackHealth.healthy) {
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_stack_unhealthy', {
+        issueId,
+        reasons: stackHealth.reasons,
+        lastObserved: stackHealth.lastObserved,
+      }));
+      if (!allowHost) {
+        emitActivityEntry({
+          source: 'dashboard',
+          level: 'error',
+          issueId: issueId.toUpperCase(),
+          message: `agent-spawn-blocked-stack-unhealthy: ${issueId.toUpperCase()}`,
+          details: stackHealth.reasons.join('; '),
+        });
+        return jsonResponse({
+          success: false,
+          blocked: true,
+          skipped: true,
+          error: `Workspace docker stack for ${issueId} is not healthy: ${stackHealth.reasons.join('; ')}`,
+          hint: `Run 'pan workspace rebuild ${issueId}' or retry with a confirmed host override.`,
+          stackHealth,
+        }, { status: 422 });
+      }
+    }
+
+    if (allowHost) {
+      emitActivityEntry({
+        source: 'dashboard',
+        level: 'warn',
+        issueId: issueId.toUpperCase(),
+        message: `agent-spawn-host-override: ${issueId.toUpperCase()}`,
+        details: 'Dashboard request included confirmed host override.',
+      });
     }
 
     if (existsSync(workspacePanContinuePath) || existsSync(workspacePanDir)) {

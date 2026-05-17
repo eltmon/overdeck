@@ -284,6 +284,23 @@ Uses `/etc/hosts` directly (requires sudo for initial setup).
 
 Uses `/etc/hosts` or dnsmasq depending on configuration.
 
+## Recovery Commands
+
+Docker-backed workspaces use stack-health gates before agents start. If a stack is unhealthy:
+
+```bash
+# Rebuild one workspace Docker stack from the configured compose template
+pan workspace rebuild MIN-123
+
+# Dry-run cleanup for stale stuck workspace Docker stacks
+pan workspace reap --days 7
+
+# Apply stale stack cleanup after reviewing the dry-run output
+pan workspace reap --days 7 --apply
+```
+
+Use `pan workspace rebuild <issueId>` for the active issue the gate reports. Use `pan workspace reap` for old orphaned stacks, not for active agents.
+
 ## Related Commands
 
 ```bash
