@@ -37,6 +37,12 @@ function writePlan(projectRoot: string, issueId: string, doc: VBriefDocument): v
   writeFileSync(join(specsDir, filename), JSON.stringify({ ...doc, status: 'active' }, null, 2));
 }
 
+function writeWorkspaceDraft(workspacePath: string, doc: VBriefDocument): void {
+  const panDir = join(workspacePath, '.pan');
+  mkdirSync(panDir, { recursive: true });
+  writeFileSync(join(panDir, 'spec.vbrief.json'), JSON.stringify(doc, null, 2));
+}
+
 function makeDoc(planId: string, items: Array<{ id: string; title: string }>): VBriefDocument {
   return {
     vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
@@ -101,6 +107,26 @@ describe('createBeadsFromVBrief', () => {
     expect(result.success).toBe(false);
     expect(result.errors).toContain('bd (beads) CLI not found in PATH');
     expect(result.created).toHaveLength(0);
+  });
+
+  it('creates beads from the workspace draft before a canonical spec exists', async () => {
+    setupRedirect(WORKSPACE_DIR);
+    writeWorkspaceDraft(WORKSPACE_DIR, makeDoc('PAN-500', [
+      { id: 'item-1', title: 'First task' },
+      { id: 'item-2', title: 'Second task' },
+    ]));
+
+    mockExecAsync
+      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'bead-001\n', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'bead-002\n', stderr: '' });
+
+    const result = await createBeadsFromVBrief(WORKSPACE_DIR);
+
+    expect(result.success).toBe(true);
+    expect(result.created).toEqual(['PAN-500: First task', 'PAN-500: Second task']);
   });
 
   it('creates .beads/redirect when main repo has .beads/ but workspace does not', async () => {

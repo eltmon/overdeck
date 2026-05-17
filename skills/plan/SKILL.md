@@ -113,7 +113,7 @@ Create `.pan/continue.json` with COMPLETE planning context:
 
 ### Step 5: Produce `.pan/spec.vbrief.json`
 
-Create `.pan/spec.vbrief.json` following the vBRIEF schema. This replaces the manual `bd create` loop — `pan plan-finalize` reads this file and creates beads automatically.
+Create `.pan/spec.vbrief.json` following the vBRIEF schema. This replaces the manual `bd create` loop — `pan plan finalize` reads this file and creates beads automatically.
 
 ```json
 {
@@ -189,17 +189,17 @@ Create `.pan/spec.vbrief.json` following the vBRIEF schema. This replaces the ma
 **After writing the JSON file:**
 ```bash
 # Materialize beads and mark the workspace spec proposed
-pan plan-finalize
+pan plan finalize
 ```
 
-**Cloister hand-off:** When `pan plan-finalize` runs, it automatically:
+**Cloister hand-off:** When `pan plan finalize` runs, it automatically:
 1. Reads `.pan/spec.vbrief.json` from the workspace
 2. Calls `createBeadsFromVBrief()` to convert vBRIEF items into beads tasks
 3. Preserves dependency relationships from `edges` (blocking order)
 4. Includes acceptance criteria in bead descriptions
 5. Marks `plan.status` as `proposed` so the dashboard shows Done
 
-You do NOT need to run `bd create` manually — `pan plan-finalize` handles the full conversion.
+You do NOT need to run `bd create` manually — `pan plan finalize` handles the full conversion.
 
 ### Step 6: Stitch Integration (UI Work)
 
@@ -316,6 +316,6 @@ Before completing /plan, verify:
 - [ ] `.pan/spec.vbrief.json` is valid JSON with all required fields
 - [ ] Each item has exact file paths in Action field
 - [ ] Dependencies (edges) are set correctly
-- [ ] `pan plan-finalize` run successfully
+- [ ] `pan plan finalize` run successfully
 - [ ] Issue tracker updated
 - [ ] No decisions left for implementation agent

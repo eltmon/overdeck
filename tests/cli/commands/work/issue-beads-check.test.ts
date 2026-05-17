@@ -72,8 +72,39 @@ describe('hasBeadsTasks', () => {
     expect(hasBeadsTasks(tmpDir, 'PAN-1094')).toBe(true);
     expect(childProcessMocks.execFileSync).toHaveBeenCalledWith(
       'bd',
-      ['list', '--json', '-l', 'pan-1094', '--status', 'all', '--limit', '1'],
+      ['list', '--json', '-l', 'pan-1094', '--status', 'all', '--limit', '0'],
       expect.objectContaining({ cwd: tmpDir }),
     );
+  });
+
+  it('detects when beads do not cover every vBRIEF item', async () => {
+    const { validateBeadsMatchPlan } = await import('../../../../src/cli/commands/start.js');
+    const workspace = join(tmpDir, 'workspaces', 'feature-pan-1094');
+    mkdirSync(join(workspace, '.pan'), { recursive: true });
+    mkdirSync(join(workspace, '.beads'), { recursive: true });
+    writeFileSync(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify({
+      vBRIEFInfo: { version: '0.5', created: '2026-05-16T00:00:00Z' },
+      plan: {
+        id: 'PAN-1094',
+        title: 'Test plan',
+        status: 'proposed',
+        items: [
+          { id: 'one', title: 'One', status: 'pending' },
+          { id: 'two', title: 'Two', status: 'pending' },
+        ],
+        edges: [],
+      },
+    }));
+    writeFileSync(join(workspace, '.beads', 'issues.jsonl'), JSON.stringify({
+      id: 'panopticon-2',
+      title: 'PAN-1094: One',
+      labels: ['pan-1094'],
+    }) + '\n');
+
+    expect(validateBeadsMatchPlan(workspace, 'PAN-1094')).toEqual({
+      valid: false,
+      beadCount: 1,
+      planItemCount: 2,
+    });
   });
 });
