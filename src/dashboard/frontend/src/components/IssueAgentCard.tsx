@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio, RotateCcw } from 'lucide-react';
+import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio, RotateCcw, Pause, Unlock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSharedTick } from '../lib/useSharedTick';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
@@ -17,6 +17,9 @@ export interface IssueAgent {
   model: string;
   startedAt: string;
   consecutiveFailures: number;
+  paused?: boolean;
+  pausedReason?: string;
+  pausedAt?: string;
   troubled?: boolean;
   troubledAt?: string;
   lastFailureAt?: string;
@@ -99,6 +102,33 @@ async function resumeAgent(agentId: string, message?: string): Promise<void> {
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.error || 'Failed to resume agent');
+  }
+}
+
+type AgentPauseFields = Pick<IssueAgent, 'paused' | 'pausedReason' | 'pausedAt'>;
+
+async function pauseAgent(agentId: string, reason?: string): Promise<AgentPauseFields> {
+  const res = await fetch(`/api/agents/${agentId}/pause`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(reason ? { reason } : {}),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to pause agent');
+  }
+  const data = await res.json().catch(() => ({}));
+  return data.agent ?? {};
+}
+
+async function unpauseAgent(agentId: string): Promise<void> {
+  const res = await fetch(`/api/agents/${agentId}/unpause`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to unpause agent');
   }
 }
 
@@ -200,6 +230,8 @@ export function IssueAgentCard({
   const showAlert = useAlert();
   const [showHandoffPanel, setShowHandoffPanel] = useState(false);
   const [activityExpanded, setActivityExpanded] = useState(false);
+  const [showPauseReason, setShowPauseReason] = useState(false);
+  const [pauseReason, setPauseReason] = useState('');
   const { groups: modelGroups, defaultModel, harnessPolicy } = useAvailableModels();
   const [launchModel, setLaunchModel] = useState(agent.model || defaultModel);
   const [launchHarness, setLaunchHarness] = useState<Harness>(getHarness(agent) === 'pi' ? 'pi' : 'claude-code');
@@ -232,6 +264,50 @@ export function IssueAgentCard({
     },
     onError: (error: Error) => {
       showAlert({ message: `Failed to resume ${agent.id}: ${error.message}`, variant: 'error' });
+    },
+  });
+
+  const pauseMutation = useMutation({
+    mutationFn: (reason?: string) => pauseAgent(agent.id, reason),
+    onSuccess: (updated, reason) => {
+      queryClient.setQueryData<IssueAgent[]>(['agents'], (agents) => agents?.map((item) => (
+        item.id === agent.id
+          ? {
+              ...item,
+              paused: true,
+              pausedReason: updated.pausedReason ?? reason,
+              pausedAt: updated.pausedAt ?? new Date().toISOString(),
+            }
+          : item
+      )));
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      setShowPauseReason(false);
+      setPauseReason('');
+      showAlert({ message: `Paused ${agent.id}`, variant: 'success' });
+    },
+    onError: (error: Error) => {
+      showAlert({ message: `Failed to pause ${agent.id}: ${error.message}`, variant: 'error' });
+    },
+  });
+
+  const unpauseMutation = useMutation({
+    mutationFn: () => unpauseAgent(agent.id),
+    onSuccess: () => {
+      queryClient.setQueryData<IssueAgent[]>(['agents'], (agents) => agents?.map((item) => (
+        item.id === agent.id
+          ? {
+              ...item,
+              paused: false,
+              pausedReason: undefined,
+              pausedAt: undefined,
+            }
+          : item
+      )));
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      showAlert({ message: `Unpaused ${agent.id}`, variant: 'success' });
+    },
+    onError: (error: Error) => {
+      showAlert({ message: `Failed to unpause ${agent.id}: ${error.message}`, variant: 'error' });
     },
   });
 
@@ -293,6 +369,29 @@ export function IssueAgentCard({
     e.stopPropagation();
     // Open the workspace detail pane where the user can type a resume message
     onSelect?.();
+  };
+
+  const handleShowPauseReason = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowPauseReason(true);
+  };
+
+  const handlePauseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const reason = pauseReason.trim();
+    pauseMutation.mutate(reason || undefined);
+  };
+
+  const handlePauseCancel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowPauseReason(false);
+    setPauseReason('');
+  };
+
+  const handleUnpause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    unpauseMutation.mutate();
   };
 
   const handleClearTroubled = (e: React.MouseEvent) => {
@@ -435,6 +534,28 @@ export function IssueAgentCard({
               </button>
             )}
 
+            {agent.paused === true ? (
+              <button
+                onClick={handleUnpause}
+                disabled={unpauseMutation.isPending}
+                className="p-2 text-muted-foreground hover:text-success hover:bg-card rounded disabled:opacity-50"
+                title={agent.pausedReason ? `Unpause agent (${agent.pausedReason})` : 'Unpause agent'}
+                data-testid="issue-agent-card-unpause"
+              >
+                <Unlock className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={handleShowPauseReason}
+                disabled={pauseMutation.isPending}
+                className="p-2 text-muted-foreground hover:text-warning hover:bg-card rounded disabled:opacity-50"
+                title="Pause agent"
+                data-testid="issue-agent-card-pause"
+              >
+                <Pause className="w-4 h-4" />
+              </button>
+            )}
+
             {/* Resume button - only for suspended */}
             {health?.state === 'suspended' && (
               <button
@@ -486,6 +607,40 @@ export function IssueAgentCard({
           </div>
         </div>
       </div>
+
+      {showPauseReason && agent.paused !== true && (
+        <form
+          className="mt-3 pt-3 border-t border-border flex items-center gap-2"
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={handlePauseSubmit}
+        >
+          <input
+            type="text"
+            value={pauseReason}
+            onChange={(e) => setPauseReason(e.target.value)}
+            placeholder="Reason (optional)"
+            className="min-w-0 flex-1 px-3 py-2 rounded bg-background border border-border text-sm"
+            disabled={pauseMutation.isPending}
+            data-testid="issue-agent-card-pause-reason"
+          />
+          <button
+            type="submit"
+            disabled={pauseMutation.isPending}
+            className="px-3 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 text-sm"
+            data-testid="issue-agent-card-pause-submit"
+          >
+            {pauseMutation.isPending ? 'Pausing…' : 'Pause'}
+          </button>
+          <button
+            type="button"
+            onClick={handlePauseCancel}
+            disabled={pauseMutation.isPending}
+            className="px-3 py-2 rounded bg-card text-muted-foreground hover:text-foreground disabled:opacity-50 text-sm"
+          >
+            Cancel
+          </button>
+        </form>
+      )}
 
       {agent.status === 'stopped' && (
         <div

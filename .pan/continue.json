@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T15:46:30.478Z",
+  "updated": "2026-05-17T15:51:18.903Z",
   "gitState": {
     "branch": "feature/pan-1141",
-    "sha": "14bae360165424fce1206c5db3bd878812511a2d",
+    "sha": "4c245cdc3074bc3e65e7a8fc5ad2390cbe9c601d",
     "dirty": true
   },
   "decisions": [
@@ -128,8 +128,8 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-aape (IssueAgentCard clear-troubled action, success/error mutation handling, immediate agents-cache update, and browser verification with mocked troubled/non-troubled cards). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-aape",
+    "description": "Completed bead workspace-avz7 (IssueAgentCard pause/unpause action buttons, inline optional reason form, immediate agents-cache updates, and browser verification with mocked paused/non-paused/error cards). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-avz7",
     "filesToRead": [
       "src/dashboard/frontend/src/components/IssueAgentCard.tsx",
       ".pan/spec.vbrief.json",
@@ -203,6 +203,12 @@
       "timestamp": "2026-05-17T15:46:30.478Z",
       "reason": "bead-complete",
       "note": "Implemented IssueAgentCard clear-troubled control visible only for troubled agents, POST /api/agents/:id/untroubled mutation, immediate agents cache clearing of troubled/failure fields, and failure-count tooltip. npm run typecheck and npm run lint passed. Browser verification mounted mocked troubled/non-troubled cards in Vite: troubled-only button rendered, POST fired, success alert appeared, clear button disappeared, and failure text cleared without mutating real agent state.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T15:51:18.903Z",
+      "reason": "bead-complete",
+      "note": "Implemented IssueAgentCard pause and unpause controls with an inline optional reason form, POST /api/agents/:id/pause and /unpause mutations, immediate agents-cache pause field updates, and success/error alerts. npm run typecheck and npm run lint passed. Browser verification mounted mocked non-paused, paused, and failing cards in Vite: pause-only/unpause-only visibility, empty-reason POST body, immediate button swap after pause/unpause, and pause error alert with re-enabled submit all passed without mutating real agent state.",
       "agentModel": "gpt-5.5"
     }
   ],

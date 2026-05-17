@@ -4,7 +4,7 @@
     "created": "2026-05-16T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1141: Agent auto-resume controls — emergency mode, issue-level pause, troubled-state retry limits",
-    "updated": "2026-05-17T15:46:30.478Z"
+    "updated": "2026-05-17T15:51:18.903Z"
   },
   "plan": {
     "id": "pan-1141",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-17T15:46:30.478Z",
+    "updated": "2026-05-17T15:51:18.903Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1141",
@@ -774,7 +774,7 @@
       {
         "id": "frontend-pause-controls",
         "title": "IssueAgentCard: pause/unpause buttons with reason input",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -790,36 +790,41 @@
           {
             "id": "frontend-pause-controls.ac1",
             "title": "Pause button appears for non-paused agents; clicking it shows reason input and submits",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:51:18.903Z"
           },
           {
             "id": "frontend-pause-controls.ac2",
             "title": "Unpause button appears for paused agents; clicking it sends the request and updates the badge immediately on response",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:51:18.903Z"
           },
           {
             "id": "frontend-pause-controls.ac3",
             "title": "Empty reason is allowed (sends no `reason` field)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:51:18.903Z"
           },
           {
             "id": "frontend-pause-controls.ac4",
             "title": "Error responses surface as a toast or inline error; button re-enables on failure",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:51:18.903Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T15:51:18.903Z"
       },
       {
         "id": "frontend-untroubled-control",
