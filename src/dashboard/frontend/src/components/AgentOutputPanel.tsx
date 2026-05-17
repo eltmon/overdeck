@@ -13,9 +13,19 @@ import { useQuery } from '@tanstack/react-query';
 import { XTerminal } from './XTerminal';
 import { ActivityView } from './CommandDeck/ActivityView';
 import { ConversationPanel } from './chat/ConversationPanel';
-import { fetchConversations, type Conversation } from './CommandDeck/ConversationList';
+import type { Conversation } from './CommandDeck/ConversationList';
 import { useDashboardStore, selectAgentById } from '../lib/store';
 import styles from './CommandDeck/styles/command-deck.module.css';
+
+async function fetchAgentConversation(agentId: string): Promise<Conversation | null> {
+  // The list endpoint (/api/conversations) filters out agent/planning/specialist
+  // rows so the human conversations sidebar stays clean. AgentOutputPanel needs
+  // the row anyway for its liveness signal — fetch it directly by name.
+  const res = await fetch(`/api/conversations/${encodeURIComponent(agentId)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Failed to fetch conversation for ${agentId}`);
+  return res.json();
+}
 
 interface AgentOutputPanelProps {
   agentId: string;
@@ -77,18 +87,24 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
   // snapshot refresh gaps, and recovery cycles, and made active synthesizers
   // render as "Starting…" when the snapshot was stale.
   //
-  // Every specialist role now gets a row in the conversations table at spawn
-  // time (see src/lib/agents.ts spawnRun), so we pull the real row from the
-  // shared `['conversations']` cache that ConversationList already maintains.
-  const { data: conversations = [] } = useQuery({
-    queryKey: ['conversations'],
-    queryFn: fetchConversations,
+  // Specialist rows are created at spawn (src/lib/agents.ts spawnRun) and
+  // backfilled by the conversation-lifecycle service for any tmux session
+  // that's missing one. They're excluded from the public list endpoint so
+  // they don't clutter the sidebar, so we fetch by name directly here.
+  const { data: realConversation } = useQuery({
+    queryKey: ['conversation', agentId],
+    queryFn: () => fetchAgentConversation(agentId),
     enabled: !!specialist,
+    refetchInterval: (query) => {
+      // Poll faster while the row is still missing (just-spawned race) and
+      // slower once we have it (lifecycle poll handles the alive/ended
+      // transitions server-side).
+      const data = query.state.data as Conversation | null | undefined;
+      if (data == null) return 2000;
+      if (data.sessionAlive) return 5000;
+      return 10000;
+    },
   });
-  const realConversation = useMemo<Conversation | null>(() => {
-    if (!specialist) return null;
-    return conversations.find(c => c.name === agentId) ?? null;
-  }, [specialist, conversations, agentId]);
 
   // If the row hasn't appeared yet (brief race after spawn, or pre-fix
   // orchestrator agents that were spawned before this code shipped), fall
