@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T16:11:38.569Z",
+  "updated": "2026-05-17T16:13:47.531Z",
   "gitState": {
     "branch": "feature/pan-1141",
     "sha": "dea74e98b42d8ddd3cb0c0ca7773b501ebbb3829",
@@ -128,11 +128,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-w0kj (pan untroubled clears troubled/failure fields without spawning, reports already-untroubled as a successful no-op, and prints a pan start/deacon patrol hint). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-w0kj",
+    "description": "Completed bead workspace-hgok (created pan-pause, pan-unpause, and pan-untroubled wrapper skills with persistence semantics and start/kill interactions; lint skill consistency passed). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-hgok",
     "filesToRead": [
-      "src/cli/commands/untroubled.ts",
-      "src/cli/index.ts",
+      "skills/pan-pause/SKILL.md",
+      "skills/pan-unpause/SKILL.md",
+      "skills/pan-untroubled/SKILL.md",
       ".pan/spec.vbrief.json",
       ".pan/continue.json"
     ]
@@ -240,6 +241,12 @@
       "timestamp": "2026-05-17T16:11:38.569Z",
       "reason": "bead-complete",
       "note": "Implemented pan untroubled <id> using clearAgentTroubled, unknown-agent refusal, already-untroubled no-op output, no spawn/resume behavior, CLI registration, and explicit pan start/deacon patrol hint. npm run typecheck and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T16:13:47.531Z",
+      "reason": "bead-complete",
+      "note": "Created wrapper skills for pan pause, pan unpause, and pan untroubled with correct CLI-wrapper frontmatter, persistence semantics, and interactions with pan start/pan kill. npm run typecheck and npm run lint passed, including scripts/lint-skills.sh.",
       "agentModel": "gpt-5.5"
     }
   ],

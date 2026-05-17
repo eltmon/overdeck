@@ -929,7 +929,7 @@
       {
         "id": "wrapper-skills",
         "title": "Wrapper skills for pan-pause, pan-unpause, pan-untroubled",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -945,28 +945,32 @@
           {
             "id": "wrapper-skills.ac1",
             "title": "Three SKILL.md files exist with correct frontmatter and CLI-wrapper shape",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:13:47.531Z"
           },
           {
             "id": "wrapper-skills.ac2",
             "title": "Each skill body documents the verb's persistence semantics and interaction with `pan start`/`pan kill`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:13:47.531Z"
           },
           {
             "id": "wrapper-skills.ac3",
             "title": "`scripts/lint-skills.sh` (via `npm run lint`) passes — every flag and arg the skills mention is present on the CLI",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:13:47.531Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T16:13:47.531Z"
       },
       {
         "id": "config-overrides",
