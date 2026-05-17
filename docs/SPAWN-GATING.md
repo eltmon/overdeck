@@ -16,8 +16,8 @@ If `allowHost` is true, the gate emits `agent-spawn-host-override` and persists 
 ## CLI and dashboard break-glass
 
 - `src/cli/index.ts:410` registers `pan start <id>`.
-- `src/cli/index.ts:413` adds `--host`; `src/cli/index.ts:414` adds `--yes` for non-interactive confirmation.
-- `src/cli/commands/start.ts:124` prompts `Are you sure? This bypasses workspace isolation. (y/N)` for interactive `--host` and requires `--yes` when stdin is not a TTY.
+- `src/cli/index.ts:413` adds `--host`; `src/cli/index.ts:414` adds `--yes` to confirm without an interactive prompt.
+- `src/cli/commands/start.ts:124` accepts explicit `--host --yes` before prompting; otherwise it prompts `Are you sure? This bypasses workspace isolation. (y/N)` for interactive `--host` and requires `--yes` when stdin is not a TTY.
 - `src/cli/commands/start.ts:1009` passes `allowHost` into `spawnAgent()`.
 - `src/cli/index.ts:418` registers `pan swarm <id>`.
 - `src/cli/index.ts:426` adds `--host`; `src/cli/index.ts:427` adds `--yes` for non-interactive confirmation.

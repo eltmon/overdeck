@@ -35,8 +35,8 @@ an autonomous Claude Code agent in a tmux session (`agent-<id>`). The agent load
 issue spec, creates a plan, and begins implementation.
 
 For projects with workspace Docker configured, `pan start` checks stack health before
-spawning. Use `--host` only as an explicit break-glass override; interactive use asks for
-confirmation, and non-interactive use requires `--yes`.
+spawning. Use `--host` only as an explicit break-glass override; pass `--yes` to confirm
+without an interactive prompt.
 
 ## When to Use
 

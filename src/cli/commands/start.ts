@@ -125,12 +125,13 @@ function determineWorkspaceLocation(options: IssueOptions): 'local' | 'remote' |
 async function confirmHostOverride(options: IssueOptions): Promise<boolean> {
   if (!options.host) return true;
 
+  if (options.yes) {
+    console.warn(chalk.yellow('--host --yes given; bypassing workspace isolation.'));
+    return true;
+  }
+
   if (!process.stdin.isTTY) {
-    if (options.yes) {
-      console.warn(chalk.yellow('--host --yes given in a non-interactive context; bypassing workspace isolation.'));
-      return true;
-    }
-    console.error(chalk.red('Error: --host requires an interactive confirmation, or pass --yes for non-interactive use.'));
+    console.error(chalk.red('Error: --host requires an interactive confirmation, or pass --yes.'));
     return false;
   }
 

@@ -20,6 +20,7 @@ function expectModelRejection(fn: () => unknown | Promise<unknown>) {
 describe('model override validation', () => {
   it('normalizes safe provider model identifiers and rejects shell metacharacters', () => {
     expect(normalizeModelOverride(' qwen/qwen3.6-plus:free ')).toBe('qwen/qwen3.6-plus:free');
+    expect(normalizeModelOverride(' oai@gpt-5.5 ')).toBe('oai@gpt-5.5');
     expect(normalizeModelOverride('')).toBeUndefined();
     expect(() => normalizeModelOverride(MALICIOUS_MODEL)).toThrow(/model must match/);
     expect(() => normalizeModelOverride('claude-sonnet-4-6 && whoami')).toThrow(/model must match/);
