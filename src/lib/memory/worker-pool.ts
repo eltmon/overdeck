@@ -9,6 +9,7 @@ import {
 import { updateMemoryHealth, type MemoryHealthUpdate } from './health.js';
 import { writeObservation, type WriteObservationResult } from './observations.js';
 import { extractWithProviderPolicy, type MemoryExtractionPolicyResult } from './providers/index.js';
+import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput, type ExtractFromTranscriptDeltaResult } from './pipeline.js';
 import { getMemoryWorkerConcurrency } from './settings.js';
 
 export const DEFAULT_MEMORY_WORKER_CONCURRENCY = 4;
@@ -30,9 +31,28 @@ export interface MemoryExtractionWorkerPoolOptions {
   onResult?: (result: MemoryExtractionJobResult) => void | Promise<void>;
 }
 
+export interface MemoryPipelineJob extends ExtractFromTranscriptDeltaInput {
+  jobId?: string;
+}
+
+export type MemoryPipelineJobResult =
+  | { jobId: string; status: 'completed'; result: ExtractFromTranscriptDeltaResult }
+  | { jobId: string; status: 'failed'; error: unknown };
+
+export interface MemoryPipelineWorkerPoolOptions {
+  loadConcurrency?: () => number | Promise<number>;
+  extractFromTranscriptDelta?: (input: ExtractFromTranscriptDeltaInput) => Promise<ExtractFromTranscriptDeltaResult>;
+  onResult?: (result: MemoryPipelineJobResult) => void | Promise<void>;
+}
+
 interface QueuedMemoryExtractionJob {
   jobId: string;
   job: MemoryExtractionJob;
+}
+
+interface QueuedMemoryPipelineJob {
+  jobId: string;
+  job: MemoryPipelineJob;
 }
 
 export class MemoryExtractionWorkerPool {
@@ -165,14 +185,102 @@ export class MemoryExtractionWorkerPool {
   }
 }
 
+export class MemoryPipelineWorkerPool {
+  private readonly queue: QueuedMemoryPipelineJob[] = [];
+  private readonly loadConcurrency: () => number | Promise<number>;
+  private readonly extractDelta: (input: ExtractFromTranscriptDeltaInput) => Promise<ExtractFromTranscriptDeltaResult>;
+  private readonly onResult?: (result: MemoryPipelineJobResult) => void | Promise<void>;
+  private active = 0;
+  private pumping = false;
+  private idleResolvers: Array<() => void> = [];
+
+  constructor(options: MemoryPipelineWorkerPoolOptions = {}) {
+    this.loadConcurrency = options.loadConcurrency ?? getMemoryWorkerConcurrency;
+    this.extractDelta = options.extractFromTranscriptDelta ?? extractFromTranscriptDelta;
+    this.onResult = options.onResult;
+  }
+
+  enqueue(job: MemoryPipelineJob): string {
+    const jobId = job.jobId ?? randomUUID();
+    this.queue.push({ jobId, job: { ...job, jobId } });
+    void this.pump();
+    return jobId;
+  }
+
+  pendingCount(): number {
+    return this.queue.length + this.active;
+  }
+
+  async waitForIdle(): Promise<void> {
+    if (this.pendingCount() === 0) return;
+    await new Promise<void>((resolve) => this.idleResolvers.push(resolve));
+  }
+
+  private async pump(): Promise<void> {
+    if (this.pumping) return;
+    this.pumping = true;
+    try {
+      while (this.queue.length > 0 && this.active < await this.effectiveConcurrency()) {
+        const queued = this.queue.shift();
+        if (!queued) break;
+        this.active += 1;
+        void this.runQueuedJob(queued);
+      }
+    } finally {
+      this.pumping = false;
+      this.resolveIdleIfNeeded();
+    }
+  }
+
+  private async runQueuedJob(queued: QueuedMemoryPipelineJob): Promise<void> {
+    let result: MemoryPipelineJobResult;
+    try {
+      result = { jobId: queued.jobId, status: 'completed', result: await this.extractDelta(queued.job) };
+    } catch (error) {
+      result = { jobId: queued.jobId, status: 'failed', error };
+    }
+
+    try {
+      await this.onResult?.(result);
+    } catch {
+      // Result observers must not feed failures back into the extraction path.
+    } finally {
+      this.active -= 1;
+      void this.pump();
+      this.resolveIdleIfNeeded();
+    }
+  }
+
+  private async effectiveConcurrency(): Promise<number> {
+    const concurrency = await this.loadConcurrency();
+    return Number.isInteger(concurrency) && concurrency > 0 ? concurrency : DEFAULT_MEMORY_WORKER_CONCURRENCY;
+  }
+
+  private resolveIdleIfNeeded(): void {
+    if (this.pendingCount() !== 0) return;
+    const resolvers = this.idleResolvers;
+    this.idleResolvers = [];
+    for (const resolve of resolvers) resolve();
+  }
+}
+
 const defaultMemoryExtractionWorkerPool = new MemoryExtractionWorkerPool();
+const defaultMemoryPipelineWorkerPool = new MemoryPipelineWorkerPool();
 
 export function getMemoryExtractionWorkerPool(): MemoryExtractionWorkerPool {
   return defaultMemoryExtractionWorkerPool;
 }
 
+export function getMemoryPipelineWorkerPool(): MemoryPipelineWorkerPool {
+  return defaultMemoryPipelineWorkerPool;
+}
+
 export function enqueueMemoryExtractionJob(job: MemoryExtractionJob): string {
   return defaultMemoryExtractionWorkerPool.enqueue(job);
+}
+
+export function enqueueMemoryPipelineJob(job: MemoryPipelineJob): string {
+  return defaultMemoryPipelineWorkerPool.enqueue(job);
 }
 
 export function enqueueReconciledMemoryExtractionJobs(jobs: MemoryExtractionJob[]): string[] {

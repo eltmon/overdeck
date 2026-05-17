@@ -23,10 +23,11 @@ import { getAgentRuntimeStateAsync, getAgentStateAsync, listRunningAgentsAsync, 
 import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
 import { getTranscriptCheckpoint } from '../../../lib/memory/checkpoints.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
-import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput } from '../../../lib/memory/pipeline.js';
+import type { ExtractFromTranscriptDeltaInput } from '../../../lib/memory/pipeline.js';
 import { registerTranscriptForPolling } from '../../../lib/memory/poller.js';
 import { areMemoryObservationsEnabled } from '../../../lib/memory/settings.js';
 import { isSubagentHookPayload } from '../../../lib/memory/subagent-filter.js';
+import { enqueueMemoryPipelineJob } from '../../../lib/memory/worker-pool.js';
 
 const CLEAR_ON = new Set([
   'PostToolUse',
@@ -371,9 +372,7 @@ async function getTranscriptStat(transcriptPath: string): Promise<{ size: number
 }
 
 function enqueueMemoryTurnPipeline(input: ExtractFromTranscriptDeltaInput): void {
-  void extractFromTranscriptDelta(input).catch((error: unknown) => {
-    console.warn('[hooks] memory turn pipeline failed:', error instanceof Error ? error.message : String(error));
-  });
+  enqueueMemoryPipelineJob(input);
 }
 
 function stringField(value: unknown): string | null {

@@ -85,13 +85,13 @@ describe('TranscriptPoller', () => {
     const readTranscriptSlice = vi.fn()
       .mockResolvedValueOnce('{"type":"user"}\n')
       .mockResolvedValueOnce('{"type":"assistant"}\n');
-    const extract = vi.fn(async () => ({ status: 'noop' as const, observation: null, reason: 'offset-mismatch' as const }));
+    const enqueue = vi.fn(async () => undefined);
     const poller = new TranscriptPoller({
       activityLineThreshold: 2,
       statTranscript,
       readTranscriptSlice,
       getTranscriptCheckpoint: () => null,
-      extractFromTranscriptDelta: extract,
+      enqueueTranscriptDelta: enqueue,
     });
     poller.register(entry());
 
@@ -100,7 +100,7 @@ describe('TranscriptPoller', () => {
 
     expect(readTranscriptSlice).toHaveBeenNthCalledWith(1, '/tmp/session-1.jsonl', 0, 10);
     expect(readTranscriptSlice).toHaveBeenNthCalledWith(2, '/tmp/session-1.jsonl', 10, 20);
-    expect(extract).toHaveBeenCalledWith(expect.objectContaining({
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({
       sessionId: 'session-1',
       transcriptPath: '/tmp/session-1.jsonl',
       fromOffset: 0,

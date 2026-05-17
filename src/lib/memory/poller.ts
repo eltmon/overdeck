@@ -4,6 +4,7 @@ import { getTranscriptCheckpoint } from './checkpoints.js';
 import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput, type ExtractFromTranscriptDeltaResult } from './pipeline.js';
 import { areMemoryObservationsEnabled } from './settings.js';
 import { getActiveTranscriptEntries, type TranscriptEntry } from './transcript-source.js';
+import { enqueueMemoryPipelineJob } from './worker-pool.js';
 
 export const DEFAULT_MEMORY_POLLER_INTERVAL_MS = 2_000;
 export const DEFAULT_MEMORY_POLLER_ACTIVITY_LINE_THRESHOLD = 20;
@@ -33,6 +34,7 @@ export interface TranscriptPollerOptions {
   readTranscriptSlice?: (path: string, fromOffset: number, toOffset: number) => Promise<string>;
   getTranscriptCheckpoint?: typeof getTranscriptCheckpoint;
   extractFromTranscriptDelta?: (input: ExtractFromTranscriptDeltaInput) => Promise<ExtractFromTranscriptDeltaResult>;
+  enqueueTranscriptDelta?: (input: ExtractFromTranscriptDeltaInput) => void | Promise<unknown>;
   areObservationsEnabled?: () => boolean | Promise<boolean>;
 }
 
@@ -56,7 +58,7 @@ export class TranscriptPoller {
   private readonly statTranscript: (path: string) => Promise<{ size: number; mtimeMs: number }>;
   private readonly readTranscriptSlice: (path: string, fromOffset: number, toOffset: number) => Promise<string>;
   private readonly getCheckpoint: typeof getTranscriptCheckpoint;
-  private readonly extractDelta: (input: ExtractFromTranscriptDeltaInput) => Promise<ExtractFromTranscriptDeltaResult>;
+  private readonly enqueueDelta: (input: ExtractFromTranscriptDeltaInput) => void | Promise<unknown>;
   private readonly areObservationsEnabled: () => boolean | Promise<boolean>;
   private timer: ReturnType<typeof setInterval> | null = null;
   private ticking = false;
@@ -71,7 +73,7 @@ export class TranscriptPoller {
     this.statTranscript = options.statTranscript ?? stat;
     this.readTranscriptSlice = options.readTranscriptSlice ?? readTranscriptSlice;
     this.getCheckpoint = options.getTranscriptCheckpoint ?? getTranscriptCheckpoint;
-    this.extractDelta = options.extractFromTranscriptDelta ?? extractFromTranscriptDelta;
+    this.enqueueDelta = options.enqueueTranscriptDelta ?? options.extractFromTranscriptDelta ?? ((input) => { enqueueMemoryPipelineJob(input); });
     this.areObservationsEnabled = options.areObservationsEnabled ?? areMemoryObservationsEnabled;
   }
 
@@ -180,7 +182,7 @@ export class TranscriptPoller {
     if (pendingLineCount < this.activityLineThreshold) return 'belowThreshold';
     if (this.isRateLimited(entry.sessionId)) return 'rateLimited';
 
-    await this.extractDelta({
+    await this.enqueueDelta({
       sessionId: entry.sessionId,
       transcriptPath: entry.transcriptPath,
       fromOffset: entry.lastExtractionOffset,

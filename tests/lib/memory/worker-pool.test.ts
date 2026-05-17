@@ -4,7 +4,7 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MemoryObservation } from '@panctl/contracts';
 import { readMemoryHealthSnapshot, updateMemoryHealth, type MemoryHealthChangedPayload } from '../../../src/lib/memory/health.js';
-import { MemoryExtractionWorkerPool, type MemoryExtractionJobResult } from '../../../src/lib/memory/worker-pool.js';
+import { MemoryExtractionWorkerPool, MemoryPipelineWorkerPool, type MemoryExtractionJobResult, type MemoryPipelineJobResult } from '../../../src/lib/memory/worker-pool.js';
 
 const identity = {
   projectId: 'panopticon-cli',
@@ -38,6 +38,18 @@ function job(overrides: Partial<Parameters<MemoryExtractionWorkerPool['enqueue']
     identity,
     gitBranch: 'feature/pan-1052',
     sourceTranscriptOffset: 42,
+    ...overrides,
+  };
+}
+
+function pipelineJob(overrides: Partial<Parameters<MemoryPipelineWorkerPool['enqueue']>[0]> = {}) {
+  return {
+    sessionId: 'session-1',
+    transcriptPath: '/tmp/session-1.jsonl',
+    fromOffset: 0,
+    toOffset: 100,
+    identity,
+    trigger: 'poller' as const,
     ...overrides,
   };
 }
@@ -101,6 +113,39 @@ describe('memory extraction worker pool', () => {
     await pool.waitForIdle();
 
     expect(results.map((result) => result.status)).toEqual(['written', 'written', 'written', 'written']);
+    expect(maxActive).toBe(2);
+  });
+
+  it('runs transcript-delta pipeline jobs with bounded concurrency', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const releases: Array<() => void> = [];
+    const results: MemoryPipelineJobResult[] = [];
+    const pool = new MemoryPipelineWorkerPool({
+      loadConcurrency: () => 2,
+      onResult: (result) => results.push(result),
+      extractFromTranscriptDelta: async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise<void>((resolve) => releases.push(resolve));
+        active -= 1;
+        return { status: 'noop' as const, observation: null, reason: 'empty-delta' as const };
+      },
+    });
+
+    for (let index = 0; index < 4; index++) {
+      pool.enqueue(pipelineJob({ jobId: `pipeline-${index}` }));
+    }
+
+    await vi.waitFor(() => expect(releases).toHaveLength(2));
+    expect(maxActive).toBe(2);
+
+    releases.splice(0).forEach((release) => release());
+    await vi.waitFor(() => expect(releases).toHaveLength(2));
+    releases.splice(0).forEach((release) => release());
+    await pool.waitForIdle();
+
+    expect(results.map((result) => result.status)).toEqual(['completed', 'completed', 'completed', 'completed']);
     expect(maxActive).toBe(2);
   });
 
