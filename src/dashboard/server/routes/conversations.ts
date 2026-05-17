@@ -1220,13 +1220,18 @@ const getConversationRoute = HttpRouter.add(
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
     const params = yield* HttpRouter.params;
-    const id = Number(params['id']);
+    const rawId = params['id'] ?? '';
+    const numericId = Number(rawId);
     return yield* Effect.promise(async () => {
       try {
-        if (isNaN(id)) {
-          return jsonResponse({ error: 'Invalid conversation ID' }, { status: 400 });
-        }
-        const conv = getConversationById(id);
+        // The list endpoint deliberately excludes agent/planning/specialist
+        // rows (kept out of the human-conversations sidebar), but consumers
+        // like AgentOutputPanel still need to fetch a single agent row by
+        // name. When the path param looks like a name rather than a number,
+        // resolve via getConversationByName instead of getConversationById.
+        const conv = !Number.isNaN(numericId) && /^\d+$/.test(rawId)
+          ? getConversationById(numericId)
+          : getConversationByName(rawId);
         if (!conv) {
           return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         }
