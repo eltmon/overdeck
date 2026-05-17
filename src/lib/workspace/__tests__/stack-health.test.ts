@@ -83,6 +83,33 @@ describe('evaluateWorkspaceStackHealth', () => {
     expect(health.reasons[0]).toContain('init exited non-zero (127)');
   });
 
+  it('keeps init containers healthy when they exit zero', () => {
+    const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [
+      container({
+        name: 'panopticon-feature-pan-1140-init-1',
+        status: 'Exited (0) 2 minutes ago',
+        state: 'exited',
+      }),
+      container({ status: 'Up 2 minutes', state: 'running' }),
+    ], { now });
+
+    expect(health.healthy).toBe(true);
+    expect(health.reasons).toEqual([]);
+  });
+
+  it('marks service containers unhealthy when they exit zero', () => {
+    const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [
+      container({
+        name: 'panopticon-feature-pan-1140-server-1',
+        status: 'Exited (0) 2 minutes ago',
+        state: 'exited',
+      }),
+    ], { now });
+
+    expect(health.healthy).toBe(false);
+    expect(health.reasons).toEqual(['panopticon-feature-pan-1140-server-1 service exited (0)']);
+  });
+
   it('keeps Up containers healthy', () => {
     const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [
       container({ status: 'Up 2 minutes', state: 'running' }),

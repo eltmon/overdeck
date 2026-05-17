@@ -4,10 +4,10 @@ Agent starts for projects with `workspace.docker.compose_template` must pass wor
 
 ## Central gate
 
-- `src/lib/agents.ts:1808` defines `assertWorkspaceStackHealthyForSpawn(issueId, role, allowHost)`.
-- `src/lib/agents.ts:1864` gates `spawnRun()` before role-run state or tmux session creation.
-- `src/lib/agents.ts:2102` gates `spawnAgent()` before hook initialization, beads checks, state writes, or work-agent tmux creation.
-- `src/lib/agents.ts:2704`, `src/lib/agents.ts:2873`, `src/lib/agents.ts:3032`, and `src/lib/agents.ts:3198` gate fallback relaunch, resume, restart, and crash recovery before they create replacement tmux sessions.
+- `src/lib/agents.ts:1814` defines `assertWorkspaceStackHealthyForSpawn(issueId, role, allowHost)`.
+- `src/lib/agents.ts:1872` gates `spawnRun()` before role-run state or tmux session creation.
+- `src/lib/agents.ts:2117` gates `spawnAgent()` before hook initialization, beads checks, state writes, or work-agent tmux creation.
+- `src/lib/agents.ts:2719`, `src/lib/agents.ts:2890`, `src/lib/agents.ts:3051`, and `src/lib/agents.ts:3219` gate fallback relaunch, resume, restart, and crash recovery before they create replacement tmux sessions.
 
 The spawn gate reads the cached Docker lifecycle snapshot maintained by `DockerStatsCollector`; it does not run `docker ps` or any Docker subprocess on the spawn path. CLI/status/manual diagnostics can still collect Docker state explicitly and pass it into stack-health evaluation.
 
@@ -31,8 +31,8 @@ There is no `pan work` spawn command today; the CLI audit found `pan start <id>`
 
 ## Spawn entrypoint audit
 
-- `src/lib/agents.ts:1844` `spawnRun()` is the role-run choke point for review, test, and ship roles; it gates non-work roles directly and delegates work to `spawnAgent()`.
-- `src/lib/agents.ts:2091` `spawnAgent()` is the work-agent choke point; dashboard direct services, swarm slots, merge-prep recovery, and handoff all flow through it.
+- `src/lib/agents.ts:1851` `spawnRun()` is the role-run choke point for review, test, and ship roles; it gates non-work roles directly and delegates work to `spawnAgent()`.
+- `src/lib/agents.ts:2106` `spawnAgent()` is the work-agent choke point; dashboard direct services, swarm slots, merge-prep recovery, and handoff all flow through it.
 - `src/lib/cloister/review-agent.ts:335` and `src/lib/cloister/review-agent.ts:525` start review roles through `spawnRun()`.
 - `src/lib/cloister/test-agent-queue.ts:85`, `src/lib/cloister/deacon.ts:1568`, `src/lib/cloister/deacon.ts:1745`, and `src/dashboard/server/routes/workspaces.ts:3602` start test roles through `spawnRun()`.
 - `src/lib/cloister/merge-agent.ts:1149` starts ship roles through `spawnRun()`.

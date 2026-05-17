@@ -73,7 +73,11 @@ export async function workspaceRebuildCommand(issueId: string): Promise<void> {
     process.exit(1);
   }
 
-  const workspacePath = join(resolvedProject.projectPath, 'workspaces', `feature-${normalizedIssueId}`);
+  const workspacePath = join(
+    resolvedProject.projectPath,
+    projectConfig.workspace?.workspaces_dir ?? 'workspaces',
+    `feature-${normalizedIssueId}`,
+  );
   if (!existsSync(workspacePath)) {
     console.error(chalk.red(`✗ Workspace not found: ${workspacePath}`));
     process.exit(1);

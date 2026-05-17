@@ -109,7 +109,7 @@ import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js
 import { extractPrefix, extractNumber, parseIssueId } from '../../../lib/issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
-import { getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
+import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
@@ -1328,7 +1328,7 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
       return jsonResponse({ error: `Invalid issue ID: ${invalid.issueId}` }, { status: 400 });
     }
 
-    const entries = yield* Effect.promise(() => Promise.all(parsedIds.map(async ({ parsed }) => {
+    const workspaceRequests = parsedIds.map(({ parsed }) => {
       const normalizedIssueId = parsed!.raw.toUpperCase();
       const workspaceMetadata = (() => {
         try {
@@ -1338,12 +1338,20 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
         }
       })();
       if (workspaceMetadata?.location === 'remote') {
-        return [normalizedIssueId, { exists: true, issueId: normalizedIssueId, location: 'remote', isRemote: true }] as const;
+        return {
+          kind: 'response' as const,
+          normalizedIssueId,
+          response: { exists: true, issueId: normalizedIssueId, location: 'remote', isRemote: true },
+        };
       }
 
       const resolved = resolveProjectFromIssue(normalizedIssueId);
       if (!resolved) {
-        return [normalizedIssueId, { exists: false, issueId: normalizedIssueId }] as const;
+        return {
+          kind: 'response' as const,
+          normalizedIssueId,
+          response: { exists: false, issueId: normalizedIssueId },
+        };
       }
 
       const projectConfig = getProject(resolved.projectKey);
@@ -1353,23 +1361,50 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
         `feature-${parsed!.normalized}`,
       );
       if (!existsSync(workspacePath)) {
-        return [normalizedIssueId, { exists: false, issueId: normalizedIssueId }] as const;
+        return {
+          kind: 'response' as const,
+          normalizedIssueId,
+          response: { exists: false, issueId: normalizedIssueId },
+        };
       }
 
-      const stackHealth = await getWorkspaceStackHealth(normalizedIssueId, {
-        projectConfig: { ...projectConfig, path: resolved.projectPath },
+      return {
+        kind: 'local' as const,
+        normalizedIssueId,
+        projectConfig,
+        projectPath: resolved.projectPath,
         workspacePath,
-      });
+      };
+    });
 
-      return [normalizedIssueId, {
-        exists: true,
-        issueId: normalizedIssueId,
-        path: workspacePath,
-        stackHealth,
-        hasDocker: Boolean(projectConfig.workspace?.docker?.compose_template),
-        location: 'local',
-      }] as const;
-    })));
+    const entries = yield* Effect.promise(async () => {
+      const containers = workspaceRequests.some((request) =>
+        request.kind === 'local' && Boolean(request.projectConfig.workspace?.docker?.compose_template)
+      )
+        ? await collectDockerContainerLifecycleSnapshot()
+        : undefined;
+
+      return Promise.all(workspaceRequests.map(async (request) => {
+        if (request.kind === 'response') {
+          return [request.normalizedIssueId, request.response] as const;
+        }
+
+        const stackHealth = await getWorkspaceStackHealth(request.normalizedIssueId, {
+          projectConfig: { ...request.projectConfig, path: request.projectPath },
+          workspacePath: request.workspacePath,
+          containers,
+        });
+
+        return [request.normalizedIssueId, {
+          exists: true,
+          issueId: request.normalizedIssueId,
+          path: request.workspacePath,
+          stackHealth,
+          hasDocker: Boolean(request.projectConfig.workspace?.docker?.compose_template),
+          location: 'local',
+        }] as const;
+      }));
+    });
 
     return jsonResponse({ workspaces: Object.fromEntries(entries) });
   })),

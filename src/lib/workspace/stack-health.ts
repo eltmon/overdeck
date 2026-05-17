@@ -152,9 +152,15 @@ export function evaluateWorkspaceStackHealth(
 
   for (const container of stackContainers) {
     const exitCode = parseExitCode(container.status);
-    if (isExited(container) && exitCode !== null && exitCode !== 0) {
-      const role = isInitContainer(container.name) ? 'init' : 'service';
-      reasons.push(`${container.name} ${role} exited non-zero (${exitCode})`);
+    if (isExited(container)) {
+      if (isInitContainer(container.name)) {
+        if (exitCode !== null && exitCode !== 0) {
+          reasons.push(`${container.name} init exited non-zero (${exitCode})`);
+        }
+      } else {
+        const exit = exitCode === null ? 'unknown' : String(exitCode);
+        reasons.push(`${container.name} service exited (${exit})`);
+      }
       continue;
     }
 
