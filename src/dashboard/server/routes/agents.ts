@@ -364,6 +364,52 @@ function resolveAgentCountEnv(varName: string, fallback: number): number {
   return Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : fallback;
 }
 
+export interface AgentStartGateDecision {
+  success: false;
+  blocked: true;
+  skipped: true;
+  error: string;
+  hint: string;
+  agentId: string;
+  paused: boolean;
+  troubled: boolean;
+}
+
+export function evaluateAgentStartGate(
+  agentId: string,
+  state: Pick<AgentState, 'paused' | 'pausedReason' | 'troubled' | 'consecutiveFailures'> | null | undefined,
+): AgentStartGateDecision | null {
+  if (state?.paused === true) {
+    const reason = state.pausedReason ? ` (${state.pausedReason})` : '';
+    return {
+      success: false,
+      blocked: true,
+      skipped: true,
+      error: `Agent ${agentId} is paused${reason}.`,
+      hint: `Run pan unpause ${agentId} before starting it from the dashboard.`,
+      agentId,
+      paused: true,
+      troubled: state.troubled === true,
+    };
+  }
+
+  if (state?.troubled === true) {
+    const failures = state.consecutiveFailures ?? 0;
+    return {
+      success: false,
+      blocked: true,
+      skipped: true,
+      error: `Agent ${agentId} is troubled (${failures} failure${failures === 1 ? '' : 's'}).`,
+      hint: `Investigate the crash cause, then run pan untroubled ${agentId} before starting it from the dashboard.`,
+      agentId,
+      paused: false,
+      troubled: true,
+    };
+  }
+
+  return null;
+}
+
 export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuardrailDecision {
   const warnings: SpawnGuardrailAdvisory[] = [];
   const availableGb = Math.round((health.summary.availableMemoryBytes / (1024 ** 3)) * 10) / 10;
@@ -2065,6 +2111,16 @@ const postAgentsRoute = HttpRouter.add(
 
     const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
+    const startGateBlock = evaluateAgentStartGate(agentSessionName, getAgentState(agentSessionName));
+    if (startGateBlock) {
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_gate', {
+        issueId,
+        paused: startGateBlock.paused,
+        troubled: startGateBlock.troubled,
+        reason: startGateBlock.error,
+      }));
+      return jsonResponse(startGateBlock, { status: 409 });
+    }
 
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
     const isRemote = workspaceMetadata?.location === 'remote';

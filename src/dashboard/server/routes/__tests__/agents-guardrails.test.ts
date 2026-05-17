@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { evaluateSpawnGuardrails } from '../agents.js';
+import { evaluateAgentStartGate, evaluateSpawnGuardrails } from '../agents.js';
 import { readGlobalResourceConfig } from '../../services/system-health-service.js';
 import type { SystemHealthSnapshot } from '../../services/system-health-service.js';
 
@@ -63,6 +63,52 @@ function createHealthSnapshot(overrides: Partial<SystemHealthSnapshot> = {}): Sy
     topConsumers: overrides.topConsumers ?? base.topConsumers,
   };
 }
+
+describe('evaluateAgentStartGate', () => {
+  it('blocks paused agents before dashboard start can write state', () => {
+    const decision = evaluateAgentStartGate('agent-pan-1141', {
+      paused: true,
+      pausedReason: 'manual inspection',
+      troubled: false,
+      consecutiveFailures: 0,
+    });
+
+    expect(decision).toEqual({
+      success: false,
+      blocked: true,
+      skipped: true,
+      error: 'Agent agent-pan-1141 is paused (manual inspection).',
+      hint: 'Run pan unpause agent-pan-1141 before starting it from the dashboard.',
+      agentId: 'agent-pan-1141',
+      paused: true,
+      troubled: false,
+    });
+  });
+
+  it('blocks troubled agents before dashboard start can write state', () => {
+    const decision = evaluateAgentStartGate('agent-pan-1141', {
+      paused: false,
+      troubled: true,
+      consecutiveFailures: 3,
+    });
+
+    expect(decision).toEqual({
+      success: false,
+      blocked: true,
+      skipped: true,
+      error: 'Agent agent-pan-1141 is troubled (3 failures).',
+      hint: 'Investigate the crash cause, then run pan untroubled agent-pan-1141 before starting it from the dashboard.',
+      agentId: 'agent-pan-1141',
+      paused: false,
+      troubled: true,
+    });
+  });
+
+  it('allows starts when no persistent gate is set', () => {
+    expect(evaluateAgentStartGate('agent-pan-1141', undefined)).toBeNull();
+    expect(evaluateAgentStartGate('agent-pan-1141', { paused: false, troubled: false })).toBeNull();
+  });
+});
 
 describe('evaluateSpawnGuardrails', () => {
   afterEach(async () => {
