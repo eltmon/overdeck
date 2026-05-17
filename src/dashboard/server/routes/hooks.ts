@@ -11,16 +11,19 @@
  * emit an in-memory-only event via emitOnly().
  */
 
+import { stat } from 'fs/promises';
 import { basename, dirname } from 'path';
 import type { MemoryIdentity } from '@panctl/contracts';
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Result, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { getEventStore } from '../event-store.js';
 import { getAgentStateAsync } from '../../../lib/agents.js';
 import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
+import { getTranscriptCheckpoint } from '../../../lib/memory/checkpoints.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
+import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput } from '../../../lib/memory/pipeline.js';
 import { isSubagentHookPayload } from '../../../lib/memory/subagent-filter.js';
 
 const CLEAR_ON = new Set([
@@ -31,9 +34,77 @@ const CLEAR_ON = new Set([
   'PermissionDenied',
 ])
 
+const MemoryTurnHookPayload = Schema.Struct({
+  session_id: Schema.String,
+  transcript_path: Schema.String,
+  stop_hook_active: Schema.optional(Schema.Boolean),
+  identity: Schema.optional(Schema.Unknown),
+  from_offset: Schema.optional(Schema.Number),
+  to_offset: Schema.optional(Schema.Number),
+});
+
+type MemoryTurnHookPayload = typeof MemoryTurnHookPayload.Type;
+
+export interface HandleMemoryTurnBodyOptions {
+  resolveIdentity?: (body: Record<string, unknown>, sessionId: string) => Promise<MemoryIdentity | null>;
+  getTranscriptCheckpoint?: typeof getTranscriptCheckpoint;
+  getTranscriptSize?: (transcriptPath: string) => Promise<number>;
+  enqueuePipeline?: (input: ExtractFromTranscriptDeltaInput) => void;
+}
+
+export type HandleMemoryTurnBodyResult =
+  | { status: 'subagent' }
+  | { status: 'accepted'; pipelineInput: ExtractFromTranscriptDeltaInput }
+  | { status: 'error'; statusCode: 400 | 422; error: string };
+
 export function memoryTurnHookResponse(body: unknown): typeof HttpServerResponse.Type | null {
   if (!isSubagentHookPayload(body)) return null;
   return HttpServerResponse.text('', { status: 204 });
+}
+
+export async function handleMemoryTurnBody(
+  body: Record<string, unknown>,
+  options: HandleMemoryTurnBodyOptions = {},
+): Promise<HandleMemoryTurnBodyResult> {
+  if (isSubagentHookPayload(body)) return { status: 'subagent' };
+
+  const payloadResult = Schema.decodeUnknownResult(MemoryTurnHookPayload)(body);
+  if (payloadResult._tag === 'Failure') {
+    return { status: 'error', statusCode: 400, error: 'invalid memory turn payload' };
+  }
+
+  const payload = Result.getOrThrow(payloadResult) as MemoryTurnHookPayload;
+  const sessionId = payload.session_id.trim();
+  const transcriptPath = payload.transcript_path.trim();
+  if (!sessionId || !transcriptPath) {
+    return { status: 'error', statusCode: 400, error: 'session_id and transcript_path are required' };
+  }
+
+  const identity = parseMemoryIdentity(payload.identity, sessionId)
+    ?? await (options.resolveIdentity ?? resolveMemoryIdentity)(body, sessionId);
+  if (!identity) {
+    return { status: 'error', statusCode: 422, error: 'memory identity could not be resolved' };
+  }
+
+  const fromOffset = validOffset(payload.from_offset)
+    ? payload.from_offset
+    : (options.getTranscriptCheckpoint ?? getTranscriptCheckpoint)(sessionId)?.lastOffset ?? 0;
+  const toOffset = validOffset(payload.to_offset)
+    ? payload.to_offset
+    : await (options.getTranscriptSize ?? getTranscriptSize)(transcriptPath);
+
+  const pipelineInput: ExtractFromTranscriptDeltaInput = {
+    sessionId,
+    transcriptPath,
+    fromOffset,
+    toOffset,
+    identity,
+    trigger: 'stop-hook',
+    hookPayload: body,
+  };
+
+  (options.enqueuePipeline ?? enqueueMemoryTurnPipeline)(pipelineInput);
+  return { status: 'accepted', pipelineInput };
 }
 
 export async function handleMemoryInjectBody(body: Record<string, unknown>) {
@@ -95,8 +166,9 @@ const postMemoryTurnRoute = HttpRouter.add(
       return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
     }
 
-    const subagentResponse = memoryTurnHookResponse(body);
-    if (subagentResponse) return subagentResponse;
+    const result = yield* Effect.promise(() => handleMemoryTurnBody(body));
+    if (result.status === 'subagent') return HttpServerResponse.text('', { status: 204 });
+    if (result.status === 'error') return jsonResponse({ ok: false, error: result.error }, { status: result.statusCode });
 
     return jsonResponse({ ok: true }, { status: 202 });
   })),
@@ -188,6 +260,20 @@ function inferProjectId(workspacePath: string): string {
   const workspaceName = basename(workspacePath);
   if (workspaceName.startsWith('feature-')) return basename(dirname(dirname(workspacePath)));
   return basename(workspacePath);
+}
+
+function validOffset(value: number | undefined): value is number {
+  return Number.isInteger(value) && value >= 0;
+}
+
+async function getTranscriptSize(transcriptPath: string): Promise<number> {
+  return (await stat(transcriptPath)).size;
+}
+
+function enqueueMemoryTurnPipeline(input: ExtractFromTranscriptDeltaInput): void {
+  void extractFromTranscriptDelta(input).catch((error: unknown) => {
+    console.warn('[hooks] memory turn pipeline failed:', error instanceof Error ? error.message : String(error));
+  });
 }
 
 function stringField(value: unknown): string | null {
