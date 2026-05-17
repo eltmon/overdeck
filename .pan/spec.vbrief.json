@@ -4,7 +4,7 @@
     "created": "2026-05-16T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1141: Agent auto-resume controls — emergency mode, issue-level pause, troubled-state retry limits",
-    "updated": "2026-05-17T16:58:13.099Z"
+    "updated": "2026-05-17T17:03:24.831Z"
   },
   "plan": {
     "id": "pan-1141",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-17T16:58:13.099Z",
+    "updated": "2026-05-17T17:03:24.831Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1141",
@@ -1056,7 +1056,7 @@
       {
         "id": "tests-failure-tracking",
         "title": "Tests: failure counter, backoff windows, troubled-flip threshold",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -1072,20 +1072,23 @@
           {
             "id": "tests-failure-tracking.ac1",
             "title": "All eight test cases exist and pass under `npm test`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T17:03:24.831Z"
           },
           {
             "id": "tests-failure-tracking.ac2",
             "title": "Time-dependent tests use fake timers (vitest's `vi.useFakeTimers()`) to keep them deterministic and fast",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T17:03:24.831Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T17:03:24.831Z"
       },
       {
         "id": "docs-updates",

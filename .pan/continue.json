@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T16:58:13.099Z",
+  "updated": "2026-05-17T17:03:24.831Z",
   "gitState": {
     "branch": "feature/pan-1141",
-    "sha": "ce5e1e61f20f66a9735ca86ecb682688a9b5f8c7",
+    "sha": "a8e07d4f5920249258c39daeb7923de960422af4",
     "dirty": true
   },
   "decisions": [
@@ -128,11 +128,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-nx12 (added pan dev --no-resume, injected PANOPTICON_NO_RESUME into the dashboard child process, and surfaced startup output; typecheck/lint/source help check passed). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-nx12",
+    "description": "Completed bead workspace-kcaf (added failure-tracking tests for resume failure, orphan crash observations, running reset, backoff windows, equality boundary, troubled threshold/window sliding, and project overrides; targeted npm test/typecheck/lint passed). Next agent should run bd ready -l pan-1141 and claim the next ready PAN-1141 bead.",
+    "beadId": "workspace-kcaf",
     "filesToRead": [
-      "src/cli/index.ts",
-      "src/cli/commands/dev.ts",
+      "tests/lib/cloister/failure-tracking.test.ts",
+      "src/lib/agents.ts",
+      "src/lib/cloister/deacon.ts",
       ".pan/spec.vbrief.json",
       ".pan/continue.json"
     ]
@@ -258,6 +259,12 @@
       "timestamp": "2026-05-17T16:58:13.099Z",
       "reason": "bead-complete",
       "note": "Implemented pan dev --no-resume with Commander registration, startup [no-resume mode active] output, and PANOPTICON_NO_RESUME=1 injection into the Node 22 dashboard API child process only. npm run typecheck, npm run lint, and npx tsx src/cli/index.ts dev --help | grep -- --no-resume passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T17:03:24.831Z",
+      "reason": "bead-complete",
+      "note": "Added tests/lib/cloister/failure-tracking.test.ts with eight deterministic fake-timer cases covering auto-resume failure increments, orphan-crash failure observations, reset on running transition, 5s/30s/120s backoff, retry equality boundary, troubled threshold, sliding window, and per-project override config. npm test -- tests/lib/cloister/failure-tracking.test.ts, npm run typecheck, and npm run lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],
