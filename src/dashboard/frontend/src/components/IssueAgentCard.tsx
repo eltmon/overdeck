@@ -27,6 +27,7 @@ export interface IssueAgent {
   lastFailureNextRetryAt?: string;
   contextPercent?: number | null;
   initialContextPercent?: number | null;
+  runtimeState?: string;
 }
 
 export interface CloisterHealth {
@@ -442,7 +443,7 @@ export function IssueAgentCard({
     agent.pausedAt ? `Paused: ${formatRelativeTime(agent.pausedAt, now)}` : undefined,
   ].filter(Boolean).join('\n');
   const isRunning = health?.isRunning === true || (health === undefined && agent.status === 'healthy');
-  const isCompletedStopped = agent.status === 'stopped' && agent.paused !== true && agent.troubled !== true;
+  const isCompletedStopped = agent.status === 'stopped' && agent.runtimeState === 'completed' && agent.paused !== true && agent.troubled !== true;
   const gatingReason = !isRunning && !isCompletedStopped
     ? agent.paused === true
       ? 'Paused'

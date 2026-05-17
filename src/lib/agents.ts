@@ -905,13 +905,13 @@ export function recordAgentFailure(agentId: string, reason: string): boolean {
 }
 
 /** Records one failed resume/crash observation using async filesystem operations. */
-export async function recordAgentFailureAsync(agentId: string, reason: string): Promise<boolean> {
+export async function recordAgentFailureAsync(agentId: string, reason: string): Promise<AgentState | null> {
   const state = await getAgentStateAsync(agentId);
-  if (!state) return false;
+  if (!state) return null;
 
   applyAgentFailure(state, reason);
   await saveAgentStateAsync(state);
-  return true;
+  return state;
 }
 
 /** Resets failure tracking after an agent reaches running state. */
