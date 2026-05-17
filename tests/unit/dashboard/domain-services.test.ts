@@ -177,10 +177,35 @@ describe('EventStoreService', () => {
 
       store.append({ type: 'agent.started', timestamp: new Date().toISOString(), payload: {} } as any);
       store.append({ type: 'agent.stopped', timestamp: new Date().toISOString(), payload: {} } as any);
+      store.append({
+        type: 'memory.observation_created',
+        timestamp: new Date().toISOString(),
+        payload: {
+          observation: {
+            id: 'obs-1',
+            timestamp: new Date().toISOString(),
+            projectId: 'panopticon-cli',
+            workspaceId: 'feature-pan-1052',
+            issueId: 'PAN-1052',
+            runId: 'run-1',
+            sessionId: 'session-1',
+            agentRole: 'work',
+            agentHarness: 'claude-code',
+            sourceTranscriptOffset: 1,
+            actionStatus: 'Updated memory stream',
+            narrative: 'Memory event streamed through event store.',
+            summary: 'Memory event streamed through event store.',
+            files: [],
+            tags: [],
+            tokens: { prompt: 1, completion: 1, total: 2 },
+            model: 'stub-model',
+          },
+        },
+      } as any);
 
       unsubscribe();
 
-      expect(received).toEqual(['agent.started', 'agent.stopped']);
+      expect(received).toEqual(['agent.started', 'agent.stopped', 'memory.observation_created']);
     });
 
     it('streamEvents is a valid Stream (non-null)', async () => {

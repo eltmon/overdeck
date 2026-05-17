@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { DomainEvent, INITIAL_READ_MODEL_STATE, applyEvent } from '@panctl/contracts'
+import { DomainEvent, INITIAL_READ_MODEL_STATE, applyEvent, syncSnapshot } from '@panctl/contracts'
 
 const TS = '2026-05-15T00:00:00.000Z'
 const decode = Schema.decodeUnknownResult(DomainEvent)
@@ -137,5 +137,47 @@ describe('memory DomainEvent contracts', () => {
     expect(next.observationsByIssueId['PAN-1052']).toHaveLength(50)
     expect(next.observationsByIssueId['PAN-1052']?.[0]?.id).toBe('obs-1')
     expect(next.observationsByIssueId['PAN-1052']?.[49]?.id).toBe('obs-50')
+  })
+
+  it('hydrates memory state from dashboard snapshots', () => {
+    const next = syncSnapshot(INITIAL_READ_MODEL_STATE, {
+      sequence: 10,
+      agents: [],
+      specialists: [],
+      reviewStatuses: [],
+      issues: [],
+      timestamp: TS,
+      memory: {
+        observationsByIssueId: { 'PAN-1052': [observation] },
+        statusByIssueId: { 'PAN-1052': status },
+        rollupsByIssueId: {
+          'PAN-1052': [{
+            projectId: identity.projectId,
+            workspaceId: identity.workspaceId,
+            issueId: identity.issueId,
+            pendingTurns: [pendingTurn],
+            threshold: 4,
+            triggeredAt: TS,
+          }],
+        },
+        resetMarkersByScopeId: { 'workspace:feature-pan-1052': [marker] },
+        healthByIssueId: {
+          'PAN-1052': {
+            projectId: identity.projectId,
+            issueId: identity.issueId,
+            status: 'degraded',
+            reason: 'provider timeout',
+            updatedAt: TS,
+          },
+        },
+      },
+    })
+
+    expect(next.sequence).toBe(10)
+    expect(next.observationsByIssueId['PAN-1052']).toEqual([observation])
+    expect(next.statusByIssueId['PAN-1052']).toEqual(status)
+    expect(next.rollupsByIssueId['PAN-1052']).toHaveLength(1)
+    expect(next.resetMarkersByScopeId['workspace:feature-pan-1052']).toEqual([marker])
+    expect(next.healthByIssueId['PAN-1052']?.status).toBe('degraded')
   })
 })
