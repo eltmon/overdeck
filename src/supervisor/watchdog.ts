@@ -1,5 +1,8 @@
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { acquireRestartLock } from '../lib/restart-lock.js';
 import { writeRestartStatus } from '../lib/restart-status.js';
+import { getPanopticonHome } from '../lib/paths.js';
 
 export interface SupervisorWatchdogConfig {
   enabled: boolean;
@@ -44,6 +47,38 @@ interface InternalState {
   lastError: string | null;
 }
 
+interface WatchdogPersistentState {
+  restartAttempts: number[];
+  gaveUp: boolean;
+}
+
+function watchdogStatePath(): string {
+  return join(getPanopticonHome(), 'supervisor-watchdog.json');
+}
+
+function readWatchdogPersistentState(): WatchdogPersistentState {
+  try {
+    const parsed = JSON.parse(readFileSync(watchdogStatePath(), 'utf8')) as Partial<WatchdogPersistentState>;
+    const restartAttempts = Array.isArray(parsed.restartAttempts)
+      ? parsed.restartAttempts.filter((ts): ts is number => typeof ts === 'number' && Number.isFinite(ts))
+      : [];
+    return {
+      restartAttempts,
+      gaveUp: parsed.gaveUp === true,
+    };
+  } catch {
+    return { restartAttempts: [], gaveUp: false };
+  }
+}
+
+function writeWatchdogPersistentState(state: WatchdogPersistentState): void {
+  const path = watchdogStatePath();
+  mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  renameSync(tmp, path);
+}
+
 export function parsePositiveIntEnv(value: string | undefined, fallback: number): number {
   if (value === undefined || value.trim() === '') return fallback;
   const parsed = Number.parseInt(value, 10);
@@ -72,16 +107,10 @@ export class SupervisorWatchdog {
   private readonly clearIntervalFn: typeof clearInterval;
   private timer: ReturnType<typeof setInterval> | null = null;
   private runningCheck: Promise<void> | null = null;
-  private readonly state: InternalState = {
-    healthy: true,
-    lastCheck: null,
-    consecutiveFailures: 0,
-    restartAttempts: [],
-    gaveUp: false,
-    lastError: null,
-  };
+  private readonly state: InternalState;
 
   constructor(deps: SupervisorWatchdogDeps) {
+    const persistedState = readWatchdogPersistentState();
     this.config = deps.config;
     this.spawnRestart = deps.spawnRestart;
     this.log = deps.log;
@@ -89,6 +118,14 @@ export class SupervisorWatchdog {
     this.now = deps.now ?? Date.now;
     this.setIntervalFn = deps.setIntervalFn ?? setInterval;
     this.clearIntervalFn = deps.clearIntervalFn ?? clearInterval;
+    this.state = {
+      healthy: true,
+      lastCheck: null,
+      consecutiveFailures: 0,
+      restartAttempts: persistedState.restartAttempts,
+      gaveUp: persistedState.gaveUp,
+      lastError: null,
+    };
   }
 
   start(): void {
@@ -140,6 +177,7 @@ export class SupervisorWatchdog {
       this.state.gaveUp = false;
       this.state.lastError = null;
       this.pruneRestartAttempts(startedAt);
+      this.persistState();
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -151,10 +189,12 @@ export class SupervisorWatchdog {
 
     if (this.state.consecutiveFailures < this.config.failThreshold) return;
     this.pruneRestartAttempts(startedAt);
+    this.persistState();
     if (this.state.gaveUp) return;
 
     if (this.state.restartAttempts.length >= this.config.maxRestarts) {
       this.state.gaveUp = true;
+      this.persistState();
       const error = `WATCHDOG GIVING UP — manual intervention required: ${this.state.lastError ?? 'dashboard health check failed'}`;
       this.log(error);
       writeRestartStatus({
@@ -177,6 +217,7 @@ export class SupervisorWatchdog {
     lock.release();
 
     this.state.restartAttempts.push(startedAt);
+    this.persistState();
     this.log(`watchdog triggering dashboard restart after ${this.state.consecutiveFailures} consecutive failures`);
     const result = this.spawnRestart();
     writeRestartStatus({
@@ -197,5 +238,12 @@ export class SupervisorWatchdog {
   private pruneRestartAttempts(now: number): void {
     const cutoff = now - this.config.windowMs;
     this.state.restartAttempts = this.state.restartAttempts.filter((ts) => ts >= cutoff);
+  }
+
+  private persistState(): void {
+    writeWatchdogPersistentState({
+      restartAttempts: this.state.restartAttempts,
+      gaveUp: this.state.gaveUp,
+    });
   }
 }
