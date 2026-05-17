@@ -21,6 +21,7 @@ import {
 import { resolveGitHubIssue } from '../tracker-utils.js';
 
 import { resolveProjectFromIssue } from '../projects.js';
+import { restoreTrackedBeadsExport } from '../beads-restore.js';
 import { runMergeValidation, autoRevertMerge, runQualityGates } from './validation.js';
 import { loadProjectsConfig } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
@@ -1441,6 +1442,13 @@ export async function syncMainIntoWorkspace(
 ): Promise<SyncMainResult> {
   console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
   logActivity('sync_main_start', `Starting sync for ${issueId}`);
+
+  // PAN-1158 safety net: a workspace bd dolt DB that briefly went empty can
+  // leave `.beads/issues.jsonl` reported as deleted by `git status`. The
+  // auto-commit below would then propagate that deletion onto the feature
+  // branch. Restore the tracked export first so the auto-commit only sees
+  // intentional changes.
+  await restoreTrackedBeadsExport(projectPath);
 
   // Pre-flight: auto-commit uncommitted changes before merge
   try {
