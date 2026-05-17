@@ -1,0 +1,553 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-17T14:30:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1139: Dashboard restart fragility: Bad Gateway after agent-triggered reload",
+    "updated": "2026-05-17T14:22:31.180Z"
+  },
+  "plan": {
+    "id": "pan-1139",
+    "title": "Dashboard restart fragility: Bad Gateway after agent-triggered reload",
+    "status": "proposed",
+    "uid": "e1f8d420-9c2a-4c2e-8b21-7a3e2f9d0c01",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-17T14:30:00.000Z",
+    "updated": "2026-05-17T14:22:31.180Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1139",
+        "label": "PAN-1139",
+        "type": "issue"
+      },
+      {
+        "uri": "src/cli/commands/restart.ts",
+        "label": "current pan restart",
+        "type": "code"
+      },
+      {
+        "uri": "src/lib/platform-lifecycle.ts",
+        "label": "stopDashboard / waitForDashboardHealth",
+        "type": "code"
+      },
+      {
+        "uri": "src/supervisor/server.ts",
+        "label": "supervisor sidecar (pull-only today)",
+        "type": "code"
+      },
+      {
+        "uri": "src/cli/index.ts:813",
+        "label": "pan up bare fuser-kill (bug)",
+        "type": "code"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "lifecycle",
+      "reliability",
+      "watchdog",
+      "dx"
+    ],
+    "narratives": {
+      "Problem": "Agent-triggered dashboard reloads frequently leave Traefik serving 502 Bad Gateway until the user manually intervenes. Three root causes contribute: (1) `pan reload` is a skill that chains `npm run build && pan up` with no check that the build succeeded — a failing build still kills the old dashboard; (2) `pan up` (src/cli/index.ts:~813) issues bare `fuser -k -TERM` and waits 5s for the port to free, without SIGTERM/SIGKILL escalation, so a stubborn process leaves the new dashboard unable to bind; (3) no active watchdog — the supervisor sidecar exists but only responds to manual restart requests, so if the dashboard dies between reloads, nothing brings it back. The user must notice the 502, spin up a fresh Claude Code session, and ask it to restart — 5-10 min interrupt, multiple times per day. The whole point of dogfooding is that the host process should be at least as resilient as the agents it manages.",
+      "Proposal": "Address all three causes with small, independently-mergeable changes: (a) introduce a single restart lockfile and a new `pan reload` CLI command that runs `npm run build` to completion, verifies the rebuilt bundle, and only then calls the existing `restartDashboard()`; (b) replace `pan up`'s bare fuser-kill with the proper `stopDashboard()` primitive that already exists in `src/lib/platform-lifecycle.ts` and does SIGTERM→SIGKILL escalation; (c) extend the existing supervisor sidecar (`src/supervisor/server.ts`) with an active poll loop against `/api/health` that auto-restarts the dashboard after 3 consecutive failures (~30s downtime), capped at 3 restarts per 5-min window to prevent flapping; (d) persist restart outcomes to `~/.panopticon/restart-status.json` and surface them via `pan status` so failures are visible without debugging Traefik. Out of scope per the issue: rewriting the build system, replacing Traefik, true blue-green deploy (dashboard binds a fixed port; achievable guarantee is build-validated-before-kill, health-gated-before-success, status-surfaced-on-failure)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Build-before-swap = run `npm run build` to completion, verify `dist/dashboard/server.js` exists and was modified after build started, THEN call restartDashboard. No shadow-port blue-green deploy.",
+        "rationale": "True blue-green requires Traefik dynamic routing changes which are out of scope per the issue's Out of Scope list. The achievable interpretation is: validate the artifact before killing the old process. If `npm run build` fails (non-zero exit), the old dashboard is never touched and the user sees the build error."
+      },
+      {
+        "summary": "Watchdog lives in the existing `src/supervisor/server.ts` sidecar — not systemd, not a new process.",
+        "rationale": "The supervisor already participates in the `pan up`/`pan down` lifecycle, already runs cross-platform (Linux/Mac/WSL), and already exposes a `/restart-dashboard` endpoint that the new auto-watchdog can reuse. Adding a systemd unit would lock us to Linux and break parity with the supervisor's other duties."
+      },
+      {
+        "summary": "Watchdog cadence: poll `/api/health` every 10s; declare unhealthy after 3 consecutive failures (~30s); cap auto-restarts at 3 per 5-min rolling window.",
+        "rationale": "Conservative defaults chosen to favor false negatives (let a slow-but-alive dashboard stay up) over false positives (kill a healthy dashboard during a burst of work). Cap prevents masking real deploy bugs behind continuous restarts. All thresholds are env-overridable so operators can tune."
+      },
+      {
+        "summary": "Single lockfile at `~/.panopticon/restart.lock` (PID + timestamp, stale-detection on >5 min OR holder PID dead).",
+        "rationale": "Two parallel work agents committing simultaneously is a real concurrency hazard; a single lock acquired by `pan reload`, `pan restart --dashboard`, and the watchdog serializes them deterministically. Stale-detection ensures a crashed reload cannot deadlock the system."
+      },
+      {
+        "summary": "Failure surface = persisted JSON status file at `~/.panopticon/restart-status.json` + `pan status` rendering + the existing supervisor.log. No desktop notifications.",
+        "rationale": "Desktop notifications require platform-specific code (notify-send / osascript / Windows toast) and out-of-process daemons that have their own permission ceremonies. A status file is cheap, debuggable, and integrates with `pan status` which the user already runs to check the system."
+      },
+      {
+        "summary": "New verb `pan reload` for rebuild+restart; `pan restart --dashboard` keeps its current rebuild-less semantics.",
+        "rationale": "Overloading `pan restart` with a `--build` flag would silently change behavior for existing call sites. Two distinct verbs is unambiguous: `pan reload` = agent committed changes and wants the new code live; `pan restart --dashboard` = quick cycle without rebuild. The existing `pan-reload` skill is rewired to call the new command."
+      },
+      {
+        "summary": "Default health timeout for `pan reload` is 30s (vs 15s for `pan restart --dashboard`).",
+        "rationale": "Cold-start after a full rebuild can be slower than a warm cycle (more module loading, possible Vite re-bundle). 30s is generous without being unbounded; `--health-timeout` is exposed for tuning."
+      }
+    ],
+    "items": [
+      {
+        "id": "lockfile",
+        "title": "Add restart lockfile primitive (acquire/release/stale-detection)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-17T14:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1139",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a new module `src/lib/restart-lock.ts` exporting `acquireRestartLock(caller: string): { release(): void } | null` and `readRestartLockHolder(): { pid, ts, caller } | null`. Lockfile lives at `${PANOPTICON_HOME}/restart.lock` and contains JSON `{pid, ts, caller}`. Acquire writes the file atomically (open with O_EXCL); if the file exists, parse it — if PID is dead OR ts is older than 5 min, overwrite (stale); otherwise return `null`. Release deletes the file (idempotent; tolerates missing). No SIGCHLD trap needed — beads that use the lock are responsible for calling release(), and the next caller's stale-detection will recover from forgotten releases. This is the cross-cutting primitive the next three beads depend on."
+        },
+        "subItems": [
+          {
+            "id": "lockfile.ac1",
+            "title": "`acquireRestartLock(caller)` returns a release handle on first call; returns null if a live lock is held by a different PID < 5 min old.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lockfile.ac2",
+            "title": "Stale-detection: if the lockfile's PID is dead (process.kill(pid, 0) throws) OR ts is > 5 min ago, acquireRestartLock overwrites and succeeds.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lockfile.ac3",
+            "title": "release() deletes the lockfile and is idempotent (calling twice does not throw).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lockfile.ac4",
+            "title": "Lockfile path is `${PANOPTICON_HOME}/restart.lock` (uses paths.ts PANOPTICON_HOME, not hard-coded), and parent dir is auto-created.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lockfile.ac5",
+            "title": "Vitest unit tests cover: fresh acquire, contention, stale-by-time, stale-by-dead-PID, idempotent release.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-reload-cmd",
+        "title": "Add `pan reload` CLI command (build-verified restart)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-17T14:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1139",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `src/cli/commands/reload.ts` exporting `reloadCommand(options)`. Flow: (1) call `acquireRestartLock('pan reload')` — if null, print 'restart in progress (held by PID X)' and exit 2; (2) unless `--skip-build`, capture the pre-build mtime of `dist/dashboard/server.js` (or 0 if missing), spawn `npm run build` with stdio inherit so the user sees compiler output, await exit; if exit code != 0, print 'Build failed — old dashboard left running' and exit 1 WITHOUT calling stopDashboard; (3) verify `dist/dashboard/server.js` exists AND its mtime > pre-build mtime — abort with clear error if not; (4) call `restartDashboard(config, spawnDashboardDetached, { healthTimeoutMs })` (defaults to 30000); on StageError, print the staged error verbatim; (5) release the lock in a finally block. Register in `src/cli/index.ts` as `program.command('reload')` with options `--skip-build`, `--health-timeout <ms>`, `--no-deacon`. Update `skills/pan-reload/SKILL.md` to call `pan reload` (single command) and fix the stale port references (3001/3002 → 3010/3011). Verify `scripts/lint-skills.sh` still passes."
+        },
+        "subItems": [
+          {
+            "id": "pan-reload-cmd.ac1",
+            "title": "`pan reload` with a successful build rebuilds dist and brings up a healthy dashboard; on failure it prints the staged StageError and exits non-zero.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-reload-cmd.ac2",
+            "title": "`pan reload` with a FAILING build (simulated by `EXIT=1 pan reload` or a deliberately broken file) does NOT kill the old dashboard, prints the build error, and exits 1. After the failure, `curl http://127.0.0.1:3011/api/health` still returns 200.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-reload-cmd.ac3",
+            "title": "`pan reload --skip-build` skips the npm step and behaves like `pan restart --dashboard` (still uses the lock, still health-gates).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-reload-cmd.ac4",
+            "title": "Lockfile is acquired before the build runs and released in a finally block (covers crash mid-build).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-reload-cmd.ac5",
+            "title": "`skills/pan-reload/SKILL.md` is updated to call `pan reload` (single command) and references ports 3010/3011 (current truth), not 3001/3002 (stale).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-reload-cmd.ac6",
+            "title": "`pan reload --help` exposes `--skip-build`, `--health-timeout <ms>`, `--no-deacon`. `scripts/lint-skills.sh` passes (skill mentions match CLI help).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-up-fix",
+        "title": "Replace `pan up`'s bare fuser-kill with `stopDashboard()` (SIGTERM→SIGKILL escalation)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-17T14:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1139",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In `src/cli/index.ts` (the `program.command('up')` action, currently lines ~809-835), delete the bare `execSync('fuser -k -TERM ...')` calls and the `waitForPortToFree` loop, and replace with a single call to `await stopDashboard(config)` from `src/lib/platform-lifecycle.ts`. This adopts the same SIGTERM→wait→SIGKILL escalation `pan restart --dashboard` already uses, so a stubborn old process cannot leak past the kill window and cause EADDRINUSE on the new dashboard."
+        },
+        "subItems": [
+          {
+            "id": "pan-up-fix.ac1",
+            "title": "`pan up` calls `stopDashboard(config)` (with both dashboardPort and dashboardApiPort) before spawning the new server.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-up-fix.ac2",
+            "title": "The bare `fuser -k -TERM` + bash /dev/tcp polling loop is removed from `src/cli/index.ts`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-up-fix.ac3",
+            "title": "Manual test: start a dummy process that binds 3010 and ignores SIGTERM (`trap '' TERM; nc -l 3010`); `pan up` escalates to SIGKILL within 5s and the new dashboard binds successfully.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stop-dashboard-pid-surface",
+        "title": "Surface stuck port-holder PID + cmdline when SIGKILL fails to free port",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-17T14:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1139",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In `src/lib/platform-lifecycle.ts` `stopDashboard()`, after the SIGKILL phase, if any of the dashboard ports are still bound, fetch the holder PIDs (already done via `pidsOnPort`), then run `ps -p <pid> -o pid=,cmd=` for each, and throw a `StageError` whose reason includes the PID + cmdline. The current code silently returns after `SIGKILL`; if the kill genuinely failed (kernel uninterruptible sleep, zombie parent, etc.) the user has no idea what's holding the port."
+        },
+        "subItems": [
+          {
+            "id": "stop-dashboard-pid-surface.ac1",
+            "title": "When SIGKILL leaves a port still bound after the final 2s wait, `stopDashboard` throws `StageError` whose `failure.reason` includes 'port X still held by PID Y (cmd: Z)' for every stuck holder.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-dashboard-pid-surface.ac2",
+            "title": "When the kill succeeds (the common case), behavior is unchanged — no extra exec, no log spam.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-watchdog",
+        "title": "Active watchdog in supervisor: poll `/api/health`, auto-restart with cap",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-17T14:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1139",
+          "requiresInspection": true,
+          "inspectionDepth": "deep"
+        },
+        "narrative": {
+          "Action": "Extend `src/supervisor/server.ts` with a background watchdog. On startup, read `PANOPTICON_SUPERVISOR_WATCHDOG` env (default '1'); if disabled, skip. Otherwise: every 10s (`PANOPTICON_SUPERVISOR_POLL_MS`), `fetch('http://127.0.0.1:${dashboardApiPort}/api/health', { signal: AbortSignal.timeout(2000) })`. Track `consecutiveFailures` (reset on any 2xx) and a sliding-window `restartAttempts[]` (timestamps in last 5 min). After 3 consecutive failures (`PANOPTICON_SUPERVISOR_FAIL_THRESHOLD`), check if `restartAttempts.length >= 3` (`PANOPTICON_SUPERVISOR_MAX_RESTARTS`) within 5 min (`PANOPTICON_SUPERVISOR_WINDOW_MS`) — if so, log loudly with 'WATCHDOG GIVING UP — manual intervention required' and stop attempting (don't restart at all until consecutiveFailures resets via a manual recovery). Otherwise: check the restart lockfile from the lockfile bead; if held, skip this cycle. If free: append timestamp to `restartAttempts`, spawn `pan restart --dashboard` exactly as the existing `/restart-dashboard` endpoint does, and log the trigger. Add a new `GET /status` endpoint returning `{healthy, lastCheck, consecutiveFailures, restartAttempts, gaveUp, lastError}` so the dashboard and `pan status` can read watchdog state. The dashboardApiPort is read from `readPlatformConfig()` so the supervisor doesn't need extra env wiring."
+        },
+        "subItems": [
+          {
+            "id": "supervisor-watchdog.ac1",
+            "title": "Supervisor polls `/api/health` every 10s by default (overridable via PANOPTICON_SUPERVISOR_POLL_MS).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-watchdog.ac2",
+            "title": "After 3 consecutive failures, the supervisor spawns `pan restart --dashboard` and logs the trigger to `~/.panopticon/logs/supervisor.log`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-watchdog.ac3",
+            "title": "If 3 restart attempts have occurred within a 5-min rolling window, the watchdog logs 'WATCHDOG GIVING UP' and stops attempting until consecutiveFailures resets (i.e., a manual recovery brings the dashboard back).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-watchdog.ac4",
+            "title": "If the restart lockfile is held by another caller (e.g., `pan reload` is in flight), the watchdog skips that cycle without consuming an attempt.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-watchdog.ac5",
+            "title": "`PANOPTICON_SUPERVISOR_WATCHDOG=0` disables the watchdog loop at startup (the supervisor still serves /health, /restart-dashboard, /status).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-watchdog.ac6",
+            "title": "`GET /status` returns `{healthy, lastCheck, consecutiveFailures, restartAttempts: [iso8601...], gaveUp, lastError}`. Endpoint is available even when the watchdog is disabled.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-watchdog.ac7",
+            "title": "Manual smoke: kill the dashboard with `pkill -f dashboard/server.js`; within ~40s, the supervisor restarts it and `curl /api/health` returns 200 again. Confirm via supervisor.log.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "restart-status-surface",
+        "title": "Persist restart outcomes to `~/.panopticon/restart-status.json` and display in `pan status`",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-17T14:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1139",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add `src/lib/restart-status.ts` exporting `writeRestartStatus(entry)` and `readRestartStatus(): RestartStatus | null`. The file at `${PANOPTICON_HOME}/restart-status.json` holds the most recent attempt: `{ts, trigger: 'pan reload' | 'pan restart' | 'watchdog', success, error?, durationMs, attempts}`. `pan reload`, `restartCommand()`, and the supervisor watchdog all call `writeRestartStatus` on each attempt (both success and failure). Update `src/cli/commands/status.ts` to render the most recent entry in its output (e.g., 'Last dashboard restart: ✓ ok (pan reload, 2.4s ago)' or '⚠ FAILED — watchdog gave up at 14:23:01: [dashboard] health check at http://127.0.0.1:3011/api/health did not pass within 15000ms'). On watchdog give-up, the status also surfaces `gaveUp: true` so the user sees the alarm in plain text."
+        },
+        "subItems": [
+          {
+            "id": "restart-status-surface.ac1",
+            "title": "Every successful or failed restart attempt (pan reload, pan restart --dashboard, watchdog) writes a JSON entry to `~/.panopticon/restart-status.json`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-status-surface.ac2",
+            "title": "`pan status` renders the most recent restart-status entry in its output, including trigger, success/failure, age, and error message on failure.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-status-surface.ac3",
+            "title": "When the watchdog has given up (`gaveUp: true`), `pan status` shows a prominent ⚠ marker so the user notices without scrolling.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-status-surface.ac4",
+            "title": "Status file is JSON-parseable, atomically written (write to .tmp then rename), and tolerates being missing (readRestartStatus returns null).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tests",
+        "title": "Vitest coverage for lockfile, build-fail-leaves-old-running, watchdog auto-restart, watchdog cap",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-17T14:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1139",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add Vitest tests under `src/lib/__tests__/restart-lock.test.ts`, `src/cli/commands/__tests__/reload.test.ts`, and `src/supervisor/__tests__/watchdog.test.ts`. For the supervisor watchdog, factor the poll loop into a pure `watchdogTick(state, now, fetchHealth, spawnRestart, isLocked)` function so the test can drive it deterministically without real timers. For `pan reload`, mock `child_process.spawn` and the platform-lifecycle module so the test verifies: build-failure path does NOT call stopDashboard; build-success path does. For lockfile, real-filesystem tests in a tmpdir cover fresh-acquire, contention, stale-by-time (mock Date.now), stale-by-dead-PID (use a recycled PID expected to be dead)."
+        },
+        "subItems": [
+          {
+            "id": "tests.ac1",
+            "title": "`restart-lock.test.ts` covers: fresh acquire returns handle, second acquire returns null, stale lock (>5min) is overwritten, stale lock (dead PID) is overwritten, release is idempotent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests.ac2",
+            "title": "`reload.test.ts` covers: build-success path calls restartDashboard; build-failure path does NOT call stopDashboard/restartDashboard and exits non-zero.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests.ac3",
+            "title": "`watchdog.test.ts` covers: 3 consecutive failures trigger a restart spawn; restart counter resets on health success; >3 attempts in 5min triggers gaveUp; lockfile-held cycle is skipped without consuming an attempt.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tests.ac4",
+            "title": "`npm test` passes; `npm run typecheck` and `npm run lint` pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dev-sop-doc",
+        "title": "Write `docs/PANOPTICON_DEV_SOP.md` (follow-up from issue)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-17T14:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1139",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `docs/PANOPTICON_DEV_SOP.md` covering: (1) post-reboot startup — `pan up` for bundled production mode (Node 22, the only supported path) vs `pan dev` for Vite-HMR development; (2) mode switching — when to use which; (3) what the new restart behavior guarantees — build-before-swap, lockfile serialization, watchdog cadence + cap, status surface at `~/.panopticon/restart-status.json` + `pan status`; (4) failure triage — where to look first (`pan status` → `~/.panopticon/logs/supervisor.log` → `~/.panopticon/logs/dashboard.log`); (5) known limitations — supervisor itself can die (out of scope, follow-up issue). Link to this doc from `CLAUDE.md`'s Dashboard Server section."
+        },
+        "subItems": [
+          {
+            "id": "dev-sop-doc.ac1",
+            "title": "`docs/PANOPTICON_DEV_SOP.md` exists and covers the five sections above.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dev-sop-doc.ac2",
+            "title": "`CLAUDE.md`'s Dashboard Server section links to the new SOP doc.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lockfile",
+        "to": "pan-reload-cmd",
+        "type": "blocks"
+      },
+      {
+        "from": "lockfile",
+        "to": "supervisor-watchdog",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-watchdog",
+        "to": "restart-status-surface",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-reload-cmd",
+        "to": "tests",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-watchdog",
+        "to": "tests",
+        "type": "blocks"
+      },
+      {
+        "from": "lockfile",
+        "to": "tests",
+        "type": "blocks"
+      },
+      {
+        "from": "restart-status-surface",
+        "to": "dev-sop-doc",
+        "type": "informs"
+      },
+      {
+        "from": "supervisor-watchdog",
+        "to": "dev-sop-doc",
+        "type": "informs"
+      },
+      {
+        "from": "pan-reload-cmd",
+        "to": "dev-sop-doc",
+        "type": "informs"
+      },
+      {
+        "from": "stop-dashboard-pid-surface",
+        "to": "pan-up-fix",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-17-PAN-1139-dashboard-restart-fragility-bad-gateway-after-agent-triggered-reload.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
