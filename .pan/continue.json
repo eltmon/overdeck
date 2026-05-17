@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T15:51:18.903Z",
+  "updated": "2026-05-17T15:55:12.498Z",
   "gitState": {
     "branch": "feature/pan-1141",
-    "sha": "4c245cdc3074bc3e65e7a8fc5ad2390cbe9c601d",
+    "sha": "dea74e98b42d8ddd3cb0c0ca7773b501ebbb3829",
     "dirty": true
   },
   "decisions": [
@@ -128,8 +128,8 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-avz7 (IssueAgentCard pause/unpause action buttons, inline optional reason form, immediate agents-cache updates, and browser verification with mocked paused/non-paused/error cards). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-avz7",
+    "description": "Completed bead workspace-0pwp (IssueAgentCard paused/troubled badges, gating-reason pill, no-resume mode query, and browser verification with mocked paused/troubled/manual/boot/running/stopped cards). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-0pwp",
     "filesToRead": [
       "src/dashboard/frontend/src/components/IssueAgentCard.tsx",
       ".pan/spec.vbrief.json",
@@ -209,6 +209,12 @@
       "timestamp": "2026-05-17T15:51:18.903Z",
       "reason": "bead-complete",
       "note": "Implemented IssueAgentCard pause and unpause controls with an inline optional reason form, POST /api/agents/:id/pause and /unpause mutations, immediate agents-cache pause field updates, and success/error alerts. npm run typecheck and npm run lint passed. Browser verification mounted mocked non-paused, paused, and failing cards in Vite: pause-only/unpause-only visibility, empty-reason POST body, immediate button swap after pause/unpause, and pause error alert with re-enabled submit all passed without mutating real agent state.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T15:55:12.498Z",
+      "reason": "bead-complete",
+      "note": "Implemented IssueAgentCard Paused and Troubled badges with tooltips, queried GET /api/no-resume-mode, and added a gating-reason pill for non-running non-completed agents: Paused, Troubled (N failures), Boot --no-resume, or Manual. npm run typecheck and npm run lint passed. Browser verification mounted mocked paused, troubled, manual, no-resume, stopped-completed, and running cards in Vite; badges/tooltips/pills appeared correctly and pills were hidden for running and completed-stopped cards.",
       "agentModel": "gpt-5.5"
     }
   ],

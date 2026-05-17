@@ -160,6 +160,25 @@ function inferIssueId(agent: IssueAgent): string | undefined {
   return agent.id.match(/[A-Z][A-Z0-9]*-\d+/)?.[0];
 }
 
+interface NoResumeMode {
+  active: boolean;
+  since: string | null;
+}
+
+async function fetchNoResumeMode(): Promise<NoResumeMode> {
+  const res = await fetch('/api/no-resume-mode');
+  if (!res.ok) return { active: false, since: null };
+  return res.json();
+}
+
+function useNoResumeMode() {
+  return useQuery({
+    queryKey: ['no-resume-mode'],
+    queryFn: fetchNoResumeMode,
+    refetchInterval: 10000,
+  });
+}
+
 interface ActivityEntry {
   ts: string;
   tool: string;
@@ -237,6 +256,7 @@ export function IssueAgentCard({
   const [launchHarness, setLaunchHarness] = useState<Harness>(getHarness(agent) === 'pi' ? 'pi' : 'claude-code');
   const issueId = inferIssueId(agent);
   const now = useSharedTick();
+  const { data: noResumeMode } = useNoResumeMode();
   const { data: costData } = useAgentCost(agent.id);
   const { data: activityData } = useActivity(agent.id, health?.isRunning || health?.state === 'suspended');
 
@@ -416,6 +436,25 @@ export function IssueAgentCard({
     agent.lastFailureAt ? `Last failure: ${formatRelativeTime(agent.lastFailureAt, now)}` : undefined,
     agent.lastFailureNextRetryAt ? `Next retry: ${formatRelativeTime(agent.lastFailureNextRetryAt, now)}` : undefined,
   ].filter(Boolean).join('\n');
+  const pausedTitle = [
+    'Paused',
+    agent.pausedReason ? `Reason: ${agent.pausedReason}` : undefined,
+    agent.pausedAt ? `Paused: ${formatRelativeTime(agent.pausedAt, now)}` : undefined,
+  ].filter(Boolean).join('\n');
+  const isRunning = health?.isRunning === true || (health === undefined && agent.status === 'healthy');
+  const isCompletedStopped = agent.status === 'stopped' && agent.paused !== true && agent.troubled !== true;
+  const gatingReason = !isRunning && !isCompletedStopped
+    ? agent.paused === true
+      ? 'Paused'
+      : agent.troubled === true
+        ? `Troubled (${agent.consecutiveFailures} failure${agent.consecutiveFailures === 1 ? '' : 's'})`
+        : noResumeMode?.active === true
+          ? 'Boot --no-resume'
+          : 'Manual'
+    : undefined;
+  const gatingTitle = gatingReason === 'Boot --no-resume' && noResumeMode?.since
+    ? `No-resume mode active since ${formatRelativeTime(noResumeMode.since, now)}`
+    : gatingReason;
 
   const toggleHandoffPanel = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -443,6 +482,24 @@ export function IssueAgentCard({
                   {HEALTH_STATE_EMOJI[health.state]}
                 </span>
               )}
+              {agent.paused === true && (
+                <span
+                  className="px-1.5 py-0.5 rounded border border-border bg-muted text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                  title={pausedTitle}
+                  data-testid="issue-agent-card-paused-badge"
+                >
+                  Paused
+                </span>
+              )}
+              {agent.troubled === true && (
+                <span
+                  className="px-1.5 py-0.5 rounded bg-destructive/15 text-[10px] font-medium uppercase tracking-wide text-destructive"
+                  title={failureTitle || 'Troubled'}
+                  data-testid="issue-agent-card-troubled-badge"
+                >
+                  Troubled
+                </span>
+              )}
             </div>
             <div className="text-sm text-muted-foreground flex items-center gap-2">
               <span
@@ -457,6 +514,15 @@ export function IssueAgentCard({
                 {getHarness(agent)}
               </span>
               <span>/ {agent.model}</span>
+              {gatingReason && (
+                <span
+                  className="px-1.5 py-0.5 rounded bg-orange-500/15 text-[10px] font-medium uppercase tracking-wide text-orange-300"
+                  title={gatingTitle}
+                  data-testid="issue-agent-card-gating-reason"
+                >
+                  {gatingReason}
+                </span>
+              )}
               {costData && costData.cost > 0 && (
                 <span
                   className="flex items-center gap-1 text-xs text-success"

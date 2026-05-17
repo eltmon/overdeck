@@ -4,7 +4,7 @@
     "created": "2026-05-16T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1141: Agent auto-resume controls — emergency mode, issue-level pause, troubled-state retry limits",
-    "updated": "2026-05-17T15:51:18.903Z"
+    "updated": "2026-05-17T15:55:12.498Z"
   },
   "plan": {
     "id": "pan-1141",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-17T15:51:18.903Z",
+    "updated": "2026-05-17T15:55:12.498Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1141",
@@ -724,7 +724,7 @@
       {
         "id": "frontend-badges",
         "title": "IssueAgentCard: Paused/Troubled badges and gating-reason pill",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -740,36 +740,41 @@
           {
             "id": "frontend-badges.ac1",
             "title": "Paused badge appears on cards whose agent has `paused: true`, with the reason in a tooltip",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:55:12.498Z"
           },
           {
             "id": "frontend-badges.ac2",
             "title": "Troubled badge appears on cards whose agent has `troubled: true`, with failure count and timestamp in a tooltip",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:55:12.498Z"
           },
           {
             "id": "frontend-badges.ac3",
             "title": "Gating-reason pill displays one of the four labels for non-running in-flight agents",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:55:12.498Z"
           },
           {
             "id": "frontend-badges.ac4",
             "title": "Pill is hidden for running agents and for agents that completed normally",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T15:55:12.498Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T15:55:12.498Z"
       },
       {
         "id": "frontend-pause-controls",
