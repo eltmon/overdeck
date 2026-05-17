@@ -4263,7 +4263,7 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
  * no live tmux session — this happens after a system crash where tmux was killed but
  * state.json was never updated. Reset them to 'stopped' so resume/re-plan works correctly.
  */
-async function recoverOrphanedAgents(context?: string): Promise<string[]> {
+export async function recoverOrphanedAgents(context?: string): Promise<string[]> {
   const noResumeMode = getNoResumeMode();
   if (noResumeMode.active) {
     logDeaconEvent(`PANOPTICON_NO_RESUME=1 — skipping recoverOrphanedAgents${context ? ` (${context})` : ''}`);
