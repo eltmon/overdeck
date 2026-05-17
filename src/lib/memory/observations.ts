@@ -1,21 +1,38 @@
 import { randomUUID } from 'crypto';
-import { appendFile, readFile, rename, writeFile } from 'fs/promises';
+import { open, readFile, rename, writeFile } from 'fs/promises';
 import { dirname } from 'path';
 import type { MemoryObservation } from '@panctl/contracts';
 import { ensureParentDir, resolveObservationsFile } from './paths.js';
+import { withMemoryFtsDatabase } from './fts-db.js';
+import { updateMemoryHealth } from './health.js';
 
 export interface WriteObservationResult {
   jsonlPath: string;
   markdownPath: string;
 }
 
-export async function writeObservation(observation: MemoryObservation): Promise<WriteObservationResult> {
+export interface WriteObservationOptions {
+  indexObservation?: (observation: MemoryObservation, jsonlPath: string, byteOffset: number) => Promise<void>;
+  updateHealth?: typeof updateMemoryHealth;
+}
+
+export async function writeObservation(observation: MemoryObservation, options: WriteObservationOptions = {}): Promise<WriteObservationResult> {
   const jsonlPath = resolveObservationsFile(observation.projectId, observation.issueId, observation.timestamp);
   const markdownPath = observationMarkdownPath(observation);
 
   await ensureParentDir(jsonlPath);
-  await appendFile(jsonlPath, `${JSON.stringify(observation)}\n`, { encoding: 'utf8', flag: 'a' });
+  const byteOffset = await appendJsonl(jsonlPath, observation);
   await upsertObservationMarkdown(markdownPath, observation);
+
+  try {
+    await (options.indexObservation ?? indexObservation)(observation, jsonlPath, byteOffset);
+  } catch {
+    await (options.updateHealth ?? updateMemoryHealth)(observation, {
+      status: 'degraded',
+      reason: 'fts-index-failed',
+      success: false,
+    });
+  }
 
   return { jsonlPath, markdownPath };
 }
@@ -30,6 +47,68 @@ export function renderObservationMarkdownLine(observation: MemoryObservation): s
   const files = observation.files.length > 0 ? ` — files: ${observation.files.map(inline).join(', ')}` : '';
   const tags = observation.tags.length > 0 ? ` — tags: ${observation.tags.map(inline).join(', ')}` : '';
   return `- <!-- obs:${observation.id} --> **${time}** ${inline(status)}${files}${tags}`;
+}
+
+async function appendJsonl(jsonlPath: string, observation: MemoryObservation): Promise<number> {
+  const handle = await open(jsonlPath, 'a');
+  try {
+    const { size } = await handle.stat();
+    await handle.write(`${JSON.stringify(observation)}\n`, undefined, 'utf8');
+    return size;
+  } finally {
+    await handle.close();
+  }
+}
+
+async function indexObservation(observation: MemoryObservation, jsonlPath: string, byteOffset: number): Promise<void> {
+  const content = [observation.narrative, observation.summary].filter(Boolean).join('\n\n');
+  await withMemoryFtsDatabase(observation.projectId, (db) => {
+    db.prepare(`
+      INSERT INTO memory_fts (
+        content,
+        display_content,
+        source,
+        branch,
+        entry_date,
+        entry_time,
+        entry_type,
+        files,
+        tags,
+        doc_type,
+        scope,
+        project_id,
+        workspace_id,
+        issue_id,
+        run_id,
+        session_id,
+        agent_role,
+        agent_harness
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      content,
+      observation.summary,
+      observation.id,
+      observation.gitBranch,
+      observation.timestamp.slice(0, 10),
+      observation.timestamp.slice(11),
+      'memory',
+      observation.files.join(','),
+      observation.tags.join(','),
+      'observation',
+      'workspace',
+      observation.projectId,
+      observation.workspaceId,
+      observation.issueId,
+      observation.runId,
+      observation.sessionId,
+      observation.agentRole,
+      observation.agentHarness,
+    );
+    db.prepare(`
+      INSERT OR REPLACE INTO observation_index (id, observation_path_jsonl, byte_offset)
+      VALUES (?, ?, ?)
+    `).run(observation.id, jsonlPath, byteOffset);
+  });
 }
 
 async function upsertObservationMarkdown(markdownPath: string, observation: MemoryObservation): Promise<void> {

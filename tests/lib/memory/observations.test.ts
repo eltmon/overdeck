@@ -8,6 +8,8 @@ import {
   renderObservationMarkdownLine,
   writeObservation,
 } from '../../../src/lib/memory/observations.js';
+import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
+import { readMemoryHealthSnapshot } from '../../../src/lib/memory/health.js';
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
@@ -47,6 +49,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  closeMemoryFtsDatabases();
   if (originalHome === undefined) delete process.env.PANOPTICON_HOME;
   else process.env.PANOPTICON_HOME = originalHome;
   if (tempDir) await rm(tempDir, { recursive: true, force: true });
@@ -92,6 +95,79 @@ describe('observation writer', () => {
 
     const files = await readdir(join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations'));
     expect(files.sort()).toEqual(['2026-05-16.jsonl', '2026-05-16.md']);
+  });
+
+  it('indexes observations into memory_fts with a JSONL byte-offset back-reference', async () => {
+    const entry = observation({
+      narrative: 'Narrative details about prompt memory indexing.',
+      summary: 'Summary details about prompt memory indexing.',
+      tags: ['handoff', 'memory'],
+    });
+
+    const result = await writeObservation(entry);
+
+    const ftsRows = await withMemoryFtsDatabase(entry.projectId, (db) => db.prepare(`
+      SELECT rowid, content, display_content, source, branch, entry_date, entry_time, entry_type,
+             files, tags, doc_type, scope, project_id, workspace_id, issue_id, run_id,
+             session_id, agent_role, agent_harness
+      FROM memory_fts
+      WHERE memory_fts MATCH 'prompt memory indexing'
+    `).all() as Array<Record<string, unknown>>);
+    expect(ftsRows).toHaveLength(1);
+    expect(ftsRows[0]).toMatchObject({
+      content: 'Narrative details about prompt memory indexing.\n\nSummary details about prompt memory indexing.',
+      display_content: 'Summary details about prompt memory indexing.',
+      source: 'obs-1',
+      branch: 'feature/pan-1052',
+      entry_date: '2026-05-16',
+      entry_time: '20:33:00.000Z',
+      entry_type: 'memory',
+      files: 'src/lib/memory/observations.ts',
+      tags: 'handoff,memory',
+      doc_type: 'observation',
+      scope: 'workspace',
+      project_id: entry.projectId,
+      workspace_id: entry.workspaceId,
+      issue_id: entry.issueId,
+      run_id: entry.runId,
+      session_id: entry.sessionId,
+      agent_role: entry.agentRole,
+      agent_harness: entry.agentHarness,
+    });
+
+    const indexRow = await withMemoryFtsDatabase(entry.projectId, (db) => db.prepare(`
+      SELECT id, observation_path_jsonl, byte_offset
+      FROM observation_index
+      WHERE id = ?
+    `).get(entry.id) as { id: string; observation_path_jsonl: string; byte_offset: number });
+    expect(indexRow).toEqual({ id: entry.id, observation_path_jsonl: result.jsonlPath, byte_offset: 0 });
+
+    const raw = await readFile(indexRow.observation_path_jsonl, 'utf8');
+    const indexedJson = raw.slice(indexRow.byte_offset).split('\n')[0];
+    expect(JSON.parse(indexedJson)).toEqual(entry);
+  });
+
+  it('does not block JSONL writes when FTS indexing fails and records health', async () => {
+    const entry = observation();
+    const result = await writeObservation(entry, {
+      indexObservation: async () => {
+        throw new Error('sqlite unavailable');
+      },
+    });
+
+    const jsonl = await readFile(result.jsonlPath, 'utf8');
+    expect(JSON.parse(jsonl.trim())).toEqual(entry);
+    await expect(readFile(result.markdownPath, 'utf8')).resolves.toContain('Implemented observation writer');
+
+    const health = await readMemoryHealthSnapshot(entry);
+    expect(health).toMatchObject({
+      status: 'degraded',
+      last_success: null,
+      extractions_attempted: 1,
+      extractions_succeeded: 0,
+      failed_by_reason: { 'fts-index-failed': 1 },
+    });
+    expect(health.last_failure).toBeTruthy();
   });
 
   it('renders summary when actionStatus is null and compacts multiline fields', () => {
