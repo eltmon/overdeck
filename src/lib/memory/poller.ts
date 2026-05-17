@@ -2,6 +2,7 @@ import { open, stat } from 'fs/promises';
 import type { MemoryIdentity } from '@panctl/contracts';
 import { getTranscriptCheckpoint } from './checkpoints.js';
 import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput, type ExtractFromTranscriptDeltaResult } from './pipeline.js';
+import { areMemoryObservationsEnabled } from './settings.js';
 import { getActiveTranscriptEntries, type TranscriptEntry } from './transcript-source.js';
 
 export const DEFAULT_MEMORY_POLLER_INTERVAL_MS = 2_000;
@@ -32,6 +33,7 @@ export interface TranscriptPollerOptions {
   readTranscriptSlice?: (path: string, fromOffset: number, toOffset: number) => Promise<string>;
   getTranscriptCheckpoint?: typeof getTranscriptCheckpoint;
   extractFromTranscriptDelta?: (input: ExtractFromTranscriptDeltaInput) => Promise<ExtractFromTranscriptDeltaResult>;
+  areObservationsEnabled?: () => boolean | Promise<boolean>;
 }
 
 export interface TranscriptPollerTickResult {
@@ -55,6 +57,7 @@ export class TranscriptPoller {
   private readonly readTranscriptSlice: (path: string, fromOffset: number, toOffset: number) => Promise<string>;
   private readonly getCheckpoint: typeof getTranscriptCheckpoint;
   private readonly extractDelta: (input: ExtractFromTranscriptDeltaInput) => Promise<ExtractFromTranscriptDeltaResult>;
+  private readonly areObservationsEnabled: () => boolean | Promise<boolean>;
   private timer: ReturnType<typeof setInterval> | null = null;
   private ticking = false;
 
@@ -69,6 +72,7 @@ export class TranscriptPoller {
     this.readTranscriptSlice = options.readTranscriptSlice ?? readTranscriptSlice;
     this.getCheckpoint = options.getTranscriptCheckpoint ?? getTranscriptCheckpoint;
     this.extractDelta = options.extractFromTranscriptDelta ?? extractFromTranscriptDelta;
+    this.areObservationsEnabled = options.areObservationsEnabled ?? areMemoryObservationsEnabled;
   }
 
   register(entry: TranscriptEntry): void {
@@ -99,6 +103,8 @@ export class TranscriptPoller {
   }
 
   async syncActiveTranscripts(): Promise<void> {
+    if (!await this.areObservationsEnabled()) return;
+
     const active = await this.getActiveEntries();
     const activeIds = new Set(active.map((entry) => entry.sessionId));
     for (const entry of active) this.register(entry);
@@ -129,6 +135,7 @@ export class TranscriptPoller {
       fired: 0,
       removed: 0,
     };
+    if (!await this.areObservationsEnabled()) return result;
     if (this.ticking || this.entries.size === 0) return result;
 
     this.ticking = true;

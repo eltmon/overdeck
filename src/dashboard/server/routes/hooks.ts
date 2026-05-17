@@ -25,6 +25,7 @@ import { getTranscriptCheckpoint } from '../../../lib/memory/checkpoints.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
 import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput } from '../../../lib/memory/pipeline.js';
 import { registerTranscriptForPolling } from '../../../lib/memory/poller.js';
+import { areMemoryObservationsEnabled } from '../../../lib/memory/settings.js';
 import { isSubagentHookPayload } from '../../../lib/memory/subagent-filter.js';
 
 const CLEAR_ON = new Set([
@@ -58,21 +59,25 @@ export interface HandleMemoryTurnBodyOptions {
   getTranscriptCheckpoint?: typeof getTranscriptCheckpoint;
   getTranscriptSize?: (transcriptPath: string) => Promise<number>;
   enqueuePipeline?: (input: ExtractFromTranscriptDeltaInput) => void;
+  areObservationsEnabled?: () => boolean | Promise<boolean>;
 }
 
 export interface HandleMemorySessionStartBodyOptions {
   resolveIdentity?: (body: Record<string, unknown>, sessionId: string) => Promise<MemoryIdentity | null>;
   statTranscript?: (transcriptPath: string) => Promise<{ size: number; mtimeMs: number }>;
   registerTranscript?: typeof registerTranscriptForPolling;
+  areObservationsEnabled?: () => boolean | Promise<boolean>;
 }
 
 export type HandleMemoryTurnBodyResult =
   | { status: 'subagent' }
+  | { status: 'disabled' }
   | { status: 'accepted'; pipelineInput: ExtractFromTranscriptDeltaInput }
   | { status: 'error'; statusCode: 400 | 422; error: string };
 
 export type HandleMemorySessionStartBodyResult =
   | { status: 'subagent' }
+  | { status: 'disabled' }
   | { status: 'accepted'; sessionId: string }
   | { status: 'error'; statusCode: 400 | 422; error: string };
 
@@ -86,6 +91,7 @@ export async function handleMemoryTurnBody(
   options: HandleMemoryTurnBodyOptions = {},
 ): Promise<HandleMemoryTurnBodyResult> {
   if (isSubagentHookPayload(body)) return { status: 'subagent' };
+  if (!await (options.areObservationsEnabled ?? areMemoryObservationsEnabled)()) return { status: 'disabled' };
 
   const payloadResult = Schema.decodeUnknownResult(MemoryTurnHookPayload)(body);
   if (payloadResult._tag === 'Failure') {
@@ -131,6 +137,7 @@ export async function handleMemorySessionStartBody(
   options: HandleMemorySessionStartBodyOptions = {},
 ): Promise<HandleMemorySessionStartBodyResult> {
   if (isSubagentHookPayload(body)) return { status: 'subagent' };
+  if (!await (options.areObservationsEnabled ?? areMemoryObservationsEnabled)()) return { status: 'disabled' };
 
   const payloadResult = Schema.decodeUnknownResult(MemorySessionStartHookPayload)(body);
   if (payloadResult._tag === 'Failure') {
@@ -224,7 +231,7 @@ const postMemorySessionStartRoute = HttpRouter.add(
     }
 
     const result = yield* Effect.promise(() => handleMemorySessionStartBody(body));
-    if (result.status === 'subagent') return HttpServerResponse.text('', { status: 204 });
+    if (result.status === 'subagent' || result.status === 'disabled') return HttpServerResponse.text('', { status: 204 });
     if (result.status === 'error') return jsonResponse({ ok: false, error: result.error }, { status: result.statusCode });
 
     return jsonResponse({ ok: true }, { status: 202 });
@@ -246,7 +253,7 @@ const postMemoryTurnRoute = HttpRouter.add(
     }
 
     const result = yield* Effect.promise(() => handleMemoryTurnBody(body));
-    if (result.status === 'subagent') return HttpServerResponse.text('', { status: 204 });
+    if (result.status === 'subagent' || result.status === 'disabled') return HttpServerResponse.text('', { status: 204 });
     if (result.status === 'error') return jsonResponse({ ok: false, error: result.error }, { status: result.statusCode });
 
     return jsonResponse({ ok: true }, { status: 202 });

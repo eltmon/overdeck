@@ -44,6 +44,28 @@ describe('TranscriptPoller', () => {
     expect(extract).not.toHaveBeenCalled();
   });
 
+  it('does no syscalls or extraction work when observations are disabled', async () => {
+    const statTranscript = vi.fn();
+    const extract = vi.fn();
+    const poller = new TranscriptPoller({
+      areObservationsEnabled: () => false,
+      statTranscript,
+      extractFromTranscriptDelta: extract,
+    });
+    poller.register(entry());
+
+    await expect(poller.tick()).resolves.toEqual({
+      scanned: 0,
+      unchanged: 0,
+      belowThreshold: 0,
+      rateLimited: 0,
+      fired: 0,
+      removed: 0,
+    });
+    expect(statTranscript).not.toHaveBeenCalled();
+    expect(extract).not.toHaveBeenCalled();
+  });
+
   it('uses stat as a fast path and skips unchanged transcripts', async () => {
     const statTranscript = vi.fn(async () => ({ size: 100, mtimeMs: 10 }));
     const readTranscriptSlice = vi.fn();
@@ -129,5 +151,18 @@ describe('TranscriptPoller', () => {
 
     await poller.syncActiveTranscripts();
     expect(poller.snapshot().map((item) => item.sessionId)).toEqual(['session-b']);
+  });
+
+  it('skips lifecycle registry sync when observations are disabled', async () => {
+    const getActiveTranscriptEntries = vi.fn();
+    const poller = new TranscriptPoller({
+      areObservationsEnabled: () => false,
+      getActiveTranscriptEntries,
+    });
+
+    await poller.syncActiveTranscripts();
+
+    expect(getActiveTranscriptEntries).not.toHaveBeenCalled();
+    expect(poller.snapshot()).toEqual([]);
   });
 });
