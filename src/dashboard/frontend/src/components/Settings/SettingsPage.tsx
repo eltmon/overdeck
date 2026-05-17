@@ -108,8 +108,26 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
       workhorses?: unknown;
       roles?: unknown;
     };
+    const parentConversationPatch: SettingsConfig['conversations'] = {
+      ...(settings.conversations?.compaction_model !== undefined
+        ? { compaction_model: settings.conversations.compaction_model }
+        : {}),
+      ...(settings.conversations?.manual_compact_mode !== undefined
+        ? { manual_compact_mode: settings.conversations.manual_compact_mode }
+        : {}),
+      ...(settings.conversations?.rich_compaction !== undefined
+        ? { rich_compaction: settings.conversations.rich_compaction }
+        : {}),
+      ...(settings.conversations?.title_model !== undefined
+        ? { title_model: settings.conversations.title_model }
+        : {}),
+    };
     merged = {
       ...settings,
+      conversations: {
+        ...latest.conversations,
+        ...parentConversationPatch,
+      },
       ...(latestRouting.workhorses !== undefined
         ? { workhorses: latestRouting.workhorses }
         : {}),
@@ -293,6 +311,16 @@ export function SettingsPage() {
         const body = await res.json().catch(() => null) as { error?: string } | null;
         throw new Error(body?.error ?? `HTTP ${res.status}`);
       }
+      setFormData((prev) => prev ? {
+        ...prev,
+        conversations: {
+          ...prev.conversations,
+          embeddings: convConfig.embeddings,
+          embedding_provider: convConfig.embeddingProvider as 'openai' | 'voyage' | 'ollama',
+          embedding_model: convConfig.embeddingModel,
+          embedding_auto_on_deep: convConfig.embeddingAutoOnDeep,
+        },
+      } : prev);
       setConvConfigDirty(false);
       toast.success('Embedding settings saved');
     } catch (err) {

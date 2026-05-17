@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { HttpServerRequest } from 'effect/unstable/http';
 
@@ -6,6 +6,17 @@ import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-t
 import { jsonResponse } from '../http-helpers.js';
 
 export const DASHBOARD_SESSION_COOKIE = 'panopticon_session';
+
+let browserSessionToken: string | undefined;
+
+export function _resetDashboardSessionTokenForTests(): void {
+  browserSessionToken = undefined;
+}
+
+function getDashboardSessionToken(): string {
+  browserSessionToken ??= process.env['PANOPTICON_DASHBOARD_SESSION_TOKEN'] ?? randomBytes(32).toString('base64url');
+  return browserSessionToken;
+}
 
 function getHeader(
   request: HttpServerRequest.HttpServerRequest,
@@ -37,15 +48,17 @@ function cookieValue(cookieHeader: string | undefined, name: string): string | u
   for (const part of cookieHeader.split(';')) {
     const [rawKey, ...rawValue] = part.trim().split('=');
     if (rawKey !== name) continue;
-    return decodeURIComponent(rawValue.join('='));
+    try {
+      return decodeURIComponent(rawValue.join('='));
+    } catch {
+      return undefined;
+    }
   }
   return undefined;
 }
 
-export function dashboardSessionCookieHeader(): string | null {
-  const token = getInternalToken();
-  if (!token) return null;
-  return `${DASHBOARD_SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict`;
+export function dashboardSessionCookieHeader(): string {
+  return `${DASHBOARD_SESSION_COOKIE}=${encodeURIComponent(getDashboardSessionToken())}; Path=/; HttpOnly; SameSite=Strict`;
 }
 
 export function hasDashboardAuth(request: HttpServerRequest.HttpServerRequest): boolean {
@@ -61,7 +74,7 @@ export function hasDashboardAuth(request: HttpServerRequest.HttpServerRequest): 
     if (scheme?.toLowerCase() === 'bearer' && constantTimeTokenEqual(token, expected)) return true;
   }
 
-  return constantTimeTokenEqual(cookieValue(getHeader(request, 'cookie'), DASHBOARD_SESSION_COOKIE), expected);
+  return constantTimeTokenEqual(cookieValue(getHeader(request, 'cookie'), DASHBOARD_SESSION_COOKIE), getDashboardSessionToken());
 }
 
 export function rejectUnauthorizedDashboardRequest(

@@ -4,7 +4,6 @@ import * as RpcGroup from "effect/unstable/rpc/RpcGroup"
 import { DomainEvent } from "./events"
 import {
   AgentStatus,
-  ConversationCostSummary,
   ConversationFilter,
   DashboardSnapshot,
   DiscoveredSessionSnapshot,
@@ -27,6 +26,7 @@ export const WS_METHODS = {
   enrichSessions: "pan.enrichSessions",
   embedSessions: "pan.embedSessions",
   getConversationCost: "pan.getConversationCost",
+  getConversationStats: "pan.getConversationStats",
 
   // Streaming subscriptions
   subscribeDomainEvents: "pan.subscribeDomainEvents",
@@ -308,6 +308,38 @@ export const GetAvailableEditorsRpc = Rpc.make(WS_METHODS.getAvailableEditors, {
 
 // ─── Conversation Discovery RPC procs (PAN-457) ───────────────────────────────
 
+const DiscoveredSessionListResult = Schema.Struct({
+  sessions: Schema.Array(DiscoveredSessionSnapshot),
+  count: Schema.Number,
+  total: Schema.Number,
+})
+
+const DiscoveredSessionSearchResult = Schema.Struct({
+  sessions: Schema.Array(DiscoveredSessionSnapshot),
+  total: Schema.Number,
+  mode: Schema.String,
+  durationMs: Schema.Number,
+  error: Schema.optional(Schema.String),
+})
+
+const DiscoveredSessionStatsResult = Schema.Struct({
+  total: Schema.Number,
+  enriched: Schema.Number,
+  embedded: Schema.Number,
+  managedCount: Schema.Number,
+  embeddingModels: Schema.optional(Schema.Array(Schema.Struct({
+    model: Schema.String,
+    embedded: Schema.Number,
+  }))),
+})
+
+const ConversationCostTotals = Schema.Struct({
+  sessionCount: Schema.Number,
+  totalCost: Schema.Number,
+  totalTokensIn: Schema.Number,
+  totalTokensOut: Schema.Number,
+})
+
 /** Scan conversations (trigger discovery) */
 export const ScanConversationsRpc = Rpc.make(WS_METHODS.scanConversations, {
   payload: Schema.Struct({
@@ -322,18 +354,14 @@ export const ScanConversationsRpc = Rpc.make(WS_METHODS.scanConversations, {
 /** Search discovered sessions with filters + optional FTS query */
 export const SearchConversationsRpc = Rpc.make(WS_METHODS.searchConversations, {
   payload: ConversationFilter,
-  success: Schema.Array(DiscoveredSessionSnapshot),
+  success: DiscoveredSessionSearchResult,
   error: PanRpcError,
 })
 
 /** List discovered sessions (recent, with optional managed/unmanaged filter) */
 export const ListDiscoveredSessionsRpc = Rpc.make(WS_METHODS.listDiscoveredSessions, {
-  payload: Schema.Struct({
-    managed: Schema.optional(Schema.Boolean),
-    limit: Schema.optional(Schema.Number),
-    offset: Schema.optional(Schema.Number),
-  }),
-  success: Schema.Array(DiscoveredSessionSnapshot),
+  payload: ConversationFilter,
+  success: DiscoveredSessionListResult,
   error: PanRpcError,
 })
 
@@ -380,12 +408,17 @@ export const EmbedSessionsRpc = Rpc.make(WS_METHODS.embedSessions, {
   error: PanRpcError,
 })
 
-/** Aggregate cost breakdown for discovered sessions */
+/** Aggregate cost totals for discovered sessions */
 export const GetConversationCostRpc = Rpc.make(WS_METHODS.getConversationCost, {
-  payload: Schema.Struct({
-    groupBy: Schema.optional(Schema.Literals(['workspace', 'model'])),
-  }),
-  success: ConversationCostSummary,
+  payload: ConversationFilter,
+  success: ConversationCostTotals,
+  error: PanRpcError,
+})
+
+/** Discovery index statistics */
+export const GetConversationStatsRpc = Rpc.make(WS_METHODS.getConversationStats, {
+  payload: Schema.Struct({}),
+  success: DiscoveredSessionStatsResult,
   error: PanRpcError,
 })
 
@@ -419,5 +452,6 @@ export const PanRpcGroup = RpcGroup.make(
   EnrichSessionsRpc,
   EmbedSessionsRpc,
   GetConversationCostRpc,
+  GetConversationStatsRpc,
 )
 export type PanRpcGroup = typeof PanRpcGroup

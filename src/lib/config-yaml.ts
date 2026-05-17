@@ -579,12 +579,12 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     embeddings: false,
     embeddingProvider: 'openai',
     embeddingModel: 'text-embedding-3-small',
-    embeddingAutoOnDeep: false,
+    embeddingAutoOnDeep: true,
     enrichment: {
       quickModel: null,
       deepModel: null,
-      maxParallel: 2,
-      costConfirmThreshold: 0.25,
+      maxParallel: 4,
+      costConfirmThreshold: 1.00,
     },
   },
   shadow: {

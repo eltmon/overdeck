@@ -66,7 +66,7 @@ async function runJob(
     case 'enrichSessions':
       return enrichSessions({ ...(payload as EnrichOptions), onProgress: emitProgress });
     case 'embedSessions':
-      return embedSessions(payload as EmbedSessionsOptions);
+      return embedSessions({ ...(payload as EmbedSessionsOptions), onProgress: emitProgress });
   }
 }
 

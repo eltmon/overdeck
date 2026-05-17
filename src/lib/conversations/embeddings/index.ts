@@ -48,6 +48,12 @@ export interface EmbedProgress {
   total: number;
   errors: number;
   elapsedMs: number;
+  session?: {
+    sessionId: number;
+    model: string;
+    success: boolean;
+    error?: string;
+  };
 }
 
 export interface EmbedResult {
@@ -127,10 +133,26 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
   const total = sessions.length;
 
   const tasks = sessions.map((session) => async () => {
+    const emitProgress = (success: boolean, error?: string) => {
+      processed++;
+      opts.onProgress?.({
+        processed,
+        total,
+        errors: result.errors,
+        elapsedMs: Date.now() - startTs,
+        session: {
+          sessionId: session.id,
+          model,
+          success,
+          error,
+        },
+      });
+    };
+
     const text = buildEmbeddingText(session);
     if (!text.trim()) {
       result.skipped++;
-      processed++;
+      emitProgress(false, 'No embedding text available');
       return;
     }
 
@@ -144,21 +166,15 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
 
       insertEmbedding(session.id, model, embedResult.embedding);
       result.embedded++;
+      emitProgress(true);
     } catch (err) {
       result.errors++;
       const message = err instanceof Error ? err.message : String(err);
       if (result.errorMessages && result.errorMessages.length < 5 && !result.errorMessages.includes(message)) {
         result.errorMessages.push(message);
       }
+      emitProgress(false, message);
     }
-
-    processed++;
-    opts.onProgress?.({
-      processed,
-      total,
-      errors: result.errors,
-      elapsedMs: Date.now() - startTs,
-    });
   });
 
   await runWithPool(tasks, maxParallel);

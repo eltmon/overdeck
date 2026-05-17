@@ -7,11 +7,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Filter } from 'lucide-react';
+import { WS_METHODS } from '@panctl/contracts';
+import type { DiscoveredSessionSnapshot } from '@panctl/contracts';
 import { SessionTable } from './SessionTable';
 import { SessionDetail } from './SessionDetail';
 import { ScanButton } from './ScanButton';
 import { FacetPanel } from './FacetPanel';
 import { useDashboardStore, selectScanProgress } from '../../lib/store';
+import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
@@ -38,6 +41,7 @@ interface DiscoveredSession {
 interface ListResponse {
   sessions: DiscoveredSession[];
   count: number;
+  total: number;
 }
 
 interface StatsResponse {
@@ -68,6 +72,17 @@ interface ScanResult {
   skipped: number;
   errors: number;
   durationMs: number;
+}
+
+interface ConversationRpcFilter {
+  workspacePath?: string;
+  primaryModel?: string;
+  since?: string;
+  managed?: boolean;
+  enriched?: boolean;
+  minCost?: number;
+  maxCost?: number;
+  enrichmentLevel?: number;
 }
 
 interface FacetValue {
@@ -145,21 +160,69 @@ function buildFilterParams(filters: {
   enrichmentLevel?: string;
 }): URLSearchParams {
   const params = new URLSearchParams();
-  if (filters.workspace) params.set('workspace', filters.workspace);
+  if (filters.workspace) params.set('workspacePath', filters.workspace);
   if (filters.since) params.set('since', filters.since);
   if (filters.managed) params.set('managed', 'true');
   if (filters.enriched) params.set('enriched', 'true');
-  if (filters.model) params.set('model', filters.model);
-  if (filters.minCost) params.set('min_cost', filters.minCost);
-  if (filters.maxCost) params.set('max_cost', filters.maxCost);
-  if (filters.enrichmentLevel) params.set('enrichment_level', filters.enrichmentLevel);
+  if (filters.model) params.set('primaryModel', filters.model);
+  if (filters.minCost) params.set('minCost', filters.minCost);
+  if (filters.maxCost) params.set('maxCost', filters.maxCost);
+  if (filters.enrichmentLevel) params.set('enrichmentLevel', filters.enrichmentLevel);
   return params;
 }
 
+function filterPayload(params: URLSearchParams): ConversationRpcFilter {
+  const payload: ConversationRpcFilter = {};
+  const workspacePath = params.get('workspacePath');
+  const primaryModel = params.get('primaryModel');
+  const since = params.get('since');
+  const managed = params.get('managed');
+  const enriched = params.get('enriched');
+  const minCost = params.get('minCost');
+  const maxCost = params.get('maxCost');
+  const enrichmentLevel = params.get('enrichmentLevel');
+  if (workspacePath) payload.workspacePath = workspacePath;
+  if (primaryModel) payload.primaryModel = primaryModel;
+  if (since) payload.since = since;
+  if (managed) payload.managed = managed === 'true';
+  if (enriched) payload.enriched = enriched === 'true';
+  if (minCost && Number.isFinite(Number(minCost))) payload.minCost = Number(minCost);
+  if (maxCost && Number.isFinite(Number(maxCost))) payload.maxCost = Number(maxCost);
+  if (enrichmentLevel && Number.isFinite(Number(enrichmentLevel))) payload.enrichmentLevel = Number(enrichmentLevel);
+  return payload;
+}
+
+function fromRpcSession(session: DiscoveredSessionSnapshot): DiscoveredSession {
+  return {
+    id: session.id,
+    jsonlPath: session.jsonlPath,
+    workspacePath: session.workspacePath ?? null,
+    primaryModel: session.primaryModel ?? null,
+    messageCount: session.messageCount,
+    firstTs: session.firstTs ?? null,
+    lastTs: session.lastTs ?? null,
+    estimatedCost: session.estimatedCost,
+    tokenInput: session.tokenInput,
+    tokenOutput: session.tokenOutput,
+    toolsUsed: [...session.toolsUsed],
+    tags: [...session.tags],
+    summary: session.summary ?? null,
+    enrichmentLevel: session.enrichmentLevel as 0 | 1 | 2 | 3,
+    enrichmentFailed: session.enrichmentFailed,
+    panopticonManaged: session.panopticonManaged,
+    panIssueId: session.panIssueId ?? null,
+  };
+}
+
 async function fetchSessions(params: URLSearchParams): Promise<ListResponse> {
-  const resp = await fetch(`/api/discovered-sessions?${params}`);
-  if (!resp.ok) throw new Error('Failed to fetch sessions');
-  return resp.json() as Promise<ListResponse>;
+  const result = await getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.listDiscoveredSessions]({
+      ...filterPayload(params),
+      limit: Number(params.get('limit') ?? 50),
+      offset: Number(params.get('offset') ?? 0),
+    }),
+  );
+  return { ...result, sessions: result.sessions.map(fromRpcSession) };
 }
 
 async function fetchSearch(
@@ -169,36 +232,38 @@ async function fetchSearch(
   offset = 0,
   semantic = false,
 ): Promise<SearchResponse> {
-  const params = new URLSearchParams({ q, limit: String(limit), offset: String(offset) });
-  if (semantic) params.set('semantic', 'true');
-  for (const [key, value] of filterParams) {
-    params.set(key, value);
-  }
-  const resp = await fetch(`/api/discovered-sessions/search?${params}`);
-  if (!resp.ok) throw new Error('Search failed');
-  return resp.json() as Promise<SearchResponse>;
+  const result = await getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.searchConversations]({
+      ...filterPayload(filterParams),
+      query: q,
+      semantic,
+      limit,
+      offset,
+    }),
+  );
+  return { ...result, sessions: result.sessions.map(fromRpcSession) };
 }
 
 async function fetchStats(): Promise<StatsResponse> {
-  const resp = await fetch('/api/discovered-sessions/stats');
-  if (!resp.ok) throw new Error('Failed to fetch stats');
-  return resp.json() as Promise<StatsResponse>;
+  const stats = await getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.getConversationStats]({}),
+  );
+  return {
+    ...stats,
+    embeddingModels: stats.embeddingModels?.map((entry) => ({ ...entry })),
+  };
 }
 
 async function fetchCost(params: URLSearchParams): Promise<CostResponse> {
-  const resp = await fetch(`/api/discovered-sessions/cost?${params}`);
-  if (!resp.ok) throw new Error('Failed to fetch cost');
-  return resp.json() as Promise<CostResponse>;
+  return getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.getConversationCost](filterPayload(params)),
+  );
 }
 
 async function triggerScan(): Promise<ScanResult> {
-  const resp = await fetch('/api/discovered-sessions/scan', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mode: 'system' }),
-  });
-  if (!resp.ok) throw new Error('Scan failed');
-  return resp.json() as Promise<ScanResult>;
+  return getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.scanConversations]({ mode: 'system' }),
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────

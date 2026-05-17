@@ -28,6 +28,7 @@ import type {
   ScanCompleteEvent,
   EnrichProgressEvent,
   EnrichCompleteEvent,
+  EmbedProgressEvent,
 } from '@panctl/contracts';
 import type { ConversationFilter, DiscoveredSession } from '../../../lib/database/discovered-sessions-db.js';
 import type { SearchResult } from '../../../lib/conversations/search.js';
@@ -377,7 +378,7 @@ const postEnrichByIdRoute = HttpRouter.add(
               error: progressSession.error,
             },
           };
-          await Effect.runPromise(eventStore.append(progressEvent as EnrichProgressEvent));
+          await Effect.runPromise(eventStore.appendAsync(progressEvent as EnrichProgressEvent));
         }),
       );
       return jsonResponse(result);
@@ -437,7 +438,7 @@ const postScanRoute = HttpRouter.add(
       timestamp: new Date().toISOString(),
       payload: { mode, dirs: body.dirs ?? [] },
     };
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append(startedEvent as ScanStartedEvent)));
+    yield* Effect.promise(() => Effect.runPromise(eventStore.appendAsync(startedEvent as ScanStartedEvent)));
 
     const result = yield* Effect.promise(() =>
       runDashboardDbJob('scanConversations', {
@@ -467,7 +468,7 @@ const postScanRoute = HttpRouter.add(
             elapsedMs: progress.elapsedMs,
           },
         };
-        await Effect.runPromise(eventStore.append(progressEvent as ScanProgressEvent));
+        await Effect.runPromise(eventStore.appendAsync(progressEvent as ScanProgressEvent));
       }),
     );
 
@@ -483,7 +484,7 @@ const postScanRoute = HttpRouter.add(
         durationMs: result.durationMs,
       },
     };
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append(completeEvent as ScanCompleteEvent)));
+    yield* Effect.promise(() => Effect.runPromise(eventStore.appendAsync(completeEvent as ScanCompleteEvent)));
 
     return jsonResponse(result);
   })),
@@ -540,7 +541,7 @@ const postEnrichRoute = HttpRouter.add(
               error: session.error,
             },
           };
-          await Effect.runPromise(eventStore.append(progressEvent as EnrichProgressEvent));
+          await Effect.runPromise(eventStore.appendAsync(progressEvent as EnrichProgressEvent));
         }),
       );
 
@@ -555,7 +556,7 @@ const postEnrichRoute = HttpRouter.add(
           durationMs: result.durationMs,
         },
       };
-      yield* Effect.promise(() => Effect.runPromise(eventStore.append(completeEvent as EnrichCompleteEvent)));
+      yield* Effect.promise(() => Effect.runPromise(eventStore.appendAsync(completeEvent as EnrichCompleteEvent)));
 
       return jsonResponse(result);
     } catch (err) {
@@ -597,6 +598,7 @@ const postEmbedRoute = HttpRouter.add(
     const config = yield* Effect.promise(() => getConversationsConfigAsync());
     const embedMaxParallel = body.maxParallel !== undefined ? Math.min(Math.max(1, body.maxParallel), 16) : config.enrichment.maxParallel;
     const embedSessionIds = body.sessionIds ? body.sessionIds.slice(0, 500) : undefined;
+    const eventStore = yield* EventStoreService;
 
     const result = yield* Effect.promise(() =>
       runDashboardDbJob('embedSessions', {
@@ -605,6 +607,17 @@ const postEmbedRoute = HttpRouter.add(
         model: body.model,
         maxParallel: embedMaxParallel,
         config,
+      }, async (rawProgress) => {
+        const progress = rawProgress as {
+          session?: { sessionId: number; model: string; success: boolean; error?: string };
+        };
+        if (!progress.session) return;
+        const progressEvent: Omit<EmbedProgressEvent, 'sequence'> = {
+          type: 'embed.progress',
+          timestamp: new Date().toISOString(),
+          payload: progress.session,
+        };
+        await Effect.runPromise(eventStore.appendAsync(progressEvent as EmbedProgressEvent));
       }),
     );
 

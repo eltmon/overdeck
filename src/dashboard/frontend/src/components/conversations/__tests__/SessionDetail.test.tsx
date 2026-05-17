@@ -11,9 +11,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionDetail } from '../SessionDetail';
 
 const rpcMocks = vi.hoisted(() => ({
+  get: vi.fn(),
   enrich: vi.fn().mockResolvedValue({ processed: 1, totalCost: 0, failures: 0 }),
   embed: vi.fn().mockResolvedValue({ total: 1, embedded: 1, model: 'text-embedding-3-small' }),
   request: vi.fn((fn: (client: Record<string, unknown>) => unknown) => fn({
+    'pan.getDiscoveredSession': rpcMocks.get,
     'pan.enrichSessions': rpcMocks.enrich,
     'pan.embedSessions': rpcMocks.embed,
   })),
@@ -72,6 +74,7 @@ function renderDetail(
 
 describe('SessionDetail', () => {
   beforeEach(() => {
+    rpcMocks.get.mockResolvedValue(BASE_SESSION);
     rpcMocks.enrich.mockResolvedValue({ processed: 1, totalCost: 0, failures: 0 });
     rpcMocks.embed.mockResolvedValue({ total: 1, embedded: 1, model: 'text-embedding-3-small' });
   });

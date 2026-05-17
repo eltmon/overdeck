@@ -55,7 +55,6 @@ import { diffsRouteLayer } from './routes/diffs.js';
 import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { swarmRouteLayer } from './routes/swarm.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
-import { dashboardSessionCookieHeader } from './routes/dashboard-auth.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -170,11 +169,7 @@ const staticRouteLayer = HttpRouter.add(
       // change on every build. If the browser caches an old index.html, it will
       // load stale JS bundles and the user sees outdated UI.
       return yield* HttpServerResponse.file(indexPath).pipe(
-        Effect.map((res) => {
-          const noCache = HttpServerResponse.setHeader(res, 'Cache-Control', 'no-cache, no-store, must-revalidate');
-          const cookie = dashboardSessionCookieHeader();
-          return cookie ? HttpServerResponse.setHeader(noCache, 'Set-Cookie', cookie) : noCache;
-        }),
+        Effect.map((res) => HttpServerResponse.setHeader(res, 'Cache-Control', 'no-cache, no-store, must-revalidate')),
         Effect.catch(() =>
           Effect.succeed(HttpServerResponse.text('Internal Server Error', { status: 500 })),
         ),
@@ -191,9 +186,7 @@ const staticRouteLayer = HttpRouter.add(
     // change on every build. If the browser caches an old index.html, it will
     // load stale JS bundles and the user sees outdated UI.
     if (filePath.endsWith('index.html')) {
-      const noCache = HttpServerResponse.setHeader(res, 'Cache-Control', 'no-cache, no-store, must-revalidate');
-      const cookie = dashboardSessionCookieHeader();
-      return cookie ? HttpServerResponse.setHeader(noCache, 'Set-Cookie', cookie) : noCache;
+      return HttpServerResponse.setHeader(res, 'Cache-Control', 'no-cache, no-store, must-revalidate');
     }
 
     return res;

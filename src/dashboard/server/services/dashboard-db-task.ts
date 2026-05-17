@@ -183,7 +183,7 @@ async function runInline(
     case 'enrichSessions':
       return enrichSessions({ ...(payload as EnrichOptions), onProgress });
     case 'embedSessions':
-      return embedSessions(payload as EmbedSessionsOptions);
+      return embedSessions({ ...(payload as EmbedSessionsOptions), onProgress });
   }
 }
 

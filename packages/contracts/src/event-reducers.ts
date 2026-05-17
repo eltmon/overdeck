@@ -65,6 +65,8 @@ export interface ReadModelState {
   enrichStats: EnrichStatsSnapshot | null
   /** PAN-457 — latest per-session enrichment progress */
   enrichProgressBySessionId: Record<number, EnrichProgressSnapshot>
+  /** PAN-457 — latest per-session embedding progress */
+  embedProgressBySessionId: Record<number, EmbedProgressSnapshot>
 }
 
 export interface ScanProgressSnapshot {
@@ -94,6 +96,14 @@ export interface EnrichProgressSnapshot {
   level: number
   model: string
   cost: number
+  success: boolean
+  error?: string
+  timestamp: string
+}
+
+export interface EmbedProgressSnapshot {
+  sessionId: number
+  model: string
   success: boolean
   error?: string
   timestamp: string
@@ -133,6 +143,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   scanProgress: null,
   enrichStats: null,
   enrichProgressBySessionId: {},
+  embedProgressBySessionId: {},
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -151,6 +162,7 @@ const MAX_AGENT_OUTPUT_LINES = 200
 const MAX_ACTIVITY_ENTRIES = 50
 const MAX_DETAILED_ENTRIES = 200
 const MAX_TTS_ENTRIES = 50
+const MAX_SESSION_PROGRESS_ENTRIES = 100
 export const DEFAULT_MAX_TURN_DIFF_SUMMARIES_PER_AGENT = 200
 
 export function getMaxTurnDiffSummariesPerAgent(): number {
@@ -166,6 +178,23 @@ export function isTerminalTurnDiffSummaryStatus(status: unknown): boolean {
 export function trimTurnDiffSummaries(summaries: TurnDiffSummary[]): TurnDiffSummary[] {
   const max = getMaxTurnDiffSummariesPerAgent()
   return summaries.length > max ? summaries.slice(-max) : summaries
+}
+
+function upsertBoundedSessionProgress<T extends { sessionId: number; timestamp: string }>(
+  bySessionId: Record<number, T>,
+  progress: T,
+): Record<number, T> {
+  const existing = bySessionId[progress.sessionId]
+  const entries = Object.values(bySessionId)
+  if (existing || entries.length < MAX_SESSION_PROGRESS_ENTRIES) {
+    return { ...bySessionId, [progress.sessionId]: progress }
+  }
+  const keep = entries
+    .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+    .slice(-(MAX_SESSION_PROGRESS_ENTRIES - 1))
+  const next: Record<number, T> = {}
+  for (const entry of [...keep, progress]) next[entry.sessionId] = entry
+  return next
 }
 
 export function omitTurnDiffSummariesForAgent(
@@ -1120,6 +1149,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'enrich.progress': {
       const { sessionId, level, model, cost, success, error } = event.payload
       const prev = state.enrichStats ?? { processed: 0, totalCost: 0, failures: 0, durationMs: 0 }
+      const progress = { sessionId, level, model, cost, success, error, timestamp: event.timestamp }
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
@@ -1129,10 +1159,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           failures: prev.failures + (success ? 0 : 1),
           durationMs: 0,
         },
-        enrichProgressBySessionId: {
-          ...state.enrichProgressBySessionId,
-          [sessionId]: { sessionId, level, model, cost, success, error, timestamp: event.timestamp },
-        },
+        enrichProgressBySessionId: upsertBoundedSessionProgress(state.enrichProgressBySessionId, progress),
       }
     }
 
@@ -1142,6 +1169,17 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         enrichStats: { processed, totalCost, failures, durationMs },
+        enrichProgressBySessionId: {},
+      }
+    }
+
+    case 'embed.progress': {
+      const { sessionId, model, success, error } = event.payload
+      const progress = { sessionId, model, success, error, timestamp: event.timestamp }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        embedProgressBySessionId: upsertBoundedSessionProgress(state.embedProgressBySessionId, progress),
       }
     }
 

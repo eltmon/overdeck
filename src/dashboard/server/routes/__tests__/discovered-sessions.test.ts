@@ -21,7 +21,7 @@ import {
 import { enrichSessions } from '../../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../../lib/conversations/embeddings/index.js';
 import { parseSearchParams, rejectUntrustedOrigin } from '../discovered-sessions.js';
-import { DASHBOARD_SESSION_COOKIE, rejectUnauthorizedDashboardRequest } from '../dashboard-auth.js';
+import { DASHBOARD_SESSION_COOKIE, _resetDashboardSessionTokenForTests, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest } from '../dashboard-auth.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 
 let TEST_HOME: string;
@@ -55,7 +55,9 @@ beforeEach(() => {
   process.env.PANOPTICON_HOME = TEST_HOME;
   process.env.HOME = TEST_HOME;
   process.env.PANOPTICON_INTERNAL_TOKEN = 'test-dashboard-token';
+  process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
   _resetInternalTokenCacheForTests();
+  _resetDashboardSessionTokenForTests();
 });
 
 afterEach(async () => {
@@ -63,7 +65,9 @@ afterEach(async () => {
   delete process.env.PANOPTICON_HOME;
   delete process.env.HOME;
   delete process.env.PANOPTICON_INTERNAL_TOKEN;
+  delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
   _resetInternalTokenCacheForTests();
+  _resetDashboardSessionTokenForTests();
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
@@ -206,8 +210,24 @@ describe('dashboard conversation route guards', () => {
   });
 
   it('allows discovered-session requests with dashboard session cookie', () => {
-    const response = rejectUnauthorizedDashboardRequest(request({ cookie: `${DASHBOARD_SESSION_COOKIE}=test-dashboard-token` }));
+    const response = rejectUnauthorizedDashboardRequest(request({ cookie: `${DASHBOARD_SESSION_COOKIE}=test-browser-session-token` }));
     expect(response).toBeNull();
+  });
+
+  it('rejects internal tokens presented as dashboard session cookies', () => {
+    const response = rejectUnauthorizedDashboardRequest(request({ cookie: `${DASHBOARD_SESSION_COOKIE}=test-dashboard-token` }));
+    expect(response?.status).toBe(401);
+  });
+
+  it('fails closed on malformed dashboard session cookies', () => {
+    const response = rejectUnauthorizedDashboardRequest(request({ cookie: `${DASHBOARD_SESSION_COOKIE}=%E0%A4%A` }));
+    expect(response?.status).toBe(401);
+  });
+
+  it('mints a browser session cookie that does not disclose the internal token', () => {
+    const cookie = dashboardSessionCookieHeader();
+    expect(cookie).toContain(`${DASHBOARD_SESSION_COOKIE}=test-browser-session-token`);
+    expect(cookie).not.toContain('test-dashboard-token');
   });
 
   it('rejects semantic GET requests without origin evidence', () => {

@@ -526,6 +526,7 @@ export const ConversationFilter = Schema.Struct({
   tools: Schema.optional(Schema.Array(Schema.String)),
   files: Schema.optional(Schema.Array(Schema.String)),
   issueId: Schema.optional(Schema.String),
+  enrichmentLevel: Schema.optional(Schema.Number),
   enriched: Schema.optional(Schema.Boolean),
   notEnriched: Schema.optional(Schema.Boolean),
   query: Schema.optional(Schema.String),

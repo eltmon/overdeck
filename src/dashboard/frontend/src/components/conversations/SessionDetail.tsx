@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { X, ExternalLink, Sparkles } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { WS_METHODS } from '@panctl/contracts';
+import type { DiscoveredSessionSnapshot } from '@panctl/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { useDashboardStore } from '../../lib/store';
 
@@ -79,10 +80,34 @@ function parseCostThreshold(err: unknown, tier: 1 | 2 | 3): CostThresholdDetails
   };
 }
 
+function fromRpcSession(session: DiscoveredSessionSnapshot): Session {
+  return {
+    id: session.id,
+    jsonlPath: session.jsonlPath,
+    workspacePath: session.workspacePath ?? null,
+    primaryModel: session.primaryModel ?? null,
+    messageCount: session.messageCount,
+    firstTs: session.firstTs ?? null,
+    lastTs: session.lastTs ?? null,
+    estimatedCost: session.estimatedCost,
+    tokenInput: session.tokenInput,
+    tokenOutput: session.tokenOutput,
+    toolsUsed: [...session.toolsUsed],
+    tags: [...session.tags],
+    summary: session.summary ?? null,
+    summaryDetailed: session.summaryDetailed ?? null,
+    enrichmentLevel: session.enrichmentLevel as 0 | 1 | 2 | 3,
+    enrichmentFailed: session.enrichmentFailed,
+    panopticonManaged: session.panopticonManaged,
+    panIssueId: session.panIssueId ?? null,
+  };
+}
+
 async function fetchSession(sessionId: number): Promise<Session> {
-  const resp = await fetch(`/api/discovered-sessions/${sessionId}`);
-  if (!resp.ok) throw new Error('Failed to fetch session');
-  return resp.json() as Promise<Session>;
+  const session = await getTransport().request((client) =>
+    (client as PanRpcProtocolClient)[WS_METHODS.getDiscoveredSession]({ id: sessionId }),
+  );
+  return fromRpcSession(session);
 }
 
 export function SessionDetail({ session, onClose }: Props) {

@@ -7,6 +7,25 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationsPage } from '../ConversationsPage';
 
+const rpcMocks = vi.hoisted(() => ({
+  list: vi.fn(),
+  search: vi.fn(),
+  stats: vi.fn(),
+  cost: vi.fn(),
+  scan: vi.fn(),
+  request: vi.fn((fn: (client: Record<string, unknown>) => unknown) => fn({
+    'pan.listDiscoveredSessions': rpcMocks.list,
+    'pan.searchConversations': rpcMocks.search,
+    'pan.getConversationStats': rpcMocks.stats,
+    'pan.getConversationCost': rpcMocks.cost,
+    'pan.scanConversations': rpcMocks.scan,
+  })),
+}));
+
+vi.mock('../../../lib/wsTransport', () => ({
+  getTransport: () => ({ request: rpcMocks.request }),
+}));
+
 // ─── FacetPanel mock captures onChange so tests can drive filter state ─────
 
 type FilterOnChange = (key: string, val: string | boolean | undefined) => void;
@@ -53,9 +72,10 @@ const SESSION_STUB = {
   panIssueId: null,
 };
 
-const LIST_RESPONSE = { sessions: [SESSION_STUB], count: 1 };
-const SEARCH_RESPONSE = { sessions: [SESSION_STUB], total: 1, mode: 'fts' };
+const LIST_RESPONSE = { sessions: [SESSION_STUB], count: 1, total: 1 };
+const SEARCH_RESPONSE = { sessions: [SESSION_STUB], total: 1, mode: 'fts', durationMs: 2 };
 const STATS_RESPONSE = { total: 10, enriched: 5, embedded: 2, managedCount: 3 };
+const COST_RESPONSE = { sessionCount: 10, totalCost: 0.25, totalTokensIn: 1000, totalTokensOut: 2000 };
 
 function makeClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -72,121 +92,71 @@ function renderPage(client: QueryClient) {
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('ConversationsPage endpoint selection', () => {
-  let fetchMock: ReturnType<typeof vi.fn>;
-
   beforeEach(() => {
     capturedOnChange = null;
-    fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+    rpcMocks.list.mockResolvedValue(LIST_RESPONSE);
+    rpcMocks.search.mockResolvedValue(SEARCH_RESPONSE);
+    rpcMocks.stats.mockResolvedValue(STATS_RESPONSE);
+    rpcMocks.cost.mockResolvedValue(COST_RESPONSE);
+    rpcMocks.scan.mockResolvedValue({ inserted: 0, updated: 0, skipped: 0, errors: 0, durationMs: 0 });
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
 
-  it('calls the list endpoint on initial render (no query)', async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes('/stats')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(STATS_RESPONSE) });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(LIST_RESPONSE) });
-    });
-
+  it('calls the list RPC on initial render (no query)', async () => {
     renderPage(makeClient());
 
     await waitFor(() => expect(screen.queryByTestId('session-table')).toBeInTheDocument());
 
-    const listCalls = fetchMock.mock.calls.filter(
-      ([url]: [string]) => url.includes('/api/discovered-sessions?'),
-    );
-    expect(listCalls.length).toBeGreaterThan(0);
-
-    const searchCalls = fetchMock.mock.calls.filter(
-      ([url]: [string]) => url.includes('/api/discovered-sessions/search'),
-    );
-    expect(searchCalls.length).toBe(0);
+    expect(rpcMocks.list).toHaveBeenCalledWith({ limit: 50, offset: 0 });
+    expect(rpcMocks.search).not.toHaveBeenCalled();
   });
 
-  it('calls the search endpoint when query is typed', async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes('/stats')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(STATS_RESPONSE) });
-      }
-      if (url.includes('/search')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(SEARCH_RESPONSE) });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(LIST_RESPONSE) });
-    });
-
+  it('calls the search RPC when query is typed', async () => {
     renderPage(makeClient());
 
     const input = screen.getByPlaceholderText('Search sessions…');
     fireEvent.change(input, { target: { value: 'auth bug' } });
 
-    await waitFor(() => {
-      const searchCalls = fetchMock.mock.calls.filter(
-        ([url]: [string]) => url.includes('/api/discovered-sessions/search'),
-      );
-      expect(searchCalls.length).toBeGreaterThan(0);
-    });
+    await waitFor(() => expect(rpcMocks.search).toHaveBeenCalled());
 
-    const searchCall = fetchMock.mock.calls.find(
-      ([url]: [string]) => url.includes('/search'),
-    );
-    expect(searchCall![0]).toContain('q=auth+bug');
+    expect(rpcMocks.search).toHaveBeenLastCalledWith({
+      query: 'auth bug',
+      semantic: false,
+      limit: 50,
+      offset: 0,
+    });
   });
 
-  it('search URL includes active facet filters', async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes('/stats')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(STATS_RESPONSE) });
-      }
-      if (url.includes('/search')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(SEARCH_RESPONSE) });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(LIST_RESPONSE) });
-    });
-
+  it('search RPC includes active facet filters', async () => {
     renderPage(makeClient());
 
-    // Open facets to mount FacetPanel and capture the onChange handler
     const filterBtn = screen.getByText('Filters');
     fireEvent.click(filterBtn);
 
-    // Apply a workspace filter via the captured onChange
     await waitFor(() => expect(capturedOnChange).not.toBeNull());
     act(() => {
       capturedOnChange!('workspace', '/home/user/Projects/alpha');
     });
 
-    // Now type a search query
     const input = screen.getByPlaceholderText('Search sessions…');
     fireEvent.change(input, { target: { value: 'memory leak' } });
 
-    await waitFor(() => {
-      const searchCalls = fetchMock.mock.calls.filter(
-        ([url]: [string]) => url.includes('/api/discovered-sessions/search'),
-      );
-      expect(searchCalls.length).toBeGreaterThan(0);
-      // Filter must be forwarded to the search endpoint
-      const searchUrl: string = searchCalls[searchCalls.length - 1][0] as string;
-      expect(searchUrl).toContain('q=memory+leak');
-      expect(searchUrl).toContain('workspace=');
+    await waitFor(() => expect(rpcMocks.search).toHaveBeenCalled());
+    expect(rpcMocks.search).toHaveBeenLastCalledWith({
+      workspacePath: '/home/user/Projects/alpha',
+      query: 'memory leak',
+      semantic: false,
+      limit: 50,
+      offset: 0,
     });
   });
 
-  it('list URL includes active facet filters', async () => {
-    fetchMock.mockImplementation((url: string) => {
-      if (url.includes('/stats')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(STATS_RESPONSE) });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(LIST_RESPONSE) });
-    });
-
+  it('list RPC includes active facet filters', async () => {
     renderPage(makeClient());
 
-    // Open facets to mount FacetPanel and capture the onChange handler
     const filterBtn = screen.getByText('Filters');
     fireEvent.click(filterBtn);
 
@@ -196,11 +166,7 @@ describe('ConversationsPage endpoint selection', () => {
     });
 
     await waitFor(() => {
-      const listCalls = fetchMock.mock.calls.filter(
-        ([url]: [string]) => url.includes('/api/discovered-sessions?'),
-      );
-      const hasManaged = listCalls.some(([url]: [string]) => url.includes('managed=true'));
-      expect(hasManaged).toBe(true);
+      expect(rpcMocks.list).toHaveBeenLastCalledWith({ managed: true, limit: 50, offset: 0 });
     });
   });
 });

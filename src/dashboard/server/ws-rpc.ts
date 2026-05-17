@@ -19,12 +19,13 @@ import { parseConversationMessages, watchConversation } from './services/convers
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNamesAsync } from '../../lib/tmux.js';
 import { listProjects } from '../../lib/projects.js';
-import type { AgentStatus, ConversationEvent, DomainEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionTreeDelta } from '@panctl/contracts';
+import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionTreeDelta } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
+import { parseRelativeTime } from '../../lib/conversations/search.js';
 import type { SearchResult } from '../../lib/conversations/search.js';
 import { CostThresholdError } from '../../lib/conversations/enrichment/index.js';
 import { getConversationsConfigAsync } from '../../lib/config-yaml.js';
-import type { DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
+import type { ConversationFilter, DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { rejectUnauthorizedDashboardRequest } from './routes/dashboard-auth.js';
 import { jsonResponse } from './http-helpers.js';
@@ -69,6 +70,50 @@ function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
     panIssueId: session.panIssueId ?? undefined,
     panAgentId: session.panAgentId ?? undefined,
     scannedAt: session.scannedAt,
+  };
+}
+
+function normalizeConversationFilter(input: {
+  workspacePath?: string;
+  primaryModel?: string;
+  managed?: boolean;
+  unmanaged?: boolean;
+  since?: string;
+  before?: string;
+  after?: string;
+  minCost?: number;
+  maxCost?: number;
+  minMessages?: number;
+  tags?: string[];
+  tools?: string[];
+  files?: string[];
+  issueId?: string;
+  enrichmentLevel?: number;
+  enriched?: boolean;
+  notEnriched?: boolean;
+  limit?: number;
+  offset?: number;
+}): ConversationFilter {
+  return {
+    workspacePath: input.workspacePath,
+    primaryModel: input.primaryModel,
+    managed: input.managed,
+    unmanaged: input.unmanaged,
+    since: input.since ? parseRelativeTime(input.since) : undefined,
+    before: input.before ? parseRelativeTime(input.before) : undefined,
+    after: input.after ? parseRelativeTime(input.after) : undefined,
+    minCost: input.minCost,
+    maxCost: input.maxCost,
+    minMessages: input.minMessages,
+    tags: input.tags,
+    tools: input.tools,
+    files: input.files,
+    issueId: input.issueId,
+    enrichmentLevel: input.enrichmentLevel,
+    enriched: input.enriched,
+    notEnriched: input.notEnriched,
+    limit: input.limit,
+    offset: input.offset,
   };
 }
 
@@ -468,7 +513,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       [WS_METHODS.scanConversations]: (input) =>
         Effect.promise(async () => {
           const config = await getConversationsConfigAsync();
-          await Effect.runPromise(eventStore.append({
+          await Effect.runPromise(eventStore.appendAsync({
             type: 'scan.started',
             timestamp: new Date().toISOString(),
             payload: { mode: input.mode, dirs: input.dirs ?? [] },
@@ -497,13 +542,13 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             const complete = progress.dirsProcessed >= progress.dirsTotal;
             if (!complete && now - lastProgressEmit < 500) return;
             lastProgressEmit = now;
-            await Effect.runPromise(eventStore.append({
+            await Effect.runPromise(eventStore.appendAsync({
               type: 'scan.progress',
               timestamp: new Date().toISOString(),
               payload: progress,
             } as ScanProgressEvent));
           });
-          await Effect.runPromise(eventStore.append({
+          await Effect.runPromise(eventStore.appendAsync({
             type: 'scan.complete',
             timestamp: new Date().toISOString(),
             payload: {
@@ -520,27 +565,40 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       [WS_METHODS.searchConversations]: (input) =>
         Effect.promise(async () => {
           const config = await getConversationsConfigAsync();
-          const result = await runDashboardDbJob<SearchResult>('searchSessions', {
-            q: input.semantic === true ? undefined : input.query,
-            semanticQuery: input.semantic === true ? input.query : undefined,
-            similarTo: input.similarTo,
-            filter: input,
-            limit: input.limit,
-            offset: input.offset,
-            config,
-          });
-          return result.sessions.map(toDiscoveredSessionSnapshot);
+          const filter = normalizeConversationFilter(input);
+          try {
+            const result = await runDashboardDbJob<SearchResult>('searchSessions', {
+              q: input.semantic === true ? undefined : input.query,
+              semanticQuery: input.semantic === true ? input.query : undefined,
+              similarTo: input.similarTo,
+              filter,
+              limit: input.limit,
+              offset: input.offset,
+              config,
+            });
+            return {
+              ...result,
+              sessions: result.sessions.map(toDiscoveredSessionSnapshot),
+            };
+          } catch (err) {
+            if (input.semantic === true) {
+              return {
+                sessions: [],
+                total: 0,
+                mode: 'semantic',
+                durationMs: 0,
+                error: err instanceof Error ? err.message : String(err),
+              };
+            }
+            throw err;
+          }
         }),
 
       [WS_METHODS.listDiscoveredSessions]: (input) =>
         Effect.promise(async () => {
-          const { sessions } = await runDashboardDbJob<{ sessions: DiscoveredSession[]; total: number }>('listDiscoveredSessions', {
-            managed: input.managed === true ? true : undefined,
-            unmanaged: input.managed === false ? true : undefined,
-            limit: input.limit,
-            offset: input.offset,
-          });
-          return sessions.map(toDiscoveredSessionSnapshot);
+          const filter = normalizeConversationFilter(input);
+          const { sessions, total } = await runDashboardDbJob<{ sessions: DiscoveredSession[]; total: number }>('listDiscoveredSessions', filter);
+          return { sessions: sessions.map(toDiscoveredSessionSnapshot), count: sessions.length, total };
         }),
 
       [WS_METHODS.getDiscoveredSession]: (input) =>
@@ -583,7 +641,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               };
               if (!progress.session) return;
               const { session } = progress;
-              await Effect.runPromise(eventStore.append({
+              await Effect.runPromise(eventStore.appendAsync({
                 type: 'enrich.progress',
                 timestamp: new Date().toISOString(),
                 payload: {
@@ -597,7 +655,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               } as EnrichProgressEvent));
             });
             const processed = result.enriched + result.errors;
-            await Effect.runPromise(eventStore.append({
+            await Effect.runPromise(eventStore.appendAsync({
               type: 'enrich.complete',
               timestamp: new Date().toISOString(),
               payload: { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors, durationMs: result.durationMs },
@@ -621,15 +679,25 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             sessionIds: input.ids,
             regenerate: input.regenerate,
             config,
+          }, async (rawProgress) => {
+            const progress = rawProgress as {
+              session?: { sessionId: number; model: string; success: boolean; error?: string };
+            };
+            if (!progress.session) return;
+            await Effect.runPromise(eventStore.appendAsync({
+              type: 'embed.progress',
+              timestamp: new Date().toISOString(),
+              payload: progress.session,
+            } as EmbedProgressEvent));
           });
           return { total: result.embedded + result.skipped + result.errors, embedded: result.embedded, model: config.embeddingModel };
         }),
 
       [WS_METHODS.getConversationCost]: (input) =>
-        Effect.promise(async () => {
-          const groupBy = input.groupBy ?? 'workspace';
-          return { groupBy, ...(await runDashboardDbJob<Record<string, unknown>>('aggregateDiscoveredSessionCostBy', groupBy)) };
-        }),
+        Effect.promise(async () => runDashboardDbJob('aggregateDiscoveredSessionCost', normalizeConversationFilter(input))),
+
+      [WS_METHODS.getConversationStats]: () =>
+        Effect.promise(async () => runDashboardDbJob('getDiscoveredStats')),
     });
   }),
 );
