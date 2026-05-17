@@ -121,52 +121,69 @@ export function useAutoPresoWebSocket() {
 
   const startListening = useCallback(async () => {
     if (isListening) return;
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const AudioContextCtor = window.AudioContext;
-    const audioContext = new AudioContextCtor({ sampleRate: 24000 });
-    const source = audioContext.createMediaStreamSource(stream);
-    const analyser = audioContext.createAnalyser();
-    const processor = audioContext.createScriptProcessor(4096, 1, 1);
-    const socket = new WebSocket(websocketUrl('/ws/voice'));
-    socket.binaryType = 'arraybuffer';
+    let stream: MediaStream | null = null;
+    let audioContext: AudioContext | null = null;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let analyser: AnalyserNode | null = null;
+    let processor: ScriptProcessorNode | null = null;
+    let socket: WebSocket | null = null;
 
-    socket.onmessage = (event) => {
-      const message = JSON.parse(String(event.data)) as VoiceMessage;
-      if (message.type === 'transcript:partial') setPartialText(message.text);
-      if (message.type === 'transcript:committed') {
-        setPartialText('');
-        setCommittedTurns((turns) => [...turns, { text: message.text, timestamp: new Date() }].slice(-MAX_COMMITTED_TURNS));
-      }
-      if (message.type === 'transcript:finalized') finalizeResolverRef.current?.();
-    };
-    socket.onclose = () => {
-      if (voiceSocketRef.current === socket) void stopListening(false);
-    };
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const AudioContextCtor = window.AudioContext;
+      audioContext = new AudioContextCtor({ sampleRate: 24000 });
+      source = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      processor = audioContext.createScriptProcessor(4096, 1, 1);
+      socket = new WebSocket(websocketUrl('/ws/voice'));
+      socket.binaryType = 'arraybuffer';
 
-    processor.onaudioprocess = (event) => {
-      if (socket.readyState !== WebSocket.OPEN) return;
-      if (socket.bufferedAmount > MAX_SOCKET_BUFFERED_AUDIO_BYTES) return;
-      const input = event.inputBuffer.getChannelData(0);
-      const pcm = new Int16Array(input.length);
-      for (let i = 0; i < input.length; i += 1) {
-        const sample = Math.max(-1, Math.min(1, input[i] ?? 0));
-        pcm[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-      }
-      socket.send(pcm.buffer);
-    };
+      socket.onmessage = (event) => {
+        const message = JSON.parse(String(event.data)) as VoiceMessage;
+        if (message.type === 'transcript:partial') setPartialText(message.text);
+        if (message.type === 'transcript:committed') {
+          setPartialText('');
+          setCommittedTurns((turns) => [...turns, { text: message.text, timestamp: new Date() }].slice(-MAX_COMMITTED_TURNS));
+        }
+        if (message.type === 'transcript:finalized') finalizeResolverRef.current?.();
+      };
+      socket.onclose = () => {
+        if (voiceSocketRef.current === socket) void stopListening(false);
+      };
 
-    source.connect(analyser);
-    analyser.connect(processor);
-    processor.connect(audioContext.destination);
+      processor.onaudioprocess = (event) => {
+        if (socket?.readyState !== WebSocket.OPEN) return;
+        if (socket.bufferedAmount > MAX_SOCKET_BUFFERED_AUDIO_BYTES) return;
+        const input = event.inputBuffer.getChannelData(0);
+        const pcm = new Int16Array(input.length);
+        for (let i = 0; i < input.length; i += 1) {
+          const sample = Math.max(-1, Math.min(1, input[i] ?? 0));
+          pcm[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+        }
+        socket.send(pcm.buffer);
+      };
 
-    mediaStreamRef.current = stream;
-    audioContextRef.current = audioContext;
-    sourceRef.current = source;
-    analyserRef.current = analyser;
-    processorRef.current = processor;
-    voiceSocketRef.current = socket;
-    setAnalyserNode(analyser);
-    setIsListening(true);
+      source.connect(analyser);
+      analyser.connect(processor);
+      processor.connect(audioContext.destination);
+
+      mediaStreamRef.current = stream;
+      audioContextRef.current = audioContext;
+      sourceRef.current = source;
+      analyserRef.current = analyser;
+      processorRef.current = processor;
+      voiceSocketRef.current = socket;
+      setAnalyserNode(analyser);
+      setIsListening(true);
+    } catch (error) {
+      socket?.close();
+      processor?.disconnect();
+      source?.disconnect();
+      analyser?.disconnect();
+      void audioContext?.close();
+      stream?.getTracks().forEach((track) => track.stop());
+      throw error;
+    }
   }, [isListening, stopListening]);
 
   return {
