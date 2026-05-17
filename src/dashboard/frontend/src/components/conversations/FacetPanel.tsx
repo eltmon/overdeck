@@ -8,6 +8,9 @@ interface Filters {
   managed?: boolean;
   enriched?: boolean;
   model?: string;
+  tag?: string;
+  tool?: string;
+  file?: string;
   minCost?: string;
   maxCost?: string;
   enrichmentLevel?: string;
@@ -27,6 +30,9 @@ interface Props {
   facets: {
     models: FacetValue[];
     workspaces: FacetValue[];
+    tags: FacetValue[];
+    tools: FacetValue[];
+    files: FacetValue[];
     timeRanges: FacetValue[];
     costRanges: FacetValue[];
     enrichmentLevels: FacetValue[];
@@ -119,6 +125,99 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
               title={model.value}
             >
               {model.count} · {model.value}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <label className="text-xs text-gray-400 block mb-1">Tag</label>
+        <input
+          type="text"
+          list="conversation-tags"
+          value={filters.tag ?? ''}
+          onChange={(e) => onChange('tag', e.target.value || undefined)}
+          placeholder="e.g. bugfix"
+          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
+        />
+        <datalist id="conversation-tags">
+          {facets.tags.map((tag) => <option key={tag.value} value={tag.value} />)}
+        </datalist>
+        <div className="mt-2 flex flex-wrap gap-1 max-h-20 overflow-auto">
+          {facets.tags.slice(0, 12).map((tag) => (
+            <button
+              key={tag.value}
+              onClick={() => onChange('tag', filters.tag === tag.value ? undefined : tag.value)}
+              className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+                filters.tag === tag.value
+                  ? 'bg-blue-900 text-blue-100'
+                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+              }`}
+              title={tag.value}
+            >
+              {tag.value}: {tag.count}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <label className="text-xs text-gray-400 block mb-1">Tool</label>
+        <input
+          type="text"
+          list="conversation-tools"
+          value={filters.tool ?? ''}
+          onChange={(e) => onChange('tool', e.target.value || undefined)}
+          placeholder="e.g. Read"
+          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
+        />
+        <datalist id="conversation-tools">
+          {facets.tools.map((tool) => <option key={tool.value} value={tool.value} />)}
+        </datalist>
+        <div className="mt-2 flex flex-wrap gap-1 max-h-20 overflow-auto">
+          {facets.tools.slice(0, 12).map((tool) => (
+            <button
+              key={tool.value}
+              onClick={() => onChange('tool', filters.tool === tool.value ? undefined : tool.value)}
+              className={`rounded px-1.5 py-0.5 text-[10px] transition-colors ${
+                filters.tool === tool.value
+                  ? 'bg-blue-900 text-blue-100'
+                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+              }`}
+              title={tool.value}
+            >
+              {tool.value}: {tool.count}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <label className="text-xs text-gray-400 block mb-1">File touched</label>
+        <input
+          type="text"
+          list="conversation-files"
+          value={filters.file ?? ''}
+          onChange={(e) => onChange('file', e.target.value || undefined)}
+          placeholder="e.g. src/index.ts"
+          className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500"
+        />
+        <datalist id="conversation-files">
+          {facets.files.map((file) => <option key={file.value} value={file.value} />)}
+        </datalist>
+        <div className="mt-2 space-y-1 max-h-24 overflow-auto">
+          {facets.files.slice(0, 8).map((file) => (
+            <button
+              key={file.value}
+              onClick={() => onChange('file', filters.file === file.value ? undefined : file.value)}
+              className={`w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] transition-colors ${
+                filters.file === file.value
+                  ? 'bg-blue-900 text-blue-100'
+                  : 'bg-gray-900 text-gray-400 hover:text-gray-200'
+              }`}
+              title={file.value}
+            >
+              {file.count} · {file.value}
             </button>
           ))}
         </div>
@@ -238,6 +337,9 @@ export function FacetPanel({ filters, facets, onChange }: Props) {
             onChange('managed', undefined);
             onChange('enriched', undefined);
             onChange('model', undefined);
+            onChange('tag', undefined);
+            onChange('tool', undefined);
+            onChange('file', undefined);
             onChange('minCost', undefined);
             onChange('maxCost', undefined);
             onChange('enrichmentLevel', undefined);

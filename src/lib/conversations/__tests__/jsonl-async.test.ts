@@ -90,6 +90,40 @@ describe('parseSessionJsonl', () => {
     expect(meta.filesTouched).not.toContain('npm test');
   });
 
+  it('counts Claude cache read and cache creation tokens as input tokens', async () => {
+    const lines = [
+      JSON.stringify({
+        timestamp: '2025-01-01T10:00:00Z',
+        message: {
+          role: 'assistant',
+          model: 'claude-sonnet-4-6',
+          usage: {
+            input_tokens: 100,
+            output_tokens: 20,
+            cache_creation_input_tokens: 30,
+            cache_read_input_tokens: 40,
+          },
+        },
+      }),
+      JSON.stringify({
+        timestamp: '2025-01-01T10:01:00Z',
+        usage: {
+          input_tokens: 10,
+          output_tokens: 5,
+          cache_creation_input_tokens: 6,
+          cache_read_input_tokens: 7,
+        },
+      }),
+    ];
+    const file = join(fixtureDir, 'cache-tokens.jsonl');
+    writeFileSync(file, lines.join('\n') + '\n', 'utf8');
+
+    const meta = await parseSessionJsonl(file);
+
+    expect(meta.tokenInput).toBe(193);
+    expect(meta.tokenOutput).toBe(25);
+  });
+
   it('reads cwd from first JSONL message when present', async () => {
     const file = join(fixtureDir, 'cwd.jsonl');
     writeFileSync(file, SAMPLE_LINES.join('\n') + '\n', 'utf8');

@@ -30,6 +30,7 @@ interface DiscoveredSession {
   tokenInput: number;
   tokenOutput: number;
   toolsUsed: string[];
+  filesTouched: string[];
   tags: string[];
   summary: string | null;
   enrichmentLevel: 0 | 1 | 2 | 3;
@@ -82,6 +83,9 @@ interface ConversationRpcFilter {
   enriched?: boolean;
   minCost?: number;
   maxCost?: number;
+  tags?: string[];
+  tools?: string[];
+  files?: string[];
   enrichmentLevel?: number;
 }
 
@@ -155,6 +159,9 @@ function buildFilterParams(filters: {
   managed?: boolean;
   enriched?: boolean;
   model?: string;
+  tag?: string;
+  tool?: string;
+  file?: string;
   minCost?: string;
   maxCost?: string;
   enrichmentLevel?: string;
@@ -165,6 +172,9 @@ function buildFilterParams(filters: {
   if (filters.managed) params.set('managed', 'true');
   if (filters.enriched) params.set('enriched', 'true');
   if (filters.model) params.set('primaryModel', filters.model);
+  if (filters.tag) params.set('tag', filters.tag);
+  if (filters.tool) params.set('tool', filters.tool);
+  if (filters.file) params.set('file', filters.file);
   if (filters.minCost) params.set('minCost', filters.minCost);
   if (filters.maxCost) params.set('maxCost', filters.maxCost);
   if (filters.enrichmentLevel) params.set('enrichmentLevel', filters.enrichmentLevel);
@@ -178,6 +188,9 @@ function filterPayload(params: URLSearchParams): ConversationRpcFilter {
   const since = params.get('since');
   const managed = params.get('managed');
   const enriched = params.get('enriched');
+  const tag = params.get('tag');
+  const tool = params.get('tool');
+  const file = params.get('file');
   const minCost = params.get('minCost');
   const maxCost = params.get('maxCost');
   const enrichmentLevel = params.get('enrichmentLevel');
@@ -186,6 +199,9 @@ function filterPayload(params: URLSearchParams): ConversationRpcFilter {
   if (since) payload.since = since;
   if (managed) payload.managed = managed === 'true';
   if (enriched) payload.enriched = enriched === 'true';
+  if (tag) payload.tags = [tag];
+  if (tool) payload.tools = [tool];
+  if (file) payload.files = [file];
   if (minCost && Number.isFinite(Number(minCost))) payload.minCost = Number(minCost);
   if (maxCost && Number.isFinite(Number(maxCost))) payload.maxCost = Number(maxCost);
   if (enrichmentLevel && Number.isFinite(Number(enrichmentLevel))) payload.enrichmentLevel = Number(enrichmentLevel);
@@ -205,6 +221,7 @@ function fromRpcSession(session: DiscoveredSessionSnapshot): DiscoveredSession {
     tokenInput: session.tokenInput,
     tokenOutput: session.tokenOutput,
     toolsUsed: [...session.toolsUsed],
+    filesTouched: [...session.filesTouched],
     tags: [...session.tags],
     summary: session.summary ?? null,
     enrichmentLevel: session.enrichmentLevel as 0 | 1 | 2 | 3,
@@ -282,6 +299,9 @@ export function ConversationsPage() {
     managed?: boolean;
     enriched?: boolean;
     model?: string;
+    tag?: string;
+    tool?: string;
+    file?: string;
     minCost?: string;
     maxCost?: string;
     enrichmentLevel?: string;
@@ -349,6 +369,9 @@ export function ConversationsPage() {
   const facetOptions = {
     models: countFacetValues(sessions.map((s) => s.primaryModel)),
     workspaces: countFacetValues(sessions.map((s) => s.workspacePath), sessions.map((s) => s.estimatedCost)),
+    tags: countFacetValues(sessions.flatMap((s) => s.tags)),
+    tools: countFacetValues(sessions.flatMap((s) => s.toolsUsed)),
+    files: countFacetValues(sessions.flatMap((s) => s.filesTouched)),
     timeRanges: countTimeFacets(sessions),
     costRanges: countCostFacets(sessions),
     enrichmentLevels: countFacetValues(sessions.map((s) => String(s.enrichmentLevel))),
@@ -356,6 +379,9 @@ export function ConversationsPage() {
   const activeFilterChips = [
     filters.workspace ? { key: 'workspace', label: `Workspace: ${filters.workspace}` } : null,
     filters.model ? { key: 'model', label: `Model: ${filters.model}` } : null,
+    filters.tag ? { key: 'tag', label: `Tag: ${filters.tag}` } : null,
+    filters.tool ? { key: 'tool', label: `Tool: ${filters.tool}` } : null,
+    filters.file ? { key: 'file', label: `File: ${filters.file}` } : null,
     filters.since ? { key: 'since', label: `Since: ${filters.since}` } : null,
     filters.managed ? { key: 'managed', label: 'Managed' } : null,
     filters.enriched ? { key: 'enriched', label: 'Enriched' } : null,

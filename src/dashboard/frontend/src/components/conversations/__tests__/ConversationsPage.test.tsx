@@ -64,6 +64,7 @@ const SESSION_STUB = {
   tokenInput: 100,
   tokenOutput: 200,
   toolsUsed: ['Read'],
+  filesTouched: ['/home/user/Projects/alpha/src/auth.ts'],
   tags: ['feat'],
   summary: 'Fixed the auth bug',
   enrichmentLevel: 1 as const,
@@ -167,6 +168,34 @@ describe('ConversationsPage endpoint selection', () => {
 
     await waitFor(() => {
       expect(rpcMocks.list).toHaveBeenLastCalledWith({ managed: true, limit: 50, offset: 0 });
+    });
+  });
+
+  it('wires tag, tool, and file filters into search RPC payloads', async () => {
+    renderPage(makeClient());
+
+    const filterBtn = screen.getByText('Filters');
+    fireEvent.click(filterBtn);
+
+    await waitFor(() => expect(capturedOnChange).not.toBeNull());
+    act(() => {
+      capturedOnChange!('tag', 'feat');
+      capturedOnChange!('tool', 'Read');
+      capturedOnChange!('file', 'src/auth.ts');
+    });
+
+    const input = screen.getByPlaceholderText('Search sessions…');
+    fireEvent.change(input, { target: { value: 'auth' } });
+
+    await waitFor(() => expect(rpcMocks.search).toHaveBeenCalled());
+    expect(rpcMocks.search).toHaveBeenLastCalledWith({
+      tags: ['feat'],
+      tools: ['Read'],
+      files: ['src/auth.ts'],
+      query: 'auth',
+      semantic: false,
+      limit: 50,
+      offset: 0,
     });
   });
 });

@@ -210,12 +210,53 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
     }
 
     const fileMtime = new Date(stat.mtimeMs).toISOString();
+    const correlation = correlationMap.get(jsonlPath) ?? {
+      panopticonManaged: false,
+      panIssueId: null,
+      panAgentId: null,
+      actualCost: null,
+      costEventCount: 0,
+    };
     if (
       existing &&
       existing.fileSize === stat.size &&
       existing.fileMtime === fileMtime
     ) {
-      result.skipped++;
+      const correlationChanged =
+        existing.panopticonManaged !== correlation.panopticonManaged ||
+        existing.panIssueId !== correlation.panIssueId ||
+        existing.panAgentId !== correlation.panAgentId;
+
+      if (correlationChanged) {
+        if (correlation.actualCost != null) {
+          validateEstimatedCost(jsonlPath, existing.estimatedCost, correlation.actualCost, result.warnings!);
+        }
+        upsertDiscoveredSession({
+          jsonlPath,
+          sessionId: existing.sessionId,
+          workspacePath: existing.workspacePath,
+          workspaceHash: existing.workspaceHash,
+          messageCount: existing.messageCount,
+          firstTs: existing.firstTs,
+          lastTs: existing.lastTs,
+          modelsUsed: existing.modelsUsed,
+          primaryModel: existing.primaryModel,
+          tokenInput: existing.tokenInput,
+          tokenOutput: existing.tokenOutput,
+          estimatedCost: existing.estimatedCost,
+          toolsUsed: existing.toolsUsed,
+          filesTouched: existing.filesTouched,
+          panopticonManaged: correlation.panopticonManaged,
+          panIssueId: correlation.panIssueId,
+          panAgentId: correlation.panAgentId,
+          fileSize: stat.size,
+          fileMtime,
+        });
+        result.updated++;
+        sessionsFound++;
+      } else {
+        result.skipped++;
+      }
       dirsProcessed++;
       await opts.onProgress?.({
         dirsProcessed,
@@ -243,15 +284,6 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
         });
         return;
       }
-
-      // Correlation (managed by Panopticon?)
-      const correlation = correlationMap.get(jsonlPath) ?? {
-        panopticonManaged: false,
-        panIssueId: null,
-        panAgentId: null,
-        actualCost: null,
-        costEventCount: 0,
-      };
 
       // Estimate cost from token counts using model-capabilities pricing
       const estimatedCost = estimateCost(meta.primaryModel, meta.tokenInput, meta.tokenOutput);

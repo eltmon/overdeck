@@ -38,6 +38,13 @@ export interface SessionMetadata {
  * message.content, not at the top level. Legacy/simplified fixtures may use
  * top-level content. We try message.content first, then fall back.
  */
+interface ClaudeUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_creation_input_tokens?: number;
+  cache_read_input_tokens?: number;
+}
+
 interface ClaudeMessageWithCwd {
   sessionId?: string;
   cwd?: string;
@@ -45,18 +52,13 @@ interface ClaudeMessageWithCwd {
   model?: string;
   /** top-level content (legacy fixture format) */
   content?: string | ContentBlock[];
-  usage?: { input_tokens?: number; output_tokens?: number };
+  usage?: ClaudeUsage;
   message?: {
     role?: 'user' | 'assistant';
     model?: string;
     /** real transcript format: content blocks live here */
     content?: string | ContentBlock[];
-    usage?: {
-      input_tokens?: number;
-      output_tokens?: number;
-      cache_creation_input_tokens?: number;
-      cache_read_input_tokens?: number;
-    };
+    usage?: ClaudeUsage;
     [key: string]: unknown;
   };
 }
@@ -157,7 +159,9 @@ export async function parseSessionJsonl(filePath: string): Promise<SessionMetada
       // Token usage — check message.usage first, then top-level usage
       const usage = msg.message?.usage ?? msg.usage;
       if (usage) {
-        result.tokenInput += usage.input_tokens ?? 0;
+        result.tokenInput += (usage.input_tokens ?? 0)
+          + (usage.cache_creation_input_tokens ?? 0)
+          + (usage.cache_read_input_tokens ?? 0);
         result.tokenOutput += usage.output_tokens ?? 0;
       }
 

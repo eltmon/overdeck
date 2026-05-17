@@ -37,6 +37,7 @@ const BASE_SESSION = {
   tokenInput: 300,
   tokenOutput: 150,
   toolsUsed: ['Read', 'Write'],
+  filesTouched: ['/home/user/Projects/alpha/src/auth.ts', '/home/user/Projects/alpha/README.md'],
   tags: ['auth', 'bugfix'],
   summary: 'Fixed the authentication bug',
   summaryDetailed: null,
@@ -164,6 +165,22 @@ describe('SessionDetail', () => {
     }));
   });
 
+  it('dispatches enrichment with a custom model override', async () => {
+    renderDetail(BASE_SESSION);
+
+    fireEvent.change(screen.getByPlaceholderText('Use default provider model'), {
+      target: { value: 'claude-opus-4-7' },
+    });
+    fireEvent.click(screen.getByText('Quick (L1)'));
+
+    await waitFor(() => expect(rpcMocks.enrich).toHaveBeenCalledWith({
+      ids: [42],
+      level: 1,
+      confirmed: undefined,
+      model: 'claude-opus-4-7',
+    }));
+  });
+
   it('dispatches embedding generation from the Embed control', async () => {
     renderDetail(BASE_SESSION);
 
@@ -176,6 +193,12 @@ describe('SessionDetail', () => {
     renderDetail(BASE_SESSION);
     expect(screen.getByText('auth')).toBeInTheDocument();
     expect(screen.getByText('bugfix')).toBeInTheDocument();
+  });
+
+  it('renders files touched when present', () => {
+    renderDetail(BASE_SESSION);
+    expect(screen.getByText('Files Touched')).toBeInTheDocument();
+    expect(screen.getByText('/home/user/Projects/alpha/src/auth.ts')).toBeInTheDocument();
   });
 
   it('renders file path', () => {

@@ -124,6 +124,40 @@ describe('scanner', () => {
     expect(r2.inserted + r2.updated).toBe(0);
   });
 
+  it('refreshes Panopticon correlation metadata for unchanged files', async () => {
+    const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'late-correlated.jsonl');
+    writeFileSync(p, SESSION_JSONL, 'utf8');
+
+    await scan({ mode: 'system', watchDirs: [] });
+    const { findDiscoveredSessions } = await import('../../database/discovered-sessions-db.js');
+    expect(findDiscoveredSessions().find((s) => s.jsonlPath === p)?.panopticonManaged).toBe(false);
+
+    const { insertCostEvent } = await import('../../database/cost-events-db.js');
+    insertCostEvent({
+      ts: '2025-01-01T10:02:00Z',
+      type: 'cost',
+      agentId: 'agent-late',
+      issueId: 'PAN-457',
+      sessionType: 'work',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-6',
+      input: 100,
+      output: 200,
+      cacheRead: 0,
+      cacheWrite: 0,
+      cost: 0.01,
+      sessionId: 'late-correlated',
+    });
+
+    const result = await scan({ mode: 'system', watchDirs: [] });
+
+    const session = findDiscoveredSessions().find((s) => s.jsonlPath === p);
+    expect(result.updated).toBeGreaterThan(0);
+    expect(session?.panopticonManaged).toBe(true);
+    expect(session?.panIssueId).toBe('PAN-457');
+    expect(session?.panAgentId).toBe('agent-late');
+  });
+
   it('dry-run performs no DB writes', async () => {
     const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'dry.jsonl');
     writeFileSync(p, SESSION_JSONL, 'utf8');
