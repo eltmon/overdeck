@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T17:12:44.000Z",
+  "updated": "2026-05-17T17:18:30.000Z",
   "gitState": {
     "branch": "feature/pan-1141",
     "sha": "a8e07d4f5920249258c39daeb7923de960422af4",
@@ -128,12 +128,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-8sc5 (added cloister gating tests covering paused/troubled skip behavior, PANOPTICON_NO_RESUME no-op behavior for auto-resume and orphan recovery, and pan start paused --force/refusal behavior; targeted npm test/typecheck/lint passed). Next agent should run bd ready -l pan-1141 and claim the next ready PAN-1141 bead.",
-    "beadId": "workspace-8sc5",
+    "description": "Completed bead workspace-y8vc (pan status now prints a Gate line for non-running paused, troubled, boot no-resume, and manually stopped agents, leaves running/mid-pipeline agents without a gate, and includes gatingReason in JSON output; targeted status harness test/typecheck/lint passed). Next agent should run bd ready -l pan-1141 and claim the next ready PAN-1141 bead.",
+    "beadId": "workspace-y8vc",
     "filesToRead": [
-      "tests/lib/cloister/auto-resume-gating.test.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/cli/commands/start.ts",
+      "src/cli/commands/status.ts",
+      "src/cli/commands/__tests__/status-harness.test.ts",
       ".pan/spec.vbrief.json",
       ".pan/continue.json"
     ]
@@ -271,6 +270,12 @@
       "timestamp": "2026-05-17T17:12:44.000Z",
       "reason": "bead-complete",
       "note": "Added tests/lib/cloister/auto-resume-gating.test.ts with five fake-timer/temp-home cases covering paused and troubled auto-resume skips, PANOPTICON_NO_RESUME skipping both auto-resume and orphan recovery, pan start --force clearing paused state, and pan start refusal without --force. npm test -- tests/lib/cloister/auto-resume-gating.test.ts, npm run typecheck, and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T17:18:30.000Z",
+      "reason": "bead-complete",
+      "note": "Updated pan status to compute gating reasons for non-running agents: Paused (reason), Troubled (N failures), Boot --no-resume from env or dashboard /api/no-resume-mode, and Manual for user-stopped agents, while omitting the Gate line for running and ungated mid-pipeline agents. npm test -- src/cli/commands/__tests__/status-harness.test.ts, npm run typecheck, and npm run lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],

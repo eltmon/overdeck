@@ -4,7 +4,7 @@
     "created": "2026-05-16T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1141: Agent auto-resume controls — emergency mode, issue-level pause, troubled-state retry limits",
-    "updated": "2026-05-17T17:12:44.000Z"
+    "updated": "2026-05-17T17:18:30.000Z"
   },
   "plan": {
     "id": "pan-1141",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-17T17:12:44.000Z",
+    "updated": "2026-05-17T17:18:30.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1141",
@@ -579,7 +579,7 @@
       {
         "id": "cli-status-gating-reason",
         "title": "Surface gating reason in `pan status`",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -595,20 +595,23 @@
           {
             "id": "cli-status-gating-reason.ac1",
             "title": "Each non-running in-flight agent shows one of the four gating reasons (or no gating reason if it is mid-pipeline waiting on review feedback)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T17:18:30.000Z"
           },
           {
             "id": "cli-status-gating-reason.ac2",
             "title": "Running agents do not show a gating reason column",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T17:18:30.000Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T17:18:30.000Z"
       },
       {
         "id": "cli-start-refuse-paused",
