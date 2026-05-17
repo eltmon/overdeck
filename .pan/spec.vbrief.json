@@ -436,7 +436,7 @@
       {
         "id": "cli-untroubled",
         "title": "Add `pan untroubled <id>` command",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -452,28 +452,32 @@
           {
             "id": "cli-untroubled.ac1",
             "title": "`pan untroubled <id>` clears `troubled`, `troubledAt`, `consecutiveFailures`, `firstFailureInRunAt`, `lastFailureAt`, `lastFailureReason`, `lastFailureNextRetryAt`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:11:38.569Z"
           },
           {
             "id": "cli-untroubled.ac2",
             "title": "Untroubling a non-troubled agent is a successful no-op with a dim message",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:11:38.569Z"
           },
           {
             "id": "cli-untroubled.ac3",
             "title": "Does NOT spawn or resume the agent",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:11:38.569Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T16:11:38.569Z"
       },
       {
         "id": "cli-dev-no-resume",

@@ -42,6 +42,7 @@ import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
 import { pauseCommand } from './commands/pause.js';
 import { unpauseCommand } from './commands/unpause.js';
+import { untroubledCommand } from './commands/untroubled.js';
 import { forkCommand } from './commands/fork.js';
 import { unarchiveConversationCommand } from './commands/unarchive-conversation.js';
 import { resumeCommand } from './commands/resume.js';
@@ -339,6 +340,11 @@ program
   .command('unpause <id>')
   .description('Clear an agent pause gate without spawning it')
   .action(unpauseCommand);
+
+program
+  .command('untroubled <id>')
+  .description('Clear an agent troubled gate without spawning it')
+  .action(untroubledCommand);
 
 program
   .command('fork <conv>')
