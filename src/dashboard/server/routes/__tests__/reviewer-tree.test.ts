@@ -317,6 +317,102 @@ describe('buildReviewerNodes (PAN-830)', () => {
     expect(nodes.every(n => n.endedAt === undefined)).toBe(true);
   });
 
+  it('uses per-reviewer stoppedAt from state.json instead of parent endedAt', async () => {
+    // Sub-reviewer finished early, parent (synthesizer) still active.
+    // Without per-node endedAt, the frontend renders "Starting…" over the JSONL.
+    const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+    await mkdir(join(agentsDir, correctness), { recursive: true });
+    await writeFile(
+      join(agentsDir, correctness, 'state.json'),
+      JSON.stringify({
+        id: correctness,
+        role: 'review',
+        reviewSubRole: 'correctness',
+        status: 'stopped',
+        startedAt: '2026-01-01T00:00:00Z',
+        stoppedAt: '2026-01-01T00:05:00Z',
+      }),
+    );
+
+    const nodes = await buildReviewerNodes({
+      issueId: ISSUE_ID,
+      projectKey: PROJECT_KEY,
+      workspacePath: WORKSPACE_PATH,
+      tmuxSessionNames: new Set(), // sub-reviewer's tmux is dead
+      startedAt: '2026-01-01T00:00:00Z',
+      // No endedAt — parent review section is still running.
+      status: 'running',
+      agentsDirOverride: agentsDir,
+    });
+
+    const correctnessNode = nodes.find(n => n.role === 'correctness')!;
+    expect(correctnessNode.endedAt).toBe('2026-01-01T00:05:00Z');
+    expect(correctnessNode.duration).toBe(300);
+
+    // Other roles without their own state.json fall through to parent's
+    // (undefined) endedAt — still acceptable because they'll be backfilled
+    // on the next poll once they finish.
+    const security = nodes.find(n => n.role === 'security')!;
+    expect(security.endedAt).toBeUndefined();
+  });
+
+  it('falls back to latest round endedAt when state.json is missing', async () => {
+    const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+    await mkdir(join(agentsDir, correctness), { recursive: true });
+    await writeFile(
+      join(agentsDir, correctness, 'round-1.json'),
+      JSON.stringify({
+        round: 1,
+        status: 'completed',
+        success: true,
+        endedAt: '2026-01-01T00:07:00Z',
+      }),
+    );
+
+    const nodes = await buildReviewerNodes({
+      issueId: ISSUE_ID,
+      projectKey: PROJECT_KEY,
+      workspacePath: WORKSPACE_PATH,
+      tmuxSessionNames: new Set(),
+      startedAt: '2026-01-01T00:00:00Z',
+      status: 'running',
+      agentsDirOverride: agentsDir,
+    });
+
+    const correctnessNode = nodes.find(n => n.role === 'correctness')!;
+    expect(correctnessNode.endedAt).toBe('2026-01-01T00:07:00Z');
+  });
+
+  it('keeps endedAt undefined for a genuinely live reviewer', async () => {
+    // A live, non-zombie reviewer should never inherit a stoppedAt from a
+    // stale state.json — sessionAlive drives the UI in that case.
+    const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+    await mkdir(join(agentsDir, correctness), { recursive: true });
+    await writeFile(
+      join(agentsDir, correctness, 'state.json'),
+      JSON.stringify({
+        id: correctness,
+        status: 'running',
+        startedAt: '2026-01-01T00:00:00Z',
+        stoppedAt: '2026-01-01T00:05:00Z', // stale — process is actually live
+      }),
+    );
+
+    const nodes = await buildReviewerNodes({
+      issueId: ISSUE_ID,
+      projectKey: PROJECT_KEY,
+      workspacePath: WORKSPACE_PATH,
+      tmuxSessionNames: new Set([correctness]),
+      startedAt: '2026-01-01T00:00:00Z',
+      status: 'running',
+      agentsDirOverride: agentsDir,
+    });
+
+    const correctnessNode = nodes.find(n => n.role === 'correctness')!;
+    expect(correctnessNode.endedAt).toBeUndefined();
+    expect(correctnessNode.presence).toBe('active');
+  });
+
   it('hasJsonl is false when no JSONL transcript resolves', async () => {
     const nodes = await buildReviewerNodes({
       issueId: ISSUE_ID,

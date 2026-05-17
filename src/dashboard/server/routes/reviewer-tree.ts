@@ -54,6 +54,31 @@ async function detectApiError(sessionId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Read the agent's own `stoppedAt` from `~/.panopticon/agents/<sessionId>/state.json`.
+ *
+ * Used to give each reviewer node its own end timestamp instead of inheriting the
+ * parent review section's `endedAt` — sub-reviewers (correctness/security/...)
+ * routinely finish minutes before the synthesizer's parent step closes, so the
+ * parent's `endedAt` is null while the child has long stopped. Without a per-node
+ * endedAt, the frontend's `synthesizedConversation` produces
+ * `{ sessionAlive: false, endedAt: null }`, which `ConversationPanel.isSpawning`
+ * interprets as "still spawning" and renders a "Starting…" placeholder over the
+ * already-complete JSONL.
+ */
+async function readReviewerStoppedAt(
+  sessionId: string,
+  agentsRoot: string,
+): Promise<string | undefined> {
+  try {
+    const raw = await readFile(join(agentsRoot, sessionId, 'state.json'), 'utf-8');
+    const parsed = JSON.parse(raw) as { stoppedAt?: string };
+    return typeof parsed.stoppedAt === 'string' ? parsed.stoppedAt : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface ReviewerRoundSummary {
   round: number;
   status: string;
@@ -329,6 +354,20 @@ export async function buildReviewerNodes(
       // Detect API errors in live sessions (e.g. 502 unknown provider, retry exhaustion)
       const hasApiError = (isLive && !isZombie) ? await detectApiError(sessionId) : false;
 
+      // Per-reviewer endedAt: the agent's own stoppedAt from state.json, falling
+      // back to the latest round's endedAt artifact, and finally the parent's
+      // endedAt. The parent is a poor fallback because the synthesizer typically
+      // outlives the convoy children — using it leaves stopped children with
+      // endedAt=undefined while the parent is still active.
+      const ownStoppedAt = (!isLive || isZombie)
+        ? await readReviewerStoppedAt(sessionId, agentsRoot)
+        : undefined;
+      const latestRoundEndedAt = roundMetadata?.history.at(-1)?.endedAt
+        ?? roundMetadata?.history.at(-1)?.archivedAt;
+      const nodeEndedAt = (isLive && !isZombie)
+        ? opts.endedAt
+        : (ownStoppedAt ?? latestRoundEndedAt ?? opts.endedAt);
+
       let presence: SessionNodePresence;
       if (hasApiError) {
         presence = 'idle';
@@ -362,10 +401,10 @@ export async function buildReviewerNodes(
         tmuxSession: (isLive && !isZombie) ? sessionId : undefined,
         model: 'specialist',
         startedAt: opts.startedAt,
-        endedAt: opts.endedAt,
-        duration: opts.startedAt && opts.endedAt
+        endedAt: nodeEndedAt,
+        duration: opts.startedAt && nodeEndedAt
           ? (() => {
-              const ms = new Date(opts.endedAt).getTime() - new Date(opts.startedAt).getTime();
+              const ms = new Date(nodeEndedAt).getTime() - new Date(opts.startedAt).getTime();
               return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
             })()
           : null,
