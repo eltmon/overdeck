@@ -115,6 +115,7 @@ import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
+import { restoreTrackedBeadsExport } from '../../../lib/bd-mutex.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -593,6 +594,10 @@ async function getDirtyWorkspaceErrorForReviewRequest(
   workspaceInfo: WorkspaceInfo,
 ): Promise<string | null> {
   try {
+    if (!workspaceInfo.isRemote) {
+      await restoreTrackedBeadsExport(workspacePath);
+    }
+
     const statusCmd = 'git status --porcelain -uno';
     const status = workspaceInfo.isRemote && workspaceInfo.vmName
       ? (await execAsync(
