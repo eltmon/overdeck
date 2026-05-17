@@ -681,7 +681,7 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: name,
               issueId,
-              runtime: 'claude',
+              runtime: state.harness ?? 'claude-code',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'healthy' as const,
               startedAt,
@@ -716,7 +716,7 @@ const getAgentsRoute = HttpRouter.add(
               return {
                 id: name,
                 issueId,
-                runtime: 'claude',
+                runtime: state.harness ?? persistedState.harness ?? 'claude-code',
                 model: state.model || (isPlanning ? 'opus' : 'sonnet'),
                 status: 'healthy' as const,
                 startedAt: state.startedAt || persistedState.startedAt || new Date().toISOString(),
@@ -794,7 +794,7 @@ const getAgentsRoute = HttpRouter.add(
               stoppedAgents.push({
                 id: dir,
                 issueId,
-                runtime: 'claude',
+                runtime: state.harness ?? 'claude-code',
                 model: state.model || (isPlanning ? 'opus' : 'sonnet'),
                 status: 'stopped' as const,
                 startedAt: state.startedAt || new Date().toISOString(),
@@ -828,7 +828,7 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: dir,
               issueId,
-              runtime: 'claude',
+              runtime: state.harness ?? 'claude-code',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'starting' as const,
               startedAt: state.startedAt || new Date().toISOString(),
@@ -856,7 +856,7 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: dir,
               issueId,
-              runtime: 'claude',
+              runtime: state.harness ?? 'claude-code',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'error' as const,
               startedAt: state.startedAt || new Date().toISOString(),

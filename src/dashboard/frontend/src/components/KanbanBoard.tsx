@@ -848,7 +848,7 @@ export function CompactChildCard({
 
   const issueIdLower = issue.identifier.toLowerCase();
   const hasAgent = agents.some(
-    a => a.issueId?.toLowerCase() === issueIdLower && a.status !== 'dead'
+    a => a.issueId?.toLowerCase() === issueIdLower && isAgentSessionAttachable(a)
   );
 
   return (
