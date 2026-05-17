@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T15:32:40.229Z",
+  "updated": "2026-05-17T15:46:30.478Z",
   "gitState": {
     "branch": "feature/pan-1141",
-    "sha": "e291498d9",
+    "sha": "14bae360165424fce1206c5db3bd878812511a2d",
     "dirty": true
   },
   "decisions": [
@@ -128,13 +128,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-f0u6 (pan pause CLI command registered with --reason, persistent pause state, and stop-if-running behavior). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-f0u6",
+    "description": "Completed bead workspace-aape (IssueAgentCard clear-troubled action, success/error mutation handling, immediate agents-cache update, and browser verification with mocked troubled/non-troubled cards). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-aape",
     "filesToRead": [
-      "src/cli/commands/pause.ts",
-      "src/cli/index.ts",
-      "src/lib/agents.ts",
-      ".pan/spec.vbrief.json"
+      "src/dashboard/frontend/src/components/IssueAgentCard.tsx",
+      ".pan/spec.vbrief.json",
+      ".pan/continue.json"
     ]
   },
   "beadsMapping": {},
@@ -198,6 +197,12 @@
       "timestamp": "2026-05-17T15:32:40.229Z",
       "reason": "bead-complete",
       "note": "Implemented pan pause <id> with --reason support, persistent AgentState pause helper usage, stop-if-running behavior, non-zero unknown-agent errors, and CLI registration. npm run typecheck and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T15:46:30.478Z",
+      "reason": "bead-complete",
+      "note": "Implemented IssueAgentCard clear-troubled control visible only for troubled agents, POST /api/agents/:id/untroubled mutation, immediate agents cache clearing of troubled/failure fields, and failure-count tooltip. npm run typecheck and npm run lint passed. Browser verification mounted mocked troubled/non-troubled cards in Vite: troubled-only button rendered, POST fired, success alert appeared, clear button disappeared, and failure text cleared without mutating real agent state.",
       "agentModel": "gpt-5.5"
     }
   ],

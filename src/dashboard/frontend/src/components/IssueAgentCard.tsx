@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio } from 'lucide-react';
+import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio, RotateCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSharedTick } from '../lib/useSharedTick';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
@@ -17,6 +17,11 @@ export interface IssueAgent {
   model: string;
   startedAt: string;
   consecutiveFailures: number;
+  troubled?: boolean;
+  troubledAt?: string;
+  lastFailureAt?: string;
+  lastFailureReason?: string;
+  lastFailureNextRetryAt?: string;
   contextPercent?: number | null;
   initialContextPercent?: number | null;
 }
@@ -94,6 +99,17 @@ async function resumeAgent(agentId: string, message?: string): Promise<void> {
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.error || 'Failed to resume agent');
+  }
+}
+
+async function clearTroubledAgent(agentId: string): Promise<void> {
+  const res = await fetch(`/api/agents/${agentId}/untroubled`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to clear troubled state');
   }
 }
 
@@ -188,6 +204,7 @@ export function IssueAgentCard({
   const [launchModel, setLaunchModel] = useState(agent.model || defaultModel);
   const [launchHarness, setLaunchHarness] = useState<Harness>(getHarness(agent) === 'pi' ? 'pi' : 'claude-code');
   const issueId = inferIssueId(agent);
+  const now = useSharedTick();
   const { data: costData } = useAgentCost(agent.id);
   const { data: activityData } = useActivity(agent.id, health?.isRunning || health?.state === 'suspended');
 
@@ -215,6 +232,30 @@ export function IssueAgentCard({
     },
     onError: (error: Error) => {
       showAlert({ message: `Failed to resume ${agent.id}: ${error.message}`, variant: 'error' });
+    },
+  });
+
+  const clearTroubledMutation = useMutation({
+    mutationFn: () => clearTroubledAgent(agent.id),
+    onSuccess: () => {
+      queryClient.setQueryData<IssueAgent[]>(['agents'], (agents) => agents?.map((item) => (
+        item.id === agent.id
+          ? {
+              ...item,
+              troubled: false,
+              troubledAt: undefined,
+              consecutiveFailures: 0,
+              lastFailureAt: undefined,
+              lastFailureReason: undefined,
+              lastFailureNextRetryAt: undefined,
+            }
+          : item
+      )));
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      showAlert({ message: `Cleared troubled state for ${agent.id}`, variant: 'success' });
+    },
+    onError: (error: Error) => {
+      showAlert({ message: `Failed to clear troubled state for ${agent.id}: ${error.message}`, variant: 'error' });
     },
   });
 
@@ -254,6 +295,11 @@ export function IssueAgentCard({
     onSelect?.();
   };
 
+  const handleClearTroubled = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    clearTroubledMutation.mutate();
+  };
+
   const handleStart = (e: React.MouseEvent) => {
     e.stopPropagation();
     startMutation.mutate();
@@ -265,6 +311,12 @@ export function IssueAgentCard({
   };
 
   const needsPoke = health?.state === 'warning' || health?.state === 'stuck';
+  const failureTitle = [
+    `${agent.consecutiveFailures} consecutive failure${agent.consecutiveFailures === 1 ? '' : 's'}`,
+    agent.lastFailureReason ? `Last reason: ${agent.lastFailureReason}` : undefined,
+    agent.lastFailureAt ? `Last failure: ${formatRelativeTime(agent.lastFailureAt, now)}` : undefined,
+    agent.lastFailureNextRetryAt ? `Next retry: ${formatRelativeTime(agent.lastFailureNextRetryAt, now)}` : undefined,
+  ].filter(Boolean).join('\n');
 
   const toggleHandoffPanel = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -351,7 +403,7 @@ export function IssueAgentCard({
               <LiveLastHeard lastActivity={health.lastActivity} />
             )}
             {agent.consecutiveFailures > 0 && (
-              <div className="flex items-center gap-1 text-sm text-warning-foreground">
+              <div className="flex items-center gap-1 text-sm text-warning-foreground" title={failureTitle}>
                 <AlertTriangle className="w-4 h-4" />
                 {agent.consecutiveFailures} failures
               </div>
@@ -404,6 +456,19 @@ export function IssueAgentCard({
                 title="Poke agent (send nudge message)"
               >
                 <Bell className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Clear troubled state - only for troubled agents */}
+            {agent.troubled === true && (
+              <button
+                onClick={handleClearTroubled}
+                disabled={clearTroubledMutation.isPending}
+                className="p-2 text-muted-foreground hover:text-success hover:bg-card rounded disabled:opacity-50"
+                title={failureTitle ? `Clear troubled state\n${failureTitle}` : 'Clear troubled state'}
+                data-testid="issue-agent-card-clear-troubled"
+              >
+                <RotateCcw className="w-4 h-4" />
               </button>
             )}
 
