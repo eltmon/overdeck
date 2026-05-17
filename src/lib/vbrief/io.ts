@@ -178,7 +178,7 @@ export function applyStatusOverrides(doc: VBriefDocument, overrides: Record<stri
       const itemId = key.slice(0, dotIndex);
       const subId = key.slice(dotIndex + 1);
       const item = merged.plan.items.find(i => i.id === itemId);
-      const sub = item?.subItems?.find(s => s.id === subId);
+      const sub = item?.subItems?.find(s => s.id === subId || s.id === key);
       if (sub) {
         sub.status = status as VBriefItemStatus;
         if (status === 'completed' && !sub.completed) {
