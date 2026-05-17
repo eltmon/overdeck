@@ -1328,10 +1328,16 @@ const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
       return jsonResponse({ error: `Invalid issue ID: ${invalid.issueId}` }, { status: 400 });
     }
 
-    const entries = yield* Effect.promise(() => Promise.all(parsedIds.map(async ({ issueId, parsed }) => {
+    const entries = yield* Effect.promise(() => Promise.all(parsedIds.map(async ({ parsed }) => {
       const normalizedIssueId = parsed!.raw.toUpperCase();
-      const workspaceInfo = getWorkspaceInfoForIssue(normalizedIssueId);
-      if (workspaceInfo.isRemote) {
+      const workspaceMetadata = (() => {
+        try {
+          return loadWorkspaceMetadata(normalizedIssueId);
+        } catch {
+          return null;
+        }
+      })();
+      if (workspaceMetadata?.location === 'remote') {
         return [normalizedIssueId, { exists: true, issueId: normalizedIssueId, location: 'remote', isRemote: true }] as const;
       }
 
