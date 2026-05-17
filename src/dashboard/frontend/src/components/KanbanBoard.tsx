@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef, createContext, useContext } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, createContext, useContext, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAgentList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
@@ -104,6 +104,14 @@ function LiveLastHeardBadge({ lastActivity }: { lastActivity?: string }) {
 // Shared one-second tick for all KanbanBoard child components (eliminates
 // N independent setInterval timers when many agent cards are visible).
 const KanbanTickContext = createContext<number>(Date.now());
+function KanbanTickProvider({ children }: { children: ReactNode }) {
+  const [kanbanTick, setKanbanTick] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setKanbanTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return <KanbanTickContext.Provider value={kanbanTick}>{children}</KanbanTickContext.Provider>;
+}
 function useKanbanTick() {
   return useContext(KanbanTickContext);
 }
@@ -1143,13 +1151,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   // Rally feature expand/collapse state (lifted from ColumnContent for expand/collapse all)
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
 
-  // Shared one-second tick for all child badges (eliminates per-badge intervals)
-  const [kanbanTick, setKanbanTick] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setKanbanTick(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
   const toggleFeature = useCallback((featureId: string) => {
     setCollapsedFeatures(prev => {
       const next = new Set(prev);
@@ -1657,7 +1658,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   const stackHealthByIssue = useWorkspaceStackHealthQuery(kanbanIssueIds).data?.workspaces ?? {};
 
   return (
-    <KanbanTickContext.Provider value={kanbanTick}>
+    <KanbanTickProvider>
     <div className="space-y-4">
       {/* Filter bar */}
       <div className="flex flex-col gap-2">
@@ -2029,7 +2030,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         onClose={handleCloseProgress}
       />
     </div>
-    </KanbanTickContext.Provider>
+    </KanbanTickProvider>
   );
 }
 
