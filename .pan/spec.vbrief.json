@@ -1085,7 +1085,7 @@
       {
         "id": "docs-updates",
         "title": "Documentation updates",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -1101,28 +1101,32 @@
           {
             "id": "docs-updates.ac1",
             "title": "CLAUDE.md and any relevant docs/* references describe the three new gates",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:52:31.418Z"
           },
           {
             "id": "docs-updates.ac2",
             "title": "README or docs include a 'troubleshooting an agent that keeps crashing' note that mentions `pan untroubled`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:52:31.418Z"
           },
           {
             "id": "docs-updates.ac3",
             "title": "`docs/SKILLS-CONVENTION.md` exclusion list is unchanged or explicitly notes that pan-pause/unpause/untroubled have wrapper skills",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:52:31.418Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T16:52:31.418Z"
       }
     ],
     "edges": [
