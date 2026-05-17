@@ -2,12 +2,12 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 
-interface NoResumeMode {
+export interface NoResumeMode {
   active: boolean;
   since: string | null;
 }
 
-const NO_RESUME_QUERY_KEY = ['no-resume-mode'] as const;
+export const NO_RESUME_QUERY_KEY = ['no-resume-mode'] as const;
 
 async function fetchNoResumeMode(): Promise<NoResumeMode> {
   const res = await fetch('/api/no-resume-mode');

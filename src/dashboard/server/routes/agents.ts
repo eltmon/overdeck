@@ -1417,12 +1417,13 @@ const postAgentPauseRoute = HttpRouter.add(
     }
 
     const previousStatus = toAgentStatusPayload(stateBeforePause.status);
-    let updatedState = yield* Effect.promise(() => setAgentPausedAsync(id, reason));
+    const hasLiveSession = yield* Effect.promise(() => sessionExistsAsync(id));
+    const stoppedByPause = hasLiveSession || stateBeforePause.status === 'running' || stateBeforePause.status === 'starting';
+    let updatedState = yield* Effect.promise(() => setAgentPausedAsync(id, reason, stoppedByPause));
     if (!updatedState) {
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
 
-    const hasLiveSession = yield* Effect.promise(() => sessionExistsAsync(id));
     if (hasLiveSession) {
       yield* Effect.promise(() => captureAgentOutputBeforeKill(id));
       yield* Effect.promise(() => killSessionAsync(id));

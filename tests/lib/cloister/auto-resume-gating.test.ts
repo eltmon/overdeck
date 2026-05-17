@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -200,8 +200,9 @@ describe('auto-resume gates', () => {
     }));
 
     const agents = await import('../../../src/lib/agents.js');
+    const lifecycle = await import('../../../src/lib/work-agent-lifecycle.js');
     const start = await import('../../../src/cli/commands/start.js');
-    return { agents, issueCommand: start.issueCommand };
+    return { agents, issueCommand: start.issueCommand, assertCanStartFresh: lifecycle.assertCanStartFresh };
   }
 
   it('skips paused agents even when review feedback is pending', async () => {
@@ -226,6 +227,64 @@ describe('auto-resume gates', () => {
 
     expect(resumed).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
+  });
+
+  it('auto-resumes unpaused agents stopped by pause', async () => {
+    const agentId = 'agent-pan-1141-paused-stop';
+    resumeAgentMock.mockResolvedValue({ success: true });
+    const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
+    agents.saveAgentState({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: workspaceFor(agentId),
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: BASE_TIME.toISOString(),
+      stoppedByUser: true,
+      stoppedByPause: true,
+      paused: true,
+      pausedReason: 'manual inspection',
+      pausedAt: BASE_TIME.toISOString(),
+    });
+
+    agents.clearAgentPaused(agentId);
+    const resumed = await autoResumeStoppedWorkAgents();
+
+    expect(resumed).toEqual([agentId]);
+    expect(resumeAgentMock).toHaveBeenCalledWith(agentId);
+    const state = agents.getAgentState(agentId);
+    expect(state?.paused).toBeUndefined();
+    expect(state?.stoppedByPause).toBeUndefined();
+    expect(state?.stoppedByUser).toBeUndefined();
+  });
+
+  it('keeps manual-stop intent when unpausing an agent not stopped by pause', async () => {
+    const agentId = 'agent-pan-1141-paused-killed';
+    resumeAgentMock.mockResolvedValue({ success: true });
+    const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
+    agents.saveAgentState({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: workspaceFor(agentId),
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: BASE_TIME.toISOString(),
+      stoppedByUser: true,
+      paused: true,
+      pausedReason: 'manual inspection',
+      pausedAt: BASE_TIME.toISOString(),
+    });
+
+    agents.clearAgentPaused(agentId);
+    const resumed = await autoResumeStoppedWorkAgents();
+
+    expect(resumed).toEqual([]);
+    expect(resumeAgentMock).not.toHaveBeenCalled();
+    expect(agents.getAgentState(agentId)?.stoppedByUser).toBe(true);
   });
 
   it('skips troubled agents', async () => {
@@ -287,6 +346,45 @@ describe('auto-resume gates', () => {
     expect(recovered).toEqual([]);
     expect(resumeAgentMock).not.toHaveBeenCalled();
     expect(agents.getAgentState(runningAgentId)?.status).toBe('running');
+  });
+
+  it('clears paused state and spawns when pan start --force is not a dry run', async () => {
+    const { agents, issueCommand, assertCanStartFresh } = await loadStartCommand();
+    const agentId = 'agent-pan-1141';
+    vi.mocked(assertCanStartFresh).mockImplementation((_id, options?: { allowPausedForce?: boolean }) => {
+      if (options?.allowPausedForce !== true) {
+        throw new Error('lifecycle guard blocked');
+      }
+      return {} as ReturnType<typeof assertCanStartFresh>;
+    });
+    mkdirSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.beads'), { recursive: true });
+    writeFileSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.beads', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
+    agents.saveAgentState({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: join(projectRoot, 'workspaces', 'feature-pan-1141'),
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: BASE_TIME.toISOString(),
+      stoppedByUser: true,
+      stoppedByPause: true,
+      paused: true,
+      pausedReason: 'manual inspection',
+      pausedAt: BASE_TIME.toISOString(),
+    });
+
+    await issueCommand('PAN-1141', { model: '', force: true } as any);
+
+    expect(assertCanStartFresh).toHaveBeenCalledWith('PAN-1141', { allowPausedForce: true });
+    expect(agents.spawnAgent).toHaveBeenCalled();
+    const state = agents.getAgentState(agentId);
+    expect(state?.paused).toBeUndefined();
+    expect(state?.pausedReason).toBeUndefined();
+    expect(state?.pausedAt).toBeUndefined();
+    expect(state?.stoppedByPause).toBeUndefined();
+    expect(state?.stoppedByUser).toBeUndefined();
   });
 
   it('keeps paused state when pan start --force is only a dry run', async () => {

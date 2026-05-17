@@ -20,7 +20,7 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
   const wasRunning = sessionExists(agentId);
 
   try {
-    setAgentPaused(agentId, options.reason);
+    setAgentPaused(agentId, options.reason, wasRunning || state.status === 'running' || state.status === 'starting');
     if (wasRunning) {
       stopAgent(agentId);
     }

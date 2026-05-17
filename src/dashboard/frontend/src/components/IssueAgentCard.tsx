@@ -8,6 +8,7 @@ import { HandoffPanel } from './HandoffPanel';
 import { useConfirm, useAlert } from './DialogProvider';
 import { getHarness } from '@panctl/contracts';
 import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
+import { NO_RESUME_QUERY_KEY, type NoResumeMode } from './NoResumeBanner';
 
 export interface IssueAgent {
   id: string;
@@ -161,25 +162,6 @@ function inferIssueId(agent: IssueAgent): string | undefined {
   return agent.id.match(/[A-Z][A-Z0-9]*-\d+/)?.[0];
 }
 
-interface NoResumeMode {
-  active: boolean;
-  since: string | null;
-}
-
-async function fetchNoResumeMode(): Promise<NoResumeMode> {
-  const res = await fetch('/api/no-resume-mode');
-  if (!res.ok) return { active: false, since: null };
-  return res.json();
-}
-
-function useNoResumeMode() {
-  return useQuery({
-    queryKey: ['no-resume-mode'],
-    queryFn: fetchNoResumeMode,
-    refetchInterval: 10000,
-  });
-}
-
 interface ActivityEntry {
   ts: string;
   tool: string;
@@ -257,7 +239,7 @@ export function IssueAgentCard({
   const [launchHarness, setLaunchHarness] = useState<Harness>(getHarness(agent) === 'pi' ? 'pi' : 'claude-code');
   const issueId = inferIssueId(agent);
   const now = useSharedTick();
-  const { data: noResumeMode } = useNoResumeMode();
+  const noResumeMode = queryClient.getQueryData<NoResumeMode>(NO_RESUME_QUERY_KEY);
   const { data: costData } = useAgentCost(agent.id);
   const { data: activityData } = useActivity(agent.id, health?.isRunning || health?.state === 'suspended');
 

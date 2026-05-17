@@ -546,6 +546,7 @@ export interface AgentState {
    *  resume. Read by deacon's autoResumeStoppedWorkAgents to distinguish a
    *  deliberate stop from a crash/orphan. */
   stoppedByUser?: boolean;
+  stoppedByPause?: boolean;
   paused?: boolean;
   pausedReason?: string;
   pausedAt?: string;
@@ -622,6 +623,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     lastActivity: raw.lastActivity,
     stoppedAt: raw.stoppedAt,
     stoppedByUser: raw.stoppedByUser,
+    stoppedByPause: raw.stoppedByPause,
     paused: raw.paused,
     pausedReason: raw.pausedReason,
     pausedAt: raw.pausedAt,
@@ -749,11 +751,14 @@ function clearFailureTrackingFields(state: AgentState): void {
 }
 
 /** Sets the persistent manual pause gate used before stopping or suppressing resume. */
-function applyAgentPaused(state: AgentState, reason?: string): void {
+function applyAgentPaused(state: AgentState, reason?: string, stoppedByPause = false): void {
   if (!state.paused) {
     state.pausedAt = new Date().toISOString();
   }
   state.paused = true;
+  if (stoppedByPause) {
+    state.stoppedByPause = true;
+  }
   if (reason === undefined) {
     delete state.pausedReason;
   } else {
@@ -762,26 +767,30 @@ function applyAgentPaused(state: AgentState, reason?: string): void {
 }
 
 /** Sets the persistent manual pause gate used before stopping or suppressing resume. */
-export function setAgentPaused(agentId: string, reason?: string): boolean {
+export function setAgentPaused(agentId: string, reason?: string, stoppedByPause = false): boolean {
   const state = getAgentState(agentId);
   if (!state) return false;
 
-  applyAgentPaused(state, reason);
+  applyAgentPaused(state, reason, stoppedByPause);
   saveAgentState(state);
   return true;
 }
 
 /** Sets the persistent manual pause gate using async filesystem operations. */
-export async function setAgentPausedAsync(agentId: string, reason?: string): Promise<AgentState | null> {
+export async function setAgentPausedAsync(agentId: string, reason?: string, stoppedByPause = false): Promise<AgentState | null> {
   const state = await getAgentStateAsync(agentId);
   if (!state) return null;
 
-  applyAgentPaused(state, reason);
+  applyAgentPaused(state, reason, stoppedByPause);
   await saveAgentStateAsync(state);
   return state;
 }
 
 function applyAgentUnpaused(state: AgentState): void {
+  if (state.stoppedByPause === true) {
+    delete state.stoppedByUser;
+  }
+  delete state.stoppedByPause;
   delete state.paused;
   delete state.pausedReason;
   delete state.pausedAt;

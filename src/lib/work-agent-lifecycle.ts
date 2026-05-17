@@ -117,9 +117,16 @@ export function getWorkAgentLifecycleState(agentOrIssueId: string): WorkAgentLif
   };
 }
 
-export function assertCanStartFresh(agentOrIssueId: string): WorkAgentLifecycleState {
+interface StartFreshOptions {
+  allowPausedForce?: boolean;
+}
+
+export function assertCanStartFresh(agentOrIssueId: string, options: StartFreshOptions = {}): WorkAgentLifecycleState {
   const lifecycle = getWorkAgentLifecycleState(agentOrIssueId);
-  if (!lifecycle.canStartFresh) {
+  const pausedForceOverride = options.allowPausedForce === true
+    && lifecycle.requiresSessionResetBeforeFreshStart
+    && getAgentState(lifecycle.agentId)?.paused === true;
+  if (!lifecycle.canStartFresh && !pausedForceOverride) {
     throw new Error(lifecycle.reason || `Cannot start fresh for ${lifecycle.agentId}`);
   }
   return lifecycle;

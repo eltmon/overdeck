@@ -741,7 +741,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Refuse fresh start when a resumable session already exists.
     // Users must choose resume or reset-session explicitly.
     try {
-      assertCanStartFresh(id);
+      assertCanStartFresh(id, { allowPausedForce: shouldClearPauseAfterSpawn });
     } catch (error) {
       if (workspacePath || isRemote) {
         throw error;
