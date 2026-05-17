@@ -8,6 +8,7 @@ import type { ProjectConfig } from '../../projects.js';
 import {
   evaluateWorkspaceStackHealth,
   getWorkspaceStackHealth,
+  inferIssueIdFromStackContainerName,
   recordWorkspaceStackHealthTransition,
   resetWorkspaceStackHealthTransitionsForTests,
   type DockerContainerLifecycle,
@@ -85,6 +86,24 @@ describe('evaluateWorkspaceStackHealth', () => {
 
     expect(health.healthy).toBe(true);
     expect(health.reasons).toEqual([]);
+  });
+
+  it('does not match overlapping issue IDs by substring', () => {
+    const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [
+      container({
+        name: 'panopticon-feature-pan-11400-init-1',
+        status: 'Exited (1) 3 minutes ago',
+        state: 'exited',
+      }),
+    ], { now });
+
+    expect(health.healthy).toBe(true);
+    expect(health.reasons).toEqual([]);
+  });
+
+  it('infers issue IDs from workspace stack container names', () => {
+    expect(inferIssueIdFromStackContainerName('panopticon-feature-pan-1140-init-1')).toBe('PAN-1140');
+    expect(inferIssueIdFromStackContainerName('panopticon-feature-pan-11400-init-1')).toBe('PAN-11400');
   });
 
   it('uses the cached Docker lifecycle snapshot when containers are omitted', async () => {

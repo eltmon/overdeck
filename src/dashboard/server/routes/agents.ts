@@ -1755,6 +1755,12 @@ const postAgentsRoute = HttpRouter.add(
   'POST',
   '/api/agents',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
+    }
+
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const lifecycle = yield* IssueLifecycle;

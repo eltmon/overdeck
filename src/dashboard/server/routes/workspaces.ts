@@ -1419,7 +1419,7 @@ const getWorkspaceRoute = HttpRouter.add(
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
-          getWorkspaceStackHealth(issueId, { emitTransitionActivity: true }),
+          getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true }),
           getMrUrlAsync(issueId, workspacePath),
           listSessionNamesAsync(),
           capturePaneAsync(agentSession, 50).catch(() => ''),

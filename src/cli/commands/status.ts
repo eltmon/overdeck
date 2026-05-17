@@ -4,12 +4,20 @@ import { join, basename } from 'path';
 import { listRunningAgents, getAgentDir } from '../../lib/agents.js';
 import { isShadowed, getShadowState } from '../../lib/shadow-state.js';
 import { getTldrMetrics, getTldrDaemonService } from '../../lib/tldr-daemon.js';
-import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../lib/workspace/stack-health.js';
+import {
+  collectDockerContainerLifecycleSnapshot,
+  getWorkspaceStackHealth,
+  inferIssueIdFromStackContainerName,
+} from '../../lib/workspace/stack-health.js';
 
 interface StatusOptions {
   json?: boolean;
   tldr?: boolean;
   context?: boolean;
+}
+
+function issueKey(issueId: string): string {
+  return issueId.toUpperCase();
 }
 
 export function readContextPercent(agentId: string): number | null {
@@ -36,12 +44,26 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     agent.id && agent.issueId && agent.workspace
   );
   const dockerContainers = await collectDockerContainerLifecycleSnapshot();
+  const issueIds = new Map<string, string>();
+  for (const agent of agents) {
+    issueIds.set(issueKey(agent.issueId!), agent.issueId!);
+  }
+  for (const container of dockerContainers) {
+    const issueId = inferIssueIdFromStackContainerName(container.name);
+    if (issueId) issueIds.set(issueKey(issueId), issueId);
+  }
+
   const stackHealthByIssue = new Map(await Promise.all(
-    agents.map(async agent => [
-      agent.issueId!,
-      await getWorkspaceStackHealth(agent.issueId!, { containers: dockerContainers }),
+    Array.from(issueIds, async ([key, issueId]) => [
+      key,
+      await getWorkspaceStackHealth(issueId, { containers: dockerContainers }),
     ] as const)
   ));
+  const agentIssueKeys = new Set(agents.map(agent => issueKey(agent.issueId!)));
+  const brokenStacksWithoutAgent = Array.from(issueIds)
+    .filter(([key]) => !agentIssueKeys.has(key))
+    .map(([key, issueId]) => ({ issueId, stackHealth: stackHealthByIssue.get(key) }))
+    .filter((entry): entry is { issueId: string; stackHealth: NonNullable<typeof entry.stackHealth> } => Boolean(entry.stackHealth && !entry.stackHealth.healthy));
 
   if (options.json) {
     // Add shadow mode info and optional context % to JSON output
@@ -53,7 +75,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
         shadowMode: shadowed,
         shadowStatus: shadowState?.shadowStatus,
         trackerStatus: shadowState?.trackerStatus,
-        stackHealth: agent.issueId ? stackHealthByIssue.get(agent.issueId) : undefined,
+        stackHealth: agent.issueId ? stackHealthByIssue.get(issueKey(agent.issueId)) : undefined,
         ...(options.context ? { contextPercent: readContextPercent(agent.id) } : {}),
       };
     }));
@@ -61,13 +83,15 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     return;
   }
 
-  if (agents.length === 0) {
+  if (agents.length === 0 && brokenStacksWithoutAgent.length === 0) {
     console.log(chalk.dim('No running agents.'));
     console.log(chalk.dim('Use "pan start <id>" to spawn one.'));
     return;
   }
 
-  console.log(chalk.bold('\nRunning Agents\n'));
+  if (agents.length > 0) {
+    console.log(chalk.bold('\nRunning Agents\n'));
+  }
 
   for (const agent of agents) {
     const statusColor = agent.tmuxActive ? chalk.green : chalk.red;
@@ -101,7 +125,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     console.log(`  Duration: ${duration} min`);
     console.log(`  Workspace: ${chalk.dim(agent.workspace)}`);
 
-    const stackHealth = agent.issueId ? stackHealthByIssue.get(agent.issueId) : undefined;
+    const stackHealth = agent.issueId ? stackHealthByIssue.get(issueKey(agent.issueId)) : undefined;
     if (stackHealth && !stackHealth.healthy) {
       console.log(`  Stack:    ${chalk.red('STACK BROKEN')} ${stackHealth.reasons.join('; ')}`);
     }
@@ -117,6 +141,15 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     } catch { /* non-fatal — workspace may not have TLDR */ }
 
     console.log('');
+  }
+
+  if (brokenStacksWithoutAgent.length > 0) {
+    console.log(chalk.bold('Broken Workspace Stacks\n'));
+    for (const { issueId, stackHealth } of brokenStacksWithoutAgent) {
+      console.log(`${chalk.cyan(issueId)}`);
+      console.log(`  Stack:    ${chalk.red('STACK BROKEN')} ${stackHealth.reasons.join('; ')}`);
+      console.log('');
+    }
   }
 
   // Show legend

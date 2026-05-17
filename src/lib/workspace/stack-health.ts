@@ -5,6 +5,7 @@ import { emitActivityEntry } from '../activity-logger.js';
 import {
   getCachedDockerContainerLifecycleObservedAt,
   getCachedDockerContainerLifecycleSnapshot,
+  recordDockerContainerLifecycleSnapshot,
   type DockerContainerLifecycle,
 } from '../docker-stats.js';
 import { parseIssueId } from '../issue-id.js';
@@ -58,10 +59,27 @@ function hasDockerWorkspace(projectConfig: WorkspaceStackProject | null | undefi
   return Boolean(projectConfig?.workspace?.docker?.compose_template);
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function hasNameToken(name: string, token: string): boolean {
+  return new RegExp(`(^|[-_])${escapeRegExp(token)}($|[-_])`).test(name);
+}
+
+export function inferIssueIdFromStackContainerName(name: string): string | null {
+  const lower = name.toLowerCase();
+  const standard = lower.match(/(?:^|[-_])feature-([a-z]+-\d+)(?=$|[-_])/) ?? lower.match(/(?:^|[-_])([a-z]+-\d+)(?=$|[-_])/);
+  if (standard?.[1]) return standard[1].toUpperCase();
+
+  const rally = lower.match(/(?:^|[-_])feature-((?:f|us|de|ta|tc)\d+)(?=$|[-_])/) ?? lower.match(/(?:^|[-_])((?:f|us|de|ta|tc)\d+)(?=$|[-_])/);
+  return rally?.[1]?.toUpperCase() ?? null;
+}
+
 function isStackContainer(container: DockerContainerLifecycle, issueId: string): boolean {
   const normalized = normalizeIssue(issueId);
   const name = container.name.toLowerCase();
-  return name.includes(`feature-${normalized}`) || name.includes(normalized);
+  return hasNameToken(name, `feature-${normalized}`) || hasNameToken(name, normalized);
 }
 
 function isInitContainer(name: string): boolean {
@@ -159,14 +177,27 @@ export async function getWorkspaceStackHealth(
   options: WorkspaceStackHealthOptions = {},
 ): Promise<WorkspaceStackHealth> {
   const projectConfig = options.projectConfig ?? resolveStackProject(issueId);
-  const cachedObservedAt = getCachedDockerContainerLifecycleObservedAt();
-  const containers = options.containers ?? getCachedDockerContainerLifecycleSnapshot();
+  let observedAt: string | null = null;
+  let containers = options.containers;
+
+  if (!containers) {
+    observedAt = getCachedDockerContainerLifecycleObservedAt();
+    containers = observedAt ? getCachedDockerContainerLifecycleSnapshot() : undefined;
+  }
+
+  if (!containers) {
+    const observed = options.now ?? new Date();
+    containers = await collectDockerContainerLifecycleSnapshot();
+    observedAt = observed.toISOString();
+    recordDockerContainerLifecycleSnapshot(containers, observedAt);
+  }
+
   const health = evaluateWorkspaceStackHealth(issueId, projectConfig, containers, {
     now: options.now,
     stuckCreatedThresholdMs: options.stuckCreatedThresholdMs,
   });
-  const observedHealth = cachedObservedAt && !options.now
-    ? { ...health, lastObserved: cachedObservedAt }
+  const observedHealth = observedAt && !options.now
+    ? { ...health, lastObserved: observedAt }
     : health;
 
   if (options.emitTransitionActivity) {
