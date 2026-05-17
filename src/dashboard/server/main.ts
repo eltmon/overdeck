@@ -38,6 +38,7 @@ import { resumeSwarmAutoAdvanceLoopOnStartup } from './routes/swarm.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
 import { startTranscriptPoller, stopTranscriptPoller, syncTranscriptPollerRegistry } from '../../lib/memory/poller.js';
+import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../../lib/memory/reconciliation.js';
 
 declare const Bun: unknown;
 
@@ -329,12 +330,22 @@ void startTtsSummarizer().catch(err => console.warn('[tts-summarizer] start fail
 void startTtsPlayback().catch(err => console.warn('[tts-playback] start failed:', err));
 
 void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] initial registry sync failed:', err?.message ?? err));
+void reconcileStaleTranscriptCheckpoints({ log: (message) => console.log(message) })
+  .catch(err => console.warn('[memory-reconciliation] startup sweep failed:', err?.message ?? err));
 startTranscriptPoller();
 console.log('[panopticon] Memory transcript poller started');
 
 void (async () => {
   const store = await initEventStore();
   store.subscribe((event) => {
+    if (event.type === 'agent.stopped') {
+      const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
+        ? (event.payload as { agentId: string }).agentId
+        : null;
+      if (agentId) {
+        void reconcileAgentMemory(agentId).catch(err => console.warn('[memory-reconciliation] agent sweep failed:', err?.message ?? err));
+      }
+    }
     if (event.type === 'agent.started' || event.type === 'agent.stopped') {
       void syncTranscriptPollerRegistry().catch(err => console.warn('[memory-poller] lifecycle registry sync failed:', err?.message ?? err));
     }

@@ -120,6 +120,28 @@ export function claimTranscriptRange(input: ClaimTranscriptRangeInput): ClaimTra
   };
 }
 
+export function listTranscriptCheckpoints(limit = 100): TranscriptCheckpoint[] {
+  const rows = getDatabase()
+    .prepare(`
+      SELECT
+        session_id,
+        project_id,
+        workspace_id,
+        issue_id,
+        transcript_path,
+        last_offset,
+        last_observation_at,
+        last_mid_turn_at,
+        mid_turn_count_in_current_turn,
+        updated_at
+      FROM transcript_checkpoints
+      ORDER BY updated_at ASC
+      LIMIT ?
+    `)
+    .all(Math.max(0, Math.floor(limit))) as TranscriptCheckpointRow[];
+  return rows.map(rowToCheckpoint);
+}
+
 export function getTranscriptCheckpoint(sessionId: string): TranscriptCheckpoint | null {
   const row = getDatabase()
     .prepare(`
