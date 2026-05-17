@@ -1,3 +1,7 @@
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -88,11 +92,18 @@ describe('evaluateWorkspaceStackHealth', () => {
     expect(health.reasons).toEqual([]);
   });
 
-  it('marks a Docker workspace unhealthy when no stack containers are observed', () => {
-    const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [], { now });
+  it('marks a Docker workspace unhealthy when no expected stack containers are observed', () => {
+    const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [], { now, stackExpected: true });
 
     expect(health.healthy).toBe(false);
     expect(health.reasons).toEqual(['No Docker containers found for workspace stack pan-1140']);
+  });
+
+  it('allows a Docker workspace before its stack has been created', () => {
+    const health = evaluateWorkspaceStackHealth('PAN-1140', dockerProject, [], { now, stackExpected: false });
+
+    expect(health.healthy).toBe(true);
+    expect(health.reasons).toEqual([]);
   });
 
   it('does not match overlapping issue IDs by substring', () => {
@@ -129,6 +140,49 @@ describe('evaluateWorkspaceStackHealth', () => {
       reasons: ['panopticon-feature-pan-1140-init-1 init exited non-zero (1)'],
       lastObserved: '2026-05-16T23:01:00.000Z',
     });
+  });
+
+  it('allows a missing stack when the workspace has not rendered devcontainer state', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'pan-stack-health-'));
+    try {
+      const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1140');
+      mkdirSync(workspacePath, { recursive: true });
+
+      const health = await getWorkspaceStackHealth('PAN-1140', {
+        projectConfig: { ...dockerProject, path: projectRoot },
+        containers: [],
+        now,
+      });
+
+      expect(health).toEqual({
+        healthy: true,
+        reasons: [],
+        lastObserved: now.toISOString(),
+      });
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('marks a missing stack unhealthy after devcontainer state exists', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'pan-stack-health-'));
+    try {
+      mkdirSync(join(projectRoot, 'workspaces', 'feature-pan-1140', '.devcontainer'), { recursive: true });
+
+      const health = await getWorkspaceStackHealth('PAN-1140', {
+        projectConfig: { ...dockerProject, path: projectRoot },
+        containers: [],
+        now,
+      });
+
+      expect(health).toEqual({
+        healthy: false,
+        reasons: ['No Docker containers found for workspace stack pan-1140'],
+        lastObserved: now.toISOString(),
+      });
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 
   it('emits only on healthy to unhealthy transitions', () => {

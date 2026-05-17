@@ -2088,7 +2088,7 @@ const postAgentsRoute = HttpRouter.add(
       throw err;
     }
 
-    const stackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig }));
+    const stackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, stackExpected: false }));
     if (!stackHealth.healthy) {
       yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_stack_unhealthy', {
         issueId,

@@ -30,6 +30,7 @@ services:
     environment:
       - NODE_ENV=development
       - HUSKY=0
+      - PANOPTICON_SKIP_NATIVE_POSTINSTALL=1
     command: >
       sh -c "
         echo 'Installing dependencies...' &&

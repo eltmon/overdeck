@@ -1,4 +1,6 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { emitActivityEntry } from '../activity-logger.js';
@@ -24,7 +26,8 @@ export interface WorkspaceStackHealth {
 }
 
 export interface WorkspaceStackProject {
-  workspace?: { docker?: { compose_template?: string } };
+  path?: string;
+  workspace?: { workspaces_dir?: string; docker?: { compose_template?: string } };
 }
 
 export interface WorkspaceStackHealthOptions {
@@ -33,6 +36,8 @@ export interface WorkspaceStackHealthOptions {
   now?: Date;
   stuckCreatedThresholdMs?: number;
   emitTransitionActivity?: boolean;
+  workspacePath?: string;
+  stackExpected?: boolean;
 }
 
 interface DockerPsJson {
@@ -57,6 +62,25 @@ function resolveStackProject(issueId: string): WorkspaceStackProject | null {
 
 function hasDockerWorkspace(projectConfig: WorkspaceStackProject | null | undefined): boolean {
   return Boolean(projectConfig?.workspace?.docker?.compose_template);
+}
+
+function defaultWorkspacePath(issueId: string, projectConfig: WorkspaceStackProject | null | undefined): string | null {
+  if (!projectConfig?.path) return null;
+  return join(
+    projectConfig.path,
+    projectConfig.workspace?.workspaces_dir ?? 'workspaces',
+    `feature-${normalizeIssue(issueId)}`,
+  );
+}
+
+function isWorkspaceStackExpected(
+  issueId: string,
+  projectConfig: WorkspaceStackProject | null | undefined,
+  workspacePath?: string,
+): boolean {
+  const resolvedWorkspacePath = workspacePath ?? defaultWorkspacePath(issueId, projectConfig);
+  if (!resolvedWorkspacePath) return true;
+  return existsSync(join(resolvedWorkspacePath, '.devcontainer'));
 }
 
 function escapeRegExp(value: string): string {
@@ -110,7 +134,7 @@ export function evaluateWorkspaceStackHealth(
   issueId: string,
   projectConfig: WorkspaceStackProject | null | undefined,
   containers: DockerContainerLifecycle[],
-  options: { now?: Date; stuckCreatedThresholdMs?: number } = {},
+  options: { now?: Date; stuckCreatedThresholdMs?: number; stackExpected?: boolean } = {},
 ): WorkspaceStackHealth {
   const now = options.now ?? new Date();
   const lastObserved = now.toISOString();
@@ -122,7 +146,7 @@ export function evaluateWorkspaceStackHealth(
   const stackContainers = containers.filter((container) => isStackContainer(container, issueId));
   const reasons: string[] = [];
 
-  if (stackContainers.length === 0) {
+  if (stackContainers.length === 0 && options.stackExpected !== false) {
     reasons.push(`No Docker containers found for workspace stack ${normalizeIssue(issueId)}`);
   }
 
@@ -203,6 +227,7 @@ export async function getWorkspaceStackHealth(
   const health = evaluateWorkspaceStackHealth(issueId, projectConfig, containers, {
     now: options.now,
     stuckCreatedThresholdMs: options.stuckCreatedThresholdMs,
+    stackExpected: options.stackExpected ?? isWorkspaceStackExpected(issueId, projectConfig, options.workspacePath),
   });
   const observedHealth = observedAt && !options.now
     ? { ...health, lastObserved: observedAt }
