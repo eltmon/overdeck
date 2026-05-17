@@ -1291,7 +1291,6 @@ export async function getContainersReferencingWorkspacePath(
  */
 export async function stopWorkspaceDocker(
   workspacePath: string,
-  projectName: string,
   featureName: string,
 ): Promise<DockerCleanupResult> {
   const result: DockerCleanupResult = {
@@ -1327,7 +1326,8 @@ export async function stopWorkspaceDocker(
     }
   }
 
-  const composeProjectName = `${projectName}-feature-${featureName}`;
+  const featureFolder = `feature-${featureName}`;
+  const composeProjectName = `panopticon-${featureFolder}`;
   const devScriptPaths = [
     join(workspacePath, DEVCONTAINER_DIRNAME, 'dev'),
     join(workspacePath, 'dev'),
@@ -1336,7 +1336,6 @@ export async function stopWorkspaceDocker(
     try {
       if (!existsSync(devPath)) continue;
       const content = readFileSync(devPath, 'utf-8');
-      const featureFolder = `feature-${featureName}`;
       const templatedMatch = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
       const declared = templatedMatch
         ? `${templatedMatch[1]}${featureFolder}`
@@ -1448,7 +1447,7 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   }
 
   // Stop Docker containers and clean up Docker-created files
-  const dockerResult = await stopWorkspaceDocker(workspacePath, projectConfig.name || 'workspace', featureName);
+  const dockerResult = await stopWorkspaceDocker(workspacePath, featureName);
   result.steps.push(...dockerResult.steps);
 
   // Remove worktrees

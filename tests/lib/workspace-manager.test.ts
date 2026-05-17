@@ -3,6 +3,26 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'fs'
 import { join } from 'path';
 import { tmpdir } from 'os';
 
+const { mockExecAsync } = vi.hoisted(() => ({
+  mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+}));
+
+vi.mock('child_process', async () => {
+  const actual = await vi.importActual<typeof import('child_process')>('child_process');
+  return {
+    ...actual,
+    exec: vi.fn(),
+  };
+});
+
+vi.mock('util', async () => {
+  const actual = await vi.importActual<typeof import('util')>('util');
+  return {
+    ...actual,
+    promisify: () => mockExecAsync,
+  };
+});
+
 let mockHomedir = '';
 vi.mock('os', async () => {
   const actual = await vi.importActual<typeof import('os')>('os');
@@ -28,6 +48,8 @@ describe('copyPanopticonSettingsToWorkspace', () => {
     mkdirSync(join(homeDir, '.claude'), { recursive: true });
     mkdirSync(join(homeDir, '.panopticon'), { recursive: true });
 
+    mockExecAsync.mockReset();
+    mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
     vi.resetModules();
   });
 
@@ -190,5 +212,52 @@ describe('copyPanopticonSettingsToWorkspace', () => {
 
     const workspaceSettings = JSON.parse(readFileSync(join(workspaceDir, '.claude', 'settings.json'), 'utf8'));
     expect(workspaceSettings.hooks).toBeUndefined();
+  });
+});
+
+describe('stopWorkspaceDocker', () => {
+  let tempDir: string;
+  let workspaceDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'pan-wm-docker-test-'));
+    workspaceDir = join(tempDir, 'workspace');
+    mkdirSync(join(workspaceDir, '.devcontainer'), { recursive: true });
+    writeFileSync(join(workspaceDir, '.devcontainer', 'docker-compose.devcontainer.yml'), 'services: {}\n', 'utf8');
+    mockExecAsync.mockReset();
+    mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('uses the canonical rendered compose project name for teardown', async () => {
+    writeFileSync(
+      join(workspaceDir, '.devcontainer', 'dev'),
+      'FEATURE_FOLDER="feature-pan-1140"\nexport COMPOSE_PROJECT_NAME="panopticon-${FEATURE_FOLDER}"\n',
+      'utf8',
+    );
+
+    const { stopWorkspaceDocker } = await import('../../src/lib/workspace-manager.js');
+    await stopWorkspaceDocker(workspaceDir, 'pan-1140');
+
+    const composeCall = mockExecAsync.mock.calls.find(([command]) => String(command).startsWith('docker compose'));
+    expect(composeCall?.[0]).toContain('-p "panopticon-feature-pan-1140" down -v --remove-orphans');
+  });
+
+  it('rejects workspace-controlled compose project name mismatches before teardown', async () => {
+    writeFileSync(
+      join(workspaceDir, '.devcontainer', 'dev'),
+      'FEATURE_FOLDER="feature-pan-1140"\nexport COMPOSE_PROJECT_NAME="victim-project"\n',
+      'utf8',
+    );
+
+    const { stopWorkspaceDocker } = await import('../../src/lib/workspace-manager.js');
+    await expect(stopWorkspaceDocker(workspaceDir, 'pan-1140')).rejects.toThrow(
+      'declares COMPOSE_PROJECT_NAME=victim-project, expected panopticon-feature-pan-1140',
+    );
+    expect(mockExecAsync).not.toHaveBeenCalledWith(expect.stringContaining('docker compose'), expect.anything());
   });
 });
