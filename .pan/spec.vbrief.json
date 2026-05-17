@@ -4,7 +4,7 @@
     "created": "2026-05-16T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1141: Agent auto-resume controls — emergency mode, issue-level pause, troubled-state retry limits",
-    "updated": "2026-05-17T14:48:03.658Z"
+    "updated": "2026-05-17T14:53:47.956Z"
   },
   "plan": {
     "id": "pan-1141",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-17T14:48:03.658Z",
+    "updated": "2026-05-17T14:53:47.956Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1141",
@@ -143,7 +143,7 @@
       {
         "id": "cloister-skip-paused-troubled",
         "title": "Gate autoResumeStoppedWorkAgents() on paused and troubled flags",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -159,7 +159,7 @@
           {
             "id": "cloister-skip-paused-troubled.ac1",
             "title": "Paused agents are skipped with log line `autoResumeStoppedWorkAgents: <id> skipped — paused (<reason>)`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -167,7 +167,7 @@
           {
             "id": "cloister-skip-paused-troubled.ac2",
             "title": "Troubled agents are skipped with log line `autoResumeStoppedWorkAgents: <id> skipped — troubled (<N> consecutive failures since <timestamp>)`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -175,7 +175,7 @@
           {
             "id": "cloister-skip-paused-troubled.ac3",
             "title": "Both gates take precedence over the review-feedback short-circuit — a paused/troubled agent with pending review feedback is still NOT resumed",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

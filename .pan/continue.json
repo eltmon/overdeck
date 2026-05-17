@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T14:48:18.271Z",
+  "updated": "2026-05-17T14:53:55.187Z",
   "gitState": {
     "branch": "feature/pan-1141",
-    "sha": "84f87caec",
+    "sha": "069a92280",
     "dirty": true
   },
   "decisions": [
@@ -128,10 +128,10 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-3m2h (AgentState gating fields and helper API). Next agent should run bd ready -l pan-1141 and claim the next unblocked PAN-1141 bead.",
-    "beadId": "workspace-3m2h",
+    "description": "Completed bead workspace-2024 (autoResumeStoppedWorkAgents skips paused/troubled agents before review-feedback auto-resume). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-2024",
     "filesToRead": [
-      "src/lib/agents.ts",
+      "src/lib/cloister/deacon.ts",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -154,6 +154,12 @@
       "timestamp": "2026-05-17T14:48:18.271Z",
       "reason": "bead-complete",
       "note": "Implemented AgentState pause/troubled/failure-tracking fields, cleanAgentState round-trip preservation, and exported helper functions for pause/troubled/failure state. npm run typecheck and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T14:53:55.187Z",
+      "reason": "bead-complete",
+      "note": "Implemented paused and troubled hard gates in autoResumeStoppedWorkAgents above the pending-review-feedback resume path. npm run typecheck and npm run lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],

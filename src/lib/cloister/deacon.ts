@@ -4850,6 +4850,18 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
+    if (state.paused === true) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — paused (${state.pausedReason ?? 'no reason'})`);
+      continue;
+    }
+
+    if (state.troubled === true) {
+      const failureCount = state.consecutiveFailures ?? 0;
+      const since = state.firstFailureInRunAt ?? state.troubledAt ?? 'unknown';
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — troubled (${failureCount} consecutive failures since ${since})`);
+      continue;
+    }
+
     const deliberatelyStopped = state.stoppedByUser === true;
     if (deliberatelyStopped) {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
