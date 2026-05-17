@@ -2088,7 +2088,7 @@ const postAgentsRoute = HttpRouter.add(
       throw err;
     }
 
-    const stackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, stackExpected: false }));
+    const stackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, workspacePath }));
     if (!stackHealth.healthy) {
       yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_stack_unhealthy', {
         issueId,
@@ -2736,7 +2736,7 @@ const postAgentsRoute = HttpRouter.add(
     } catch (error: any) {
       const output = String(error?.output ?? error?.message ?? '');
       if (output.includes(`Workspace docker stack for ${issueId}`) && output.includes('is not healthy')) {
-        const failedStackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig }));
+        const failedStackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig, workspacePath }));
         emitActivityEntry({
           source: 'dashboard',
           level: 'error',

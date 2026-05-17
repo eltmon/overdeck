@@ -1815,10 +1815,11 @@ export async function assertWorkspaceStackHealthyForSpawn(
   issueId: string,
   role: Role,
   allowHost = false,
+  workspacePath?: string,
 ): Promise<void> {
   if (role === 'plan') return;
 
-  const health = await getWorkspaceStackHealth(issueId, { stackExpected: false });
+  const health = await getWorkspaceStackHealth(issueId, { workspacePath });
   if (health.healthy) return;
 
   const normalizedIssue = issueId.toUpperCase();
@@ -1868,7 +1869,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     throw new Error(`Role run ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
-  await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost);
+  await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost, workspace);
 
   initHook(agentId);
 
@@ -2113,7 +2114,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
-  await assertWorkspaceStackHealthyForSpawn(options.issueId, role, options.allowHost);
+  await assertWorkspaceStackHealthyForSpawn(options.issueId, role, options.allowHost, options.workspace);
 
   // Initialize hook for this agent (FPP support)
   initHook(agentId);
@@ -2719,6 +2720,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
       resumeRole,
       agentState.hostOverride === true,
+      agentState.workspace,
     );
     const fallbackPiFields = fallbackHarness === 'pi'
       ? await getPiLauncherFields(normalizedId, resumeModel)
@@ -2889,6 +2891,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
       agentState.role ?? 'work',
       agentState.hostOverride === true,
+      agentState.workspace,
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
@@ -3049,6 +3052,7 @@ export async function restartAgent(
       agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
       agentState.role ?? 'work',
       agentState.hostOverride === true,
+      agentState.workspace,
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
@@ -3216,6 +3220,7 @@ export async function recoverAgent(
       state.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
       recoveryRole,
       state.hostOverride === true,
+      state.workspace,
     );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);

@@ -49,7 +49,7 @@ import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';
 import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgress';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
 import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
-import { useWorkspaceQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
+import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
 
 
 // Parity registry anchor — keeps the card action surface tied to the
@@ -1648,6 +1648,14 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     return result;
   }, [grouped, planningStateById]);
 
+  const kanbanIssueIds = useMemo(() => {
+    if (cycleFilter === 'all' || cycleFilter === 'backlog' || cycleFilter === 'canceled') return [];
+    return STATUS_ORDER
+      .filter((status) => status !== 'backlog')
+      .flatMap((status) => sortedGrouped[status].map((issue) => issue.identifier));
+  }, [cycleFilter, sortedGrouped]);
+  const stackHealthByIssue = useWorkspaceStackHealthQuery(kanbanIssueIds).data?.workspaces ?? {};
+
   return (
     <KanbanTickContext.Provider value={kanbanTick}>
     <div className="space-y-4">
@@ -1931,6 +1939,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     bulkSelectedIds={bulkSelection.selectedIds}
                     onBulkToggle={bulkSelection.toggle}
                     planningStateById={planningStateById}
+                    workspaceByIssueId={stackHealthByIssue}
                   />
                 </div>
               </div>
@@ -2042,6 +2051,7 @@ function ColumnContent({
   bulkSelectedIds,
   onBulkToggle,
   planningStateById,
+  workspaceByIssueId,
 }: {
   issues: Issue[];
   issueWorkAgentsById: Map<string, Agent[]>;
@@ -2060,6 +2070,7 @@ function ColumnContent({
   bulkSelectedIds?: Set<string>;
   onBulkToggle?: (issueId: string) => void;
   planningStateById?: Record<string, PlanningState>;
+  workspaceByIssueId?: Record<string, WorkspaceData>;
 }) {
   // Check if any Rally issues with hierarchy exist
   const hasRallyHierarchy = issues.some(i => i.artifactType?.includes('PortfolioItem'));
@@ -2096,6 +2107,7 @@ function ColumnContent({
         isBulkSelected={bulkSelectedIds?.has(issue.identifier)}
         onBulkToggle={onBulkToggle ? () => onBulkToggle(issue.identifier) : undefined}
         planningState={planningStateById?.[issue.identifier]}
+        workspace={workspaceByIssueId?.[issue.identifier.toUpperCase()]}
       />
     );
   };
@@ -2718,11 +2730,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const cardRef = useRef<HTMLDivElement>(null);
   const { prefs: _prefs } = useUIPreferences();
   const { groups: modelGroups, defaultModel, harnessPolicy } = useAvailableModels();
-  const workspaceQuery = useWorkspaceQuery(issue.identifier || '', {
-    enabled: !workspaceProp && !!issue.identifier,
-  });
-  const workspace = workspaceProp ?? workspaceQuery.data;
-  const stackHealth = workspace?.stackHealth;
+  const stackHealth = workspaceProp?.stackHealth;
   const isStackUnhealthy = stackHealth?.healthy === false;
   const stackHealthDetails = stackHealth?.reasons.join('; ');
   const [launchModel, setLaunchModel] = useState(defaultModel);

@@ -368,6 +368,10 @@ export interface WorkspaceData {
   corrupted?: boolean;
 }
 
+export interface WorkspaceStackHealthBatchResponse {
+  workspaces: Record<string, WorkspaceData>;
+}
+
 export function useWorkspaceQuery(
   issueId: string,
   options?: Omit<UseQueryOptions<WorkspaceData>, 'queryKey' | 'queryFn'>,
@@ -375,6 +379,22 @@ export function useWorkspaceQuery(
   return useQuery({
     queryKey: ['workspace', issueId],
     queryFn: () => fetchJson<WorkspaceData>(`/api/workspaces/${issueId}`),
+    refetchInterval: 30_000,
+    ...options,
+  });
+}
+
+export function useWorkspaceStackHealthQuery(
+  issueIds: string[],
+  options?: Omit<UseQueryOptions<WorkspaceStackHealthBatchResponse>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<WorkspaceStackHealthBatchResponse> {
+  const normalizedIds = Array.from(new Set(issueIds.filter(Boolean).map((id) => id.toUpperCase()))).sort();
+  return useQuery({
+    queryKey: ['workspace-stack-health', normalizedIds],
+    queryFn: () => fetchJson<WorkspaceStackHealthBatchResponse>(
+      `/api/workspace-stack-health?issueIds=${encodeURIComponent(normalizedIds.join(','))}`,
+    ),
+    enabled: normalizedIds.length > 0,
     refetchInterval: 30_000,
     ...options,
   });

@@ -7,6 +7,7 @@ import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
  * Workspaces + lifecycle + review HTTP routes.
  *
  * Workspace data endpoints (/api/workspaces/):
+ *   GET    /api/workspace-stack-health
  *   GET    /api/workspaces/:issueId
  *   POST   /api/workspaces
  *   GET    /api/workspaces/:issueId/plan
@@ -53,6 +54,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import {
   resolveProjectFromIssue,
+  getProject,
   listProjects,
   findProjectByTeam,
   extractTeamPrefix,
@@ -1272,6 +1274,67 @@ const readJsonBody = Effect.gen(function* () {
     return {};
   }
 });
+
+// ─── Route: GET /api/workspace-stack-health ──────────────────────────────────
+
+const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
+  'GET',
+  '/api/workspace-stack-health',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = new URL(request.url, 'http://localhost');
+    const issueIds = Array.from(new Set((url.searchParams.get('issueIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean)))
+      .slice(0, 100);
+
+    const parsedIds = issueIds.map((issueId) => ({ issueId, parsed: parseIssueId(issueId) }));
+    const invalid = parsedIds.find(({ parsed }) => !parsed);
+    if (invalid) {
+      return jsonResponse({ error: `Invalid issue ID: ${invalid.issueId}` }, { status: 400 });
+    }
+
+    const entries = yield* Effect.promise(() => Promise.all(parsedIds.map(async ({ issueId, parsed }) => {
+      const normalizedIssueId = parsed!.raw.toUpperCase();
+      const workspaceInfo = getWorkspaceInfoForIssue(normalizedIssueId);
+      if (workspaceInfo.isRemote) {
+        return [normalizedIssueId, { exists: true, issueId: normalizedIssueId, location: 'remote', isRemote: true }] as const;
+      }
+
+      const resolved = resolveProjectFromIssue(normalizedIssueId);
+      if (!resolved) {
+        return [normalizedIssueId, { exists: false, issueId: normalizedIssueId }] as const;
+      }
+
+      const projectConfig = getProject(resolved.projectKey);
+      const workspacePath = join(
+        resolved.projectPath,
+        projectConfig.workspace?.workspaces_dir ?? 'workspaces',
+        `feature-${parsed!.normalized}`,
+      );
+      if (!existsSync(workspacePath)) {
+        return [normalizedIssueId, { exists: false, issueId: normalizedIssueId }] as const;
+      }
+
+      const stackHealth = await getWorkspaceStackHealth(normalizedIssueId, {
+        projectConfig: { ...projectConfig, path: resolved.projectPath },
+        workspacePath,
+      });
+
+      return [normalizedIssueId, {
+        exists: true,
+        issueId: normalizedIssueId,
+        path: workspacePath,
+        stackHealth,
+        hasDocker: Boolean(projectConfig.workspace?.docker?.compose_template),
+        location: 'local',
+      }] as const;
+    })));
+
+    return jsonResponse({ workspaces: Object.fromEntries(entries) });
+  })),
+);
 
 // ─── Route: GET /api/workspaces/:issueId ─────────────────────────────────────
 
@@ -5828,6 +5891,7 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
 );
 
 export const workspacesRouteLayer = Layer.mergeAll(
+  getWorkspaceStackHealthBatchRoute,
   getWorkspaceRoute,
   postWorkspacesRoute,
   getWorkspaceStateMdRoute,
