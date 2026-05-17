@@ -8,11 +8,6 @@
 
 import { getDatabase } from './index.js';
 
-/** Escape LIKE metacharacters so user-supplied strings are matched literally. */
-function escapeLike(value: string): string {
-  return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
-}
-
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface DiscoveredSession {
@@ -210,6 +205,52 @@ export function getDiscoveredSessionById(id: number): DiscoveredSession | null {
   return row ? rowToSession(row) : null;
 }
 
+function getDiscoveredSessionsByIds(ids: number[]): Map<number, DiscoveredSession> {
+  if (ids.length === 0) return new Map();
+  const db = getDatabase();
+  const rows = db
+    .prepare(`SELECT * FROM discovered_sessions WHERE id IN (${ids.map(() => '?').join(',')})`)
+    .all(...ids) as Record<string, unknown>[];
+  return new Map(rows.map((row) => {
+    const session = rowToSession(row);
+    return [session.id, session];
+  }));
+}
+
+type ArrayIndexTarget =
+  | { table: 'discovered_session_tags'; column: 'tag' }
+  | { table: 'discovered_session_tools'; column: 'tool' }
+  | { table: 'discovered_session_files'; column: 'file_path' };
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter((value) => value.length > 0))];
+}
+
+function replaceSessionArrayIndex(target: ArrayIndexTarget, sessionId: number, values: string[]): void {
+  const db = getDatabase();
+  const replace = db.transaction((items: string[]) => {
+    db.prepare(`DELETE FROM ${target.table} WHERE session_id = ?`).run(sessionId);
+    const insert = db.prepare(`INSERT OR IGNORE INTO ${target.table} (session_id, ${target.column}) VALUES (?, ?)`);
+    for (const value of uniqueStrings(items)) insert.run(sessionId, value);
+  });
+  replace(values);
+}
+
+function replaceDiscoveredSessionArrayIndexes(session: DiscoveredSession): void {
+  replaceSessionArrayIndex({ table: 'discovered_session_tags', column: 'tag' }, session.id, session.tags);
+  replaceSessionArrayIndex({ table: 'discovered_session_tools', column: 'tool' }, session.id, session.toolsUsed);
+  replaceSessionArrayIndex({ table: 'discovered_session_files', column: 'file_path' }, session.id, session.filesTouched);
+}
+
+function arrayIndexCondition(target: ArrayIndexTarget, sessionIdExpression: string, values: string[]): { sql: string; params: string[] } | null {
+  const filtered = uniqueStrings(values);
+  if (filtered.length === 0) return null;
+  return {
+    sql: `EXISTS (SELECT 1 FROM ${target.table} idx WHERE idx.session_id = ${sessionIdExpression} AND idx.${target.column} IN (${filtered.map(() => '?').join(',')}))`,
+    params: filtered,
+  };
+}
+
 // ─── Filter SQL builder (shared by find + count) ─────────────────────────────
 
 function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { where: string; params: unknown[] } {
@@ -273,26 +314,20 @@ function buildFilterSql(filter: ConversationFilter, tableAlias?: string): { wher
     conditions.push(`${col('enrichment_level')} < ?`);
     params.push(filter.enrichmentLevelLessThan);
   }
-  if (filter.tags && filter.tags.length > 0) {
-    const tagConditions = filter.tags.map(() => `${col('tags')} LIKE ? ESCAPE '\\'`);
-    conditions.push(`(${tagConditions.join(' OR ')})`);
-    for (const tag of filter.tags) {
-      params.push(`%"${escapeLike(tag)}"%`);
-    }
+  const tagCondition = filter.tags ? arrayIndexCondition({ table: 'discovered_session_tags', column: 'tag' }, col('id'), filter.tags) : null;
+  if (tagCondition) {
+    conditions.push(tagCondition.sql);
+    params.push(...tagCondition.params);
   }
-  if (filter.tools && filter.tools.length > 0) {
-    const toolConditions = filter.tools.map(() => `${col('tools_used')} LIKE ? ESCAPE '\\'`);
-    conditions.push(`(${toolConditions.join(' OR ')})`);
-    for (const tool of filter.tools) {
-      params.push(`%"${escapeLike(tool)}"%`);
-    }
+  const toolCondition = filter.tools ? arrayIndexCondition({ table: 'discovered_session_tools', column: 'tool' }, col('id'), filter.tools) : null;
+  if (toolCondition) {
+    conditions.push(toolCondition.sql);
+    params.push(...toolCondition.params);
   }
-  if (filter.files && filter.files.length > 0) {
-    const fileConditions = filter.files.map(() => `${col('files_touched')} LIKE ? ESCAPE '\\'`);
-    conditions.push(`(${fileConditions.join(' OR ')})`);
-    for (const file of filter.files) {
-      params.push(`%${escapeLike(file)}%`);
-    }
+  const fileCondition = filter.files ? arrayIndexCondition({ table: 'discovered_session_files', column: 'file_path' }, col('id'), filter.files) : null;
+  if (fileCondition) {
+    conditions.push(fileCondition.sql);
+    params.push(...fileCondition.params);
   }
 
   return { where: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '', params };
@@ -495,6 +530,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
     .prepare(`SELECT * FROM discovered_sessions WHERE jsonl_path = ?`)
     .get(opts.jsonlPath) as Record<string, unknown>;
   const session = rowToSession(row);
+  replaceDiscoveredSessionArrayIndexes(session);
   if (oldRow && oldRow.enrichment_level > 0) {
     replaceFtsRow(session.id, oldRow);
   }
@@ -546,6 +582,9 @@ export function updateEnrichment(
     id,
   );
 
+  if (opts.tags) {
+    replaceSessionArrayIndex({ table: 'discovered_session_tags', column: 'tag' }, id, opts.tags);
+  }
   replaceFtsRow(id, oldRow);
 }
 
@@ -746,8 +785,9 @@ export function topKCosine(
   const page = top
     .sort((a, b) => b.score - a.score)
     .slice(safeOffset, safeOffset + safeLimit);
+  const sessionsById = getDiscoveredSessionsByIds(page.map((item) => item.sessionId));
   const results = page.flatMap((item) => {
-    const session = getDiscoveredSessionById(item.sessionId);
+    const session = sessionsById.get(item.sessionId);
     return session ? [{ session, score: item.score }] : [];
   });
 

@@ -326,6 +326,36 @@ function getPricing(provider, model) {
 	return pricing || null;
 }
 join(COSTS_DIR, "budgets.json");
+function parseArrayColumn(value) {
+	if (!value) return [];
+	try {
+		const parsed = JSON.parse(value);
+		return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string" && item.length > 0) : [];
+	} catch {
+		return [];
+	}
+}
+function uniqueStrings(values) {
+	return [...new Set(values)];
+}
+function backfillDiscoveredSessionArrayIndexes(db) {
+	const rows = db.prepare(`SELECT id, tools_used, files_touched, tags FROM discovered_sessions`).all();
+	const deleteTags = db.prepare(`DELETE FROM discovered_session_tags WHERE session_id = ?`);
+	const deleteTools = db.prepare(`DELETE FROM discovered_session_tools WHERE session_id = ?`);
+	const deleteFiles = db.prepare(`DELETE FROM discovered_session_files WHERE session_id = ?`);
+	const insertTag = db.prepare(`INSERT OR IGNORE INTO discovered_session_tags (session_id, tag) VALUES (?, ?)`);
+	const insertTool = db.prepare(`INSERT OR IGNORE INTO discovered_session_tools (session_id, tool) VALUES (?, ?)`);
+	const insertFile = db.prepare(`INSERT OR IGNORE INTO discovered_session_files (session_id, file_path) VALUES (?, ?)`);
+	const replaceRow = db.transaction((row) => {
+		deleteTags.run(row.id);
+		deleteTools.run(row.id);
+		deleteFiles.run(row.id);
+		for (const tag of uniqueStrings(parseArrayColumn(row.tags))) insertTag.run(row.id, tag);
+		for (const tool of uniqueStrings(parseArrayColumn(row.tools_used))) insertTool.run(row.id, tool);
+		for (const file of uniqueStrings(parseArrayColumn(row.files_touched))) insertFile.run(row.id, file);
+	});
+	for (const row of rows) replaceRow(row);
+}
 function initDiscoveredSessionsSchema(db) {
 	db.exec(`
     CREATE TABLE IF NOT EXISTS discovered_sessions (
@@ -364,6 +394,33 @@ function initDiscoveredSessionsSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
     CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
     CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_tags (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      tag        TEXT    NOT NULL,
+      PRIMARY KEY (session_id, tag)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_tags_tag
+      ON discovered_session_tags(tag, session_id);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_tools (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      tool       TEXT    NOT NULL,
+      PRIMARY KEY (session_id, tool)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_tools_tool
+      ON discovered_session_tools(tool, session_id);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_files (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      file_path  TEXT    NOT NULL,
+      PRIMARY KEY (session_id, file_path)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_files_file_path
+      ON discovered_session_files(file_path, session_id);
 
     CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
       summary,
@@ -782,7 +839,7 @@ function initSchema(db) {
       ON session_embeddings(model, session_id);
   `);
 	initDiscoveredSessionsSchema(db);
-	db.pragma(`user_version = 37`);
+	db.pragma(`user_version = 38`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -790,7 +847,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 37) return;
+	if (currentVersion === 38) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -1218,7 +1275,11 @@ function runMigrations(db) {
       CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
         ON session_embeddings(model, session_id)
     `);
-	db.pragma(`user_version = 37`);
+	if (currentVersion < 38) {
+		initDiscoveredSessionsSchema(db);
+		backfillDiscoveredSessionArrayIndexes(db);
+	}
+	db.pragma(`user_version = 38`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

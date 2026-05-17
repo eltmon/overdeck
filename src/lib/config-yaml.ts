@@ -9,10 +9,11 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 'fs';
-import { readFile as readFileAsync, stat as statAsync } from 'fs/promises';
-import { join } from 'path';
+import { mkdir as mkdirAsync, readFile as readFileAsync, stat as statAsync, writeFile as writeFileAsync } from 'fs/promises';
+import { dirname, join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
+import { parseDocument } from 'yaml';
 import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
 import { MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
@@ -501,6 +502,7 @@ export interface NormalizedCavemanConfig {
  */
 export type RuntimeConversationsConfig = NormalizedConfig['conversations'] & {
   apiKeys?: NormalizedConfig['apiKeys'];
+  enabledProviders?: NormalizedConfig['enabledProviders'];
 };
 
 export function resolveConversationWatchDirs(config: RuntimeConversationsConfig): RuntimeConversationsConfig {
@@ -517,6 +519,7 @@ export function getConversationsConfig(): RuntimeConversationsConfig {
   return resolveConversationWatchDirs({
     ...config.conversations,
     apiKeys: config.apiKeys,
+    enabledProviders: config.enabledProviders,
   });
 }
 
@@ -525,7 +528,33 @@ export async function getConversationsConfigAsync(): Promise<RuntimeConversation
   return resolveConversationWatchDirs({
     ...config.conversations,
     apiKeys: config.apiKeys,
+    enabledProviders: config.enabledProviders,
   });
+}
+
+export async function updateConversationsConfigAsync(updates: ConversationsConfig): Promise<void> {
+  await loadConfigAsyncNoMigration();
+  let existingContent = '{}\n';
+  try {
+    const content = await readFileAsync(GLOBAL_CONFIG_PATH, 'utf-8');
+    existingContent = content.trim().length > 0 ? content : '{}\n';
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT') throw error;
+  }
+
+  const doc = parseDocument(existingContent);
+  if (doc.contents === null) {
+    doc.contents = parseDocument('{}\n').contents;
+  }
+
+  for (const [key, value] of Object.entries(updates) as Array<[keyof ConversationsConfig, unknown]>) {
+    if (value !== undefined) doc.setIn(['conversations', key], value);
+  }
+
+  await mkdirAsync(dirname(GLOBAL_CONFIG_PATH), { recursive: true });
+  await writeFileAsync(GLOBAL_CONFIG_PATH, doc.toString({ lineWidth: 120 }), 'utf-8');
+  clearConfigCache();
 }
 
 export interface MigrationResult {
@@ -1510,7 +1539,7 @@ async function getMtimeAsync(filePath: string): Promise<number> {
   }
 }
 
-async function loadConfigAsyncNoMigration(): Promise<ConfigLoadResult> {
+export async function loadConfigAsyncNoMigration(): Promise<ConfigLoadResult> {
   const mtimes = await getConfigMtimesAsync();
   if (
     configCache &&

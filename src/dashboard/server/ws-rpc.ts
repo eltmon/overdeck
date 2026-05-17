@@ -25,6 +25,7 @@ import { parseRelativeTime } from '../../lib/conversations/search.js';
 import type { SearchResult } from '../../lib/conversations/search.js';
 import { CostThresholdError } from '../../lib/conversations/enrichment/index.js';
 import { getConversationsConfigAsync } from '../../lib/config-yaml.js';
+import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { rejectUnauthorizedDashboardRequest } from './routes/dashboard-auth.js';
@@ -75,6 +76,35 @@ function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
 
 const DEFAULT_CONVERSATION_LIMIT = 50;
 const MAX_CONVERSATION_LIMIT = 500;
+
+type EnrichSessionsRpcInput = {
+  level?: number;
+  ids?: number[];
+  filter?: ConversationFilter;
+  limit?: number;
+  model?: string;
+  customPrompt?: string;
+  upgrade?: boolean;
+  confirmed?: boolean;
+  force?: boolean;
+  fullTranscript?: boolean;
+};
+
+export function buildEnrichSessionsJobPayload(input: EnrichSessionsRpcInput, config: RuntimeConversationsConfig) {
+  return {
+    tier: input.level,
+    sessionIds: input.ids,
+    filter: input.filter,
+    limit: input.limit,
+    maxParallel: config.enrichment.maxParallel,
+    modelOverride: input.model,
+    promptSuffix: input.customPrompt,
+    fullTranscript: input.fullTranscript,
+    skipAlreadyEnriched: input.upgrade !== true,
+    force: input.confirmed === true || input.force === true,
+    config,
+  };
+}
 
 function normalizeConversationPagination(limit: number | undefined, offset: number | undefined): { limit: number; offset: number } {
   const normalizedLimit = limit ?? DEFAULT_CONVERSATION_LIMIT;
@@ -647,18 +677,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               estimatedCost: number;
               actualCost: number | null;
               durationMs: number;
-            }>('enrichSessions', {
-              tier: input.level,
-              sessionIds: input.ids,
-              filter: input.filter,
-              limit: input.limit,
-              maxParallel: config.enrichment.maxParallel,
-              modelOverride: input.model,
-              promptSuffix: input.customPrompt,
-              skipAlreadyEnriched: input.upgrade !== true,
-              force: input.confirmed === true || input.force === true,
-              config,
-            }, async (rawProgress) => {
+            }>('enrichSessions', buildEnrichSessionsJobPayload(input, config), async (rawProgress) => {
               const progress = rawProgress as {
                 session?: { sessionId: number; tier: number; model: string; cost?: number; success: boolean; error?: string };
               };

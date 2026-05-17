@@ -34,8 +34,7 @@ import type { ConversationFilter, DiscoveredSession } from '../../../lib/databas
 import type { SearchResult } from '../../../lib/conversations/search.js';
 import { CostThresholdError } from '../../../lib/conversations/enrichment/index.js';
 import { parseRelativeTime } from '../../../lib/conversations/search.js';
-import { getConversationsConfigAsync } from '../../../lib/config-yaml.js';
-import { updateSettingsApi } from '../../../lib/settings-api.js';
+import { getConversationsConfigAsync, updateConversationsConfigAsync } from '../../../lib/config-yaml.js';
 import { embed } from '../../../lib/conversations/embeddings/providers.js';
 import { validateOrigin } from './origin-validation.js';
 import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
@@ -734,13 +733,11 @@ const putConvConfigRoute = HttpRouter.add(
     if (!parsedBody.ok) return parsedBody.response;
     const body = parsedBody.body;
 
-    yield* Effect.promise(() => updateSettingsApi({
-      conversations: {
-        embeddings: body.embeddings,
-        embedding_provider: body.embeddingProvider as 'openai' | 'voyage' | 'ollama' | undefined,
-        embedding_model: body.embeddingModel,
-        embedding_auto_on_deep: body.embeddingAutoOnDeep,
-      },
+    yield* Effect.promise(() => updateConversationsConfigAsync({
+      embeddings: body.embeddings,
+      embedding_provider: body.embeddingProvider as 'openai' | 'voyage' | 'ollama' | undefined,
+      embedding_model: body.embeddingModel,
+      embedding_auto_on_deep: body.embeddingAutoOnDeep,
     }));
 
     return validatedJsonResponse(OkResponseSchema, { ok: true });

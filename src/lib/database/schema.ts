@@ -10,7 +10,47 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 37;
+export const SCHEMA_VERSION = 38;
+
+function parseArrayColumn(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string' && item.length > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function backfillDiscoveredSessionArrayIndexes(db: Database.Database): void {
+  const rows = db.prepare(`SELECT id, tools_used, files_touched, tags FROM discovered_sessions`).all() as Array<{
+    id: number;
+    tools_used: string | null;
+    files_touched: string | null;
+    tags: string | null;
+  }>;
+  const deleteTags = db.prepare(`DELETE FROM discovered_session_tags WHERE session_id = ?`);
+  const deleteTools = db.prepare(`DELETE FROM discovered_session_tools WHERE session_id = ?`);
+  const deleteFiles = db.prepare(`DELETE FROM discovered_session_files WHERE session_id = ?`);
+  const insertTag = db.prepare(`INSERT OR IGNORE INTO discovered_session_tags (session_id, tag) VALUES (?, ?)`);
+  const insertTool = db.prepare(`INSERT OR IGNORE INTO discovered_session_tools (session_id, tool) VALUES (?, ?)`);
+  const insertFile = db.prepare(`INSERT OR IGNORE INTO discovered_session_files (session_id, file_path) VALUES (?, ?)`);
+
+  const replaceRow = db.transaction((row: typeof rows[number]) => {
+    deleteTags.run(row.id);
+    deleteTools.run(row.id);
+    deleteFiles.run(row.id);
+    for (const tag of uniqueStrings(parseArrayColumn(row.tags))) insertTag.run(row.id, tag);
+    for (const tool of uniqueStrings(parseArrayColumn(row.tools_used))) insertTool.run(row.id, tool);
+    for (const file of uniqueStrings(parseArrayColumn(row.files_touched))) insertFile.run(row.id, file);
+  });
+
+  for (const row of rows) replaceRow(row);
+}
 
 export function initDiscoveredSessionsSchema(db: Database.Database): void {
   db.exec(`
@@ -50,6 +90,33 @@ export function initDiscoveredSessionsSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
     CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
     CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_tags (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      tag        TEXT    NOT NULL,
+      PRIMARY KEY (session_id, tag)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_tags_tag
+      ON discovered_session_tags(tag, session_id);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_tools (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      tool       TEXT    NOT NULL,
+      PRIMARY KEY (session_id, tool)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_tools_tool
+      ON discovered_session_tools(tool, session_id);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_files (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      file_path  TEXT    NOT NULL,
+      PRIMARY KEY (session_id, file_path)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_files_file_path
+      ON discovered_session_files(file_path, session_id);
 
     CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
       summary,
@@ -1047,6 +1114,12 @@ export function runMigrations(db: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
         ON session_embeddings(model, session_id)
     `);
+  }
+
+  // v37 → v38: normalize discovered-session arrays into indexed lookup tables
+  if (currentVersion < 38) {
+    initDiscoveredSessionsSchema(db);
+    backfillDiscoveredSessionArrayIndexes(db);
   }
 
   // After all migrations, set the version

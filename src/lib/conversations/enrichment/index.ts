@@ -11,7 +11,7 @@
 import { findDiscoveredSessions, getDiscoveredSessionById } from '../../database/discovered-sessions-db.js';
 import type { ConversationFilter, DiscoveredSession } from '../../database/discovered-sessions-db.js';
 import { runWithPool } from '../work-pool.js';
-import { enrichSession } from './enrich-session.js';
+import { createConfiguredClaudeApi, enrichSession, resolveEnrichmentModel } from './enrich-session.js';
 import { embedSessions } from '../embeddings/index.js';
 import type { EnrichSessionOptions } from './enrich-session.js';
 import { getConversationsConfig } from '../../config-yaml.js';
@@ -138,6 +138,11 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
     deepModel: config.enrichment.deepModel,
   };
   const maxParallel = opts.maxParallel ?? config.enrichment.maxParallel;
+  const callApi = opts.callApi ?? createConfiguredClaudeApi({
+    apiKeys: config.apiKeys,
+    enabledProviders: config.enabledProviders,
+  });
+  const resolveModel = opts.callApi ? undefined : (model: string) => resolveEnrichmentModel(model, config.enabledProviders);
 
   // Select sessions to enrich
   const sessions = selectSessionsForEnrichment(opts, tier);
@@ -174,7 +179,8 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       promptSuffix: opts.promptSuffix,
       fullTranscript: opts.fullTranscript,
       config: tierConfig,
-      callApi: opts.callApi,
+      callApi,
+      resolveModel,
     });
 
     processed++;

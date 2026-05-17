@@ -16,7 +16,7 @@ import { applyFallback, selectEnrichmentModelForTier } from '../../model-fallbac
 import { loadConfig as loadYamlConfig } from '../../config-yaml.js';
 import { getProviderEnv, getProviderForModel } from '../../providers.js';
 import type { TokenUsage } from '../../cost.js';
-import type { EnrichmentTier, EnrichmentTierConfig } from '../../model-fallback.js';
+import type { EnrichmentTier, EnrichmentTierConfig, ModelProvider } from '../../model-fallback.js';
 import type { ModelId } from '../../settings.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,6 +26,11 @@ export interface EnrichmentResponse {
   summaryDetailed?: string;
   tags: string[];
   usage?: TokenUsage & { cost: number };
+}
+
+export interface EnrichmentApiConfig {
+  enabledProviders?: Set<ModelProvider>;
+  apiKeys?: Partial<Record<ModelProvider | 'voyage', string | undefined>>;
 }
 
 export interface EnrichSessionOptions {
@@ -41,6 +46,7 @@ export interface EnrichSessionOptions {
   fullTranscript?: boolean;
   /** Injected for testing — skips real API call */
   callApi?: (model: string, prompt: string) => Promise<EnrichmentResponse>;
+  resolveModel?: (model: string) => string;
 }
 
 export interface EnrichSessionResult {
@@ -245,7 +251,8 @@ Reply ONLY with valid JSON matching this schema:
 
 const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com/v1';
 
-function resolveEnrichmentModel(model: string): string {
+export function resolveEnrichmentModel(model: string, enabledProviders?: Set<ModelProvider>): string {
+  if (enabledProviders) return applyFallback(model as ModelId, enabledProviders);
   const { config } = loadYamlConfig();
   return applyFallback(model as ModelId, config.enabledProviders);
 }
@@ -257,14 +264,19 @@ function getProviderApiKey(providerName: string, configuredKey?: string): string
   return configuredKey;
 }
 
-export async function callClaudeApi(
+export function createConfiguredClaudeApi(config: EnrichmentApiConfig): (model: string, prompt: string) => Promise<EnrichmentResponse> {
+  return (model, prompt) => callClaudeApiWithConfig(model, prompt, config);
+}
+
+async function callClaudeApiWithConfig(
   model: string,
   prompt: string,
+  enrichmentConfig?: EnrichmentApiConfig,
 ): Promise<EnrichmentResponse> {
-  const effectiveModel = resolveEnrichmentModel(model);
+  const effectiveModel = resolveEnrichmentModel(model, enrichmentConfig?.enabledProviders);
   const provider = getProviderForModel(effectiveModel);
-  const { config } = loadYamlConfig();
-  const configuredKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
+  const yamlConfig = enrichmentConfig ? undefined : loadYamlConfig().config;
+  const configuredKey = enrichmentConfig?.apiKeys?.[provider.name as ModelProvider] ?? yamlConfig?.apiKeys[provider.name as keyof typeof yamlConfig.apiKeys];
   const apiKey = getProviderApiKey(provider.name, configuredKey);
   if (!apiKey) {
     throw new Error(`${provider.displayName} API key is not set — cannot enrich sessions with ${effectiveModel}`);
@@ -332,6 +344,13 @@ export async function callClaudeApi(
   }
 }
 
+export async function callClaudeApi(
+  model: string,
+  prompt: string,
+): Promise<EnrichmentResponse> {
+  return callClaudeApiWithConfig(model, prompt);
+}
+
 // ─── Main enrichment function ─────────────────────────────────────────────────
 
 /**
@@ -346,7 +365,7 @@ export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichS
   const apiCall = opts.callApi ?? callClaudeApi;
 
   try {
-    model = opts.callApi ? requestedModel : resolveEnrichmentModel(requestedModel);
+    model = opts.resolveModel ? opts.resolveModel(requestedModel) : opts.callApi ? requestedModel : resolveEnrichmentModel(requestedModel);
     const lines = await sampleJsonlLines(jsonlPath, tier, { fullTranscript: opts.fullTranscript });
     if (lines.length === 0) {
       return { sessionId, tier, model, error: 'No readable messages in JSONL' };

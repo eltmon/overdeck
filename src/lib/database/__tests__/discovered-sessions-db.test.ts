@@ -191,6 +191,22 @@ describe('discovered-sessions-db', () => {
     expect(results[0].jsonlPath).toBe('/tagged.jsonl');
   });
 
+  it('findDiscoveredSessions filters tools and files through exact indexed arrays', async () => {
+    const { upsertDiscoveredSession, findDiscoveredSessions } = await import(
+      '../discovered-sessions-db.js'
+    );
+    upsertDiscoveredSession({
+      jsonlPath: '/indexed-arrays.jsonl',
+      toolsUsed: ['Read', 'Edit'],
+      filesTouched: ['/repo/src/auth.ts'],
+    });
+    upsertDiscoveredSession({ jsonlPath: '/other-arrays.jsonl', toolsUsed: ['Bash'], filesTouched: ['/repo/src/other.ts'] });
+
+    expect(findDiscoveredSessions({ tools: ['Edit'] }).map((session) => session.jsonlPath)).toEqual(['/indexed-arrays.jsonl']);
+    expect(findDiscoveredSessions({ files: ['/repo/src/auth.ts'] }).map((session) => session.jsonlPath)).toEqual(['/indexed-arrays.jsonl']);
+    expect(findDiscoveredSessions({ files: ['auth'] })).toEqual([]);
+  });
+
   // ─── FTS5 insert/search ───────────────────────────────────────────────────
 
   it('searchFts returns matching sessions after syncFts', async () => {
