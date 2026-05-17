@@ -70,6 +70,7 @@ import {
   clearAgentPausedAsync,
   clearAgentTroubledAsync,
   markAgentStoppedState,
+  type AgentRuntimeState,
   type AgentState,
   getActivity,
   saveSessionId,
@@ -102,7 +103,7 @@ import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
-import { getWorkAgentLifecycleStateAsync } from '../../../lib/work-agent-lifecycle.js';
+import { getWorkAgentLifecycleStateAsync, type WorkAgentLifecycleState, type WorkAgentRecommendedAction } from '../../../lib/work-agent-lifecycle.js';
 import { buildStashMessage, createNamedStash } from '../../../lib/stashes.js';
 import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
@@ -244,6 +245,72 @@ function buildAgentGateFailureSnapshot(state: Partial<AgentState>) {
     lastFailureAt: state.lastFailureAt ?? null,
     lastFailureReason: state.lastFailureReason ?? null,
     lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
+  };
+}
+
+function buildStoppedAgentLifecycle(
+  agentOrIssueId: string,
+  state: Partial<AgentState>,
+  runtimeData: Partial<AgentRuntimeState>,
+): WorkAgentLifecycleState {
+  const agentId = normalizeAgentId(agentOrIssueId);
+  const hasAgentState = true;
+  const hasLiveTmuxSession = false;
+  const hasSavedSession = !!runtimeData.claudeSessionId;
+  const hasWorkspace = typeof state.workspace === 'string' && state.workspace.length > 0;
+  const agentStatus = state.status || 'unknown';
+  const runtime = runtimeData.state || 'uninitialized';
+  const isCompleted = runtimeData.resolution === 'completed';
+  const isPlaceholder = agentStatus === 'starting' && typeof state.model === 'string' && state.model.startsWith('pending-');
+  const isStopped = agentStatus === 'stopped' || agentStatus === 'error' || isCompleted || runtime === 'stopped' || runtime === 'idle' || runtime === 'suspended';
+  const isRunning = false;
+  const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
+  const isRunningButStuck = false;
+  const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const isOrphaned = !hasLiveTmuxSession && (
+    (hasSavedSession && !hasResumableBackingState)
+    || (hasAgentState && (!hasWorkspace || isPlaceholder))
+  );
+  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableBackingState && (isStopped || isCrashed);
+
+  let recommendedAction: WorkAgentRecommendedAction = 'start';
+  let reason: string | undefined;
+
+  if (isOrphaned) {
+    recommendedAction = 'start';
+    reason = hasSavedSession
+      ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
+      : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
+  } else if (requiresSessionResetBeforeFreshStart) {
+    recommendedAction = 'resume';
+    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it or 'pan review reset --session ${agentOrIssueId}' before starting fresh.`;
+  } else if (hasAgentState && !hasSavedSession && isStopped) {
+    recommendedAction = 'start';
+    reason = `Agent ${agentId} is stopped and has no saved Claude session. Start Agent will create a fresh session in the existing workspace.`;
+  }
+
+  return {
+    agentId,
+    hasAgentState,
+    hasLiveTmuxSession,
+    hasSavedSession,
+    hasWorkspace,
+    isPlaceholder,
+    isOrphaned,
+    isRunning,
+    isRunningButStuck,
+    isStopped,
+    isCompleted,
+    isCrashed,
+    runtimeState: runtime,
+    agentStatus,
+    canStartFresh: !requiresSessionResetBeforeFreshStart || isOrphaned,
+    canResumeSession: hasSavedSession && hasResumableBackingState && (isStopped || isCrashed),
+    canRestartWithContext: hasAgentState && hasWorkspace,
+    canResetSession: hasSavedSession && hasResumableBackingState,
+    requiresSessionResetBeforeFreshStart,
+    recommendedAction,
+    reason,
   };
 }
 
@@ -713,7 +780,7 @@ const getAgentsRoute = HttpRouter.add(
                   )
                 );
               if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000 && !keepStoppedAgentVisible) continue;
-              const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleStateAsync(dir));
+              const lifecycle = buildStoppedAgentLifecycle(dir, state, runtimeData);
               const needsInput = runtimeData.resolution === 'needs_input';
               const pendingQuestionPrompt = needsInput
                 ? normalizeAwaitingInputPrompt(
