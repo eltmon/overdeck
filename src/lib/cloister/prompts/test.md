@@ -17,6 +17,7 @@ optional:
   - POLYREPO_DIRS
   - MULTI_SUITE
   - DNS_DOMAIN
+  - MEMORY_CONTEXT
 ---
 # Test Execution — {{ISSUE_ID}}
 
@@ -27,6 +28,12 @@ optional:
 - **Workspace:** {{WORKSPACE}}
 {{#IS_POLYREPO}}- **Polyrepo:** git repos in subdirectories: {{POLYREPO_DIRS}}
 {{/IS_POLYREPO}}
+
+{{#MEMORY_CONTEXT}}
+## Memory Context
+
+{{MEMORY_CONTEXT}}
+{{/MEMORY_CONTEXT}}
 
 ## Test Suites
 

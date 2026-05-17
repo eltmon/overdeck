@@ -17,6 +17,7 @@ export interface PromptTimeMemoryInjectionInput {
   prompt: string;
   identity: MemoryIdentity;
   previousObservations?: Parameters<typeof expandMemoryQuery>[0]['previousObservations'];
+  surface?: RagDecision['surface'];
   now?: Date;
   id?: string;
   budgets?: Partial<MemoryBudgets>;
@@ -61,7 +62,10 @@ interface CandidateContext {
 export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInput): Promise<PromptTimeMemoryInjectionResult> {
   const now = input.now ?? new Date();
   const budgets: MemoryBudgets = { ...PROMPT_TIME_MEMORY_BUDGETS, ...input.budgets };
-  const enabled = await (input.loadPromptTimeEnabled ?? isMemoryPromptTimeInjectionEnabled)();
+  const surface = input.surface ?? 'user-prompt';
+  const enabled = surface === 'user-prompt'
+    ? await (input.loadPromptTimeEnabled ?? isMemoryPromptTimeInjectionEnabled)()
+    : true;
 
   if (!enabled) {
     return finalize(input, now, budgets, {
@@ -211,12 +215,13 @@ function hitCandidate(hit: MemorySearchHit): CandidateContext {
 
 function siblingCandidate(hit: MemorySearchHit): CandidateContext {
   const text = [
+    'Sibling memory hint (not authoritative current state).',
     `Provenance: ${hit.provenance}`,
     hit.displayContent || hit.content,
   ].join('\n');
   return {
     key: 'sibling',
-    title: `Sibling: ${hit.provenance}`,
+    title: `Sibling hint: ${hit.provenance}`,
     text,
     source: {
       id: `memory_fts:${hit.rowid}`,
@@ -294,7 +299,7 @@ async function finalize(
     timestamp: now.toISOString(),
     type: 'rag-decision',
     identity: input.identity,
-    surface: 'user-prompt',
+    surface: input.surface ?? 'user-prompt',
     outcome: state.outcome,
     query: state.query,
     expandedTerms: state.expandedTerms,

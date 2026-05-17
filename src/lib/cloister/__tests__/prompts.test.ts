@@ -266,6 +266,98 @@ optional:
       })
     );
 
+    it.effect('renders MEMORY_CONTEXT in role prompt templates and hides it when empty', () =>
+      Effect.gen(function* () {
+        const memoryContext = '<panopticon-memory-context>durable context</panopticon-memory-context>';
+        const planning = yield* renderPrompt({
+          name: 'planning',
+          vars: {
+            ISSUE_ID: 'PAN-611',
+            ISSUE_ID_LOWER: 'pan-611',
+            ISSUE_TITLE: 'Memory context',
+            ISSUE_URL: 'https://example.test/PAN-611',
+            ISSUE_DESCRIPTION: 'Need memory context',
+            VERSION: '0.0.0',
+            MODEL_AUTHOR: 'agent:test',
+            MEMORY_CONTEXT: memoryContext,
+          },
+        });
+        const work = yield* renderPrompt({
+          name: 'work',
+          vars: {
+            ISSUE_ID: 'PAN-611',
+            ISSUE_ID_LOWER: 'pan-611',
+            WORKSPACE_PATH: '/workspace',
+            LOCAL: true,
+            REMOTE: false,
+            MEMORY_CONTEXT: memoryContext,
+          },
+        });
+        const review = yield* renderPrompt({
+          name: 'review',
+          vars: {
+            ISSUE_ID: 'PAN-611',
+            BRANCH: 'feature/pan-611',
+            WORKSPACE: '/workspace',
+            DIFF_BASE: 'main',
+            IS_POLYREPO: false,
+            GIT_DIFF_COMMANDS: 'git diff --name-only main...HEAD',
+            GIT_DIFF_FILE_CMD: 'git diff main...HEAD -- <file>',
+            API_URL: 'http://localhost:3011',
+            MEMORY_CONTEXT: memoryContext,
+          },
+        });
+        const test = yield* renderPrompt({
+          name: 'test',
+          vars: {
+            ISSUE_ID: 'PAN-611',
+            BRANCH: 'feature/pan-611',
+            WORKSPACE: '/workspace',
+            IS_POLYREPO: false,
+            TEST_COMMANDS: 'npm test',
+            BASELINE_COMMANDS: 'git checkout main && npm test',
+            TEST_CONFIG_SUMMARY: 'default test suite',
+            TIMEOUT_MS: 600000,
+            API_URL: 'http://localhost:3011',
+            FEATURE_NAME: 'pan-611',
+            DOCKER_PS_FORMAT: '{{.Names}}',
+            MEMORY_CONTEXT: memoryContext,
+          },
+        });
+        const merge = yield* renderPrompt({
+          name: 'merge',
+          vars: {
+            ISSUE_ID: 'PAN-611',
+            SOURCE_BRANCH: 'feature/pan-611',
+            TARGET_BRANCH: 'main',
+            PROJECT_PATH: '/workspace',
+            DO_PUSH: false,
+            DO_BUILD: false,
+            API_URL: 'http://localhost:3011',
+            MEMORY_CONTEXT: memoryContext,
+          },
+        });
+        const emptyWork = yield* renderPrompt({
+          name: 'work',
+          vars: {
+            ISSUE_ID: 'PAN-611',
+            ISSUE_ID_LOWER: 'pan-611',
+            WORKSPACE_PATH: '/workspace',
+            LOCAL: true,
+            REMOTE: false,
+            MEMORY_CONTEXT: '',
+          },
+        });
+
+        for (const out of [planning, work, review, test, merge]) {
+          expect(out).toContain('## Memory Context');
+          expect(out).toContain(memoryContext);
+        }
+        expect(emptyWork).not.toContain('## Memory Context');
+        expect(emptyWork).not.toContain('no context found');
+      })
+    );
+
     it.effect('renders Playwright isolation guidance in the work prompt', () =>
       Effect.gen(function* () {
         const out = yield* renderPrompt({

@@ -17,6 +17,7 @@ optional:
   - EFFORT_SECTION
   - AUTO_SECTION
   - PRD_REFERENCES
+  - MEMORY_CONTEXT
 ---
 <!-- panopticon:orchestration-context-start -->
 <!-- This is Panopticon orchestration context injected automatically.
@@ -95,6 +96,11 @@ After `pan plan finalize` and the user clicks **Done**, the pipeline runs withou
 ## Description
 {{ISSUE_DESCRIPTION}}
 {{COMMENTS_SECTION}}{{SPEC_SECTION}}{{CHILD_STORIES_SECTION}}{{PROJECT_STRUCTURE_SECTION}}
+{{#MEMORY_CONTEXT}}
+## Memory Context
+
+{{MEMORY_CONTEXT}}
+{{/MEMORY_CONTEXT}}
 ---
 
 ## Your Mission

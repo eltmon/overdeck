@@ -140,6 +140,7 @@ describe('prompt-time memory injection', () => {
     expect(result.status).toBe('injected');
     expect(result.context).toContain('<panopticon-memory-context>');
     expect(result.context).toContain('prompt injection memory retrieval summary observation hit');
+    expect(result.context).toContain('Sibling memory hint (not authoritative current state).');
     expect(result.decision.allocations.status).toBeLessThanOrEqual(PROMPT_TIME_MEMORY_BUDGETS.status);
     expect(result.decision.allocations.observations).toBeLessThanOrEqual(PROMPT_TIME_MEMORY_BUDGETS.observations);
     expect(result.decision.allocations.summaries).toBeLessThanOrEqual(PROMPT_TIME_MEMORY_BUDGETS.summaries);
@@ -157,6 +158,38 @@ describe('prompt-time memory injection', () => {
     });
     expect(entries.at(-1).allocationBytes.observations).toBeGreaterThan(0);
     expect(entries.at(-1).sources.map((source: { docType: string }) => source.docType)).toContain('sibling');
+  });
+
+  it('keeps spawn-time injection enabled when the prompt-time settings toggle is disabled', async () => {
+    await writeStatus();
+
+    const result = await injectPromptTimeMemory({
+      prompt: 'spawn status context',
+      identity,
+      surface: 'spawn',
+      now: new Date('2026-05-16T22:30:00.000Z'),
+      id: 'spawn-1',
+      loadPromptTimeEnabled: async () => false,
+      expansion: async () => ({
+        status: 'extracted',
+        provider: 'stub',
+        result: {
+          data: { terms: ['spawn status context', 'memory', 'rag'] },
+          usage: { input: 1, output: 1 },
+          cost: { usd: 0 },
+          model: 'stub-model',
+          provider: 'stub',
+        },
+      }),
+    });
+
+    expect(result.status).toBe('injected');
+    expect(result.context).toContain('<panopticon-memory-context>');
+    expect((await readRagEntries()).at(-1)).toMatchObject({
+      id: 'spawn-1',
+      surface: 'spawn',
+      outcome: 'injected',
+    });
   });
 
   it('skips prompt-time injection when the settings toggle is disabled', async () => {

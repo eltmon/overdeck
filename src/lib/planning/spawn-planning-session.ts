@@ -27,7 +27,7 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel, roleAgentDefinitionPath } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath } from '../agents.js';
 import { loadConfig, resolveModel } from '../config-yaml.js';
 import { canUseHarness } from '../harness-policy.js';
 import { generateLauncherScript } from '../launcher-generator.js';
@@ -160,7 +160,7 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false): Promise<string> {
+export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high', auto = false, memoryContext = ''): Promise<string> {
   const issueLower = issue.identifier.toLowerCase();
   const version = await getPackageVersion();
   const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
@@ -295,6 +295,7 @@ The user invoked \`pan plan --auto\`. Complete planning end-to-end without askin
       EFFORT_SECTION: effortSection,
       AUTO_SECTION: autoSection,
       PRD_REFERENCES: prdReferences,
+      MEMORY_CONTEXT: memoryContext,
     },
   }));
 }
@@ -489,7 +490,18 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 4: Configure agent ─────────────────────────────────────────
     progress(4, 'Configuring agent', planningModel);
 
-    const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true);
+    let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true);
+    const memoryContext = await retrieveSpawnTimeMemoryContext({
+      prompt: planningPrompt,
+      issueId: issue.identifier,
+      workspace: workspacePath,
+      agentId: sessionName,
+      role: 'plan',
+      harness: effectiveHarness,
+    });
+    if (memoryContext) {
+      planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, memoryContext);
+    }
 
     // Capture planning prompt in workspace .pan/continue.json.
     await Effect.runPromise(writeWorkspaceContinue(workspacePath, {
