@@ -4,7 +4,7 @@
     "created": "2026-05-17T14:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1139: Dashboard restart fragility: Bad Gateway after agent-triggered reload",
-    "updated": "2026-05-17T14:22:31.180Z"
+    "updated": "2026-05-17T16:35:18.385Z"
   },
   "plan": {
     "id": "pan-1139",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "e1f8d420-9c2a-4c2e-8b21-7a3e2f9d0c01",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 54,
     "created": "2026-05-17T14:30:00.000Z",
-    "updated": "2026-05-17T14:22:31.180Z",
+    "updated": "2026-05-17T16:35:18.385Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1139",
@@ -546,7 +546,64 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-17-PAN-1139-dashboard-restart-fragility-bad-gateway-after-agent-triggered-reload.vbrief.json"
+      "canonicalFilename": "2026-05-17-PAN-1139-dashboard-restart-fragility-bad-gateway-after-agent-triggered-reload.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1139",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-17T16:35:18.385Z",
+        "work": {
+          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-17T16:35:18.385Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-17T16:35:18.385Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-17T16:35:18.385Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-17T16:35:18.385Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1156"
+        }
+      }
     }
   },
   "status": "proposed"

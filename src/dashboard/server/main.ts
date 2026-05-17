@@ -331,20 +331,18 @@ const emitShutdownActivity = () => {
     emitActivityTts({ utterance: 'Dashboard stopping', priority: 2 });
   } catch { /* non-fatal */ }
 };
-process.once('SIGTERM', () => {
+const handleShutdownSignal = (signal: NodeJS.Signals) => {
+  console.log(`[panopticon] received ${signal} (pid=${process.pid} ppid=${process.ppid}) — shutting down`);
   emitShutdownActivity();
   clearInterval(attachmentCleanupTimer);
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
-});
-process.once('SIGINT', () => {
-  emitShutdownActivity();
-  clearInterval(attachmentCleanupTimer);
-  stopAgentEnrichmentService();
-  stopConversationLifecycleService();
-  stopTtsSummarizer();
-});
+  process.exit(0);
+};
+process.once('SIGTERM', () => handleShutdownSignal('SIGTERM'));
+process.once('SIGINT', () => handleShutdownSignal('SIGINT'));
+process.once('SIGHUP', () => handleShutdownSignal('SIGHUP'));
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();

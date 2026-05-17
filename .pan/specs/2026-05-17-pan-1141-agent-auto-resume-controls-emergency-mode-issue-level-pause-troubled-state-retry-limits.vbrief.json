@@ -4,7 +4,7 @@
     "created": "2026-05-16T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1141: Agent auto-resume controls — emergency mode, issue-level pause, troubled-state retry limits",
-    "updated": "2026-05-17T14:16:57.146Z"
+    "updated": "2026-05-17T20:34:53.384Z"
   },
   "plan": {
     "id": "pan-1141",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a3f7c2d9-1b4e-4a8f-9c2d-7f5b8e1c3d4a",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 80,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-17T14:16:57.146Z",
+    "updated": "2026-05-17T20:34:53.384Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1141",
@@ -1217,7 +1217,66 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-17-PAN-1141-agent-auto-resume-controls-emergency-mode-issue-level-pause-troubled-state-retry-limits.vbrief.json"
+      "canonicalFilename": "2026-05-17-PAN-1141-agent-auto-resume-controls-emergency-mode-issue-level-pause-troubled-state-retry-limits.vbrief.json",
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-1141",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-17T20:34:53.381Z",
+        "work": {
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-17T20:34:53.381Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "reviewing",
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "notes": "pan start bypasses troubled gate; dashboard Start buttons shown for paused/troubled agents; dashboard routes use sync I/O; npm test timeout",
+          "history": [
+            {
+              "status": "reviewing",
+              "at": "2026-05-17T20:34:53.381Z",
+              "notes": "pan start bypasses troubled gate; dashboard Start buttons shown for paused/troubled agents; dashboard routes use sync I/O; npm test timeout"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-17T20:34:53.381Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-17T20:34:53.381Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1157"
+        }
+      }
     }
   },
   "status": "proposed"

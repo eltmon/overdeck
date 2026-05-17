@@ -270,6 +270,9 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     // proceed anyway
   }
 
+  // Tracked here (not in shutdown()) so child-close handlers can see it.
+  let shuttingDown = false;
+
   // ── Start API server ───────────────────────────────────────────────────────
   console.log(chalk.dim('Starting API server (Node 22)...'));
   const apiChild = spawn(node22, [bundledServer], {
@@ -296,7 +299,8 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     process.exit(1);
   });
 
-  apiChild.on('close', (code) => {
+  apiChild.on('close', (code, signal) => {
+    console.error(chalk.yellow(`[pan dev] API child closed: pid=${apiChild.pid} code=${code} signal=${signal ?? 'none'} shuttingDown=${shuttingDown}`));
     if (code !== 0 && code !== null) {
       console.error(chalk.red(`API server exited with code ${code}`));
       process.exit(1);
@@ -337,6 +341,10 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
     process.exit(1);
   });
 
+  viteChild.on('close', (code, signal) => {
+    console.error(chalk.yellow(`[pan dev] Vite child closed: pid=${viteChild.pid} code=${code} signal=${signal ?? 'none'} shuttingDown=${shuttingDown}`));
+  });
+
   try {
     await waitForHttp200(config.dashboardPort, 10000);
     console.log(chalk.green('✓ Vite dev server ready'));
@@ -362,11 +370,10 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   console.log(chalk.dim('\nPress Ctrl+C to stop\n'));
 
   // ── Graceful shutdown ──────────────────────────────────────────────────────
-  let shuttingDown = false;
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
-    console.log(chalk.dim(`\n${signal} received, shutting down...`));
+    console.log(chalk.dim(`\n${signal} received by pan dev (pid=${process.pid} ppid=${process.ppid}), shutting down...`));
 
     viteChild.kill('SIGTERM');
     apiChild.kill('SIGTERM');
@@ -402,6 +409,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
 
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGHUP', () => shutdown('SIGHUP'));
 
   // Keep the process alive
   await new Promise(() => {});
