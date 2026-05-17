@@ -433,7 +433,7 @@ export function IssueAgentCard({
         ? `Troubled (${agent.consecutiveFailures} failure${agent.consecutiveFailures === 1 ? '' : 's'})`
         : noResumeMode?.active === true
           ? 'Boot --no-resume'
-          : 'Manual'
+          : undefined
     : undefined;
   const gatingTitle = gatingReason === 'Boot --no-resume' && noResumeMode?.since
     ? `No-resume mode active since ${formatRelativeTime(noResumeMode.since, now)}`

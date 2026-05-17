@@ -231,6 +231,31 @@ function buildAgentControlEventPayload(state: AgentState, previousStatus?: Agent
   };
 }
 
+function buildAgentGateFailureSnapshot(state: Partial<AgentState>) {
+  return {
+    paused: state.paused === true,
+    pausedReason: state.pausedReason ?? null,
+    pausedAt: state.pausedAt ?? null,
+    troubled: state.troubled === true,
+    troubledAt: state.troubledAt ?? null,
+    consecutiveFailures: state.consecutiveFailures ?? 0,
+    firstFailureInRunAt: state.firstFailureInRunAt ?? null,
+    lastFailureAt: state.lastFailureAt ?? null,
+    lastFailureReason: state.lastFailureReason ?? null,
+    lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
+  };
+}
+
+async function readPersistedAgentState(agentId: string): Promise<Partial<AgentState>> {
+  const stateFile = join(homedir(), '.panopticon', 'agents', agentId, 'state.json');
+  if (!existsSync(stateFile)) return {};
+  try {
+    return JSON.parse(await readFile(stateFile, 'utf-8')) as Partial<AgentState>;
+  } catch {
+    return {};
+  }
+}
+
 async function captureAgentOutputBeforeKill(agentId: string): Promise<void> {
   const output = await capturePaneAsync(agentId, 5000).catch(() => '');
   if (!output) return;
@@ -495,7 +520,7 @@ const getAgentsRoute = HttpRouter.add(
             const stateFile = join(homedir(), '.panopticon', 'agents', name, 'state.json');
             const healthFile = join(homedir(), '.panopticon', 'agents', name, 'health.json');
             let state: any = { model: isPlanning ? 'opus' : 'sonnet', workspace: process.cwd() };
-            let health: any = { consecutiveFailures: 0, killCount: 0 };
+            let health: any = { killCount: 0 };
 
             if (existsSync(stateFile)) {
               try { state = { ...state, ...JSON.parse(await readFile(stateFile, 'utf-8')) }; } catch {}
@@ -536,7 +561,7 @@ const getAgentsRoute = HttpRouter.add(
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'healthy' as const,
               startedAt,
-              consecutiveFailures: health.consecutiveFailures || 0,
+              ...buildAgentGateFailureSnapshot(state),
               killCount: health.killCount || 0,
               workspace: state.workspace || null,
               workspaceLocation,
@@ -561,7 +586,8 @@ const getAgentsRoute = HttpRouter.add(
             const isPlanning = name.startsWith('planning-');
             try {
               const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
-              const issueId = state.issueId?.toUpperCase() || name.replace(/^(agent-|planning-)/, '').toUpperCase();
+              const persistedState = await readPersistedAgentState(name);
+              const issueId = state.issueId?.toUpperCase() || persistedState.issueId?.toUpperCase() || name.replace(/^(agent-|planning-)/, '').toUpperCase();
               const workspaceLocation = await getWorkspaceLocation(issueId);
               return {
                 id: name,
@@ -569,8 +595,8 @@ const getAgentsRoute = HttpRouter.add(
                 runtime: 'claude',
                 model: state.model || (isPlanning ? 'opus' : 'sonnet'),
                 status: 'healthy' as const,
-                startedAt: state.startedAt || new Date().toISOString(),
-                consecutiveFailures: 0,
+                startedAt: state.startedAt || persistedState.startedAt || new Date().toISOString(),
+                ...buildAgentGateFailureSnapshot(persistedState),
                 killCount: 0,
                 workspace: `/workspace (${state.vmName})`,
                 workspaceLocation: 'remote',
@@ -645,7 +671,7 @@ const getAgentsRoute = HttpRouter.add(
                 model: state.model || (isPlanning ? 'opus' : 'sonnet'),
                 status: 'stopped' as const,
                 startedAt: state.startedAt || new Date().toISOString(),
-                consecutiveFailures: 0,
+                ...buildAgentGateFailureSnapshot(state),
                 killCount: 0,
                 workspace: state.workspace || null,
                 workspaceLocation: 'local',
@@ -679,7 +705,7 @@ const getAgentsRoute = HttpRouter.add(
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'starting' as const,
               startedAt: state.startedAt || new Date().toISOString(),
-              consecutiveFailures: 0,
+              ...buildAgentGateFailureSnapshot(state),
               killCount: 0,
               workspace: state.workspace || null,
               workspaceLocation: 'local',
@@ -707,7 +733,7 @@ const getAgentsRoute = HttpRouter.add(
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'error' as const,
               startedAt: state.startedAt || new Date().toISOString(),
-              consecutiveFailures: 0,
+              ...buildAgentGateFailureSnapshot(state),
               killCount: 0,
               workspace: state.workspace || null,
               workspaceLocation: state.location || 'local',
