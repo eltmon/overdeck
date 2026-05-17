@@ -7,6 +7,7 @@ import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { bridgeCodexAuthToCliproxyAsync } from '../../../lib/cliproxy.js';
 import { createSessionAsync, sessionExistsAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { getDashboardApiUrl } from '../../../lib/config.js';
 import { validateOrigin } from './origin-validation.js';
 
 // ─── Re-auth session registry ──────────────────────────────────────────────────
@@ -68,14 +69,13 @@ function cleanupExpiredReauthSessions(): void {
 
 export function consumeReauthTerminalToken(sessionName: string, token: string | undefined): boolean {
   const session = getLiveReauthSession(sessionName);
-  if (!session || !token || session.terminalToken !== token) return false;
-  session.terminalToken = '';
-  return true;
+  return !!session && !!token && session.terminalToken === token;
 }
 
 function buildTerminalCookie(sessionName: string, terminalToken: string): string {
   const value = encodeURIComponent(`${sessionName}:${terminalToken}`);
-  return `pan_codex_reauth=${value}; HttpOnly; SameSite=Strict; Path=/ws/terminal; Max-Age=${Math.floor(SESSION_MAX_AGE_MS / 1000)}`;
+  const secure = getDashboardApiUrl().startsWith('https://') ? '; Secure' : '';
+  return `pan_codex_reauth=${value}; HttpOnly; SameSite=Strict; Path=/ws/terminal; Max-Age=${Math.floor(SESSION_MAX_AGE_MS / 1000)}${secure}`;
 }
 
 // ─── Route: GET /api/settings/codex-auth ───────────────────────────────────────
@@ -114,11 +114,10 @@ const postCodexReauthRoute = HttpRouter.add(
       const existing = yield* Effect.promise(() => getExistingLiveReauthSession());
       if (existing) {
         const headless = !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
+        existing.session.terminalToken = randomUUID();
         return jsonResponse(
           { sessionName: existing.sessionName, statusToken: existing.session.statusToken, headless, existing: true },
-          existing.session.terminalToken
-            ? { headers: { 'Set-Cookie': buildTerminalCookie(existing.sessionName, existing.session.terminalToken) } }
-            : undefined,
+          { headers: { 'Set-Cookie': buildTerminalCookie(existing.sessionName, existing.session.terminalToken) } },
         );
       }
 
@@ -155,8 +154,9 @@ const postCodexReauthStatusRoute = HttpRouter.add(
       const body = yield* readJsonBody;
       const sessionName = typeof body.session === 'string' ? body.session : '';
       const token = typeof body.token === 'string' ? body.token : '';
+      const session = getLiveReauthSession(sessionName);
 
-      if (!validateReauthStatusToken(sessionName, token)) {
+      if (!validateReauthStatusToken(sessionName, token) || !session) {
         return jsonResponse({ completed: false });
       }
 
@@ -166,7 +166,7 @@ const postCodexReauthStatusRoute = HttpRouter.add(
       }
 
       yield* Effect.promise(() => bridgeCodexAuthToCliproxyAsync());
-      const authStatus = yield* Effect.promise(() => checkCodexAuthStatus());
+      const authStatus = yield* Effect.promise(() => checkCodexAuthStatus({ ignoreBurnBefore: session.createdAt }));
       if (authStatus.status !== 'valid') {
         return jsonResponse({
           completed: true,
