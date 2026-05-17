@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T16:05:59.072Z",
+  "updated": "2026-05-17T16:09:38.459Z",
   "gitState": {
     "branch": "feature/pan-1141",
     "sha": "dea74e98b42d8ddd3cb0c0ca7773b501ebbb3829",
@@ -128,11 +128,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-iuoi (pan unpause clears paused fields without spawning, reports already-unpaused as a successful no-op, and prints a pan start/deacon patrol hint). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-iuoi",
+    "description": "Completed bead workspace-29wd (NoResumeBanner fetches /api/no-resume-mode, refreshes on dashboard reconnect, renders active boot timestamp/copy, hides when inactive, and mounts above other top banners). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-29wd",
     "filesToRead": [
-      "src/cli/commands/unpause.ts",
-      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/NoResumeBanner.tsx",
+      "src/dashboard/frontend/src/App.tsx",
       ".pan/spec.vbrief.json",
       ".pan/continue.json"
     ]
@@ -228,6 +228,12 @@
       "timestamp": "2026-05-17T16:05:59.072Z",
       "reason": "bead-complete",
       "note": "Implemented pan unpause <id> using clearAgentPaused, unknown-agent refusal, already-unpaused no-op output, no spawn/resume behavior, CLI registration, and explicit pan start/deacon patrol hint. npm run typecheck and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T16:09:38.459Z",
+      "reason": "bead-complete",
+      "note": "Implemented NoResumeBanner with GET /api/no-resume-mode polling, refresh on panopticon:reconnected, active/inactive rendering, boot timestamp and override copy, and App.tsx placement above DeaconPauseBanner/StoppedAgentsBanner/CodexAuthBanner. npm run typecheck, npm run lint, browser verification, and graphify update . passed.",
       "agentModel": "gpt-5.5"
     }
   ],

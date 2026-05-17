@@ -879,7 +879,7 @@
       {
         "id": "frontend-no-resume-banner",
         "title": "Top-level NoResumeBanner component",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -895,28 +895,32 @@
           {
             "id": "frontend-no-resume-banner.ac1",
             "title": "Banner renders when `active: true` and is hidden when false",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:09:38.459Z"
           },
           {
             "id": "frontend-no-resume-banner.ac2",
             "title": "Banner copy includes the boot timestamp and the override instruction",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:09:38.459Z"
           },
           {
             "id": "frontend-no-resume-banner.ac3",
             "title": "Banner sits above DeaconPauseBanner / StoppedAgentsBanner / CodexAuthBanner in the App.tsx render order",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:09:38.459Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T16:09:38.459Z"
       },
       {
         "id": "wrapper-skills",
