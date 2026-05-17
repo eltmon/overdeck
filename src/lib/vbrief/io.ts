@@ -350,7 +350,9 @@ export function updateSubItemStatus(
   const item = doc.plan.items.find(i => i.id === itemId);
   if (!item?.subItems) return;
 
-  const subItem = item.subItems.find(s => s.id === subItemId);
+  // Normalize subItemId before validation — spec uses "parentId.subId" format
+  const fullSubId = subItemId.includes('.') ? subItemId : `${itemId}.${subItemId}`;
+  const subItem = item.subItems.find(s => s.id === subItemId || s.id === fullSubId);
   if (!subItem) return;
 
   const continueState = readWorkspaceContinue(workspacePath) ?? {
@@ -367,11 +369,7 @@ export function updateSubItemStatus(
   };
 
   const overrides = { ...continueState.statusOverrides };
-  // SubItem IDs use format "parentId.subId" (e.g. "item-1.ac1").
-  // subItemId may be passed in full format ("item-1.ac1") or just the child part
-  // ("ac1"). Store only once — use the full form directly when subItemId has a dot.
-  const key = subItemId.includes('.') ? subItemId : `${itemId}.${subItemId}`;
-  overrides[key] = status;
+  overrides[fullSubId] = status;
   continueState.statusOverrides = overrides;
 
   writeWorkspaceContinue(workspacePath, continueState);

@@ -288,8 +288,15 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
 
   if (trackerType === 'github') {
     await reopenGitHubIssueCommand(id, options);
-  } else {
+  } else if (trackerType === 'linear') {
     await reopenLinearIssueCommand(id, options);
+  } else {
+    // rally and gitlab are not yet supported — fail fast rather than silently
+    // falling through to the Linear SDK which could misroute the issue.
+    console.log(chalk.red(`\nError: \`pan reopen\` does not support ${trackerType} tracker.`));
+    console.log(`  Issue ${id} is tracked as ${trackerType} in your projects.yaml.`);
+    console.log(`  Currently supported trackers: github, linear.`);
+    process.exit(1);
   }
 }
 
