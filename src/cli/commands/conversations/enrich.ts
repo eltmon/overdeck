@@ -32,7 +32,7 @@ export async function enrichAction(
   const upgrade = Boolean(opts['upgrade']);
   const full = Boolean(opts['full']);
   const modelOverride = opts['with'] as string | undefined;
-  const tierRaw = deep ? (upgrade ? 2 : 3) : (full && modelOverride ? 3 : parseInt((opts['tier'] as string) ?? '1', 10));
+  const tierRaw = deep ? (upgrade ? 2 : 3) : (full ? 3 : parseInt((opts['tier'] as string) ?? '1', 10));
   const tier = tierRaw as EnrichmentTier;
   const yes = Boolean(opts['yes']);
   const maxParallel = opts['maxParallel'] ? parseInt(opts['maxParallel'] as string, 10) : undefined;
@@ -82,6 +82,7 @@ export async function enrichAction(
       force,
       modelOverride,
       promptSuffix: opts['prompt'] as string | undefined,
+      fullTranscript: full,
       onProgress: (p) => {
         const pct = p.total > 0 ? Math.round((p.processed / p.total) * 100) : 0;
         const elapsed = (p.elapsedMs / 1000).toFixed(1);
@@ -127,6 +128,7 @@ export async function enrichAction(
         skipAlreadyEnriched,
         modelOverride,
         promptSuffix: opts['prompt'] as string | undefined,
+        fullTranscript: full,
         force: true,
       });
       console.log(`  Enriched: ${chalk.green(result.enriched)}, Errors: ${chalk.red(result.errors)}, Cost: ${formatCost(result.actualCost, result.estimatedCost)}`);

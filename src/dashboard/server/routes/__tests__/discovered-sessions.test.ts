@@ -21,6 +21,8 @@ import {
 import { enrichSessions } from '../../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../../lib/conversations/embeddings/index.js';
 import { parseSearchParams, rejectUntrustedOrigin } from '../discovered-sessions.js';
+import { DASHBOARD_SESSION_COOKIE, rejectUnauthorizedDashboardRequest } from '../dashboard-auth.js';
+import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 
 let TEST_HOME: string;
 let fakeClaudeDir: string;
@@ -52,12 +54,16 @@ beforeEach(() => {
   mkdirSync(join(fakeClaudeDir, '-home-user-Projects-myapp'), { recursive: true });
   process.env.PANOPTICON_HOME = TEST_HOME;
   process.env.HOME = TEST_HOME;
+  process.env.PANOPTICON_INTERNAL_TOKEN = 'test-dashboard-token';
+  _resetInternalTokenCacheForTests();
 });
 
 afterEach(async () => {
   await resetDb();
   delete process.env.PANOPTICON_HOME;
   delete process.env.HOME;
+  delete process.env.PANOPTICON_INTERNAL_TOKEN;
+  _resetInternalTokenCacheForTests();
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
 
@@ -184,10 +190,25 @@ describe('parseSearchParams', () => {
 
 // ─── Origin validation ────────────────────────────────────────────────────────
 
-describe('rejectUntrustedOrigin', () => {
+describe('dashboard conversation route guards', () => {
   function request(headers: Record<string, string> = {}, method = 'GET') {
     return { headers, method } as never;
   }
+
+  it('rejects discovered-session requests without dashboard auth', () => {
+    const response = rejectUnauthorizedDashboardRequest(request());
+    expect(response?.status).toBe(401);
+  });
+
+  it('allows discovered-session requests with internal token header', () => {
+    const response = rejectUnauthorizedDashboardRequest(request({ [INTERNAL_TOKEN_HEADER]: 'test-dashboard-token' }));
+    expect(response).toBeNull();
+  });
+
+  it('allows discovered-session requests with dashboard session cookie', () => {
+    const response = rejectUnauthorizedDashboardRequest(request({ cookie: `${DASHBOARD_SESSION_COOKIE}=test-dashboard-token` }));
+    expect(response).toBeNull();
+  });
 
   it('rejects semantic GET requests without origin evidence', () => {
     const response = rejectUntrustedOrigin(request(), { requireOriginHeader: true });

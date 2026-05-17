@@ -45,3 +45,11 @@ Semantic search origin hardening is covered by `src/dashboard/server/routes/__te
 - rejects semantic GET requests without origin evidence,
 - allows semantic GET requests from trusted origins,
 - rejects semantic GET requests from untrusted origins.
+
+## Browser UAT — dashboard session auth
+
+Using the rebuilt Node 22 dashboard on `http://127.0.0.1:4313/sessions`:
+
+- Sessions page loaded with `Session History` after `index.html` issued the dashboard session cookie.
+- Authenticated discovered-session requests succeeded: `/api/discovered-sessions?limit=50`, `/api/discovered-sessions/stats`, and `/api/discovered-sessions/cost?` all returned `200 OK`.
+- A same-page fetch to `/api/discovered-sessions?limit=1` with `credentials: 'omit'` returned `401 {"error":"unauthorized"}`, confirming transcript-derived metadata is not exposed without the dashboard session/shared-secret credential.

@@ -111,8 +111,8 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
 
   const config = opts.config ?? getConversationsConfig();
   const provider = (opts.provider ?? config.embeddingProvider) as EmbeddingProviderName;
-  const providerDefaultModel = provider === 'voyage' ? 'voyage-code-3' : provider === 'openai' ? 'text-embedding-3-small' : config.embeddingModel;
-  const model = opts.model ?? (opts.provider ? providerDefaultModel : config.embeddingModel);
+  const providerDefaultModel = provider === 'voyage' ? 'voyage-code-3' : provider === 'ollama' ? 'nomic-embed-text' : 'text-embedding-3-small';
+  const model = opts.model ?? (opts.provider || provider !== config.embeddingProvider ? providerDefaultModel : config.embeddingModel);
   const maxParallel = opts.maxParallel ?? config.enrichment.maxParallel;
   const embedFn = opts.embedFn ?? embed;
 

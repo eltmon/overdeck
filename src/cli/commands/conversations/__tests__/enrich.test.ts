@@ -125,6 +125,22 @@ describe('enrichAction', () => {
     }));
   });
 
+  it('--full requests L3 full-transcript enrichment for explicit sessions', async () => {
+    mockEnrichSessions.mockResolvedValue({ enriched: 1, skipped: 0, errors: 0, durationMs: 100 });
+
+    const { enrichAction } = await import('../enrich.js');
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await enrichAction(['42'], { full: true, yes: true });
+
+    expect(mockEnrichSessions).toHaveBeenCalledWith(expect.objectContaining({
+      tier: 3,
+      sessionIds: [42],
+      fullTranscript: true,
+      skipAlreadyEnriched: false,
+    }));
+  });
+
   it('--with plus --full requests L3 full-transcript enrichment for explicit sessions', async () => {
     mockEnrichSessions.mockResolvedValue({ enriched: 1, skipped: 0, errors: 0, durationMs: 100 });
 
@@ -138,6 +154,7 @@ describe('enrichAction', () => {
       sessionIds: [42],
       modelOverride: 'claude-opus-4-7',
       skipAlreadyEnriched: false,
+      fullTranscript: true,
     }));
   });
 

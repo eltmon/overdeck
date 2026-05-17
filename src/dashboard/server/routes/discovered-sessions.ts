@@ -37,6 +37,7 @@ import { getConversationsConfigAsync } from '../../../lib/config-yaml.js';
 import { updateSettingsApi } from '../../../lib/settings-api.js';
 import { embed } from '../../../lib/conversations/embeddings/providers.js';
 import { validateOrigin } from './origin-validation.js';
+import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
 
 function getRequestHeader(
@@ -121,9 +122,12 @@ function parseRequestBody<A>(schema: Schema.Schema<A, unknown, never>, raw: unkn
 const getStatsRoute = HttpRouter.add(
   'GET',
   '/api/discovered-sessions/stats',
-  httpHandler(Effect.promise(async () =>
-    jsonResponse(await runDashboardDbJob('getDiscoveredStats')),
-  )),
+  httpHandler(Effect.gen(function* () {
+    const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
+    return jsonResponse(yield* Effect.promise(() => runDashboardDbJob('getDiscoveredStats')));
+  })),
 );
 
 // ─── GET /api/discovered-sessions ────────────────────────────────────────────
@@ -133,6 +137,8 @@ const listRoute = HttpRouter.add(
   '/api/discovered-sessions',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
     const params = new URL(req.url, 'http://localhost').searchParams;
 
     const rawLimit = parseInt(params.get('limit') ?? '50', 10);
@@ -223,6 +229,8 @@ const searchRoute = HttpRouter.add(
   '/api/discovered-sessions/search',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
     const params = new URL(req.url, 'http://localhost').searchParams;
 
     const q = params.get('q') ?? undefined;
@@ -275,6 +283,8 @@ const getCostRoute = HttpRouter.add(
   '/api/discovered-sessions/cost',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
     const params = new URL(req.url, 'http://localhost').searchParams;
 
     const filter = parseSearchParams(params);
@@ -289,6 +299,9 @@ const getByIdRoute = HttpRouter.add(
   'GET',
   '/api/discovered-sessions/:id',
   httpHandler(Effect.gen(function* () {
+    const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
     const params = yield* HttpRouter.params;
     const id = parseInt(params.id ?? '', 10);
 
@@ -312,6 +325,8 @@ const postEnrichByIdRoute = HttpRouter.add(
   '/api/discovered-sessions/:id/enrich',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
     const originError = rejectUntrustedOrigin(req);
     if (originError) return originError;
     const params = yield* HttpRouter.params;
@@ -390,6 +405,8 @@ const postScanRoute = HttpRouter.add(
   '/api/discovered-sessions/scan',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
     const originError = rejectUntrustedOrigin(req);
     if (originError) return originError;
     const parsedBody = parseRequestBody(ScanBodySchema, yield* req.json);
@@ -479,6 +496,8 @@ const postEnrichRoute = HttpRouter.add(
   '/api/discovered-sessions/enrich',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
     const originError = rejectUntrustedOrigin(req);
     if (originError) return originError;
     const parsedBody = parseRequestBody(EnrichBodySchema, yield* req.json);
@@ -563,6 +582,8 @@ const postEmbedRoute = HttpRouter.add(
   '/api/discovered-sessions/embed',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
     const originError = rejectUntrustedOrigin(req);
     if (originError) return originError;
     const parsedBody = parseRequestBody(EmbedBodySchema, yield* req.json);
@@ -597,6 +618,9 @@ const getConvConfigRoute = HttpRouter.add(
   'GET',
   '/api/discovered-sessions/config',
   httpHandler(Effect.gen(function* () {
+    const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
     const config = yield* Effect.promise(() => getConversationsConfigAsync());
     return jsonResponse({
       embeddings: config.embeddings,
@@ -614,6 +638,8 @@ const putConvConfigRoute = HttpRouter.add(
   '/api/discovered-sessions/config',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
     const originError = rejectUntrustedOrigin(req);
     if (originError) return originError;
     const parsedBody = parseRequestBody(ConversationsConfigBodySchema, yield* req.json);
@@ -640,6 +666,8 @@ const postTestConnectionRoute = HttpRouter.add(
   '/api/discovered-sessions/test-connection',
   httpHandler(Effect.gen(function* () {
     const req = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(req);
+    if (authError) return authError;
     const originError = rejectUntrustedOrigin(req);
     if (originError) return originError;
     const parsedBody = parseRequestBody(TestConnectionBodySchema, yield* req.json);

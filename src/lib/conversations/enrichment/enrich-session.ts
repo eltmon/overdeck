@@ -37,6 +37,8 @@ export interface EnrichSessionOptions {
   modelOverride?: string;
   /** Append custom text to the enrichment prompt */
   promptSuffix?: string;
+  /** Read every JSONL line without tier sampling caps */
+  fullTranscript?: boolean;
   /** Injected for testing — skips real API call */
   callApi?: (model: string, prompt: string) => Promise<EnrichmentResponse>;
 }
@@ -88,7 +90,7 @@ function deterministicReservoirSlot(candidateCount: number, reservoirSize: numbe
   return n % candidateCount < reservoirSize ? n % reservoirSize : -1;
 }
 
-async function sampleJsonlLines(filePath: string, tier: EnrichmentTier): Promise<string[]> {
+async function sampleJsonlLines(filePath: string, tier: EnrichmentTier, options: { fullTranscript?: boolean } = {}): Promise<string[]> {
   try {
     await fs.access(filePath);
   } catch {
@@ -114,6 +116,10 @@ async function sampleJsonlLines(filePath: string, tier: EnrichmentTier): Promise
     rl.on('line', (line) => {
       const trimmed = line.trim();
       if (!trimmed || capped) return;
+      if (options.fullTranscript) {
+        l3Lines.push(trimmed);
+        return;
+      }
       const sampled = boundedLine(trimmed);
       seen++;
 
@@ -142,7 +148,7 @@ async function sampleJsonlLines(filePath: string, tier: EnrichmentTier): Promise
     });
 
     rl.on('close', () => {
-      if (tier === 3) {
+      if (tier === 3 || options.fullTranscript) {
         resolve(l3Lines);
         return;
       }
@@ -150,7 +156,7 @@ async function sampleJsonlLines(filePath: string, tier: EnrichmentTier): Promise
       for (const item of [...first, ...middle, ...tail]) byIndex.set(item.index, item.line);
       resolve([...byIndex.entries()].sort(([a], [b]) => a - b).map(([, line]) => line));
     });
-    rl.on('error', () => resolve(tier === 3 ? l3Lines : []));
+    rl.on('error', () => resolve(tier === 3 || options.fullTranscript ? l3Lines : []));
   });
 }
 
@@ -338,12 +344,13 @@ export async function callClaudeApi(
 export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichSessionResult> {
   const { sessionId, jsonlPath, tier, config } = opts;
   const requestedModel = opts.modelOverride ?? selectEnrichmentModelForTier(tier, config);
-  const model = opts.callApi ? requestedModel : resolveEnrichmentModel(requestedModel);
+  let model = requestedModel;
 
   const apiCall = opts.callApi ?? callClaudeApi;
 
   try {
-    const lines = await sampleJsonlLines(jsonlPath, tier);
+    model = opts.callApi ? requestedModel : resolveEnrichmentModel(requestedModel);
+    const lines = await sampleJsonlLines(jsonlPath, tier, { fullTranscript: opts.fullTranscript });
     if (lines.length === 0) {
       return { sessionId, tier, model, error: 'No readable messages in JSONL' };
     }

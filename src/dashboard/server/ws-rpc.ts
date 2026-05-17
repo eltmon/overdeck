@@ -26,6 +26,7 @@ import { CostThresholdError } from '../../lib/conversations/enrichment/index.js'
 import { getConversationsConfigAsync } from '../../lib/config-yaml.js';
 import type { DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
 import { validateOrigin } from './routes/origin-validation.js';
+import { rejectUnauthorizedDashboardRequest } from './routes/dashboard-auth.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
 
@@ -657,6 +658,8 @@ export const websocketRpcRouteLayer = Layer.unwrap(
       if (!originCheck.ok) {
         return jsonResponse({ error: originCheck.error }, { status: 403 });
       }
+      const authError = rejectUnauthorizedDashboardRequest(request);
+      if (authError) return authError;
       return yield* rpcWebSocketHttpEffect;
     }));
   }),

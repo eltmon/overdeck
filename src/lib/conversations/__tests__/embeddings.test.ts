@@ -242,6 +242,37 @@ describe('embedSessions', () => {
     expect(getEmbedding(session!.id, 'text-embedding-3-small')?.length).toBe(1536);
   });
 
+  it('uses nomic-embed-text as the Ollama provider default', async () => {
+    const session = seedEnrichedSession(1);
+    const embedFn = vi.fn(async (_provider: unknown, opts: { model: string }): Promise<EmbeddingResult> => ({
+      embedding: new Float32Array(768).fill(0.1),
+      model: opts.model,
+    }));
+
+    const result = await embedSessions({
+      provider: 'ollama',
+      embedFn: embedFn as typeof import('../embeddings/providers.js').embed,
+      maxParallel: 1,
+      config: {
+        compactionModel: 'claude-haiku-4-5',
+        manualCompactMode: 'claude-code',
+        richCompaction: true,
+        titleModel: 'claude-haiku-4-5',
+        watchDirs: [],
+        scanMaxParallel: null,
+        embeddings: true,
+        embeddingProvider: 'ollama',
+        embeddingModel: 'text-embedding-3-small',
+        embeddingAutoOnDeep: false,
+        enrichment: { quickModel: null, deepModel: null, maxParallel: 1, costConfirmThreshold: 1 },
+      },
+    });
+
+    expect(result.embedded).toBe(1);
+    expect(embedFn).toHaveBeenCalledWith('ollama', expect.objectContaining({ model: 'nomic-embed-text' }));
+    expect(getEmbedding(session!.id, 'nomic-embed-text')?.length).toBe(768);
+  });
+
   it('stores Voyage voyage-code-3 embeddings as 1024 dimensions', async () => {
     const session = seedEnrichedSession(1);
     const embedFn = vi.fn(async (_provider: unknown, opts: { model: string }): Promise<EmbeddingResult> => ({

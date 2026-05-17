@@ -1145,6 +1145,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     }
     if (config.conversations?.embedding_provider) {
       result.conversations.embeddingProvider = config.conversations.embedding_provider;
+      if (config.conversations.embedding_provider === 'ollama' && !config.conversations.embedding_model) {
+        result.conversations.embeddingModel = 'nomic-embed-text';
+      }
     }
     if (config.conversations?.embedding_model) {
       result.conversations.embeddingModel = config.conversations.embedding_model;

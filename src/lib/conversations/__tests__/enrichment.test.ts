@@ -236,6 +236,30 @@ describe('enrichSession', () => {
     expect(capturedPrompt.length).toBeLessThan(2_800_000);
   });
 
+  it('full-transcript enrichment bypasses L3 line caps', async () => {
+    const largePath = join(TEST_HOME, 'full-l3.jsonl');
+    const lines = Array.from({ length: 5_050 }, (_, i) => JSON.stringify({
+      message: { role: 'user', content: `literal full transcript line ${i}` },
+    }));
+    writeFileSync(largePath, lines.join('\n') + '\n', 'utf8');
+    const session = upsertDiscoveredSession({ jsonlPath: largePath, messageCount: lines.length });
+    let capturedPrompt = '';
+
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: largePath,
+      tier: 3,
+      fullTranscript: true,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_model, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Full deep sample.', summaryDetailed: 'Full.', tags: ['full'] };
+      },
+    });
+
+    expect(capturedPrompt).toContain('literal full transcript line 5049');
+  });
+
   it('omits raw tool inputs and redacts secrets before sending enrichment prompts', async () => {
     const secretPath = join(TEST_HOME, 'secret-tool-use.jsonl');
     const lines = [
@@ -456,6 +480,20 @@ describe('enrichSessions', () => {
       maxParallel: 1,
     });
     expect(result.enriched).toBe(0);
+  });
+
+  it('counts progress callback failures instead of dropping work-pool errors', async () => {
+    seedSession();
+
+    const result = await enrichSessions({
+      tier: 1,
+      callApi: mockApiCall,
+      onProgress: () => { throw new Error('progress sink failed'); },
+      maxParallel: 1,
+    });
+
+    expect(result.enriched).toBe(1);
+    expect(result.errors).toBe(1);
   });
 
   it('enriches all unenriched sessions with progress callbacks', async () => {

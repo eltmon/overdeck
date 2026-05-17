@@ -46,31 +46,28 @@ function derivePlanningIssueId(agent: Agent): string | undefined {
   return undefined;
 }
 
-export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, title: titleProp, onSessionEnded }: TerminalPanelProps) {
+function PlanningActivityPanel({ issueId, onClose }: { issueId: string; onClose: () => void }) {
+  return (
+    <div className="flex flex-col h-full min-w-0" style={{ backgroundColor: '#0d1117' }}>
+      <div
+        className="flex items-center justify-between px-3 py-1.5 border-b shrink-0"
+        style={{ borderColor: '#232f48', backgroundColor: '#161b26' }}
+      >
+        <span className="text-xs font-medium" style={{ color: '#92a4c9' }}>{issueId}</span>
+        <button onClick={onClose} className="p-1 rounded transition-colors hover:bg-white/10" style={{ color: '#92a4c9' }} title="Close terminal">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        <ActivityView issueId={issueId} />
+      </div>
+    </div>
+  );
+}
+
+function TerminalPanelTerminal({ agent, onClose, sessionName: sessionNameProp, title: titleProp, onSessionEnded }: TerminalPanelProps) {
   const activeSession = sessionNameProp ?? agent.id;
   const displayTitle = titleProp ?? agent.id;
-
-  // Planning agents show ActivityView instead of a live terminal
-  const isPlanning = agent.agentPhase === 'planning' || agent.id.startsWith('planning-');
-  const planningIssueId = isPlanning ? derivePlanningIssueId(agent) : undefined;
-  if (isPlanning && planningIssueId) {
-    return (
-      <div className="flex flex-col h-full min-w-0" style={{ backgroundColor: '#0d1117' }}>
-        <div
-          className="flex items-center justify-between px-3 py-1.5 border-b shrink-0"
-          style={{ borderColor: '#232f48', backgroundColor: '#161b26' }}
-        >
-          <span className="text-xs font-medium" style={{ color: '#92a4c9' }}>{planningIssueId}</span>
-          <button onClick={onClose} className="p-1 rounded transition-colors hover:bg-white/10" style={{ color: '#92a4c9' }} title="Close terminal">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-        <div className="flex-1 min-h-0 overflow-auto">
-          <ActivityView issueId={planningIssueId} />
-        </div>
-      </div>
-    );
-  }
   const terminalRef = useRef<HTMLPreElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -208,4 +205,13 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
       )}
     </div>
   );
+}
+
+export function TerminalPanel(props: TerminalPanelProps) {
+  const isPlanning = props.agent.agentPhase === 'planning' || props.agent.id.startsWith('planning-');
+  const planningIssueId = isPlanning ? derivePlanningIssueId(props.agent) : undefined;
+  if (planningIssueId) {
+    return <PlanningActivityPanel issueId={planningIssueId} onClose={props.onClose} />;
+  }
+  return <TerminalPanelTerminal {...props} />;
 }

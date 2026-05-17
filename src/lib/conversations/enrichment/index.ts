@@ -39,6 +39,8 @@ export interface EnrichOptions {
   modelOverride?: string;
   /** Append custom text to the enrichment prompt */
   promptSuffix?: string;
+  /** Read every JSONL line for literal full-transcript enrichment */
+  fullTranscript?: boolean;
   /** Injected API caller for testing */
   callApi?: EnrichSessionOptions['callApi'];
   /** Preloaded conversations config for dashboard callers */
@@ -161,18 +163,22 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
   const total = sessions.length;
   const enrichedIds: number[] = [];
 
-  const tasks = sessions.map((session) => async () => {
+  const taskStates = sessions.map((session) => ({ session, accounted: false }));
+  const tasks = taskStates.map((state) => async () => {
+    const { session } = state;
     const sessionResult = await enrichSession({
       sessionId: session.id,
       jsonlPath: session.jsonlPath,
       tier,
       modelOverride: opts.modelOverride,
       promptSuffix: opts.promptSuffix,
+      fullTranscript: opts.fullTranscript,
       config: tierConfig,
       callApi: opts.callApi,
     });
 
     processed++;
+    state.accounted = true;
     if (sessionResult.error) {
       result.errors++;
     } else {
@@ -184,23 +190,36 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       }
     }
 
-    await opts.onProgress?.({
-      processed,
-      total,
-      errors: result.errors,
-      elapsedMs: Date.now() - startTs,
-      session: {
-        sessionId: session.id,
-        tier,
-        model: sessionResult.model,
-        cost: sessionResult.error ? undefined : sessionResult.cost ?? estimateEnrichmentCost(1, tier),
-        success: !sessionResult.error,
-        error: sessionResult.error,
-      },
-    });
+    try {
+      await opts.onProgress?.({
+        processed,
+        total,
+        errors: result.errors,
+        elapsedMs: Date.now() - startTs,
+        session: {
+          sessionId: session.id,
+          tier,
+          model: sessionResult.model,
+          cost: sessionResult.error ? undefined : sessionResult.cost ?? estimateEnrichmentCost(1, tier),
+          success: !sessionResult.error,
+          error: sessionResult.error,
+        },
+      });
+    } catch {
+      result.errors++;
+    }
   });
 
-  await runWithPool(tasks, maxParallel);
+  const taskResults = await runWithPool(tasks, maxParallel);
+  for (let i = 0; i < taskResults.length; i++) {
+    const taskResult = taskResults[i];
+    if (!(taskResult instanceof Error)) continue;
+    const state = taskStates[i];
+    if (!state.accounted) {
+      processed++;
+      result.errors++;
+    }
+  }
 
   if (tier >= 2 && config.embeddings && config.embeddingAutoOnDeep) {
     if (enrichedIds.length > 0) {
