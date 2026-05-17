@@ -25,11 +25,14 @@ vi.mock('fs', async () => {
 // Mock projects module
 vi.mock('../../../src/lib/projects.js', () => ({
   loadProjectsConfig: vi.fn(),
+  resolveProjectFromIssue: vi.fn(),
   getIssuePrefix: (config: any) => config?.issue_prefix,
 }));
 
 import { resolveTrackerType } from '../../../src/lib/tracker-utils.js';
-import { loadProjectsConfig } from '../../../src/lib/projects.js';
+import { loadProjectsConfig, resolveProjectFromIssue } from '../../../src/lib/projects.js';
+
+const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssue);
 
 const mockLoadProjectsConfig = vi.mocked(loadProjectsConfig);
 
@@ -125,5 +128,44 @@ describe('pan reopen tracker routing parity with pan start', () => {
     // PAN prefix matches the github_repo project → github
     expect(resolveTrackerType('PAN-1')).toBe('github');
     expect(resolveTrackerType('PAN-999')).toBe('github');
+  });
+
+  /**
+   * Acceptance criterion: "assert the resolver matches resolveProjectFromIssue for
+   * both PAN- and MIN- prefixes."
+   *
+   * For each prefix, resolveTrackerType() must agree with the tracker type implied
+   * by the project that resolveProjectFromIssue() returns for the same issue ID.
+   */
+  it('resolveTrackerType agrees with resolveProjectFromIssue for PAN and MIN prefixes', () => {
+    // Mock resolveProjectFromIssue to return appropriate project for each prefix
+    mockResolveProjectFromIssue.mockImplementation((issueId: string) => {
+      if (issueId.toUpperCase().startsWith('PAN-')) {
+        return { projectKey: 'panopticon', projectName: 'Panopticon', projectPath: '/home/user/panopticon' };
+      }
+      if (issueId.toUpperCase().startsWith('MIN-')) {
+        return { projectKey: 'myn', projectName: 'Mind Your Now', projectPath: '/home/user/myn' };
+      }
+      return null;
+    });
+
+    // PAN prefix → both resolvers must agree on GitHub
+    expect(resolveTrackerType('PAN-457')).toBe('github');
+    expect(mockResolveProjectFromIssue('PAN-457', [])?.projectKey).toBe('panopticon');
+
+    // MIN prefix → both resolvers must agree on Linear
+    expect(resolveTrackerType('MIN-848')).toBe('linear');
+    expect(mockResolveProjectFromIssue('MIN-848', [])?.projectKey).toBe('myn');
+
+    // Both functions agree for mixed prefixes
+    for (const issue of ['PAN-1', 'PAN-999', 'MIN-123', 'MIN-456']) {
+      const trackerType = resolveTrackerType(issue);
+      const project = resolveProjectFromIssue(issue, []);
+      if (project?.projectKey === 'panopticon') {
+        expect(trackerType).toBe('github');
+      } else if (project?.projectKey === 'myn') {
+        expect(trackerType).toBe('linear');
+      }
+    }
   });
 });

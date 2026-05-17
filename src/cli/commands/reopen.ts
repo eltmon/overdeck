@@ -174,13 +174,17 @@ async function reopenGitHubIssue(issueId: string): Promise<void> {
     state: 'open',
   });
 
-  // Add in-progress label
-  await octokit.issues.addLabels({
-    owner: gh.owner,
-    repo: gh.repo,
-    issue_number: gh.number,
-    labels: ['in-progress'],
-  });
+  // Add in-progress label (best-effort — warn if label is missing, don't abort reopen)
+  try {
+    await octokit.issues.addLabels({
+      owner: gh.owner,
+      repo: gh.repo,
+      issue_number: gh.number,
+      labels: ['in-progress'],
+    });
+  } catch (err) {
+    console.warn(chalk.yellow(`Warning: could not add in-progress label (may already exist): ${err instanceof Error ? err.message : String(err)}`));
+  }
 }
 
 /**
@@ -320,6 +324,26 @@ async function reopenGitHubIssueCommand(id: string, options: ReopenOptions): Pro
     // Show comments count
     console.log(chalk.bold(`Comments:`), issue.comments);
     console.log('');
+
+    // Guard: if the issue is already open, `pan reopen` is almost never the right verb.
+    // The user probably wants `pan review restart` (or `pan review reset`) — both leave
+    // the workspace, branch, and PR untouched and only re-trigger the specialist pipeline.
+    // `pan reopen` is meant for issues that have been closed/completed and need to
+    // re-enter the pipeline.
+    if (issue.state === 'open' && !options.force) {
+      console.log(chalk.yellow(`Heads up: ${id.toUpperCase()} is already open.`));
+      console.log('');
+      console.log(`\`pan reopen\` is for re-entering the pipeline after an issue was`);
+      console.log(`closed/completed/cancelled. For an issue that is already open, you`);
+      console.log(`probably want one of:`);
+      console.log('');
+      console.log(`  ${chalk.cyan(`pan review restart ${id}`)}   kill stuck reviewers and dispatch a fresh review`);
+      console.log(`  ${chalk.cyan(`pan review reset   ${id}`)}   reset review/test/merge cycles (human override)`);
+      console.log(`  ${chalk.cyan(`pan review abort   ${id}`)}   kill running reviewers, leave the worker idle`);
+      console.log('');
+      console.log(`If you really want to reset specialist state via reopen anyway, re-run with ${chalk.bold('--force')}.`);
+      return;
+    }
 
     // JSON output
     if (options.json) {
