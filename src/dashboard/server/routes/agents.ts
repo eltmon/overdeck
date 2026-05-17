@@ -2404,18 +2404,6 @@ const postAgentsRoute = HttpRouter.add(
         detached: true,
         stdio: ['ignore', spawnLogHandle.fd, spawnLogHandle.fd],
       });
-      child.on('error', (error) => {
-        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_error', {
-          issueId,
-          role,
-          workspacePath,
-          activityId,
-          error: error.message,
-          args,
-          cwd: cwd || workspacePath,
-          spawnLogPath,
-        }).catch(() => undefined);
-      });
       child.once('spawn', () => {
         void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_spawned', {
           issueId,
@@ -2428,22 +2416,46 @@ const postAgentsRoute = HttpRouter.add(
           spawnLogPath,
         }).catch(() => undefined);
       });
-      child.once('close', (code, signal) => {
-        void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_closed', {
-          issueId,
-          role,
-          workspacePath,
-          activityId,
-          code,
-          signal,
-          args,
-          cwd: cwd || workspacePath,
-          spawnLogPath,
-        }).catch(() => undefined);
-      });
-      child.unref();
-      await spawnLogHandle.close();
-      return activityId;
+      try {
+        const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+          child.once('error', (error) => {
+            void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_error', {
+              issueId,
+              role,
+              workspacePath,
+              activityId,
+              error: error.message,
+              args,
+              cwd: cwd || workspacePath,
+              spawnLogPath,
+            }).catch(() => undefined);
+            reject(error);
+          });
+          child.once('close', (code, signal) => {
+            void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_closed', {
+              issueId,
+              role,
+              workspacePath,
+              activityId,
+              code,
+              signal,
+              args,
+              cwd: cwd || workspacePath,
+              spawnLogPath,
+            }).catch(() => undefined);
+            resolve({ code, signal });
+          });
+        });
+        if (result.code !== 0) {
+          const output = await readFile(spawnLogPath, 'utf-8').catch(() => '');
+          const error = new Error(output.trim() || `pan ${args.join(' ')} exited with code ${result.code ?? 'null'}`);
+          Object.assign(error, { activityId, spawnLogPath, code: result.code, signal: result.signal, output });
+          throw error;
+        }
+        return activityId;
+      } finally {
+        await spawnLogHandle.close();
+      }
     };
 
     // Use IssueLifecycle service to transition issue to "In Progress" (PAN-449)
@@ -2692,12 +2704,45 @@ const postAgentsRoute = HttpRouter.add(
       role,
       workspacePath,
     }));
-    const activityId = yield* Effect.promise(() => spawnPanCommand(
-      ['start', issueId, '--local', '--model', spawnModel,
-        ...(effectiveHarness ? ['--harness', effectiveHarness] : []),
-        ...(allowHost ? ['--host', '--yes'] : [])],
-      workspacePath,
-    ));
+    let activityId: string;
+    try {
+      activityId = yield* Effect.promise(() => spawnPanCommand(
+        ['start', issueId, '--local', '--model', spawnModel,
+          ...(effectiveHarness ? ['--harness', effectiveHarness] : []),
+          ...(allowHost ? ['--host', '--yes'] : [])],
+        workspacePath,
+      ));
+    } catch (error: any) {
+      const output = String(error?.output ?? error?.message ?? '');
+      if (output.includes(`Workspace docker stack for ${issueId}`) && output.includes('is not healthy')) {
+        const failedStackHealth = yield* Effect.promise(() => getWorkspaceStackHealth(issueId, { projectConfig }));
+        emitActivityEntry({
+          source: 'dashboard',
+          level: 'error',
+          issueId: issueId.toUpperCase(),
+          message: `agent-spawn-blocked-stack-unhealthy: ${issueId.toUpperCase()}`,
+          details: failedStackHealth.reasons.length > 0 ? failedStackHealth.reasons.join('; ') : output.trim(),
+        });
+        return jsonResponse({
+          success: false,
+          blocked: true,
+          skipped: true,
+          error: failedStackHealth.reasons.length > 0
+            ? `Workspace docker stack for ${issueId} is not healthy: ${failedStackHealth.reasons.join('; ')}`
+            : output.trim(),
+          hint: `Run 'pan workspace rebuild ${issueId}' or retry with a confirmed host override.`,
+          stackHealth: failedStackHealth,
+          activityId: error?.activityId,
+        }, { status: 422 });
+      }
+      return jsonResponse({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: output.trim() || `Failed to start agent for ${issueId}`,
+        activityId: error?.activityId,
+      }, { status: 500 });
+    }
 
     // Write early state.json so the dashboard immediately shows agent-<id> as the
     // active agent. Without this there's a race window between spawnPanCommand returning

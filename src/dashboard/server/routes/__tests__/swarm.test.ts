@@ -685,6 +685,23 @@ describe('swarm route helpers', () => {
     expect(newDispatch?.status).toBe('running');
   });
 
+  it('passes confirmed host override into swarm slot spawns', async () => {
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue([]);
+
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 0,
+      allowHost: true,
+    });
+
+    expect(result.status).toBe(200);
+    expect(agents.spawnAgent).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-971',
+      allowHost: true,
+    }));
+  });
+
   it('does not advance while current wave still has running slots', async () => {
     const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
     writeFileSync(swarmStatePath, JSON.stringify({

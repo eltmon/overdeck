@@ -89,6 +89,9 @@ interface SwarmDispatchRequest {
   model?: string;
   maxSlots?: number;
   autoAdvance?: boolean;
+  host?: boolean;
+  allowHost?: boolean;
+  hostOverrideConfirmation?: string;
 }
 
 const ISSUE_KEY_PATTERN = /^[A-Z][A-Z0-9]*-\d+$/;
@@ -102,6 +105,10 @@ function canonicalIssueId(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const canonical = value.trim().toUpperCase();
   return ISSUE_KEY_PATTERN.test(canonical) ? canonical : null;
+}
+
+function buildHostOverrideConfirmation(issueId: string): string {
+  return `I understand this bypasses workspace isolation for ${issueId.toUpperCase()}`;
 }
 
 function validateModelId(value: unknown): { ok: true; value: string | undefined } | { ok: false; error: string } {
@@ -565,7 +572,7 @@ async function refreshSwarmSlotStatuses(
 async function dispatchSwarmWave(
   request: SwarmDispatchRequest,
 ): Promise<{ status: number; body: SwarmDispatchResponseBody }> {
-  const { wave: requestedWave, model: requestedModel, maxSlots, autoAdvance } = request;
+  const { wave: requestedWave, model: requestedModel, maxSlots, autoAdvance, allowHost } = request;
   const issueUpper = canonicalIssueId(request.issueId);
   if (!issueUpper) {
     return { status: 400, body: { error: 'issueId must be a tracker key like PAN-977.' } };
@@ -1004,6 +1011,7 @@ async function dispatchSwarmWave(
           swarmItemId: item.id,
           prompt: itemPrompt,
           phase: dispatchSynthesisFirst ? 'synthesis' : 'implementation',
+          ...(allowHost ? { allowHost: true } : {}),
         };
 
         await spawnAgent(spawnOptions);
@@ -1716,7 +1724,8 @@ const postSwarmRoute = HttpRouter.add(
 
     const body = yield* readJsonBody;
     const { wave, model, maxSlots, autoAdvance } = body as SwarmDispatchRequest;
-    const issueId = canonicalIssueId((body as Record<string, unknown>)['issueId']);
+    const rawBody = body as Record<string, unknown>;
+    const issueId = canonicalIssueId(rawBody['issueId']);
 
     if (!issueId) {
       return jsonResponse({ error: 'issueId must be a tracker key like PAN-977.' }, { status: 400 });
@@ -1731,6 +1740,18 @@ const postSwarmRoute = HttpRouter.add(
     if (!modelCheck.ok) {
       return jsonResponse({ error: modelCheck.error }, { status: 400 });
     }
+    const requestedHostOverride = rawBody.host === true || rawBody.allowHost === true;
+    const hostOverrideConfirmation = buildHostOverrideConfirmation(issueId);
+    const allowHost = requestedHostOverride && rawBody.hostOverrideConfirmation === hostOverrideConfirmation;
+    if (requestedHostOverride && !allowHost) {
+      return jsonResponse({
+        success: false,
+        error: 'host_override_confirmation_required',
+        requiresHostConfirmation: true,
+        confirmation: hostOverrideConfirmation,
+        hint: `Host override bypasses workspace isolation. Retry only after explicitly confirming: ${hostOverrideConfirmation}`,
+      }, { status: 409 });
+    }
 
     const result = yield* Effect.promise(() => dispatchSwarmWave({
       issueId,
@@ -1738,6 +1759,7 @@ const postSwarmRoute = HttpRouter.add(
       model: modelCheck.value,
       maxSlots,
       autoAdvance,
+      allowHost,
     }));
 
     return jsonResponse(result.body, { status: result.status });

@@ -5,7 +5,7 @@ import { dirname, join } from 'path';
 import chalk from 'chalk';
 import ora from 'ora';
 import { ensureDevcontainer } from '../../lib/workspace/ensure-devcontainer.js';
-import { extractTeamPrefix, findProjectByTeam } from '../../lib/projects.js';
+import { getProject, resolveProjectFromIssue } from '../../lib/projects.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -52,9 +52,9 @@ async function dockerCompose(args: string[], cwd: string): Promise<void> {
 
 export async function workspaceRebuildCommand(issueId: string): Promise<void> {
   const normalizedIssueId = issueId.toLowerCase();
-  const teamPrefix = extractTeamPrefix(issueId);
-  const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
-  if (!projectConfig) {
+  const resolvedProject = resolveProjectFromIssue(issueId);
+  const projectConfig = resolvedProject ? getProject(resolvedProject.projectKey) : null;
+  if (!resolvedProject || !projectConfig) {
     console.error(chalk.red(`✗ No project found for issue ${issueId}`));
     process.exit(1);
   }
@@ -64,7 +64,7 @@ export async function workspaceRebuildCommand(issueId: string): Promise<void> {
     process.exit(1);
   }
 
-  const workspacePath = join(projectConfig.path, 'workspaces', `feature-${normalizedIssueId}`);
+  const workspacePath = join(resolvedProject.projectPath, 'workspaces', `feature-${normalizedIssueId}`);
   if (!existsSync(workspacePath)) {
     console.error(chalk.red(`✗ Workspace not found: ${workspacePath}`));
     process.exit(1);
