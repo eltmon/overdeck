@@ -128,10 +128,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-2024 (autoResumeStoppedWorkAgents skips paused/troubled agents before review-feedback auto-resume). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-2024",
+    "description": "Completed bead workspace-0qip (PANOPTICON_NO_RESUME boot gate short-circuits orphan recovery and auto-resume, with GET /api/no-resume-mode). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-0qip",
     "filesToRead": [
+      "src/lib/cloister/no-resume-mode.ts",
       "src/lib/cloister/deacon.ts",
+      "src/dashboard/server/routes/misc.ts",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -160,6 +162,12 @@
       "timestamp": "2026-05-17T14:53:55.187Z",
       "reason": "bead-complete",
       "note": "Implemented paused and troubled hard gates in autoResumeStoppedWorkAgents above the pending-review-feedback resume path. npm run typecheck and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T15:00:22.927Z",
+      "reason": "bead-complete",
+      "note": "Implemented PANOPTICON_NO_RESUME boot-scoped gate for recoverOrphanedAgents and autoResumeStoppedWorkAgents, added shared truthy parser/state helper, and exposed GET /api/no-resume-mode. npm run typecheck and npm run lint passed.",
       "agentModel": "gpt-5.5"
     }
   ],

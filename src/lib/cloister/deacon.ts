@@ -22,6 +22,7 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
 import { loadCloisterConfig } from './config.js';
+import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatus, loadReviewStatuses, getReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
@@ -4262,6 +4263,12 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
  * state.json was never updated. Reset them to 'stopped' so resume/re-plan works correctly.
  */
 async function recoverOrphanedAgents(context?: string): Promise<string[]> {
+  const noResumeMode = getNoResumeMode();
+  if (noResumeMode.active) {
+    logDeaconEvent(`PANOPTICON_NO_RESUME=1 — skipping recoverOrphanedAgents${context ? ` (${context})` : ''}`);
+    return [];
+  }
+
   if (!existsSync(AGENTS_DIR)) return [];
   let dirs: string[];
   try { dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-') || d.startsWith('planning-')); }
@@ -4766,6 +4773,12 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
  */
 export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   const resumed: string[] = [];
+  const noResumeMode = getNoResumeMode();
+  if (noResumeMode.active) {
+    logDeaconEvent('PANOPTICON_NO_RESUME=1 — skipping autoResumeStoppedWorkAgents');
+    return resumed;
+  }
+
   if (!existsSync(AGENTS_DIR)) return resumed;
 
   let dirs: string[];

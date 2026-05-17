@@ -185,7 +185,7 @@
       {
         "id": "cloister-no-resume-env",
         "title": "Honor PANOPTICON_NO_RESUME=1 in deacon startup paths",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -201,7 +201,7 @@
           {
             "id": "cloister-no-resume-env.ac1",
             "title": "`PANOPTICON_NO_RESUME=1` causes `autoResumeStoppedWorkAgents()` to return an empty array without scanning agent dirs",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -209,7 +209,7 @@
           {
             "id": "cloister-no-resume-env.ac2",
             "title": "`PANOPTICON_NO_RESUME=1` causes `recoverOrphanedAgents()` to return without touching any state.json",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -217,7 +217,7 @@
           {
             "id": "cloister-no-resume-env.ac3",
             "title": "Dashboard exposes `GET /api/no-resume-mode` returning the active state and boot timestamp",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -225,7 +225,7 @@
           {
             "id": "cloister-no-resume-env.ac4",
             "title": "Truthy values `1`, `true`, `yes` are all honored; falsy values `0`, `false`, empty string disable",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
