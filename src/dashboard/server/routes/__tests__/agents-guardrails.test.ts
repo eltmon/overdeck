@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { evaluateAgentStartGate, evaluateSpawnGuardrails } from '../agents.js';
+import { evaluateAgentStartGate, evaluateSpawnGuardrails, hasActiveAgentGateOrRetry } from '../agents.js';
 import { readGlobalResourceConfig } from '../../services/system-health-service.js';
 import type { SystemHealthSnapshot } from '../../services/system-health-service.js';
 
@@ -107,6 +107,36 @@ describe('evaluateAgentStartGate', () => {
   it('allows starts when no persistent gate is set', () => {
     expect(evaluateAgentStartGate('agent-pan-1141', undefined)).toBeNull();
     expect(evaluateAgentStartGate('agent-pan-1141', { paused: false, troubled: false })).toBeNull();
+  });
+});
+
+describe('hasActiveAgentGateOrRetry', () => {
+  const now = Date.parse('2026-05-17T12:00:00.000Z');
+
+  it('retains paused and troubled stopped agents regardless of age', () => {
+    expect(hasActiveAgentGateOrRetry({ paused: true, troubled: false }, now)).toBe(true);
+    expect(hasActiveAgentGateOrRetry({ paused: false, troubled: true }, now)).toBe(true);
+  });
+
+  it('retains stopped agents with a future retry backoff', () => {
+    expect(hasActiveAgentGateOrRetry({
+      paused: false,
+      troubled: false,
+      lastFailureNextRetryAt: '2026-05-17T12:01:00.000Z',
+    }, now)).toBe(true);
+  });
+
+  it('does not retain stopped agents for expired or invalid retry backoff', () => {
+    expect(hasActiveAgentGateOrRetry({
+      paused: false,
+      troubled: false,
+      lastFailureNextRetryAt: '2026-05-17T11:59:00.000Z',
+    }, now)).toBe(false);
+    expect(hasActiveAgentGateOrRetry({
+      paused: false,
+      troubled: false,
+      lastFailureNextRetryAt: 'not-a-date',
+    }, now)).toBe(false);
   });
 });
 

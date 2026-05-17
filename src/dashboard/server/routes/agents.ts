@@ -410,6 +410,16 @@ export function evaluateAgentStartGate(
   return null;
 }
 
+export function hasActiveAgentGateOrRetry(
+  state: Pick<AgentState, 'paused' | 'troubled' | 'lastFailureNextRetryAt'>,
+  nowMs: number = Date.now(),
+): boolean {
+  if (state.paused === true || state.troubled === true) return true;
+  if (!state.lastFailureNextRetryAt) return false;
+  const retryAtMs = Date.parse(state.lastFailureNextRetryAt);
+  return Number.isFinite(retryAtMs) && retryAtMs > nowMs;
+}
+
 export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuardrailDecision {
   const warnings: SpawnGuardrailAdvisory[] = [];
   const availableGb = Math.round((health.summary.availableMemoryBytes / (1024 ** 3)) * 10) / 10;
@@ -687,18 +697,21 @@ const getAgentsRoute = HttpRouter.add(
               const isPlanning = dir.startsWith('planning-');
               const issueId = state.issueId?.toUpperCase() ||
                 (isPlanning ? dir.replace('planning-', '') : dir.replace('agent-', '')).toUpperCase();
-              const lastActivity = runtimeData.lastActivity || state.lastActivity;
-              const stoppedAt = lastActivity ? new Date(lastActivity) : null;
+              const stoppedTimestamp = state.stoppedAt || runtimeData.lastActivity || state.lastActivity;
+              const stoppedAt = stoppedTimestamp ? new Date(stoppedTimestamp) : null;
               const reviewStatus = getReviewStatus(issueId);
               const keepStoppedAgentVisible =
-                !!reviewStatus &&
-                reviewStatus.mergeStatus !== 'merged' &&
+                hasActiveAgentGateOrRetry(state, now) ||
                 (
-                  !!reviewStatus.prUrl ||
-                  reviewStatus.readyForMerge === true ||
-                  reviewStatus.reviewStatus !== 'pending' ||
-                  reviewStatus.testStatus !== 'pending' ||
-                  reviewStatus.mergeStatus === 'failed'
+                  !!reviewStatus &&
+                  reviewStatus.mergeStatus !== 'merged' &&
+                  (
+                    !!reviewStatus.prUrl ||
+                    reviewStatus.readyForMerge === true ||
+                    reviewStatus.reviewStatus !== 'pending' ||
+                    reviewStatus.testStatus !== 'pending' ||
+                    reviewStatus.mergeStatus === 'failed'
+                  )
                 );
               if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000 && !keepStoppedAgentVisible) continue;
               const lifecycle = getWorkAgentLifecycleState(dir);

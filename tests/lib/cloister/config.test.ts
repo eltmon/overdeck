@@ -2,12 +2,52 @@
  * Tests for Cloister configuration management
  */
 
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
   DEFAULT_CLOISTER_CONFIG,
   type CloisterConfig,
   type HealthThresholds,
 } from '../../../src/lib/cloister/config.js';
+import {
+  DEFAULT_AUTO_RESUME_CONFIG,
+  normalizeAutoResumeConfig,
+} from '../../../src/lib/cloister/auto-resume-config.js';
+
+describe('auto-resume config normalization', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('falls back to numeric defaults and warns for negative values', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const config = normalizeAutoResumeConfig({
+      maxConsecutiveFailures: -1,
+      troubledWindowMs: -1000,
+    }, 'test.autoResume');
+
+    expect(config.maxConsecutiveFailures).toBe(DEFAULT_AUTO_RESUME_CONFIG.maxConsecutiveFailures);
+    expect(config.troubledWindowMs).toBe(DEFAULT_AUTO_RESUME_CONFIG.troubledWindowMs);
+    expect(warn).toHaveBeenCalledWith('[auto-resume] Invalid test.autoResume.maxConsecutiveFailures; using default 3');
+    expect(warn).toHaveBeenCalledWith('[auto-resume] Invalid test.autoResume.troubledWindowMs; using default 600000');
+  });
+
+  it('falls back to default backoff schedule and warns for invalid schedules', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const nonArrayConfig = normalizeAutoResumeConfig({
+      failureBackoffSchedule: 'invalid',
+    } as any, 'test.autoResume');
+    const invalidEntryConfig = normalizeAutoResumeConfig({
+      failureBackoffSchedule: [5, -1, 30],
+    } as any, 'test.autoResume');
+
+    expect(nonArrayConfig.failureBackoffSchedule).toEqual(DEFAULT_AUTO_RESUME_CONFIG.failureBackoffSchedule);
+    expect(invalidEntryConfig.failureBackoffSchedule).toEqual(DEFAULT_AUTO_RESUME_CONFIG.failureBackoffSchedule);
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledWith('[auto-resume] Invalid test.autoResume.failureBackoffSchedule; using default 5,30,120');
+  });
+});
 
 describe('Cloister Configuration', () => {
   describe('DEFAULT_CLOISTER_CONFIG', () => {
