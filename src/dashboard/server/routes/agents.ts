@@ -1395,6 +1395,12 @@ const postAgentPauseRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/pause',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
+    }
+
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
@@ -1449,6 +1455,12 @@ const postAgentUnpauseRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/unpause',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
+    }
+
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
@@ -1481,6 +1493,12 @@ const postAgentUntroubledRoute = HttpRouter.add(
   'POST',
   '/api/agents/:id/untroubled',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
+    }
+
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;

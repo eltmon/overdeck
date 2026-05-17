@@ -858,11 +858,7 @@ export async function clearAgentTroubledAsync(agentId: string): Promise<AgentSta
   return state;
 }
 
-/** Records one failed resume/crash observation for later backoff and troubled gating. */
-export function recordAgentFailure(agentId: string, reason: string): boolean {
-  const state = getAgentState(agentId);
-  if (!state) return false;
-
+function applyAgentFailure(state: AgentState, reason: string): void {
   const config = resolveAutoResumeConfigForIssue(state.issueId);
   const nowMs = Date.now();
   const now = new Date(nowMs).toISOString();
@@ -890,10 +886,31 @@ export function recordAgentFailure(agentId: string, reason: string): boolean {
     && Number.isFinite(firstFailureInRunMs)
     && nowMs - firstFailureInRunMs <= config.troubledWindowMs;
 
-  saveAgentState(state);
   if (shouldMarkTroubled) {
-    markAgentTroubled(agentId);
+    if (!state.troubled) {
+      state.troubledAt = now;
+    }
+    state.troubled = true;
   }
+}
+
+/** Records one failed resume/crash observation for later backoff and troubled gating. */
+export function recordAgentFailure(agentId: string, reason: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+
+  applyAgentFailure(state, reason);
+  saveAgentState(state);
+  return true;
+}
+
+/** Records one failed resume/crash observation using async filesystem operations. */
+export async function recordAgentFailureAsync(agentId: string, reason: string): Promise<boolean> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return false;
+
+  applyAgentFailure(state, reason);
+  await saveAgentStateAsync(state);
   return true;
 }
 
@@ -1359,7 +1376,6 @@ function markAgentRunning(state: AgentState): void {
   const oldStatus = state.status;
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
-  resetAgentFailureCount(state.id);
   clearFailureTrackingFields(state);
   delete state.stoppedAt;
   // Clear user-stop intent so a later crash/orphan can be auto-resumed. Without

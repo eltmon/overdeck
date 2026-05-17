@@ -41,7 +41,7 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent, recordAgentFailure } from '../agents.js';
+import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, saveAgentStateAsync, resumeAgent, recordAgentFailureAsync } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, isPaneDeadAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
@@ -4335,8 +4335,8 @@ export async function recoverOrphanedAgents(context?: string): Promise<string[]>
       const oldStatus = state.status;
       state.status = 'stopped';
       state.stoppedAt = new Date().toISOString();
-      writeFileSync(stateFile, JSON.stringify(state, null, 2));
-      if (state.stoppedByUser !== true && recordAgentFailure(dir, `orphaned: tmux session missing (${context ?? 'patrol'})`)) {
+      await saveAgentStateAsync(state);
+      if (state.stoppedByUser !== true && await recordAgentFailureAsync(dir, `orphaned: tmux session missing (${context ?? 'patrol'})`)) {
         orphanFailureRecordedForAutoResume.add(dir);
       }
       const msg = `Recovered orphaned agent ${dir} (${oldStatus}→stopped)`;
@@ -4950,7 +4950,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       } else {
         const msg = `Failed to auto-resume ${agentId}: ${result.error}`;
         if (!orphanFailureRecordedForAutoResume.has(agentId)) {
-          recordAgentFailure(agentId, msg);
+          await recordAgentFailureAsync(agentId, msg);
         }
         console.warn(`[deacon] ${msg}`);
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${msg}`);
@@ -4959,7 +4959,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!orphanFailureRecordedForAutoResume.has(agentId)) {
-        recordAgentFailure(agentId, `Auto-resume error for ${agentId}: ${msg}`);
+        await recordAgentFailureAsync(agentId, `Auto-resume error for ${agentId}: ${msg}`);
       }
       console.warn(`[deacon] Auto-resume error for ${agentId}: ${msg}`);
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} auto-resume threw: ${msg}`);
