@@ -4,7 +4,7 @@
     "created": "2026-05-16T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1141: Agent auto-resume controls — emergency mode, issue-level pause, troubled-state retry limits",
-    "updated": "2026-05-17T15:55:12.498Z"
+    "updated": "2026-05-17T16:58:13.099Z"
   },
   "plan": {
     "id": "pan-1141",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-17T15:55:12.498Z",
+    "updated": "2026-05-17T16:58:13.099Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1141",
@@ -482,7 +482,7 @@
       {
         "id": "cli-dev-no-resume",
         "title": "Add `--no-resume` flag to `pan dev`",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -498,36 +498,41 @@
           {
             "id": "cli-dev-no-resume.ac1",
             "title": "`pan dev --no-resume` starts dashboard + traefik + cliproxy normally",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:58:13.099Z"
           },
           {
             "id": "cli-dev-no-resume.ac2",
             "title": "Child dashboard process sees `PANOPTICON_NO_RESUME=1` in its environment",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:58:13.099Z"
           },
           {
             "id": "cli-dev-no-resume.ac3",
             "title": "No agents are auto-spawned; deacon logs the skip; dashboard shows the no-resume banner",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:58:13.099Z"
           },
           {
             "id": "cli-dev-no-resume.ac4",
             "title": "Startup terminal output shows a clear `[no-resume mode active]` line",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-17T16:58:13.099Z"
           }
-        ]
+        ],
+        "completed": "2026-05-17T16:58:13.099Z"
       },
       {
         "id": "cli-up-no-resume",

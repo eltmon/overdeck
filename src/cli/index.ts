@@ -488,6 +488,7 @@ program
   .description('Start dashboard in development mode with Vite HMR')
   .option('--skip-traefik', 'Skip Traefik startup')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
+  .option('--no-resume', 'Start dashboard with agent auto-resume disabled for this boot')
   .action(devCommand);
 
 program

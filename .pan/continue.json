@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1141",
   "created": "2026-05-17T14:06:59.650Z",
-  "updated": "2026-05-17T16:52:31.418Z",
+  "updated": "2026-05-17T16:58:13.099Z",
   "gitState": {
     "branch": "feature/pan-1141",
-    "sha": "dea74e98b42d8ddd3cb0c0ca7773b501ebbb3829",
+    "sha": "ce5e1e61f20f66a9735ca86ecb682688a9b5f8c7",
     "dirty": true
   },
   "decisions": [
@@ -128,13 +128,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-73ry (documented auto-resume gates in CLAUDE.md, README.md, DEACON-HEALTH-MONITORING.md, and SKILLS-CONVENTION.md; typecheck/lint passed). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
-    "beadId": "workspace-73ry",
+    "description": "Completed bead workspace-nx12 (added pan dev --no-resume, injected PANOPTICON_NO_RESUME into the dashboard child process, and surfaced startup output; typecheck/lint/source help check passed). Next agent should run bd ready -l pan-1141 and claim the next vBRIEF-ordered PAN-1141 bead.",
+    "beadId": "workspace-nx12",
     "filesToRead": [
-      "CLAUDE.md",
-      "README.md",
-      "docs/DEACON-HEALTH-MONITORING.md",
-      "docs/SKILLS-CONVENTION.md",
+      "src/cli/index.ts",
+      "src/cli/commands/dev.ts",
       ".pan/spec.vbrief.json",
       ".pan/continue.json"
     ]
@@ -254,6 +252,12 @@
       "timestamp": "2026-05-17T16:52:31.418Z",
       "reason": "bead-complete",
       "note": "Documented PAN-1141 auto-resume gates: boot no-resume, manual pause/unpause, troubled/untroubled failure gating, per-project backoff config, dashboard visibility, and wrapper-skill rationale. npm run typecheck and npm run lint passed.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-17T16:58:13.099Z",
+      "reason": "bead-complete",
+      "note": "Implemented pan dev --no-resume with Commander registration, startup [no-resume mode active] output, and PANOPTICON_NO_RESUME=1 injection into the Node 22 dashboard API child process only. npm run typecheck, npm run lint, and npx tsx src/cli/index.ts dev --help | grep -- --no-resume passed.",
       "agentModel": "gpt-5.5"
     }
   ],

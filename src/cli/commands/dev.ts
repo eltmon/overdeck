@@ -171,7 +171,7 @@ async function startSidecars(): Promise<void> {
   }
 }
 
-export async function devCommand(options: { skipTraefik?: boolean; deacon?: boolean }) {
+export async function devCommand(options: { skipTraefik?: boolean; deacon?: boolean; noResume?: boolean }) {
   // Force dev mode for Traefik config generation and all downstream code
   process.env['PANOPTICON_DEV'] = '1';
 
@@ -181,6 +181,9 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
   const frontendDir = join(__dirname, '..', '..', 'src', 'dashboard', 'frontend');
 
   console.log(chalk.bold('Starting Panopticon in development mode...\n'));
+  if (options.noResume) {
+    console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
+  }
 
   // ── Auto-sync ──────────────────────────────────────────────────────────────
   {
@@ -277,6 +280,7 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
       API_PORT: String(config.dashboardApiPort),
       PANOPTICON_MODE: 'development',
       ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
+      ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
     },
   });
 
