@@ -107,6 +107,22 @@ describe('enrichAction', () => {
     expect(secondCall.force).toBe(true);
   });
 
+  it('--with plus --full requests L3 full-transcript enrichment for explicit sessions', async () => {
+    mockEnrichSessions.mockResolvedValue({ enriched: 1, skipped: 0, errors: 0, durationMs: 100 });
+
+    const { enrichAction } = await import('../enrich.js');
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await enrichAction(['42'], { full: true, with: 'claude-opus-4-7', yes: true });
+
+    expect(mockEnrichSessions).toHaveBeenCalledWith(expect.objectContaining({
+      tier: 3,
+      sessionIds: [42],
+      modelOverride: 'claude-opus-4-7',
+      skipAlreadyEnriched: false,
+    }));
+  });
+
   it('happy path: shows enrichment summary', async () => {
     mockEnrichSessions.mockResolvedValue({ enriched: 5, skipped: 2, errors: 0, durationMs: 200 });
 

@@ -20,7 +20,7 @@ import {
 } from '../../../../lib/database/discovered-sessions-db.js';
 import { enrichSessions } from '../../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../../lib/conversations/embeddings/index.js';
-import { parseSearchParams } from '../discovered-sessions.js';
+import { parseSearchParams, rejectUntrustedOrigin } from '../discovered-sessions.js';
 
 let TEST_HOME: string;
 let fakeClaudeDir: string;
@@ -179,6 +179,35 @@ describe('parseSearchParams', () => {
   it('returns empty object for empty params', () => {
     const filter = parseSearchParams(new URLSearchParams());
     expect(Object.keys(filter).length).toBe(0);
+  });
+});
+
+// ─── Origin validation ────────────────────────────────────────────────────────
+
+describe('rejectUntrustedOrigin', () => {
+  function request(headers: Record<string, string> = {}, method = 'GET') {
+    return { headers, method } as never;
+  }
+
+  it('rejects semantic GET requests without origin evidence', () => {
+    const response = rejectUntrustedOrigin(request(), { requireOriginHeader: true });
+    expect(response?.status).toBe(403);
+  });
+
+  it('allows semantic GET requests from trusted origins', () => {
+    const response = rejectUntrustedOrigin(
+      request({ origin: 'http://localhost:3011' }),
+      { requireOriginHeader: true },
+    );
+    expect(response).toBeNull();
+  });
+
+  it('rejects semantic GET requests from untrusted origins', () => {
+    const response = rejectUntrustedOrigin(
+      request({ origin: 'https://evil.example' }),
+      { requireOriginHeader: true },
+    );
+    expect(response?.status).toBe(403);
   });
 });
 

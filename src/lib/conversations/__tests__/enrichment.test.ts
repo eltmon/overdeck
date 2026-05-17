@@ -161,6 +161,81 @@ describe('enrichSession', () => {
     expect(sess?.summaryDetailed).toContain('JWT');
   });
 
+  it('preserves the L1 quick summary when L2 adds detailed summary and tags', async () => {
+    seedSession();
+    const [session] = findDiscoveredSessions({});
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: fakeJsonlPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async () => ({ summary: 'Original L1 summary.', tags: ['l1'] }),
+    });
+
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: fakeJsonlPath,
+      tier: 2,
+      config: { quickModel: null, deepModel: null },
+      callApi: async () => ({
+        summary: 'Replacement L2 quick summary.',
+        summaryDetailed: 'Detailed L2 summary.',
+        tags: ['l2'],
+      }),
+    });
+
+    const [updated] = findDiscoveredSessions({});
+    expect(updated.summary).toBe('Original L1 summary.');
+    expect(updated.summaryDetailed).toBe('Detailed L2 summary.');
+    expect(updated.tags).toEqual(['l2']);
+  });
+
+  it('bounds sampled prompt size for large L1 transcripts', async () => {
+    const largePath = join(TEST_HOME, 'large-l1.jsonl');
+    const lines = Array.from({ length: 10_000 }, (_, i) => JSON.stringify({
+      message: { role: i % 2 === 0 ? 'user' : 'assistant', content: `message ${i} ${'x'.repeat(200)}` },
+    }));
+    writeFileSync(largePath, lines.join('\n') + '\n', 'utf8');
+    const session = upsertDiscoveredSession({ jsonlPath: largePath, messageCount: lines.length });
+    let capturedPrompt = '';
+
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: largePath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_model, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Bounded sample.', tags: ['bounded'] };
+      },
+    });
+
+    expect(capturedPrompt.length).toBeLessThan(5_000);
+  });
+
+  it('caps L3 prompt size for very large transcripts', async () => {
+    const largePath = join(TEST_HOME, 'large-l3.jsonl');
+    const lines = Array.from({ length: 8_000 }, (_, i) => JSON.stringify({
+      message: { role: 'user', content: `deep message ${i} ${'y'.repeat(500)}` },
+    }));
+    writeFileSync(largePath, lines.join('\n') + '\n', 'utf8');
+    const session = upsertDiscoveredSession({ jsonlPath: largePath, messageCount: lines.length });
+    let capturedPrompt = '';
+
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: largePath,
+      tier: 3,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_model, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Capped deep sample.', summaryDetailed: 'Capped.', tags: ['capped'] };
+      },
+    });
+
+    expect(capturedPrompt.length).toBeLessThan(2_800_000);
+  });
+
   it('marks session as failed when API throws', async () => {
     seedSession();
     const sessions = findDiscoveredSessions({});

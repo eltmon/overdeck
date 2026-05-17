@@ -9,9 +9,9 @@
 
 import {
   findDiscoveredSessions,
+  findEnrichedSessionsMissingEmbedding,
   getDiscoveredSessionById,
   insertEmbedding,
-  getEmbedding,
 } from '../../database/discovered-sessions-db.js';
 import type { DiscoveredSession } from '../../database/discovered-sessions-db.js';
 import { runWithPool } from '../work-pool.js';
@@ -90,9 +90,8 @@ function selectSessionsForEmbedding(
       .filter((s): s is DiscoveredSession => s != null);
   }
 
-  const enriched = findDiscoveredSessions({ enriched: true });
-  if (regenerate) return enriched;
-  return enriched.filter((s) => getEmbedding(s.id, model) === null);
+  if (regenerate) return findDiscoveredSessions({ enriched: true });
+  return findEnrichedSessionsMissingEmbedding(model);
 }
 
 // ─── Main embed function ──────────────────────────────────────────────────────

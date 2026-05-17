@@ -72,7 +72,7 @@ async function runJob(
 
 const queue: DashboardDbRequest[] = [];
 let activeJobs = 0;
-const MAX_CONCURRENT_JOBS = 1;
+const MAX_CONCURRENT_JOBS_PER_LANE = 1;
 
 async function execute(message: DashboardDbRequest): Promise<void> {
   try {
@@ -95,7 +95,7 @@ async function execute(message: DashboardDbRequest): Promise<void> {
 }
 
 function drainQueue(): void {
-  while (activeJobs < MAX_CONCURRENT_JOBS) {
+  while (activeJobs < MAX_CONCURRENT_JOBS_PER_LANE) {
     const next = queue.shift();
     if (!next) return;
     activeJobs++;

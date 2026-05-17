@@ -11,6 +11,7 @@ import { SessionTable } from './SessionTable';
 import { SessionDetail } from './SessionDetail';
 import { ScanButton } from './ScanButton';
 import { FacetPanel } from './FacetPanel';
+import { useDashboardStore, selectScanProgress } from '../../lib/store';
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
@@ -204,6 +205,7 @@ async function triggerScan(): Promise<ScanResult> {
 
 export function ConversationsPage() {
   const queryClient = useQueryClient();
+  const scanProgress = useDashboardStore(selectScanProgress);
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showFacets, setShowFacets] = useState(false);
@@ -369,6 +371,7 @@ export function ConversationsPage() {
           isScanning={scanMutation.isPending}
           onScan={() => scanMutation.mutate()}
           lastResult={scanMutation.data}
+          progress={scanProgress}
         />
       </div>
 

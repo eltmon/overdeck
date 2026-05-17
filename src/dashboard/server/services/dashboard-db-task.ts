@@ -30,6 +30,7 @@ export type DashboardDbOperation =
   | 'embedSessions';
 
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
+type WorkerLane = 'read' | 'long';
 
 interface PendingJob {
   resolve: (value: unknown) => void;
@@ -65,7 +66,7 @@ const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
   'embedSessions',
 ]);
 
-let worker: Worker | null = null;
+const workers: Record<WorkerLane, Worker | null> = { read: null, long: null };
 const pending = new Map<string, PendingJob>();
 const sharedJobs = new Map<string, SharedJob>();
 
@@ -95,13 +96,19 @@ function coalescingKey(operation: DashboardDbOperation, payload: unknown): strin
   return `${operation}:${stableStringify(payload)}`;
 }
 
-function getWorker(): Worker {
-  if (worker) return worker;
+function workerLane(operation: DashboardDbOperation): WorkerLane {
+  return COALESCED_OPERATIONS.has(operation) ? 'long' : 'read';
+}
 
-  worker = new Worker(workerScriptUrl(), {
+function getWorker(lane: WorkerLane): Worker {
+  const existing = workers[lane];
+  if (existing) return existing;
+
+  const worker = new Worker(workerScriptUrl(), {
     type: 'module',
     execArgv: process.execArgv.filter((arg) => !arg.startsWith('--inspect')),
   });
+  workers[lane] = worker;
 
   worker.on('message', (message: WorkerResponse) => {
     const job = pending.get(message.id);
@@ -137,12 +144,12 @@ function getWorker(): Worker {
 
   worker.on('error', (err) => {
     failPending(err);
-    worker = null;
+    workers[lane] = null;
   });
 
   worker.on('exit', (code) => {
-    if (code !== 0) failPending(new Error(`Dashboard database worker exited with code ${code}`));
-    worker = null;
+    if (code !== 0) failPending(new Error(`Dashboard database ${lane} worker exited with code ${code}`));
+    workers[lane] = null;
   });
 
   return worker;
@@ -201,6 +208,7 @@ export function runDashboardDbJob<T>(
   }
 
   const id = randomUUID();
+  const lane = workerLane(operation);
   const progressListeners = new Set<ProgressHandler>();
   if (onProgress) progressListeners.add(onProgress);
 
@@ -211,7 +219,7 @@ export function runDashboardDbJob<T>(
       progressListeners,
       progressChain: Promise.resolve(),
     });
-    getWorker().postMessage({ id, operation, payload });
+    getWorker(lane).postMessage({ id, operation, payload });
   });
 
   if (key) {

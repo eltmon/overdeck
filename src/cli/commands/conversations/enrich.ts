@@ -30,11 +30,13 @@ export async function enrichAction(
 ): Promise<void> {
   const deep = Boolean(opts['deep']);
   const upgrade = Boolean(opts['upgrade']);
-  const tierRaw = deep ? (upgrade ? 2 : 3) : parseInt((opts['tier'] as string) ?? '1', 10);
+  const full = Boolean(opts['full']);
+  const modelOverride = opts['with'] as string | undefined;
+  const tierRaw = deep ? (upgrade ? 2 : 3) : (full && modelOverride ? 3 : parseInt((opts['tier'] as string) ?? '1', 10));
   const tier = tierRaw as EnrichmentTier;
   const yes = Boolean(opts['yes']);
   const maxParallel = opts['maxParallel'] ? parseInt(opts['maxParallel'] as string, 10) : undefined;
-  const skipAlreadyEnriched = !Boolean(opts['full']) && !upgrade;
+  const skipAlreadyEnriched = !full && !upgrade;
   const force = yes;
   const limit = opts['limit'] ? parseInt(opts['limit'] as string, 10) : undefined;
   const workspace = opts['workspace'] as string | undefined;
@@ -78,7 +80,7 @@ export async function enrichAction(
       maxParallel,
       skipAlreadyEnriched,
       force,
-      modelOverride: opts['with'] as string | undefined,
+      modelOverride,
       promptSuffix: opts['prompt'] as string | undefined,
       onProgress: (p) => {
         const pct = p.total > 0 ? Math.round((p.processed / p.total) * 100) : 0;
@@ -123,7 +125,7 @@ export async function enrichAction(
         sessionIds,
         maxParallel,
         skipAlreadyEnriched,
-        modelOverride: opts['with'] as string | undefined,
+        modelOverride,
         promptSuffix: opts['prompt'] as string | undefined,
         force: true,
       });

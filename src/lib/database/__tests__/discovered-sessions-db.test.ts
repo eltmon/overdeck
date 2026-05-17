@@ -226,6 +226,44 @@ describe('discovered-sessions-db', () => {
     expect(searchFts('authentication refactor').some((r) => r.id === s2.id)).toBe(true);
   });
 
+  it('upsertDiscoveredSession preserves enriched tags when scanner omits tags', async () => {
+    const { upsertDiscoveredSession, updateEnrichment, getDiscoveredSessionByJsonlPath } = await import(
+      '../discovered-sessions-db.js'
+    );
+    const s = upsertDiscoveredSession({ jsonlPath: '/rescan-tags.jsonl', filesTouched: ['old.ts'] });
+    updateEnrichment(s.id, {
+      enrichmentLevel: 1,
+      enrichmentModel: 'test',
+      summary: 'Changed auth tags',
+      tags: ['auth', 'security'],
+    });
+
+    upsertDiscoveredSession({ jsonlPath: '/rescan-tags.jsonl', filesTouched: ['new.ts'], messageCount: 7 });
+
+    const updated = getDiscoveredSessionByJsonlPath('/rescan-tags.jsonl');
+    expect(updated?.tags).toEqual(['auth', 'security']);
+    expect(updated?.filesTouched).toEqual(['new.ts']);
+  });
+
+  it('upsertDiscoveredSession refreshes FTS for enriched rows when files change', async () => {
+    const { upsertDiscoveredSession, updateEnrichment, searchFts } = await import(
+      '../discovered-sessions-db.js'
+    );
+    const s = upsertDiscoveredSession({ jsonlPath: '/rescan-fts.jsonl', filesTouched: ['oldtoken.ts'] });
+    updateEnrichment(s.id, {
+      enrichmentLevel: 1,
+      enrichmentModel: 'test',
+      summary: 'Keeps the same summary',
+      tags: ['stable'],
+    });
+    expect(searchFts('oldtoken').some((r) => r.id === s.id)).toBe(true);
+
+    upsertDiscoveredSession({ jsonlPath: '/rescan-fts.jsonl', filesTouched: ['newtoken.ts'] });
+
+    expect(searchFts('oldtoken').some((r) => r.id === s.id)).toBe(false);
+    expect(searchFts('newtoken').some((r) => r.id === s.id)).toBe(true);
+  });
+
   // ─── Embedding storage round-trip ─────────────────────────────────────────
 
   it('insertEmbedding and getEmbedding round-trip correctly', async () => {

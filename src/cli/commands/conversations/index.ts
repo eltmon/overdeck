@@ -117,7 +117,7 @@ export function registerConversationsCommands(program: Command): void {
     .description('Enrich sessions with AI-generated summaries and tags')
     .option('--tier <n>', 'Enrichment tier: 1 (quick) | 2 (detailed) | 3 (deep)', '1')
     .option('--deep', 'Shorthand for --tier 3')
-    .option('--full', 'Enrich even already-enriched sessions')
+    .option('--full', 'Use full-transcript enrichment with --with; enrich even already-enriched sessions')
     .option('--upgrade', 'Re-enrich sessions at a lower tier than requested')
     .option('--with <model>', 'Override the model used for enrichment')
     .option('--prompt <text>', 'Append custom prompt text to the enrichment request')

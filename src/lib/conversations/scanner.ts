@@ -249,10 +249,15 @@ export async function scan(opts: ScanOptions): Promise<ScanResult> {
         panopticonManaged: false,
         panIssueId: null,
         panAgentId: null,
+        actualCost: null,
+        costEventCount: 0,
       };
 
       // Estimate cost from token counts using model-capabilities pricing
       const estimatedCost = estimateCost(meta.primaryModel, meta.tokenInput, meta.tokenOutput);
+      if (correlation.actualCost != null) {
+        validateEstimatedCost(jsonlPath, estimatedCost, correlation.actualCost, result.warnings!);
+      }
 
       // Upsert into DB
       const wasExisting = !!existing;
@@ -328,6 +333,22 @@ function estimateCost(
     return (cap.costPer1MTokens / 1_000_000) * (tokenInput + tokenOutput);
   } catch {
     return 0;
+  }
+}
+
+function validateEstimatedCost(
+  jsonlPath: string,
+  estimatedCost: number,
+  actualCost: number,
+  warnings: string[],
+): void {
+  const delta = Math.abs(estimatedCost - actualCost);
+  const tolerance = Math.max(0.01, actualCost * 0.25);
+  if (delta > tolerance) {
+    warnings.push(
+      `Estimated cost for ${jsonlPath} differs from cost_events by $${delta.toFixed(4)} ` +
+      `(estimated $${estimatedCost.toFixed(4)}, actual $${actualCost.toFixed(4)})`,
+    );
   }
 }
 

@@ -38,7 +38,23 @@ import { embed } from '../../../lib/conversations/embeddings/providers.js';
 import { validateOrigin } from './origin-validation.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
 
-function rejectUntrustedOrigin(request: HttpServerRequest.HttpServerRequest): Response | null {
+function getRequestHeader(
+  request: HttpServerRequest.HttpServerRequest,
+  name: string,
+): string | undefined {
+  const value = (request.headers as Record<string, string | string[] | undefined>)[name];
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+export function rejectUntrustedOrigin(
+  request: HttpServerRequest.HttpServerRequest,
+  options: { requireOriginHeader?: boolean } = {},
+): Response | null {
+  if (options.requireOriginHeader && !getRequestHeader(request, 'origin') && !getRequestHeader(request, 'referer')) {
+    return jsonResponse({ error: 'Missing origin' }, { status: 403 });
+  }
+
   const originCheck = validateOrigin(request);
   if (!originCheck.ok) {
     return jsonResponse({ error: originCheck.error }, { status: 403 });
@@ -210,6 +226,10 @@ const searchRoute = HttpRouter.add(
 
     const q = params.get('q') ?? undefined;
     const semantic = params.get('semantic') === 'true';
+    if (semantic) {
+      const originError = rejectUntrustedOrigin(req, { requireOriginHeader: true });
+      if (originError) return originError;
+    }
     const rawSimilarTo = params.has('similar_to') ? parseInt(params.get('similar_to')!, 10) : undefined;
     const similarTo = rawSimilarTo !== undefined && Number.isFinite(rawSimilarTo) ? rawSimilarTo : undefined;
     const rawLimit = parseInt(params.get('limit') ?? '20', 10);

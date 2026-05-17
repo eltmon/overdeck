@@ -17,6 +17,7 @@ interface Session {
   enrichmentLevel: 0 | 1 | 2 | 3;
   enrichmentFailed: boolean;
   panopticonManaged: boolean;
+  panIssueId: string | null;
 }
 
 interface Props {
@@ -68,8 +69,15 @@ export function SessionTable({ sessions, selectedId, onSelect }: Props) {
 
                 {/* Workspace + summary */}
                 <td className="px-3 py-1.5 max-w-xs">
-                  <div className="font-mono text-gray-200 truncate" title={workspace}>
-                    {shortWorkspace}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="font-mono text-gray-200 truncate" title={workspace}>
+                      {shortWorkspace}
+                    </div>
+                    {session.panopticonManaged && (
+                      <span className="shrink-0 rounded-full border border-cyan-700 bg-cyan-950 px-1.5 py-0.5 text-[10px] font-medium text-cyan-200">
+                        Managed{session.panIssueId ? ` · ${session.panIssueId}` : ''}
+                      </span>
+                    )}
                   </div>
                   {session.summary && (
                     <div className="text-gray-500 truncate mt-0.5" title={session.summary}>

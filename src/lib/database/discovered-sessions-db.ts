@@ -156,6 +156,40 @@ function rowToSession(row: Record<string, unknown>): DiscoveredSession {
   };
 }
 
+type FtsRow = {
+  enrichment_level: number;
+  summary: string | null;
+  summary_detailed: string | null;
+  tags: string | null;
+  files_touched: string | null;
+};
+
+function getFtsRow(id: number): FtsRow | undefined {
+  return getDatabase()
+    .prepare(
+      `SELECT enrichment_level, summary, summary_detailed, tags, files_touched
+       FROM discovered_sessions WHERE id = ?`,
+    )
+    .get(id) as FtsRow | undefined;
+}
+
+function replaceFtsRow(id: number, oldRow: FtsRow | undefined): void {
+  const db = getDatabase();
+  if (oldRow && oldRow.enrichment_level > 0) {
+    db.prepare(
+      `INSERT INTO sessions_fts(sessions_fts, rowid, summary, summary_detailed, tags, files_touched)
+       VALUES('delete', ?, ?, ?, ?, ?)`,
+    ).run(id, oldRow.summary, oldRow.summary_detailed, oldRow.tags, oldRow.files_touched);
+  }
+
+  const newRow = getFtsRow(id);
+  if (!newRow || newRow.enrichment_level === 0) return;
+  db.prepare(
+    `INSERT INTO sessions_fts(rowid, summary, summary_detailed, tags, files_touched)
+     VALUES(?, ?, ?, ?, ?)`,
+  ).run(id, newRow.summary, newRow.summary_detailed, newRow.tags, newRow.files_touched);
+}
+
 // ─── Read operations ──────────────────────────────────────────────────────────
 
 export function getDiscoveredSessionByJsonlPath(jsonlPath: string): DiscoveredSession | null {
@@ -165,6 +199,8 @@ export function getDiscoveredSessionByJsonlPath(jsonlPath: string): DiscoveredSe
     .get(jsonlPath) as Record<string, unknown> | undefined;
   return row ? rowToSession(row) : null;
 }
+
+export const getByJsonlPath = getDiscoveredSessionByJsonlPath;
 
 export function getDiscoveredSessionById(id: number): DiscoveredSession | null {
   const db = getDatabase();
@@ -286,6 +322,23 @@ export function findDiscoveredSessions(filter: ConversationFilter = {}): Discove
 
 export const findByFilters = findDiscoveredSessions;
 
+export function findEnrichedSessionsMissingEmbedding(model: string): DiscoveredSession[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT ds.*
+       FROM discovered_sessions ds
+       WHERE ds.enrichment_level > 0
+         AND NOT EXISTS (
+           SELECT 1 FROM session_embeddings se
+           WHERE se.session_id = ds.id AND se.model = ?
+         )
+       ORDER BY ds.last_ts DESC NULLS LAST`,
+    )
+    .all(model) as Record<string, unknown>[];
+  return rows.map(rowToSession);
+}
+
 /**
  * Count sessions matching filters using a SQL COUNT(*) — no rows materialized.
  */
@@ -356,6 +409,12 @@ export function aggregateDiscoveredSessionCostBy(groupBy: 'workspace' | 'model')
 export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): DiscoveredSession {
   const db = getDatabase();
   const now = new Date().toISOString();
+  const oldRow = db
+    .prepare(
+      `SELECT id, enrichment_level, summary, summary_detailed, tags, files_touched
+       FROM discovered_sessions WHERE jsonl_path = ?`,
+    )
+    .get(opts.jsonlPath) as (FtsRow & { id: number }) | undefined;
 
   db.prepare(
     `INSERT INTO discovered_sessions (
@@ -382,7 +441,7 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
        estimated_cost     = excluded.estimated_cost,
        tools_used         = excluded.tools_used,
        files_touched      = excluded.files_touched,
-       tags               = excluded.tags,
+       tags               = CASE WHEN ? = 1 THEN excluded.tags ELSE discovered_sessions.tags END,
        panopticon_managed = excluded.panopticon_managed,
        pan_issue_id       = excluded.pan_issue_id,
        pan_agent_id       = excluded.pan_agent_id,
@@ -411,13 +470,20 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
     opts.fileSize ?? null,
     opts.fileMtime ?? null,
     now,
+    opts.tags !== undefined ? 1 : 0,
   );
 
   const row = db
     .prepare(`SELECT * FROM discovered_sessions WHERE jsonl_path = ?`)
     .get(opts.jsonlPath) as Record<string, unknown>;
-  return rowToSession(row);
+  const session = rowToSession(row);
+  if (oldRow && oldRow.enrichment_level > 0) {
+    replaceFtsRow(session.id, oldRow);
+  }
+  return session;
 }
+
+export const insert = upsertDiscoveredSession;
 
 /**
  * Update enrichment fields for a discovered session.
@@ -436,20 +502,7 @@ export function updateEnrichment(
 ): void {
   const db = getDatabase();
 
-  // Read old FTS-relevant values before UPDATE so we can delete the stale FTS entry.
-  // enrichment_level > 0 means the session was previously enriched and has a FTS row.
-  const oldRow = db
-    .prepare(
-      `SELECT enrichment_level, summary, summary_detailed, tags, files_touched
-       FROM discovered_sessions WHERE id = ?`,
-    )
-    .get(id) as {
-    enrichment_level: number;
-    summary: string | null;
-    summary_detailed: string | null;
-    tags: string | null;
-    files_touched: string | null;
-  } | undefined;
+  const oldRow = getFtsRow(id);
 
   db.prepare(
     `UPDATE discovered_sessions SET
@@ -475,27 +528,7 @@ export function updateEnrichment(
     id,
   );
 
-  // Per-row FTS sync: delete stale entry (if any), then insert current values.
-  if (oldRow && oldRow.enrichment_level > 0) {
-    db.prepare(
-      `INSERT INTO sessions_fts(sessions_fts, rowid, summary, summary_detailed, tags, files_touched)
-       VALUES('delete', ?, ?, ?, ?, ?)`,
-    ).run(id, oldRow.summary, oldRow.summary_detailed, oldRow.tags, oldRow.files_touched);
-  }
-  const newRow = db
-    .prepare(
-      `SELECT summary, summary_detailed, tags, files_touched FROM discovered_sessions WHERE id = ?`,
-    )
-    .get(id) as {
-    summary: string | null;
-    summary_detailed: string | null;
-    tags: string | null;
-    files_touched: string | null;
-  };
-  db.prepare(
-    `INSERT INTO sessions_fts(rowid, summary, summary_detailed, tags, files_touched)
-     VALUES(?, ?, ?, ?, ?)`,
-  ).run(id, newRow.summary, newRow.summary_detailed, newRow.tags, newRow.files_touched);
+  replaceFtsRow(id, oldRow);
 }
 
 /**

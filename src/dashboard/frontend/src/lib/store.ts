@@ -203,6 +203,8 @@ export const selectIsBootstrapped = (s: DashboardState): boolean => s.bootstrapC
 
 export const selectDashboardLifecycle = (s: DashboardState) => s.dashboardLifecycle
 
+export const selectScanProgress = (s: DashboardState) => s.scanProgress
+
 export const selectResources = (s: DashboardState): ResourceStats | null => s.resources
 
 export const selectIssues = (s: DashboardState): unknown[] => s.issuesRaw

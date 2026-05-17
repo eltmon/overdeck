@@ -221,6 +221,36 @@ describe('scanner', () => {
     expect(parser).toHaveBeenCalledWith(target);
   });
 
+  it('validates estimated scan cost against matching cost_events records', async () => {
+    const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'cost-session.jsonl');
+    writeFileSync(p, SESSION_JSONL, 'utf8');
+    const { insertCostEvent } = await import('../../database/cost-events-db.js');
+    insertCostEvent({
+      ts: '2025-01-01T10:02:00Z',
+      type: 'cost',
+      agentId: 'agent-cost',
+      issueId: 'PAN-457',
+      sessionType: 'work',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-6',
+      input: 100,
+      output: 200,
+      cacheRead: 0,
+      cacheWrite: 0,
+      cost: 5,
+      sessionId: 'cost-session',
+    });
+
+    const result = await scan({ mode: 'system', watchDirs: [] });
+
+    expect(result.warnings?.some((warning) => warning.includes('differs from cost_events'))).toBe(true);
+    const { findDiscoveredSessions } = await import('../../database/discovered-sessions-db.js');
+    const session = findDiscoveredSessions().find((s) => s.jsonlPath === p);
+    expect(session?.panopticonManaged).toBe(true);
+    expect(session?.panIssueId).toBe('PAN-457');
+    expect(session?.panAgentId).toBe('agent-cost');
+  });
+
   it('scan persists sessionId from JSONL into discovered_sessions', async () => {
     const p = join(fakeClaudeDir, '-home-user-Projects-myapp', 'with-session-id.jsonl');
     writeFileSync(p, SESSION_JSONL, 'utf8');

@@ -10,7 +10,7 @@ import { promises as fs } from 'fs';
 import * as readline from 'readline';
 import { createReadStream } from 'fs';
 
-import { updateEnrichment, markEnrichmentFailed } from '../../database/discovered-sessions-db.js';
+import { getDiscoveredSessionById, updateEnrichment, markEnrichmentFailed } from '../../database/discovered-sessions-db.js';
 import { calculateCost, getPricing } from '../../cost.js';
 import { applyFallback, selectEnrichmentModelForTier } from '../../model-fallback.js';
 import { loadConfig as loadYamlConfig } from '../../config-yaml.js';
@@ -61,56 +61,91 @@ function redactSensitiveText(text: string): string {
     .replace(/\b(password|passwd|api[_-]?key|secret|token)\s*[:=]\s*[^\s,;]+/gi, '$1=[REDACTED]');
 }
 
-/**
- * Read up to `maxLines` lines from a JSONL file.
- * Returns raw line strings (not parsed) for prompt construction.
- */
-async function readJsonlLines(filePath: string): Promise<string[]> {
-  const lines: string[] = [];
+const MAX_JSONL_LINE_CHARS = 20_000;
+const L3_MAX_LINES = 5_000;
+const L3_MAX_BYTES = 2_000_000;
+
+type SampledLine = { index: number; line: string };
+
+function boundedLine(line: string): string {
+  return line.length > MAX_JSONL_LINE_CHARS ? line.slice(0, MAX_JSONL_LINE_CHARS) : line;
+}
+
+function pushRing<T>(ring: T[], value: T, max: number): void {
+  ring.push(value);
+  if (ring.length > max) ring.shift();
+}
+
+function deterministicReservoirSlot(candidateCount: number, reservoirSize: number): number {
+  if (candidateCount <= reservoirSize) return candidateCount - 1;
+  const n = (candidateCount * 1_103_515_245 + 12_345) >>> 0;
+  return n % candidateCount < reservoirSize ? n % reservoirSize : -1;
+}
+
+async function sampleJsonlLines(filePath: string, tier: EnrichmentTier): Promise<string[]> {
   try {
     await fs.access(filePath);
   } catch {
-    return lines;
+    return [];
   }
 
   return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: createReadStream(filePath, { encoding: 'utf8' }),
-      crlfDelay: Infinity,
-    });
+    const stream = createReadStream(filePath, { encoding: 'utf8' });
+    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+
+    const firstLimit = tier === 1 ? 1 : 3;
+    const middleLimit = tier === 1 ? 1 : 5;
+    const tailLimit = tier === 1 ? 1 : 3;
+    const first: SampledLine[] = [];
+    const middle: SampledLine[] = [];
+    const tail: SampledLine[] = [];
+    const l3Lines: string[] = [];
+    let seen = 0;
+    let middleCandidates = 0;
+    let bytes = 0;
+    let capped = false;
 
     rl.on('line', (line) => {
       const trimmed = line.trim();
-      if (trimmed) lines.push(trimmed);
+      if (!trimmed || capped) return;
+      const sampled = boundedLine(trimmed);
+      seen++;
+
+      if (tier === 3) {
+        bytes += Buffer.byteLength(trimmed, 'utf8');
+        if (l3Lines.length >= L3_MAX_LINES || bytes > L3_MAX_BYTES) {
+          capped = true;
+          rl.close();
+          stream.destroy();
+          return;
+        }
+        l3Lines.push(sampled);
+        return;
+      }
+
+      const entry = { index: seen, line: sampled };
+      if (first.length < firstLimit) {
+        first.push(entry);
+        return;
+      }
+
+      middleCandidates++;
+      const slot = deterministicReservoirSlot(middleCandidates, middleLimit);
+      if (slot >= 0) middle[slot] = entry;
+      pushRing(tail, entry, tailLimit);
     });
 
-    rl.on('close', () => resolve(lines));
-    rl.on('error', () => resolve(lines));
+    rl.on('close', () => {
+      if (tier === 3) {
+        resolve(l3Lines);
+        return;
+      }
+      const byIndex = new Map<number, string>();
+      for (const item of [...first, ...middle, ...tail]) byIndex.set(item.index, item.line);
+      resolve([...byIndex.entries()].sort(([a], [b]) => a - b).map(([, line]) => line));
+    });
+    rl.on('error', () => resolve(tier === 3 ? l3Lines : []));
   });
-}
-
-function pickMiddle<T>(items: T[], count: number): T[] {
-  if (items.length <= count) return items;
-  if (count <= 0) return [];
-  const selected: T[] = [];
-  const step = (items.length - 1) / Math.max(1, count - 1);
-  for (let i = 0; i < count; i++) {
-    selected.push(items[Math.round(i * step)]);
-  }
-  return selected;
-}
-
-function sampleLinesForTier(lines: string[], tier: EnrichmentTier): string[] {
-  if (tier === 3 || lines.length <= 3) return lines;
-  if (tier === 1) {
-    const middle = lines.length > 2 ? [lines[Math.floor(lines.length / 2)]] : [];
-    return [...lines.slice(0, 1), ...middle, ...lines.slice(-1)];
-  }
-
-  const first = lines.slice(0, 3);
-  const last = lines.slice(-3);
-  const middlePool = lines.slice(3, Math.max(3, lines.length - 3));
-  return [...first, ...pickMiddle(middlePool, 5), ...last];
 }
 
 /**
@@ -302,7 +337,7 @@ export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichS
   const apiCall = opts.callApi ?? callClaudeApi;
 
   try {
-    const lines = sampleLinesForTier(await readJsonlLines(jsonlPath), tier);
+    const lines = await sampleJsonlLines(jsonlPath, tier);
     if (lines.length === 0) {
       return { sessionId, tier, model, error: 'No readable messages in JSONL' };
     }
@@ -323,9 +358,12 @@ export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichS
     // Call API
     const response = await apiCall(model, prompt);
 
+    const existing = getDiscoveredSessionById(sessionId);
+    const preserveQuickSummary = tier === 2 && existing?.enrichmentLevel === 1 && Boolean(existing.summary);
+
     // Persist to DB (syncFts is called inside updateEnrichment)
     updateEnrichment(sessionId, {
-      summary: response.summary,
+      summary: preserveQuickSummary ? undefined : response.summary,
       summaryDetailed: response.summaryDetailed ?? null,
       tags: response.tags,
       enrichmentLevel: tier,

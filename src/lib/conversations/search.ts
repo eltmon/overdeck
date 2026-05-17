@@ -20,13 +20,10 @@
 import {
   findDiscoveredSessions,
   countDiscoveredSessions,
-  countFts,
-  searchFts,
   searchFtsSessions,
   countFtsSessions,
   loadEmbeddings,
   getEmbedding,
-  getDiscoveredSessionById,
   topKCosine,
 } from '../database/discovered-sessions-db.js';
 import type { DiscoveredSession, ConversationFilter } from '../database/discovered-sessions-db.js';
@@ -243,12 +240,8 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
       sessions = searchFtsSessions(query.q!, filter, limit, offset);
       total = countFtsSessions(query.q!, filter);
     } else {
-      const ftsMatches = searchFts(query.q!, offset + limit);
-      total = countFts(query.q!);
-      sessions = ftsMatches
-        .slice(offset, offset + limit)
-        .map((m) => getDiscoveredSessionById(m.id))
-        .filter((s): s is DiscoveredSession => s != null);
+      sessions = searchFtsSessions(query.q!, {}, limit, offset);
+      total = countFtsSessions(query.q!, {});
     }
 
     return {
@@ -291,13 +284,9 @@ export async function searchSessions(query: SearchQuery): Promise<SearchResult> 
     const candidateLimit = semanticRerankCandidateLimit(ftsTotal, limit, offset);
     candidates = searchFtsSessions(query.q!, filter, candidateLimit, 0);
   } else {
-    ftsTotal = countFts(query.q!);
+    ftsTotal = countFtsSessions(query.q!, {});
     const candidateLimit = semanticRerankCandidateLimit(ftsTotal, limit, offset);
-    const ftsMatches = searchFts(query.q!, candidateLimit);
-    const ftsIds = ftsMatches.map((m) => m.id);
-    candidates = ftsIds
-      .map((id) => getDiscoveredSessionById(id))
-      .filter((s): s is DiscoveredSession => s != null);
+    candidates = searchFtsSessions(query.q!, {}, candidateLimit, 0);
   }
 
   if (!refEmbedding || candidates.length === 0) {
