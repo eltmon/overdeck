@@ -29,6 +29,10 @@ type ClientControlMessage =
   | { type: 'ready' }
   | { type: 'resize'; cols: number; rows: number };
 
+const ATTACH_TIMEOUT_MS = 5000;
+const PRE_ATTACH_MAX_MESSAGES = 32;
+const PRE_ATTACH_MAX_BYTES = 64 * 1024;
+
 function parseControlMessage(message: string): ClientControlMessage | null {
   if (!message.startsWith('{')) return null;
   try {
@@ -169,15 +173,25 @@ export function setupTerminalWebSocket(server: http.Server): void {
     // The client sends resize dimensions immediately on connect, but we have async
     // operations (tmux checks) that take time. Without buffering, messages are lost.
     const earlyMessages: string[] = [];
+    let preAttachBytes = 0;
     let messageHandler: ((data: string) => void) | null = null;
     let resolvePendingAttach: ((attach: Extract<ClientControlMessage, { type: 'attach' }> | null) => void) | null = null;
+
+    const bufferPreAttachMessage = (message: string): boolean => {
+      preAttachBytes += Buffer.byteLength(message);
+      if (earlyMessages.length >= PRE_ATTACH_MAX_MESSAGES || preAttachBytes > PRE_ATTACH_MAX_BYTES) {
+        ws.close(1008, 'attach-handshake-too-large');
+        return false;
+      }
+      earlyMessages.push(message);
+      return true;
+    };
 
     ws.on('message', (data) => {
       const message = data.toString();
       if (messageHandler) {
         messageHandler(message);
-      } else {
-        earlyMessages.push(message);
+      } else if (bufferPreAttachMessage(message)) {
         console.log(`[ws-terminal] Buffered early message for ${sessionName}: ${message.slice(0, 50)}...`);
       }
     });
@@ -203,16 +217,26 @@ export function setupTerminalWebSocket(server: http.Server): void {
       }
 
       let attachMessage: Extract<ClientControlMessage, { type: 'attach' }> | null = null;
+      let attachTimer: ReturnType<typeof setTimeout> | null = null;
       const attachPromise = new Promise<Extract<ClientControlMessage, { type: 'attach' }> | null>((resolve) => {
         resolvePendingAttach = resolve;
+        attachTimer = setTimeout(() => {
+          ws.close(1008, 'attach-handshake-timeout');
+          resolve(null);
+        }, ATTACH_TIMEOUT_MS);
       });
       const remainingMessages: string[] = [];
+      let remainingBytes = 0;
       for (const msg of earlyMessages) {
         const parsed = parseControlMessage(msg);
         if (!attachMessage && parsed?.type === 'attach') {
           attachMessage = parsed;
-        } else {
+        } else if (remainingMessages.length < PRE_ATTACH_MAX_MESSAGES && remainingBytes <= PRE_ATTACH_MAX_BYTES) {
+          remainingBytes += Buffer.byteLength(msg);
           remainingMessages.push(msg);
+        } else {
+          ws.close(1008, 'attach-handshake-too-large');
+          return;
         }
       }
       earlyMessages.length = 0;
@@ -221,7 +245,15 @@ export function setupTerminalWebSocket(server: http.Server): void {
         const parsed = parseControlMessage(message);
         if (!attachMessage && parsed?.type === 'attach') {
           attachMessage = parsed;
+          if (attachTimer) clearTimeout(attachTimer);
           resolvePendingAttach?.(parsed);
+          resolvePendingAttach = null;
+          return;
+        }
+        remainingBytes += Buffer.byteLength(message);
+        if (remainingMessages.length >= PRE_ATTACH_MAX_MESSAGES || remainingBytes > PRE_ATTACH_MAX_BYTES) {
+          ws.close(1008, 'attach-handshake-too-large');
+          resolvePendingAttach?.(null);
           resolvePendingAttach = null;
           return;
         }
@@ -232,6 +264,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
       if (!attachMessage) {
         attachMessage = await attachPromise;
       }
+      if (attachTimer) clearTimeout(attachTimer);
       if (!attachMessage) {
         return;
       }
@@ -271,7 +304,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
           existingHub.cols = requestedCols;
           existingHub.rows = requestedRows;
           try {
-            existingHub.pty.resize(requestedCols, requestedRows);
+            existingHub.pty?.resize(requestedCols, requestedRows);
           } catch {
             // PTY may be mid-teardown; subsequent operations will notice.
           }
@@ -299,7 +332,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
             existingHub.cols = parsed.cols;
             existingHub.rows = parsed.rows;
             try {
-              existingHub.pty.resize(parsed.cols, parsed.rows);
+              existingHub.pty?.resize(parsed.cols, parsed.rows);
             } catch {
               return;
             }
@@ -314,6 +347,10 @@ export function setupTerminalWebSocket(server: http.Server): void {
             return;
           }
           if (existingHub.inputClient !== ws) return;
+          if (!existingHub.pty) {
+            existingHub.pendingInput.push(message);
+            return;
+          }
           try {
             existingHub.pty.write(message);
           } catch {
@@ -344,17 +381,18 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
       let ptyProcess: pty.IPty | null = null;
       let ptyStarted = false;
-      const pendingInput: string[] = [];
 
       const hub: PtyHub = {
-        pty: null as unknown as pty.IPty,
+        pty: null,
         clients: new Set(),
         cols: requestedCols,
         rows: requestedRows,
+        pendingInput: [],
         inputClient: ws,
         clientStates: new Map(),
       };
 
+      activePtyHubs.set(sessionName, hub);
       addClientToHub(hub, ws, false);
 
       const startLocalPty = async () => {
@@ -366,11 +404,13 @@ export function setupTerminalWebSocket(server: http.Server): void {
             // Use 4404 (private-use range) so the client can distinguish
             // "session doesn't exist" from "normal disconnect". The client
             // should NOT retry on 4404 — the session is gone.
+            activePtyHubs.delete(sessionName);
             ws.close(4404, 'session-not-found');
             return;
           }
         } catch {
           console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
+          activePtyHubs.delete(sessionName);
           ws.close(4404, 'session-not-found');
           return;
         }
@@ -393,7 +433,6 @@ export function setupTerminalWebSocket(server: http.Server): void {
         });
 
         hub.pty = ptyProcess;
-        activePtyHubs.set(sessionName, hub);
 
         let ptyChunks = 0;
         let ptyBytes = 0;
@@ -424,13 +463,20 @@ export function setupTerminalWebSocket(server: http.Server): void {
           hub.clientStates.clear();
         });
 
-        for (const input of pendingInput) {
+        for (const input of hub.pendingInput) {
           ptyProcess.write(input);
         }
-        pendingInput.length = 0;
+        hub.pendingInput.length = 0;
       };
 
-      const snapshot = await captureFreshSnapshot(sessionName, requestedCols, requestedRows);
+      let snapshot: { cols: number; rows: number; data: string };
+      try {
+        snapshot = await captureFreshSnapshot(sessionName, requestedCols, requestedRows);
+      } catch (err) {
+        activePtyHubs.delete(sessionName);
+        ws.close(1008, `Failed to capture terminal snapshot: ${err}`);
+        return;
+      }
       sendControl(ws, { type: 'snapshot', cols: snapshot.cols, rows: snapshot.rows, data: snapshot.data });
       // Start PTY immediately — don't wait for client 'ready'. The hub buffers
       // live data for not-yet-ready clients (pty-hub.ts broadcastToHub), so data
@@ -470,7 +516,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
         if (ptyProcess) {
           ptyProcess.write(message);
         } else {
-          pendingInput.push(message);
+          hub.pendingInput.push(message);
         }
       };
 

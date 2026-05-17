@@ -2,10 +2,12 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { readFile, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
-import { bridgeCodexAuthToCliproxyAsync } from '../../../lib/cliproxy.js';
+import { bridgeCodexAuthToCliproxyAsync, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
 import { createSessionAsync, sessionExistsAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { getDashboardApiUrl } from '../../../lib/config.js';
 import { validateOrigin } from './origin-validation.js';
@@ -76,6 +78,20 @@ function buildTerminalCookie(sessionName: string, terminalToken: string): string
   const value = encodeURIComponent(`${sessionName}:${terminalToken}`);
   const secure = getDashboardApiUrl().startsWith('https://') ? '; Secure' : '';
   return `pan_codex_reauth=${value}; HttpOnly; SameSite=Strict; Path=/ws/terminal; Max-Age=${Math.floor(SESSION_MAX_AGE_MS / 1000)}${secure}`;
+}
+
+async function readBridgedCodexCredential(): Promise<{ accessToken: string | null; mtimeMs: number | null }> {
+  const path = join(getCliproxyAuthDir(), 'codex-primary.json');
+  try {
+    const [raw, fileStat] = await Promise.all([readFile(path, 'utf8'), stat(path)]);
+    const parsed = JSON.parse(raw) as { access_token?: unknown };
+    return {
+      accessToken: typeof parsed.access_token === 'string' ? parsed.access_token : null,
+      mtimeMs: fileStat.mtimeMs,
+    };
+  } catch {
+    return { accessToken: null, mtimeMs: null };
+  }
 }
 
 // ─── Route: GET /api/settings/codex-auth ───────────────────────────────────────
@@ -157,7 +173,7 @@ const postCodexReauthStatusRoute = HttpRouter.add(
       const session = getLiveReauthSession(sessionName);
 
       if (!validateReauthStatusToken(sessionName, token) || !session) {
-        return jsonResponse({ completed: false });
+        return jsonResponse({ completed: true, success: false, error: 'Re-auth session expired or invalid' });
       }
 
       const exists = yield* Effect.promise(() => sessionExistsAsync(sessionName));
@@ -165,14 +181,22 @@ const postCodexReauthStatusRoute = HttpRouter.add(
         return jsonResponse({ completed: false });
       }
 
-      yield* Effect.promise(() => bridgeCodexAuthToCliproxyAsync());
-      const authStatus = yield* Effect.promise(() => checkCodexAuthStatus({ ignoreBurnBefore: session.createdAt }));
-      if (authStatus.status !== 'valid') {
+      const beforeCredential = yield* Effect.promise(() => readBridgedCodexCredential());
+      const bridged = yield* Effect.promise(() => bridgeCodexAuthToCliproxyAsync());
+      const afterCredential = yield* Effect.promise(() => readBridgedCodexCredential());
+      const refreshedCredential = bridged && (
+        (beforeCredential.accessToken !== null && afterCredential.accessToken !== beforeCredential.accessToken) ||
+        (afterCredential.mtimeMs !== null && afterCredential.mtimeMs >= session.createdAt)
+      );
+      const authStatus = yield* Effect.promise(() => checkCodexAuthStatus(
+        refreshedCredential ? { ignoreBurnBefore: session.createdAt } : undefined,
+      ));
+      if (!refreshedCredential || authStatus.status !== 'valid') {
         return jsonResponse({
           completed: true,
           success: false,
           authStatus,
-          error: authStatus.message || `Codex authentication is ${authStatus.status}`,
+          error: !bridged ? 'Codex credentials were not bridged' : (authStatus.message || `Codex authentication is ${authStatus.status}`),
         });
       }
 

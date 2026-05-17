@@ -173,6 +173,13 @@ async function testApiKey(provider: string, apiKey: string, model?: string): Pro
   return res.json();
 }
 
+function formatCodexExpiry(expiresAt?: string): string | null {
+  if (!expiresAt) return null;
+  const date = new Date(expiresAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return `Expires ${date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`;
+}
+
 // Provider definitions
 const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[] = [
   { id: 'anthropic', name: 'Anthropic', icon: Code, placeholder: 'sk-ant-...' },
@@ -650,10 +657,19 @@ export function SettingsPage() {
                             {codexAuth.email && (
                               <SensitiveText value={codexAuth.email} className="text-[10px] text-muted-foreground" />
                             )}
+                            {formatCodexExpiry(codexAuth.expiresAt) && (
+                              <span className="text-[10px] text-muted-foreground">{formatCodexExpiry(codexAuth.expiresAt)}</span>
+                            )}
                           </div>
                         ) : (codexAuth?.status === 'expired' || codexAuth?.status === 'burned') ? (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-warning capitalize">{codexAuth.status}</span>
+                            {codexAuth.email && (
+                              <SensitiveText value={codexAuth.email} className="text-[10px] text-muted-foreground" />
+                            )}
+                            {formatCodexExpiry(codexAuth.expiresAt) && (
+                              <span className="text-[10px] text-muted-foreground">{formatCodexExpiry(codexAuth.expiresAt)}</span>
+                            )}
                             <button
                               onClick={async () => {
                                 try {
