@@ -21,7 +21,14 @@ import {
 import { enrichSessions } from '../../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../../lib/conversations/embeddings/index.js';
 import { parseSearchParams, rejectUntrustedOrigin } from '../discovered-sessions.js';
-import { DASHBOARD_SESSION_COOKIE, _resetDashboardSessionTokenForTests, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest } from '../dashboard-auth.js';
+import {
+  DASHBOARD_SESSION_COOKIE,
+  _resetDashboardSessionTokenForTests,
+  dashboardSessionCookieHeader,
+  hasDashboardInternalToken,
+  rejectUnauthorizedDashboardRequest,
+  rejectUnauthorizedDashboardSessionMintRequest,
+} from '../dashboard-auth.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 
 let TEST_HOME: string;
@@ -214,6 +221,16 @@ describe('dashboard conversation route guards', () => {
     expect(response).toBeNull();
   });
 
+  it('does not treat dashboard session cookies as internal-token proof', () => {
+    expect(hasDashboardInternalToken(request({ cookie: `${DASHBOARD_SESSION_COOKIE}=test-browser-session-token` }))).toBe(false);
+    expect(hasDashboardInternalToken(request({ [INTERNAL_TOKEN_HEADER]: 'test-dashboard-token' }))).toBe(true);
+  });
+
+  it('requires internal-token proof before minting dashboard session cookies', () => {
+    expect(rejectUnauthorizedDashboardSessionMintRequest(request({ cookie: `${DASHBOARD_SESSION_COOKIE}=test-browser-session-token` }))?.status).toBe(401);
+    expect(rejectUnauthorizedDashboardSessionMintRequest(request({ [INTERNAL_TOKEN_HEADER]: 'test-dashboard-token' }))).toBeNull();
+  });
+
   it('rejects internal tokens presented as dashboard session cookies', () => {
     const response = rejectUnauthorizedDashboardRequest(request({ cookie: `${DASHBOARD_SESSION_COOKIE}=test-dashboard-token` }));
     expect(response?.status).toBe(401);
@@ -228,6 +245,10 @@ describe('dashboard conversation route guards', () => {
     const cookie = dashboardSessionCookieHeader();
     expect(cookie).toContain(`${DASHBOARD_SESSION_COOKIE}=test-browser-session-token`);
     expect(cookie).not.toContain('test-dashboard-token');
+  });
+
+  it('marks dashboard session cookies secure for HTTPS requests', () => {
+    expect(dashboardSessionCookieHeader({ secure: true })).toContain('; Secure');
   });
 
   it('rejects semantic GET requests without origin evidence', () => {

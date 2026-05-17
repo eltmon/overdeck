@@ -190,6 +190,42 @@ describe('enrichSession', () => {
     expect(updated.tags).toEqual(['l2']);
   });
 
+  it('sends L1 as 3 sampled messages and L2 as 11 sampled messages with tool summaries', async () => {
+    const samplePath = join(TEST_HOME, 'sampled.jsonl');
+    const lines = Array.from({ length: 20 }, (_, i) => JSON.stringify({
+      message: {
+        role: i % 2 === 0 ? 'user' : 'assistant',
+        content: i === 1
+          ? [{ type: 'tool_use', name: 'Read', input: { file_path: '/secret/path' } }]
+          : `message ${i}`,
+      },
+    }));
+    writeFileSync(samplePath, lines.join('\n') + '\n', 'utf8');
+    const session = upsertDiscoveredSession({ jsonlPath: samplePath, messageCount: lines.length });
+    const prompts: Record<number, string> = {};
+
+    for (const tier of [1, 2] as const) {
+      await enrichSession({
+        sessionId: session.id,
+        jsonlPath: samplePath,
+        tier,
+        force: true,
+        config: { quickModel: null, deepModel: null },
+        callApi: async (_model, prompt) => {
+          prompts[tier] = prompt;
+          return tier === 1
+            ? { summary: 'Sampled L1.', tags: ['sampled'] }
+            : { summary: 'Sampled L2.', summaryDetailed: 'Sampled L2 detail.', tags: ['sampled'] };
+        },
+      });
+    }
+
+    expect(prompts[1].split('\n').filter((line) => line.startsWith('['))).toHaveLength(3);
+    expect(prompts[2].split('\n').filter((line) => line.startsWith('['))).toHaveLength(11);
+    expect(prompts[2]).toContain('[tool_use:Read]');
+    expect(prompts[2]).not.toContain('/secret/path');
+  });
+
   it('bounds sampled prompt size for large L1 transcripts', async () => {
     const largePath = join(TEST_HOME, 'large-l1.jsonl');
     const lines = Array.from({ length: 10_000 }, (_, i) => JSON.stringify({
@@ -439,6 +475,29 @@ describe('enrichSessions', () => {
     expect(err).toBeInstanceOf(CostThresholdError);
     expect(err.estimatedCost).toBe(1.5);
     expect(err.name).toBe('CostThresholdError');
+  });
+
+  it('reports actual enrichment cost within the 20% estimate tolerance for a sample run', async () => {
+    seedSession();
+    const estimated = estimateEnrichmentCost(1, 1);
+
+    const result = await enrichSessions({
+      tier: 1,
+      callApi: async () => ({
+        summary: 'Cost sample.',
+        tags: ['cost'],
+        usage: {
+          inputTokens: 300,
+          outputTokens: 150,
+          cost: estimated * 1.1,
+        },
+      }),
+      maxParallel: 1,
+    });
+
+    expect(result.estimatedCost).toBe(estimated);
+    expect(result.actualCost).toBeCloseTo(estimated * 1.1);
+    expect(Math.abs(result.actualCost! - result.estimatedCost) / result.estimatedCost).toBeLessThanOrEqual(0.2);
   });
 
   it('tier 2 bulk enrichment includes sessions already at L1', async () => {

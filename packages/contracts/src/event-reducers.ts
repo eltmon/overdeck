@@ -265,6 +265,10 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     resolvedChannelPermissionDecisionIdsByAgentId: {},
     resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
+    scanProgress: snapshot.scanProgress ?? null,
+    enrichStats: snapshot.enrichStats ?? null,
+    enrichProgressBySessionId: snapshot.enrichProgressBySessionId ?? {},
+    embedProgressBySessionId: snapshot.embedProgressBySessionId ?? {},
   }
 }
 

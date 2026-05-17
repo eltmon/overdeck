@@ -107,6 +107,80 @@ const TestConnectionBodySchema = Schema.Struct({
   ollamaBaseUrl: Schema.optional(Schema.String),
 });
 
+const StatsResponseSchema = Schema.Struct({
+  total: Schema.Number,
+  enriched: Schema.Number,
+  embedded: Schema.Number,
+  managedCount: Schema.Number,
+  embeddingModels: Schema.optional(Schema.Array(Schema.Struct({ model: Schema.String, embedded: Schema.Number }))),
+});
+const DiscoveredSessionResponseSchema = Schema.Struct({
+  id: Schema.Number,
+  jsonlPath: Schema.String,
+  sessionId: Schema.NullOr(Schema.String),
+  workspacePath: Schema.NullOr(Schema.String),
+  workspaceHash: Schema.NullOr(Schema.String),
+  messageCount: Schema.Number,
+  firstTs: Schema.NullOr(Schema.String),
+  lastTs: Schema.NullOr(Schema.String),
+  modelsUsed: Schema.Array(Schema.String),
+  primaryModel: Schema.NullOr(Schema.String),
+  tokenInput: Schema.Number,
+  tokenOutput: Schema.Number,
+  estimatedCost: Schema.Number,
+  toolsUsed: Schema.Array(Schema.String),
+  filesTouched: Schema.Array(Schema.String),
+  tags: Schema.Array(Schema.String),
+  summary: Schema.NullOr(Schema.String),
+  summaryDetailed: Schema.NullOr(Schema.String),
+  enrichmentLevel: Schema.Number,
+  enrichmentModel: Schema.NullOr(Schema.String),
+  enrichedAt: Schema.NullOr(Schema.String),
+  enrichmentFailed: Schema.Boolean,
+  panopticonManaged: Schema.Boolean,
+  panIssueId: Schema.NullOr(Schema.String),
+  panAgentId: Schema.NullOr(Schema.String),
+  fileSize: Schema.NullOr(Schema.Number),
+  fileMtime: Schema.NullOr(Schema.String),
+  scannedAt: Schema.String,
+});
+const ListResponseSchema = Schema.Struct({ sessions: Schema.Array(DiscoveredSessionResponseSchema), count: Schema.Number, total: Schema.Number });
+const SearchResponseSchema = Schema.Struct({
+  sessions: Schema.Array(DiscoveredSessionResponseSchema),
+  total: Schema.Number,
+  mode: Schema.String,
+  durationMs: Schema.Number,
+  error: Schema.optional(Schema.String),
+});
+const CostResponseSchema = Schema.Struct({
+  sessionCount: Schema.Number,
+  totalCost: Schema.Number,
+  totalTokensIn: Schema.Number,
+  totalTokensOut: Schema.Number,
+});
+const ScanResponseSchema = Schema.Struct({ inserted: Schema.Number, updated: Schema.Number, skipped: Schema.Number, errors: Schema.Number, durationMs: Schema.Number });
+const EnrichResponseSchema = Schema.Struct({
+  enriched: Schema.Number,
+  errors: Schema.Number,
+  estimatedCost: Schema.Number,
+  actualCost: Schema.NullOr(Schema.Number),
+  durationMs: Schema.Number,
+});
+const EmbedResponseSchema = Schema.Struct({ embedded: Schema.Number, skipped: Schema.Number, errors: Schema.Number });
+const ConfigResponseSchema = Schema.Struct({
+  embeddings: Schema.Boolean,
+  embeddingProvider: Schema.String,
+  embeddingModel: Schema.String,
+  embeddingAutoOnDeep: Schema.Boolean,
+});
+const OkResponseSchema = Schema.Struct({ ok: Schema.Boolean });
+const TestConnectionResponseSchema = Schema.Struct({ ok: Schema.Boolean, latencyMs: Schema.optional(Schema.Number), error: Schema.optional(Schema.String) });
+
+function validatedJsonResponse<A>(schema: Schema.Schema<A, unknown, never>, data: unknown): ReturnType<typeof jsonResponse> {
+  Schema.decodeUnknownSync(schema)(data);
+  return jsonResponse(data);
+}
+
 function parseRequestBody<A>(schema: Schema.Schema<A, unknown, never>, raw: unknown): { ok: true; body: A } | { ok: false; response: Response } {
   try {
     return { ok: true, body: Schema.decodeUnknownSync(schema)(raw) };
@@ -127,7 +201,7 @@ const getStatsRoute = HttpRouter.add(
     const req = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnauthorizedDashboardRequest(req);
     if (authError) return authError;
-    return jsonResponse(yield* Effect.promise(() => runDashboardDbJob('getDiscoveredStats')));
+    return validatedJsonResponse(StatsResponseSchema, yield* Effect.promise(() => runDashboardDbJob('getDiscoveredStats')));
   })),
 );
 
@@ -172,7 +246,7 @@ const listRoute = HttpRouter.add(
     const { sessions, total } = yield* Effect.promise(() =>
       runDashboardDbJob<{ sessions: DiscoveredSession[]; total: number }>('listDiscoveredSessions', filter),
     );
-    return jsonResponse({ sessions, count: sessions.length, total });
+    return validatedJsonResponse(ListResponseSchema, { sessions, count: sessions.length, total });
   })),
 );
 
@@ -260,10 +334,10 @@ const searchRoute = HttpRouter.add(
           offset,
           config,
         });
-        return jsonResponse(result);
+        return validatedJsonResponse(SearchResponseSchema, result);
       } catch (err) {
         if (semantic) {
-          return jsonResponse({
+          return validatedJsonResponse(SearchResponseSchema, {
             sessions: [],
             total: 0,
             mode: 'semantic',
@@ -290,7 +364,7 @@ const getCostRoute = HttpRouter.add(
 
     const filter = parseSearchParams(params);
 
-    return jsonResponse(yield* Effect.promise(() => runDashboardDbJob('aggregateDiscoveredSessionCost', filter)));
+    return validatedJsonResponse(CostResponseSchema, yield* Effect.promise(() => runDashboardDbJob('aggregateDiscoveredSessionCost', filter)));
   })),
 );
 
@@ -315,7 +389,7 @@ const getByIdRoute = HttpRouter.add(
       return jsonResponse({ error: `Session ${id} not found` }, { status: 404 });
     }
 
-    return jsonResponse(session);
+    return validatedJsonResponse(DiscoveredSessionResponseSchema, session);
   })),
 );
 
@@ -381,7 +455,7 @@ const postEnrichByIdRoute = HttpRouter.add(
           await Effect.runPromise(eventStore.appendAsync(progressEvent as EnrichProgressEvent));
         }),
       );
-      return jsonResponse(result);
+      return validatedJsonResponse(EnrichResponseSchema, result);
     } catch (err) {
       if (err instanceof CostThresholdError) {
         return jsonResponse(
@@ -486,7 +560,7 @@ const postScanRoute = HttpRouter.add(
     };
     yield* Effect.promise(() => Effect.runPromise(eventStore.appendAsync(completeEvent as ScanCompleteEvent)));
 
-    return jsonResponse(result);
+    return validatedJsonResponse(ScanResponseSchema, result);
   })),
 );
 
@@ -558,7 +632,7 @@ const postEnrichRoute = HttpRouter.add(
       };
       yield* Effect.promise(() => Effect.runPromise(eventStore.appendAsync(completeEvent as EnrichCompleteEvent)));
 
-      return jsonResponse(result);
+      return validatedJsonResponse(EnrichResponseSchema, result);
     } catch (err) {
       if (err instanceof CostThresholdError) {
         return jsonResponse(
@@ -621,7 +695,7 @@ const postEmbedRoute = HttpRouter.add(
       }),
     );
 
-    return jsonResponse(result);
+    return validatedJsonResponse(EmbedResponseSchema, result);
   })),
 );
 
@@ -635,7 +709,7 @@ const getConvConfigRoute = HttpRouter.add(
     const authError = rejectUnauthorizedDashboardRequest(req);
     if (authError) return authError;
     const config = yield* Effect.promise(() => getConversationsConfigAsync());
-    return jsonResponse({
+    return validatedJsonResponse(ConfigResponseSchema, {
       embeddings: config.embeddings,
       embeddingProvider: config.embeddingProvider,
       embeddingModel: config.embeddingModel,
@@ -668,7 +742,7 @@ const putConvConfigRoute = HttpRouter.add(
       },
     }));
 
-    return jsonResponse({ ok: true });
+    return validatedJsonResponse(OkResponseSchema, { ok: true });
   })),
 );
 
@@ -707,7 +781,7 @@ const postTestConnectionRoute = HttpRouter.add(
       }
     });
 
-    return jsonResponse(result);
+    return validatedJsonResponse(TestConnectionResponseSchema, result);
   })),
 );
 

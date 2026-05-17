@@ -368,6 +368,50 @@ export type TurnDiffSummary = typeof TurnDiffSummary.Type
 
 // ─── Dashboard Snapshot ──────────────────────────────────────────────────────
 
+export const ScanProgressSnapshot = Schema.Struct({
+  active: Schema.Boolean,
+  mode: Schema.Literals(['targeted', 'watched', 'system']),
+  dirs: Schema.Array(Schema.String),
+  dirsProcessed: Schema.Number,
+  dirsTotal: Schema.Number,
+  sessionsFound: Schema.Number,
+  elapsedMs: Schema.Number,
+  inserted: Schema.Number,
+  updated: Schema.Number,
+  skipped: Schema.Number,
+  errors: Schema.Number,
+  durationMs: Schema.Number,
+})
+export type ScanProgressSnapshot = typeof ScanProgressSnapshot.Type
+
+export const EnrichStatsSnapshot = Schema.Struct({
+  processed: Schema.Number,
+  totalCost: Schema.Number,
+  failures: Schema.Number,
+  durationMs: Schema.Number,
+})
+export type EnrichStatsSnapshot = typeof EnrichStatsSnapshot.Type
+
+export const EnrichProgressSnapshot = Schema.Struct({
+  sessionId: Schema.Number,
+  level: Schema.Number,
+  model: Schema.String,
+  cost: Schema.Number,
+  success: Schema.Boolean,
+  error: Schema.optional(Schema.String),
+  timestamp: Schema.String,
+})
+export type EnrichProgressSnapshot = typeof EnrichProgressSnapshot.Type
+
+export const EmbedProgressSnapshot = Schema.Struct({
+  sessionId: Schema.Number,
+  model: Schema.String,
+  success: Schema.Boolean,
+  error: Schema.optional(Schema.String),
+  timestamp: Schema.String,
+})
+export type EmbedProgressSnapshot = typeof EmbedProgressSnapshot.Type
+
 export const DashboardSnapshot = Schema.Struct({
   sequence: SequenceNumber,
   agents: Schema.Array(AgentSnapshot),
@@ -377,6 +421,10 @@ export const DashboardSnapshot = Schema.Struct({
   resources: Schema.optional(Schema.Unknown),
   agentRuntimeById: Schema.optional(Schema.Record(Schema.String, AgentRuntimeSnapshot)),
   channelPermissionRequests: Schema.optional(Schema.Array(ChannelPermissionRequestSnapshot)),
+  scanProgress: Schema.optional(Schema.NullOr(ScanProgressSnapshot)),
+  enrichStats: Schema.optional(Schema.NullOr(EnrichStatsSnapshot)),
+  enrichProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EnrichProgressSnapshot)),
+  embedProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EmbedProgressSnapshot)),
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type

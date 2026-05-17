@@ -663,6 +663,25 @@ export function countFtsInSet(query: string, ids: number[]): number {
 
 // ─── Embedding operations ─────────────────────────────────────────────────────
 
+const MAX_SEMANTIC_RESULT_WINDOW = 1_000;
+
+function insertScoredCandidate(
+  heap: Array<{ sessionId: number; score: number }>,
+  candidate: { sessionId: number; score: number },
+  maxSize: number,
+): void {
+  if (maxSize === 0) return;
+  if (heap.length < maxSize) {
+    heap.push(candidate);
+    return;
+  }
+  let minIndex = 0;
+  for (let i = 1; i < heap.length; i++) {
+    if (heap[i]!.score < heap[minIndex]!.score) minIndex = i;
+  }
+  if (candidate.score > heap[minIndex]!.score) heap[minIndex] = candidate;
+}
+
 export function topKCosine(
   queryEmbedding: Float32Array,
   model: string,
@@ -675,6 +694,11 @@ export function topKCosine(
   const modelClause = where ? `${where} AND se.model = ?` : 'WHERE se.model = ?';
   const safeLimit = Number.isFinite(limit) && limit >= 0 ? limit : 50;
   const safeOffset = Number.isFinite(offset) && offset >= 0 ? offset : 0;
+  const windowSize = safeOffset + safeLimit;
+  if (windowSize > MAX_SEMANTIC_RESULT_WINDOW) {
+    throw new Error(`Semantic search result window exceeds ${MAX_SEMANTIC_RESULT_WINDOW}`);
+  }
+
   const countRow = db
     .prepare(
       `SELECT COUNT(*) AS cnt
@@ -683,26 +707,33 @@ export function topKCosine(
        ${modelClause}`,
     )
     .get(...params, model) as { cnt: number } | undefined;
-  const rows = db
-    .prepare(
-      `SELECT ds.*, se.dim AS embedding_dim, se.embedding AS embedding_blob
-       FROM session_embeddings se
-       JOIN discovered_sessions ds ON ds.id = se.session_id
-       ${modelClause}`,
-    )
-    .all(...params, model) as Array<Record<string, unknown> & { embedding_dim: number; embedding_blob: Buffer }>;
+  const rows = db.prepare(
+    `SELECT se.session_id, se.dim AS embedding_dim, se.embedding AS embedding_blob
+     FROM session_embeddings se
+     JOIN discovered_sessions ds ON ds.id = se.session_id
+     ${modelClause}`,
+  );
 
-  const scored = rows
-    .map((row) => ({
-      session: rowToSession(row),
+  const top: Array<{ sessionId: number; score: number }> = [];
+  for (const row of rows.iterate(...params, model) as Iterable<{ session_id: number; embedding_dim: number; embedding_blob: Buffer }>) {
+    insertScoredCandidate(top, {
+      sessionId: row.session_id,
       score: cosineSimilarity(
         queryEmbedding,
         new Float32Array(row.embedding_blob.buffer, row.embedding_blob.byteOffset, row.embedding_dim),
       ),
-    }))
-    .sort((a, b) => b.score - a.score);
+    }, windowSize);
+  }
 
-  return { results: scored.slice(safeOffset, safeOffset + safeLimit), total: countRow?.cnt ?? scored.length };
+  const page = top
+    .sort((a, b) => b.score - a.score)
+    .slice(safeOffset, safeOffset + safeLimit);
+  const results = page.flatMap((item) => {
+    const session = getDiscoveredSessionById(item.sessionId);
+    return session ? [{ session, score: item.score }] : [];
+  });
+
+  return { results, total: countRow?.cnt ?? top.length };
 }
 
 /**

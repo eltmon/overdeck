@@ -46,12 +46,28 @@ function dashboardSessionUrl(url?: string): string {
 
 let dashboardSessionPromise: Promise<void> | null = null
 
+function consumeDashboardBootstrapToken(): string | null {
+  if (typeof window === 'undefined') return null
+  const hash = window.location.hash.replace(/^#/, '')
+  if (!hash) return null
+  const params = new URLSearchParams(hash)
+  const token = params.get('panopticon_token') ?? params.get('token')
+  params.delete('panopticon_token')
+  params.delete('token')
+  const nextHash = params.toString()
+  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${nextHash ? `#${nextHash}` : ''}`)
+  return token
+}
+
 export function ensureDashboardSession(url?: string): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve()
+  const token = consumeDashboardBootstrapToken()
   dashboardSessionPromise ??= fetch(dashboardSessionUrl(url), {
     method: 'POST',
     credentials: 'include',
+    headers: token ? { 'x-panopticon-internal-token': token } : undefined,
   }).then((response) => {
+    if (response.status === 401) return
     if (!response.ok) throw new Error(`Dashboard session bootstrap failed: HTTP ${response.status}`)
   }).catch((err) => {
     dashboardSessionPromise = null

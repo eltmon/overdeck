@@ -55,7 +55,7 @@ import { diffsRouteLayer } from './routes/diffs.js';
 import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { swarmRouteLayer } from './routes/swarm.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
-import { dashboardSessionCookieHeader } from './routes/dashboard-auth.js';
+import { dashboardSessionCookieHeader, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 
@@ -111,14 +111,43 @@ function allowDashboardSessionCors(
   if (!origin) return response;
   return HttpServerResponse.setHeader(
     HttpServerResponse.setHeader(
-      HttpServerResponse.setHeader(response, 'Access-Control-Allow-Origin', origin),
-      'Access-Control-Allow-Credentials',
-      'true',
+      HttpServerResponse.setHeader(
+        HttpServerResponse.setHeader(response, 'Access-Control-Allow-Origin', origin),
+        'Access-Control-Allow-Credentials',
+        'true',
+      ),
+      'Access-Control-Allow-Headers',
+      'x-panopticon-internal-token, authorization, content-type',
     ),
     'Vary',
     'Origin',
   );
 }
+
+function isHttpsRequest(request: HttpServerRequest.HttpServerRequest): boolean {
+  const forwardedProto = requestHeader(request, 'x-forwarded-proto');
+  if (forwardedProto?.split(',')[0]?.trim().toLowerCase() === 'https') return true;
+  return HttpServerRequest.toURL(request).pipe(Option.match({
+    onNone: () => false,
+    onSome: (url) => url.protocol === 'https:',
+  }));
+}
+
+const dashboardSessionPreflightRouteLayer = HttpRouter.add(
+  'OPTIONS',
+  '/api/dashboard/session',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    return allowDashboardSessionCors(
+      HttpServerResponse.setHeader(jsonResponse({ ok: true }), 'Access-Control-Allow-Methods', 'POST, OPTIONS'),
+      request,
+    );
+  }),
+);
 
 const dashboardSessionRouteLayer = HttpRouter.add(
   'POST',
@@ -129,13 +158,15 @@ const dashboardSessionRouteLayer = HttpRouter.add(
     if (!originCheck.ok) {
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
+    const authError = rejectUnauthorizedDashboardSessionMintRequest(request);
+    if (authError) return authError;
 
     return allowDashboardSessionCors(
       HttpServerResponse.setHeader(
         HttpServerResponse.setHeader(
           jsonResponse({ ok: true }),
           'Set-Cookie',
-          dashboardSessionCookieHeader(),
+          dashboardSessionCookieHeader({ secure: isHttpsRequest(request) }),
         ),
         'Cache-Control',
         'no-store',
@@ -246,6 +277,7 @@ const staticRouteLayer = HttpRouter.add(
 
 export const makeRoutesLayer = Layer.mergeAll(
   healthRouteLayer,
+  dashboardSessionPreflightRouteLayer,
   dashboardSessionRouteLayer,
   websocketRpcRouteLayer,
   issuesRouteLayer,

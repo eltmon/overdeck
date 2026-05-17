@@ -46,10 +46,44 @@ Semantic search origin hardening is covered by `src/dashboard/server/routes/__te
 - allows semantic GET requests from trusted origins,
 - rejects semantic GET requests from untrusted origins.
 
+Dashboard session minting is now guarded by proof of possession of the internal token:
+
+- `rejectUnauthorizedDashboardSessionMintRequest()` returns `401` for a browser session cookie without the internal token header.
+- `rejectUnauthorizedDashboardSessionMintRequest()` returns `null` for `x-panopticon-internal-token: test-dashboard-token`.
+- `dashboardSessionCookieHeader()` still mints a browser-only cookie whose value is not the internal token.
+- `dashboardSessionCookieHeader({ secure: true })` adds `Secure` for HTTPS-terminated requests.
+
 ## Browser UAT — dashboard session auth
 
-Using the rebuilt Node 22 dashboard on `http://127.0.0.1:4313/sessions`:
+Using an isolated rebuilt Node 22 dashboard with `PANOPTICON_HOME=/tmp/pan-457-uat-auth2`, `PANOPTICON_INTERNAL_TOKEN=uat-dashboard-token`, and `PANOPTICON_DISABLE_DEACON=1` on `http://127.0.0.1:4315/sessions`:
 
-- Sessions page loaded with `Session History` after `index.html` issued the dashboard session cookie.
-- Authenticated discovered-session requests succeeded: `/api/discovered-sessions?limit=50`, `/api/discovered-sessions/stats`, and `/api/discovered-sessions/cost?` all returned `200 OK`.
-- A same-page fetch to `/api/discovered-sessions?limit=1` with `credentials: 'omit'` returned `401 {"error":"unauthorized"}`, confirming transcript-derived metadata is not exposed without the dashboard session/shared-secret credential.
+- CORS preflight for `POST /api/dashboard/session` returned `200` with `Access-Control-Allow-Methods: POST, OPTIONS`, `Access-Control-Allow-Credentials: true`, and `Access-Control-Allow-Headers: x-panopticon-internal-token, authorization, content-type`.
+- `POST /api/dashboard/session` with trusted origin but no internal token returned `401`.
+- `POST /api/dashboard/session` with trusted origin and `x-panopticon-internal-token: uat-dashboard-token` returned `200` and `Set-Cookie: panopticon_session=uat-browser-session-token; Path=/; HttpOnly; SameSite=Strict`.
+- The same request with `x-forwarded-proto: https` returned a cookie with `; Secure`.
+- Loading `/sessions#panopticon_token=uat-dashboard-token` consumed and removed the fragment token, then rendered `Session History` at `/sessions`.
+- Same-page `fetch('/api/discovered-sessions/stats', { credentials: 'include' })` returned `200` and the validated stats shape.
+- Same-page `fetch('/api/discovered-sessions?limit=1', { credentials: 'omit' })` returned `401 {"error":"unauthorized"}`, confirming transcript-derived metadata is not exposed without the dashboard session/shared-secret credential.
+
+## Requirements evidence — L1/L2 sampling semantics
+
+`src/lib/conversations/__tests__/enrichment.test.ts` now proves the requirement executablely:
+
+- L1 sends exactly 3 sampled transcript messages into the single provider prompt: first, one deterministic middle sample, and last.
+- L2 sends exactly 11 sampled transcript messages into the single provider prompt: first 3, five deterministic middle samples, and last 3.
+- Tool-use blocks are represented as summaries such as `[tool_use:Read]`; raw tool inputs are not sent.
+
+## Requirements evidence — HTTP response validation
+
+`src/dashboard/server/routes/discovered-sessions.ts` validates every successful discovered-session HTTP response before serialization with Effect `Schema.decodeUnknownSync()`:
+
+- stats, list, search, semantic-error search fallback, cost, get-by-id,
+- scan, enrich-by-id, bulk enrich, embed,
+- config GET, config PUT, and test-connection.
+
+## Requirements evidence — cost estimate accuracy
+
+Cost-estimate behavior is covered by sample-run tests:
+
+- `src/lib/conversations/__tests__/scanner.test.ts` validates the 20% scan-cost tolerance boundary and warns when matched `cost_events` differ by more than 20%.
+- `src/lib/conversations/__tests__/enrichment.test.ts` now runs a mocked enrichment sample where actual cost is 110% of estimate and asserts the estimate-vs-actual delta is within the 20% tolerance.

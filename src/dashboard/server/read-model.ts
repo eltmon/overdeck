@@ -228,6 +228,10 @@ export const ReadModelServiceLive = Layer.effect(
         channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
         issues: state.issuesRaw,
         resources: state.resources ?? undefined,
+        scanProgress: state.scanProgress,
+        enrichStats: state.enrichStats,
+        enrichProgressBySessionId: state.enrichProgressBySessionId,
+        embedProgressBySessionId: state.embedProgressBySessionId,
         timestamp: new Date().toISOString(),
       };
     }

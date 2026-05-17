@@ -4,7 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 import { parseRelativeTime, cosineSimilarity, searchSessions } from '../search.js';
-import { upsertDiscoveredSession, updateEnrichment, insertEmbedding } from '../../database/discovered-sessions-db.js';
+import { upsertDiscoveredSession, updateEnrichment, insertEmbedding, topKCosine } from '../../database/discovered-sessions-db.js';
 
 let TEST_HOME: string;
 
@@ -348,6 +348,10 @@ describe('FTS pagination with non-zero offset', () => {
 
 describe('similar-session search paginates after excluding the reference session', () => {
   const MODEL = 'text-embedding-3-small';
+
+  it('rejects semantic result windows that would require large heap materialization', () => {
+    expect(() => topKCosine(new Float32Array([1, 0]), MODEL, {}, 50, 1_000)).toThrow(/Semantic search result window exceeds 1000/);
+  });
 
   function seedEmbeddedSession(index: number, vector: number[], lastTs: string) {
     const s = upsertDiscoveredSession({

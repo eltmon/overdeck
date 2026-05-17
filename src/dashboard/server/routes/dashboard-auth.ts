@@ -57,11 +57,12 @@ function cookieValue(cookieHeader: string | undefined, name: string): string | u
   return undefined;
 }
 
-export function dashboardSessionCookieHeader(): string {
-  return `${DASHBOARD_SESSION_COOKIE}=${encodeURIComponent(getDashboardSessionToken())}; Path=/; HttpOnly; SameSite=Strict`;
+export function dashboardSessionCookieHeader(options: { secure?: boolean } = {}): string {
+  const secure = options.secure ? '; Secure' : '';
+  return `${DASHBOARD_SESSION_COOKIE}=${encodeURIComponent(getDashboardSessionToken())}; Path=/; HttpOnly; SameSite=Strict${secure}`;
 }
 
-export function hasDashboardAuth(request: HttpServerRequest.HttpServerRequest): boolean {
+export function hasDashboardInternalToken(request: HttpServerRequest.HttpServerRequest): boolean {
   const expected = getInternalToken();
   if (!expected) return false;
 
@@ -74,7 +75,24 @@ export function hasDashboardAuth(request: HttpServerRequest.HttpServerRequest): 
     if (scheme?.toLowerCase() === 'bearer' && constantTimeTokenEqual(token, expected)) return true;
   }
 
-  return constantTimeTokenEqual(cookieValue(getHeader(request, 'cookie'), DASHBOARD_SESSION_COOKIE), getDashboardSessionToken());
+  return false;
+}
+
+export function hasDashboardAuth(request: HttpServerRequest.HttpServerRequest): boolean {
+  return hasDashboardInternalToken(request) || constantTimeTokenEqual(cookieValue(getHeader(request, 'cookie'), DASHBOARD_SESSION_COOKIE), getDashboardSessionToken());
+}
+
+export function rejectUnauthorizedDashboardSessionMintRequest(
+  request: HttpServerRequest.HttpServerRequest,
+): Response | null {
+  const expected = getInternalToken();
+  if (!expected) {
+    return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
+  }
+  if (!hasDashboardInternalToken(request)) {
+    return jsonResponse({ error: 'unauthorized' }, { status: 401 });
+  }
+  return null;
 }
 
 export function rejectUnauthorizedDashboardRequest(
