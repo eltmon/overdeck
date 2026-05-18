@@ -1,0 +1,111 @@
+{
+  "version": "1",
+  "issueId": "PAN-1169",
+  "created": "2026-05-18T08:34:50.104Z",
+  "updated": "2026-05-18T09:10:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1169",
+    "sha": "81cf7398d",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Adopt Fix #1 from the issue body: drop `--filter` flags from the init service's `bun install` in `infra/.devcontainer-template/docker-compose.devcontainer.yml.template`. A plain `bun install` triggers bun's workspace-hoist phase against the named `container-node-modules` volume and populates top-level `node_modules/<pkg>` entries that the pre-built dashboard server requires at runtime.",
+      "recordedAt": "2026-05-18T09:10:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Apply the `--filter` removal to BOTH templates that invoke `bun install` against the named volume: the docker-compose `init.command` AND the devcontainer.json `postCreateCommand`. Both run against the same broken named volume; leaving the VS Code attach path unfixed would re-introduce the defect on dev-container attach.",
+      "recordedAt": "2026-05-18T09:10:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Add an UNRESOLVED_IMPORT guard inside the init's shell pipeline so any future regression in the same class (bun version change, bundler config change, etc.) fails init loudly during build, rather than passing init silently and crashing the server container at runtime.",
+      "recordedAt": "2026-05-18T09:10:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Do NOT switch the container init to `npm install` (Fix #3 in the issue body) and do NOT add a manual relink step (Fix #2). Plain `bun install` is the host's already-proven path; the other two options diverge from host tooling or paper over the same root cause.",
+      "recordedAt": "2026-05-18T09:10:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Do NOT add a unit test under `src/lib/workspace/__tests__/` for the install behavior. The defect is a bun-binary x docker-named-volume interaction — there is no unit-test-friendly surface. Verification is empirical (work agent inspects the named volume after rebuild). The UNRESOLVED_IMPORT guard is the durable, automated regression defense.",
+      "recordedAt": "2026-05-18T09:10:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Do NOT auto-heal existing broken workspaces (e.g. PAN-1052). The template fix prevents NEW workspaces from hitting the bug; existing broken workspaces need a one-line operator action (`pan workspace rebuild <id>`) which will be documented in the PR description.",
+      "recordedAt": "2026-05-18T09:10:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Keep the existing `bun-store` named-volume cache mount untouched. It targets `/root/.bun/install/cache` (bun's content-addressed cache) and is independent of the hoist/symlink step that is the actual defect.",
+      "recordedAt": "2026-05-18T09:10:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Scope is limited to the devcontainer templates. The host-side `workspace-manager.ts` install path is unaffected and already uses plain `bun install` correctly.",
+      "recordedAt": "2026-05-18T09:10:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Plain `bun install` against the named docker volume could itself hit a different bun + overlay-filesystem interaction issue (one of the two suspected mechanisms in the issue body). The fix's success is empirical, not theoretical.",
+      "mitigation": "Bead-1's acceptance criteria require concrete post-rebuild inspection: `docker run --rm -v <stack>_container-node-modules:/nm alpine ls /nm` must list top-level package directories (effect, yaml, @iarna at minimum), AND the server container must reach steady state without ERR_MODULE_NOT_FOUND. If plain `bun install` also fails, escalate to Fix #2 (relink step) or Fix #3 (npm install) as a follow-up bead — do NOT silently degrade quality."
+    },
+    {
+      "id": "H2",
+      "summary": "Existing workspaces have a stale `.devcontainer/docker-compose.devcontainer.yml` rendered from the previous template. They do not pick up the fix until rebuilt.",
+      "mitigation": "Document `pan workspace rebuild <id>` as the upgrade path in the PR description. `pan start --host` remains the documented temporary workaround for already-broken workspaces."
+    },
+    {
+      "id": "H3",
+      "summary": "The previous `--filter` flag was presumably an init-time optimization. Removing it may make init slower because bun now installs the full workspace tree (apps/desktop, packages/moonshine-linux-x64).",
+      "mitigation": "The issue notes the workspace count is small. PR description should record before/after init wall-clock so reviewers can verify the cost tradeoff. If regression > 30s, file a follow-up to explore Fix #2."
+    },
+    {
+      "id": "H4",
+      "summary": "Bead-2's UNRESOLVED_IMPORT guard runs inside busybox `sh -c` (alpine-based container), not bash. A naive `set -o pipefail` may not be portable; `${PIPESTATUS[0]}` is bash-specific.",
+      "mitigation": "Bead-2's acceptance criterion ac2 explicitly requires correct exit-status handling under busybox sh. Work agent must verify the chosen idiom (`set -o pipefail`, intermediate file, or explicit grep + status check) works under the actual container's `sh`. Test by injecting both a bundler warning AND a bundler non-zero exit and confirming both cause init to fail."
+    },
+    {
+      "id": "H5",
+      "summary": "The init container also experienced a transient better-sqlite3 install-script crash (exit 127, missing node-abi/abi_registry.json) on first boot. That crash is orthogonal to the symlink omission but compounded triage.",
+      "mitigation": "Out of scope for this issue. Note in PR description as related-but-separate. File a follow-up if it recurs after the template fix lands."
+    },
+    {
+      "id": "H6",
+      "summary": "The host's bun version (1.3.11) differs from the container's (1.3.13 per the issue body). Behavior differences between bun minor versions are plausible.",
+      "mitigation": "All bead-1 and bead-2 verification must be performed inside the docker init container (via `docker compose up init` for the workspace stack), NOT on the host. The container's Dockerfile installs bun via `curl -fsSL https://bun.sh/install` which pulls the latest at image build time, so verification reflects what end users will see."
+    },
+    {
+      "id": "H7",
+      "summary": "tsdown's `UNRESOLVED_IMPORT` token may change format in a future bundler upgrade, silently disabling the bead-2 guard.",
+      "mitigation": "Bead-2's acceptance criterion ac3 requires a comment in the template explaining the contract (token pattern, references PAN-1169) so a future bundler swap updates the detection rather than removing it as 'noise'."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {
+    "drop-filter-from-init": "workspace-0bdf",
+    "fail-init-on-unresolved-import": "workspace-ya3b"
+  },
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "content": "<panopticon orchestration context — preserved from session start>",
+      "note": "Planning session started for PAN-1169: Workspace docker init: bun --filter install populates .bun cache but never creates top-level node_modules symlinks",
+      "timestamp": "2026-05-18T08:34:50.104Z"
+    },
+    {
+      "timestamp": "2026-05-18T09:10:00.000Z",
+      "reason": "planning",
+      "note": "Reconciled with prior auto-planning artifact at .pan/spec.vbrief.json (status: proposed, sequence: 2). Verified the existing plan is consistent with the current template state (both docker-compose.devcontainer.yml.template and devcontainer.json.template still use --filter on bun install) and with the issue body's recommended Fix #1. Beads are already materialized in beads tracker (workspace-0bdf: drop-filter, workspace-ya3b: fail-on-UNRESOLVED_IMPORT). No re-finalize needed; planning is complete and ready for the work role to pick up.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
