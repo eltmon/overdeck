@@ -34,6 +34,7 @@ export function PipelineView() {
   const issues = useDashboardStore(selectIssues) as Issue[];
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const openIssue = useDashboardStore((state) => state.openIssue);
 
   const agentByIssueId = useMemo(() => {
     const map = new Map<string, Agent>();
@@ -84,6 +85,7 @@ export function PipelineView() {
                   labels={issue.labels.slice(0, 3)}
                   agent={agent ? { name: agent.id, sub: agentSub(agent) } : undefined}
                   assignee={issue.assignee ? { name: issue.assignee.name } : undefined}
+                  onOpen={openIssue}
                 />
               );
             })}

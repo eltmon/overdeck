@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useDashboardStore } from '../../lib/store';
@@ -22,7 +22,9 @@ function issue(overrides: Partial<Issue>): Issue {
 
 describe('PipelineView', () => {
   beforeEach(() => {
+    window.history.replaceState(null, '', '/');
     useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [
         issue({ identifier: 'PAN-1', title: 'Ready to ship', priority: 1, labels: ['ship'], project: { id: 'pan', name: 'Panopticon', color: '#fff' } }),
         issue({ identifier: 'PAN-2', title: 'Active work', priority: 2, status: 'In Progress', state: 'in_progress' }),
@@ -65,5 +67,20 @@ describe('PipelineView', () => {
     expect(within(workPhase).getByText('agent-pan-2')).toBeInTheDocument();
     expect(within(planPhase).getByText('Planned work')).toBeInTheDocument();
     expect(container.querySelectorAll('[data-component="phase-header"]')).toHaveLength(5);
+  });
+
+  it('opens the issue drawer from a Pipeline row without disturbing scroll position', () => {
+    const { container } = render(<PipelineView />);
+    const scroller = container.querySelector('[data-component="pipeline-view"] > .flex-1') as HTMLElement;
+    scroller.scrollTop = 160;
+
+    fireEvent.click(screen.getByText('Ready to ship'));
+
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
+    expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
+
+    useDashboardStore.getState().closeIssue();
+
+    expect(scroller.scrollTop).toBe(160);
   });
 });

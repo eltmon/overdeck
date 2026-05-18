@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T21:54:21.152Z",
+  "updated": "2026-05-18T21:58:30.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "sha": "515cb4f3a",
@@ -421,6 +421,9 @@
     "d1-drawer-shell-store.ac6": "completed",
     "d1-drawer-shell-store.ac7": "completed",
     "d1-drawer-shell-store.ac8": "completed",
-    "d1-drawer-shell-store.ac9": "completed"
+    "d1-drawer-shell-store.ac9": "completed",
+    "p5-pipeline-drawer-wiring": "completed",
+    "p5-pipeline-drawer-wiring.ac1": "completed",
+    "p5-pipeline-drawer-wiring.ac2": "completed"
   }
 }
