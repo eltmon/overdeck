@@ -241,6 +241,12 @@ body::after {
   .badge-border-info {
     border-color: color-mix(in srgb, var(--info) 32%, transparent);
   }
+  .drawer-gate-border-pass {
+    border-color: color-mix(in srgb, var(--success) 32%, transparent);
+  }
+  .drawer-gate-border-fail {
+    border-color: color-mix(in srgb, var(--destructive) 32%, transparent);
+  }
   .verb-badge-pulse {
     animation: verb-badge-pulse 1.6s ease-out infinite;
   }

@@ -34,6 +34,15 @@ export type DrawerBeadItem = {
   duration: string;
 };
 
+export type DrawerVerificationGateStatus = 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+
+export type DrawerVerificationGate = {
+  id: 'typecheck' | 'lint' | 'test' | 'uat';
+  label: string;
+  status: DrawerVerificationGateStatus;
+  detail: string;
+};
+
 type ActivityEntry = {
   id?: string;
   timestamp?: string;
@@ -66,7 +75,7 @@ export type DrawerData = {
   agents: Agent[];
   beads: DrawerBeadItem[];
   reviewSpecialists: DrawerReviewSpecialist[];
-  verificationGates: unknown[];
+  verificationGates: DrawerVerificationGate[];
   activityRail: DrawerActivityItem[];
 };
 
@@ -76,6 +85,8 @@ const REVIEW_SPECIALIST_ROLES = [
   'review.performance',
   'review.requirements',
 ] as const;
+
+const QUALITY_GATE_ORDER = ['typecheck', 'lint', 'test'] as const;
 
 function issueMatches(issue: Issue, issueId: string) {
   return issue.identifier.toLowerCase() === issueId.toLowerCase() || issue.id.toLowerCase() === issueId.toLowerCase();
@@ -186,6 +197,53 @@ function normalizeBeads(tasks: BeadTask[] | undefined, issueId: string): DrawerB
   });
 }
 
+function gateStatus(status: string | undefined): DrawerVerificationGateStatus {
+  if (status === 'passed' || status === 'failed' || status === 'pending' || status === 'running' || status === 'skipped') return status;
+  if (status === 'testing') return 'running';
+  if (status === 'dispatch_failed') return 'failed';
+  return 'pending';
+}
+
+function failedQualityGate(notes: string | undefined) {
+  const match = notes?.match(/Verification FAILED at (typecheck|lint|test)\b/i);
+  return match?.[1]?.toLowerCase() as (typeof QUALITY_GATE_ORDER)[number] | undefined;
+}
+
+function qualityGateStatus(gate: (typeof QUALITY_GATE_ORDER)[number], reviewStatus: ReviewStatusSnapshot | undefined): DrawerVerificationGateStatus {
+  const verificationStatus = gateStatus(reviewStatus?.verificationStatus);
+  if (verificationStatus === 'passed' || verificationStatus === 'skipped' || verificationStatus === 'running' || verificationStatus === 'pending') return verificationStatus;
+
+  const failedGate = failedQualityGate(reviewStatus?.verificationNotes);
+  if (!failedGate) return 'passed';
+  if (gate === failedGate) return 'failed';
+  return QUALITY_GATE_ORDER.indexOf(gate) < QUALITY_GATE_ORDER.indexOf(failedGate) ? 'passed' : 'pending';
+}
+
+function gateDetail(status: DrawerVerificationGateStatus) {
+  switch (status) {
+    case 'passed':
+      return 'pass';
+    case 'failed':
+      return 'fail';
+    case 'running':
+      return 'running';
+    case 'skipped':
+      return 'skipped';
+    case 'pending':
+    default:
+      return 'pending';
+  }
+}
+
+function verificationGates(reviewStatus: ReviewStatusSnapshot | undefined): DrawerVerificationGate[] {
+  const qualityGates = QUALITY_GATE_ORDER.map((gate) => {
+    const status = qualityGateStatus(gate, reviewStatus);
+    return { id: gate, label: gate, status, detail: gateDetail(status) };
+  });
+  const uatStatus = gateStatus(reviewStatus?.uatStatus);
+  return [...qualityGates, { id: 'uat', label: 'UAT', status: uatStatus, detail: gateDetail(uatStatus) }];
+}
+
 export function useDrawerData(): DrawerData {
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const issues = useDashboardStore(selectIssues) as Issue[];
@@ -230,7 +288,7 @@ export function useDrawerData(): DrawerData {
       agents: issueAgents,
       beads: normalizeBeads(beadsData?.tasks, drawerIssueId),
       reviewSpecialists: reviewSpecialists(reviewStatus),
-      verificationGates: [],
+      verificationGates: verificationGates(reviewStatus),
       activityRail,
     };
   }, [agents, beadsData, detailedActivity, drawerIssueId, issues, recentActivity, reviewStatus]);

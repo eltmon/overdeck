@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useDashboardStore } from '../../lib/store';
@@ -141,6 +141,35 @@ describe('IssueDrawer', () => {
 
     await waitFor(() => expect(scrollArea.scrollTop).toBe(0));
     expect(screen.getByTestId('drawer-activity-dot-review')).toHaveClass('bg-signal-review');
+  });
+
+  it('renders verification gates from drawer data with PRD border tones', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          reviewStatus: 'reviewing',
+          testStatus: 'pending',
+          verificationStatus: 'failed',
+          verificationNotes: 'Verification FAILED at lint (1200ms): lint output',
+          uatStatus: 'testing',
+          readyForMerge: false,
+          updatedAt: '2026-05-18T00:00:00.000Z',
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    expect(screen.getByTestId('drawer-verification-gates')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-verification-gates').lastElementChild).toHaveClass('grid-cols-4', 'gap-[8px]');
+    expect(screen.getByTestId('drawer-verification-gate-typecheck')).toHaveClass('drawer-gate-border-pass', 'text-success-foreground');
+    expect(within(screen.getByTestId('drawer-verification-gate-typecheck')).getByText('pass')).toHaveClass('text-[14px]', 'font-medium');
+    expect(screen.getByTestId('drawer-verification-gate-lint')).toHaveClass('drawer-gate-border-fail', 'text-destructive-foreground');
+    expect(within(screen.getByTestId('drawer-verification-gate-lint')).getByText('lint')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
+    expect(screen.getByTestId('drawer-verification-gate-test')).toHaveClass('badge-border-muted', 'text-muted-foreground');
+    expect(screen.getByTestId('drawer-verification-gate-uat')).toHaveClass('badge-border-info', 'text-info-foreground');
   });
 
   it('renders drawer beads list from drawer data with done and current states', () => {

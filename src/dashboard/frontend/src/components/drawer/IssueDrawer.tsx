@@ -4,6 +4,7 @@ import { useDashboardStore } from '../../lib/store';
 import DrawerActivityRail from './DrawerActivityRail';
 import DrawerBeadsList from './DrawerBeadsList';
 import DrawerReviewSpecialists from './DrawerReviewSpecialists';
+import DrawerVerificationGates from './DrawerVerificationGates';
 import { useDrawerData } from './useDrawerData';
 
 export function IssueDrawer() {
@@ -72,6 +73,7 @@ export function IssueDrawer() {
                   Issue details will appear here as data streams in.
                 </p>
               </div>
+              <DrawerVerificationGates />
               <DrawerBeadsList />
               <DrawerReviewSpecialists />
             </div>
