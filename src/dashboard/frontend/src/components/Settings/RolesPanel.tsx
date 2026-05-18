@@ -3,9 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship';
+type RoleId = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel';
 type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
 type ModelRef = string;
+type Harness = 'claude-code' | 'pi';
+type Effort = 'low' | 'medium' | 'high';
+type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 interface RoleSubConfig {
   model?: ModelRef;
@@ -13,6 +16,10 @@ interface RoleSubConfig {
 
 interface RoleConfig {
   model?: ModelRef;
+  harness?: Harness;
+  effort?: Effort;
+  maxAgents?: number;
+  scope?: FlywheelScope;
   sub?: Record<string, RoleSubConfig>;
 }
 
@@ -64,6 +71,13 @@ const WORKHORSE_SLOTS: Array<{ id: WorkhorseSlot; label: string }> = [
   { id: 'cheap', label: 'Cheap' },
 ];
 
+const DEFAULT_FLYWHEEL_CONFIG: Required<Pick<RoleConfig, 'harness' | 'effort' | 'maxAgents' | 'scope'>> = {
+  harness: 'claude-code',
+  effort: 'high',
+  maxAgents: 8,
+  scope: 'pan-only',
+};
+
 const ROLES: RoleDefinition[] = [
   {
     id: 'plan',
@@ -110,6 +124,13 @@ const ROLES: RoleDefinition[] = [
     icon: 'rocket_launch',
     description: 'Prepares approved branches for human-controlled merge.',
     defaultModel: 'workhorse:mid',
+  },
+  {
+    id: 'flywheel',
+    name: 'Flywheel',
+    icon: 'all_inclusive',
+    description: 'Runs the singleton Fix-All Flywheel orchestrator.',
+    defaultModel: 'claude-opus-4-7',
   },
 ];
 
@@ -206,7 +227,7 @@ function providerWarning(
   return null;
 }
 
-async function saveRoleModel(role: RoleId, modelRef: ModelRef, subRole?: string): Promise<void> {
+async function saveRoleConfig(role: RoleId, patch: RoleConfig, subRole?: string): Promise<void> {
   const settings = await fetchSettings();
   const currentRole = settings.roles?.[role] ?? {};
   const nextRole: RoleConfig = subRole
@@ -216,13 +237,13 @@ async function saveRoleModel(role: RoleId, modelRef: ModelRef, subRole?: string)
           ...(currentRole.sub ?? {}),
           [subRole]: {
             ...(currentRole.sub?.[subRole] ?? {}),
-            model: modelRef,
+            model: patch.model,
           },
         },
       }
     : {
         ...currentRole,
-        model: modelRef,
+        ...patch,
       };
 
   const nextSettings = {
@@ -239,8 +260,8 @@ async function saveRoleModel(role: RoleId, modelRef: ModelRef, subRole?: string)
     body: JSON.stringify(nextSettings),
   });
   if (!res.ok) {
-    const message = await res.text().catch(() => 'Failed to save role model');
-    throw new Error(message || 'Failed to save role model');
+    const message = await res.text().catch(() => 'Failed to save role config');
+    throw new Error(message || 'Failed to save role config');
   }
 }
 
@@ -303,6 +324,13 @@ function ModelPicker({ label, value, workhorses, providerGroups, providers, disa
   );
 }
 
+function getFlywheelConfig(settings: SettingsResponse | undefined): Required<Pick<RoleConfig, 'harness' | 'effort' | 'maxAgents' | 'scope'>> {
+  return {
+    ...DEFAULT_FLYWHEEL_CONFIG,
+    ...(settings?.roles?.flywheel ?? {}),
+  };
+}
+
 export function RolesPanel() {
   const queryClient = useQueryClient();
   const [expandedRoles, setExpandedRoles] = useState<Partial<Record<RoleId, boolean>>>({});
@@ -318,15 +346,15 @@ export function RolesPanel() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: ({ role, modelRef, subRole }: { role: RoleId; modelRef: ModelRef; subRole?: string }) => (
-      saveRoleModel(role, modelRef, subRole)
+    mutationFn: ({ role, patch, subRole }: { role: RoleId; patch: RoleConfig; subRole?: string }) => (
+      saveRoleConfig(role, patch, subRole)
     ),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['settings'] });
-      toast.success('Role model updated');
+      toast.success('Role config updated');
     },
     onError: (error: Error) => {
-      toast.error(`Failed to update role model: ${error.message}`);
+      toast.error(`Failed to update role config: ${error.message}`);
     },
   });
 
@@ -350,7 +378,7 @@ export function RolesPanel() {
         <div>
           <h3 className="text-sm font-semibold text-foreground">Role Models</h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Route plan, work, review, test, and ship runs through workhorse slots or explicit models.
+            Route plan, work, review, test, ship, and Flywheel runs through workhorse slots or explicit models.
           </p>
         </div>
       </div>
@@ -367,6 +395,7 @@ export function RolesPanel() {
             const tooltip = modelRefTooltip(roleModel, workhorses);
             const isExpanded = !!expandedRoles[role.id];
             const canExpand = !!role.subRoles?.length;
+            const flywheelConfig = role.id === 'flywheel' ? getFlywheelConfig(settings) : null;
 
             return (
               <div key={role.id} data-testid="role-card" className="rounded-lg border border-border bg-background/40 p-3">
@@ -410,10 +439,73 @@ export function RolesPanel() {
                       providerGroups={providerGroups}
                       providers={settings?.models?.providers}
                       disabled={saveMutation.isPending}
-                      onChange={(modelRef) => saveMutation.mutate({ role: role.id, modelRef })}
+                      onChange={(modelRef) => saveMutation.mutate({ role: role.id, patch: { model: modelRef } })}
                     />
                   </div>
                 </div>
+
+                {flywheelConfig && (
+                  <div className="mt-4 border-t border-border pt-3">
+                    <div className="grid gap-3 md:grid-cols-4">
+                      <label className="space-y-1.5">
+                        <span className="text-xs font-medium text-foreground">Flywheel harness</span>
+                        <select
+                          aria-label="Flywheel harness"
+                          value={flywheelConfig.harness}
+                          onChange={(event) => saveMutation.mutate({ role: role.id, patch: { harness: event.target.value as Harness } })}
+                          disabled={saveMutation.isPending}
+                          className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                        >
+                          <option value="claude-code">Claude Code</option>
+                          <option value="pi">Pi</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1.5">
+                        <span className="text-xs font-medium text-foreground">Flywheel effort</span>
+                        <select
+                          aria-label="Flywheel effort"
+                          value={flywheelConfig.effort}
+                          onChange={(event) => saveMutation.mutate({ role: role.id, patch: { effort: event.target.value as Effort } })}
+                          disabled={saveMutation.isPending}
+                          className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1.5">
+                        <span className="text-xs font-medium text-foreground">Flywheel max agents</span>
+                        <input
+                          aria-label="Flywheel max agents"
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={flywheelConfig.maxAgents}
+                          onChange={(event) => saveMutation.mutate({ role: role.id, patch: { maxAgents: Number(event.target.value) } })}
+                          disabled={saveMutation.isPending}
+                          className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                        />
+                      </label>
+                      <label className="space-y-1.5">
+                        <span className="text-xs font-medium text-foreground">Flywheel scope</span>
+                        <select
+                          aria-label="Flywheel scope"
+                          value={flywheelConfig.scope}
+                          onChange={(event) => saveMutation.mutate({ role: role.id, patch: { scope: event.target.value as FlywheelScope } })}
+                          disabled={saveMutation.isPending}
+                          className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                        >
+                          <option value="pan-only">PAN only</option>
+                          <option value="all-tracked-projects">All tracked projects</option>
+                        </select>
+                      </label>
+                    </div>
+                    <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
+                      Changes apply on the next tick — no restart needed.
+                    </p>
+                  </div>
+                )}
 
                 {canExpand && isExpanded && (
                   <div id={`${role.id}-subroles`} className="mt-4 border-t border-border pt-3">
@@ -441,7 +533,7 @@ export function RolesPanel() {
                               providerGroups={providerGroups}
                               providers={settings?.models?.providers}
                               disabled={saveMutation.isPending}
-                              onChange={(modelRef) => saveMutation.mutate({ role: role.id, subRole: subRole.id, modelRef })}
+                              onChange={(modelRef) => saveMutation.mutate({ role: role.id, subRole: subRole.id, patch: { model: modelRef } })}
                             />
                           </div>
                         );
