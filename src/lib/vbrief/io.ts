@@ -322,8 +322,6 @@ export function updateItemStatus(workspacePath: string, itemId: string, status: 
   };
 
   const overrides = { ...continueState.statusOverrides };
-  if ((overrides[itemId] ?? item.status) === status) return;
-
   overrides[itemId] = status;
   continueState.statusOverrides = overrides;
 
@@ -368,8 +366,6 @@ export function updateSubItemStatus(
   };
 
   const overrides = { ...continueState.statusOverrides };
-  if ((overrides[fullSubId] ?? subItem.status) === status) return;
-
   overrides[fullSubId] = status;
   continueState.statusOverrides = overrides;
 

@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from 'fs';
 import { readFile } from 'fs/promises';
-import { isAbsolute, join, resolve } from 'path';
+import { join } from 'path';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import chalk from 'chalk';
@@ -33,42 +33,16 @@ function isTimeout(error: unknown): boolean {
     /timed out|timeout/i.test(error.message);
 }
 
-async function resolveBeadsJsonlPath(workspacePath: string): Promise<string | null> {
-  const beadsDir = join(workspacePath, '.beads');
-  const redirectPath = join(beadsDir, 'redirect');
-  if (existsSync(redirectPath)) {
-    const target = (await readFile(redirectPath, 'utf-8')).trim();
-    const candidates = isAbsolute(target)
-      ? [target]
-      : [resolve(workspacePath, target), resolve(beadsDir, target)];
-    for (const candidate of candidates) {
-      const redirectedJsonl = join(candidate, 'issues.jsonl');
-      if (existsSync(redirectedJsonl)) return redirectedJsonl;
-    }
-  }
-
-  const jsonlPath = join(beadsDir, 'issues.jsonl');
-  return existsSync(jsonlPath) ? jsonlPath : null;
-}
-
 async function readIssueBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadRecord[] | null> {
-  const jsonlPath = await resolveBeadsJsonlPath(workspacePath);
-  if (!jsonlPath) return null;
+  const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+  if (!existsSync(jsonlPath)) return null;
 
   const label = issueId.toLowerCase();
-  const beads: BeadRecord[] = [];
-  for (const line of (await readFile(jsonlPath, 'utf-8')).split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const bead = JSON.parse(line) as BeadRecord;
-      if (Array.isArray(bead.labels) && bead.labels.map(String).includes(label)) {
-        beads.push(bead);
-      }
-    } catch {
-      return null;
-    }
-  }
-  return beads;
+  return (await readFile(jsonlPath, 'utf-8'))
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as BeadRecord)
+    .filter((bead) => Array.isArray(bead.labels) && bead.labels.map(String).includes(label));
 }
 
 async function listBeadsByStatus(

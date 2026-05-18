@@ -194,17 +194,6 @@ describe('updateItemStatus', () => {
     const raw = JSON.parse(readFileSync(specPath, 'utf-8'));
     expect(raw.plan.items[0].status).toBe('pending');
   });
-
-  it('does not rewrite continue.json when the item override already has the requested status', () => {
-    writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
-    updateItemStatus(WORKSPACE_PATH, 'item-1', 'completed');
-    const continuePath = join(WORKSPACE_PATH, '.pan', 'continue.json');
-    const first = readFileSync(continuePath, 'utf-8');
-
-    updateItemStatus(WORKSPACE_PATH, 'item-1', 'completed');
-
-    expect(readFileSync(continuePath, 'utf-8')).toBe(first);
-  });
 });
 
 describe('updateSubItemStatus', () => {
@@ -277,18 +266,6 @@ describe('updateSubItemStatus', () => {
     const updated = readWorkspacePlan(WORKSPACE_PATH)!;
     const sub = updated.plan.items[0].subItems!.find(s => s.id === 'item-1.ac1');
     expect(sub?.status).toBe('completed');
-  });
-
-  it('does not rewrite continue.json when the subItem override already has the requested status', () => {
-    const doc = makePlanWithSubItems();
-    writePlanDoc(doc);
-    updateSubItemStatus(WORKSPACE_PATH, 'item-1', 'item-1.ac1', 'completed');
-    const continuePath = join(WORKSPACE_PATH, '.pan', 'continue.json');
-    const first = readFileSync(continuePath, 'utf-8');
-
-    updateSubItemStatus(WORKSPACE_PATH, 'item-1', 'item-1.ac1', 'completed');
-
-    expect(readFileSync(continuePath, 'utf-8')).toBe(first);
   });
 
   it('no-ops when item ID does not exist', () => {

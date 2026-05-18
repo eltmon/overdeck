@@ -5,24 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentState } from '../agents.js';
 
 let tempHome: string;
-let originalHome: string | undefined;
 
 describe('AgentState role persistence', () => {
   beforeEach(() => {
     vi.resetModules();
     tempHome = mkdtempSync(join(tmpdir(), 'pan-agent-role-'));
-    originalHome = process.env.HOME;
-    process.env.HOME = tempHome;
     process.env.PANOPTICON_HOME = tempHome;
-    const claudeDir = join(tempHome, '.claude');
-    mkdirSync(claudeDir, { recursive: true });
-    writeFileSync(join(claudeDir, 'settings.json'), JSON.stringify({
-      hooks: {
-        PostToolUse: [{
-          hooks: [{ command: join(tempHome, '.panopticon', 'bin', 'heartbeat-hook') }],
-        }],
-      },
-    }));
   });
 
   afterEach(() => {
@@ -33,11 +21,6 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../activity-logger.js');
     vi.doUnmock('../cloister/work-agent-prompt.js');
     vi.doUnmock('../projects.js');
-    if (originalHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = originalHome;
-    }
     delete process.env.PANOPTICON_HOME;
     rmSync(tempHome, { recursive: true, force: true });
   });

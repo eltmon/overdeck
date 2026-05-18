@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -77,27 +77,6 @@ describe('runPreflightChecks', () => {
     const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
     const result = await runPreflightChecks(tempDir, 'PAN-714');
     expect(result).toEqual([]);
-  });
-
-  it('falls back to bd list when the beads JSONL export has a malformed line', async () => {
-    mkdirSync(join(tempDir, '.beads'), { recursive: true });
-    writeFileSync(join(tempDir, '.beads', 'issues.jsonl'), '{not json}\n', 'utf-8');
-    const capturedArgs: string[][] = [];
-    mockExecFileFn.mockImplementation((_file: string, args: string[], _opts: unknown, cb: Function) => {
-      capturedArgs.push(args);
-      cb(null, { stdout: '[]', stderr: '' });
-    });
-    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
-      cb(null, { stdout: '', stderr: '' });
-    });
-    mockGetVBriefACStatus.mockReturnValue(null);
-
-    const { runPreflightChecks } = await import('../../../src/lib/work/done-preflight.js');
-    const result = await runPreflightChecks(tempDir, 'PAN-714');
-
-    expect(result).toEqual([]);
-    expect(capturedArgs.some((args) => args.includes('open'))).toBe(true);
-    expect(capturedArgs.some((args) => args.includes('closed'))).toBe(true);
   });
 
   it('aggregates failures from open beads AND uncommitted changes', async () => {

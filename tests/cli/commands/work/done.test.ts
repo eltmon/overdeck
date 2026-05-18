@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -29,7 +29,6 @@ const mockSetReviewStatus = vi.fn();
 const mockGetReviewStatus = vi.fn().mockReturnValue(null);
 const mockGetDashboardApiUrl = vi.fn().mockReturnValue('http://localhost:3000');
 const mockGetVBriefACStatus = vi.fn().mockReturnValue(null);
-const mockSyncBeadStatusToVBrief = vi.fn().mockReturnValue(null);
 
 // execFile mock delegates to mockExecFn so tests that only set up exec
 // implementations also cover the bd list calls done-preflight makes via execFile.
@@ -92,7 +91,7 @@ vi.mock('../../../../src/lib/shadow-utils.js', () => ({
 
 vi.mock('../../../../src/lib/vbrief/beads.js', () => ({
   getVBriefACStatus: mockGetVBriefACStatus,
-  syncBeadStatusToVBrief: mockSyncBeadStatusToVBrief,
+  syncBeadStatusToVBrief: vi.fn().mockReturnValue(null),
 }));
 
 // Suppress ora spinner output in tests
@@ -108,8 +107,6 @@ beforeEach(() => {
   mockGetReviewStatus.mockReset();
   mockGetReviewStatus.mockReturnValue(null);
   mockSetReviewStatus.mockClear();
-  mockSyncBeadStatusToVBrief.mockReset();
-  mockSyncBeadStatusToVBrief.mockReturnValue(null);
 });
 
 function makeAgentState(workspace: string) {
@@ -293,43 +290,6 @@ describe('doneCommand dashboard-unreachable graceful path', () => {
     await expect(doneCommand('PAN-714', { force: true })).resolves.not.toThrow();
   });
 
-  it('does not rewrite continue.json when the latest end entry already matches', async () => {
-    mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
-    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
-      cb(null, { stdout: '[]', stderr: '' });
-    });
-    mockShouldSkipTrackerUpdate.mockResolvedValue(true);
-    mockUpdateShadowState.mockResolvedValue(undefined);
-    mockGetDashboardApiUrl.mockReturnValue('http://localhost:19999');
-
-    const panDir = join(tempDir, '.pan');
-    mkdirSync(panDir, { recursive: true });
-    const continuePath = join(panDir, 'continue.json');
-    writeFileSync(continuePath, JSON.stringify({
-      version: '1',
-      issueId: 'PAN-714',
-      created: '2026-01-01T00:00:00.000Z',
-      updated: '2026-01-01T00:00:00.000Z',
-      gitState: {},
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      beadsMapping: {},
-      sessionHistory: [{
-        timestamp: '2026-01-01T00:00:00.000Z',
-        reason: 'end',
-        note: 'Agent signaled work complete',
-      }],
-      feedback: [],
-    }, null, 2));
-    const before = readFileSync(continuePath, 'utf-8');
-
-    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
-    await doneCommand('PAN-714', { force: true });
-
-    expect(readFileSync(continuePath, 'utf-8')).toBe(before);
-  });
-
   it('does not skip review when stored merged status is stale', async () => {
     mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
     mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
@@ -434,7 +394,44 @@ describe('doneCommand preflight failure paths', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  it('commits a stale tracked project-side continue artifact before preflight', async () => {
+  it('does NOT exit(1) when only .pan/spec.vbrief.json is dirty (stale from prior run)', async () => {
+    mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
+    mockShouldSkipTrackerUpdate.mockResolvedValue(true);
+    mockUpdateShadowState.mockResolvedValue(undefined);
+
+    // Simulate stale spec.vbrief.json: dirty before the pre-preflight commit fires,
+    // clean afterward (all other git status checks pass).
+    let planCommitted = false;
+    const capturedCmds: string[] = [];
+    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
+      capturedCmds.push(cmd);
+      if (cmd.includes('bd list')) {
+        cb(null, { stdout: '[]', stderr: '' });
+      } else if (
+        cmd.includes('git status --porcelain .pan/') &&
+        !planCommitted
+      ) {
+        // First check: stale file from prior run
+        cb(null, { stdout: ' M .pan/spec.vbrief.json\n', stderr: '' });
+      } else if (cmd.includes('git commit')) {
+        planCommitted = true;
+        cb(null, { stdout: '', stderr: '' });
+      } else {
+        // git add, git status (no path or post-commit), etc. → clean/success
+        cb(null, { stdout: '', stderr: '' });
+      }
+    });
+
+    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
+    await doneCommand('PAN-714');
+
+    // Pre-flight must NOT block on the stale spec.vbrief.json
+    expect(exitSpy).not.toHaveBeenCalledWith(1);
+    // The stale file must have been committed before preflight ran
+    expect(capturedCmds.some((c) => c.includes('git commit'))).toBe(true);
+  });
+
+  it('does NOT exit(1) when stale .pan/continue.json is dirty (other managed planning artifact)', async () => {
     mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
     mockShouldSkipTrackerUpdate.mockResolvedValue(true);
     mockUpdateShadowState.mockResolvedValue(undefined);
@@ -446,10 +443,11 @@ describe('doneCommand preflight failure paths', () => {
       if (cmd.includes('bd list')) {
         cb(null, { stdout: '[]', stderr: '' });
       } else if (
-        cmd.includes('git status --porcelain -- .pan/continues/pan-714.vbrief.json') &&
+        cmd.includes('git status --porcelain .pan/') &&
         !planningCommitted
       ) {
-        cb(null, { stdout: ' M .pan/continues/pan-714.vbrief.json\n', stderr: '' });
+        // Stale continue.json from a prior interrupted run
+        cb(null, { stdout: ' M .pan/continue.json\n', stderr: '' });
       } else if (cmd.includes('git commit')) {
         planningCommitted = true;
         cb(null, { stdout: '', stderr: '' });
@@ -462,57 +460,6 @@ describe('doneCommand preflight failure paths', () => {
     await doneCommand('PAN-714');
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
-    expect(capturedCmds.some((c) => c.includes('git add -- .pan/continues/pan-714.vbrief.json'))).toBe(true);
-    expect(capturedCmds.some((c) => c.includes('git add .pan/'))).toBe(false);
-  });
-
-  it('commits the tracked project-side continue artifact produced by preflight bead-to-vBRIEF sync before rebase', async () => {
-    mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
-    mockShouldSkipTrackerUpdate.mockResolvedValue(true);
-    mockUpdateShadowState.mockResolvedValue(undefined);
-    mockSyncBeadStatusToVBrief.mockImplementation(() => {
-      mkdirSync(join(tempDir, '.pan'), { recursive: true });
-      writeFileSync(join(tempDir, '.pan', 'continue.json'), JSON.stringify({
-        version: '1',
-        issueId: 'PAN-714',
-        created: '2026-05-18T00:00:00.000Z',
-        updated: '2026-05-18T00:00:00.000Z',
-        gitState: {},
-        decisions: [],
-        hazards: [],
-        resumePoint: null,
-        beadsMapping: {},
-        sessionHistory: [],
-        statusOverrides: { 'item-1': 'completed', 'item-1.ac1': 'completed' },
-      }), 'utf-8');
-      return 'item-1';
-    });
-
-    let panStatusCalls = 0;
-    const capturedCmds: string[] = [];
-    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
-      capturedCmds.push(cmd);
-      if (cmd.includes('bd list') && cmd.includes('closed')) {
-        cb(null, { stdout: JSON.stringify([{ id: 'bead-c1', title: 'Completed work' }]), stderr: '' });
-      } else if (cmd.includes('bd list')) {
-        cb(null, { stdout: '[]', stderr: '' });
-      } else if (cmd.includes('git status --porcelain -- .pan/continues/pan-714.vbrief.json')) {
-        panStatusCalls += 1;
-        cb(null, { stdout: panStatusCalls === 2 ? ' M .pan/continues/pan-714.vbrief.json\n' : '', stderr: '' });
-      } else {
-        cb(null, { stdout: '', stderr: '' });
-      }
-    });
-
-    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
-    await doneCommand('PAN-714');
-
-    expect(exitSpy).not.toHaveBeenCalledWith(1);
-    expect(mockSyncBeadStatusToVBrief).toHaveBeenCalledWith('bead-c1', tempDir, 'completed', 'Completed work');
-    const postPreflightCommitIndex = capturedCmds.findIndex((c, index) =>
-      c.includes('git commit') && capturedCmds.slice(0, index).some((prior) => prior.includes('bd list') && prior.includes('closed')),
-    );
-    expect(postPreflightCommitIndex).toBeGreaterThan(-1);
-    expect(capturedCmds.some((c) => c.includes('git add .pan/'))).toBe(false);
+    expect(capturedCmds.some((c) => c.includes('git commit'))).toBe(true);
   });
 });

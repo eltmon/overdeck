@@ -2,11 +2,10 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { saveAgentRuntimeState } from '../../lib/agents.js';
 import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from 'fs';
-import { exec, execFile } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
-import { join, relative } from 'path';
+import { join } from 'path';
 import { homedir } from 'os';
 import { AGENTS_DIR } from '../../lib/paths.js';
 import { runPreflightChecks } from '../../lib/work/done-preflight.js';
@@ -15,12 +14,10 @@ import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
-import { getContinueFilePath, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
+import { getWorkspacePanPaths, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
 import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
-import { readContinueState, writeContinueState } from '../../lib/vbrief/continue-state.js';
 import type { MergeSet } from '../../lib/merge-set.js';
-import type { WorkspaceContinueState } from '../../lib/pan-dir/index.js';
 
 interface DoneOptions {
   comment?: string;
@@ -175,46 +172,6 @@ async function isMergeSetMergedIntoTargets(
   return true;
 }
 
-function relativeArtifactPaths(workspacePath: string, artifactPaths: string[]): string[] {
-  return [...new Set(artifactPaths.map(path => relative(workspacePath, path)))]
-    .filter(path => path && !path.startsWith('..'));
-}
-
-async function syncWorkspaceStatusOverridesToTrackedContinue(workspacePath: string, issueId: string): Promise<string> {
-  const continuePath = getContinueFilePath(workspacePath, issueId);
-  const workspaceContinue = readWorkspaceContinue(workspacePath);
-  const statusOverrides = workspaceContinue?.statusOverrides;
-  if (!statusOverrides || Object.keys(statusOverrides).length === 0) return continuePath;
-
-  const existing = readContinueState(workspacePath, issueId) as WorkspaceContinueState | null;
-  const existingOverrides = existing?.statusOverrides ?? {};
-  const mergedOverrides = { ...existingOverrides, ...statusOverrides };
-  if (JSON.stringify(existingOverrides) === JSON.stringify(mergedOverrides)) return continuePath;
-
-  const next = {
-    ...(existing ?? workspaceContinue),
-    issueId: issueId.toUpperCase(),
-    statusOverrides: mergedOverrides,
-  } satisfies WorkspaceContinueState;
-  writeContinueState(workspacePath, issueId, next);
-  return continuePath;
-}
-
-async function commitWorkspacePanArtifacts(workspacePath: string, artifactPaths: string[]): Promise<boolean> {
-  const paths = relativeArtifactPaths(workspacePath, artifactPaths);
-  if (paths.length === 0) return false;
-
-  const { stdout } = await execFileAsync('git', ['status', '--porcelain', '--', ...paths], {
-    cwd: workspacePath,
-    encoding: 'utf-8',
-  });
-  if (!stdout.trim()) return false;
-
-  await execFileAsync('git', ['add', '--', ...paths], { cwd: workspacePath });
-  await execFileAsync('git', ['commit', '-m', 'chore: sync planning artifacts'], { cwd: workspacePath });
-  return true;
-}
-
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan done MIN-123" and "pan done agent-min-123"
   const issueId = resolveIssueId(id);
@@ -283,14 +240,18 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     const workspacePath = agentState?.workspace;
 
     if (workspacePath && existsSync(workspacePath)) {
-      const trackedContinuePath = getContinueFilePath(workspacePath, issueId);
-
-      // Commit any stale tracked continue updates from a previous interrupted
+      // Commit any stale workspace orchestration artifacts from a previous interrupted
       // pan done run so the uncommitted-changes gate in runPreflightChecks doesn't
       // reject them.
       try {
-        await syncWorkspaceStatusOverridesToTrackedContinue(workspacePath, issueId);
-        await commitWorkspacePanArtifacts(workspacePath, [trackedContinuePath]);
+        const { stdout: preDirty } = await execAsync(
+          'git status --porcelain .pan/',
+          { cwd: workspacePath, encoding: 'utf-8' }
+        );
+        if (preDirty.trim()) {
+          await execAsync('git add .pan/', { cwd: workspacePath });
+          await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
+        }
       } catch { /* non-fatal */ }
 
       const failures = await runPreflightChecks(workspacePath, issueId);
@@ -308,16 +269,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         return;
       }
 
-      try {
-        await syncWorkspaceStatusOverridesToTrackedContinue(workspacePath, issueId);
-        await commitWorkspacePanArtifacts(workspacePath, [trackedContinuePath]);
-      } catch (error) {
-        console.error(chalk.red(`\n✖ Failed to commit planning artifacts after preflight for ${issueId}:\n`));
-        console.error(chalk.red(`  ${(error as Error).message}`));
-        console.error('');
-        process.exit(1);
-        return;
-      }
+      // Status updates now live in continue.json statusOverrides (PAN-1124),
+      // so there is no workspace spec to commit.
     }
   }
 
@@ -474,22 +427,18 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     try {
       const continueState = readWorkspaceContinue(workspacePath);
       if (continueState) {
-        const note = options.comment || 'Agent signaled work complete';
-        const lastEntry = continueState.sessionHistory.at(-1);
-        if (lastEntry?.reason !== 'end' || lastEntry.note !== note) {
-          const now = new Date().toISOString();
-          writeWorkspaceContinue(workspacePath, {
-            ...continueState,
-            sessionHistory: [
-              ...continueState.sessionHistory,
-              {
-                timestamp: now,
-                reason: 'end',
-                note,
-              },
-            ],
-          });
-        }
+        const now = new Date().toISOString();
+        writeWorkspaceContinue(workspacePath, {
+          ...continueState,
+          sessionHistory: [
+            ...continueState.sessionHistory,
+            {
+              timestamp: now,
+              reason: 'end',
+              note: options.comment || 'Agent signaled work complete',
+            },
+          ],
+        });
       }
     } catch (continueErr: any) {
       console.warn(`[pan done] Failed to append end entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
