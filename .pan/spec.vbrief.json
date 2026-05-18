@@ -63,7 +63,7 @@
       {
         "id": "drop-filter-from-init",
         "title": "Drop --filter from workspace devcontainer templates' bun install commands",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T04:30:00.000Z",
         "metadata": {
@@ -79,7 +79,7 @@
           {
             "id": "drop-filter-from-init.ac1",
             "title": "In `infra/.devcontainer-template/docker-compose.devcontainer.yml.template`, the `init` service's `command:` block invokes `bun install` (no `--filter` flags, no workspace name arguments).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -87,7 +87,7 @@
           {
             "id": "drop-filter-from-init.ac2",
             "title": "In `infra/.devcontainer-template/devcontainer.json.template`, `postCreateCommand` is `bun install` (no `--filter` flags, no workspace name arguments).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -95,7 +95,7 @@
           {
             "id": "drop-filter-from-init.ac3",
             "title": "A short comment in the docker-compose template (adjacent to the changed `bun install` line) documents that `--filter` was removed because it leaves top-level node_modules un-hoisted on the named volume, and references PAN-1169.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -103,7 +103,7 @@
           {
             "id": "drop-filter-from-init.ac4",
             "title": "After a freshly-rebuilt workspace (`pan workspace rebuild PAN-1169` or equivalent fresh `docker compose up`), running `docker run --rm -v <stack>_container-node-modules:/nm alpine ls /nm` lists top-level package directories (must include at least `effect`, `yaml`, and `@iarna` — the three confirmed-missing in the issue body), not just `.bun`.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -111,7 +111,7 @@
           {
             "id": "drop-filter-from-init.ac5",
             "title": "After the same fresh rebuild, the `server` container reaches a steady running state (no `ERR_MODULE_NOT_FOUND` in `docker logs panopticon-feature-pan-1169-server-1`, container does not exit within 60 seconds of starting).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -119,7 +119,7 @@
           {
             "id": "drop-filter-from-init.ac6",
             "title": "After the same fresh rebuild, `evaluateWorkspaceStackHealth('PAN-1169', ...)` returns `healthy: true` (no `stuck Created`, no `init exited non-zero`, no `service exited` reasons).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -127,7 +127,7 @@
           {
             "id": "drop-filter-from-init.ac7",
             "title": "No other files are modified by this bead. (Specifically: `infra/.devcontainer-template/Dockerfile`, `infra/.devcontainer-template/dev.template`, `src/lib/workspace/devcontainer-renderer.ts`, and `src/lib/workspace-manager.ts` are unchanged.)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
