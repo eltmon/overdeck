@@ -81,6 +81,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/ && npm run lint:permissions && npm run lint:skills",
     "lint:permissions": "bash scripts/lint-permissions.sh",
+    "prelint:skills": "npm run build:contracts && npm run build:cli",
     "lint:skills": "bash scripts/lint-skills.sh",
     "pretest": "npm run build:contracts",
     "test": "vitest run",

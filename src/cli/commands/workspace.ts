@@ -39,19 +39,23 @@ import {
 } from '../../lib/remote/workspace-metadata.js';
 
 const execAsync = promisify(exec);
+const REDIRECT_MANAGED_BEADS_VERSION = 1 * 10000 + 0 * 100 + 4;
+
+function encodeBeadsVersion(version: string): number {
+  const match = version.match(/(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return 0;
+  const [, major, minor, patch] = match.map(Number);
+  return major * 10000 + minor * 100 + patch;
+}
 
 /**
  * Check beads version to determine which approach to use
- * Returns version as a number (e.g., 47.1 for v0.47.1) or 0 if not installed
+ * Returns version as a sortable semver number (e.g., v1.0.4 = 10004) or 0 if not installed
  */
 async function getBeadsVersion(): Promise<number> {
   try {
     const { stdout } = await execAsync('bd --version', { encoding: 'utf-8' });
-    const match = stdout.match(/(\d+)\.(\d+)\.(\d+)/);
-    if (match) {
-      const [, , minor, patch] = match.map(Number);
-      return minor * 100 + patch; // e.g., 47.1 = 4701
-    }
+    return encodeBeadsVersion(stdout);
   } catch {}
   return 0;
 }
@@ -90,8 +94,8 @@ async function initializeWorkspaceBeads(workspacePath: string, issueId: string):
   try {
     const beadsVersion = await getBeadsVersion();
 
-    if (beadsVersion >= 4701) {
-      // v0.47.1+ - Use shared database with issue label for scoping
+    if (beadsVersion >= REDIRECT_MANAGED_BEADS_VERSION) {
+      // v1.0.4+ - Use shared database with issue label for scoping
       // The worktree's .beads/ directory is created from git (only issues.jsonl is committed),
       // so it lacks the redirect file needed to find the main repo's Dolt database.
       // We must create .beads/redirect explicitly — it is gitignored so cannot be inherited.
@@ -123,7 +127,7 @@ async function initializeWorkspaceBeads(workspacePath: string, issueId: string):
       const match = stdout.match(/([a-z]+-[a-z0-9]+)/);
       return { success: true, beadId: match?.[1] };
     } else {
-      // Legacy approach for older beads versions (< 0.47.1)
+      // Legacy approach for older beads versions (< 1.0.4)
       // Remove inherited .beads directory and initialize fresh
       const beadsDir = join(workspacePath, '.beads');
       if (existsSync(beadsDir)) {
@@ -154,6 +158,11 @@ async function initializeWorkspaceBeads(workspacePath: string, issueId: string):
     return { success: false, error: error.message };
   }
 }
+
+export const __testInternals = {
+  encodeBeadsVersion,
+  REDIRECT_MANAGED_BEADS_VERSION,
+};
 
 export function registerWorkspaceCommands(program: Command): void {
   const workspace = program.command('workspace').description('Workspace management');
@@ -1263,13 +1272,13 @@ async function migrateCommand(issueId: string, options: MigrateOptions): Promise
       return;
     }
 
-    // Sync beads before migrating
-    spinner.text = 'Syncing beads...';
+    // Persist beads before migrating
+    spinner.text = 'Persisting beads...';
     try {
-      await execAsync('bd sync', { encoding: 'utf-8' });
+      await execAsync('bd dolt commit -m "Sync beads before migration"', { encoding: 'utf-8' });
       await execAsync('git add .beads/ && git commit -m "Sync beads before migration" && git push', { encoding: 'utf-8' });
     } catch {
-      // Non-fatal - beads sync might not be needed
+      // Non-fatal - beads persistence might not be needed
     }
 
     // Create remote workspace

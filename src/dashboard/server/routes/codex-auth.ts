@@ -1,39 +1,63 @@
-import { Effect, Layer, Option } from 'effect';
+import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { readFile, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
-import { bridgeCodexAuthToCliproxyAsync } from '../../../lib/cliproxy.js';
+import { bridgeCodexAuthToCliproxyAsync, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
 import { createSessionAsync, sessionExistsAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { getDashboardApiUrl } from '../../../lib/config.js';
+import { validateOrigin } from './origin-validation.js';
 
 // ─── Re-auth session registry ──────────────────────────────────────────────────
 
 interface ReauthSession {
-  token: string;
+  terminalToken: string;
+  statusToken: string;
   createdAt: number;
 }
 
 const reauthSessions = new Map<string, ReauthSession>();
 const SESSION_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
-function generateReauthSession(): { sessionName: string; token: string } {
-  const sessionName = `reauth-${randomUUID()}`;
-  const token = randomUUID();
-  reauthSessions.set(sessionName, { token, createdAt: Date.now() });
-  return { sessionName, token };
+const readJsonBody = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const text = yield* request.text;
+  return text ? JSON.parse(text) as Record<string, unknown> : {};
+});
+
+function rejectInvalidOrigin(request: HttpServerRequest.HttpServerRequest): ReturnType<typeof jsonResponse> | null {
+  const originCheck = validateOrigin(request);
+  if (!originCheck.ok) {
+    return jsonResponse({ error: originCheck.error }, { status: 403 });
+  }
+  return null;
 }
 
-function validateReauthToken(sessionName: string, token: string): boolean {
+function generateReauthSession(): { sessionName: string; terminalToken: string; statusToken: string } {
+  const sessionName = `reauth-${randomUUID()}`;
+  const terminalToken = randomUUID();
+  const statusToken = randomUUID();
+  reauthSessions.set(sessionName, { terminalToken, statusToken, createdAt: Date.now() });
+  return { sessionName, terminalToken, statusToken };
+}
+
+function getLiveReauthSession(sessionName: string): ReauthSession | undefined {
   const session = reauthSessions.get(sessionName);
-  if (!session) return false;
-  if (session.token !== token) return false;
+  if (!session) return undefined;
   if (Date.now() - session.createdAt > SESSION_MAX_AGE_MS) {
     reauthSessions.delete(sessionName);
-    return false;
+    return undefined;
   }
-  return true;
+  return session;
+}
+
+function validateReauthStatusToken(sessionName: string, token: string): boolean {
+  const session = getLiveReauthSession(sessionName);
+  return !!session && session.statusToken === token;
 }
 
 function cleanupExpiredReauthSessions(): void {
@@ -45,18 +69,29 @@ function cleanupExpiredReauthSessions(): void {
   }
 }
 
-export function getReauthSessionToken(sessionName: string): string | undefined {
-  const session = reauthSessions.get(sessionName);
-  if (!session) return undefined;
-  if (Date.now() - session.createdAt > SESSION_MAX_AGE_MS) {
-    reauthSessions.delete(sessionName);
-    return undefined;
-  }
-  return session.token;
+export function consumeReauthTerminalToken(sessionName: string, token: string | undefined): boolean {
+  const session = getLiveReauthSession(sessionName);
+  return !!session && !!token && session.terminalToken === token;
 }
 
-export function invalidateReauthToken(sessionName: string): void {
-  reauthSessions.delete(sessionName);
+function buildTerminalCookie(sessionName: string, terminalToken: string): string {
+  const value = encodeURIComponent(`${sessionName}:${terminalToken}`);
+  const secure = getDashboardApiUrl().startsWith('https://') ? '; Secure' : '';
+  return `pan_codex_reauth=${value}; HttpOnly; SameSite=Strict; Path=/ws/terminal; Max-Age=${Math.floor(SESSION_MAX_AGE_MS / 1000)}${secure}`;
+}
+
+async function readBridgedCodexCredential(): Promise<{ accessToken: string | null; mtimeMs: number | null }> {
+  const path = join(getCliproxyAuthDir(), 'codex-primary.json');
+  try {
+    const [raw, fileStat] = await Promise.all([readFile(path, 'utf8'), stat(path)]);
+    const parsed = JSON.parse(raw) as { access_token?: unknown };
+    return {
+      accessToken: typeof parsed.access_token === 'string' ? parsed.access_token : null,
+      mtimeMs: fileStat.mtimeMs,
+    };
+  } catch {
+    return { accessToken: null, mtimeMs: null };
+  }
 }
 
 // ─── Route: GET /api/settings/codex-auth ───────────────────────────────────────
@@ -74,13 +109,11 @@ const getCodexAuthRoute = HttpRouter.add(
 
 // ─── Route: POST /api/settings/codex-reauth ────────────────────────────────────
 
-async function findExistingLiveReauthSession(): Promise<{ sessionName: string; token: string } | null> {
+async function getExistingLiveReauthSession(): Promise<{ sessionName: string; session: ReauthSession } | null> {
   cleanupExpiredReauthSessions();
   const sessions = await listSessionNamesAsync();
-  for (const [name, session] of reauthSessions.entries()) {
-    if (sessions.includes(name)) {
-      return { sessionName: name, token: session.token };
-    }
+  for (const [sessionName, session] of reauthSessions.entries()) {
+    if (sessions.includes(sessionName)) return { sessionName, session };
   }
   return null;
 }
@@ -90,16 +123,21 @@ const postCodexReauthRoute = HttpRouter.add(
   '/api/settings/codex-reauth',
   httpHandler(
     Effect.gen(function* () {
-      const existing = yield* Effect.promise(() => findExistingLiveReauthSession());
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const originError = rejectInvalidOrigin(request);
+      if (originError) return originError;
+
+      const existing = yield* Effect.promise(() => getExistingLiveReauthSession());
       if (existing) {
-        return jsonResponse({
-          sessionName: existing.sessionName,
-          token: existing.token,
-          headless: !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY,
-        });
+        const headless = !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
+        existing.session.terminalToken = randomUUID();
+        return jsonResponse(
+          { sessionName: existing.sessionName, statusToken: existing.session.statusToken, headless, existing: true },
+          { headers: { 'Set-Cookie': buildTerminalCookie(existing.sessionName, existing.session.terminalToken) } },
+        );
       }
 
-      const { sessionName, token } = generateReauthSession();
+      const { sessionName, terminalToken, statusToken } = generateReauthSession();
 
       const headless = !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
       const command = headless ? 'codex login --device-auth' : 'codex login';
@@ -110,34 +148,60 @@ const postCodexReauthRoute = HttpRouter.add(
         }),
       );
 
-      return jsonResponse({ sessionName, token, headless });
+      return jsonResponse(
+        { sessionName, statusToken, headless },
+        { headers: { 'Set-Cookie': buildTerminalCookie(sessionName, terminalToken) } },
+      );
     }),
   ),
 );
 
-// ─── Route: GET /api/settings/codex-reauth/status ──────────────────────────────
+// ─── Route: POST /api/settings/codex-reauth/status ─────────────────────────────
 
-const getCodexReauthStatusRoute = HttpRouter.add(
-  'GET',
+const postCodexReauthStatusRoute = HttpRouter.add(
+  'POST',
   '/api/settings/codex-reauth/status',
   httpHandler(
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
-      const urlOpt = HttpServerRequest.toURL(request);
-      const searchParams = Option.isSome(urlOpt)
-        ? urlOpt.value.searchParams
-        : new URLSearchParams();
-      const sessionName = searchParams.get('session') ?? '';
+      const originError = rejectInvalidOrigin(request);
+      if (originError) return originError;
+
+      const body = yield* readJsonBody;
+      const sessionName = typeof body.session === 'string' ? body.session : '';
+      const token = typeof body.token === 'string' ? body.token : '';
+      const session = getLiveReauthSession(sessionName);
+
+      if (!validateReauthStatusToken(sessionName, token) || !session) {
+        return jsonResponse({ completed: true, success: false, error: 'Re-auth session expired or invalid' });
+      }
 
       const exists = yield* Effect.promise(() => sessionExistsAsync(sessionName));
       if (exists) {
         return jsonResponse({ completed: false });
       }
 
-      yield* Effect.promise(() => bridgeCodexAuthToCliproxyAsync());
-      const authStatus = yield* Effect.promise(() => checkCodexAuthStatus());
+      const beforeCredential = yield* Effect.promise(() => readBridgedCodexCredential());
+      const bridged = yield* Effect.promise(() => bridgeCodexAuthToCliproxyAsync());
+      const afterCredential = yield* Effect.promise(() => readBridgedCodexCredential());
+      const refreshedCredential = bridged && (
+        (beforeCredential.accessToken !== null && afterCredential.accessToken !== beforeCredential.accessToken) ||
+        (afterCredential.mtimeMs !== null && afterCredential.mtimeMs >= session.createdAt)
+      );
+      const authStatus = yield* Effect.promise(() => checkCodexAuthStatus(
+        refreshedCredential ? { ignoreBurnBefore: session.createdAt } : undefined,
+      ));
+      if (!refreshedCredential || authStatus.status !== 'valid') {
+        return jsonResponse({
+          completed: true,
+          success: false,
+          authStatus,
+          error: !bridged ? 'Codex credentials were not bridged' : (authStatus.message || `Codex authentication is ${authStatus.status}`),
+        });
+      }
+
       reauthSessions.delete(sessionName);
-      return jsonResponse({ completed: true, authStatus });
+      return jsonResponse({ completed: true, success: true, authStatus });
     }),
   ),
 );
@@ -145,5 +209,5 @@ const getCodexReauthStatusRoute = HttpRouter.add(
 export const codexAuthRouteLayer = Layer.mergeAll(
   getCodexAuthRoute,
   postCodexReauthRoute,
-  getCodexReauthStatusRoute,
+  postCodexReauthStatusRoute,
 );

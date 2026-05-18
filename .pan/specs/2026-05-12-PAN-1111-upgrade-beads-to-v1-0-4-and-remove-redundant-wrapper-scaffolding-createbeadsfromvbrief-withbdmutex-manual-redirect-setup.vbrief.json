@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-12T17:57:53.652Z",
-    "updated": "2026-05-16T13:00:51.767Z",
+    "updated": "2026-05-18T00:51:34.042Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1111: Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding",
     "inspectionPolicy": "auto"
@@ -10,72 +10,72 @@
   "plan": {
     "id": "pan-1111",
     "title": "Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding",
-    "status": "proposed",
+    "status": "completed",
     "uid": "bb7041db-13db-488a-9429-70382b646a68",
     "author": "agent:claude-opus-4-7",
-    "sequence": 74,
+    "sequence": 82,
     "created": "2026-05-12T17:57:53.652Z",
-    "updated": "2026-05-16T13:00:51.767Z",
+    "updated": "2026-05-18T00:51:34.042Z",
     "metadata": {
       "canonicalFilename": "2026-05-12-PAN-1111-upgrade-beads-to-v1-0-4-and-remove-redundant-wrapper-scaffolding-createbeadsfromvbrief-withbdmutex-manual-redirect-setup.vbrief.json",
       "pipeline": {
-        "phase": "merge",
+        "phase": "review",
         "issueId": "PAN-1111",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-16T13:00:51.766Z",
+        "updatedAt": "2026-05-18T00:51:26.626Z",
         "work": {
-          "updatedAt": "2026-05-16T13:00:51.766Z",
+          "updatedAt": "2026-05-18T00:51:26.626Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-05-16T13:00:51.766Z",
+          "status": "failed",
+          "updatedAt": "2026-05-18T00:51:26.626Z",
+          "notes": "Acceptance criteria check FAILED — 29/29 AC incomplete:\n\n### Bump bd install version pin from 1.0.2 to 1.0.4 (4/4 incomplete)\n  - [ ] src/cli/commands/install.ts recommendedVersion encodes 1.0.4 (10004)\n  - [ ] No surviving 1.0.2 literals in install.ts (URLs, comments, error strings)\n  - [ ] `bd --version` on the developer machine reports 1.0.4 (or later patch on 1.0.x) after running pan install\n  - [ ] `npm run typecheck` and `npm run lint` pass\n\n### Replace `bd list --json --limit 0` connectivity probe with `bd ping --json` (3/3 incomplete)\n  - [ ] The connectivity probe in createBeadsFromVBrief uses `bd ping --json` (not `bd list`)\n  - [ ] Probe timeout remains 8s; cwd remains workspacePath\n  - [ ] Mocks in src/lib/vbrief/__tests__/create-beads.test.ts updated; `vitest run src/lib/vbrief/__tests__/create-beads.test.ts` passes\n\n### Simplify createBeadsFromVBrief recovery: on probe failure, run `bd doctor --fix` once then retry (6/6 incomplete)\n  - [ ] On `bd ping` failure, the code invokes `bd doctor --fix` exactly once before retrying the probe\n  - [ ] The stale-artifact heuristic (staleArtifacts array, presentStale check, dolt-residue diagnostic) is deleted from src/lib/vbrief/beads.ts\n  - [ ] The redirect-vs-main-beads branch logic in the catch block is collapsed into a single retry/error-return path\n  - [ ] The fresh-install bd-init fallback (no redirect, no main .beads/) is preserved with identical argv and follow-on `git config` / `bd config set` calls\n  - [ ] A code comment near createBeadsFromVBrief explains why the heuristic was removed (refs beads v1.0.3 dolt auto-recovery)\n  - [ ] `npm run typecheck` and `npm run lint` pass\n\n### Update create-beads.test.ts to match the simplified recovery surface (5/5 incomplete)\n  - [ ] All mocks reference `bd ping` (with `--json`), not the old `bd list --json --limit 0` probe\n  - [ ] Tests for the stale-artifact heuristic are removed (no remaining references to `metadata.json` / `embeddeddolt` / `presentStale`)\n  - [ ] There is a test asserting `bd doctor --fix` is called once between a failed probe and a successful retry, and the function returns `success: true`\n  - [ ] There is a test asserting `success: false` with non-empty `errors` when both probe attempts fail\n  - [ ] `vitest run src/lib/vbrief/__tests__/create-beads.test.ts` passes\n\n### Add corruption-recovery integration test (issue AC #5) (4/4 incomplete)\n  - [ ] Test simulates a `table not found: issues` probe failure followed by `bd doctor --fix` and a successful retry\n  - [ ] Test asserts createBeadsFromVBrief returns `success: true` and per-item create mocks were invoked\n  - [ ] Returned errors array contains no message referencing 'stale local-DB artifacts'\n  - [ ] Test passes under `vitest run`\n\n### Update skills/beads/SKILL.md: document `bd ping`, `bd doctor --fix`, `bd prune`, `bd dolt push --remote` (4/4 incomplete)\n  - [ ] skills/beads/SKILL.md mentions `bd ping --json` and `bd doctor --fix` with usage examples\n  - [ ] skills/beads/SKILL.md mentions `bd prune` and `bd dolt push --remote`\n  - [ ] No surviving references to v1.0.2 in the skill front matter or body\n  - [ ] `npm run lint` passes\n\n### Update skills/beads-panopticon-guide/SKILL.md with the worktree redirect story for v1.0.4 (3/3 incomplete)\n  - [ ] Doc explains both the redirect-based hydration path Panopticon uses and the auto-import path beads v1.0.4 supports\n  - [ ] Doc reiterates the `never bd init in a redirect-managed worktree` rule\n  - [ ] `npm run lint` passes",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-16T13:00:51.766Z"
+              "status": "failed",
+              "at": "2026-05-18T00:51:26.626Z",
+              "notes": "Acceptance criteria check FAILED — 29/29 AC incomplete:\n\n### Bump bd install version pin from 1.0.2 to 1.0.4 (4/4 incomplete)\n  - [ ] src/cli/commands/install.ts recommendedVersion encodes 1.0.4 (10004)\n  - [ ] No surviving 1.0.2 literals in install.ts (URLs, comments, error strings)\n  - [ ] `bd --version` on the developer machine reports 1.0.4 (or later patch on 1.0.x) after running pan install\n  - [ ] `npm run typecheck` and `npm run lint` pass\n\n### Replace `bd list --json --limit 0` connectivity probe with `bd ping --json` (3/3 incomplete)\n  - [ ] The connectivity probe in createBeadsFromVBrief uses `bd ping --json` (not `bd list`)\n  - [ ] Probe timeout remains 8s; cwd remains workspacePath\n  - [ ] Mocks in src/lib/vbrief/__tests__/create-beads.test.ts updated; `vitest run src/lib/vbrief/__tests__/create-beads.test.ts` passes\n\n### Simplify createBeadsFromVBrief recovery: on probe failure, run `bd doctor --fix` once then retry (6/6 incomplete)\n  - [ ] On `bd ping` failure, the code invokes `bd doctor --fix` exactly once before retrying the probe\n  - [ ] The stale-artifact heuristic (staleArtifacts array, presentStale check, dolt-residue diagnostic) is deleted from src/lib/vbrief/beads.ts\n  - [ ] The redirect-vs-main-beads branch logic in the catch block is collapsed into a single retry/error-return path\n  - [ ] The fresh-install bd-init fallback (no redirect, no main .beads/) is preserved with identical argv and follow-on `git config` / `bd config set` calls\n  - [ ] A code comment near createBeadsFromVBrief explains why the heuristic was removed (refs beads v1.0.3 dolt auto-recovery)\n  - [ ] `npm run typecheck` and `npm run lint` pass\n\n### Update create-beads.test.ts to match the simplified recovery surface (5/5 incomplete)\n  - [ ] All mocks reference `bd ping` (with `--json`), not the old `bd list --json --limit 0` probe\n  - [ ] Tests for the stale-artifact heuristic are removed (no remaining references to `metadata.json` / `embeddeddolt` / `presentStale`)\n  - [ ] There is a test asserting `bd doctor --fix` is called once between a failed probe and a successful retry, and the function returns `success: true`\n  - [ ] There is a test asserting `success: false` with non-empty `errors` when both probe attempts fail\n  - [ ] `vitest run src/lib/vbrief/__tests__/create-beads.test.ts` passes\n\n### Add corruption-recovery integration test (issue AC #5) (4/4 incomplete)\n  - [ ] Test simulates a `table not found: issues` probe failure followed by `bd doctor --fix` and a successful retry\n  - [ ] Test asserts createBeadsFromVBrief returns `success: true` and per-item create mocks were invoked\n  - [ ] Returned errors array contains no message referencing 'stale local-DB artifacts'\n  - [ ] Test passes under `vitest run`\n\n### Update skills/beads/SKILL.md: document `bd ping`, `bd doctor --fix`, `bd prune`, `bd dolt push --remote` (4/4 incomplete)\n  - [ ] skills/beads/SKILL.md mentions `bd ping --json` and `bd doctor --fix` with usage examples\n  - [ ] skills/beads/SKILL.md mentions `bd prune` and `bd dolt push --remote`\n  - [ ] No surviving references to v1.0.2 in the skill front matter or body\n  - [ ] `npm run lint` passes\n\n### Update skills/beads-panopticon-guide/SKILL.md with the worktree redirect story for v1.0.4 (3/3 incomplete)\n  - [ ] Doc explains both the redirect-based hydration path Panopticon uses and the auto-import path beads v1.0.4 supports\n  - [ ] Doc reiterates the `never bd init in a redirect-managed worktree` rule\n  - [ ] `npm run lint` passes"
             }
           ]
         },
         "review": {
-          "status": "passed",
-          "updatedAt": "2026-05-16T13:00:51.766Z",
-          "notes": "All 29 ACs implemented; 4/4 reviewers approved; typecheck/lint/tests pass",
+          "status": "failed",
+          "updatedAt": "2026-05-18T00:51:26.626Z",
+          "notes": "Review role spawn failed: Workspace docker stack for PAN-1111 is not healthy: No Docker containers found for workspace stack pan-1111. Run 'pan workspace rebuild PAN-1111' or retry with --host to override.",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-16T13:00:51.766Z",
-              "notes": "All 29 ACs implemented; 4/4 reviewers approved; typecheck/lint/tests pass"
+              "status": "failed",
+              "at": "2026-05-18T00:51:26.626Z",
+              "notes": "Review role spawn failed: Workspace docker stack for PAN-1111 is not healthy: No Docker containers found for workspace stack pan-1111. Run 'pan workspace rebuild PAN-1111' or retry with --host to override."
             }
           ],
-          "approval": "approved"
+          "approval": "changes_requested"
         },
         "test": {
-          "status": "passed",
-          "updatedAt": "2026-05-16T13:00:51.766Z",
-          "notes": "Skipped: no code changed since pre-review verification gate",
+          "status": "pending",
+          "updatedAt": "2026-05-18T00:51:26.626Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-16T13:00:51.766Z",
-              "notes": "Skipped: no code changed since pre-review verification gate"
+              "status": "pending",
+              "at": "2026-05-18T00:51:26.626Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-16T13:00:51.766Z",
+          "updatedAt": "2026-05-18T00:51:26.626Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-16T13:00:51.766Z",
+          "updatedAt": "2026-05-18T00:51:26.626Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-16T13:00:51.766Z"
+              "at": "2026-05-18T00:51:26.626Z"
             }
           ],
-          "readyForMerge": true,
+          "readyForMerge": false,
           "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1114"
         }
       }
@@ -525,5 +525,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }

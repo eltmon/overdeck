@@ -1,4 +1,5 @@
 import { existsSync, readdirSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
@@ -9,6 +10,8 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 const BD_LIST_TIMEOUT_MS = 10_000;
+
+type BeadRecord = Record<string, unknown>;
 
 function errorCode(error: unknown): unknown {
   return error instanceof Error
@@ -30,11 +33,33 @@ function isTimeout(error: unknown): boolean {
     /timed out|timeout/i.test(error.message);
 }
 
+async function readIssueBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadRecord[] | null> {
+  const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+  if (!existsSync(jsonlPath)) return null;
+
+  const label = issueId.toLowerCase();
+  return (await readFile(jsonlPath, 'utf-8'))
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as BeadRecord)
+    .filter((bead) => Array.isArray(bead.labels) && bead.labels.map(String).includes(label));
+}
+
 async function listBeadsByStatus(
   workspacePath: string,
   issueId: string,
   status: 'open' | 'closed',
+  preloadedBeads?: BeadRecord[] | null,
 ): Promise<string> {
+  if (preloadedBeads !== undefined && preloadedBeads !== null) {
+    return JSON.stringify(preloadedBeads.filter((bead) => bead.status === status));
+  }
+
+  const jsonlBeads = await readIssueBeadsFromJsonl(workspacePath, issueId);
+  if (jsonlBeads !== null) {
+    return JSON.stringify(jsonlBeads.filter((bead) => bead.status === status));
+  }
+
   const { stdout } = await execFileAsync(
     'bd',
     ['list', '--status', status, '-l', issueId.toLowerCase(), '--limit', '0', '--json'],
@@ -53,10 +78,10 @@ async function listBeadsByStatus(
  *
  * Returns an array of failure lines (empty = pass).
  */
-export async function checkOpenBeads(workspacePath: string, issueId: string): Promise<string[]> {
+export async function checkOpenBeads(workspacePath: string, issueId: string, preloadedBeads?: BeadRecord[] | null): Promise<string[]> {
   let stdout: string;
   try {
-    stdout = await listBeadsByStatus(workspacePath, issueId, 'open');
+    stdout = await listBeadsByStatus(workspacePath, issueId, 'open', preloadedBeads);
   } catch (error: unknown) {
     if (isMissingCommand(error)) return [];
     if (isTimeout(error)) {
@@ -183,8 +208,10 @@ export function checkVBriefACStatus(workspacePath: string): string[] {
 export async function runPreflightChecks(workspacePath: string, issueId: string): Promise<string[]> {
   const failures: string[] = [];
 
+  const issueBeads = await readIssueBeadsFromJsonl(workspacePath, issueId);
+
   // Check 1: Open beads
-  const beadFailures = await checkOpenBeads(workspacePath, issueId);
+  const beadFailures = await checkOpenBeads(workspacePath, issueId, issueBeads);
   failures.push(...beadFailures);
 
   // Check 2: Uncommitted changes
@@ -193,7 +220,7 @@ export async function runPreflightChecks(workspacePath: string, issueId: string)
 
   // Sync closed beads to vBRIEF before AC check
   try {
-    const stdout = await listBeadsByStatus(workspacePath, issueId, 'closed');
+    const stdout = await listBeadsByStatus(workspacePath, issueId, 'closed', issueBeads);
     const closedBeads = JSON.parse(stdout || '[]');
     let synced = 0;
     for (const bead of closedBeads) {

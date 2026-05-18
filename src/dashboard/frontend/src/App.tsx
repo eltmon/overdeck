@@ -237,6 +237,16 @@ async function restartCliproxy(): Promise<void> {
   if (!res.ok) throw new Error('Failed to restart CLIProxy');
 }
 
+function StandaloneTerminalRoute({ sessionName, token }: { sessionName: string; token?: string }) {
+  useCodexAutoRetry();
+  return (
+    <div className="h-screen overflow-hidden bg-[#0d1117]">
+      <EventRouter />
+      <StandaloneTerminal sessionName={sessionName} token={token} />
+    </div>
+  );
+}
+
 export default function App() {
   const terminalPath = window.location.pathname;
   const terminalSession = new URLSearchParams(window.location.search).get('terminal');
@@ -245,12 +255,7 @@ export default function App() {
       ? terminalPath.replace('/terminal/', '')
       : terminalSession!;
     const token = new URLSearchParams(window.location.search).get('token') ?? undefined;
-    return (
-      <div className="h-screen overflow-hidden bg-[#0d1117]">
-        <EventRouter />
-        <StandaloneTerminal sessionName={sessionName} token={token} />
-      </div>
-    );
+    return <StandaloneTerminalRoute sessionName={sessionName} token={token} />;
   }
 
   const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);

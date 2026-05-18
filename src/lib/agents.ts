@@ -2261,16 +2261,13 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
-  // PAN-1059 / PAN-977: specialist roles (review sub-roles, test, ship) must not
-  // pass the prompt as a positional argument to Claude Code. Inside a detached
-  // tmux session, `--session-id` combined with a large positional prompt causes
-  // Claude Code to exit immediately (session-env directory created, then silent
-  // death). Work agents avoid this by delivering the prompt via tmux send-keys
-  // after Claude boots. Specialist roles now use the same delivery path.
-  // Exception: review sub-roles use `--print` mode which requires the prompt
-  // as an argument — tmux send-keys delivery doesn't work with `--print`.
-  const usesPrintMode = role === 'review' && options.subRole;
-  const shouldDeliverPromptViaTmux = isSpecialistRole && !usesPrintMode;
+  // PAN-1059 / PAN-977: specialist roles (test, ship, and interactive review
+  // roles) must not pass the prompt as a positional argument to Claude Code.
+  // Headless Claude Code review sub-roles are different: they run `claude --print`
+  // and must receive the prompt on stdin because there is no interactive TUI to
+  // wait for before tmux delivery.
+  const shouldUsePromptFileStdin = isClaudeCodeReviewSubRole;
+  const shouldDeliverPromptViaTmux = isSpecialistRole && !shouldUsePromptFileStdin;
 
   const launcherContent = generateLauncherScript({
     role,
@@ -2280,6 +2277,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setTerminalEnv: true,
     providerExports,
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
+    promptFileMode: shouldUsePromptFileStdin ? 'stdin' : undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
     sessionId,
@@ -2575,17 +2573,20 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   });
 
-  // Channels: dismiss the dev-channels confirmation dialog before any prompt
-  // delivery. Must run while we are still in the launch path so the channel
-  // listener is registered before deliverAgentMessage starts preferring the
-  // socket. Skipped when the agent was not eligible at launch time.
-  if (state.channelsEnabled) {
-    await dismissDevChannelsDialog(agentId);
-  }
+  // Channels: start dismissing the dev-channels confirmation dialog as soon as
+  // the tmux session exists, but only block on completion when we are about to
+  // deliver an initial prompt. Spawn-only callers should not sit in a 20s poll
+  // loop waiting for a dialog they may never need.
+  const dismissChannelsDialogPromise = state.channelsEnabled
+    ? dismissDevChannelsDialog(agentId).catch(() => undefined)
+    : null;
 
   // Send the initial prompt after Claude's interactive prompt is ready.
   // Wait for the session to be ready by polling tmux output for Claude's prompt.
   if (prompt) {
+    if (dismissChannelsDialogPromise) {
+      await dismissChannelsDialogPromise;
+    }
     // Wait for tmux session to exist and Claude to show its prompt
     let ready = false;
     for (let i = 0; i < 30; i++) {

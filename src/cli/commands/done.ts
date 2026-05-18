@@ -15,6 +15,7 @@ import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
+import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
 import type { MergeSet } from '../../lib/merge-set.js';
 
@@ -491,6 +492,8 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       autoRequeueCount: 0,
     });
 
+    await restoreTrackedBeadsExport(workspacePath);
+
     spinner.succeed(`Work complete: ${issueId}`);
     console.log('');
 
@@ -592,6 +595,10 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       // Don't fail the done command if auto-review fails
       console.log(chalk.dim(`  Could not auto-trigger review: ${error.message}`));
     }
+
+    await restoreTrackedBeadsExport(workspacePath);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await restoreTrackedBeadsExport(workspacePath);
 
   } catch (error: any) {
     spinner.fail(error.message);
