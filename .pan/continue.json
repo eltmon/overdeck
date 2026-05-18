@@ -2,8 +2,12 @@
   "version": "1",
   "issueId": "PAN-1189",
   "created": "2026-05-18T12:44:37.358Z",
-  "updated": "2026-05-18T13:05:00.000Z",
-  "gitState": { "branch": "feature/pan-1189", "dirty": false },
+  "updated": "2026-05-18T16:30:46.127Z",
+  "gitState": {
+    "branch": "feature/pan-1189",
+    "sha": "cd815da28",
+    "dirty": true
+  },
   "decisions": [
     {
       "id": "D1",
@@ -106,9 +110,23 @@
       "id": "H8",
       "summary": "Stop / pause semantics. Pausing a long-running orchestrator mid-tick may interrupt a spawn or merge it just initiated.",
       "mitigation": "Pause sets the gate so the orchestrator self-checks at tick boundaries and idles; it does NOT kill the tmux session. Resume clears the gate. Stop (kill) is a separate, explicit verb if ever needed."
+    },
+    {
+      "id": "H9",
+      "summary": "packages/contracts typecheck currently fails on pre-existing readonly schema output and ambiguous re-export errors in event-reducers/index; the FlywheelStatus build and package-local Vitest tests pass, but final root typecheck will require addressing these contract type errors.",
+      "mitigation": "Before pan done, run npm run typecheck and fix the underlying contracts reducer/export typing errors rather than bypassing the gate."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "Completed bead workspace-wjl7 (FlywheelStatus contract). Next agent should commit/close this bead if not already closed, then run bd ready -l pan-1189 and claim the next unblocked PAN-1189 bead.",
+    "beadId": "workspace-wjl7",
+    "filesToRead": [
+      "packages/contracts/src/flywheel.ts",
+      "packages/contracts/src/flywheel.test.ts",
+      "packages/contracts/src/index.ts",
+      "packages/contracts/vitest.config.ts"
+    ]
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
   "sessionHistory": [
@@ -123,6 +141,12 @@
       "reason": "planning",
       "note": "Planning complete: 12 auto-decisions recorded, 8 hazards identified, 23 beads decomposed across contract / role / lifecycle / server / CLI / UI / docs.",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-18T16:30:15.789Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-wjl7: added the FlywheelStatus Effect Schema contract, TypeScript interfaces, exports, package-local Vitest coverage, and verified packages/contracts build plus tests.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []

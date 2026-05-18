@@ -110,7 +110,7 @@
       {
         "id": "contract-flywheel-status",
         "title": "Add FlywheelStatus contract to @panctl/contracts",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T13:05:00.000Z",
         "metadata": {
@@ -126,7 +126,7 @@
           {
             "id": "contract-flywheel-status.ac1",
             "title": "FlywheelStatus TypeScript interface lives in packages/contracts/src/ and is exported via index.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -134,7 +134,7 @@
           {
             "id": "contract-flywheel-status.ac2",
             "title": "JSON schema (zod or effect Schema, matching existing contracts convention) accepts the issue-body example payload and rejects payloads missing `runId`, `headline.bugsFixed`, or `system.mainHead`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -142,7 +142,7 @@
           {
             "id": "contract-flywheel-status.ac3",
             "title": "Vitest tests cover happy-path roundtrip + at least three rejection cases (missing required field, wrong enum, wrong type)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -150,7 +150,7 @@
           {
             "id": "contract-flywheel-status.ac4",
             "title": "`npm run build` succeeds in packages/contracts after the change and dist exports include the new type",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
