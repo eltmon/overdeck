@@ -1,19 +1,14 @@
 import { useEffect } from 'react';
 
-import { useDashboardStore, selectIssues } from '../../lib/store';
-import type { Issue } from '../../types';
-
-function findIssue(issues: unknown[], issueId: string | null): Issue | null {
-  if (!issueId) return null;
-  return (issues as Issue[]).find((issue) => issue.identifier === issueId || issue.id === issueId) ?? null;
-}
+import { useDashboardStore } from '../../lib/store';
+import DrawerActivityRail from './DrawerActivityRail';
+import { useDrawerData } from './useDrawerData';
 
 export function IssueDrawer() {
   const drawer = useDashboardStore((state) => state.drawer);
   const closeIssue = useDashboardStore((state) => state.closeIssue);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
-  const issues = useDashboardStore(selectIssues);
-  const issue = findIssue(issues, drawer.issueId);
+  const { issue } = useDrawerData();
 
   useEffect(() => {
     syncDrawerFromUrl();
@@ -64,15 +59,18 @@ export function IssueDrawer() {
             ×
           </button>
         </header>
-        <div className="h-[calc(100vh-52px)] overflow-auto px-[22px] py-[18px]">
-          <div className="rounded-[var(--radius)] border border-border bg-card p-[18px]">
-            <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              {drawer.tab}
+        <div className="grid h-[calc(100vh-52px)] grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0 overflow-auto px-[22px] py-[18px]">
+            <div className="rounded-[var(--radius)] border border-border bg-card p-[18px]">
+              <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                {drawer.tab}
+              </div>
+              <p className="text-[13px] leading-6 text-muted-foreground">
+                Issue details will appear here as data streams in.
+              </p>
             </div>
-            <p className="text-[13px] leading-6 text-muted-foreground">
-              Issue details will appear here as data streams in.
-            </p>
           </div>
+          <DrawerActivityRail />
         </div>
       </aside>
     </div>

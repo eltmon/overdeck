@@ -23,7 +23,10 @@ describe('IssueDrawer', () => {
     useDashboardStore.setState({
       drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [issue],
-    });
+      agentsById: {},
+      recentActivity: [],
+      detailedActivity: [],
+    } as Parameters<typeof useDashboardStore.setState>[0]);
   });
 
   it('opens from issue URL params on mount', async () => {
@@ -73,5 +76,40 @@ describe('IssueDrawer', () => {
     });
     expect(scroller.scrollTop).toBe(120);
     scroller.remove();
+  });
+
+  it('renders most-recent-first activity rail items with phase dots and scroll reset', async () => {
+    useDashboardStore.setState({
+      recentActivity: [
+        { id: 'old', timestamp: '2026-05-18T00:00:00.000Z', source: 'work', level: 'info', message: 'Work started', issueId: 'PAN-1' },
+        { id: 'new', timestamp: '2026-05-18T00:05:00.000Z', source: 'ship', level: 'success', message: 'Merged branch', issueId: 'PAN-1' },
+        { id: 'other', timestamp: '2026-05-18T00:10:00.000Z', source: 'review', level: 'info', message: 'Other issue', issueId: 'PAN-2' },
+      ],
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1', 'activity');
+
+    const { rerender } = render(<IssueDrawer />);
+    const rail = screen.getByTestId('drawer-activity-rail');
+    const scrollArea = screen.getByTestId('drawer-activity-rail-scroll');
+
+    expect(rail).toHaveClass('w-[320px]', 'border-l', 'bg-card/70');
+    expect(screen.getByText('Merged branch')).toBeInTheDocument();
+    expect(screen.getByText('Work started')).toBeInTheDocument();
+    expect(screen.queryByText('Other issue')).not.toBeInTheDocument();
+    expect(screen.getByText('Merged branch').compareDocumentPosition(screen.getByText('Work started'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.getByTestId('drawer-activity-dot-done')).toHaveClass('bg-success');
+    expect(screen.getByTestId('drawer-activity-dot-work')).toHaveClass('bg-primary');
+
+    scrollArea.scrollTop = 120;
+    useDashboardStore.setState({
+      recentActivity: [
+        { id: 'latest', timestamp: '2026-05-18T00:06:00.000Z', source: 'review', level: 'info', message: 'Review updated', issueId: 'PAN-1' },
+        ...useDashboardStore.getState().recentActivity,
+      ],
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    rerender(<IssueDrawer />);
+
+    await waitFor(() => expect(scrollArea.scrollTop).toBe(0));
+    expect(screen.getByTestId('drawer-activity-dot-review')).toHaveClass('bg-signal-review');
   });
 });
