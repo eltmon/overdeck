@@ -1,8 +1,11 @@
-import { readFile } from 'node:fs/promises';
+import { exec } from 'node:child_process';
+import { readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { Schema } from 'effect';
 import { Command } from 'commander';
 import { FlywheelStatus } from '@panctl/contracts';
-import { getFlywheelRunDetail, listFlywheelRuns } from '../../dashboard/server/services/flywheel-run-state.js';
+import { getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns } from '../../dashboard/server/services/flywheel-run-state.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
 
@@ -14,7 +17,12 @@ interface StatusOptions {
   json?: boolean;
 }
 
+interface ReportOptions {
+  cwd?: string;
+}
+
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
+const execAsync = promisify(exec);
 
 function dashboardBaseUrl(): string {
   return (process.env.PANOPTICON_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
@@ -123,6 +131,201 @@ export async function flywheelStatusCommand(options: StatusOptions): Promise<voi
   }
 }
 
+function runNumberFromRunId(runId: string): number {
+  const match = /^RUN-(\d+)$/.exec(runId);
+  if (!match) throw new Error(`Invalid Flywheel run id for report: ${runId}`);
+  return Number(match[1]);
+}
+
+function reportDate(status: FlywheelStatus): string {
+  return status.lastTickAt.slice(0, 10);
+}
+
+function tableCell(value: string | number | undefined): string {
+  return String(value ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+}
+
+export function formatFlywheelStateReport(status: FlywheelStatus): string {
+  const runNumber = runNumberFromRunId(status.runId);
+  const activePipelineRows = status.activePipeline.length > 0
+    ? status.activePipeline.map((item) => `| ${tableCell(item.issueId)} | ${tableCell(item.verb)} | ${tableCell(item.status)} | ${tableCell(item.title)} | ${tableCell(item.progressPercent)} | ${tableCell(item.pr)} |`).join('\n')
+    : '| _None_ |  |  |  |  |  |';
+  const substrateRows = status.substrateBugs.length > 0
+    ? status.substrateBugs.map((bug) => `| ${tableCell(bug.issueId)} | ${tableCell(bug.status)} | ${tableCell(bug.title)} | ${tableCell(bug.commitSha?.slice(0, 10))} |`).join('\n')
+    : '| _None_ |  |  |  |';
+  const patternLines = status.parked.length > 0
+    ? status.parked.map((item) => `- **${item.issueId}** (${item.reason}) — ${item.title}`).join('\n')
+    : '- None recorded this run.';
+  const questionLines = status.openQuestions.length > 0
+    ? status.openQuestions.map((question) => `- ${question}`).join('\n')
+    : '- None.';
+
+  return `# Flywheel State — ${reportDate(status)} (Run ${runNumber})
+
+This file is the flywheel's memory. The next \`pan flywheel start\` run reads it before doing anything else. Updated at the END of each revolution.
+
+**Run window:** ${status.startedAt} → ${status.lastTickAt} (${status.orchestrator.harness}, ${status.orchestrator.model}, ${status.orchestrator.effort})
+
+**Headline result:** ${status.headline.bugsFixed} substrate bugs fixed; ${status.headline.swarmItemsMerged}/${status.headline.swarmItemsTotal} SWARM items merged; ${status.headline.prsMerged} PRs merged; ${status.headline.awaitingUat} awaiting UAT.
+
+**Run counters:** ticks ${status.ticks}; last tick ${status.lastTickAt}; orchestrator context ${status.orchestrator.ctxPercent}%.
+
+---
+
+## Active Pipeline
+
+| Issue | Verb | Status | Title | Progress | PR |
+|---|---|---|---|---:|---:|
+${activePipelineRows}
+
+---
+
+## Cycling Alerts
+
+${questionLines}
+
+---
+
+## Infrastructure Gaps
+
+| Issue | Status | Notes | Commit |
+|---|---|---|---|
+${substrateRows}
+
+---
+
+## Pattern Ledger
+
+${patternLines}
+
+---
+
+## Skill Gaps
+
+- Keep \`pan flywheel report\` in the closeout path so run summaries stay committed with the codebase.
+`;
+}
+
+export function formatFlywheelOperationSection(status: FlywheelStatus): string {
+  const runNumber = runNumberFromRunId(status.runId);
+  const bugLines = status.substrateBugs.length > 0
+    ? status.substrateBugs.map((bug, index) => `${index + 1}. **${bug.issueId} — ${bug.title}.** Status: ${bug.status}${bug.commitSha ? ` (${bug.commitSha.slice(0, 10)})` : ''}.`).join('\n')
+    : 'None recorded.';
+  const activeLines = status.activePipeline.length > 0
+    ? status.activePipeline.map((item) => `- **${item.issueId}** — ${item.verb}/${item.status}: ${item.title}`).join('\n')
+    : '- None.';
+
+  return `## Run ${runNumber} — ${reportDate(status)}
+
+**Window:** ${status.startedAt} – ${status.lastTickAt} (${formatElapsed(status.elapsedMs)}, ${status.orchestrator.model})
+
+**Issues moved:** ${status.headline.swarmItemsMerged}/${status.headline.swarmItemsTotal} SWARM items merged; ${status.headline.prsMerged} PRs merged; ${status.headline.awaitingUat} awaiting UAT.
+
+**Bugs fixed in code:** ${status.headline.bugsFixed}
+
+${bugLines}
+
+**Still in pipeline:**
+
+${activeLines}
+
+**System:** ${status.system.agentsActive}/${status.system.agentsCap} agents active; RAM ${status.system.ramUsedMb}/${status.system.ramTotalMb} MiB; main ${status.system.mainHead.slice(0, 7)}; ticks ${status.ticks}.
+`;
+}
+
+async function readTextIfExists(path: string): Promise<string> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch (error) {
+    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+    if (code === 'ENOENT') return '';
+    throw error;
+  }
+}
+
+function hasRunSection(existing: string, runNumber: number): boolean {
+  return existing.includes(`## Run ${runNumber} — `);
+}
+
+function replaceOrAppendRunSection(existing: string, section: string, runNumber: number): string {
+  const normalizedExisting = existing.trimEnd();
+  const heading = `## Run ${runNumber} — `;
+  const start = normalizedExisting.indexOf(heading);
+  if (start === -1) {
+    return `${normalizedExisting}${normalizedExisting ? '\n\n' : ''}${section}`;
+  }
+
+  const nextRunMatch = /^## Run \d+ — /m.exec(normalizedExisting.slice(start + heading.length));
+  const end = nextRunMatch ? start + heading.length + nextRunMatch.index : normalizedExisting.length;
+  return `${normalizedExisting.slice(0, start).trimEnd()}\n\n${section}${normalizedExisting.slice(end).trimStart() ? `\n\n${normalizedExisting.slice(end).trimStart()}` : ''}`;
+}
+
+async function loadReportFlywheelStatus(): Promise<FlywheelStatus | null> {
+  const runs = await listFlywheelRuns();
+  const run = runs.find((candidate) => candidate.status === 'running') ?? runs[0];
+  if (!run) return null;
+  const detail = await getFlywheelRunDetail(run.id);
+  return detail?.latest ?? null;
+}
+
+async function gitOutput(command: string, cwd: string): Promise<string> {
+  const { stdout } = await execAsync(command, { cwd, encoding: 'utf8' });
+  return stdout.trim();
+}
+
+async function commitFlywheelReport(cwd: string, runNumber: number, requireAmend: boolean): Promise<'commit' | 'amend'> {
+  const subject = `docs(flywheel): run ${runNumber}`;
+  await execAsync('git add docs/FLYWHEEL-STATE.md docs/OPERATION-FIX-ALL.md', { cwd });
+  const headSubject = await gitOutput('git log -1 --format=%s', cwd).catch(() => '');
+  if (requireAmend && headSubject !== subject) {
+    throw new Error(`Refusing to amend run ${runNumber}: latest commit is not ${subject}`);
+  }
+  const mode = headSubject === subject ? 'amend' : 'commit';
+  const command = mode === 'amend'
+    ? `git commit --amend -m ${JSON.stringify(subject)}`
+    : `git commit -m ${JSON.stringify(subject)}`;
+  await execAsync(command, { cwd, encoding: 'utf8' });
+  return mode;
+}
+
+export async function flywheelReportCommand(options: ReportOptions = {}): Promise<void> {
+  try {
+    const cwd = options.cwd ?? process.cwd();
+    const status = await loadReportFlywheelStatus();
+    if (!status) {
+      console.error('no flywheel run to report');
+      process.exitCode = 1;
+      return;
+    }
+
+    const runNumber = runNumberFromRunId(status.runId);
+    const statePath = join(cwd, 'docs', 'FLYWHEEL-STATE.md');
+    const operationPath = join(cwd, 'docs', 'OPERATION-FIX-ALL.md');
+    const stateReport = formatFlywheelStateReport(status);
+    const existingOperation = await readTextIfExists(operationPath);
+    const operationReport = replaceOrAppendRunSection(
+      existingOperation,
+      formatFlywheelOperationSection(status),
+      runNumber,
+    );
+
+    const existingState = await readTextIfExists(statePath);
+    if (existingState === stateReport && existingOperation === operationReport) {
+      console.log('nothing to report');
+      return;
+    }
+
+    await writeFile(statePath, stateReport, 'utf8');
+    await writeFile(operationPath, operationReport, 'utf8');
+    await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), stateReport, 'utf8');
+    const mode = await commitFlywheelReport(cwd, runNumber, hasRunSection(existingOperation, runNumber));
+    console.log(`${mode === 'amend' ? 'Updated' : 'Created'} docs(flywheel): run ${runNumber}`);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
 export function registerFlywheelCommands(program: Command): void {
   const flywheel = program
     .command('flywheel')
@@ -139,4 +342,9 @@ export function registerFlywheelCommands(program: Command): void {
     .description('Show the active Flywheel run status')
     .option('--json', 'Emit the raw FlywheelStatus JSON')
     .action(flywheelStatusCommand);
+
+  flywheel
+    .command('report')
+    .description('Write and commit the current Flywheel run report')
+    .action(flywheelReportCommand);
 }

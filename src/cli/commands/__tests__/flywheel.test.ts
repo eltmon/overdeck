@@ -1,6 +1,8 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { promisify } from 'node:util';
 import { Readable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
@@ -8,11 +10,14 @@ import type { FlywheelStatus } from '@panctl/contracts';
 import { writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
 import {
   emitStatusCommand,
+  flywheelReportCommand,
   flywheelStatusCommand,
   parseFlywheelStatusJson,
   readFlywheelStatusJson,
   registerFlywheelCommands,
 } from '../flywheel.js';
+
+const execFileAsync = promisify(execFile);
 
 const validStatus: FlywheelStatus = {
   runId: 'RUN-1',
@@ -49,6 +54,21 @@ const validStatus: FlywheelStatus = {
   lastTickAt: '2026-05-18T12:00:00.000Z',
 };
 
+async function git(cwd: string, args: string[]): Promise<string> {
+  const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf8' });
+  return stdout.trim();
+}
+
+async function createReportRepo(root: string): Promise<string> {
+  const repoDir = join(root, 'repo');
+  await mkdir(join(repoDir, 'docs'), { recursive: true });
+  await writeFile(join(repoDir, 'docs', 'OPERATION-FIX-ALL.md'), '# Operation Fix-All\n\n## Run Log\n', 'utf8');
+  await git(repoDir, ['init']);
+  await git(repoDir, ['add', 'docs/OPERATION-FIX-ALL.md']);
+  await git(repoDir, ['-c', 'user.name=Panopticon Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'docs: seed operation log']);
+  return repoDir;
+}
+
 describe('flywheel CLI commands', () => {
   let tempDir: string;
   let logSpy: ReturnType<typeof vi.spyOn>;
@@ -59,12 +79,17 @@ describe('flywheel CLI commands', () => {
     process.exitCode = undefined;
     process.env.PANOPTICON_HOME = tempDir;
     process.env.PANOPTICON_DASHBOARD_URL = 'http://dashboard.test';
+    vi.stubEnv('GIT_AUTHOR_NAME', 'Panopticon Test');
+    vi.stubEnv('GIT_AUTHOR_EMAIL', 'test@example.com');
+    vi.stubEnv('GIT_COMMITTER_NAME', 'Panopticon Test');
+    vi.stubEnv('GIT_COMMITTER_EMAIL', 'test@example.com');
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(async () => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
     delete process.env.PANOPTICON_HOME;
     delete process.env.PANOPTICON_DASHBOARD_URL;
@@ -143,6 +168,59 @@ describe('flywheel CLI commands', () => {
     expect(errorSpy).toHaveBeenCalledWith('no active flywheel run');
   });
 
+  it('writes and commits a deterministic run report', async () => {
+    const repoDir = await createReportRepo(tempDir);
+    await writeLatestFlywheelStatus({
+      ...validStatus,
+      activePipeline: [{ issueId: 'PAN-1', title: 'Pipeline item', verb: 'working', status: 'running', progressPercent: 50, pr: 123 }],
+      substrateBugs: [{ issueId: 'PAN-2', title: 'Substrate bug', status: 'fixed', commitSha: 'abcdef1234567890' }],
+      parked: [{ issueId: 'PAN-3', title: 'Parked item', reason: 'waiting on UAT' }],
+      openQuestions: ['Should the next tick resume PAN-3?'],
+    });
+
+    await flywheelReportCommand({ cwd: repoDir });
+
+    const stateReport = await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8');
+    const operationLog = await readFile(join(repoDir, 'docs', 'OPERATION-FIX-ALL.md'), 'utf8');
+    expect(stateReport).toContain('# Flywheel State — 2026-05-18 (Run 1)');
+    expect(stateReport).toContain('| PAN-1 | working | running | Pipeline item | 50 | 123 |');
+    expect(stateReport).toContain('| PAN-2 | fixed | Substrate bug | abcdef1234 |');
+    expect(operationLog).toContain('## Run 1 — 2026-05-18');
+    expect(operationLog).toContain('**System:** 1/8 agents active');
+    expect(await git(repoDir, ['log', '-1', '--format=%s'])).toBe('docs(flywheel): run 1');
+    expect(await git(repoDir, ['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'])).toBe([
+      'docs/FLYWHEEL-STATE.md',
+      'docs/OPERATION-FIX-ALL.md',
+    ].join('\n'));
+  });
+
+  it('does not create a second report commit without new ticks', async () => {
+    const repoDir = await createReportRepo(tempDir);
+    await writeLatestFlywheelStatus(validStatus);
+    await flywheelReportCommand({ cwd: repoDir });
+    logSpy.mockClear();
+
+    await flywheelReportCommand({ cwd: repoDir });
+
+    expect(logSpy).toHaveBeenCalledWith('nothing to report');
+    expect(await git(repoDir, ['rev-list', '--count', 'HEAD'])).toBe('2');
+  });
+
+  it('amends the run report commit after new ticks', async () => {
+    const repoDir = await createReportRepo(tempDir);
+    await writeLatestFlywheelStatus(validStatus);
+    await flywheelReportCommand({ cwd: repoDir });
+    const firstCommit = await git(repoDir, ['rev-parse', 'HEAD']);
+
+    await writeLatestFlywheelStatus({ ...validStatus, elapsedMs: 2000, ticks: 2, lastTickAt: '2026-05-18T12:00:02.000Z' });
+    await flywheelReportCommand({ cwd: repoDir });
+
+    expect(await git(repoDir, ['rev-list', '--count', 'HEAD'])).toBe('2');
+    expect(await git(repoDir, ['rev-parse', 'HEAD'])).not.toBe(firstCommit);
+    expect(await git(repoDir, ['log', '-1', '--format=%s'])).toBe('docs(flywheel): run 1');
+    expect(await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8')).toContain('ticks 2');
+  });
+
   it('registers flywheel subcommands with their flags', () => {
     const program = new Command();
     registerFlywheelCommands(program);
@@ -150,7 +228,9 @@ describe('flywheel CLI commands', () => {
     const flywheel = program.commands.find(command => command.name() === 'flywheel');
     const emitStatus = flywheel?.commands.find(command => command.name() === 'emit-status');
     const status = flywheel?.commands.find(command => command.name() === 'status');
+    const report = flywheel?.commands.find(command => command.name() === 'report');
     expect(emitStatus?.options.map(option => option.long)).toContain('--file');
     expect(status?.options.map(option => option.long)).toContain('--json');
+    expect(report).toBeDefined();
   });
 });
