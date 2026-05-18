@@ -19,7 +19,7 @@ import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
 import { CacheService, DEFAULT_TTLS } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
-import { loadReviewStatuses } from '../../../lib/review-status.js';
+import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { findPlanAsync, readWorkspacePlanAsync } from '../../../lib/vbrief/io.js';
 
@@ -228,11 +228,14 @@ export class IssueDataService {
   /** In-memory snapshot of shadow states, refreshed asynchronously. The hot
    * path (`getIssues`) reads from this map — no disk I/O on every request. */
   private shadowStatesCache: Map<string, any> = new Map();
+  private reviewStatusesCache: Record<string, ReviewStatus> = {};
   private _onIssuesChanged: ((issues: unknown[]) => void) | null = null;
   private planningSnapshotQueued = false;
   private planningRefreshQueue: string[] = [];
   private planningRefreshQueued = new Set<string>();
   private planningRefreshActive = 0;
+  private reviewStatusRefreshQueued = false;
+  private reviewStatusRefreshIssueIds = new Set<string>();
 
   /** Register a callback invoked whenever issue data changes (PAN-433). */
   onIssuesChanged(fn: (issues: unknown[]) => void): void {
@@ -394,20 +397,15 @@ export class IssueDataService {
     }
     // cycle === 'all': no additional filtering, show everything
 
-    // Augment with mergeStatus from review-status (used for MERGED badge)
-    try {
-      const reviewStatuses = loadReviewStatuses();
-      allIssues = allIssues.map(issue => {
-        const key = issue.identifier?.toUpperCase();
-        const rs = key ? reviewStatuses[key] : null;
-        if (rs?.mergeStatus) {
-          return { ...issue, mergeStatus: rs.mergeStatus };
-        }
-        return issue;
-      });
-    } catch {
-      // review-status.json may not exist yet
-    }
+    // Augment with mergeStatus from the asynchronous review-status cache.
+    allIssues = allIssues.map(issue => {
+      const key = issue.identifier?.toUpperCase();
+      const rs = key ? this.reviewStatusesCache[key] : null;
+      if (rs?.mergeStatus) {
+        return { ...issue, mergeStatus: rs.mergeStatus };
+      }
+      return issue;
+    });
 
     // Enrich with cached planning-state only. Refresh work is scheduled by tracker updates.
     allIssues = allIssues.map(issue => {
@@ -621,7 +619,9 @@ export class IssueDataService {
         this.trackers[tracker].lastFetchedAt = cached.lastFetchedAt;
       }
     }
-    this.schedulePlanningRefreshForIssues(this.getCachedTrackerIssues());
+    const cachedIssues = this.getCachedTrackerIssues();
+    this.schedulePlanningRefreshForIssues(cachedIssues);
+    this.scheduleReviewStatusRefreshForIssues(cachedIssues);
   }
 
   private pushSnapshot(): void {
@@ -629,7 +629,9 @@ export class IssueDataService {
   }
 
   private pushUpdated(): void {
-    this.schedulePlanningRefreshForIssues(this.getCachedTrackerIssues());
+    const cachedIssues = this.getCachedTrackerIssues();
+    this.schedulePlanningRefreshForIssues(cachedIssues);
+    this.scheduleReviewStatusRefreshForIssues(cachedIssues);
     this._onIssuesChanged?.(this.getIssues());
   }
 
@@ -672,6 +674,29 @@ export class IssueDataService {
       this.planningSnapshotQueued = false;
       if (this.started) this.pushSnapshot();
     }, 50);
+  }
+
+  private scheduleReviewStatusRefreshForIssues(issues: any[]): void {
+    for (const issue of issues) {
+      const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
+      if (identifier) this.reviewStatusRefreshIssueIds.add(identifier);
+    }
+    if (this.reviewStatusRefreshQueued || this.reviewStatusRefreshIssueIds.size === 0) return;
+    this.reviewStatusRefreshQueued = true;
+    setImmediate(() => {
+      this.reviewStatusRefreshQueued = false;
+      const issueIds = [...this.reviewStatusRefreshIssueIds];
+      this.reviewStatusRefreshIssueIds.clear();
+      try {
+        this.reviewStatusesCache = {
+          ...this.reviewStatusesCache,
+          ...loadReviewStatusesForIssues(issueIds),
+        };
+        if (this.started) this.pushSnapshot();
+      } catch {
+        // review-status store may not exist yet
+      }
+    });
   }
 
   private pushMeta(): void {
