@@ -4,7 +4,7 @@
     "created": "2026-05-18T05:10:55.134Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
-    "updated": "2026-05-18T05:46:05.288Z"
+    "updated": "2026-05-18T05:49:44.241Z"
   },
   "plan": {
     "id": "pan-1148",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T05:46:05.288Z",
+    "updated": "2026-05-18T05:49:44.241Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -231,7 +231,7 @@
       {
         "id": "f3-phase-header",
         "title": "Add PhaseHeader primitive (sticky group header for Pipeline / Command Deck)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -247,7 +247,7 @@
           {
             "id": "f3-phase-header.ac1",
             "title": "PhaseHeader.tsx implements all five phases (Ship, Review, Work, Plan, Todo) with correct top-border colors per PRD §4.7.4",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -255,7 +255,7 @@
           {
             "id": "f3-phase-header.ac2",
             "title": "Header is sticky and remains legible when rows scroll under it (verified by browser smoke test or vitest assertion of style)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -263,7 +263,7 @@
           {
             "id": "f3-phase-header.ac3",
             "title": "Count chip and optional sub-line render correctly; right-meta slot accepts arbitrary ReactNode",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
