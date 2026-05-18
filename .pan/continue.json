@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T21:18:20.000Z",
+  "updated": "2026-05-18T21:21:45.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "1fb5536f4",
+    "sha": "50cb2efbb",
     "dirty": false
   },
   "decisions": [
@@ -203,13 +203,13 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-mofs is closed and inspection was skipped because requiresInspection=false. workspace-ltqb is blocked until reopened workspace-1aqz implements the Pipeline shell; continue with an actually unblocked PAN-1148 bead.",
-    "beadId": null,
+    "description": "workspace-dvq1 is closed and inspection was skipped because requiresInspection=false. workspace-1aqz is reopened and is the next prerequisite for route/default-route work because the Pipeline shell is missing.",
+    "beadId": "workspace-1aqz",
     "filesToRead": [
-      ".pan/spec.vbrief.json",
       "src/dashboard/frontend/src/App.tsx",
       "src/dashboard/frontend/src/components/Header.tsx",
-      "src/dashboard/frontend/src/components/Sidebar.tsx"
+      "src/dashboard/frontend/src/components/Sidebar.tsx",
+      "src/dashboard/frontend/src/lib/pipeline-state.ts"
     ]
   },
   "beadsMapping": {},
@@ -295,6 +295,12 @@
       "timestamp": "2026-05-18T21:18:20.000Z",
       "reason": "bead-close",
       "note": "Closed workspace-mofs after tightening IssueRow grid/label tokens, adding focused tests, running IssueRow test, typecheck, lint, and graphify update. Reopened workspace-1aqz and unclaimed workspace-ltqb because Pipeline route prerequisites were missing.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T21:21:45.000Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-dvq1 after adding Pipeline-first Operations nav, the Awaiting Merge migration tooltip, and Sidebar tests for expanded/collapsed modes. Verified Sidebar test, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],
