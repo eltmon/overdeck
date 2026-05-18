@@ -56,11 +56,19 @@ async function readIssueBeadsFromJsonl(workspacePath: string, issueId: string): 
   if (!jsonlPath) return null;
 
   const label = issueId.toLowerCase();
-  return (await readFile(jsonlPath, 'utf-8'))
-    .split('\n')
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as BeadRecord)
-    .filter((bead) => Array.isArray(bead.labels) && bead.labels.map(String).includes(label));
+  const beads: BeadRecord[] = [];
+  for (const line of (await readFile(jsonlPath, 'utf-8')).split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const bead = JSON.parse(line) as BeadRecord;
+      if (Array.isArray(bead.labels) && bead.labels.map(String).includes(label)) {
+        beads.push(bead);
+      }
+    } catch {
+      return null;
+    }
+  }
+  return beads;
 }
 
 async function listBeadsByStatus(

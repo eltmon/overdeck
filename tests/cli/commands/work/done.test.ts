@@ -434,44 +434,7 @@ describe('doneCommand preflight failure paths', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  it('does NOT exit(1) when only .pan/spec.vbrief.json is dirty (stale from prior run)', async () => {
-    mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
-    mockShouldSkipTrackerUpdate.mockResolvedValue(true);
-    mockUpdateShadowState.mockResolvedValue(undefined);
-
-    // Simulate stale spec.vbrief.json: dirty before the pre-preflight commit fires,
-    // clean afterward (all other git status checks pass).
-    let planCommitted = false;
-    const capturedCmds: string[] = [];
-    mockExecFn.mockImplementation((cmd: string, _opts: unknown, cb: Function) => {
-      capturedCmds.push(cmd);
-      if (cmd.includes('bd list')) {
-        cb(null, { stdout: '[]', stderr: '' });
-      } else if (
-        cmd.includes('git status --porcelain .pan/') &&
-        !planCommitted
-      ) {
-        // First check: stale file from prior run
-        cb(null, { stdout: ' M .pan/spec.vbrief.json\n', stderr: '' });
-      } else if (cmd.includes('git commit')) {
-        planCommitted = true;
-        cb(null, { stdout: '', stderr: '' });
-      } else {
-        // git add, git status (no path or post-commit), etc. → clean/success
-        cb(null, { stdout: '', stderr: '' });
-      }
-    });
-
-    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
-    await doneCommand('PAN-714');
-
-    // Pre-flight must NOT block on the stale spec.vbrief.json
-    expect(exitSpy).not.toHaveBeenCalledWith(1);
-    // The stale file must have been committed before preflight ran
-    expect(capturedCmds.some((c) => c.includes('git commit'))).toBe(true);
-  });
-
-  it('does NOT exit(1) when stale .pan/continue.json is dirty (other managed planning artifact)', async () => {
+  it('commits a stale tracked project-side continue artifact before preflight', async () => {
     mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
     mockShouldSkipTrackerUpdate.mockResolvedValue(true);
     mockUpdateShadowState.mockResolvedValue(undefined);
@@ -483,11 +446,10 @@ describe('doneCommand preflight failure paths', () => {
       if (cmd.includes('bd list')) {
         cb(null, { stdout: '[]', stderr: '' });
       } else if (
-        cmd.includes('git status --porcelain .pan/') &&
+        cmd.includes('git status --porcelain -- .pan/continues/pan-714.vbrief.json') &&
         !planningCommitted
       ) {
-        // Stale continue.json from a prior interrupted run
-        cb(null, { stdout: ' M .pan/continue.json\n', stderr: '' });
+        cb(null, { stdout: ' M .pan/continues/pan-714.vbrief.json\n', stderr: '' });
       } else if (cmd.includes('git commit')) {
         planningCommitted = true;
         cb(null, { stdout: '', stderr: '' });
@@ -500,14 +462,31 @@ describe('doneCommand preflight failure paths', () => {
     await doneCommand('PAN-714');
 
     expect(exitSpy).not.toHaveBeenCalledWith(1);
-    expect(capturedCmds.some((c) => c.includes('git commit'))).toBe(true);
+    expect(capturedCmds.some((c) => c.includes('git add -- .pan/continues/pan-714.vbrief.json'))).toBe(true);
+    expect(capturedCmds.some((c) => c.includes('git add .pan/'))).toBe(false);
   });
 
-  it('commits .pan artifacts produced by preflight bead-to-vBRIEF sync before rebase', async () => {
+  it('commits the tracked project-side continue artifact produced by preflight bead-to-vBRIEF sync before rebase', async () => {
     mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
     mockShouldSkipTrackerUpdate.mockResolvedValue(true);
     mockUpdateShadowState.mockResolvedValue(undefined);
-    mockSyncBeadStatusToVBrief.mockReturnValue('item-1');
+    mockSyncBeadStatusToVBrief.mockImplementation(() => {
+      mkdirSync(join(tempDir, '.pan'), { recursive: true });
+      writeFileSync(join(tempDir, '.pan', 'continue.json'), JSON.stringify({
+        version: '1',
+        issueId: 'PAN-714',
+        created: '2026-05-18T00:00:00.000Z',
+        updated: '2026-05-18T00:00:00.000Z',
+        gitState: {},
+        decisions: [],
+        hazards: [],
+        resumePoint: null,
+        beadsMapping: {},
+        sessionHistory: [],
+        statusOverrides: { 'item-1': 'completed', 'item-1.ac1': 'completed' },
+      }), 'utf-8');
+      return 'item-1';
+    });
 
     let panStatusCalls = 0;
     const capturedCmds: string[] = [];
@@ -517,9 +496,9 @@ describe('doneCommand preflight failure paths', () => {
         cb(null, { stdout: JSON.stringify([{ id: 'bead-c1', title: 'Completed work' }]), stderr: '' });
       } else if (cmd.includes('bd list')) {
         cb(null, { stdout: '[]', stderr: '' });
-      } else if (cmd.includes('git status --porcelain .pan/')) {
+      } else if (cmd.includes('git status --porcelain -- .pan/continues/pan-714.vbrief.json')) {
         panStatusCalls += 1;
-        cb(null, { stdout: panStatusCalls === 2 ? ' M .pan/continue.json\n' : '', stderr: '' });
+        cb(null, { stdout: panStatusCalls === 2 ? ' M .pan/continues/pan-714.vbrief.json\n' : '', stderr: '' });
       } else {
         cb(null, { stdout: '', stderr: '' });
       }
@@ -534,5 +513,6 @@ describe('doneCommand preflight failure paths', () => {
       c.includes('git commit') && capturedCmds.slice(0, index).some((prior) => prior.includes('bd list') && prior.includes('closed')),
     );
     expect(postPreflightCommitIndex).toBeGreaterThan(-1);
+    expect(capturedCmds.some((c) => c.includes('git add .pan/'))).toBe(false);
   });
 });
