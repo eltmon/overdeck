@@ -2231,6 +2231,21 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   let sessionId: string | undefined;
   if (isSpecialistRole) {
     sessionId = randomUUID();
+
+    // Persist the pinned --session-id to <agentDir>/session.id so
+    // resolveClaudeSessionId can locate the JSONL after the specialist exits.
+    // Specialists run with --session-id <uuid> but `claude --print` never fires
+    // the heartbeat hook that normally writes this file for interactive agents,
+    // so without this write the dashboard's "Conversation" tab renders
+    // "No conversation data available" even though the JSONL sits on disk.
+    try {
+      const agentDir = getAgentDir(agentId);
+      await mkdir(agentDir, { recursive: true });
+      await writeFile(join(agentDir, 'session.id'), sessionId, 'utf-8');
+    } catch (err) {
+      console.warn(`[spawnRun] Failed to persist session.id for ${agentId}:`, err instanceof Error ? err.message : String(err));
+    }
+
     try {
       const conversation = {
         name: agentId,
