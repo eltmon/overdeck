@@ -241,7 +241,7 @@ export async function bridgeCodexAuthToCliproxyAsync(): Promise<boolean> {
     disabled: false,
   };
 
-  ensureDirs();
+  await ensureDirsAsync();
   const target = getCliproxyCodexCredPath();
 
   const serialized = JSON.stringify(creds, null, 2) + '\n';

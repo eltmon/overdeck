@@ -10,6 +10,11 @@
  * preventing lock contention and process pile-up.
  */
 
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
 let pending: Promise<void> = Promise.resolve();
 
 /**
@@ -26,4 +31,26 @@ export async function withBdMutex<T>(fn: () => Promise<T>): Promise<T> {
   // Update pending to track this operation's completion (success or failure)
   pending = result.then(() => {}, () => {});
   return result;
+}
+
+export async function restoreTrackedBeadsExport(workspacePath: string): Promise<void> {
+  try {
+    const { stdout } = await execAsync('git status --porcelain -- .beads/issues.jsonl', {
+      cwd: workspacePath,
+      encoding: 'utf-8',
+    });
+    if (stdout.split('\n').some((line) => line.slice(0, 2).includes('D'))) {
+      await execAsync('git restore -- .beads/issues.jsonl', { cwd: workspacePath });
+    }
+  } catch {}
+}
+
+export async function withWorkspaceBdMutex<T>(workspacePath: string, fn: () => Promise<T>): Promise<T> {
+  return withBdMutex(async () => {
+    try {
+      return await fn();
+    } finally {
+      await restoreTrackedBeadsExport(workspacePath);
+    }
+  });
 }
