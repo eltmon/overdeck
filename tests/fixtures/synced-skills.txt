@@ -37,6 +37,7 @@ pan-doctor
 pan-done
 pan-down
 pan-fly
+pan-flywheel
 pan-help
 pan-install
 pan-issues
