@@ -12,7 +12,6 @@ export type Tab =
   | 'activity'
   | 'metrics'
   | 'costs'
-  | 'awaiting-merge'
   | 'autopreso'
   | 'settings'
   | 'god-view'

@@ -4,7 +4,7 @@
     "created": "2026-05-18T05:10:55.134Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
-    "updated": "2026-05-18T05:56:18.000Z"
+    "updated": "2026-05-18T06:00:10.000Z"
   },
   "plan": {
     "id": "pan-1148",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T05:56:18.000Z",
+    "updated": "2026-05-18T06:00:10.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -1923,7 +1923,7 @@
       {
         "id": "r2-awaiting-merge-component-removal",
         "title": "Delete AwaitingMergePage.tsx + Tab type entry + all inbound references",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -1939,7 +1939,7 @@
           {
             "id": "r2-awaiting-merge-component-removal.ac1",
             "title": "AwaitingMergePage.tsx file is deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1947,7 +1947,7 @@
           {
             "id": "r2-awaiting-merge-component-removal.ac2",
             "title": "'awaiting-merge' is removed from Tab union in Header.tsx; TS typecheck still passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1955,7 +1955,7 @@
           {
             "id": "r2-awaiting-merge-component-removal.ac3",
             "title": "TAB_PATHS and PATH_TO_TAB no longer contain awaiting-merge entries",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1963,7 +1963,7 @@
           {
             "id": "r2-awaiting-merge-component-removal.ac4",
             "title": "grep -r AwaitingMergePage src/ returns zero results",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1971,7 +1971,7 @@
           {
             "id": "r2-awaiting-merge-component-removal.ac5",
             "title": "selectAwaitingMerge / selectBlockedFromMerge / selectOpenMergeRequests selectors remain in store.ts (used by Pipeline filters)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
