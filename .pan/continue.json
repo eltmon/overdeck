@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T21:21:45.000Z",
+  "updated": "2026-05-18T21:31:30.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "50cb2efbb",
+    "sha": "165d45116",
     "dirty": false
   },
   "decisions": [
@@ -203,13 +203,13 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-dvq1 is closed and inspection was skipped because requiresInspection=false. workspace-1aqz is reopened and is the next prerequisite for route/default-route work because the Pipeline shell is missing.",
-    "beadId": "workspace-1aqz",
+    "description": "workspace-1aqz Pipeline shell is implemented and verified; inspection is skipped because requiresInspection=false. Next prerequisite is workspace-ltqb to flip the default route to Pipeline and move Board to /board.",
+    "beadId": "workspace-ltqb",
     "filesToRead": [
       "src/dashboard/frontend/src/App.tsx",
-      "src/dashboard/frontend/src/components/Header.tsx",
+      "src/dashboard/frontend/src/App.test.tsx",
       "src/dashboard/frontend/src/components/Sidebar.tsx",
-      "src/dashboard/frontend/src/lib/pipeline-state.ts"
+      "src/dashboard/frontend/src/components/Sidebar.test.tsx"
     ]
   },
   "beadsMapping": {},
@@ -301,6 +301,12 @@
       "timestamp": "2026-05-18T21:21:45.000Z",
       "reason": "bead-close",
       "note": "Closed workspace-dvq1 after adding Pipeline-first Operations nav, the Awaiting Merge migration tooltip, and Sidebar tests for expanded/collapsed modes. Verified Sidebar test, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T21:31:30.000Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-1aqz Pipeline shell with /pipeline routing, TopBar primitive, helper-based phase grouping, App/Pipeline tests, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],
