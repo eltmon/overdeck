@@ -204,6 +204,43 @@ def synthesize(
     return _extract_audio(result)
 
 
+def extract_embedding(design: str, text: str) -> list:
+    tmp_path = None
+    try:
+        load_design_model()
+        assert MODEL_DESIGN is not None
+        with MODEL_LOCK:
+            result = MODEL_DESIGN.generate_voice_design(
+                text=text,
+                language="English",
+                instruct=design,
+            )
+        audio = _extract_audio(result)
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            tmp_path = f.name
+        sf.write(tmp_path, audio, samplerate=SAMPLE_RATE)
+
+        load_base_model()
+        assert MODEL_BASE is not None
+        with MODEL_LOCK:
+            prompt_items = MODEL_BASE.create_voice_clone_prompt(
+                ref_audio=tmp_path,
+                ref_text=text,
+                x_vector_only_mode=True,
+            )
+        if not prompt_items:
+            raise ValueError("voice_clone_prompt_empty")
+        spk_emb = prompt_items[0].ref_spk_embedding
+        return spk_emb.detach().cpu().tolist()
+    finally:
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+
 # ─── Audio playback: persistent pw-play stream ────────────────────────────────
 
 _PLAYER_PROC: subprocess.Popen | None = None
@@ -315,6 +352,16 @@ def worker() -> None:
             _close_player()
             continue
         try:
+            if job.get("type") == "extract-embedding":
+                result_queue = job["result_queue"]
+                try:
+                    embedding = extract_embedding(job["design"], job["text"])
+                    result_queue.put({"ok": True, "embedding": embedding})
+                except Exception as exc:  # noqa: BLE001
+                    log(f"extract-embedding failed: {exc}")
+                    result_queue.put({"ok": False, "error": str(exc)})
+                continue
+
             t0 = time.time()
             audio = synthesize(
                 job["text"],
@@ -438,48 +485,33 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json(400, {"error": "missing_design_or_text"})
                 return
 
-            tmp_path = None
+            result_queue: "queue.Queue[dict[str, Any]]" = queue.Queue(maxsize=1)
             try:
-                # 1. Generate audio with VoiceDesign
-                load_design_model()
-                assert MODEL_DESIGN is not None
-                with MODEL_LOCK:
-                    result = MODEL_DESIGN.generate_voice_design(
-                        text=text,
-                        language="English",
-                        instruct=design,
-                    )
-                audio = _extract_audio(result)
+                WORK_QUEUE.put_nowait(
+                    {
+                        "type": "extract-embedding",
+                        "design": design,
+                        "text": text,
+                        "result_queue": result_queue,
+                    }
+                )
+            except queue.Full:
+                self._json(429, {"error": "queue_full", "depth": WORK_QUEUE.qsize()})
+                return
 
-                # 2. Save to temp file
-                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                    tmp_path = f.name
-                sf.write(tmp_path, audio, samplerate=SAMPLE_RATE)
+            try:
+                result = result_queue.get(timeout=180)
+            except queue.Empty:
+                self._json(503, {"error": "extract_embedding_timeout"})
+                return
 
-                # 3. Extract speaker embedding with Base model
-                load_base_model()
-                assert MODEL_BASE is not None
-                with MODEL_LOCK:
-                    prompt_items = MODEL_BASE.create_voice_clone_prompt(
-                        ref_audio=tmp_path,
-                        ref_text=text,
-                        x_vector_only_mode=True,
-                    )
-                if not prompt_items:
-                    self._json(422, {"error": "voice_clone_prompt_empty"})
-                    return
-                spk_emb = prompt_items[0].ref_spk_embedding
-                embedding_list = spk_emb.detach().cpu().tolist()
-                self._json(200, {"embedding": embedding_list})
-            except Exception as exc:  # noqa: BLE001
-                log(f"extract-embedding failed: {exc}")
-                self._json(500, {"error": str(exc)})
-            finally:
-                if tmp_path is not None:
-                    try:
-                        os.unlink(tmp_path)
-                    except OSError:
-                        pass
+            if result.get("ok"):
+                self._json(200, {"embedding": result["embedding"]})
+                return
+            if result.get("error") == "voice_clone_prompt_empty":
+                self._json(422, {"error": "voice_clone_prompt_empty"})
+                return
+            self._json(500, {"error": str(result.get("error") or "extract_embedding_failed")})
             return
 
         self._json(404, {"error": "not_found"})

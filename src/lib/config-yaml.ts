@@ -857,14 +857,14 @@ async function loadProjectConfigAsync(): Promise<YamlConfig | null> {
   if (!projectRoot) return null;
 
   const newConfigPath = join(projectRoot, '.pan.yaml');
-  if (await pathExistsAsync(newConfigPath)) return loadYamlFileAsync(newConfigPath);
+  if (await pathExistsAsync(newConfigPath)) return stripProjectTtsEndpoint(await loadYamlFileAsync(newConfigPath));
 
   const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
   if (await pathExistsAsync(legacyConfigPath)) {
     process.stderr.write(
       `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
     );
-    return loadYamlFileAsync(legacyConfigPath);
+    return stripProjectTtsEndpoint(await loadYamlFileAsync(legacyConfigPath));
   }
 
   return null;

@@ -17,6 +17,8 @@ export const QWEN_TTS_MANUAL_STOP_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts
 export const QWEN_TTS_AUTH_TOKEN_PATH = join(PANOPTICON_HOME, 'secrets', 'qwen-tts.token');
 export const QWEN_TTS_AUTH_HEADER = 'X-Panopticon-TTS-Token';
 export const QWEN_TTS_LOG_PATH = join(LOGS_DIR, 'qwen-tts.log');
+const GPU_MEMORY_CACHE_TTL_MS = 30_000;
+let gpuMemoryCache: { pid: number; sampledAt: number; value: number | undefined } | null = null;
 
 export interface TtsDaemonState {
   pid: number;
@@ -257,6 +259,9 @@ export function isProcessAlive(pid: number): boolean {
 
 async function getGpuMemoryUsedMb(pid: number | null): Promise<number | undefined> {
   if (!pid) return undefined;
+  if (gpuMemoryCache?.pid === pid && Date.now() - gpuMemoryCache.sampledAt < GPU_MEMORY_CACHE_TTL_MS) {
+    return gpuMemoryCache.value;
+  }
   try {
     const { stdout } = await execFileAsync('nvidia-smi', [
       '--query-compute-apps=pid,used_memory',
@@ -266,12 +271,16 @@ async function getGpuMemoryUsedMb(pid: number | null): Promise<number | undefine
       const [rawPid, rawMemory] = line.split(',').map((part) => part?.trim());
       if (Number.parseInt(rawPid ?? '', 10) === pid) {
         const memory = Number.parseInt(rawMemory ?? '', 10);
-        return Number.isFinite(memory) ? memory : undefined;
+        const value = Number.isFinite(memory) ? memory : undefined;
+        gpuMemoryCache = { pid, sampledAt: Date.now(), value };
+        return value;
       }
     }
   } catch {
+    gpuMemoryCache = { pid, sampledAt: Date.now(), value: undefined };
     return undefined;
   }
+  gpuMemoryCache = { pid, sampledAt: Date.now(), value: undefined };
   return undefined;
 }
 
@@ -307,8 +316,6 @@ export async function getTtsDaemonStatus(config: NormalizedTtsDaemonConfig): Pro
   const uptimeSeconds = state?.startedAt && running
     ? Math.max(0, Math.floor((Date.now() - Date.parse(state.startedAt)) / 1000))
     : undefined;
-
-  if (!running && pid !== null) await clearState();
 
   return {
     ok: health.ok === true,
