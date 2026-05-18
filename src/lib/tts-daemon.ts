@@ -13,6 +13,7 @@ const execFileAsync = promisify(execFile);
 export const QWEN_TTS_PID_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts.pid');
 export const QWEN_TTS_STATE_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts.json');
 export const QWEN_TTS_START_LOCK_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts.start.lock');
+export const QWEN_TTS_MANUAL_STOP_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts.manual-stop');
 export const QWEN_TTS_AUTH_TOKEN_PATH = join(PANOPTICON_HOME, 'secrets', 'qwen-tts.token');
 export const QWEN_TTS_AUTH_HEADER = 'X-Panopticon-TTS-Token';
 export const QWEN_TTS_LOG_PATH = join(LOGS_DIR, 'qwen-tts.log');
@@ -150,6 +151,19 @@ async function writeState(state: TtsDaemonState): Promise<void> {
 
 export async function hasTtsDaemonState(): Promise<boolean> {
   return (await readPid()) !== null || (await readState()) !== null;
+}
+
+export async function isTtsDaemonManuallyStopped(): Promise<boolean> {
+  return pathExists(QWEN_TTS_MANUAL_STOP_PATH);
+}
+
+async function setTtsDaemonManualStopGate(): Promise<void> {
+  await mkdir(dirname(QWEN_TTS_MANUAL_STOP_PATH), { recursive: true });
+  await writeFile(QWEN_TTS_MANUAL_STOP_PATH, `${new Date().toISOString()}\n`, 'utf8');
+}
+
+async function clearTtsDaemonManualStopGate(): Promise<void> {
+  await rm(QWEN_TTS_MANUAL_STOP_PATH, { force: true });
 }
 
 export async function getTtsDaemonAuthToken(): Promise<string> {
@@ -334,6 +348,7 @@ export async function startTtsDaemon(options: TtsDaemonStartOptions): Promise<Tt
   let alreadyRunning = false;
   await acquireStartLock();
   try {
+    await clearTtsDaemonManualStopGate();
     const existing = await getTtsDaemonStatus(config);
     if (existing.running) {
       alreadyRunning = true;
@@ -406,6 +421,7 @@ export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig):
   await acquireStartLock();
   let child: ReturnType<typeof spawn>;
   try {
+    await clearTtsDaemonManualStopGate();
     child = spawn(python, [script], {
       detached: false,
       stdio: 'inherit',
@@ -440,6 +456,7 @@ export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig):
 }
 
 export async function stopTtsDaemon(timeoutMs = 5_000): Promise<TtsDaemonStopResult> {
+  await setTtsDaemonManualStopGate();
   const pid = await readPid();
   if (pid === null) return { stopped: false, pid: null, error: 'TTS daemon is not running' };
   if (!isProcessAlive(pid)) {

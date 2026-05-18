@@ -1,5 +1,5 @@
 import { loadConfig } from '../lib/config-yaml.js';
-import { getTtsDaemonStatus, hasTtsDaemonState, startTtsDaemon } from '../lib/tts-daemon.js';
+import { getTtsDaemonStatus, hasTtsDaemonState, isTtsDaemonManuallyStopped, startTtsDaemon } from '../lib/tts-daemon.js';
 
 export interface TtsWatchdogConfig {
   enabled: boolean;
@@ -91,9 +91,11 @@ export class TtsWatchdog {
     this.ticking = true;
     try {
       const ttsConfig = loadConfig().config.tts;
-      this.active = ttsConfig.enabled || ttsConfig.daemonAutoStart || await hasTtsDaemonState();
+      const manuallyStopped = await isTtsDaemonManuallyStopped();
+      this.active = !manuallyStopped && (ttsConfig.daemonAutoStart || await hasTtsDaemonState());
       if (!this.active) {
         this.consecutiveFailures = 0;
+        this.lastError = null;
         return;
       }
 

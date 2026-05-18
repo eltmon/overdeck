@@ -956,7 +956,7 @@
     "hash": "dd52649bc1aacbe76d12527406c1922b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/scripts/record-cost-event.d.ts": {
-    "mtime": 1779083140.3366253,
+    "mtime": 1779084012.3739212,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/scripts/notify-complete": {
@@ -1300,8 +1300,8 @@
     "hash": "cfcfcec2ce7b0f2baedc8c2c1b186192"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/tts-daemon.ts": {
-    "mtime": 1779083086.1014984,
-    "hash": "77a5dba57921895cffe75038400c860f"
+    "mtime": 1779083914.634282,
+    "hash": "216f846f7b9cd4906ef2cd462325ed8b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/traefik.ts": {
     "mtime": 1779079561.5147128,
@@ -2652,12 +2652,16 @@
     "hash": "32e5e79dff63eaa46f77ac2a96ed2aad"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/supervisor/tts-watchdog.ts": {
-    "mtime": 1779082882.7303438,
-    "hash": "f29e69cc7e4aa5895fe9307fb3a004fe"
+    "mtime": 1779084163.0065374,
+    "hash": "5948d27b87b76b8ab552f05eb3ddf354"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/supervisor/watchdog.ts": {
     "mtime": 1779079561.5171034,
     "hash": "cd47701351ddf7a77fa922c8679b1d49"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/supervisor/__tests__/tts-watchdog.test.ts": {
+    "mtime": 1779083948.4721987,
+    "hash": "e17caf1f462d7b7431f6aec4888387aa"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/supervisor/__tests__/watchdog.test.ts": {
     "mtime": 1779079561.5171034,
