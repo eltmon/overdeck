@@ -172,6 +172,18 @@ async function isMergeSetMergedIntoTargets(
   return true;
 }
 
+async function commitWorkspacePanArtifacts(workspacePath: string): Promise<boolean> {
+  const { stdout } = await execAsync('git status --porcelain .pan/', {
+    cwd: workspacePath,
+    encoding: 'utf-8',
+  });
+  if (!stdout.trim()) return false;
+
+  await execAsync('git add .pan/', { cwd: workspacePath });
+  await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
+  return true;
+}
+
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan done MIN-123" and "pan done agent-min-123"
   const issueId = resolveIssueId(id);
@@ -244,14 +256,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       // pan done run so the uncommitted-changes gate in runPreflightChecks doesn't
       // reject them.
       try {
-        const { stdout: preDirty } = await execAsync(
-          'git status --porcelain .pan/',
-          { cwd: workspacePath, encoding: 'utf-8' }
-        );
-        if (preDirty.trim()) {
-          await execAsync('git add .pan/', { cwd: workspacePath });
-          await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
-        }
+        await commitWorkspacePanArtifacts(workspacePath);
       } catch { /* non-fatal */ }
 
       const failures = await runPreflightChecks(workspacePath, issueId);
@@ -269,8 +274,15 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         return;
       }
 
-      // Status updates now live in continue.json statusOverrides (PAN-1124),
-      // so there is no workspace spec to commit.
+      try {
+        await commitWorkspacePanArtifacts(workspacePath);
+      } catch (error) {
+        console.error(chalk.red(`\n✖ Failed to commit planning artifacts after preflight for ${issueId}:\n`));
+        console.error(chalk.red(`  ${(error as Error).message}`));
+        console.error('');
+        process.exit(1);
+        return;
+      }
     }
   }
 
