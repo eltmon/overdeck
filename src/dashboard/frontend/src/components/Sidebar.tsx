@@ -4,7 +4,7 @@ import {
   Eye, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2, History, Mic,
+  Hammer, Loader2, History, Mic, Workflow,
 } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
@@ -19,6 +19,7 @@ const NAV_GROUPS = [
     label: 'Operations',
     items: [
       { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
+      { id: 'pipeline' as Tab, label: 'Pipeline', icon: Workflow },
       { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
       { id: 'agents' as Tab, label: 'Agents', icon: Bot },
       { id: 'autopreso' as Tab, label: 'AutoPreso', icon: Mic },

@@ -4,6 +4,7 @@
 export type Tab =
   | 'command-deck'
   | 'kanban'
+  | 'pipeline'
   | 'agents'
   | 'resources'
   | 'skills'
