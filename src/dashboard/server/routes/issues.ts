@@ -44,6 +44,7 @@ import type { CreateBeadsResult } from '../../../lib/vbrief/beads.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
+import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
@@ -62,7 +63,7 @@ import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../
 import { getAgentStateAsync, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
 import { canUseHarness } from '../../../lib/harness-policy.js';
 import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js';
-import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
+import type { LifecycleContext, StepResult, WorkflowResult } from '../../../lib/lifecycle/types.js';
 import {
   getCachedResourceAllocatedIssues,
   getResourceDetailIdentifiers,
@@ -2123,6 +2124,34 @@ const postIssueCopySettingsRoute = HttpRouter.add(
   })),
 );
 
+function buildCloseOutContext(id: string): LifecycleContext | null {
+  const resolvedProject = resolveProjectFromIssue(id);
+  if (!resolvedProject) return null;
+
+  const githubCheck = isGitHubIssue(id);
+  return {
+    issueId: id,
+    projectPath: resolvedProject.projectPath,
+    projectName: resolvedProject.projectName,
+    ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+      ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+      : {}),
+  };
+}
+
+function closeOutFailureResponse(result: WorkflowResult) {
+  const failedStep = result.steps.find((s: StepResult) => !s.success && !s.skipped);
+  return jsonResponse({
+    ...result,
+    error: failedStep?.error ?? 'Close-out workflow failed',
+    failedStep,
+  }, { status: 422 });
+}
+
+function sanitizeCloseOutError(error: unknown): string {
+  return error instanceof Error ? error.message : 'Internal server error';
+}
+
 // ─── Route: POST /api/issues/:id/close-out ───────────────────────────────────
 
 const postIssueCloseOutRoute = HttpRouter.add(
@@ -2134,32 +2163,17 @@ const postIssueCloseOutRoute = HttpRouter.add(
     if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
+
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+
+    const ctx = buildCloseOutContext(id);
+    if (!ctx) {
+      return jsonResponse({ error: `Could not resolve project for ${id}` }, { status: 404 });
+    }
+
     const eventStore = yield* EventStoreService;
-
-    const { closeOut } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
-    const githubCheck = isGitHubIssue(id);
-    let projectPath = '';
-
-    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-      const localPaths = getGitHubLocalPaths();
-      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
-    }
-    if (!projectPath) {
-      const issuePrefix = extractPrefix(id) ?? id.split('-')[0].toUpperCase();
-      projectPath = getProjectPath(undefined, issuePrefix);
-    }
-    if (!projectPath) {
-      return jsonResponse({ error: `Could not resolve project path for ${id}` }, { status: 400 });
-    }
-
-    const ctx: any = {
-      issueId: id,
-      projectPath,
-      ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
-        ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
-        : {}),
-    };
-
     const issueDataService = getIssueDataService();
     const issueSource = issueDataService.getIssueSource(id);
 
@@ -2175,46 +2189,51 @@ const postIssueCloseOutRoute = HttpRouter.add(
       }
     }
 
-    const result = yield* closeOut(ctx);
-
-    if (result.success) {
-      // Patch cached labels immediately so the board hides the issue right away
-      // without waiting for the background tracker refresh.
-      let newLabels: string[] = ['closed-out'];
+    const closeOutResult = yield* Effect.promise(async () => {
       try {
-        const cachedIssues = issueDataService.getIssues();
-        const cachedIssue = cachedIssues.find(
-          (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
-        );
-        const currentLabels: string[] = cachedIssue?.labels || [];
-        newLabels = [
-          ...currentLabels.filter((l: string) => !['in-review', 'in-progress', 'needs-close-out'].includes(l.toLowerCase())),
-          'closed-out',
-        ];
-        issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done', labels: newLabels });
-      } catch { /* non-fatal */ }
+        const { closeOut } = await import('../../../lib/lifecycle/index.js');
+        // PAN-1249: closeOut returns Effect<WorkflowResult>; bridge to Promise.
+        const result = await Effect.runPromise(closeOut(ctx));
+        return { ok: true as const, result };
+      } catch (error) {
+        return { ok: false as const, error };
+      }
+    });
 
-      yield* eventStore.append({
-        type: 'issue.statusChanged',
-        timestamp: new Date().toISOString(),
-        payload: { issueId: id, status: 'Done', canonicalStatus: 'done', labels: newLabels },
-      });
-
-      // Refresh tracker data in background so cache stays consistent
-      issueDataService.invalidateTracker('github').catch(() => {});
-      issueDataService.invalidateTracker('linear').catch(() => {});
+    if (!closeOutResult.ok) {
+      return jsonResponse({ error: sanitizeCloseOutError(closeOutResult.error) }, { status: 500 });
     }
 
-    return jsonResponse({
-      success: result.success,
-      issueId: result.issueId,
-      steps: result.steps.map((s: StepResult) => ({
-        name: s.step,
-        status: s.success ? (s.skipped ? 'skipped' : 'passed') : 'failed',
-        message: s.error || (s.details ? s.details.join('; ') : undefined),
-      })),
-      error: result.success ? undefined : result.steps.find((s: StepResult) => !s.success)?.error,
+    const result = closeOutResult.result;
+    if (!result.success) {
+      return closeOutFailureResponse(result);
+    }
+
+    let newLabels: string[] = ['closed-out'];
+    try {
+      const cachedIssues = issueDataService.getIssues();
+      const cachedIssue = cachedIssues.find(
+        (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
+      );
+      const currentLabels: string[] = cachedIssue?.labels || [];
+      newLabels = [
+        ...currentLabels.filter((l: string) => !['in-review', 'in-progress', 'needs-close-out', 'verifying-on-main'].includes(l.toLowerCase())),
+        'closed-out',
+      ];
+      issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done', labels: newLabels });
+    } catch { /* non-fatal */ }
+
+    yield* eventStore.append({
+      type: 'issue.statusChanged',
+      timestamp: new Date().toISOString(),
+      payload: { issueId: id, status: 'Done', canonicalStatus: 'done', labels: newLabels },
     });
+
+    issueDataService.invalidateTracker('github').catch(() => {});
+    issueDataService.invalidateTracker('linear').catch(() => {});
+    issueDataService.invalidateTracker('rally').catch(() => {});
+
+    return jsonResponse(result);
   })),
 );
 
