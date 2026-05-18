@@ -190,6 +190,9 @@ describe('doneCommand --force bypass', () => {
   it('does NOT call process.exit(1) from pre-flight when --force is set', async () => {
     // With force, pre-flight is bypassed entirely — bd list is never called
     mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      cb(null, { stdout: '', stderr: '' });
+    });
     mockShouldSkipTrackerUpdate.mockResolvedValue(true);
     mockUpdateShadowState.mockResolvedValue(undefined);
 

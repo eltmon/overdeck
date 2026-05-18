@@ -33,6 +33,7 @@ import { SettingsConfig, Provider, ModelId } from './types';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
+import { setReauthSession } from '../../lib/pending-codex-spawn';
 import { OpenRouterPage } from './OpenRouterPage';
 import { SensitiveText } from '../SensitiveText';
 import { DesktopSettingsSection } from './DesktopSettingsSection';
@@ -189,6 +190,13 @@ async function testApiKey(provider: string, apiKey: string, model?: string): Pro
   });
   if (!res.ok) throw new Error('Failed to test API key');
   return res.json();
+}
+
+function formatCodexExpiry(expiresAt?: string): string | null {
+  if (!expiresAt) return null;
+  const date = new Date(expiresAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return `Expires ${date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`;
 }
 
 // Provider definitions
@@ -748,14 +756,23 @@ export function SettingsPage() {
                         {codexAuth?.status === 'valid' ? (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                            <span>OAuth active</span>
+                            <span>Subscription OAuth active</span>
                             {codexAuth.email && (
                               <SensitiveText value={codexAuth.email} className="text-[10px] text-muted-foreground" />
+                            )}
+                            {formatCodexExpiry(codexAuth.expiresAt) && (
+                              <span className="text-[10px] text-muted-foreground">{formatCodexExpiry(codexAuth.expiresAt)}</span>
                             )}
                           </div>
                         ) : (codexAuth?.status === 'expired' || codexAuth?.status === 'burned') ? (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-warning capitalize">{codexAuth.status}</span>
+                            {codexAuth.email && (
+                              <SensitiveText value={codexAuth.email} className="text-[10px] text-muted-foreground" />
+                            )}
+                            {formatCodexExpiry(codexAuth.expiresAt) && (
+                              <span className="text-[10px] text-muted-foreground">{formatCodexExpiry(codexAuth.expiresAt)}</span>
+                            )}
                             <button
                               onClick={async () => {
                                 try {
@@ -764,8 +781,9 @@ export function SettingsPage() {
                                     const body = await res.json().catch(() => ({}));
                                     throw new Error(body.error || `Failed (${res.status})`);
                                   }
-                                  const { sessionName, token } = await res.json() as { sessionName: string; token: string };
-                                  window.location.href = `/terminal/${sessionName}?token=${encodeURIComponent(token)}`;
+                                  const { sessionName, statusToken } = await res.json() as { sessionName: string; statusToken: string };
+                                  setReauthSession(sessionName, statusToken);
+                                  window.location.href = `/terminal/${sessionName}`;
                                 } catch (err) {
                                   toast.error(err instanceof Error ? err.message : 'Failed to start re-authentication');
                                 }

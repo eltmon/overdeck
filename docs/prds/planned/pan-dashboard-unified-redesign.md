@@ -105,11 +105,11 @@ Three components carry the redesign. Every surface composes them.
 ```
 ┌──┬─────────┬──┬─────────────────────────────────────────┬─────────────────┬────────┬───┐
 │ ▌│ PAN-1052│ ● │ Activity feed: per-turn observations  ⊕│ agent-pan-1052  │ 19 min │ ⓔ │
-│ ▌│         │   │ dashboard · observability             │ opus-4-7 · ship │        │   │
+│ ▌│         │   │ dashboard · observability             │ opus-4-7 · ship │ $0.81  │   │
 └──┴─────────┴──┴─────────────────────────────────────────┴─────────────────┴────────┴───┘
   ▲    ▲       ▲    ▲                              ▲           ▲                ▲      ▲
   │    │       │    │                              │           │                │      └── assignee
-  │    │       │    │                              │           │                └── runtime
+  │    │       │    │                              │           │                └── ledger: runtime (mono, muted) over cost (mono, cyan)
   │    │       │    │                              │           └── agent meta (mono)
   │    │       │    │                              └── verb badge (one per row)
   │    │       │    └── title + label row (taxonomy labels only)
@@ -118,9 +118,11 @@ Three components carry the redesign. Every surface composes them.
   └── priority left border heat-map
 ```
 
-**Grid:** `14px 78px 14px 1fr 220px 84px 26px` (priority · id · phase glyph · title · agent · runtime · avatar)
+**Grid:** `14px 78px 14px 1fr 220px 84px 26px` (priority · id · phase glyph · title · agent · ledger · avatar)
 
-**Color rules:** priority sets the left-border heat (destructive · warning · muted · transparent); the verb badge is the only colored element to the right of the title; labels are always neutral.
+**The ledger cell** stacks runtime over cost vertically — these two derived measurements are always co-located. Runtime in `text-muted-foreground`, cost in `text-signal-cost-foreground` (cyan, per the style-guide rule that money always uses signal-cost). When no agent is active, both rows show `—`.
+
+**Color rules:** priority sets the left-border heat (destructive · warning · muted · transparent); the verb badge and the cost figure are the only colored elements to the right of the title; labels are always neutral. The cost figure is the single style-guide-mandated exception to "one colored signal per row" — currency must always render in cyan regardless of context.
 
 #### Issue Card (used only in Board)
 

@@ -178,10 +178,11 @@ export function applyStatusOverrides(doc: VBriefDocument, overrides: Record<stri
       const itemId = key.slice(0, dotIndex);
       const subId = key.slice(dotIndex + 1);
       const item = merged.plan.items.find(i => i.id === itemId);
-      // SubItem IDs use format "parentId.subId" (e.g. "auto-start.ac1"),
-      // but updateSubItemStatus passes only the subId portion. Reconstruct the full
-      // ID for the lookup.
-      const fullSubId = `${itemId}.${subId}`;
+      // SubItem IDs in the spec use format "parentId.subId" (e.g. "item-1.ac1").
+      // updateSubItemStatus can pass either:
+      //   (a) just the child part ("ac1") — then we reconstruct fullId = itemId.ac1
+      //   (b) the full subItemId already ("item-1.ac1") — subId contains a dot, use as-is
+      const fullSubId = subId.includes('.') ? subId : `${itemId}.${subId}`;
       const sub = item?.subItems?.find(s => s.id === fullSubId);
       if (sub) {
         sub.status = status as VBriefItemStatus;

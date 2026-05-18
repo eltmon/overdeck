@@ -221,8 +221,7 @@ async function syncWorkspaceBeads(
 
     const exportPath = join(workspacePath, '.beads', 'issues-export.jsonl');
     if (!existsSync(exportPath)) {
-      // Try syncing directly — bd sync exports to the standard JSONL
-      await execAsync('bd sync 2>&1 || true', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+      await execAsync('bd export --output .beads/issues.jsonl 2>&1 || true', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
     }
 
     // Import workspace beads into project-root database

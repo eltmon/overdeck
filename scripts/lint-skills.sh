@@ -17,18 +17,31 @@ from pathlib import Path
 ROOT = Path.cwd()
 DOC = ROOT / "docs" / "SKILLS-CONVENTION.md"
 SKILLS = ROOT / "skills"
-LOCAL_PAN = [str(ROOT / "node_modules" / ".bin" / "tsx"), str(ROOT / "src" / "cli" / "index.ts")]
+LOCAL_PAN = ["node", str(ROOT / "dist" / "cli" / "index.js")]
+RUN_PAN_CACHE: dict[tuple[str, ...], str] = {}
 
 
 def run_pan(*args: str) -> str:
-    return subprocess.run(
-        [*LOCAL_PAN, *args],
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=True,
-    ).stdout
+    key = tuple(args)
+    if key in RUN_PAN_CACHE:
+        return RUN_PAN_CACHE[key]
+
+    last: subprocess.CompletedProcess[str] | None = None
+    for _attempt in range(3):
+        last = subprocess.run(
+            [*LOCAL_PAN, *args],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        if last.returncode == 0:
+            RUN_PAN_CACHE[key] = last.stdout
+            return last.stdout
+
+    assert last is not None
+    raise subprocess.CalledProcessError(last.returncode, last.args, output=last.stdout)
 
 
 def command_names(help_text: str) -> set[str]:
@@ -136,7 +149,11 @@ def validate_command(
                 errors.append(f"{skill}:{line_no}: {command}: unknown flag {flag!r} for {target}")
 
     if first_arg and subcommands and first_arg not in subcommands and not first_arg.startswith("--"):
-        help_text = run_pan(verb, "--help")
+        try:
+            help_text = run_pan(verb, "--help")
+        except subprocess.CalledProcessError:
+            errors.append(f"{skill}:{line_no}: {command}: could not read help for pan {verb}")
+            return errors
         usage = next((line for line in help_text.splitlines() if line.startswith("Usage:")), "")
         if "[command]" in usage and not usage_allows_positional_arg(help_text):
             errors.append(

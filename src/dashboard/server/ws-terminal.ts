@@ -32,52 +32,9 @@ type ClientControlMessage =
   | { type: 'ready' }
   | { type: 'resize'; cols: number; rows: number };
 
-// Optional /ws/terminal cold-path + accumulation profiling. Enable with
-// PANOPTICON_TERMINAL_PROFILE=1. Per-connection phase timings + a periodic
-// snapshot (heap / hub-count / upgrade-listener / event-loop lag) so a
-// slow-over-time regression can be triaged from the dashboard log alone.
-const TERMINAL_PROFILE_ENABLED = process.env.PANOPTICON_TERMINAL_PROFILE === '1';
-
-function profMark(sessionName: string, t0: bigint, label: string, extra?: string): void {
-  if (!TERMINAL_PROFILE_ENABLED) return;
-  const ms = Number(process.hrtime.bigint() - t0) / 1e6;
-  console.log(`[ws-terminal-prof] ${sessionName} +${ms.toFixed(1)}ms ${label}${extra ? ' ' + extra : ''}`);
-}
-
-async function profStep<T>(sessionName: string, t0: bigint, label: string, fn: () => Promise<T>): Promise<T> {
-  if (!TERMINAL_PROFILE_ENABLED) return fn();
-  const start = process.hrtime.bigint();
-  try {
-    const result = await fn();
-    const dur = Number(process.hrtime.bigint() - start) / 1e6;
-    const elapsed = Number(process.hrtime.bigint() - t0) / 1e6;
-    console.log(`[ws-terminal-prof] ${sessionName} +${elapsed.toFixed(1)}ms ${label} took=${dur.toFixed(1)}ms`);
-    return result;
-  } catch (err) {
-    const dur = Number(process.hrtime.bigint() - start) / 1e6;
-    console.log(`[ws-terminal-prof] ${sessionName} ${label} FAILED after ${dur.toFixed(1)}ms: ${err}`);
-    throw err;
-  }
-}
-
-const PROF_DASHBOARD_START = Date.now();
-let PROF_CONNECTION_COUNT = 0;
-let PROF_LAST_EL_LAG_MS = 0;
-function measureEventLoopLag(): void {
-  if (!TERMINAL_PROFILE_ENABLED) return;
-  const t = process.hrtime.bigint();
-  setImmediate(() => {
-    PROF_LAST_EL_LAG_MS = Number(process.hrtime.bigint() - t) / 1e6;
-  });
-}
-function getAccumStateLine(httpServer: http.Server): string {
-  const heap = process.memoryUsage();
-  const heapMB = (heap.heapUsed / 1024 / 1024).toFixed(1);
-  const rssMB = (heap.rss / 1024 / 1024).toFixed(1);
-  const upMin = ((Date.now() - PROF_DASHBOARD_START) / 60000).toFixed(1);
-  const upgradeListeners = httpServer.listenerCount('upgrade');
-  return `up=${upMin}min conns=${PROF_CONNECTION_COUNT} hubs=${activePtyHubs.size} heap=${heapMB}MB rss=${rssMB}MB upListeners=${upgradeListeners} elLag=${PROF_LAST_EL_LAG_MS.toFixed(1)}ms`;
-}
+const ATTACH_TIMEOUT_MS = 5000;
+const PRE_ATTACH_MAX_MESSAGES = 32;
+const PRE_ATTACH_MAX_BYTES = 64 * 1024;
 
 function parseControlMessage(message: string): ClientControlMessage | null {
   if (!message.startsWith('{')) return null;
@@ -149,19 +106,11 @@ async function captureFreshSnapshot(
   requestedCols: number,
   requestedRows: number,
 ): Promise<{ cols: number; rows: number; data: string }> {
-  // Dimensions and pane content are independent reads — run in parallel so the
-  // snapshot's wall-time is max(getWindowDimensions, capturePane), not sum.
-  const tPar = TERMINAL_PROFILE_ENABLED ? process.hrtime.bigint() : 0n;
-  const [dims, data] = await Promise.all([
-    getWindowDimensionsAsync(sessionName),
-    capturePaneAsync(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true }),
-  ]);
-  if (TERMINAL_PROFILE_ENABLED) {
-    console.log(`[ws-terminal-prof] ${sessionName}   parallel(dims+capture lines=${SNAPSHOT_SCROLLBACK_LINES},esc) took=${(Number(process.hrtime.bigint() - tPar) / 1e6).toFixed(1)}ms bytes=${data.length}`);
-  }
+  const dims = await getWindowDimensionsAsync(sessionName);
   if (!dims) {
     return { cols: requestedCols, rows: requestedRows, data: '' };
   }
+  const data = await capturePaneAsync(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true });
   return { cols: dims.cols, rows: dims.rows, data };
 }
 
@@ -218,16 +167,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
     }
   });
 
-  // Periodic accumulation snapshot — opt-in via PANOPTICON_TERMINAL_PROFILE=1.
-  if (TERMINAL_PROFILE_ENABLED) {
-    setInterval(() => {
-      measureEventLoopLag();
-      console.log(`[ws-terminal-accum] ${getAccumStateLine(server)}`);
-    }, 30000);
-  }
-
   wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
-    const tProf = process.hrtime.bigint();
     const url = new URL(req.url || '', `http://${req.headers.host}`);
     const sessionName = url.searchParams.get('session');
 
@@ -236,38 +176,52 @@ export function setupTerminalWebSocket(server: http.Server): void {
       return;
     }
 
-    // Re-auth sessions require a valid one-time token to prevent hijacking.
+    // Re-auth sessions require a server-issued one-time terminal token to prevent hijacking.
     if (sessionName.startsWith('reauth-')) {
-      const token = url.searchParams.get('token');
-      const expected = getReauthSessionToken(sessionName);
-      if (!token || !expected || expected !== token) {
+      const cookie = req.headers.cookie ?? '';
+      const token = cookie
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.startsWith('pan_codex_reauth='))
+        ?.slice('pan_codex_reauth='.length);
+      let decodedToken = '';
+      try {
+        decodedToken = token ? decodeURIComponent(token) : '';
+      } catch {
+        decodedToken = '';
+      }
+      const [cookieSessionName, terminalToken] = decodedToken.split(':');
+      if (cookieSessionName !== sessionName || !consumeReauthTerminalToken(sessionName, terminalToken)) {
         ws.close(1008, 'Invalid or missing re-auth token');
         return;
       }
-      invalidateReauthToken(sessionName);
     }
 
     console.log(`[ws-terminal] WebSocket connected for session: ${sessionName}`);
-    if (TERMINAL_PROFILE_ENABLED) {
-      PROF_CONNECTION_COUNT += 1;
-      measureEventLoopLag();
-      console.log(`[ws-terminal-accum] @connect ${sessionName} ${getAccumStateLine(server)}`);
-    }
-    profMark(sessionName, tProf, 'connection');
 
     // Buffer messages immediately to avoid losing them during async setup.
     // The client sends resize dimensions immediately on connect, but we have async
     // operations (tmux checks) that take time. Without buffering, messages are lost.
     const earlyMessages: string[] = [];
+    let preAttachBytes = 0;
     let messageHandler: ((data: string) => void) | null = null;
     let resolvePendingAttach: ((attach: Extract<ClientControlMessage, { type: 'attach' }> | null) => void) | null = null;
+
+    const bufferPreAttachMessage = (message: string): boolean => {
+      preAttachBytes += Buffer.byteLength(message);
+      if (earlyMessages.length >= PRE_ATTACH_MAX_MESSAGES || preAttachBytes > PRE_ATTACH_MAX_BYTES) {
+        ws.close(1008, 'attach-handshake-too-large');
+        return false;
+      }
+      earlyMessages.push(message);
+      return true;
+    };
 
     ws.on('message', (data) => {
       const message = data.toString();
       if (messageHandler) {
         messageHandler(message);
-      } else {
-        earlyMessages.push(message);
+      } else if (bufferPreAttachMessage(message)) {
         console.log(`[ws-terminal] Buffered early message for ${sessionName}: ${message.slice(0, 50)}...`);
       }
     });
@@ -279,32 +233,40 @@ export function setupTerminalWebSocket(server: http.Server): void {
       }
     });
 
-    // Check if tmux session exists and set up PTY (async).
-    // Use a targeted `has-session` (sessionExistsAsync) instead of listing all
-    // sessions — same answer, one short tmux call vs. enumerating every session.
+    // Check if tmux session exists and set up PTY (async)
     (async () => {
       try {
-        const exists = await profStep(sessionName, tProf, 'sessionExistsAsync', () => sessionExistsAsync(sessionName));
-        if (!exists) {
+        const sessions = await listSessionNamesAsync();
+        if (!sessions.includes(sessionName)) {
           ws.close(4404, 'session-not-found');
           return;
         }
       } catch (err) {
-        ws.close(1008, `Failed to check tmux session: ${err}`);
+        ws.close(1008, `Failed to list tmux sessions: ${err}`);
         return;
       }
 
       let attachMessage: Extract<ClientControlMessage, { type: 'attach' }> | null = null;
+      let attachTimer: ReturnType<typeof setTimeout> | null = null;
       const attachPromise = new Promise<Extract<ClientControlMessage, { type: 'attach' }> | null>((resolve) => {
         resolvePendingAttach = resolve;
+        attachTimer = setTimeout(() => {
+          ws.close(1008, 'attach-handshake-timeout');
+          resolve(null);
+        }, ATTACH_TIMEOUT_MS);
       });
       const remainingMessages: string[] = [];
+      let remainingBytes = 0;
       for (const msg of earlyMessages) {
         const parsed = parseControlMessage(msg);
         if (!attachMessage && parsed?.type === 'attach') {
           attachMessage = parsed;
-        } else {
+        } else if (remainingMessages.length < PRE_ATTACH_MAX_MESSAGES && remainingBytes <= PRE_ATTACH_MAX_BYTES) {
+          remainingBytes += Buffer.byteLength(msg);
           remainingMessages.push(msg);
+        } else {
+          ws.close(1008, 'attach-handshake-too-large');
+          return;
         }
       }
       earlyMessages.length = 0;
@@ -313,7 +275,15 @@ export function setupTerminalWebSocket(server: http.Server): void {
         const parsed = parseControlMessage(message);
         if (!attachMessage && parsed?.type === 'attach') {
           attachMessage = parsed;
+          if (attachTimer) clearTimeout(attachTimer);
           resolvePendingAttach?.(parsed);
+          resolvePendingAttach = null;
+          return;
+        }
+        remainingBytes += Buffer.byteLength(message);
+        if (remainingMessages.length >= PRE_ATTACH_MAX_MESSAGES || remainingBytes > PRE_ATTACH_MAX_BYTES) {
+          ws.close(1008, 'attach-handshake-too-large');
+          resolvePendingAttach?.(null);
           resolvePendingAttach = null;
           return;
         }
@@ -324,10 +294,10 @@ export function setupTerminalWebSocket(server: http.Server): void {
       if (!attachMessage) {
         attachMessage = await attachPromise;
       }
+      if (attachTimer) clearTimeout(attachTimer);
       if (!attachMessage) {
         return;
       }
-      profMark(sessionName, tProf, 'attach received', `cols=${attachMessage.cols} rows=${attachMessage.rows}`);
 
       const requestedCols = attachMessage.cols;
       const requestedRows = attachMessage.rows;
@@ -335,7 +305,6 @@ export function setupTerminalWebSocket(server: http.Server): void {
       const existingHub = activePtyHubs.get(sessionName);
       if (existingHub) {
         console.log(`[ws-terminal] Joining existing PTY hub for ${sessionName} (${existingHub.clients.size} existing clients)`);
-        profMark(sessionName, tProf, 'existing-hub branch', `clients=${existingHub.clients.size}`);
         addClientToHub(existingHub, ws, false);
         existingHub.inputClient = ws;
 
@@ -346,8 +315,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
           // content and hand it to the new client directly. The captured
           // content is valid at both the hub and the client's dims (same
           // number), so it paints cleanly and no resize dance is needed.
-          const snapshot = await profStep(sessionName, tProf, 'captureViewportSnapshot', () => captureViewportSnapshot(sessionName));
-          profMark(sessionName, tProf, 'sending snapshot (hub-join)', `bytes=${snapshot.length}`);
+          const snapshot = await captureViewportSnapshot(sessionName);
           sendControl(ws, { type: 'snapshot', cols: existingHub.cols, rows: existingHub.rows, data: snapshot });
         } else {
           // Hub is at different dims than the new client needs. Sending the
@@ -366,7 +334,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
           existingHub.cols = requestedCols;
           existingHub.rows = requestedRows;
           try {
-            existingHub.pty.resize(requestedCols, requestedRows);
+            existingHub.pty?.resize(requestedCols, requestedRows);
           } catch {
             // PTY may be mid-teardown; subsequent operations will notice.
           }
@@ -394,7 +362,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
             existingHub.cols = parsed.cols;
             existingHub.rows = parsed.rows;
             try {
-              existingHub.pty.resize(parsed.cols, parsed.rows);
+              existingHub.pty?.resize(parsed.cols, parsed.rows);
             } catch {
               return;
             }
@@ -409,6 +377,10 @@ export function setupTerminalWebSocket(server: http.Server): void {
             return;
           }
           if (existingHub.inputClient !== ws) return;
+          if (!existingHub.pty) {
+            existingHub.pendingInput.push(message);
+            return;
+          }
           try {
             existingHub.pty.write(message);
           } catch {
@@ -439,28 +411,42 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
       let ptyProcess: pty.IPty | null = null;
       let ptyStarted = false;
-      const pendingInput: string[] = [];
 
       const hub: PtyHub = {
-        pty: null as unknown as pty.IPty,
+        pty: null,
         clients: new Set(),
         cols: requestedCols,
         rows: requestedRows,
+        pendingInput: [],
         inputClient: ws,
         clientStates: new Map(),
       };
 
+      activePtyHubs.set(sessionName, hub);
       addClientToHub(hub, ws, false);
 
       const startLocalPty = async () => {
         if (ptyStarted) return;
-        // The session-exists check at the top of the connection handler already
-        // verified the session is present. A second `has-session` here was pure
-        // duplication. If the session vanished between the two checks, the PTY
-        // spawn will fail immediately and `onExit` cleans up.
+        try {
+          const exists = await sessionExistsAsync(sessionName);
+          if (!exists) {
+            console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
+            // Use 4404 (private-use range) so the client can distinguish
+            // "session doesn't exist" from "normal disconnect". The client
+            // should NOT retry on 4404 — the session is gone.
+            activePtyHubs.delete(sessionName);
+            ws.close(4404, 'session-not-found');
+            return;
+          }
+        } catch {
+          console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
+          activePtyHubs.delete(sessionName);
+          ws.close(4404, 'session-not-found');
+          return;
+        }
+
         ptyStarted = true;
         console.log(`[ws-terminal] Starting local PTY for ${sessionName} at ${hub.cols}x${hub.rows}`);
-        profMark(sessionName, tProf, 'pty.spawn begin');
         // Strip TMUX/TMUX_PANE from inherited env so `tmux attach-session` doesn't refuse
         // with "sessions should be nested with care, unset $TMUX to force" when the
         // dashboard server itself was launched from inside a tmux pane.
@@ -477,12 +463,9 @@ export function setupTerminalWebSocket(server: http.Server): void {
         });
 
         hub.pty = ptyProcess;
-        activePtyHubs.set(sessionName, hub);
-        profMark(sessionName, tProf, 'pty.spawn complete');
 
         let ptyChunks = 0;
         let ptyBytes = 0;
-        let firstByteLogged = false;
         const ptyDiagInterval = setInterval(() => {
           if (ptyChunks === 0) return;
           const maxBuf = Math.max(...[...hub.clients].map(c => c.bufferedAmount));
@@ -492,10 +475,6 @@ export function setupTerminalWebSocket(server: http.Server): void {
         }, 5000);
 
         ptyProcess.onData((data) => {
-          if (!firstByteLogged) {
-            firstByteLogged = true;
-            profMark(sessionName, tProf, 'first PTY data byte', `len=${data.length}`);
-          }
           ptyChunks++;
           ptyBytes += data.length;
           broadcastToHub(hub, data);
@@ -514,14 +493,20 @@ export function setupTerminalWebSocket(server: http.Server): void {
           hub.clientStates.clear();
         });
 
-        for (const input of pendingInput) {
+        for (const input of hub.pendingInput) {
           ptyProcess.write(input);
         }
-        pendingInput.length = 0;
+        hub.pendingInput.length = 0;
       };
 
-      const snapshot = await profStep(sessionName, tProf, 'captureFreshSnapshot', () => captureFreshSnapshot(sessionName, requestedCols, requestedRows));
-      profMark(sessionName, tProf, 'sending snapshot (fresh)', `bytes=${snapshot.data.length}`);
+      let snapshot: { cols: number; rows: number; data: string };
+      try {
+        snapshot = await captureFreshSnapshot(sessionName, requestedCols, requestedRows);
+      } catch (err) {
+        activePtyHubs.delete(sessionName);
+        ws.close(1008, `Failed to capture terminal snapshot: ${err}`);
+        return;
+      }
       sendControl(ws, { type: 'snapshot', cols: snapshot.cols, rows: snapshot.rows, data: snapshot.data });
       // Start PTY immediately — don't wait for client 'ready'. The hub buffers
       // live data for not-yet-ready clients (pty-hub.ts broadcastToHub), so data
@@ -561,7 +546,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
         if (ptyProcess) {
           ptyProcess.write(message);
         } else {
-          pendingInput.push(message);
+          hub.pendingInput.push(message);
         }
       };
 

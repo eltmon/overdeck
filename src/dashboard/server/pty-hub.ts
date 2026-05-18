@@ -13,11 +13,12 @@ import type * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 
 /** A shared PTY hub: one PTY process serving multiple WebSocket clients. */
 export interface PtyHub {
-  pty: pty.IPty;
+  pty: pty.IPty | null;
   clients: Set<WebSocket>;
   /** Current PTY dimensions — set by first client, updated by any resize event. */
   cols: number;
   rows: number;
+  pendingInput: string[];
   /**
    * The client whose keystrokes are forwarded to the PTY.
    * Always the most recently connected client. When it disconnects, falls back
@@ -130,7 +131,7 @@ export function removeClientFromHub(
     // glitch (Claude Code truncating to the smaller window, dashboards
     // displaying at the larger client dims).
     try {
-      hub.pty.kill();
+      hub.pty?.kill();
     } catch {
       // PTY may already have exited; nothing to do.
     }

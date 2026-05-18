@@ -30,6 +30,7 @@ const mockGetAgentRuntimeState = vi.fn().mockReturnValue(null);
 vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
   loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args),
+  MAX_AUTO_REQUEUE: 25,
 }));
 
 vi.mock('../../../src/lib/tmux.js', () => ({

@@ -196,7 +196,10 @@
     .agent-sub{font-family:"SF Mono",monospace;font-size:10px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .agent-cell.empty .agent-name{color:var(--muted-foreground);font-style:italic;font-family:"DM Sans",sans-serif;font-size:11px}
 
-    .runtime{font-family:"SF Mono",monospace;font-size:11px;color:var(--muted-foreground);text-align:right;font-variant-numeric:tabular-nums}
+    .ledger{display:flex;flex-direction:column;gap:2px;align-items:flex-end;font-family:"SF Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .ledger .runtime{font-size:11px;color:var(--muted-foreground)}
+    .ledger .cost{font-size:10px;color:var(--signal-cost-foreground)}
+    .ledger.empty .runtime,.ledger.empty .cost{color:var(--muted-foreground);opacity:.55}
 
     .avatar-sm{width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#a855f7,#06b6d4);display:grid;place-items:center;color:#fff;font-size:9px;font-weight:600;border:1px solid var(--border)}
     .avatar-sm.b{background:linear-gradient(135deg,#f59e0b,#ef4444)}
@@ -463,7 +466,7 @@
               <div class="agent-name">agent-pan-1052-ship</div>
               <div class="agent-sub">opus-4-7 · ship</div>
             </div>
-            <div class="runtime">19 min</div>
+            <div class="ledger"><span class="runtime">19 min</span><span class="cost">$0.81</span></div>
             <div class="avatar-sm c">EB</div>
           </div>
 
@@ -487,7 +490,7 @@
               <div class="agent-name">agent-pan-1111-ship</div>
               <div class="agent-sub">gpt-5.5 · idle</div>
             </div>
-            <div class="runtime">2 min</div>
+            <div class="ledger"><span class="runtime">2 min</span><span class="cost">$0.04</span></div>
             <div class="avatar-sm c">EB</div>
           </div>
         </div>
@@ -522,7 +525,7 @@
               <div class="agent-name">convoy-pan-1053-review</div>
               <div class="agent-sub">4 specialists · sonnet-4-6</div>
             </div>
-            <div class="runtime">1h 27m</div>
+            <div class="ledger"><span class="runtime">1h 27m</span><span class="cost">$1.42</span></div>
             <div class="avatar-sm d">EB</div>
           </div>
         </div>
@@ -557,7 +560,7 @@
               <div class="agent-name">agent-pan-1124</div>
               <div class="agent-sub">opus-4-7 · bead 5/9</div>
             </div>
-            <div class="runtime">42 min</div>
+            <div class="ledger"><span class="runtime">42 min</span><span class="cost">$0.96</span></div>
             <div class="avatar-sm">EB</div>
           </div>
         </div>
@@ -586,7 +589,7 @@
               </div>
             </div>
             <div class="agent-cell empty"><div class="agent-name">no active agent</div><div class="agent-sub mono">GitHub #1129</div></div>
-            <div class="runtime">—</div>
+            <div class="ledger empty"><span class="runtime">—</span><span class="cost">—</span></div>
             <div class="avatar-sm d">EB</div>
           </div>
 
@@ -604,7 +607,7 @@
               </div>
             </div>
             <div class="agent-cell empty"><div class="agent-name">no active agent</div><div class="agent-sub mono">GitHub #1130</div></div>
-            <div class="runtime">—</div>
+            <div class="ledger empty"><span class="runtime">—</span><span class="cost">—</span></div>
             <div class="avatar-sm">EB</div>
           </div>
 
@@ -622,7 +625,7 @@
               </div>
             </div>
             <div class="agent-cell empty"><div class="agent-name">no active agent</div><div class="agent-sub mono">GitHub #1131</div></div>
-            <div class="runtime">—</div>
+            <div class="ledger empty"><span class="runtime">—</span><span class="cost">—</span></div>
             <div class="avatar-sm">EB</div>
           </div>
 
@@ -640,7 +643,7 @@
               </div>
             </div>
             <div class="agent-cell empty"><div class="agent-name">no active agent</div><div class="agent-sub mono">GitHub #1132</div></div>
-            <div class="runtime">—</div>
+            <div class="ledger empty"><span class="runtime">—</span><span class="cost">—</span></div>
             <div class="avatar-sm">EB</div>
           </div>
 
@@ -658,7 +661,7 @@
               </div>
             </div>
             <div class="agent-cell empty"><div class="agent-name">no active agent</div><div class="agent-sub mono">GitHub #1133</div></div>
-            <div class="runtime">—</div>
+            <div class="ledger empty"><span class="runtime">—</span><span class="cost">—</span></div>
             <div class="avatar-sm">EB</div>
           </div>
         </div>
