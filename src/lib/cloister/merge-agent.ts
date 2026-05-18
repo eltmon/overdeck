@@ -1145,9 +1145,17 @@ async function spawnShipRoleForTask(options: {
 
   try {
     const { spawnRun } = await import('../agents.js');
+    // Ship role delivers its rebase prompt through the work-agent's tmux session and
+    // performs git operations against the host worktree — it does not depend on the
+    // workspace's docker-compose services (server/frontend) being healthy. Pass
+    // `allowHost: true` so the stack-health pre-flight does not block ship when an
+    // ancillary container has exited (e.g. server-1 crashing on a stale init build).
+    // Blocking ship on those failures was forcing humans into a manual
+    // rebuild-and-retry loop for every merge — see PAN-1141 incident 2026-05-17.
     const run = await spawnRun(options.issueId, 'ship', {
       workspace,
       prompt: options.prompt,
+      allowHost: true,
     });
     return {
       success: true,
