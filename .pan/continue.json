@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T06:00:59.000Z",
+  "updated": "2026-05-18T06:05:00.665Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "sha": "59d0ce7c3",
@@ -279,5 +279,27 @@
       "agentModel": "gpt-5.5"
     }
   ],
-  "feedback": []
+  "feedback": [],
+  "statusOverrides": {
+    "f1-verb-badge": "completed",
+    "f1-verb-badge.f1-verb-badge.ac1": "completed",
+    "f1-verb-badge.f1-verb-badge.ac2": "completed",
+    "f1-verb-badge.f1-verb-badge.ac3": "completed",
+    "f1-verb-badge.f1-verb-badge.ac4": "completed",
+    "f1-verb-badge.f1-verb-badge.ac5": "completed",
+    "f1-verb-badge.f1-verb-badge.ac6": "completed",
+    "f2-phase-glyph": "completed",
+    "f2-phase-glyph.f2-phase-glyph.ac1": "completed",
+    "f2-phase-glyph.f2-phase-glyph.ac2": "completed",
+    "f2-phase-glyph.f2-phase-glyph.ac3": "completed",
+    "f3-phase-header": "completed",
+    "f3-phase-header.f3-phase-header.ac1": "completed",
+    "f3-phase-header.f3-phase-header.ac2": "completed",
+    "f3-phase-header.f3-phase-header.ac3": "completed",
+    "f4-metric-tile": "completed",
+    "f4-metric-tile.f4-metric-tile.ac1": "completed",
+    "f4-metric-tile.f4-metric-tile.ac2": "completed",
+    "f4-metric-tile.f4-metric-tile.ac3": "completed",
+    "f4-metric-tile.f4-metric-tile.ac4": "completed"
+  }
 }
