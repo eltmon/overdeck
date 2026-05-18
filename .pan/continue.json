@@ -1,0 +1,117 @@
+{
+  "version": "1",
+  "issueId": "PAN-1194",
+  "created": "2026-05-18T22:07:39.007Z",
+  "updated": "2026-05-18T22:40:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1194",
+    "sha": "09f233573",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Introduce a new terminal slot status `failed-merge` (matches the issue text verbatim) instead of reusing the existing `failed` value. `failed` already means the tmux pane died unexpectedly; `failed-merge` means the work completed but the slot PR cannot land. Operator recovery options differ — keep the states distinct so the UI and recovery API can branch on them.",
+      "recordedAt": "2026-05-18T22:40:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Halt the swarm + surface operator action (NOT silent merged-without-effect). The issue lists both paths as acceptable; silently dropping a slot's work is a footgun (the agent already produced commits on the slot branch and may have produced commits the operator wants to salvage). The existing failed-slot branch in `pollSwarmAutoAdvance` already wires up `recordAutoAdvanceFailure` + backoff — fold `failed-merge` into that same path so the loop halts cleanly instead of busy-polling forever.",
+      "recordedAt": "2026-05-18T22:40:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Detection scope = slots with `status ∈ {'running','completed'} && phase === 'implementation'`. Synthesis slots never open PRs (they POST to `/api/swarm/slot-merged` with `synthesisOutput`), so they are excluded. Running implementation slots are included because a slot's PR can become CONFLICTING while the slot agent is still working — e.g., a sibling slot just merged into the parent feature branch.",
+      "recordedAt": "2026-05-18T22:40:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Mergeability query uses `gh pr list --repo <owner/repo> --head <slotBranch> --state all --json number,mergeable,mergeableState,state,closed,url --limit 5` via `execAsync`. Existing pattern in `src/lib/cloister/merge-agent.ts:213`. Conflicting = `mergeableState === 'CONFLICTING'` OR (`mergeable === false` AND `mergeableState` null/undefined). Branch missing (empty list) is treated as failed-merge ONLY if the slot was already `completed` (running slots can briefly not yet have a PR). Closed-without-merge (`state === 'CLOSED' && !mergedAt`) also flips to failed-merge.",
+      "recordedAt": "2026-05-18T22:40:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Widen `SwarmSlotRuntime.status` in `src/lib/vbrief/continue-state.ts` to include `'failed-merge'`. Persisting through `failureReason` text alone would be brittle (string-matching to recover the kind). Widening the union also keeps the runtime ↔ state mappers (`runtimeFromState`/`stateFromRuntime`) symmetric.",
+      "recordedAt": "2026-05-18T22:40:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Recovery API: single endpoint `POST /api/swarm/:issueId/slot/:slotId/recover` with body `{ action: 'retry' | 'drop' | 'handoff' }`. `retry` reverts the latest matching `failed-merge` slot record + clears `autoAdvanceFailureCount`/`autoAdvanceRetryAfter`/`lastAutoAdvanceError` so the next dispatch picks the item up fresh. `drop` applies `done` to the slot's item in the canonical vBRIEF (operator confirms loss is acceptable) so the auto-advance proceeds. `handoff` clears `autoAdvance` for the swarm and emits a handback activity entry. All three actions emit `source: 'ship'` activity entries with the operator decision recorded.",
+      "recordedAt": "2026-05-18T22:40:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "CLI surface = `pan swarm recover <issueId> <slotId> --action <retry|drop|handoff>`. Wraps the recovery endpoint. Skill `skills/pan-swarm/SKILL.md` does not yet exist (no `pan-swarm` wrapper today), so per the Skills-CLI convention this CLI flag drift is acceptable — but the issue body documenting the new flag must land in the same commit as the CLI change so the lint-skills check passes if/when a wrapper is added later.",
+      "recordedAt": "2026-05-18T22:40:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Dashboard UI scope for this issue: render `failed-merge` slot status visually (distinct pill, PR link, failure reason) and surface `lastAutoAdvanceError` on the swarm panel. Interactive operator recovery buttons (retry/drop/handoff) deferred to a follow-up. Rationale: dashboard slot rendering today is read-only and a full interactive recovery flow needs UX review beyond this fix's blast radius. The CLI + API land here so the operator is unblocked even without dashboard buttons.",
+      "recordedAt": "2026-05-18T22:40:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "No `execSync`/`readFileSync` anywhere on this code path — it runs inside the dashboard event loop (the auto-advance poll fires every 5 s). All `gh` shell-outs use `execAsync` with a per-call 5 s `AbortSignal.timeout`. A timeout/error is treated as a no-op for that slot on that tick (do not flip to failed-merge on a transient gh failure); the next poll retries.",
+      "recordedAt": "2026-05-18T22:40:00.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "Tests for retry/backoff paths MUST use `vi.useFakeTimers()` per `.claude/rules/fake-timers-for-retry-tests.md`. The auto-advance poll loop, mergeability gh-call timeout, and recovery action backoff clears must all be exercised under fake timers.",
+      "recordedAt": "2026-05-18T22:40:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Cumulative slot history: `state.slots` retains all historical dispatch records for a numeric slot. A failed-merge transition must mutate ONLY the latest-matching record (reverse-scan, prefer running > completed > others). Mass-mutating every entry sharing the slot number would corrupt the historical record. See PAN-977 round-11 blocker #1 — same shape of bug.",
+      "mitigation": "Use the existing reverse-scan pattern from `onSlotMergeComplete` (lines 1164–1190) and only mutate `state.slots[matchedSlotIndex]`."
+    },
+    {
+      "id": "H2",
+      "summary": "Non-GitHub projects (Linear-only, GitLab, Rally) have no `gh pr list` equivalent. A naive call would emit shell errors every poll.",
+      "mitigation": "Use `resolveGitHubIssue(issueId)` from `src/lib/github-app.ts` (existing helper used by merge-agent.ts:209). If `!isGitHub`, the mergeability checker returns immediately with no transitions."
+    },
+    {
+      "id": "H3",
+      "summary": "`gh` may be unauthenticated or not installed in some environments. A failure here should NOT permanently flip a slot to failed-merge — that would create a worse bug (slots randomly flagged failed-merge when gh is offline).",
+      "mitigation": "Wrap every `gh pr list` call in try/catch. On error, return `{ ok: false, transient: true }` and skip the transition for that slot on that tick. The poller retries every 5 s; once gh recovers, the real PR state is observed."
+    },
+    {
+      "id": "H4",
+      "summary": "Race with the legitimate merge: a slot can briefly look CONFLICTING during the merge-agent's rebase window. Flipping it to failed-merge while a merge is genuinely in progress would create thrash.",
+      "mitigation": "Require the CONFLICTING signal to be observed twice consecutively before transitioning (introduce `consecutiveConflictCount` on the slot record, increment on first observation, transition only when >= 2). This is a small extra field; document in vBRIEF acceptance criteria."
+    },
+    {
+      "id": "H5",
+      "summary": "Recovery `retry` action could re-spawn the same slot agent with the same conflict if the operator hasn't actually resolved the underlying issue. The new dispatch would conflict again and the cycle repeats.",
+      "mitigation": "Document in the CLI help text that `retry` is only appropriate after the conflict cause is resolved (e.g., operator rebased the slot branch, or the conflicting sibling slot was reverted). `retry` does NOT auto-rebase — that's out of scope."
+    },
+    {
+      "id": "H6",
+      "summary": "Recovery `drop` action permanently marks the slot's vBRIEF item `done` — this is destructive (work is abandoned). An operator could trigger it accidentally.",
+      "mitigation": "API requires explicit `action: 'drop'` (no default). CLI requires `--action drop` (no shorthand) and prompts for confirmation `--yes` to proceed non-interactively. Emit a clear `source: 'ship', level: 'warn'` activity log entry recording the operator decision and the abandoned slot/item."
+    },
+    {
+      "id": "H7",
+      "summary": "Persistence ordering: a fresh failed-merge transition observed by the poller MUST be persisted via `saveSwarmState` BEFORE the auto-advance failure branch runs `recordAutoAdvanceFailure` — otherwise a dashboard restart between the two writes loses the transition and the next poll observes a stale `running` slot.",
+      "mitigation": "Mirror the existing PAN-977 round-13 ordering: refresh → persist → failure handling → cleanup. The mergeability refresh slots in between the existing refresh and persistence steps so the single `saveSwarmState` call captures both."
+    },
+    {
+      "id": "H8",
+      "summary": "The auto-advance loop now has TWO refresh passes per tick (`refreshSwarmSlotStatuses` for tmux liveness + `refreshSwarmSlotMergeability` for PR state). Both can mutate `state.slots`. The second pass must read the post-first-pass state, not the original, or it can race against itself.",
+      "mitigation": "Pass the post-first-pass `state` into `refreshSwarmSlotMergeability` and have it return `{ state, changed }` with the same contract as `refreshSwarmSlotStatuses`. Call them sequentially and combine `changed` flags before the single `saveSwarmState` write."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-18T22:07:39.007Z",
+      "reason": "planning",
+      "note": "Initial planning session (auto mode)",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
