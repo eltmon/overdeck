@@ -18,6 +18,7 @@ import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette } from './components/CommandPalette';
 import { CommandDeck } from './components/CommandDeck';
 import { PipelineView } from './components/Pipeline/PipelineView';
+import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
 import { ConversationsPage } from './components/conversations/ConversationsPage';
@@ -344,6 +345,8 @@ export default function App() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedIssue]);
+
+  const drawerOpen = useDashboardStore((state) => state.drawer.issueId !== null);
 
   // Dashboard lifecycle state from event store (restart events)
   const dashboardLifecycle = useDashboardStore(selectDashboardLifecycle);
@@ -851,7 +854,10 @@ export default function App() {
           </div>
         </div>
 
-        <main className="flex-1 flex overflow-hidden">
+        <main
+          data-drawer-open={drawerOpen ? 'true' : undefined}
+          className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
+        >
           {activeTab === 'command-deck' && (
             <div className="w-full h-full">
               <CommandDeck
@@ -998,6 +1004,8 @@ export default function App() {
         )}
         </main>
       </div>
+
+      <IssueDrawer />
 
       <ChannelPermissionDialog
         request={currentChannelPermissionRequest}

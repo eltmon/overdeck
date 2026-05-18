@@ -261,6 +261,17 @@ body::after {
   }
 }
 
+@keyframes issue-drawer-slide-in {
+  0% {
+    transform: translateX(24px) scale(0.98);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
 /* ─── Ready-to-merge shimmer animation ─── */
 @keyframes badge-shimmer {
   0%   { background-position: 150% 50%; }

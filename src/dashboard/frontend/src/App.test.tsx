@@ -23,6 +23,7 @@ const {
     issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
     dashboardLifecycle: { active: false },
     channelPermissionRequestsById: {},
+    drawer: { issueId: null, tab: 'overview' },
   },
   mockRefreshDashboardState: vi.fn().mockResolvedValue(undefined),
   mockToastError: vi.fn(),
@@ -119,6 +120,9 @@ vi.mock('./components/CommandDeck', () => ({
 vi.mock('./components/Pipeline/PipelineView', () => ({
   PipelineView: () => <div data-testid="pipeline-view" />,
 }));
+vi.mock('./components/drawer/IssueDrawer', () => ({
+  IssueDrawer: () => null,
+}));
 
 function renderApp() {
   const client = new QueryClient({
@@ -140,6 +144,7 @@ beforeEach(() => {
   mockDashboardState.issues = [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }]
   mockDashboardState.dashboardLifecycle = { active: false }
   mockDashboardState.channelPermissionRequestsById = {}
+  mockDashboardState.drawer = { issueId: null, tab: 'overview' }
   mockRefreshDashboardState.mockClear()
   mockToastError.mockClear()
   mockToastInfo.mockClear()
@@ -298,6 +303,13 @@ describe('App Pipeline routing', () => {
     window.history.replaceState(null, '', '/pipeline');
     renderApp();
     expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
+  });
+
+  it('marks the parent surface when the drawer is open', () => {
+    mockDashboardState.drawer = { issueId: 'PAN-123', tab: 'overview' };
+    window.history.replaceState(null, '', '/');
+    renderApp();
+    expect(screen.getByRole('main')).toHaveAttribute('data-drawer-open', 'true');
   });
 
   it('renders Board at /board', () => {

@@ -2,7 +2,7 @@
  * Unit tests for the DashboardStore event reducers and selectors (PAN-428 B4)
  */
 
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, it, expect } from 'vitest'
 import {
   syncSnapshotReducer,
   applyEventReducer,
@@ -17,6 +17,7 @@ import {
   selectResources,
   selectIssues,
   selectIssuesByCycle,
+  useDashboardStore,
   type DashboardState,
 } from '../lib/store'
 import type {
@@ -50,6 +51,7 @@ const reviewAgent: AgentSnapshot = {
 }
 
 const emptyState: DashboardState = {
+  drawer: { issueId: null, tab: 'overview' },
   bootstrapComplete: false,
   snapshotTimestamp: null,
   sequence: 0,
@@ -96,6 +98,50 @@ function makeSnapshot(seq = 5): DashboardSnapshot {
 function makeEvent(type: DomainEvent['type'], seq: number, payload: Record<string, unknown> = {}): DomainEvent {
   return { type, sequence: seq, timestamp: new Date().toISOString(), payload } as DomainEvent
 }
+
+beforeEach(() => {
+  window.history.replaceState(null, '', '/')
+  useDashboardStore.setState(emptyState)
+})
+
+describe('drawer store slice', () => {
+  it('replaces the open issue instead of stacking drawers', () => {
+    useDashboardStore.getState().openIssue('PAN-1')
+    useDashboardStore.getState().openIssue('PAN-2', 'plan')
+
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-2', tab: 'plan' })
+    expect(window.location.search).toBe('?issue=PAN-2&tab=plan')
+  })
+
+  it('closes by removing drawer URL params and resetting state', () => {
+    window.history.replaceState(null, '', '/?phase=ship&issue=PAN-1&tab=activity')
+    useDashboardStore.getState().syncDrawerFromUrl()
+
+    useDashboardStore.getState().closeIssue()
+
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: null, tab: 'overview' })
+    expect(window.location.search).toBe('?phase=ship')
+  })
+
+  it('handles rapid open-close-open bursts without creating stale state', () => {
+    for (let i = 0; i < 50; i += 1) {
+      useDashboardStore.getState().openIssue(`PAN-${i}`)
+      useDashboardStore.getState().closeIssue()
+    }
+
+    useDashboardStore.getState().openIssue('PAN-final')
+
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-final', tab: 'overview' })
+    expect(window.location.search).toBe('?issue=PAN-final&tab=overview')
+  })
+
+  it('preserves drawer state through event reducer updates', () => {
+    const state = { ...emptyState, drawer: { issueId: 'PAN-1', tab: 'overview' } }
+    const next = applyEventReducer(state, makeEvent('agent.created', 1, { agentId: 'agent-1', agent: baseAgent }))
+
+    expect(next.drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' })
+  })
+})
 
 // ─── syncSnapshotReducer ──────────────────────────────────────────────────────
 

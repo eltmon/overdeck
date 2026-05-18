@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T21:39:30.000Z",
+    "updated": "2026-05-18T21:52:30.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -572,7 +572,7 @@
       {
         "id": "d1-drawer-shell-store",
         "title": "Add Issue Detail drawer shell + global store slice (single-instance, URL-addressable)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -588,76 +588,86 @@
           {
             "id": "d1-drawer-shell-store.ac1",
             "title": "IssueDrawer.tsx implements PRD §4.7.8 surface spec: 980px max-width, max-width: calc(100vw - 48px), full-height pinned right, backdrop-filter blur(2px), shadow -24px 0 64px rgb(0 0 0 / 40%)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:52:30.000Z"
           },
           {
             "id": "d1-drawer-shell-store.ac2",
             "title": "Zustand store has new `drawer` slice with `{ issueId: string | null, tab: string }` and actions `openIssue(id, tab?)`, `closeIssue()`; opening a new issue while one is open REPLACES (not stacks)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:52:30.000Z"
           },
           {
             "id": "d1-drawer-shell-store.ac3",
             "title": "URL sync: opening sets `?issue=<id>&tab=<tab>` via history.replaceState; closing removes both params; initial page load with `?issue=<id>` opens drawer on mount",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:52:30.000Z"
           },
           {
             "id": "d1-drawer-shell-store.ac4",
             "title": "Esc, X button, and click-on-scrim all dispatch closeIssue()",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:52:30.000Z"
           },
           {
             "id": "d1-drawer-shell-store.ac5",
             "title": "Parent surface receives a `data-drawer-open=\"true\"` attribute and applies 4% accent overlay + 2px blur via CSS — no inline style mutation",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:52:30.000Z"
           },
           {
             "id": "d1-drawer-shell-store.ac6",
             "title": "Animation: drawer slide-in 200ms ease-in-out (scale 0.98 → 1, opacity 0 → 1) per PRD §4.7.11",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:52:30.000Z"
           },
           {
             "id": "d1-drawer-shell-store.ac7",
             "title": "Vitest integration test asserts the single-instance invariant: openIssue('A'), openIssue('B'), then store reads { issueId: 'B' } (not stacked)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:52:30.000Z"
           },
           {
             "id": "d1-drawer-shell-store.ac8",
             "title": "Vitest integration test for rapid open→close→open burst (50 iterations) confirms no orphan listeners or subscriptions in the store",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:52:30.000Z"
           },
           {
             "id": "d1-drawer-shell-store.ac9",
             "title": "Closing the drawer restores parent surface scroll position (drawer is overlay, not navigation)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:52:30.000Z"
           }
-        ]
+        ],
+        "updated": "2026-05-18T21:52:30.000Z"
       },
       {
         "id": "d2-drawer-subscription-contract",
