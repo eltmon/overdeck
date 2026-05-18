@@ -230,6 +230,40 @@ describe('workflows', () => {
       expect(result.steps.find(s => s.step === 'teardown:branches')).toBeDefined();
     });
 
+    it('should delete the workspace, complete vBRIEF, close GitHub, and swap verifying labels during configured close-out', async () => {
+      writeFileSync(
+        join(PANOPTICON_HOME, 'cloister.toml'),
+        '[close_out]\nremove_workspace = true\ndelete_feature_branch = false\nauto = false\nauto_delay_minutes = 60\n',
+      );
+      const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
+      mkdirSync(wsPath, { recursive: true });
+      writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.startsWith('git worktree remove')) {
+          rmSync(wsPath, { recursive: true, force: true });
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+      };
+      const result = await closeOut(ctx);
+
+      expect(result.success).toBe(true);
+      expect(existsSync(wsPath)).toBe(false);
+      expect(findSpecByIssue(testDir, 'PAN-100')?.status).toBe('completed');
+      expect(findSpecByIssue(testDir, 'PAN-100')?.document.plan.status).toBe('completed');
+
+      const commands = mockExecAsync.mock.calls.map(([command]) => String(command));
+      expect(commands.some(command => command.includes('gh issue close 100'))).toBe(true);
+      expect(commands.some(command => command.includes('--add-label "closed-out"'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label "verifying-on-main"'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
+    });
+
     it('should complete vBRIEF status and prune checkpoint refs during close-out', async () => {
       writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
 

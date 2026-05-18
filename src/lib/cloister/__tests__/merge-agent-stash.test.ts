@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { existsSync, mkdirSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 const execMock = vi.hoisted(() => vi.fn());
 const setAgentPausedMock = vi.hoisted(() => vi.fn(() => true));
@@ -81,6 +84,8 @@ vi.mock('fs/promises', async (importOriginal) => {
 import { postMergeLifecycle, resetPostMergeState, spawnMergeAgentForBranches } from '../merge-agent.js';
 import { dropStash, listStashes } from '../../stashes.js';
 import { spawnRun } from '../../agents.js';
+import { AGENTS_DIR } from '../../paths.js';
+import { findSpecByIssue, writeSpecForIssue } from '../../pan-dir/specs.js';
 
 describe('merge-agent ship role and stash lifecycle', () => {
   let setTimeoutSpy: ReturnType<typeof vi.spyOn>;
@@ -183,46 +188,78 @@ describe('merge-agent ship role and stash lifecycle', () => {
   });
 
   it('performs a non-destructive verify-on-main handoff after merge', async () => {
-    resolveGitHubIssueMock.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1 });
-    tmuxMocks.sessionExists.mockReturnValue(true);
-    tmuxMocks.listSessionNamesAsync.mockResolvedValue([
-      'agent-pan-1-test',
-      'agent-pan-1-ship',
-      'agent-pan-1-review-synthesis',
-      'specialist-panopticon-pan-1-review-security',
-      'unrelated-session',
-    ]);
-    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
-      const callback = (typeof _opts === 'function' ? _opts : cb)!;
-      if (cmd.includes('git rev-parse --verify')) return callback(null, { stdout: 'branch-sha\n', stderr: '' });
-      if (cmd.includes('git merge-base --is-ancestor')) return callback(null, { stdout: '', stderr: '' });
-      if (cmd.includes('gh issue view')) return callback(null, { stdout: 'in-review\nin-progress\n', stderr: '' });
-      callback(null, { stdout: '', stderr: '' });
-    });
+    const fixtureRoot = join(tmpdir(), `pan-post-merge-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const projectPath = join(fixtureRoot, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-1');
+    const agentStateDir = join(AGENTS_DIR, 'agent-pan-1');
+    const planningStateDir = join(AGENTS_DIR, 'planning-pan-1');
 
-    await postMergeLifecycle('PAN-1', '/tmp/workspace', 'feature/pan-1', { skipDeploy: true });
+    try {
+      mkdirSync(workspacePath, { recursive: true });
+      mkdirSync(agentStateDir, { recursive: true });
+      mkdirSync(planningStateDir, { recursive: true });
+      writeSpecForIssue(projectPath, {
+        vBRIEFInfo: { version: '0.5', created: '2026-05-18T00:00:00Z' },
+        plan: {
+          id: 'PAN-1',
+          title: 'Verify on main fixture',
+          status: 'running',
+          sequence: 1,
+          created: '2026-05-18T00:00:00Z',
+          items: [],
+          edges: [],
+        },
+      } as any, 'active');
 
-    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-1', { mergeStatus: 'merged', readyForMerge: false });
-    expect(setAgentPausedMock).toHaveBeenCalledWith('agent-pan-1', 'awaiting close-out (verify on main)', true);
-    expect(setAgentPausedMock).toHaveBeenCalledWith('planning-pan-1', 'awaiting close-out (verify on main)', true);
-    expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-pan-1');
-    expect(tmuxMocks.killSession).toHaveBeenCalledWith('planning-pan-1');
-    expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-test');
-    expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-ship');
-    expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-review-synthesis');
-    expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('specialist-panopticon-pan-1-review-security');
-    expect(tmuxMocks.killSessionAsync).not.toHaveBeenCalledWith('unrelated-session');
+      resolveGitHubIssueMock.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1 });
+      tmuxMocks.sessionExists.mockReturnValue(true);
+      tmuxMocks.listSessionNamesAsync.mockResolvedValue([
+        'agent-pan-1-test',
+        'agent-pan-1-ship',
+        'agent-pan-1-review-synthesis',
+        'specialist-panopticon-pan-1-review-security',
+        'unrelated-session',
+      ]);
+      execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
+        const callback = (typeof _opts === 'function' ? _opts : cb)!;
+        if (cmd.includes('git rev-parse --verify')) return callback(null, { stdout: 'branch-sha\n', stderr: '' });
+        if (cmd.includes('git merge-base --is-ancestor')) return callback(null, { stdout: '', stderr: '' });
+        if (cmd.includes('gh issue view')) return callback(null, { stdout: 'OPEN\n', stderr: '' });
+        callback(null, { stdout: '', stderr: '' });
+      });
 
-    const commands = execMock.mock.calls.map(([cmd]) => String(cmd));
-    expect(commands.some(command => command.includes('--add-label "verifying-on-main"'))).toBe(true);
-    expect(commands.some(command => command.includes('--remove-label "in-review"'))).toBe(true);
-    expect(commands.some(command => command.includes('--remove-label "in-progress"'))).toBe(true);
-    expect(commands.some(command => command.includes('gh issue close'))).toBe(false);
-    expect(commands.some(command => command.includes('--add-label "needs-close-out"'))).toBe(false);
-    expect(closeIssueMock).not.toHaveBeenCalled();
-    expect(transitionVBriefOnMainMock).not.toHaveBeenCalled();
-    expect(teardownWorkspaceMock).not.toHaveBeenCalled();
-    expect(movePrdMock).not.toHaveBeenCalled();
-    expect(pruneCheckpointRefsForAgentsMock).not.toHaveBeenCalled();
+      await postMergeLifecycle('PAN-1', projectPath, 'feature/pan-1', { skipDeploy: true });
+
+      expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-1', { mergeStatus: 'merged', readyForMerge: false });
+      expect(setAgentPausedMock).toHaveBeenCalledWith('agent-pan-1', 'awaiting close-out (verify on main)', true);
+      expect(setAgentPausedMock).toHaveBeenCalledWith('planning-pan-1', 'awaiting close-out (verify on main)', true);
+      expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-pan-1');
+      expect(tmuxMocks.killSession).toHaveBeenCalledWith('planning-pan-1');
+      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-test');
+      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-ship');
+      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-review-synthesis');
+      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('specialist-panopticon-pan-1-review-security');
+      expect(tmuxMocks.killSessionAsync).not.toHaveBeenCalledWith('unrelated-session');
+
+      const commands = execMock.mock.calls.map(([cmd]) => String(cmd));
+      expect(commands.some(command => command.includes('--add-label "verifying-on-main"'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label "in-review"'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label "in-progress"'))).toBe(true);
+      expect(commands.some(command => command.includes('gh issue close'))).toBe(false);
+      expect(commands.some(command => command.includes('--add-label "needs-close-out"'))).toBe(false);
+      expect(existsSync(workspacePath)).toBe(true);
+      expect(existsSync(agentStateDir)).toBe(true);
+      expect(findSpecByIssue(projectPath, 'PAN-1')?.status).toBe('active');
+      expect(findSpecByIssue(projectPath, 'PAN-1')?.document.plan.status).toBe('active');
+      expect(closeIssueMock).not.toHaveBeenCalled();
+      expect(transitionVBriefOnMainMock).not.toHaveBeenCalled();
+      expect(teardownWorkspaceMock).not.toHaveBeenCalled();
+      expect(movePrdMock).not.toHaveBeenCalled();
+      expect(pruneCheckpointRefsForAgentsMock).not.toHaveBeenCalled();
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+      rmSync(agentStateDir, { recursive: true, force: true });
+      rmSync(planningStateDir, { recursive: true, force: true });
+    }
   });
 });
