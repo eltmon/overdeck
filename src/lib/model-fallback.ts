@@ -230,6 +230,31 @@ export function isProviderEnabled(
   return enabledProviders.has(provider);
 }
 
+export const DEFAULT_QUICK_ENRICHMENT_MODEL = 'claude-haiku-4-5-20251001';
+export const DEFAULT_DEEP_ENRICHMENT_MODEL = 'claude-sonnet-4-6';
+
+export type EnrichmentTier = 1 | 2 | 3;
+
+export interface EnrichmentTierConfig {
+  quickModel: string | null;
+  deepModel: string | null;
+}
+
+export const ENRICHMENT_TIER_MAX_MESSAGES: Record<EnrichmentTier, number | null> = {
+  1: 3,
+  2: 11,
+  3: null,
+};
+
+export function selectEnrichmentModelForTier(tier: EnrichmentTier, config: EnrichmentTierConfig): string {
+  if (tier === 1) return config.quickModel ?? DEFAULT_QUICK_ENRICHMENT_MODEL;
+  return config.deepModel ?? DEFAULT_DEEP_ENRICHMENT_MODEL;
+}
+
+export function maxMessagesForEnrichmentTier(tier: EnrichmentTier): number | null {
+  return ENRICHMENT_TIER_MAX_MESSAGES[tier];
+}
+
 /**
  * Get the best Anthropic model available at or below a given tier.
  * Used when a user cannot access their preferred tier model and we want

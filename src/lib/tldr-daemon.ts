@@ -20,7 +20,7 @@ import { join } from 'path';
  * Metrics are file-based, stored in <workspace>/.tldr/:
  *   interceptions.log — written by tldr-read-enforcer on each TLDR serve
  *   bypasses.log      — written by tldr-read-enforcer on each deliberate bypass
- *   metrics-checkpoint.json — tracks line offsets for delta (per-cost-event) reporting
+ *   metrics-checkpoint.json — tracks byte offsets for delta (per-cost-event) reporting
  */
 export interface TldrSessionMetrics {
   interceptions: number;                   // TLDR summaries served since last checkpoint
@@ -32,9 +32,32 @@ export interface TldrSessionMetrics {
 
 /** Checkpoint persisted to .tldr/metrics-checkpoint.json */
 interface TldrMetricsCheckpoint {
-  interceptionsLine: number;
-  bypassesLine: number;
+  interceptionsLine?: number;
+  bypassesLine?: number;
+  interceptionsByte?: number;
+  bypassesByte?: number;
   capturedAt: string;
+}
+
+function readMetricsCheckpoint(checkpointFile: string): TldrMetricsCheckpoint | null {
+  if (!existsSync(checkpointFile)) return null;
+  try {
+    return JSON.parse(readFileSync(checkpointFile, 'utf-8')) as TldrMetricsCheckpoint;
+  } catch {
+    return null;
+  }
+}
+
+function readLogLines(logFile: string, startByte?: number, startLine = 0): { lines: string[]; size: number } {
+  if (!existsSync(logFile)) return { lines: [], size: 0 };
+  const size = statSync(logFile).size;
+  if (startByte !== undefined) {
+    const safeStart = startByte <= size ? Math.max(0, startByte) : 0;
+    const content = readFileSync(logFile).subarray(safeStart).toString('utf-8');
+    return { lines: content.split('\n').filter(l => l.trim()), size };
+  }
+  const content = readFileSync(logFile, 'utf-8');
+  return { lines: content.split('\n').filter(l => l.trim()).slice(startLine), size };
 }
 
 /**
@@ -49,22 +72,18 @@ export function getTldrMetrics(workspacePath: string, sinceCheckpoint = false): 
   const bypassesLog = join(tldrDir, 'bypasses.log');
   const checkpointFile = join(tldrDir, 'metrics-checkpoint.json');
 
-  let interceptionsStartLine = 0;
-  let bypassesStartLine = 0;
-
-  if (sinceCheckpoint && existsSync(checkpointFile)) {
-    try {
-      const checkpoint = JSON.parse(readFileSync(checkpointFile, 'utf-8')) as TldrMetricsCheckpoint;
-      interceptionsStartLine = checkpoint.interceptionsLine || 0;
-      bypassesStartLine = checkpoint.bypassesLine || 0;
-    } catch { /* start from 0 on parse error */ }
-  }
+  const checkpoint = sinceCheckpoint ? readMetricsCheckpoint(checkpointFile) : null;
+  const interceptionsStartByte = checkpoint?.interceptionsByte;
+  const bypassesStartByte = checkpoint?.bypassesByte;
+  const interceptionsStartLine = checkpoint?.interceptionsLine ?? 0;
+  const bypassesStartLine = checkpoint?.bypassesLine ?? 0;
 
   // Parse interceptions log: each line is "timestamp file_size rel_path"
-  const allInterceptionLines = existsSync(interceptionsLog)
-    ? readFileSync(interceptionsLog, 'utf-8').split('\n').filter(l => l.trim())
-    : [];
-  const newInterceptions = allInterceptionLines.slice(interceptionsStartLine);
+  const newInterceptions = readLogLines(
+    interceptionsLog,
+    sinceCheckpoint ? interceptionsStartByte : undefined,
+    sinceCheckpoint && interceptionsStartByte === undefined ? interceptionsStartLine : 0,
+  ).lines;
 
   let estimatedTokensSaved = 0;
   const filesAnalyzed: string[] = [];
@@ -84,10 +103,11 @@ export function getTldrMetrics(workspacePath: string, sinceCheckpoint = false): 
   }
 
   // Parse bypasses log: each line is "timestamp reason [rel_path]"
-  const allBypassLines = existsSync(bypassesLog)
-    ? readFileSync(bypassesLog, 'utf-8').split('\n').filter(l => l.trim())
-    : [];
-  const newBypasses = allBypassLines.slice(bypassesStartLine);
+  const newBypasses = readLogLines(
+    bypassesLog,
+    sinceCheckpoint ? bypassesStartByte : undefined,
+    sinceCheckpoint && bypassesStartByte === undefined ? bypassesStartLine : 0,
+  ).lines;
   const bypassReasons: Record<string, number> = {};
 
   for (const line of newBypasses) {
@@ -124,21 +144,25 @@ export function captureTldrMetrics(workspacePath: string): TldrSessionMetrics | 
 
   const metrics = getTldrMetrics(workspacePath, true);
 
-  // Advance checkpoint to current line counts
+  // Advance checkpoint to current byte offsets without rescanning historical logs.
   const interceptionsLog = join(tldrDir, 'interceptions.log');
   const bypassesLog = join(tldrDir, 'bypasses.log');
   const checkpointFile = join(tldrDir, 'metrics-checkpoint.json');
-
-  const interceptionsTotal = existsSync(interceptionsLog)
-    ? readFileSync(interceptionsLog, 'utf-8').split('\n').filter(l => l.trim()).length
-    : 0;
-  const bypassesTotal = existsSync(bypassesLog)
-    ? readFileSync(bypassesLog, 'utf-8').split('\n').filter(l => l.trim()).length
-    : 0;
+  const previous = readMetricsCheckpoint(checkpointFile);
+  const interceptionsByte = existsSync(interceptionsLog) ? statSync(interceptionsLog).size : 0;
+  const bypassesByte = existsSync(bypassesLog) ? statSync(bypassesLog).size : 0;
+  const previousInterceptionsLine = previous?.interceptionsByte !== undefined && previous.interceptionsByte > interceptionsByte
+    ? 0
+    : previous?.interceptionsLine ?? 0;
+  const previousBypassesLine = previous?.bypassesByte !== undefined && previous.bypassesByte > bypassesByte
+    ? 0
+    : previous?.bypassesLine ?? 0;
 
   const checkpoint: TldrMetricsCheckpoint = {
-    interceptionsLine: interceptionsTotal,
-    bypassesLine: bypassesTotal,
+    interceptionsLine: previousInterceptionsLine + metrics.interceptions,
+    bypassesLine: previousBypassesLine + metrics.bypasses,
+    interceptionsByte,
+    bypassesByte,
     capturedAt: new Date().toISOString(),
   };
 

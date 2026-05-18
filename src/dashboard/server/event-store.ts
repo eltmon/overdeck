@@ -19,6 +19,7 @@ import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getPanopticonHome } from '../../lib/paths.js';
+import { initWorkspaceDiscoveredSessionsSchema } from '../../lib/database/schema.js';
 import type { DomainEvent } from '@panctl/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -144,11 +145,14 @@ export async function openEventDb(): Promise<DbAdapter> {
         updated_at TEXT NOT NULL
       )
     `);
+    initWorkspaceDiscoveredSessionsSchema(db as unknown as import('better-sqlite3').Database);
     return db as unknown as DbAdapter;
   } else {
     // Node.js: use shared database connection — migrations run there
     const { getDatabase } = await import('../../lib/database/index.js');
-    return getDatabase() as unknown as DbAdapter;
+    const db = getDatabase();
+    initWorkspaceDiscoveredSessionsSchema(db);
+    return db as unknown as DbAdapter;
   }
 }
 

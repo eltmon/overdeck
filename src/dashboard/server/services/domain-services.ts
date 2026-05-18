@@ -22,6 +22,8 @@ import { randomUUID } from 'crypto';
 export interface EventStoreServiceShape {
   /** Append a domain event; returns the assigned sequence number. */
   readonly append: (event: Record<string, unknown>) => Effect.Effect<number>;
+  /** Queue a domain event append without blocking the HTTP/WebSocket hot path. */
+  readonly appendAsync: (event: Record<string, unknown>) => Effect.Effect<number>;
   /** Return all stored events with sequence > fromSequence. */
   readonly readFrom: (fromSequence: number) => Effect.Effect<StoredEvent[]>;
   /** Return events of a given type, most recent first, capped at limit. */
@@ -238,6 +240,7 @@ export const EventStoreServiceLive = Layer.effect(
 
     return {
       append: (event) => Effect.sync(() => store.append(event as never)),
+      appendAsync: (event) => Effect.promise(() => store.appendAsync(event as never)),
       readFrom: (fromSequence) => Effect.sync(() => store.readFrom(fromSequence)),
       queryByType: (type, limit) => Effect.sync(() => store.queryByType(type, limit)),
       getLatestSequence: Effect.sync(() => store.getLatestSequence()),

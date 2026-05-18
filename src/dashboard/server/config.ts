@@ -18,7 +18,7 @@ import { loadPanopticonEnv } from '../../lib/env-loader.js';
 export interface ServerConfigShape {
   /** HTTP port for the dashboard API (API_PORT || PORT, default 3011) */
   readonly port: number;
-  /** Dashboard host (HOST, default '0.0.0.0') */
+  /** Dashboard host (HOST, default '127.0.0.1') */
   readonly host: string;
   /** Optional Linear API key (null if not set) */
   readonly linearApiKey: string | null;
@@ -69,7 +69,7 @@ export const ServerConfigLayer = Layer.effect(
       throw new ServerConfigError('API_PORT', `Invalid port value: "${portStr}"`);
     }
 
-    const host = process.env['HOST'] ?? '0.0.0.0';
+    const host = process.env['HOST'] ?? '127.0.0.1';
     const linearApiKey = process.env['LINEAR_API_KEY'] || null;
     const anthropicApiKey = process.env['ANTHROPIC_API_KEY'] || null;
     const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;

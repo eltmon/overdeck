@@ -20,6 +20,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { CommandDeck } from './components/CommandDeck';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
+import { ConversationsPage } from './components/conversations/ConversationsPage';
 import { AutoPresoView } from './components/autopreso/AutoPresoView';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -72,6 +73,7 @@ const TAB_PATHS: Record<Tab, string> = {
   health: '/health',
   settings: '/settings',
   'god-view': '/god-view',
+  sessions: '/sessions',
 };
 
 const PATH_TO_TAB: Record<string, Tab> = Object.fromEntries(
@@ -960,6 +962,11 @@ export default function App() {
         {activeTab === 'settings' && (
           <div className="p-6 w-full overflow-auto">
             <SettingsPage />
+          </div>
+        )}
+        {activeTab === 'sessions' && (
+          <div className="w-full h-full overflow-hidden">
+            <ConversationsPage />
           </div>
         )}
         {activeTab === 'god-view' && (

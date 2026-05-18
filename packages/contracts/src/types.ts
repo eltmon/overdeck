@@ -379,6 +379,50 @@ export type TurnDiffSummary = typeof TurnDiffSummary.Type
 
 // ─── Dashboard Snapshot ──────────────────────────────────────────────────────
 
+export const ScanProgressSnapshot = Schema.Struct({
+  active: Schema.Boolean,
+  mode: Schema.Literals(['targeted', 'watched', 'system']),
+  dirs: Schema.Array(Schema.String),
+  dirsProcessed: Schema.Number,
+  dirsTotal: Schema.Number,
+  sessionsFound: Schema.Number,
+  elapsedMs: Schema.Number,
+  inserted: Schema.Number,
+  updated: Schema.Number,
+  skipped: Schema.Number,
+  errors: Schema.Number,
+  durationMs: Schema.Number,
+})
+export type ScanProgressSnapshot = typeof ScanProgressSnapshot.Type
+
+export const EnrichStatsSnapshot = Schema.Struct({
+  processed: Schema.Number,
+  totalCost: Schema.Number,
+  failures: Schema.Number,
+  durationMs: Schema.Number,
+})
+export type EnrichStatsSnapshot = typeof EnrichStatsSnapshot.Type
+
+export const EnrichProgressSnapshot = Schema.Struct({
+  sessionId: Schema.Number,
+  level: Schema.Number,
+  model: Schema.String,
+  cost: Schema.Number,
+  success: Schema.Boolean,
+  error: Schema.optional(Schema.String),
+  timestamp: Schema.String,
+})
+export type EnrichProgressSnapshot = typeof EnrichProgressSnapshot.Type
+
+export const EmbedProgressSnapshot = Schema.Struct({
+  sessionId: Schema.Number,
+  model: Schema.String,
+  success: Schema.Boolean,
+  error: Schema.optional(Schema.String),
+  timestamp: Schema.String,
+})
+export type EmbedProgressSnapshot = typeof EmbedProgressSnapshot.Type
+
 export const DashboardSnapshot = Schema.Struct({
   sequence: SequenceNumber,
   agents: Schema.Array(AgentSnapshot),
@@ -388,6 +432,10 @@ export const DashboardSnapshot = Schema.Struct({
   resources: Schema.optional(Schema.Unknown),
   agentRuntimeById: Schema.optional(Schema.Record(Schema.String, AgentRuntimeSnapshot)),
   channelPermissionRequests: Schema.optional(Schema.Array(ChannelPermissionRequestSnapshot)),
+  scanProgress: Schema.optional(Schema.NullOr(ScanProgressSnapshot)),
+  enrichStats: Schema.optional(Schema.NullOr(EnrichStatsSnapshot)),
+  enrichProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EnrichProgressSnapshot)),
+  embedProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EmbedProgressSnapshot)),
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type
@@ -487,3 +535,90 @@ export const ProjectSessionTree = Schema.Struct({
   features: Schema.Array(FeatureNode),
 })
 export type ProjectSessionTree = typeof ProjectSessionTree.Type
+
+// ─── Discovered Sessions (PAN-457) ───────────────────────────────────────────
+
+/** Snapshot of a discovered session for RPC responses and frontend display */
+export const DiscoveredSessionSnapshot = Schema.Struct({
+  id: Schema.Number,
+  jsonlPath: Schema.String,
+  sessionId: Schema.optional(Schema.String),
+  workspacePath: Schema.optional(Schema.String),
+  workspaceHash: Schema.optional(Schema.String),
+  messageCount: Schema.Number,
+  firstTs: Schema.optional(Schema.String),
+  lastTs: Schema.optional(Schema.String),
+  modelsUsed: Schema.Array(Schema.String),
+  primaryModel: Schema.optional(Schema.String),
+  tokenInput: Schema.Number,
+  tokenOutput: Schema.Number,
+  estimatedCost: Schema.Number,
+  toolsUsed: Schema.Array(Schema.String),
+  filesTouched: Schema.Array(Schema.String),
+  tags: Schema.Array(Schema.String),
+  summary: Schema.optional(Schema.String),
+  summaryDetailed: Schema.optional(Schema.String),
+  enrichmentLevel: Schema.Number,
+  enrichmentModel: Schema.optional(Schema.String),
+  enrichedAt: Schema.optional(Schema.String),
+  enrichmentFailed: Schema.Boolean,
+  panopticonManaged: Schema.Boolean,
+  panIssueId: Schema.optional(Schema.String),
+  panAgentId: Schema.optional(Schema.String),
+  scannedAt: Schema.String,
+})
+export type DiscoveredSessionSnapshot = typeof DiscoveredSessionSnapshot.Type
+
+/** Filter parameters for conversation search */
+export const ConversationFilter = Schema.Struct({
+  workspacePath: Schema.optional(Schema.String),
+  primaryModel: Schema.optional(Schema.String),
+  managed: Schema.optional(Schema.Boolean),
+  unmanaged: Schema.optional(Schema.Boolean),
+  since: Schema.optional(Schema.String),
+  before: Schema.optional(Schema.String),
+  after: Schema.optional(Schema.String),
+  minCost: Schema.optional(Schema.Number),
+  maxCost: Schema.optional(Schema.Number),
+  minMessages: Schema.optional(Schema.Number),
+  tags: Schema.optional(Schema.Array(Schema.String)),
+  tools: Schema.optional(Schema.Array(Schema.String)),
+  files: Schema.optional(Schema.Array(Schema.String)),
+  issueId: Schema.optional(Schema.String),
+  enrichmentLevel: Schema.optional(Schema.Number),
+  enriched: Schema.optional(Schema.Boolean),
+  notEnriched: Schema.optional(Schema.Boolean),
+  query: Schema.optional(Schema.String),
+  semantic: Schema.optional(Schema.Boolean),
+  similarTo: Schema.optional(Schema.Number),
+  limit: Schema.optional(Schema.Number),
+  offset: Schema.optional(Schema.Number),
+  format: Schema.optional(Schema.Literals(['table', 'json', 'brief', 'ids'])),
+})
+export type ConversationFilter = typeof ConversationFilter.Type
+
+/** Aggregate cost breakdown for conversations */
+export const ConversationCostSummary = Schema.Struct({
+  groupBy: Schema.Literals(['workspace', 'model', 'day', 'month']),
+  entries: Schema.Array(Schema.Struct({
+    key: Schema.String,
+    totalCost: Schema.Number,
+    sessionCount: Schema.Number,
+    totalTokensIn: Schema.Number,
+    totalTokensOut: Schema.Number,
+  })),
+  grandTotal: Schema.Number,
+  totalTokensIn: Schema.Number,
+  totalTokensOut: Schema.Number,
+})
+export type ConversationCostSummary = typeof ConversationCostSummary.Type
+
+/** Scan result summary */
+export const ScanResult = Schema.Struct({
+  inserted: Schema.Number,
+  updated: Schema.Number,
+  skipped: Schema.Number,
+  errors: Schema.Number,
+  durationMs: Schema.Number,
+})
+export type ScanResult = typeof ScanResult.Type

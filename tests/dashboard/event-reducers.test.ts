@@ -91,6 +91,38 @@ describe('syncSnapshot', () => {
     expect(state.issuesRaw).toHaveLength(2)
   })
 
+  it('hydrates conversation progress fields from snapshot', () => {
+    const state = syncSnapshot(makeState(), {
+      ...snapshot,
+      scanProgress: {
+        active: true,
+        mode: 'system',
+        dirs: [],
+        dirsProcessed: 1,
+        dirsTotal: 2,
+        sessionsFound: 3,
+        elapsedMs: 4,
+        inserted: 5,
+        updated: 6,
+        skipped: 7,
+        errors: 8,
+        durationMs: 9,
+      },
+      enrichStats: { processed: 1, totalCost: 0.02, failures: 0, durationMs: 10 },
+      enrichProgressBySessionId: {
+        42: { sessionId: 42, level: 2, model: 'claude-sonnet-4-6', cost: 0.01, success: true, timestamp: ts() },
+      },
+      embedProgressBySessionId: {
+        42: { sessionId: 42, model: 'text-embedding-3-small', success: true, timestamp: ts() },
+      },
+    })
+
+    expect(state.scanProgress?.sessionsFound).toBe(3)
+    expect(state.enrichStats?.processed).toBe(1)
+    expect(state.enrichProgressBySessionId[42]?.level).toBe(2)
+    expect(state.embedProgressBySessionId[42]?.success).toBe(true)
+  })
+
   it('preserves existing issuesRaw when snapshot has no issues field', () => {
     const existing = makeState({ issuesRaw: [{ id: 'OLD' }] as unknown[] })
     const state = syncSnapshot(existing, snapshot)

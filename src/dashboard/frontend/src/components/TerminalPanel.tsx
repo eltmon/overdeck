@@ -3,6 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { X, RefreshCw, ExternalLink } from 'lucide-react';
 import { Agent } from '../types';
 import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
+import { MessagesTimeline } from './chat/MessagesTimeline';
+import type { ChatMessage } from './chat/chat-types';
+import { ActivityView } from './CommandDeck/ActivityView';
 
 interface TerminalPanelProps {
   agent: Agent;
@@ -35,7 +38,34 @@ async function fetchOutput(agentId: string): Promise<string> {
 }
 
 
-export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, title: titleProp, onSessionEnded }: TerminalPanelProps) {
+function derivePlanningIssueId(agent: Agent): string | undefined {
+  if (agent.issueId) return agent.issueId;
+  // planning-pan-503 → PAN-503
+  const m = agent.id.match(/^planning-([a-z]+)-(\d+)$/i);
+  if (m) return `${m[1].toUpperCase()}-${m[2]}`;
+  return undefined;
+}
+
+function PlanningActivityPanel({ issueId, onClose }: { issueId: string; onClose: () => void }) {
+  return (
+    <div className="flex flex-col h-full min-w-0" style={{ backgroundColor: '#0d1117' }}>
+      <div
+        className="flex items-center justify-between px-3 py-1.5 border-b shrink-0"
+        style={{ borderColor: '#232f48', backgroundColor: '#161b26' }}
+      >
+        <span className="text-xs font-medium" style={{ color: '#92a4c9' }}>{issueId}</span>
+        <button onClick={onClose} className="p-1 rounded transition-colors hover:bg-white/10" style={{ color: '#92a4c9' }} title="Close terminal">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        <ActivityView issueId={issueId} />
+      </div>
+    </div>
+  );
+}
+
+function TerminalPanelTerminal({ agent, onClose, sessionName: sessionNameProp, title: titleProp, onSessionEnded }: TerminalPanelProps) {
   const activeSession = sessionNameProp ?? agent.id;
   const displayTitle = titleProp ?? agent.id;
   const terminalRef = useRef<HTMLPreElement>(null);
@@ -74,6 +104,18 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
     enabled: isStopped,
   });
 
+  const { data: conversationData } = useQuery({
+    queryKey: ['agent-conversation', agent.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/agents/${agent.id}/conversation`);
+      if (!res.ok) return { messages: [] as ChatMessage[] };
+      const data = await res.json();
+      return { messages: (data.messages ?? []) as ChatMessage[] };
+    },
+    enabled: isStopped,
+  });
+  const conversationMessages = conversationData?.messages ?? [];
+
   useEffect(() => {
     if (autoScroll && bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior: 'auto' });
@@ -102,7 +144,7 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
         style={{ borderColor, backgroundColor: '#161b26' }}
       >
         <span className="text-xs font-medium" style={{ color: textSecondary }}>
-          {isStopped ? 'Last output' : displayTitle}
+          {isStopped ? (conversationMessages.length > 0 ? 'Conversation' : 'Last output') : displayTitle}
         </span>
         <div className="flex items-center gap-1">
           {isStopped && (
@@ -138,15 +180,21 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
 
       {/* Content */}
       {isStopped ? (
-        <pre
-          ref={terminalRef}
-          onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-foreground"
-          style={{ backgroundColor: bgTerminal }}
-        >
-          {output || 'No saved output available.'}
-          <div ref={bottomRef} />
-        </pre>
+        conversationMessages.length > 0 ? (
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <MessagesTimeline messages={conversationMessages} workLog={[]} streaming={false} />
+          </div>
+        ) : (
+          <pre
+            ref={terminalRef}
+            onScroll={handleScroll}
+            className="flex-1 min-h-0 overflow-auto p-3 font-mono text-xs leading-relaxed m-0 whitespace-pre text-foreground"
+            style={{ backgroundColor: bgTerminal }}
+          >
+            {output || 'No saved output available.'}
+            <div ref={bottomRef} />
+          </pre>
+        )
       ) : (
         <div className="flex-1 min-h-0">
           <TerminalSessionWrapper
@@ -157,4 +205,13 @@ export function TerminalPanel({ agent, onClose, sessionName: sessionNameProp, ti
       )}
     </div>
   );
+}
+
+export function TerminalPanel(props: TerminalPanelProps) {
+  const isPlanning = props.agent.agentPhase === 'planning' || props.agent.id.startsWith('planning-');
+  const planningIssueId = isPlanning ? derivePlanningIssueId(props.agent) : undefined;
+  if (planningIssueId) {
+    return <PlanningActivityPanel issueId={planningIssueId} onClose={props.onClose} />;
+  }
+  return <TerminalPanelTerminal {...props} />;
 }

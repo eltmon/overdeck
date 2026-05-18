@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { promises as fs } from 'fs';
 import { join, dirname, parse as parsePath } from 'path';
 import { homedir } from 'os';
 import { parse, stringify } from '@iarna/toml';
@@ -109,6 +110,33 @@ export interface ShadowConfig {
  */
 export type ClaudePermissionMode = 'bypass' | 'auto';
 
+export interface ConversationsEnrichmentConfig {
+  /** Model tier for quick (L1) enrichment. null = Haiku tier via model-fallback */
+  quickModel: string | null;
+  /** Model tier for deep (L2) enrichment. null = Sonnet tier via model-fallback */
+  deepModel: string | null;
+  /** Max concurrent enrichment workers */
+  maxParallel: number;
+  /** USD threshold: prompt user before spending more than this */
+  costConfirmThreshold: number;
+}
+
+export interface ConversationsConfig {
+  /** Directories to scan in --watched mode (default: ['~/Projects']) */
+  watchDirs: string[];
+  /** Max parallel scanner workers. null = auto from SystemCapabilities probe */
+  scanMaxParallel: number | null;
+  /** Enable vector embedding storage and semantic search (opt-in) */
+  embeddings: boolean;
+  /** Embedding provider: openai | voyage | ollama */
+  embeddingProvider: 'openai' | 'voyage' | 'ollama';
+  /** Embedding model name */
+  embeddingModel: string;
+  /** Automatically embed sessions after deep (L2+) enrichment */
+  embeddingAutoOnDeep: boolean;
+  enrichment: ConversationsEnrichmentConfig;
+}
+
 export interface PanopticonConfig {
   panopticon: {
     version: string;
@@ -135,6 +163,7 @@ export interface PanopticonConfig {
   };
   remote?: RemoteConfig;
   shadow: ShadowConfig;
+  conversations?: ConversationsConfig;
 }
 
 const DEFAULT_CONFIG: PanopticonConfig = {
@@ -170,6 +199,20 @@ const DEFAULT_CONFIG: PanopticonConfig = {
       github: false,
       gitlab: false,
       rally: false,
+    },
+  },
+  conversations: {
+    watchDirs: ['~/Projects'],
+    scanMaxParallel: null,
+    embeddings: false,
+    embeddingProvider: 'openai',
+    embeddingModel: 'text-embedding-3-small',
+    embeddingAutoOnDeep: true,
+    enrichment: {
+      quickModel: null,
+      deepModel: null,
+      maxParallel: 4,
+      costConfirmThreshold: 1.00,
     },
   },
 };
@@ -227,6 +270,25 @@ export function loadConfig(): PanopticonConfig {
 export function saveConfig(config: PanopticonConfig): void {
   const content = stringify(config as any);
   writeFileSync(CONFIG_FILE, content, 'utf8');
+}
+
+export async function loadConfigAsync(): Promise<PanopticonConfig> {
+  try {
+    const content = await fs.readFile(CONFIG_FILE, 'utf8');
+    const parsed = parse(content) as unknown as Partial<PanopticonConfig>;
+    return deepMerge(DEFAULT_CONFIG, parsed);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return DEFAULT_CONFIG;
+    }
+    console.error('Warning: Failed to parse config, using defaults');
+    return DEFAULT_CONFIG;
+  }
+}
+
+export async function saveConfigAsync(config: PanopticonConfig): Promise<void> {
+  const content = stringify(config as any);
+  await fs.writeFile(CONFIG_FILE, content, 'utf8');
 }
 
 export function getDefaultConfig(): PanopticonConfig {
@@ -291,3 +353,24 @@ export function findDevrootForProject(projectPath: string): string {
   return projectPath;
 }
 
+/**
+ * Get the conversations config block, with defaults merged in.
+ * Resolves watchDirs ~ to home directory.
+ */
+function resolveConversationsConfig(config: PanopticonConfig): ConversationsConfig {
+  const conv = config.conversations ?? (DEFAULT_CONFIG.conversations as ConversationsConfig);
+  return {
+    ...conv,
+    watchDirs: conv.watchDirs.map((d) =>
+      d.startsWith('~/') ? join(homedir(), d.slice(2)) : d,
+    ),
+  };
+}
+
+export function getConversationsConfig(): ConversationsConfig {
+  return resolveConversationsConfig(loadConfig());
+}
+
+export async function getConversationsConfigAsync(): Promise<ConversationsConfig> {
+  return resolveConversationsConfig(await loadConfigAsync());
+}

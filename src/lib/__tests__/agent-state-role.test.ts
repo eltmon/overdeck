@@ -308,7 +308,8 @@ describe('AgentState role persistence', () => {
       startedAt: '2026-05-09T00:00:00.000Z',
     }));
 
-    expect(getAgentState('agent-pan-legacy')).toBeNull();
+    const state = getAgentState('agent-pan-legacy');
+    expect(state).toBeNull();
   });
 
   it('drops legacy agent state directories missing role during startup scan', async () => {

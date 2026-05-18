@@ -23,7 +23,7 @@ const execFileAsync = promisify(execFile);
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
 import { loadCloisterConfig } from './config.js';
 import { getNoResumeMode } from './no-resume-mode.js';
-import { setReviewStatus, loadReviewStatuses, getReviewStatus } from '../review-status.js';
+import { setReviewStatus, loadReviewStatuses, getReviewStatus, type ReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
@@ -1881,6 +1881,44 @@ export async function checkStuckReviewing(): Promise<string[]> {
  */
 const unsignaledReviewNudges = new Map<string, number>();
 
+type ReviewRunContext = {
+  generatedAt?: string;
+  headSha?: string;
+};
+
+export function isSynthesisForActiveReviewRun(
+  dirPath: string,
+  status: Pick<ReviewStatus, 'reviewSpawnedAt' | 'lastVerifiedCommit'>,
+  synthesisMtimeMs: number,
+): boolean {
+  if (!status.reviewSpawnedAt) return true;
+
+  const spawnedAtMs = Date.parse(status.reviewSpawnedAt);
+  if (!Number.isFinite(spawnedAtMs)) return true;
+  if (synthesisMtimeMs < spawnedAtMs) return false;
+
+  const contextPath = join(dirPath, 'context.json');
+  if (!existsSync(contextPath)) return false;
+
+  let context: ReviewRunContext;
+  try {
+    context = JSON.parse(readFileSync(contextPath, 'utf8')) as ReviewRunContext;
+  } catch {
+    return false;
+  }
+
+  if (context.generatedAt) {
+    const generatedAtMs = Date.parse(context.generatedAt);
+    if (Number.isFinite(generatedAtMs) && generatedAtMs < spawnedAtMs) return false;
+  }
+
+  if (status.lastVerifiedCommit && context.headSha && context.headSha !== status.lastVerifiedCommit) {
+    return false;
+  }
+
+  return true;
+}
+
 export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
   const actions: string[] = [];
   const SYNTHESIS_SETTLE_MS = 5 * 60 * 1000; // 5 minutes
@@ -1909,6 +1947,7 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         const synthPath = join(dirPath, 'synthesis.md');
         if (!existsSync(synthPath)) continue;
         const mtime = statSync(synthPath).mtimeMs;
+        if (!isSynthesisForActiveReviewRun(dirPath, status, mtime)) continue;
         if (mtime > latestMtime) {
           latestMtime = mtime;
           latestDir = dirPath;

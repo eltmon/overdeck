@@ -11,6 +11,7 @@ import {
   deleteReviewStatus as dbDelete,
   getReviewStatusFromDb,
   getAllReviewStatusesFromDb,
+  getReviewStatusesFromDb,
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
   setDeaconIgnored as dbSetDeaconIgnored,
@@ -133,6 +134,10 @@ export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<strin
     );
   }
   return getAllReviewStatusesFromDb();
+}
+
+export function loadReviewStatusesForIssues(issueIds: string[]): Record<string, ReviewStatus> {
+  return getReviewStatusesFromDb(issueIds);
 }
 
 export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, filePath = DEFAULT_STATUS_FILE): void {

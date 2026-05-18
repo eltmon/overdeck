@@ -134,9 +134,22 @@ export interface ApiSettingsConfig {
     manual_compact_mode?: 'claude-code' | 'panopticon-native';
     rich_compaction?: boolean;
     title_model?: ModelId;
+    watch_dirs?: string[];
+    scan_max_parallel?: number | null;
+    embeddings?: boolean;
+    embedding_provider?: 'openai' | 'voyage' | 'ollama';
+    embedding_model?: string;
+    embedding_auto_on_deep?: boolean;
+    enrichment?: {
+      quick_model?: string | null;
+      deep_model?: string | null;
+      max_parallel?: number;
+      cost_confirm_threshold?: number;
+    };
   };
   api_keys: {
     openai?: string;
+    voyage?: string;
     google?: string;
     minimax?: string;
     zai?: string;
@@ -416,6 +429,25 @@ export function loadSettingsApi(): ApiSettingsConfig {
     }
   }
 
+  const conversationSettings = pruneUndefined({
+    compaction_model: config.conversations?.compactionModel,
+    manual_compact_mode: config.conversations?.manualCompactMode,
+    rich_compaction: config.conversations?.richCompaction,
+    title_model: config.conversations?.titleModel,
+    watch_dirs: config.conversations?.watchDirs,
+    scan_max_parallel: config.conversations?.scanMaxParallel,
+    embeddings: config.conversations?.embeddings,
+    embedding_provider: config.conversations?.embeddingProvider,
+    embedding_model: config.conversations?.embeddingModel,
+    embedding_auto_on_deep: config.conversations?.embeddingAutoOnDeep,
+    enrichment: config.conversations?.enrichment ? pruneUndefined({
+      quick_model: config.conversations.enrichment.quickModel,
+      deep_model: config.conversations.enrichment.deepModel,
+      max_parallel: config.conversations.enrichment.maxParallel,
+      cost_confirm_threshold: config.conversations.enrichment.costConfirmThreshold,
+    }) : undefined,
+  });
+
   return {
     workhorses: seededWorkhorses(config),
     roles: seededRoles(config),
@@ -442,12 +474,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     tmux: {
       config_mode: config.tmux.configMode,
     },
-    conversations: {
-      compaction_model: config.conversations.compactionModel,
-      manual_compact_mode: config.conversations.manualCompactMode,
-      rich_compaction: config.conversations.richCompaction,
-      title_model: config.conversations.titleModel,
-    },
+    conversations: conversationSettings,
     tracker_keys: config.trackerKeys,
     experimental: {
       claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,
@@ -564,6 +591,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
     },
     api_keys: {
       openai: settings.api_keys.openai,
+      voyage: settings.api_keys.voyage,
       google: settings.api_keys.google,
       minimax: settings.api_keys.minimax,
       zai: settings.api_keys.zai,
@@ -654,7 +682,7 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
 }
 
 export async function updateProviderApiKey(
-  provider: 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous',
+  provider: 'openai' | 'voyage' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous',
   apiKey?: string
 ): Promise<ApiSettingsConfig> {
   return updateSettingsApi({

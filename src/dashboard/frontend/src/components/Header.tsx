@@ -14,4 +14,5 @@ export type Tab =
   | 'awaiting-merge'
   | 'autopreso'
   | 'settings'
-  | 'god-view';
+  | 'god-view'
+  | 'sessions';

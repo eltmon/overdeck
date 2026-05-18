@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  entry: { server: 'main.ts' },
+  entry: { server: 'main.ts', 'dashboard-db-worker': 'services/dashboard-db-worker.ts' },
   outDir: '../../../dist/dashboard',
   format: 'esm',
   platform: 'node',

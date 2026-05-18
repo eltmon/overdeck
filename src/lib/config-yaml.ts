@@ -12,6 +12,7 @@ import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 
 import { dirname, join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
+import { parseDocument } from 'yaml';
 import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
 import { MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
@@ -68,6 +69,18 @@ export interface ConversationsConfig {
   rich_compaction?: boolean;
   /** Model used for AI-generated conversation titles (default: claude-haiku-4-5) */
   title_model?: ModelId;
+  watch_dirs?: string[];
+  scan_max_parallel?: number | null;
+  embeddings?: boolean;
+  embedding_provider?: 'openai' | 'voyage' | 'ollama';
+  embedding_model?: string;
+  embedding_auto_on_deep?: boolean;
+  enrichment?: {
+    quick_model?: string | null;
+    deep_model?: string | null;
+    max_parallel?: number;
+    cost_confirm_threshold?: number;
+  };
 }
 
 /**
@@ -234,6 +247,7 @@ export interface YamlConfig {
   /** Legacy API keys (for backward compatibility) */
   api_keys?: {
     openai?: string;
+    voyage?: string;
     google?: string;
     minimax?: string;
     zai?: string;
@@ -394,6 +408,7 @@ export interface NormalizedConfig {
   /** API keys by provider */
   apiKeys: {
     openai?: string;
+    voyage?: string;
     google?: string;
     minimax?: string;
     zai?: string;
@@ -441,6 +456,18 @@ export interface NormalizedConfig {
     manualCompactMode: ManualCompactMode;
     richCompaction: boolean;
     titleModel: ModelId;
+    watchDirs: string[];
+    scanMaxParallel: number | null;
+    embeddings: boolean;
+    embeddingProvider: 'openai' | 'voyage' | 'ollama';
+    embeddingModel: string;
+    embeddingAutoOnDeep: boolean;
+    enrichment: {
+      quickModel: string | null;
+      deepModel: string | null;
+      maxParallel: number;
+      costConfirmThreshold: number;
+    };
   };
 
   /** Shadow mode configuration */
@@ -507,6 +534,63 @@ export interface NormalizedCavemanConfig {
  * Returned when deprecated model IDs are automatically migrated
  * during config load.
  */
+export type RuntimeConversationsConfig = NormalizedConfig['conversations'] & {
+  apiKeys?: NormalizedConfig['apiKeys'];
+  enabledProviders?: NormalizedConfig['enabledProviders'];
+};
+
+export function resolveConversationWatchDirs(config: RuntimeConversationsConfig): RuntimeConversationsConfig {
+  return {
+    ...config,
+    watchDirs: config.watchDirs.map((dir) =>
+      dir.startsWith('~/') ? join(homedir(), dir.slice(2)) : dir,
+    ),
+  };
+}
+
+export function getConversationsConfig(): RuntimeConversationsConfig {
+  const { config } = loadConfig();
+  return resolveConversationWatchDirs({
+    ...config.conversations,
+    apiKeys: config.apiKeys,
+    enabledProviders: config.enabledProviders,
+  });
+}
+
+export async function getConversationsConfigAsync(): Promise<RuntimeConversationsConfig> {
+  const { config } = await loadConfigAsyncNoMigration();
+  return resolveConversationWatchDirs({
+    ...config.conversations,
+    apiKeys: config.apiKeys,
+    enabledProviders: config.enabledProviders,
+  });
+}
+
+export async function updateConversationsConfigAsync(updates: ConversationsConfig): Promise<void> {
+  await loadConfigAsyncNoMigration();
+  let existingContent = '{}\n';
+  try {
+    const content = await readFileAsync(GLOBAL_CONFIG_PATH, 'utf-8');
+    existingContent = content.trim().length > 0 ? content : '{}\n';
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT') throw error;
+  }
+
+  const doc = parseDocument(existingContent);
+  if (doc.contents === null) {
+    doc.contents = parseDocument('{}\n').contents;
+  }
+
+  for (const [key, value] of Object.entries(updates) as Array<[keyof ConversationsConfig, unknown]>) {
+    if (value !== undefined) doc.setIn(['conversations', key], value);
+  }
+
+  await mkdirAsync(dirname(GLOBAL_CONFIG_PATH), { recursive: true });
+  await writeFileAsync(GLOBAL_CONFIG_PATH, doc.toString({ lineWidth: 120 }), 'utf-8');
+  clearConfigCache();
+}
+
 export interface MigrationResult {
   /** List of migrated model IDs */
   migrated: Array<{
@@ -553,6 +637,18 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     manualCompactMode: 'claude-code',
     richCompaction: true,
     titleModel: 'claude-haiku-4-5',
+    watchDirs: ['~/Projects'],
+    scanMaxParallel: null,
+    embeddings: false,
+    embeddingProvider: 'openai',
+    embeddingModel: 'text-embedding-3-small',
+    embeddingAutoOnDeep: true,
+    enrichment: {
+      quickModel: null,
+      deepModel: null,
+      maxParallel: 4,
+      costConfirmThreshold: 1.00,
+    },
   },
   shadow: {
     enabled: false,
@@ -721,6 +817,64 @@ function loadProjectConfig(): YamlConfig | null {
  */
 function loadGlobalConfig(): YamlConfig | null {
   return loadYamlFile(GLOBAL_CONFIG_PATH);
+}
+
+async function loadYamlFileAsync(filePath: string): Promise<YamlConfig | null> {
+  try {
+    const content = await readFileAsync(filePath, 'utf-8');
+    const parsed = yaml.load(content) as YamlConfig;
+    return parsed || {};
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') return null;
+    console.error(`Error loading YAML config from ${filePath}:`, error);
+    return null;
+  }
+}
+
+async function findProjectRootAsync(startDir: string = process.cwd()): Promise<string | null> {
+  let currentDir = startDir;
+
+  while (currentDir !== '/') {
+    try {
+      await statAsync(join(currentDir, '.git'));
+      return currentDir;
+    } catch { /* keep walking */ }
+    currentDir = join(currentDir, '..');
+  }
+
+  return null;
+}
+
+async function loadProjectConfigAsync(): Promise<YamlConfig | null> {
+  const projectRoot = await findProjectRootAsync();
+  if (!projectRoot) return null;
+
+  const newConfigPath = join(projectRoot, '.pan.yaml');
+  if (await pathExistsAsync(newConfigPath)) return loadYamlFileAsync(newConfigPath);
+
+  const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
+  if (await pathExistsAsync(legacyConfigPath)) {
+    process.stderr.write(
+      `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
+    );
+    return loadYamlFileAsync(legacyConfigPath);
+  }
+
+  return null;
+}
+
+async function loadGlobalConfigAsync(): Promise<YamlConfig | null> {
+  return loadYamlFileAsync(GLOBAL_CONFIG_PATH);
+}
+
+async function pathExistsAsync(filePath: string): Promise<boolean> {
+  try {
+    await statAsync(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -1123,6 +1277,39 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (config.conversations?.title_model) {
       result.conversations.titleModel = resolveModelId(config.conversations.title_model);
     }
+    if (config.conversations?.watch_dirs) {
+      result.conversations.watchDirs = config.conversations.watch_dirs;
+    }
+    if (config.conversations?.scan_max_parallel !== undefined) {
+      result.conversations.scanMaxParallel = config.conversations.scan_max_parallel;
+    }
+    if (config.conversations?.embeddings !== undefined) {
+      result.conversations.embeddings = config.conversations.embeddings;
+    }
+    if (config.conversations?.embedding_provider) {
+      result.conversations.embeddingProvider = config.conversations.embedding_provider;
+      if (config.conversations.embedding_provider === 'ollama' && !config.conversations.embedding_model) {
+        result.conversations.embeddingModel = 'nomic-embed-text';
+      }
+    }
+    if (config.conversations?.embedding_model) {
+      result.conversations.embeddingModel = config.conversations.embedding_model;
+    }
+    if (config.conversations?.embedding_auto_on_deep !== undefined) {
+      result.conversations.embeddingAutoOnDeep = config.conversations.embedding_auto_on_deep;
+    }
+    if (config.conversations?.enrichment?.quick_model !== undefined) {
+      result.conversations.enrichment.quickModel = config.conversations.enrichment.quick_model;
+    }
+    if (config.conversations?.enrichment?.deep_model !== undefined) {
+      result.conversations.enrichment.deepModel = config.conversations.enrichment.deep_model;
+    }
+    if (config.conversations?.enrichment?.max_parallel !== undefined) {
+      result.conversations.enrichment.maxParallel = config.conversations.enrichment.max_parallel;
+    }
+    if (config.conversations?.enrichment?.cost_confirm_threshold !== undefined) {
+      result.conversations.enrichment.costConfirmThreshold = config.conversations.enrichment.cost_confirm_threshold;
+    }
 
     // Merge OpenRouter favorites
     if (config.openrouter?.favorites) {
@@ -1140,6 +1327,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         if (!explicitlyDisabled.has('openai')) {
           result.enabledProviders.add('openai');
         }
+      }
+      if (config.api_keys.voyage) {
+        result.apiKeys.voyage = resolveEnvVar(config.api_keys.voyage);
       }
       if (config.api_keys.google) {
         result.apiKeys.google = resolveEnvVar(config.api_keys.google);
@@ -1371,6 +1561,52 @@ export function clearConfigCache(): void {
   configCache = null;
 }
 
+function applyEnvironmentFallbacks(config: NormalizedConfig, explicitlyDisabled: Set<ModelProvider>): void {
+  if (process.env.OPENAI_API_KEY && !config.apiKeys.openai) {
+    config.apiKeys.openai = process.env.OPENAI_API_KEY;
+    if (!explicitlyDisabled.has('openai')) config.enabledProviders.add('openai');
+  }
+  if (process.env.VOYAGE_API_KEY && !config.apiKeys.voyage) {
+    config.apiKeys.voyage = process.env.VOYAGE_API_KEY;
+  }
+  if (process.env.GOOGLE_API_KEY && !config.apiKeys.google) {
+    config.apiKeys.google = process.env.GOOGLE_API_KEY;
+    if (!explicitlyDisabled.has('google')) config.enabledProviders.add('google');
+  }
+  if (process.env.MINIMAX_API_KEY && !config.apiKeys.minimax) {
+    config.apiKeys.minimax = process.env.MINIMAX_API_KEY;
+    if (!explicitlyDisabled.has('minimax')) config.enabledProviders.add('minimax');
+  }
+  if (process.env.ZAI_API_KEY && !config.apiKeys.zai) {
+    config.apiKeys.zai = process.env.ZAI_API_KEY;
+    if (!explicitlyDisabled.has('zai')) config.enabledProviders.add('zai');
+  }
+  const kimiKey = process.env.KIMI_CODING_API_KEY || process.env.KIMI_API_KEY;
+  if (kimiKey && !config.apiKeys.kimi) {
+    config.apiKeys.kimi = kimiKey;
+    if (!explicitlyDisabled.has('kimi')) config.enabledProviders.add('kimi');
+  }
+  if (process.env.OPENROUTER_API_KEY && !config.apiKeys.openrouter) {
+    config.apiKeys.openrouter = process.env.OPENROUTER_API_KEY;
+    if (!explicitlyDisabled.has('openrouter')) config.enabledProviders.add('openrouter');
+  }
+  if (process.env.MIMO_API_KEY && !config.apiKeys.mimo) {
+    config.apiKeys.mimo = process.env.MIMO_API_KEY;
+    if (!explicitlyDisabled.has('mimo')) config.enabledProviders.add('mimo');
+  }
+  if (process.env.NOUS_API_KEY && !config.apiKeys.nous) {
+    config.apiKeys.nous = process.env.NOUS_API_KEY;
+    if (!explicitlyDisabled.has('nous')) config.enabledProviders.add('nous');
+  }
+  if (process.env.LINEAR_API_KEY && !config.trackerKeys.linear) config.trackerKeys.linear = process.env.LINEAR_API_KEY;
+  if (process.env.GITHUB_TOKEN && !config.trackerKeys.github) config.trackerKeys.github = process.env.GITHUB_TOKEN;
+  if (process.env.GITLAB_TOKEN && !config.trackerKeys.gitlab) config.trackerKeys.gitlab = process.env.GITLAB_TOKEN;
+  if (process.env.RALLY_API_KEY && !config.trackerKeys.rally) config.trackerKeys.rally = process.env.RALLY_API_KEY;
+  if (process.env.SHADOW_MODE !== undefined) {
+    config.shadow.enabled = ['true', '1', 'yes'].includes(process.env.SHADOW_MODE.toLowerCase());
+  }
+}
+
 function getConfigMtimes(): { global: number; project: number } {
   let globalMtime = 0;
   let projectMtime = 0;
@@ -1395,6 +1631,56 @@ function getConfigMtimes(): { global: number; project: number } {
   }
 
   return { global: globalMtime, project: projectMtime };
+}
+
+async function getConfigMtimesAsync(): Promise<{ global: number; project: number }> {
+  const globalMtime = await getMtimeAsync(GLOBAL_CONFIG_PATH);
+  let projectMtime = 0;
+
+  const projectRoot = await findProjectRootAsync();
+  if (projectRoot) {
+    for (const name of ['.pan.yaml', '.panopticon.yaml']) {
+      projectMtime = await getMtimeAsync(join(projectRoot, name));
+      if (projectMtime > 0) break;
+    }
+  }
+
+  return { global: globalMtime, project: projectMtime };
+}
+
+async function getMtimeAsync(filePath: string): Promise<number> {
+  try {
+    return (await statAsync(filePath)).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
+
+export async function loadConfigAsyncNoMigration(): Promise<ConfigLoadResult> {
+  const mtimes = await getConfigMtimesAsync();
+  if (
+    configCache &&
+    configCache.globalMtime === mtimes.global &&
+    configCache.projectMtime === mtimes.project
+  ) {
+    return configCache.result;
+  }
+
+  const [globalConfig, projectConfig] = await Promise.all([
+    loadGlobalConfigAsync(),
+    loadProjectConfigAsync(),
+  ]);
+  const { config, explicitlyDisabled } = mergeConfigs(projectConfig, globalConfig);
+  applyEnvironmentFallbacks(config, explicitlyDisabled);
+
+  const result: ConfigLoadResult = { config };
+  const freshMtimes = await getConfigMtimesAsync();
+  configCache = {
+    globalMtime: freshMtimes.global,
+    projectMtime: freshMtimes.project,
+    result,
+  };
+  return result;
 }
 
 /**
@@ -1453,6 +1739,9 @@ export function loadConfig(): ConfigLoadResult {
     if (!explicitlyDisabled.has('openai')) {
       config.enabledProviders.add('openai');
     }
+  }
+  if (process.env.VOYAGE_API_KEY && !config.apiKeys.voyage) {
+    config.apiKeys.voyage = process.env.VOYAGE_API_KEY;
   }
   if (process.env.GOOGLE_API_KEY && !config.apiKeys.google) {
     config.apiKeys.google = process.env.GOOGLE_API_KEY;

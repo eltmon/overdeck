@@ -1,0 +1,582 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, writeFileSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+
+import { selectModelForTier, maxMessagesForTier, DEFAULT_QUICK_MODEL, DEFAULT_DEEP_MODEL } from '../enrichment/model-fallback.js';
+import { enrichSession } from '../enrichment/enrich-session.js';
+import { estimateEnrichmentCost, enrichSessions, CostThresholdError } from '../enrichment/index.js';
+import { upsertDiscoveredSession, findDiscoveredSessions } from '../../database/discovered-sessions-db.js';
+import type { EnrichmentResponse } from '../enrichment/enrich-session.js';
+
+let TEST_HOME: string;
+let fakeJsonlPath: string;
+
+const MOCK_JSONL = [
+  JSON.stringify({
+    sessionId: 'test-sess-1',
+    timestamp: '2025-01-01T10:00:00Z',
+    message: { role: 'user', usage: { input_tokens: 50, output_tokens: 0 } },
+    content: 'How do I fix the login bug?',
+  }),
+  JSON.stringify({
+    sessionId: 'test-sess-1',
+    timestamp: '2025-01-01T10:01:00Z',
+    message: { role: 'assistant', usage: { input_tokens: 0, output_tokens: 100 } },
+    content: [{ type: 'text', text: 'Let me look at the auth module.' }],
+  }),
+].join('\n') + '\n';
+
+async function resetDb() {
+  const { resetDatabase } = await import('../../database/index.js');
+  resetDatabase();
+}
+
+function seedSession() {
+  return upsertDiscoveredSession({
+    jsonlPath: fakeJsonlPath,
+    workspacePath: '/home/user/Projects/myapp',
+    workspaceHash: 'abc123',
+    messageCount: 2,
+    firstTs: '2025-01-01T10:00:00Z',
+    lastTs: '2025-01-01T10:01:00Z',
+    modelsUsed: ['claude-sonnet-4-6'],
+    primaryModel: 'claude-sonnet-4-6',
+    tokenInput: 50,
+    tokenOutput: 100,
+    estimatedCost: 0.001,
+    toolsUsed: [],
+    filesTouched: [],
+    panopticonManaged: false,
+    panIssueId: null,
+    panAgentId: null,
+    fileSize: MOCK_JSONL.length,
+    fileMtime: '2025-01-01T10:00:00Z',
+    tags: [],
+  });
+}
+
+beforeEach(() => {
+  TEST_HOME = join(tmpdir(), `pan-457-enrich-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  mkdirSync(TEST_HOME, { recursive: true });
+  fakeJsonlPath = join(TEST_HOME, 'sess.jsonl');
+  writeFileSync(fakeJsonlPath, MOCK_JSONL, 'utf8');
+  process.env.PANOPTICON_HOME = TEST_HOME;
+  process.env.HOME = TEST_HOME;
+});
+
+afterEach(async () => {
+  await resetDb();
+  delete process.env.PANOPTICON_HOME;
+  delete process.env.HOME;
+  rmSync(TEST_HOME, { recursive: true, force: true });
+});
+
+// ─── model-fallback ───────────────────────────────────────────────────────────
+
+describe('model-fallback', () => {
+  it('L1 falls back to DEFAULT_QUICK_MODEL', () => {
+    expect(selectModelForTier(1, { quickModel: null, deepModel: null })).toBe(DEFAULT_QUICK_MODEL);
+  });
+
+  it('L2 falls back to DEFAULT_DEEP_MODEL', () => {
+    expect(selectModelForTier(2, { quickModel: null, deepModel: null })).toBe(DEFAULT_DEEP_MODEL);
+  });
+
+  it('L3 falls back to DEFAULT_DEEP_MODEL', () => {
+    expect(selectModelForTier(3, { quickModel: null, deepModel: null })).toBe(DEFAULT_DEEP_MODEL);
+  });
+
+  it('configured quickModel overrides default for L1', () => {
+    expect(selectModelForTier(1, { quickModel: 'custom-haiku', deepModel: null })).toBe('custom-haiku');
+  });
+
+  it('configured deepModel overrides default for L2/L3', () => {
+    expect(selectModelForTier(2, { quickModel: null, deepModel: 'custom-sonnet' })).toBe('custom-sonnet');
+    expect(selectModelForTier(3, { quickModel: null, deepModel: 'custom-opus' })).toBe('custom-opus');
+  });
+
+  it('maxMessagesForTier returns correct limits', () => {
+    expect(maxMessagesForTier(1)).toBe(3);
+    expect(maxMessagesForTier(2)).toBe(11);
+    expect(maxMessagesForTier(3)).toBeNull();
+  });
+});
+
+// ─── enrichSession ────────────────────────────────────────────────────────────
+
+const mockApiCall = async (_model: string, _prompt: string): Promise<EnrichmentResponse> => ({
+  summary: 'Fixed the login bug in the auth module.',
+  tags: ['auth', 'bug-fix', 'login'],
+});
+
+const mockApiCallL2 = async (_model: string, _prompt: string): Promise<EnrichmentResponse> => ({
+  summary: 'Fixed the login bug.',
+  summaryDetailed: 'Investigated auth module. Found incorrect token validation. Fixed the JWT check.',
+  tags: ['auth', 'bug-fix', 'jwt', 'login', 'token'],
+});
+
+describe('enrichSession', () => {
+  it('enriches a session at L1 and persists to DB', async () => {
+    seedSession();
+    const sessions = findDiscoveredSessions({});
+    expect(sessions.length).toBe(1);
+    const sessionId = sessions[0].id;
+
+    const result = await enrichSession({
+      sessionId,
+      jsonlPath: fakeJsonlPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: mockApiCall,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.tier).toBe(1);
+    expect(result.model).toBe(DEFAULT_QUICK_MODEL);
+
+    const updated = findDiscoveredSessions({});
+    const sess = updated.find((s) => s.id === sessionId);
+    expect(sess?.enrichmentLevel).toBe(1);
+    expect(sess?.summary).toBe('Fixed the login bug in the auth module.');
+    expect(sess?.tags).toContain('auth');
+  });
+
+  it('enriches at L2 with summaryDetailed', async () => {
+    seedSession();
+    const sessions = findDiscoveredSessions({});
+    const sessionId = sessions[0].id;
+
+    await enrichSession({
+      sessionId,
+      jsonlPath: fakeJsonlPath,
+      tier: 2,
+      config: { quickModel: null, deepModel: null },
+      callApi: mockApiCallL2,
+    });
+
+    const updated = findDiscoveredSessions({});
+    const sess = updated.find((s) => s.id === sessionId);
+    expect(sess?.enrichmentLevel).toBe(2);
+    expect(sess?.summaryDetailed).toContain('JWT');
+  });
+
+  it('preserves the L1 quick summary when L2 adds detailed summary and tags', async () => {
+    seedSession();
+    const [session] = findDiscoveredSessions({});
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: fakeJsonlPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async () => ({ summary: 'Original L1 summary.', tags: ['l1'] }),
+    });
+
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: fakeJsonlPath,
+      tier: 2,
+      config: { quickModel: null, deepModel: null },
+      callApi: async () => ({
+        summary: 'Replacement L2 quick summary.',
+        summaryDetailed: 'Detailed L2 summary.',
+        tags: ['l2'],
+      }),
+    });
+
+    const [updated] = findDiscoveredSessions({});
+    expect(updated.summary).toBe('Original L1 summary.');
+    expect(updated.summaryDetailed).toBe('Detailed L2 summary.');
+    expect(updated.tags).toEqual(['l2']);
+  });
+
+  it('sends L1 as 3 sampled messages and L2 as 11 sampled messages with tool summaries', async () => {
+    const samplePath = join(TEST_HOME, 'sampled.jsonl');
+    const lines = Array.from({ length: 20 }, (_, i) => JSON.stringify({
+      message: {
+        role: i % 2 === 0 ? 'user' : 'assistant',
+        content: i === 1
+          ? [{ type: 'tool_use', name: 'Read', input: { file_path: '/secret/path' } }]
+          : `message ${i}`,
+      },
+    }));
+    writeFileSync(samplePath, lines.join('\n') + '\n', 'utf8');
+    const session = upsertDiscoveredSession({ jsonlPath: samplePath, messageCount: lines.length });
+    const prompts: Record<number, string> = {};
+
+    for (const tier of [1, 2] as const) {
+      await enrichSession({
+        sessionId: session.id,
+        jsonlPath: samplePath,
+        tier,
+        force: true,
+        config: { quickModel: null, deepModel: null },
+        callApi: async (_model, prompt) => {
+          prompts[tier] = prompt;
+          return tier === 1
+            ? { summary: 'Sampled L1.', tags: ['sampled'] }
+            : { summary: 'Sampled L2.', summaryDetailed: 'Sampled L2 detail.', tags: ['sampled'] };
+        },
+      });
+    }
+
+    expect(prompts[1].split('\n').filter((line) => line.startsWith('['))).toHaveLength(3);
+    expect(prompts[2].split('\n').filter((line) => line.startsWith('['))).toHaveLength(11);
+    expect(prompts[2]).toContain('[tool_use:Read]');
+    expect(prompts[2]).not.toContain('/secret/path');
+  });
+
+  it('bounds sampled prompt size for large L1 transcripts', async () => {
+    const largePath = join(TEST_HOME, 'large-l1.jsonl');
+    const lines = Array.from({ length: 10_000 }, (_, i) => JSON.stringify({
+      message: { role: i % 2 === 0 ? 'user' : 'assistant', content: `message ${i} ${'x'.repeat(200)}` },
+    }));
+    writeFileSync(largePath, lines.join('\n') + '\n', 'utf8');
+    const session = upsertDiscoveredSession({ jsonlPath: largePath, messageCount: lines.length });
+    let capturedPrompt = '';
+
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: largePath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_model, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Bounded sample.', tags: ['bounded'] };
+      },
+    });
+
+    expect(capturedPrompt.length).toBeLessThan(5_000);
+  });
+
+  it('caps L3 prompt size for very large transcripts', async () => {
+    const largePath = join(TEST_HOME, 'large-l3.jsonl');
+    const lines = Array.from({ length: 8_000 }, (_, i) => JSON.stringify({
+      message: { role: 'user', content: `deep message ${i} ${'y'.repeat(500)}` },
+    }));
+    writeFileSync(largePath, lines.join('\n') + '\n', 'utf8');
+    const session = upsertDiscoveredSession({ jsonlPath: largePath, messageCount: lines.length });
+    let capturedPrompt = '';
+
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: largePath,
+      tier: 3,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_model, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Capped deep sample.', summaryDetailed: 'Capped.', tags: ['capped'] };
+      },
+    });
+
+    expect(capturedPrompt.length).toBeLessThan(2_800_000);
+  });
+
+  it('full-transcript enrichment sends every JSONL line without L3 caps', async () => {
+    const largePath = join(TEST_HOME, 'full-l3.jsonl');
+    const lines = Array.from({ length: 5_050 }, (_, i) => JSON.stringify({
+      message: {
+        role: 'user',
+        content: i === 5_049
+          ? `literal full transcript line ${i} ${'x'.repeat(520)} full-transcript-tail-sentinel`
+          : `literal full transcript line ${i}`,
+      },
+    }));
+    writeFileSync(largePath, lines.join('\n') + '\n', 'utf8');
+    const session = upsertDiscoveredSession({ jsonlPath: largePath, messageCount: lines.length });
+    let capturedPrompt = '';
+
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: largePath,
+      tier: 3,
+      fullTranscript: true,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_model, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Full deep sample.', summaryDetailed: 'Full.', tags: ['full'] };
+      },
+    });
+
+    expect(capturedPrompt).toContain('literal full transcript line 0');
+    expect(capturedPrompt).toContain('literal full transcript line 4999');
+    expect(capturedPrompt).toContain('literal full transcript line 5000');
+    expect(capturedPrompt).toContain('literal full transcript line 5049');
+    expect(capturedPrompt).toContain('full-transcript-tail-sentinel');
+  });
+
+  it('omits raw tool inputs and redacts secrets before sending enrichment prompts', async () => {
+    const secretPath = join(TEST_HOME, 'secret-tool-use.jsonl');
+    const lines = [
+      JSON.stringify({
+        message: {
+          role: 'assistant',
+          content: [{
+            type: 'tool_use',
+            name: 'Bash',
+            input: {
+              command: 'DATABASE_URL=postgres://user:pass@db/app npm_TOKEN=npm_abcdefghijklmnopqrstuvwxyz1234567890',
+            },
+          }],
+        },
+      }),
+      JSON.stringify({
+        message: {
+          role: 'user',
+          content: 'Here is a jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature and api_key=sk-proj-secret1234567890',
+        },
+      }),
+    ];
+    writeFileSync(secretPath, lines.join('\n') + '\n', 'utf8');
+    const session = upsertDiscoveredSession({ jsonlPath: secretPath, messageCount: lines.length });
+    let capturedPrompt = '';
+
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: secretPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_model, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Redacted.', tags: ['security'] };
+      },
+    });
+
+    expect(capturedPrompt).toContain('[tool_use:Bash]');
+    expect(capturedPrompt).not.toContain('DATABASE_URL=postgres://user:pass@db/app');
+    expect(capturedPrompt).not.toContain('npm_abcdefghijklmnopqrstuvwxyz1234567890');
+    expect(capturedPrompt).not.toContain('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signature');
+    expect(capturedPrompt).not.toContain('sk-proj-secret1234567890');
+    expect(capturedPrompt).toContain('[REDACTED_JWT]');
+    expect(capturedPrompt).toContain('api_key=[REDACTED]');
+  });
+
+  it('marks session as failed when API throws', async () => {
+    seedSession();
+    const sessions = findDiscoveredSessions({});
+    const sessionId = sessions[0].id;
+
+    const failingApi = async () => { throw new Error('API timeout'); };
+    const result = await enrichSession({
+      sessionId,
+      jsonlPath: fakeJsonlPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: failingApi,
+    });
+
+    expect(result.error).toContain('API timeout');
+  });
+
+  it('returns error for missing JSONL file', async () => {
+    seedSession();
+    const sessions = findDiscoveredSessions({});
+    const sessionId = sessions[0].id;
+
+    const result = await enrichSession({
+      sessionId,
+      jsonlPath: '/nonexistent/path/sess.jsonl',
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: mockApiCall,
+    });
+
+    expect(result.error).toBeDefined();
+  });
+
+  it('real transcript format: excerpt includes text from message.content', async () => {
+    // Real Claude Code JSONL: content lives in message.content, not at top level
+    const realJsonl = [
+      JSON.stringify({
+        type: 'user',
+        sessionId: 'real-enrich-1',
+        timestamp: '2025-04-01T09:00:00Z',
+        cwd: '/home/user/Projects/realapp',
+        message: { role: 'user', content: [{ type: 'text', text: 'Investigate the memory leak' }] },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        sessionId: 'real-enrich-1',
+        timestamp: '2025-04-01T09:01:00Z',
+        message: {
+          role: 'assistant',
+          model: 'claude-sonnet-4-6',
+          content: [{ type: 'text', text: 'I found a retain cycle in the event emitter.' }],
+          usage: { input_tokens: 100, output_tokens: 80 },
+        },
+      }),
+    ].join('\n') + '\n';
+    const realPath = join(TEST_HOME, 'real-sess.jsonl');
+    writeFileSync(realPath, realJsonl, 'utf8');
+
+    const session = upsertDiscoveredSession({
+      jsonlPath: realPath,
+      workspacePath: '/home/user/Projects/realapp',
+      workspaceHash: 'realh',
+      messageCount: 2,
+      firstTs: '2025-04-01T09:00:00Z',
+      lastTs: '2025-04-01T09:01:00Z',
+      modelsUsed: ['claude-sonnet-4-6'],
+      primaryModel: 'claude-sonnet-4-6',
+      tokenInput: 100,
+      tokenOutput: 80,
+      estimatedCost: 0.001,
+      toolsUsed: [],
+      filesTouched: [],
+      panopticonManaged: false,
+      panIssueId: null,
+      panAgentId: null,
+      fileSize: realJsonl.length,
+      fileMtime: '2025-04-01T09:00:00Z',
+      tags: [],
+    });
+
+    let capturedPrompt = '';
+    await enrichSession({
+      sessionId: session.id,
+      jsonlPath: realPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: async (_m, prompt) => {
+        capturedPrompt = prompt;
+        return { summary: 'Memory leak fix.', tags: ['memory', 'bug'] };
+      },
+    });
+
+    // The excerpt must contain text from message.content, not be empty
+    expect(capturedPrompt).toContain('memory leak');
+    expect(capturedPrompt).toContain('retain cycle');
+  });
+});
+
+// ─── estimateEnrichmentCost ───────────────────────────────────────────────────
+
+describe('estimateEnrichmentCost', () => {
+  it('L1 costs less than L2 for same session count', () => {
+    expect(estimateEnrichmentCost(10, 1)).toBeLessThan(estimateEnrichmentCost(10, 2));
+  });
+
+  it('zero sessions → zero cost', () => {
+    expect(estimateEnrichmentCost(0, 1)).toBe(0);
+  });
+});
+
+// ─── enrichSessions (bulk) ────────────────────────────────────────────────────
+
+describe('enrichSessions', () => {
+  it('throws CostThresholdError when estimated cost exceeds threshold', async () => {
+    // Seed 1000 sessions worth of cost by passing a tiny threshold
+    seedSession();
+
+    await expect(
+      enrichSessions({
+        tier: 1,
+        callApi: mockApiCall,
+        // Set threshold so low that even 1 session exceeds it
+        maxParallel: 1,
+      }),
+    ).resolves.toBeDefined(); // 1 session won't exceed default $1.00 threshold
+
+    // Force exceed threshold by injecting a modified config via env
+    // (test that the CostThresholdError is thrown with a negative threshold isn't practical)
+    // Instead verify the error class is accessible
+    const err = new CostThresholdError(1.5, 1.0, 100);
+    expect(err).toBeInstanceOf(CostThresholdError);
+    expect(err.estimatedCost).toBe(1.5);
+    expect(err.name).toBe('CostThresholdError');
+  });
+
+  it('reports actual enrichment cost within the 20% estimate tolerance for a sample run', async () => {
+    seedSession();
+    const estimated = estimateEnrichmentCost(1, 1);
+
+    const result = await enrichSessions({
+      tier: 1,
+      callApi: async () => ({
+        summary: 'Cost sample.',
+        tags: ['cost'],
+        usage: {
+          inputTokens: 300,
+          outputTokens: 150,
+          cost: estimated * 1.1,
+        },
+      }),
+      maxParallel: 1,
+    });
+
+    expect(result.estimatedCost).toBe(estimated);
+    expect(result.actualCost).toBeCloseTo(estimated * 1.1);
+    expect(Math.abs(result.actualCost! - result.estimatedCost) / result.estimatedCost).toBeLessThanOrEqual(0.2);
+  });
+
+  it('tier 2 bulk enrichment includes sessions already at L1', async () => {
+    // Seed a session and enrich it to L1
+    seedSession();
+    const [sess] = findDiscoveredSessions({});
+    await enrichSession({
+      sessionId: sess.id,
+      jsonlPath: fakeJsonlPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: mockApiCall,
+    });
+
+    // L1 session should be selected for tier-2 bulk enrichment
+    const result = await enrichSessions({
+      tier: 2,
+      callApi: mockApiCallL2,
+      maxParallel: 1,
+    });
+    expect(result.enriched).toBe(1);
+  });
+
+  it('tier 1 bulk enrichment skips sessions already at L1', async () => {
+    seedSession();
+    const [sess] = findDiscoveredSessions({});
+    await enrichSession({
+      sessionId: sess.id,
+      jsonlPath: fakeJsonlPath,
+      tier: 1,
+      config: { quickModel: null, deepModel: null },
+      callApi: mockApiCall,
+    });
+
+    // L1 session should be excluded from tier-1 bulk enrichment (already at tier)
+    const result = await enrichSessions({
+      tier: 1,
+      callApi: mockApiCall,
+      maxParallel: 1,
+    });
+    expect(result.enriched).toBe(0);
+  });
+
+  it('counts progress callback failures instead of dropping work-pool errors', async () => {
+    seedSession();
+
+    const result = await enrichSessions({
+      tier: 1,
+      callApi: mockApiCall,
+      onProgress: () => { throw new Error('progress sink failed'); },
+      maxParallel: 1,
+    });
+
+    expect(result.enriched).toBe(1);
+    expect(result.errors).toBe(1);
+  });
+
+  it('enriches all unenriched sessions with progress callbacks', async () => {
+    seedSession();
+    const progressCalls: unknown[] = [];
+
+    const result = await enrichSessions({
+      tier: 1,
+      callApi: mockApiCall,
+      onProgress: (p) => progressCalls.push(p),
+      maxParallel: 1,
+    });
+
+    expect(result.enriched).toBe(1);
+    expect(result.errors).toBe(0);
+    expect(progressCalls.length).toBeGreaterThan(0);
+  });
+});

@@ -61,7 +61,7 @@ describe('GodView selectors', () => {
   });
 
   it('selectGodViewActivityFeed returns recentActivity', () => {
-    const events = [{ agentId: 'a', timestamp: 'T', type: 'x', message: 'y' }];
+    const events = [{ id: 'evt-1', timestamp: 'T', source: 'cloister', level: 'info', message: 'y' }];
     expect(selectGodViewActivityFeed({ recentActivity: events })).toEqual(events);
   });
 
@@ -213,29 +213,25 @@ describe('stripAnsi', () => {
 // ─── Activity aggregation logic ───────────────────────────────────────────────
 
 describe('God View activity aggregation', () => {
-  it('deduplicates events by agentId+timestamp', () => {
+  it('deduplicates events by id', () => {
     const events = [
-      { agentId: 'a', timestamp: '2026-01-01T10:00:00Z', type: 'commit', message: 'x' },
-      { agentId: 'a', timestamp: '2026-01-01T10:00:00Z', type: 'commit', message: 'x' },
-      { agentId: 'b', timestamp: '2026-01-01T10:01:00Z', type: 'activity', message: 'y' },
+      { id: 'evt-1', source: 'cloister', level: 'info', timestamp: '2026-01-01T10:00:00Z', message: 'x' },
+      { id: 'evt-1', source: 'cloister', level: 'info', timestamp: '2026-01-01T10:00:00Z', message: 'x' },
+      { id: 'evt-2', source: 'review-specialist', level: 'success', timestamp: '2026-01-01T10:01:00Z', message: 'y' },
     ];
-    const seen = new Set<string>();
-    const unique = events.filter(e => {
-      const key = `${e.agentId}:${e.timestamp}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    const byId = new Map<string, typeof events[number]>();
+    for (const event of events) byId.set(event.id, event);
+    const unique = Array.from(byId.values());
     expect(unique).toHaveLength(2);
-    expect(unique[0].agentId).toBe('a');
-    expect(unique[1].agentId).toBe('b');
+    expect(unique[0].id).toBe('evt-1');
+    expect(unique[1].id).toBe('evt-2');
   });
 
   it('sorts events newest-first', () => {
     const events = [
-      { agentId: 'a', timestamp: '2026-01-01T09:00:00Z', type: 'activity', message: 'old' },
-      { agentId: 'b', timestamp: '2026-01-01T11:00:00Z', type: 'commit', message: 'newest' },
-      { agentId: 'c', timestamp: '2026-01-01T10:00:00Z', type: 'activity', message: 'middle' },
+      { id: 'evt-1', source: 'cloister', level: 'info', timestamp: '2026-01-01T09:00:00Z', message: 'old' },
+      { id: 'evt-2', source: 'merge-agent', level: 'success', timestamp: '2026-01-01T11:00:00Z', message: 'newest' },
+      { id: 'evt-3', source: 'test-specialist', level: 'warn', timestamp: '2026-01-01T10:00:00Z', message: 'middle' },
     ];
     events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     expect(events[0].message).toBe('newest');
@@ -245,20 +241,23 @@ describe('God View activity aggregation', () => {
 
   it('caps at 20 events', () => {
     const events = Array.from({ length: 30 }, (_, i) => ({
-      agentId: `agent-${i}`,
+      id: `evt-${i}`,
+      source: 'cloister',
+      level: 'info' as const,
       timestamp: new Date(Date.now() - i * 1000).toISOString(),
-      type: 'activity',
       message: `event ${i}`,
     }));
     expect(events.slice(0, 20)).toHaveLength(20);
   });
 
   it('preserves event structure', () => {
-    const event = { agentId: 'agent-x', timestamp: '2026-01-01T10:00:00Z', type: 'commit', message: 'feat: add thing' };
+    const event = { id: 'evt-9', source: 'merge-agent', level: 'success', timestamp: '2026-01-01T10:00:00Z', message: 'feat: add thing', issueId: 'PAN-123' };
     const feed = [event];
-    expect(feed[0]).toHaveProperty('agentId', 'agent-x');
-    expect(feed[0]).toHaveProperty('type', 'commit');
+    expect(feed[0]).toHaveProperty('id', 'evt-9');
+    expect(feed[0]).toHaveProperty('source', 'merge-agent');
+    expect(feed[0]).toHaveProperty('level', 'success');
     expect(feed[0]).toHaveProperty('message', 'feat: add thing');
+    expect(feed[0]).toHaveProperty('issueId', 'PAN-123');
   });
 });
 

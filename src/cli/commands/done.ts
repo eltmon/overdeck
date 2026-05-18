@@ -266,6 +266,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         console.error(chalk.dim('  Use --force to skip checks.'));
         console.error('');
         process.exit(1);
+        return;
       }
 
       // Status updates now live in continue.json statusOverrides (PAN-1124),
