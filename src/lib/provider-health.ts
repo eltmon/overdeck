@@ -8,6 +8,7 @@
 
 import { getProviderEnv, getProviderForModel, type ProviderConfig } from './providers.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
+import { ensureOpenAICompatibleProxyRunning } from './openai-compatible-proxy.js';
 import type { ModelId } from './settings.js';
 
 export type ProbeResultKind = 'quota' | 'auth' | 'timeout' | 'network' | 'server' | 'unknown';
@@ -107,6 +108,14 @@ async function doProbe(
   apiKey: string,
   model: string,
 ): Promise<ProbeResult> {
+  // Nous Portal routes through the local OpenAI-compatible proxy sidecar at
+  // 127.0.0.1:12436. Without this, the probe runs before the proxy is booted
+  // on the first spawn after every dashboard restart and surfaces a spurious
+  // "Cannot reach Nous Portal: fetch failed" toast.
+  if (provider.name === 'nous') {
+    await ensureOpenAICompatibleProxyRunning();
+  }
+
   const providerEnv = getProviderEnv(provider, apiKey);
   const baseUrl = providerEnv.ANTHROPIC_BASE_URL ?? provider.baseUrl;
   if (!baseUrl) return { ok: true };
