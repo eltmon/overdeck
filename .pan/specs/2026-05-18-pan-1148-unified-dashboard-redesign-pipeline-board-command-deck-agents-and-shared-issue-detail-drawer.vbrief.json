@@ -4,7 +4,7 @@
     "created": "2026-05-18T05:10:55.134Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
-    "updated": "2026-05-18T06:25:36.650Z"
+    "updated": "2026-05-18T08:39:44.877Z"
   },
   "plan": {
     "id": "pan-1148",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "4506a8e9-5388-424a-8301-87772aa05925",
     "author": "agent:claude-opus-4-7",
-    "sequence": 9,
+    "sequence": 16,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T06:25:36.650Z",
+    "updated": "2026-05-18T08:39:44.877Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -434,7 +434,7 @@
       {
         "id": "f6-issue-card",
         "title": "Add IssueCard primitive (Board card, composes VerbBadge)",
-        "status": "running",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -442,8 +442,8 @@
           "issueLabel": "pan-1148",
           "requiresInspection": false,
           "inspectionDepth": "fast",
-          "statusReason": "Swarm slot 1 dispatched",
-          "statusUpdatedAt": "2026-05-18T06:25:36.650Z"
+          "statusReason": "Swarm slot 1 merged into feature branch",
+          "statusUpdatedAt": "2026-05-18T08:39:11.958Z"
         },
         "narrative": {
           "Action": "Create src/dashboard/frontend/src/components/primitives/IssueCard.tsx implementing PRD §4.7.6 exactly: 14px radius, padding 12px 12px 10px, lighter card surface (color-mix background 92% + white), priority left border identical to IssueRow, stuck/merge-ready border color overrides, project mark + ID + verb badge in row 1, 2-line clamped title, label chips, bead progress bar with phase-colored fill, footer with agent meta + runtime + 18px avatar. Tag root with `data-component=\"issue-card\"`."
@@ -452,49 +452,55 @@
           {
             "id": "f6-issue-card.ac1",
             "title": "IssueCard implements all PRD §4.7.6 spec values (radius, padding, surface, hover, priority bar inset 12px)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:11.958Z"
           },
           {
             "id": "f6-issue-card.ac2",
             "title": "Stuck card and merge-ready card border colors swap correctly when corresponding props are true",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:11.958Z"
           },
           {
             "id": "f6-issue-card.ac3",
             "title": "Bead progress bar renders the correct fill width and phase-colored fill",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:11.958Z"
           },
           {
             "id": "f6-issue-card.ac4",
             "title": "Composes VerbBadge; never renders status colors on labels",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:11.958Z"
           },
           {
             "id": "f6-issue-card.ac5",
             "title": "Root element carries `data-component=\"issue-card\"`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:11.958Z"
           }
-        ]
+        ],
+        "completed": "2026-05-18T08:39:11.958Z"
       },
       {
         "id": "f7-agent-card",
         "title": "Add AgentCard primitive (Agents fleet card, composes VerbBadge)",
-        "status": "running",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -502,8 +508,8 @@
           "issueLabel": "pan-1148",
           "requiresInspection": false,
           "inspectionDepth": "fast",
-          "statusReason": "Swarm slot 2 dispatched",
-          "statusUpdatedAt": "2026-05-18T06:25:36.642Z"
+          "statusReason": "Swarm slot 2 merged into feature branch",
+          "statusUpdatedAt": "2026-05-18T08:39:40.186Z"
         },
         "narrative": {
           "Action": "Create src/dashboard/frontend/src/components/primitives/AgentCard.tsx implementing PRD §4.7.9 exactly: card surface with 18px radius, 3px ::before left accent per phase, stuck border override, name + verb badge + menu button row, issue panel with project mark + ID/title (2-line clamp), tri-column meta (lbl/val pairs), stream excerpt with fade-out gradient and 84px max-height, optional stuck banner, footer with primary/danger action links. Tag root with `data-component=\"agent-card\"`."
@@ -512,56 +518,64 @@
           {
             "id": "f7-agent-card.ac1",
             "title": "AgentCard implements PRD §4.7.9 spec (grid container, accent rail, stuck override)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:40.186Z"
           },
           {
             "id": "f7-agent-card.ac2",
             "title": "Stream excerpt has the fade-out gradient via ::after at 24px tall",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:40.186Z"
           },
           {
             "id": "f7-agent-card.ac3",
             "title": "Stuck banner renders inline when `stuck` prop is true; never shown otherwise",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:40.186Z"
           },
           {
             "id": "f7-agent-card.ac4",
             "title": "Footer action links: primary uses --info-foreground, danger uses --destructive-foreground (right-aligned)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:40.186Z"
           },
           {
             "id": "f7-agent-card.ac5",
             "title": "Root element carries `data-component=\"agent-card\"`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:40.186Z"
           }
-        ]
+        ],
+        "completed": "2026-05-18T08:39:40.186Z"
       },
       {
         "id": "f8-universal-chrome",
         "title": "Add fractal-noise body overlay + shared top-bar styles for new chrome",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 3 dispatched",
+          "statusUpdatedAt": "2026-05-18T08:39:16.665Z"
         },
         "narrative": {
           "Action": "PRD §4.7 'Universal rules' calls for a 3.5%-opacity fractal-noise body overlay (fixed-position SVG turbulence at 256px tile) on every page. Add it as a global element rendered once in App.tsx (or main shell). Also extract the shared top-bar style helpers per PRD §4.7.2 (52px/48px height, 13px breadcrumb, 32px search/buttons, segmented control) into src/dashboard/frontend/src/components/primitives/TopBar.tsx for reuse by Pipeline, Board, Agents."
@@ -1120,14 +1134,16 @@
       {
         "id": "p1-pipeline-page-shell",
         "title": "Add Pipeline page shell + route (greenfield)",
-        "status": "pending",
+        "status": "running",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 6 dispatched",
+          "statusUpdatedAt": "2026-05-18T08:39:17.588Z"
         },
         "narrative": {
           "Action": "Create src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx as the new Pipeline route content. Composes TopBar (52px), MetricStrip (5 tiles — wired in p2), grouped IssueRow lists under PhaseHeader (wired in p3), and a footer-empty zone. Imports the Issue Row primitive from f5. Reads issues from selectIssues + reviewStatusByIssueId from the existing dashboard store and classifies by lifecycle phase using src/dashboard/frontend/src/lib/pipeline-state.ts. Add `pipeline` to Tab type in Header.tsx; add `TAB_PATHS['pipeline'] = '/pipeline'` in App.tsx. (Default-route flip ships in n2.)"
@@ -1470,14 +1486,16 @@
       {
         "id": "b3-board-drop-drag-to-phase",
         "title": "Drop Board drag-to-phase wiring (explicitly out per PRD non-goal); keep drag-to-reorder within a column",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 4 dispatched",
+          "statusUpdatedAt": "2026-05-18T08:39:44.877Z"
         },
         "narrative": {
           "Action": "Remove any code in KanbanBoard.tsx that handles cross-column drops (currently maps the drop column to a status mutation). Keep drag-to-reorder within a single column for prioritization. Per PRD §3 this is an explicit non-goal — phase transitions are driven by agent state, not by hand."
@@ -1562,14 +1580,16 @@
       {
         "id": "c1-command-deck-right-pane-reframe",
         "title": "Reframe Command Deck right pane as tabbed per-project lens (preserves all ZoneCOverviewTabs content components)",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 5 dispatched",
+          "statusUpdatedAt": "2026-05-18T08:39:44.849Z"
         },
         "narrative": {
           "Action": "Replace the Command Deck right pane shell (currently ZoneCConversation / ZoneCOverview) with a tabbed per-project lens that mirrors Pipeline filtered to the selected project. Tabs: Pipeline (composes IssueRow scoped to project) / Plans / Beads / Conversations / Activity / Settings. Tabs 2-6 reuse existing content components from ZoneCOverviewTabs (OverviewTab, BeadsTab, ActivityTab, DiscussionsTab, MarkdownTab, CostsTab, PrDiffTab, VBriefTab) — these files MUST NOT be edited in this bead. Only the host shell changes."
@@ -1830,14 +1850,16 @@
       {
         "id": "a4-agents-move-deacon-to-health",
         "title": "Move Deacon status UI from Agents to Health page",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 7 dispatched",
+          "statusUpdatedAt": "2026-05-18T08:39:44.723Z"
         },
         "narrative": {
           "Action": "Relocate the DeaconStatus component (currently under CommandDeck/DeaconStatus.tsx) usage into HealthDashboard.tsx. Remove any Deacon-specific section that was rendered inside AgentList. CloisterStatusBar (sidebar) and the global DeaconPauseToggle (footer) are unrelated and remain unchanged."

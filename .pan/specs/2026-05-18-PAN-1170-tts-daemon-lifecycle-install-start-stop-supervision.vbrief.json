@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-18T04:46:14.779Z",
-    "updated": "2026-05-18T06:22:53.340Z",
+    "updated": "2026-05-18T08:28:08.163Z",
     "author": "panopticon-cli/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-1170: TTS daemon lifecycle: install, start/stop, supervision",
     "inspectionPolicy": "never"
@@ -13,9 +13,9 @@
     "status": "proposed",
     "uid": "09723c30-56eb-49ab-bffb-a3c515c00a04",
     "author": "panopticon-cli/auto-start",
-    "sequence": 41,
+    "sequence": 87,
     "created": "2026-05-18T04:46:14.779Z",
-    "updated": "2026-05-18T06:22:53.340Z",
+    "updated": "2026-05-18T08:28:08.163Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1170",
@@ -29,61 +29,63 @@
     "metadata": {
       "canonicalFilename": "2026-05-18-PAN-1170-tts-daemon-lifecycle-install-start-stop-supervision.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "merge",
         "issueId": "PAN-1170",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-18T06:22:53.339Z",
+        "updatedAt": "2026-05-18T08:28:08.150Z",
         "work": {
-          "updatedAt": "2026-05-18T06:22:53.339Z",
+          "updatedAt": "2026-05-18T08:28:08.150Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-18T06:22:53.339Z",
+          "updatedAt": "2026-05-18T08:28:08.150Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-18T06:22:53.339Z"
+              "at": "2026-05-18T08:28:08.150Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-05-18T06:22:53.339Z",
-          "notes": "getTtsDaemonStatus() clearState() races with watchdog, breaking AC4 crash-restart when dashboard polls /api/tts/health before watchdog tick",
+          "status": "passed",
+          "updatedAt": "2026-05-18T08:28:08.150Z",
+          "notes": "Passed: 0 security, 0 correctness, 0 performance blockers; 1 advisory (template autosave debounce)",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-05-18T06:22:53.339Z",
-              "notes": "getTtsDaemonStatus() clearState() races with watchdog, breaking AC4 crash-restart when dashboard polls /api/tts/health before watchdog tick"
+              "status": "passed",
+              "at": "2026-05-18T08:28:08.150Z",
+              "notes": "Passed: 0 security, 0 correctness, 0 performance blockers; 1 advisory (template autosave debounce)"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-05-18T06:22:53.339Z",
+          "status": "passed",
+          "updatedAt": "2026-05-18T08:28:08.150Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-18T06:22:53.339Z"
+              "status": "passed",
+              "at": "2026-05-18T08:28:08.150Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-18T06:22:53.339Z",
+          "updatedAt": "2026-05-18T08:28:08.150Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-18T06:22:53.339Z",
+          "updatedAt": "2026-05-18T08:28:08.150Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-18T06:22:53.339Z"
+              "at": "2026-05-18T08:28:08.150Z"
             }
           ],
-          "readyForMerge": false,
+          "readyForMerge": true,
           "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1172"
         }
       }
