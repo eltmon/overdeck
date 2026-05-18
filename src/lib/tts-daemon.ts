@@ -18,14 +18,20 @@ export const QWEN_TTS_AUTH_TOKEN_PATH = join(PANOPTICON_HOME, 'secrets', 'qwen-t
 export const QWEN_TTS_AUTH_HEADER = 'X-Panopticon-TTS-Token';
 export const QWEN_TTS_LOG_PATH = join(LOGS_DIR, 'qwen-tts.log');
 const GPU_MEMORY_CACHE_TTL_MS = 30_000;
+const DEFAULT_TTS_DAEMON_STARTUP_GRACE_MS = 30 * 60_000;
 let gpuMemoryCache: { pid: number; sampledAt: number; value: number | undefined } | null = null;
 let gpuMemoryInFlight: { pid: number; promise: Promise<number | undefined> } | null = null;
+
+export type TtsDaemonStatePhase = 'starting' | 'running';
+export type TtsDaemonStatusPhase = 'stopped' | 'starting' | 'healthy' | 'unhealthy';
 
 export interface TtsDaemonState {
   pid: number;
   startedAt: string;
   host: string;
   port: number;
+  phase?: TtsDaemonStatePhase;
+  startupDeadlineAt?: string;
   model?: string;
 }
 
@@ -34,6 +40,8 @@ export interface TtsDaemonStatus {
   running: boolean;
   pid: number | null;
   managed?: boolean;
+  phase: TtsDaemonStatusPhase;
+  initializing?: boolean;
   daemonHost: string;
   daemonPort: number;
   queue?: unknown;
@@ -140,6 +148,8 @@ async function readState(): Promise<TtsDaemonState | null> {
       startedAt: parsed.startedAt,
       host: parsed.host,
       port: parsed.port,
+      phase: parsed.phase === 'starting' || parsed.phase === 'running' ? parsed.phase : undefined,
+      startupDeadlineAt: typeof parsed.startupDeadlineAt === 'string' ? parsed.startupDeadlineAt : undefined,
       model: typeof parsed.model === 'string' ? parsed.model : undefined,
     };
   } catch {
@@ -250,6 +260,26 @@ async function clearState(): Promise<void> {
   ]);
 }
 
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  if (value === undefined || value.trim() === '') return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function readStartupGraceMs(): number {
+  return parsePositiveInt(process.env.PANOPTICON_TTS_DAEMON_STARTUP_GRACE_MS, DEFAULT_TTS_DAEMON_STARTUP_GRACE_MS);
+}
+
+function startupDeadlineIso(): string {
+  return new Date(Date.now() + readStartupGraceMs()).toISOString();
+}
+
+function isWithinStartupGrace(state: TtsDaemonState | null, now = Date.now()): boolean {
+  if (state?.phase !== 'starting' || !state.startupDeadlineAt) return false;
+  const deadline = Date.parse(state.startupDeadlineAt);
+  return Number.isFinite(deadline) && now < deadline;
+}
+
 export function isProcessAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
@@ -327,7 +357,7 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
   try {
     const response = await fetch(`http://${config.daemonHost}:${config.daemonPort}/health`, { signal: controller.signal });
     if (!response.ok) return { ok: false, error: 'daemon unreachable' };
-    const body = await response.json() as { queue?: unknown; model?: unknown; pid?: unknown };
+      const body = await response.json() as { queue?: unknown; model?: unknown; pid?: unknown };
     return {
       ok: true,
       pid: parseHealthPid(body.pid),
@@ -352,6 +382,25 @@ export async function getTtsDaemonStatus(config: NormalizedTtsDaemonConfig): Pro
   const healthPid = health.ok === true ? health.pid ?? null : null;
   const pid = managedRunning ? managedPid : healthPid;
   const running = managedRunning || health.ok === true;
+  const initializing = managedRunning && health.ok !== true && state?.pid === managedPid && isWithinStartupGrace(state);
+  const phase: TtsDaemonStatusPhase = health.ok === true
+    ? 'healthy'
+    : initializing
+      ? 'starting'
+      : running
+        ? 'unhealthy'
+        : 'stopped';
+
+  if (health.ok === true && managedRunning && state?.pid === managedPid && state.phase === 'starting') {
+    await writeState({
+      pid: state.pid,
+      startedAt: state.startedAt,
+      host: state.host,
+      port: state.port,
+      phase: 'running',
+      model: typeof health.model === 'string' ? health.model : state.model,
+    });
+  }
 
   const uptimeSeconds = state?.startedAt && managedRunning
     ? Math.max(0, Math.floor((Date.now() - Date.parse(state.startedAt)) / 1000))
@@ -363,6 +412,8 @@ export async function getTtsDaemonStatus(config: NormalizedTtsDaemonConfig): Pro
     running,
     pid,
     managed: managedRunning,
+    phase,
+    initializing: initializing || undefined,
     daemonHost: config.daemonHost,
     daemonPort: config.daemonPort,
     queue: health.queue,
@@ -370,7 +421,7 @@ export async function getTtsDaemonStatus(config: NormalizedTtsDaemonConfig): Pro
     model: health.model ?? state?.model,
     uptimeSeconds,
     gpuMemoryUsedMb,
-    error: health.ok === true ? undefined : health.error ?? (managedRunning ? 'daemon unhealthy' : 'daemon not running'),
+    error: health.ok === true ? undefined : initializing ? 'daemon starting' : health.error ?? (managedRunning ? 'daemon unhealthy' : 'daemon not running'),
   };
 }
 
@@ -399,7 +450,7 @@ export async function startTtsDaemon(options: TtsDaemonStartOptions): Promise<Tt
   try {
     await clearTtsDaemonManualStopGate();
     const existing = await getTtsDaemonStatus(config);
-    if (existing.ok) {
+    if (existing.ok || existing.initializing) {
       alreadyRunning = true;
       spawnedPid = existing.pid;
     } else {
@@ -442,6 +493,8 @@ export async function startTtsDaemon(options: TtsDaemonStartOptions): Promise<Tt
         startedAt: new Date().toISOString(),
         host: config.daemonHost,
         port: config.daemonPort,
+        phase: 'starting',
+        startupDeadlineAt: startupDeadlineIso(),
       });
 
       if (detach) child.unref();
@@ -493,6 +546,8 @@ export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig):
       startedAt: new Date().toISOString(),
       host: config.daemonHost,
       port: config.daemonPort,
+      phase: 'starting',
+      startupDeadlineAt: startupDeadlineIso(),
     });
   } finally {
     await releaseStartLock();

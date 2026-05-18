@@ -202,6 +202,7 @@ describe('pan tts daemon lifecycle', () => {
       ok: true,
       running: true,
       pid: 1234,
+      phase: 'healthy',
       daemonHost: '127.0.0.1',
       daemonPort: 8787,
       queueDepth: 2,
@@ -224,7 +225,7 @@ describe('pan tts daemon lifecycle', () => {
       ok: true,
       pid: 1234,
       alreadyRunning: false,
-      status: { ok: true, running: true, pid: 1234, daemonHost: '127.0.0.1', daemonPort: 8787 },
+      status: { ok: true, running: true, pid: 1234, phase: 'healthy', daemonHost: '127.0.0.1', daemonPort: 8787 },
     });
     const stdout = { log: vi.fn() };
 
@@ -252,7 +253,7 @@ describe('pan tts daemon lifecycle', () => {
   });
 
   it('prints daemon status through injected lifecycle dependencies', async () => {
-    const getStatus = vi.fn().mockResolvedValue({ ok: false, running: false, pid: null, daemonHost: '127.0.0.1', daemonPort: 8787, error: 'daemon unreachable' });
+    const getStatus = vi.fn().mockResolvedValue({ ok: false, running: false, pid: null, phase: 'stopped', daemonHost: '127.0.0.1', daemonPort: 8787, error: 'daemon unreachable' });
     const stdout = { log: vi.fn() };
 
     const result = await runTtsDaemonStatus({ config: CONFIG, getStatus, stdout });

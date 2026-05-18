@@ -111,9 +111,9 @@ export class TtsWatchdog {
       }
 
       const status = await getTtsDaemonStatus(ttsConfig);
-      if (status.ok) {
+      if (status.ok || status.initializing) {
         this.consecutiveFailures = 0;
-        this.lastError = null;
+        this.lastError = status.initializing ? status.error ?? 'TTS daemon starting' : null;
         return;
       }
 

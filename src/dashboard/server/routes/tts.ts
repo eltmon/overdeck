@@ -50,13 +50,15 @@ export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promi
   try {
     const response = await options.fetch(`http://${config.daemonHost}:${config.daemonPort}/health`, { signal: controller.signal });
     if (!response.ok) {
-      return { ok: false, running: false, pid: null, daemonHost: config.daemonHost, daemonPort: config.daemonPort, ttsEnabled: runtimeConfig.enabled, error: 'daemon unreachable' };
+      return { ok: false, running: false, pid: null, phase: 'stopped', daemonHost: config.daemonHost, daemonPort: config.daemonPort, ttsEnabled: runtimeConfig.enabled, error: 'daemon unreachable' };
     }
-    const body = await response.json() as { queue?: unknown; model?: unknown };
+    const body = await response.json() as { queue?: unknown; model?: unknown; pid?: unknown };
+    const pid = typeof body.pid === 'number' && Number.isFinite(body.pid) && body.pid > 0 ? Math.floor(body.pid) : null;
     return {
       ok: true,
       running: true,
-      pid: null,
+      pid,
+      phase: 'healthy',
       daemonHost: config.daemonHost,
       daemonPort: config.daemonPort,
       ttsEnabled: runtimeConfig.enabled,
@@ -65,7 +67,7 @@ export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promi
       model: body.model,
     };
   } catch {
-    return { ok: false, running: false, pid: null, daemonHost: config.daemonHost, daemonPort: config.daemonPort, ttsEnabled: runtimeConfig.enabled, error: 'daemon unreachable' };
+    return { ok: false, running: false, pid: null, phase: 'stopped', daemonHost: config.daemonHost, daemonPort: config.daemonPort, ttsEnabled: runtimeConfig.enabled, error: 'daemon unreachable' };
   } finally {
     clearTimeout(timeout);
   }

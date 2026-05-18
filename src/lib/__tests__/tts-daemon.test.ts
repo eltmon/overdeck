@@ -73,6 +73,42 @@ describe('tts daemon lifecycle state', () => {
     expect(status).toMatchObject({ ok: true, running: true, managed: false, pid: 4321 });
   });
 
+  it('preserves a live managed daemon that is still inside startup grace', async () => {
+    const spawn = vi.fn(() => ({ pid: 7777, unref: vi.fn() }));
+    vi.doMock('node:child_process', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('node:child_process')),
+      spawn,
+    }));
+    const killSpy = vi.spyOn(process, 'kill');
+    killSpy.mockImplementation(((pid: number) => {
+      if (pid === 4242) return true;
+      return true;
+    }) as typeof process.kill);
+    const { QWEN_TTS_PID_PATH, QWEN_TTS_STATE_PATH, getTtsDaemonStatus, startTtsDaemon } = await import('../tts-daemon.js');
+    mkdirSync(join(testHome, 'pids'), { recursive: true });
+    writeFileSync(QWEN_TTS_PID_PATH, '4242\n', 'utf8');
+    writeFileSync(QWEN_TTS_STATE_PATH, JSON.stringify({
+      pid: 4242,
+      startedAt: '2026-05-18T00:00:00.000Z',
+      host: '127.0.0.1',
+      port: 8787,
+      phase: 'starting',
+      startupDeadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    }), 'utf8');
+
+    try {
+      const status = await getTtsDaemonStatus(CONFIG);
+      const result = await startTtsDaemon({ config: CONFIG, waitForHealth: false });
+
+      expect(status).toMatchObject({ ok: false, running: true, managed: true, phase: 'starting', initializing: true, pid: 4242 });
+      expect(result).toMatchObject({ ok: true, pid: 4242, alreadyRunning: true });
+      expect(killSpy).not.toHaveBeenCalledWith(4242, 'SIGTERM');
+      expect(spawn).not.toHaveBeenCalled();
+    } finally {
+      killSpy.mockRestore();
+    }
+  });
+
   it('replaces an unhealthy live managed daemon on start', async () => {
     const spawn = vi.fn(() => ({ pid: 7777, unref: vi.fn() }));
     vi.doMock('node:child_process', async (importOriginal) => ({

@@ -82,10 +82,34 @@ describe('TtsWatchdog', () => {
     expect(mocks.startDaemon).not.toHaveBeenCalled();
   });
 
+  it('does not restart a live daemon that is still initializing', async () => {
+    mocks.hasState.mockResolvedValue(true);
+    mocks.getStatus.mockResolvedValue({
+      ok: false,
+      running: true,
+      managed: true,
+      phase: 'starting',
+      initializing: true,
+      pid: 4242,
+      daemonHost: '127.0.0.1',
+      daemonPort: 8787,
+      error: 'daemon starting',
+    });
+    const watchdog = new TtsWatchdog({
+      config: { enabled: true, pollMs: 5_000, failThreshold: 1, maxRestarts: 3, windowMs: 60_000, startTimeoutMs: 25_000 },
+      log: vi.fn(),
+    });
+
+    await tick(watchdog);
+
+    expect(watchdog.status()).toMatchObject({ active: true, consecutiveFailures: 0, lastError: 'daemon starting' });
+    expect(mocks.startDaemon).not.toHaveBeenCalled();
+  });
+
   it('restarts an unexpectedly stopped daemon when state still exists', async () => {
     mocks.ttsConfig.enabled = false;
     mocks.hasState.mockResolvedValue(true);
-    mocks.getStatus.mockResolvedValue({ ok: false, running: false, pid: null, daemonHost: '127.0.0.1', daemonPort: 8787, error: 'daemon unreachable' });
+    mocks.getStatus.mockResolvedValue({ ok: false, running: false, pid: null, phase: 'stopped', daemonHost: '127.0.0.1', daemonPort: 8787, error: 'daemon unreachable' });
     const log = vi.fn();
     const watchdog = new TtsWatchdog({
       config: { enabled: true, pollMs: 5_000, failThreshold: 1, maxRestarts: 3, windowMs: 60_000, startTimeoutMs: 25_000 },

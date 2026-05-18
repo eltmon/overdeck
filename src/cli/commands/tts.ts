@@ -264,7 +264,13 @@ function formatMegabytes(mb: number | undefined): string | undefined {
 }
 
 export function formatTtsDaemonStatus(status: TtsDaemonStatus): string {
-  const state = status.ok ? chalk.green('healthy') : status.running ? chalk.yellow('unhealthy') : chalk.red('stopped');
+  const state = status.phase === 'starting'
+    ? chalk.yellow('starting')
+    : status.ok
+      ? chalk.green('healthy')
+      : status.running
+        ? chalk.yellow('unhealthy')
+        : chalk.red('stopped');
   const lines = [
     `Daemon: ${state}`,
     `Endpoint: ${status.daemonHost}:${status.daemonPort}`,
