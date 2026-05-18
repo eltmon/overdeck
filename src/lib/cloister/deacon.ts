@@ -2515,6 +2515,89 @@ export async function reconcileFalseMerged(): Promise<string[]> {
  */
 const mergedReviewingReconciled = new Set<string>();
 
+/**
+ * Per-issue throttle for the closed-PR readyForMerge reconciler so a transient
+ * GitHub API failure doesn't burn the rate budget on the same issues every
+ * patrol. Cleared when the issue's state changes.
+ */
+const closedPrReadyReconcileCooldowns = new Map<string, number>();
+const CLOSED_PR_RECONCILE_COOLDOWN_MS = 10 * 60 * 1000;
+
+/**
+ * Reconciler: issues with readyForMerge=true whose PR is no longer OPEN.
+ *
+ * The "Awaiting Merge" view filters on readyForMerge=true, so an issue whose
+ * PR was closed without merging (cancel-flow, manual `gh pr close`, branch
+ * deleted) stays in that list forever — the merge button points at a dead PR
+ * and would only get cleared the next time the user clicks it (PAN-509-style
+ * defensive check in `/api/issues/:id/merge`). That UX is bad: the page
+ * actively lies to the human about what's ready to ship.
+ *
+ * This patrol catches it proactively: for every readyForMerge=true issue with
+ * a GitHub PR URL, ask the forge for the current PR state. If MERGED, flip
+ * mergeStatus to 'merged' (post-merge lifecycle catches up elsewhere). If
+ * CLOSED-without-merge, reset readyForMerge=false and surface why on
+ * mergeNotes so the human sees what happened instead of a missing button.
+ */
+export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
+    if (!isGitHubAppConfigured()) return actions;
+
+    const statuses = loadReviewStatuses();
+    const now = Date.now();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (!status.readyForMerge) continue;
+      if (!status.prUrl) continue;
+
+      const cooledUntil = closedPrReadyReconcileCooldowns.get(issueId);
+      if (cooledUntil && now < cooledUntil) continue;
+
+      const match = status.prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+      if (!match) continue;
+      const [, owner, repo, numberStr] = match;
+      const prNumber = parseInt(numberStr, 10);
+      if (!Number.isFinite(prNumber)) continue;
+
+      try {
+        const prState = await getPullRequestState(owner, repo, prNumber);
+        if (prState.state === 'OPEN' && !prState.merged) continue;
+
+        if (prState.merged) {
+          setReviewStatus(issueId, {
+            readyForMerge: false,
+            mergeStatus: 'merged',
+            mergeNotes: undefined,
+          });
+          const msg = `Reset readyForMerge for ${issueId} — PR #${prNumber} is already merged`;
+          actions.push(msg);
+          console.log(`[deacon] ${msg}`);
+        } else {
+          setReviewStatus(issueId, {
+            readyForMerge: false,
+            mergeStatus: 'failed',
+            mergeNotes: `PR #${prNumber} was closed without merging — reopen the PR or reset review state to re-queue this issue`,
+          });
+          const msg = `Reset readyForMerge for ${issueId} — PR #${prNumber} is ${prState.state} (not OPEN)`;
+          actions.push(msg);
+          console.log(`[deacon] ${msg}`);
+        }
+        // Don't re-check for 10 min even if state somehow gets re-set.
+        closedPrReadyReconcileCooldowns.set(issueId, now + CLOSED_PR_RECONCILE_COOLDOWN_MS);
+      } catch (prErr: any) {
+        // Throttle on API failure so we don't hammer GitHub.
+        closedPrReadyReconcileCooldowns.set(issueId, now + CLOSED_PR_RECONCILE_COOLDOWN_MS);
+        console.warn(`[deacon] reconcileClosedPrReadyForMerge: ${issueId} PR state lookup failed: ${prErr.message}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] Error in reconcileClosedPrReadyForMerge: ${err.message}`);
+  }
+  return actions;
+}
+
 export async function reconcileMergedButReviewing(): Promise<string[]> {
   const actions: string[] = [];
   try {
@@ -3948,6 +4031,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const mergedReviewingActions = await reconcileMergedButReviewing();
   actions.push(...mergedReviewingActions);
   for (const a of mergedReviewingActions) addLog('action', a, state.patrolCycle);
+
+  // Closed-PR readyForMerge reconciler: stops the "Awaiting Merge" view from
+  // listing issues whose PR was closed without merging (PAN-1111-style stale
+  // state). Best-effort against the forge; 10-min per-issue cooldown.
+  const closedPrReadyActions = await reconcileClosedPrReadyForMerge();
+  actions.push(...closedPrReadyActions);
+  for (const a of closedPrReadyActions) addLog('action', a, state.patrolCycle);
 
   // Dead-end agent recovery: nudge agents stuck with reviewStatus=blocked/failed after
   // fixing review issues but not re-requesting review. Has 10-min per-issue cooldown and
