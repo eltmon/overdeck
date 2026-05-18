@@ -4,7 +4,7 @@
     "created": "2026-05-12T19:50:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1052: Activity feed: per-turn observations with time-bucketed sidebar",
-    "updated": "2026-05-17T00:40:08.312Z"
+    "updated": "2026-05-18T21:57:56.145Z"
   },
   "plan": {
     "id": "pan-1052",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "7c4e9a2f-3d18-4b6e-9f2a-8c5d1e4f7a3b",
     "author": "agent:claude-opus-4-7",
-    "sequence": 14,
+    "sequence": 19,
     "created": "2026-05-12T19:50:00.000Z",
-    "updated": "2026-05-17T00:40:08.312Z",
+    "updated": "2026-05-18T21:57:56.145Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1052",
@@ -2279,43 +2279,55 @@
         "phase": "work",
         "issueId": "PAN-1052",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-17T00:40:08.311Z",
+        "updatedAt": "2026-05-18T21:57:56.144Z",
         "work": {
-          "updatedAt": "2026-05-17T00:40:08.311Z",
+          "updatedAt": "2026-05-18T21:57:56.144Z",
           "history": []
         },
         "verification": {
-          "updatedAt": "2026-05-17T00:40:08.311Z",
-          "history": []
-        },
-        "review": {
           "status": "pending",
-          "updatedAt": "2026-05-17T00:40:08.311Z",
+          "updatedAt": "2026-05-18T21:57:56.144Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-17T00:40:08.311Z"
+              "at": "2026-05-18T21:57:56.144Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-18T21:57:56.144Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-18T21:57:56.144Z"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-17T00:40:08.311Z",
+          "updatedAt": "2026-05-18T21:57:56.144Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-17T00:40:08.311Z"
+              "at": "2026-05-18T21:57:56.144Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-17T00:40:08.311Z",
+          "updatedAt": "2026-05-18T21:57:56.144Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-05-17T00:40:08.311Z",
-          "history": [],
+          "status": "pending",
+          "updatedAt": "2026-05-18T21:57:56.144Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-18T21:57:56.144Z"
+            }
+          ],
           "readyForMerge": false
         }
       }

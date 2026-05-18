@@ -4,7 +4,7 @@
     "created": "2026-05-18T13:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1189: Bake the Fix-All Flywheel into Panopticon — sidebar tab, configurable orchestrator, standardized status, conversation pane",
-    "updated": "2026-05-18T12:51:50.181Z"
+    "updated": "2026-05-18T18:35:15.355Z"
   },
   "plan": {
     "id": "pan-1189",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "67e5006c-957b-45dd-8838-1376b80a9de1",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 12,
     "created": "2026-05-18T13:05:00.000Z",
-    "updated": "2026-05-18T12:51:50.181Z",
+    "updated": "2026-05-18T18:35:15.355Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1189",
@@ -1299,7 +1299,51 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-18-PAN-1189-bake-the-fix-all-flywheel-into-panopticon-sidebar-tab-configurable-orchestrator-standardized-status-conversation-pane.vbrief.json"
+      "canonicalFilename": "2026-05-18-PAN-1189-bake-the-fix-all-flywheel-into-panopticon-sidebar-tab-configurable-orchestrator-standardized-status-conversation-pane.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1189",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-18T18:35:15.355Z",
+        "work": {
+          "updatedAt": "2026-05-18T18:35:15.355Z",
+          "history": []
+        },
+        "verification": {
+          "updatedAt": "2026-05-18T18:35:15.355Z",
+          "history": []
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-18T18:35:15.355Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-18T18:35:15.355Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-18T18:35:15.355Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-18T18:35:15.355Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-18T18:35:15.355Z",
+          "history": []
+        },
+        "merge": {
+          "updatedAt": "2026-05-18T18:35:15.355Z",
+          "history": [],
+          "readyForMerge": false
+        }
+      }
     }
   },
   "status": "proposed"

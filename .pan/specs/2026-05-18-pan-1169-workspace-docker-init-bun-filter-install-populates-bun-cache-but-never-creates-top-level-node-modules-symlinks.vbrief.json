@@ -4,7 +4,7 @@
     "created": "2026-05-18T04:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1169: Workspace docker init: bun --filter install populates .bun cache but never creates top-level node_modules symlinks",
-    "updated": "2026-05-18T09:53:46.550Z"
+    "updated": "2026-05-18T16:53:06.701Z"
   },
   "plan": {
     "id": "pan-1169",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "482220b8-9c46-4f63-98a5-28653fc83ff2",
     "author": "agent:claude-opus-4-7",
-    "sequence": 33,
+    "sequence": 151,
     "created": "2026-05-18T04:30:00.000Z",
-    "updated": "2026-05-18T09:53:46.550Z",
+    "updated": "2026-05-18T16:53:06.701Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1169",
@@ -205,63 +205,65 @@
     "metadata": {
       "canonicalFilename": "2026-05-18-PAN-1169-workspace-docker-init-bun-filter-install-populates-bun-cache-but-never-creates-top-level-node-modules-symlinks.vbrief.json",
       "pipeline": {
-        "phase": "test",
+        "phase": "merge",
         "issueId": "PAN-1169",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-18T09:53:46.543Z",
+        "updatedAt": "2026-05-18T16:53:06.701Z",
         "work": {
-          "updatedAt": "2026-05-18T09:53:46.543Z",
+          "updatedAt": "2026-05-18T16:53:06.701Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-18T09:53:46.543Z",
+          "updatedAt": "2026-05-18T16:53:06.701Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-18T09:53:46.543Z"
+              "at": "2026-05-18T16:53:06.701Z"
             }
           ]
         },
         "review": {
           "status": "passed",
-          "updatedAt": "2026-05-18T09:53:46.543Z",
-          "notes": "2 partial requirements: guard comment lacks noise warning; injection test used alternate method",
+          "updatedAt": "2026-05-18T16:53:06.701Z",
+          "notes": "All 13 ACs implemented; all 4 reviewers clean",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-18T09:53:46.543Z",
-              "notes": "2 partial requirements: guard comment lacks noise warning; injection test used alternate method"
+              "at": "2026-05-18T16:53:06.701Z",
+              "notes": "All 13 ACs implemented; all 4 reviewers clean"
             }
           ],
           "approval": "approved"
         },
         "test": {
           "status": "passed",
-          "updatedAt": "2026-05-18T09:53:46.543Z",
+          "updatedAt": "2026-05-18T16:53:06.701Z",
           "notes": "Skipped: no code changed since pre-review verification gate",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-18T09:53:46.543Z",
+              "at": "2026-05-18T16:53:06.701Z",
               "notes": "Skipped: no code changed since pre-review verification gate"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-18T09:53:46.543Z",
+          "updatedAt": "2026-05-18T16:53:06.701Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-18T09:53:46.543Z",
+          "updatedAt": "2026-05-18T16:53:06.701Z",
+          "notes": "Post-rebase verification failed at vbrief-ac",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-18T09:53:46.543Z"
+              "at": "2026-05-18T16:53:06.701Z",
+              "notes": "Post-rebase verification failed at vbrief-ac"
             }
           ],
-          "readyForMerge": false,
+          "readyForMerge": true,
           "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1187"
         }
       }

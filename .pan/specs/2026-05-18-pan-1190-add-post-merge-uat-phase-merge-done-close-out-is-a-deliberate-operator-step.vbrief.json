@@ -4,7 +4,7 @@
     "created": "2026-05-18T13:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1190: Add post-merge UAT phase — merge ≠ done, close-out is a deliberate operator step",
-    "updated": "2026-05-18T13:15:45.046Z"
+    "updated": "2026-05-18T17:36:29.051Z"
   },
   "plan": {
     "id": "pan-1190",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "f5e8a1c2-9b3d-4e7f-a8b1-c2d3e4f5a6b7",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 8,
     "created": "2026-05-18T13:25:00.000Z",
-    "updated": "2026-05-18T13:15:45.046Z",
+    "updated": "2026-05-18T17:36:29.051Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1190",
@@ -1077,7 +1077,51 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-18-PAN-1190-add-post-merge-uat-phase-merge-done-close-out-is-a-deliberate-operator-step.vbrief.json"
+      "canonicalFilename": "2026-05-18-PAN-1190-add-post-merge-uat-phase-merge-done-close-out-is-a-deliberate-operator-step.vbrief.json",
+      "pipeline": {
+        "phase": "work",
+        "issueId": "PAN-1190",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-18T17:36:29.050Z",
+        "work": {
+          "updatedAt": "2026-05-18T17:36:29.050Z",
+          "history": []
+        },
+        "verification": {
+          "updatedAt": "2026-05-18T17:36:29.050Z",
+          "history": []
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-18T17:36:29.050Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-18T17:36:29.050Z"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-18T17:36:29.050Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-18T17:36:29.050Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-18T17:36:29.050Z",
+          "history": []
+        },
+        "merge": {
+          "updatedAt": "2026-05-18T17:36:29.050Z",
+          "history": [],
+          "readyForMerge": false
+        }
+      }
     }
   },
   "status": "proposed"
