@@ -2,25 +2,22 @@ import { useState, useMemo, useCallback, useEffect, useRef, createContext, useCo
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAgentList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
-/* Drag-and-drop disabled pending rework (PAN-TODO)
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
-  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
-  DragStartEvent,
-  DragEndEvent,
-  defaultDropAnimationSideEffects,
-  DropAnimation,
+  type DragEndEvent,
+  closestCenter,
 } from '@dnd-kit/core';
 import {
-  useDraggable,
-  useDroppable,
-} from '@dnd-kit/core';
-*/
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState, type StartAgentResponse } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw, Radio, VolumeX, Unlock } from 'lucide-react';
@@ -1123,14 +1120,6 @@ interface KanbanBoardProps {
 
 type CycleFilter = 'current' | 'all' | 'backlog' | 'canceled';
 
-// Undo history entry
-interface UndoEntry {
-  issueId: string;
-  fromStatus: CanonicalState;
-  toStatus: CanonicalState;
-  timestamp: number;
-}
-
 export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssue: externalOnSelectIssue, onPlanDialogChange, bulkSelectedIds, onBulkToggle, onBulkSelectAll, onBulkDeselectAll }: KanbanBoardProps) {
   const queryClient = useQueryClient();
   const [internalSelectedIssue, setInternalSelectedIssue] = useState<string | null>(null);
@@ -1166,26 +1155,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     });
   }, []);
 
-  /* DnD state disabled pending rework
-  const [activeDragIssue, setActiveDragIssue] = useState<Issue | null>(null);
-  const [activeDragStatus, setActiveDragStatus] = useState<CanonicalState | null>(null);
-  */
-
-  // Undo state
-  const [undoHistory, setUndoHistory] = useState<UndoEntry[]>([]);
-  const [showUndoToast, setShowUndoToast] = useState(false);
-  const [undoTimeoutId, setUndoTimeoutId] = useState<NodeJS.Timeout | null>(null);
-
-  // Dialog states
-  const [agentWarningDialog, setAgentWarningDialog] = useState<{
-    open: boolean;
-    issue: Issue | null;
-    targetStatus: CanonicalState | null;
-  }>({ open: false, issue: null, targetStatus: null });
-  const [syncPromptDialog, setSyncPromptDialog] = useState<{
-    open: boolean;
-    issue: Issue | null;
-  }>({ open: false, issue: null });
+  // Manual column order overrides for intra-column drag-to-reorder
+  const [columnOrders, setColumnOrders] = useState<Record<string, string[]>>({});
 
   // Use external state if provided, otherwise use internal state
   const selectedIssue = externalSelectedIssue !== undefined ? externalSelectedIssue : internalSelectedIssue;
@@ -1309,204 +1280,38 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     bulkSelection.clear();
   }, [bulkSelection]);
 
-  /* DnD sensors disabled pending rework
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
       },
     }),
-    useSensor(KeyboardSensor)
   );
-  */
 
-  // Move status mutation
-  const moveStatusMutation = useMutation({
-    mutationFn: async ({ issueId, targetStatus, syncToTracker }: { issueId: string; targetStatus: CanonicalState; syncToTracker?: boolean }) => {
-      const res = await fetch(`/api/issues/${issueId}/move-status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetStatus, syncToTracker }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to move issue');
-      }
-      return res.json();
-    },
-    onSuccess: async () => {
-      await refreshDashboardState(queryClient);
-    },
-  });
-
-  // Handle undo
-  const handleUndo = useCallback(() => {
-    if (undoHistory.length === 0) return;
-
-    const lastEntry = undoHistory[undoHistory.length - 1];
-    moveStatusMutation.mutate({
-      issueId: lastEntry.issueId,
-      targetStatus: lastEntry.fromStatus,
-    });
-
-    setUndoHistory(prev => prev.slice(0, -1));
-    setShowUndoToast(false);
-    if (undoTimeoutId) {
-      clearTimeout(undoTimeoutId);
-      setUndoTimeoutId(null);
-    }
-  }, [undoHistory, moveStatusMutation, undoTimeoutId]);
-
-  // Keyboard shortcut for undo
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-        e.preventDefault();
-        handleUndo();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo]);
-
-  // Show undo toast
-  const showUndoNotification = useCallback((issueId: string, fromStatus: CanonicalState, toStatus: CanonicalState) => {
-    setUndoHistory(prev => [...prev, { issueId, fromStatus, toStatus, timestamp: Date.now() }]);
-    setShowUndoToast(true);
-
-    if (undoTimeoutId) {
-      clearTimeout(undoTimeoutId);
-    }
-
-    const timeoutId = setTimeout(() => {
-      setShowUndoToast(false);
-    }, 8000);
-    setUndoTimeoutId(timeoutId);
-  }, [undoTimeoutId]);
-
-  /* Drag handlers disabled pending rework
-  // Handle drag start
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const { active } = event;
-    const issueId = active.id as string;
-    const issue = issues?.find(i => i.id === issueId);
-    if (issue) {
-      setActiveDragIssue(issue);
-      setActiveDragStatus(STATUS_LABELS[issue.status] as CanonicalState);
-    }
-  }, [issues]);
-
-  // Handle drag end
+  // Intra-column drag end — reorder within the same column; cross-column is a no-op
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveDragIssue(null);
-    setActiveDragStatus(null);
-
     if (!over) return;
 
-    const issueId = active.id as string;
-    const targetStatus = over.id as CanonicalState;
+    const activeId = active.id as string;
+    const overId = over.id as string;
+    if (activeId === overId) return;
 
-    const issue = issues?.find(i => i.id === issueId);
-    if (!issue) return;
+    const activeContainer = active.data.current?.sortable?.containerId as string | undefined;
+    const overContainer = over.data.current?.sortable?.containerId as string | undefined;
 
-    const currentStatus = STATUS_LABELS[issue.status] as CanonicalState;
+    // Cross-column drop is a no-op (phase transitions are driven by agent state, not hand)
+    if (!activeContainer || !overContainer || activeContainer !== overContainer) return;
 
-    // No change
-    if (currentStatus === targetStatus) return;
+    const columnItems = sortedGrouped[activeContainer as keyof typeof sortedGrouped] ?? [];
+    const oldIndex = columnItems.findIndex(i => i.id === activeId);
+    const newIndex = columnItems.findIndex(i => i.id === overId);
 
-    // Check for active agents
-    const issueIdLower = issue.identifier.toLowerCase();
-    const hasActiveAgent = agents.some(
-      a => a.issueId?.toLowerCase() === issueIdLower && a.status !== 'dead'
-    );
-
-    if (hasActiveAgent) {
-      setAgentWarningDialog({ open: true, issue, targetStatus });
-      return;
+    if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+      const newOrder = arrayMove(columnItems.map(i => i.id), oldIndex, newIndex);
+      setColumnOrders(prev => ({ ...prev, [activeContainer]: newOrder }));
     }
-
-    // Check if moving to done
-    if (targetStatus === 'done') {
-      setSyncPromptDialog({ open: true, issue });
-      return;
-    }
-
-    // Proceed with move
-    showUndoNotification(issue.identifier, currentStatus, targetStatus);
-    moveStatusMutation.mutate({ issueId: issue.identifier, targetStatus });
-  }, [issues, agents, moveStatusMutation, showUndoNotification]);
-  */
-
-  // Confirm agent warning
-  const confirmAgentMove = useCallback(() => {
-    const { issue, targetStatus } = agentWarningDialog;
-    if (!issue || !targetStatus) return;
-
-    setAgentWarningDialog({ open: false, issue: null, targetStatus: null });
-
-    const currentStatus = STATUS_LABELS[issue.status] as CanonicalState;
-
-    if (targetStatus === 'done') {
-      setSyncPromptDialog({ open: true, issue });
-      return;
-    }
-
-    showUndoNotification(issue.identifier, currentStatus, targetStatus);
-    moveStatusMutation.mutate({ issueId: issue.identifier, targetStatus });
-  }, [agentWarningDialog, moveStatusMutation, showUndoNotification]);
-
-  // Handle sync prompt response
-  const handleSyncPrompt = useCallback(async (syncToTracker: boolean, options?: { cleanupWorkspace?: boolean; stopAgents?: boolean }) => {
-    const { issue } = syncPromptDialog;
-    if (!issue) return;
-
-    setSyncPromptDialog({ open: false, issue: null });
-
-    const currentStatus = STATUS_LABELS[issue.status] as CanonicalState;
-
-    // Stop agents if requested
-    if (options?.stopAgents) {
-      const issueIdLower = issue.identifier.toLowerCase();
-      const issueAgents = agents.filter(a => a.issueId?.toLowerCase() === issueIdLower);
-      for (const agent of issueAgents) {
-        try {
-          await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
-        } catch (e) {
-          console.error(`Failed to stop agent ${agent.id}:`, e);
-        }
-      }
-    }
-
-    // Cleanup workspace if requested
-    if (options?.cleanupWorkspace) {
-      try {
-        await fetch(`/api/issues/${issue.identifier}/cleanup-workspace`, { method: 'POST' });
-      } catch (e) {
-        console.error(`Failed to cleanup workspace for ${issue.identifier}:`, e);
-      }
-    }
-
-    showUndoNotification(issue.identifier, currentStatus, 'done');
-    moveStatusMutation.mutate({ issueId: issue.identifier, targetStatus: 'done', syncToTracker });
-
-    // Invalidate agents query to refresh the list
-    if (options?.stopAgents) {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-    }
-  }, [syncPromptDialog, moveStatusMutation, showUndoNotification, agents, queryClient]);
-
-  /* Drop animation config disabled pending rework
-  const dropAnimation: DropAnimation = {
-    sideEffects: defaultDropAnimationSideEffects({
-      styles: {
-        active: {
-          opacity: '0.5',
-        },
-      },
-    }),
-  };
-  */
+  }, [sortedGrouped]);
 
   // Fetch costs for all issues
   const { data: issueCosts = {}, isLoading: costsLoading } = useQuery({
@@ -1638,7 +1443,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     return map;
   }, [filteredIssues]);
 
-  // Sort Todo: planning-complete first, then updatedAt desc
+  // Sort Todo: planning-complete first, then updatedAt desc; apply manual column orders
   const sortedGrouped = useMemo(() => {
     const result = { ...grouped };
     if (result.todo) {
@@ -1649,8 +1454,17 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       });
     }
+    for (const [status, manualIds] of Object.entries(columnOrders)) {
+      if (!result[status]) continue;
+      const idSet = new Set(manualIds);
+      const known = result[status].filter(i => idSet.has(i.id));
+      const added = result[status].filter(i => !idSet.has(i.id));
+      const orderMap = new Map(manualIds.map((id, i) => [id, i]));
+      known.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+      result[status] = [...known, ...added];
+    }
     return result;
-  }, [grouped, planningStateById]);
+  }, [grouped, planningStateById, columnOrders]);
 
   const kanbanIssueIds = useMemo(() => {
     if (cycleFilter === 'all' || cycleFilter === 'backlog' || cycleFilter === 'canceled') return [];
@@ -1887,93 +1701,74 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           )}
         </div>
       ) : (
-        /* Kanban columns - DnD disabled pending rework (PAN-TODO) */
-        <div className="flex gap-4 overflow-hidden pb-4">
-          {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => {
-            const columnIssueIds = sortedGrouped[status].map(i => i.identifier);
-            const selectedInColumn = columnIssueIds.filter(id => bulkSelection.isSelected(id));
-            const allSelected = columnIssueIds.length > 0 && selectedInColumn.length === columnIssueIds.length;
-            const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
+        /* Kanban columns — intra-column drag-to-reorder only; cross-column drops are a no-op */
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <div className="flex gap-4 overflow-hidden pb-4">
+            {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => {
+              const columnIssueIds = sortedGrouped[status].map(i => i.identifier);
+              const selectedInColumn = columnIssueIds.filter(id => bulkSelection.isSelected(id));
+              const allSelected = columnIssueIds.length > 0 && selectedInColumn.length === columnIssueIds.length;
+              const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
 
-            return (
-              <div
-                key={status}
-                className="flex-1 min-w-0"
-                data-testid={`kanban-column-${status.replace(/_/g, '-')}`}
-              >
-                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-card rounded-lg transition-colors`}>
-                  <div className="px-4 py-3 border-b border-border bg-card">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={allSelected}
-                          ref={(el) => {
-                            if (el) el.indeterminate = someSelected;
-                          }}
-                          onChange={() => {
-                            if (allSelected) {
-                              bulkSelection.deselectAll(columnIssueIds);
-                            } else {
-                              bulkSelection.selectAll(columnIssueIds);
-                            }
-                          }}
-                          className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
-                          aria-label={`Select all ${COLUMN_TITLES[status]}`}
-                        />
-                        <h3 className="font-semibold text-foreground">{COLUMN_TITLES[status]}</h3>
+              return (
+                <div
+                  key={status}
+                  className="flex-1 min-w-0"
+                  data-testid={`kanban-column-${status.replace(/_/g, '-')}`}
+                >
+                  <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-card rounded-lg transition-colors`}>
+                    <div className="px-4 py-3 border-b border-border bg-card">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = someSelected;
+                            }}
+                            onChange={() => {
+                              if (allSelected) {
+                                bulkSelection.deselectAll(columnIssueIds);
+                              } else {
+                                bulkSelection.selectAll(columnIssueIds);
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
+                            aria-label={`Select all ${COLUMN_TITLES[status]}`}
+                          />
+                          <h3 className="font-semibold text-foreground">{COLUMN_TITLES[status]}</h3>
+                        </div>
+                        <span className="text-sm text-muted-foreground">{sortedGrouped[status].length}</span>
                       </div>
-                      <span className="text-sm text-muted-foreground">{sortedGrouped[status].length}</span>
                     </div>
+                    <SortableContext id={status} items={sortedGrouped[status].map(i => i.id)} strategy={verticalListSortingStrategy}>
+                      <ColumnContent
+                        issues={sortedGrouped[status]}
+                        issueWorkAgentsById={issueWorkAgentsById}
+                        agents={agents}
+                        specialists={specialists}
+                        issueCosts={issueCosts}
+                        costsLoading={costsLoading}
+                        selectedIssue={selectedIssue}
+                        onSelectIssue={onSelectIssue}
+                        onPlan={openPlanDialog}
+                        onViewBeads={setBeadsDialogIssue}
+                        onViewVBrief={setVbriefDialogIssue}
+                        collapsedFeatures={collapsedFeatures}
+                        onToggleFeature={toggleFeature}
+                        bulkSelectedIds={bulkSelection.selectedIds}
+                        onBulkToggle={bulkSelection.toggle}
+                        planningStateById={planningStateById}
+                        workspaceByIssueId={stackHealthByIssue}
+                      />
+                    </SortableContext>
                   </div>
-                  <ColumnContent
-                    issues={sortedGrouped[status]}
-                    issueWorkAgentsById={issueWorkAgentsById}
-                    agents={agents}
-                    specialists={specialists}
-                    issueCosts={issueCosts}
-                    costsLoading={costsLoading}
-                    selectedIssue={selectedIssue}
-                    onSelectIssue={onSelectIssue}
-                    onPlan={openPlanDialog}
-                    onViewBeads={setBeadsDialogIssue}
-                    onViewVBrief={setVbriefDialogIssue}
-                    collapsedFeatures={collapsedFeatures}
-                    onToggleFeature={toggleFeature}
-                    bulkSelectedIds={bulkSelection.selectedIds}
-                    onBulkToggle={bulkSelection.toggle}
-                    planningStateById={planningStateById}
-                    workspaceByIssueId={stackHealthByIssue}
-                  />
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </DndContext>
       )}
-
-      {/* Undo Toast */}
-      <UndoToast
-        isVisible={showUndoToast}
-        onUndo={handleUndo}
-        onClose={() => setShowUndoToast(false)}
-      />
-
-      {/* Agent Warning Dialog */}
-      <AgentWarningDialog
-        isOpen={agentWarningDialog.open}
-        onClose={() => setAgentWarningDialog({ open: false, issue: null, targetStatus: null })}
-        onConfirm={confirmAgentMove}
-        issue={agentWarningDialog.issue}
-      />
-
-      {/* Sync Prompt Dialog */}
-      <SyncPromptDialog
-        isOpen={syncPromptDialog.open}
-        onClose={() => setSyncPromptDialog({ open: false, issue: null })}
-        onSync={handleSyncPrompt}
-        issue={syncPromptDialog.issue}
-      />
 
       {/* Plan Dialog - lifted to survive IssueCard re-renders */}
       {planDialogIssue && (
@@ -2037,6 +1832,23 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   );
 }
 
+// Sortable wrapper for IssueCard — must be rendered inside a SortableContext
+function SortableIssueCard(props: IssueCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.issue.id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+      <IssueCard {...props} />
+    </div>
+  );
+}
+
 // ColumnContent — renders issues with Rally hierarchy grouping
 function ColumnContent({
   issues,
@@ -2092,7 +1904,7 @@ function ColumnContent({
     );
 
     return (
-      <IssueCard
+      <SortableIssueCard
         key={issue.id}
         issue={issue}
         workAgent={workAgent}
@@ -2177,233 +1989,6 @@ function ColumnContent({
           </FeatureCard>
         );
       })}
-    </div>
-  );
-}
-
-/* DnD components disabled pending rework
-// DroppableColumn component
-function DroppableColumn({ status, children }: { status: CanonicalState; children: React.ReactNode }) {
-  const { isOver, setNodeRef } = useDroppable({
-    id: status,
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`flex-1 min-w-0 transition-all ${isOver ? 'scale-[1.02]' : ''}`}
-    >
-      {children}
-    </div>
-  );
-}
-
-// DraggableCard wrapper component
-interface DraggableCardWrapperProps {
-  issue: Issue;
-  children: React.ReactNode;
-}
-
-function DraggableCardWrapper({ issue, children }: DraggableCardWrapperProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: issue.id,
-    data: { issue },
-  });
-
-  const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-      }
-    : undefined;
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className={`${isDragging ? 'opacity-30' : 'opacity-100'} cursor-grab active:cursor-grabbing`}
-    >
-      {children}
-    </div>
-  );
-}
-
-// DragOverlayCard component for ghost card
-interface DragOverlayCardProps {
-  issue: Issue;
-}
-
-function DragOverlayCard({ issue }: DragOverlayCardProps) {
-  return (
-    <div className="bg-popover rounded-lg p-3 border-l-4 border-l-blue-500 shadow-2xl rotate-2 scale-105 opacity-90">
-      <div className="flex items-center gap-2">
-        <span className="text-muted-foreground text-sm">{issue.identifier}</span>
-      </div>
-      <p className="text-sm text-foreground mt-1 line-clamp-2">{issue.title}</p>
-    </div>
-  );
-}
-*/
-
-// Agent Warning Dialog
-interface AgentWarningDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  issue: Issue | null;
-}
-
-function AgentWarningDialog({ isOpen, onClose, onConfirm, issue }: AgentWarningDialogProps) {
-  if (!isOpen || !issue) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-start gap-4">
-          <div className="p-2 badge-bg-warning rounded-lg">
-            <AlertTriangle className="w-6 h-6 text-warning-foreground" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              Active Agent Warning
-            </h3>
-            <p className="text-foreground text-sm mb-4">
-              <strong>{issue.identifier}</strong> has an active agent working on it.
-              Moving this issue may disrupt the agent's work.
-            </p>
-            <p className="text-muted-foreground text-xs mb-6">
-              Are you sure you want to proceed?
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onConfirm}
-                className="px-4 py-2 bg-warning hover:bg-warning/90 text-foreground rounded-lg transition-colors text-sm"
-              >
-                Move Anyway
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Sync Prompt Dialog
-interface SyncPromptDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSync: (syncToTracker: boolean, options?: { cleanupWorkspace?: boolean; stopAgents?: boolean }) => void;
-  issue: Issue | null;
-}
-
-function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogProps) {
-  const [cleanupWorkspace, setCleanupWorkspace] = useState(false);
-  const [stopAgents, setStopAgents] = useState(false);
-
-  if (!isOpen || !issue) return null;
-
-  // Determine tracker type from issue source
-  const trackerName = issue.source === 'github' ? 'GitHub' : 'Linear';
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-start gap-4">
-          <div className="p-2 badge-bg-success rounded-lg">
-            <Check className="w-6 h-6 text-success-foreground" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              Move to Done
-            </h3>
-            <p className="text-foreground text-sm mb-4">
-              You're moving <strong>{issue.identifier}</strong> to Done.
-            </p>
-
-            {/* Cleanup options */}
-            <div className="space-y-2 mb-4 p-3 bg-popover/50 rounded-lg">
-              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={cleanupWorkspace}
-                  onChange={(e) => setCleanupWorkspace(e.target.checked)}
-                  className="rounded border-border bg-popover text-success focus:ring-ring"
-                />
-                Clean up workspace
-              </label>
-              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={stopAgents}
-                  onChange={(e) => setStopAgents(e.target.checked)}
-                  className="rounded border-border bg-popover text-success focus:ring-ring"
-                />
-                Stop running agents
-              </label>
-            </div>
-
-            <p className="text-muted-foreground text-xs mb-4">
-              Sync status change to {trackerName}?
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => onSync(false, { cleanupWorkspace, stopAgents })}
-                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
-              >
-                Shadow Only
-              </button>
-              <button
-                onClick={() => onSync(true, { cleanupWorkspace, stopAgents })}
-                className="px-4 py-2 bg-success hover:bg-success/90 text-foreground rounded-lg transition-colors text-sm"
-              >
-                Sync to {trackerName}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Undo Toast component
-interface UndoToastProps {
-  isVisible: boolean;
-  onUndo: () => void;
-  onClose: () => void;
-}
-
-function UndoToast({ isVisible, onUndo, onClose }: UndoToastProps) {
-  if (!isVisible) return null;
-
-  return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-      <div className="bg-card border border-border rounded-lg shadow-xl px-4 py-3 flex items-center gap-4">
-        <span className="text-sm text-foreground">Issue moved</span>
-        <button
-          onClick={onUndo}
-          className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors"
-        >
-          <Undo className="w-4 h-4" />
-          Undo
-        </button>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-muted-foreground"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
     </div>
   );
 }
