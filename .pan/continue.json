@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T21:41:30.000Z",
+  "updated": "2026-05-18T21:54:21.152Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "4c5dcf8f2",
+    "sha": "515cb4f3a",
     "dirty": false
   },
   "decisions": [
@@ -411,6 +411,16 @@
     "n2-default-route-flip.n2-default-route-flip.ac2": "completed",
     "n2-default-route-flip.n2-default-route-flip.ac3": "completed",
     "n2-default-route-flip.n2-default-route-flip.ac4": "completed",
-    "n2-default-route-flip.n2-default-route-flip.ac5": "completed"
+    "n2-default-route-flip.n2-default-route-flip.ac5": "completed",
+    "d1-drawer-shell-store": "completed",
+    "d1-drawer-shell-store.ac1": "completed",
+    "d1-drawer-shell-store.ac2": "completed",
+    "d1-drawer-shell-store.ac3": "completed",
+    "d1-drawer-shell-store.ac4": "completed",
+    "d1-drawer-shell-store.ac5": "completed",
+    "d1-drawer-shell-store.ac6": "completed",
+    "d1-drawer-shell-store.ac7": "completed",
+    "d1-drawer-shell-store.ac8": "completed",
+    "d1-drawer-shell-store.ac9": "completed"
   }
 }
