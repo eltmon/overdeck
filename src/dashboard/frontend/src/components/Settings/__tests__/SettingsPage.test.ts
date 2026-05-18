@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { buildMiniMaxFormData } from '../SettingsPage';
+import { buildMiniMaxFormData, buildTtsAutosavePayload } from '../SettingsPage';
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import type { SettingsConfig } from '../types';
 
@@ -57,6 +57,46 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).not.toContain('<AgentCardsPanel');
     expect(SETTINGS_PAGE_SOURCE).not.toContain("from './AgentCards'");
   });
+
+  it('includes the TTS sidebar item and settings section controls', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain("{ id: 'tts', label: 'TTS'");
+    expect(SETTINGS_PAGE_SOURCE).toContain('id="tts"');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ enabled:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ volume:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ dropInfoWhenFull:');
+    expect(SETTINGS_PAGE_SOURCE).toContain('<TtsSystemVoicePicker');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ voice: voiceId })');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ statusVoice: voiceId })');
+  });
+
+  it('includes advanced TTS voice map, muted sources, and template controls', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('fetchTtsVoices');
+    expect(SETTINGS_PAGE_SOURCE).toContain('TTS_EVENT_KEYS.map');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsVoiceMapChange(eventKey');
+    expect(SETTINGS_PAGE_SOURCE).toContain('ACTIVITY_SOURCE_OPTIONS.map');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsMutedSourceChange(source');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleAddTtsTemplate');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsTemplateChange(eventKey');
+  });
+
+  it('serializes TTS settings autosaves through a TTS-only latest-snapshot queue', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('pendingTtsSaveRef = useRef<TtsConfig | null>(null)');
+    expect(SETTINGS_PAGE_SOURCE).toContain('ttsSaveInFlightRef');
+    expect(SETTINGS_PAGE_SOURCE).toContain('const latest = await fetchSettings()');
+    expect(SETTINGS_PAGE_SOURCE).toContain('saveSettings(buildTtsAutosavePayload(latest, snapshot))');
+    expect(SETTINGS_PAGE_SOURCE).toContain('scheduleTtsSave(nextTts, options.debounce === true)');
+  });
+
+  it('debounces high-frequency TTS autosaves', () => {
+    expect(SETTINGS_PAGE_SOURCE).toContain('const TTS_AUTOSAVE_DEBOUNCE_MS = 400');
+    expect(SETTINGS_PAGE_SOURCE).toContain('ttsSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)');
+    expect(SETTINGS_PAGE_SOURCE).toContain('setTimeout(() => {');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ volume: Number(e.target.value) }, { debounce: true })');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ rate: Number(e.target.value) }, { debounce: true })');
+    expect(SETTINGS_PAGE_SOURCE).toContain('handleTtsConfigChange({ maxChars: Number(e.target.value) }, { debounce: true })');
+  });
 });
 
 describe('MODELS_BY_PROVIDER', () => {
@@ -64,6 +104,25 @@ describe('MODELS_BY_PROVIDER', () => {
     const allModelIds = Object.values(MODELS_BY_PROVIDER).flatMap(p => p.models.map(m => m.id));
     const found = DEPRECATED_MODEL_IDS.filter(dep => allModelIds.includes(dep as never));
     expect(found).toEqual([]);
+  });
+});
+
+
+describe('buildTtsAutosavePayload', () => {
+  it('overlays only TTS settings onto the latest server snapshot', () => {
+    const latest: SettingsConfig = {
+      ...MINIMAX_DEFAULTS,
+      api_keys: { openai: 'server-key' },
+      tracker_keys: { github: 'server-token' },
+      tmux: { config_mode: 'managed' },
+      tts: { enabled: false, volume: 0.4 },
+    };
+    const result = buildTtsAutosavePayload(latest, { enabled: true, volume: 0.8 });
+
+    expect(result).toEqual({
+      ...latest,
+      tts: { enabled: true, volume: 0.8 },
+    });
   });
 });
 
@@ -103,6 +162,15 @@ describe('buildMiniMaxFormData', () => {
     };
     const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
     expect(result.openrouter?.favorites).toEqual(['qwen/qwq-32b']);
+  });
+
+  it('preserves existing TTS settings from formData', () => {
+    const existing: SettingsConfig = {
+      ...MINIMAX_DEFAULTS,
+      tts: { enabled: true, volume: 0.6, rate: 1.2, maxChars: 200, dropInfoWhenFull: false },
+    };
+    const result = buildMiniMaxFormData(existing, MINIMAX_DEFAULTS);
+    expect(result.tts).toEqual(existing.tts);
   });
 
   it('preserves gemini_thinking_level from formData, not from defaults', () => {

@@ -12,6 +12,8 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
+import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
+import { refreshTtsRuntimeConfig } from './services/tts-runtime-config.js';
 import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
@@ -314,7 +316,9 @@ void cleanupOrphanedConversationAttachments();
 console.log('[panopticon] Attachment cleanup started');
 
 // Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
+await refreshTtsRuntimeConfig();
 void startTtsSummarizer().catch(err => console.warn('[tts-summarizer] start failed:', err));
+void startTtsPlayback().catch(err => console.warn('[tts-playback] start failed:', err));
 
 // Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
 startCliproxyWatchdog();
@@ -328,7 +332,12 @@ const emitShutdownActivity = () => {
       level: 'info',
       message: 'Dashboard stopping',
     });
-    emitActivityTts({ utterance: 'Dashboard stopping', priority: 2 });
+    emitActivityTts({
+      utterance: 'Dashboard stopping',
+      priority: 2,
+      source: 'dashboard',
+      eventType: 'dashboard.stopping',
+    });
   } catch { /* non-fatal */ }
 };
 const handleShutdownSignal = (signal: NodeJS.Signals) => {
@@ -338,6 +347,7 @@ const handleShutdownSignal = (signal: NodeJS.Signals) => {
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
+  stopTtsPlayback();
   process.exit(0);
 };
 process.once('SIGTERM', () => handleShutdownSignal('SIGTERM'));

@@ -1,0 +1,174 @@
+import type { NormalizedTtsDaemonConfig } from './config-yaml.js';
+import { findVoiceById, type TtsVoice } from './tts-voices.js';
+
+export type TtsSpeakMode = 'custom' | 'design' | 'clone';
+export type TtsSpeakResult = 'spoken' | 'muted' | 'daemon-unavailable' | 'no-voice';
+
+type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
+export interface ResolveAndSpeakOptions {
+  text: string;
+  source?: string;
+  eventType?: string;
+  issueId?: string;
+  priority?: number;
+  voiceId?: string;
+  preview?: boolean;
+  voice?: string;
+  instruct?: string;
+  volume?: number;
+  mode?: TtsSpeakMode;
+  embedding?: number[];
+}
+
+export interface TtsSpeakPayload {
+  text: string;
+  voice: string;
+  instruct: string;
+  volume: number;
+  rate: number;
+  maxChars: number;
+  dropInfoWhenFull: boolean;
+  mode: TtsSpeakMode;
+  embedding?: number[];
+}
+
+export interface ResolveAndSpeakDeps {
+  config: NormalizedTtsDaemonConfig;
+  findVoiceById?: (id: string) => Promise<TtsVoice | undefined>;
+  fetch?: FetchLike;
+  timeoutMs?: number;
+}
+
+function renderTemplate(template: string, issueId: string | undefined): string {
+  return template.replaceAll('{issueId}', issueId ?? '');
+}
+
+function truncateForTts(text: string, config: NormalizedTtsDaemonConfig): string {
+  return text.length > config.maxChars ? text.slice(0, config.maxChars) : text;
+}
+
+function ttsPayloadControls(config: NormalizedTtsDaemonConfig): Pick<TtsSpeakPayload, 'rate' | 'maxChars' | 'dropInfoWhenFull'> {
+  return {
+    rate: config.rate,
+    maxChars: config.maxChars,
+    dropInfoWhenFull: config.dropInfoWhenFull,
+  };
+}
+
+function resolveVoiceId(options: ResolveAndSpeakOptions, config: NormalizedTtsDaemonConfig): string {
+  if (options.voiceId) return options.voiceId;
+  if (options.eventType && config.voiceMap[options.eventType]) return config.voiceMap[options.eventType];
+  if (options.priority === 2) return config.statusVoice || config.voice;
+  return config.voice;
+}
+
+export function buildTtsSpeakPayload(
+  voice: TtsVoice,
+  text: string,
+  config: NormalizedTtsDaemonConfig,
+): TtsSpeakPayload {
+  if (voice.kind === 'design') {
+    return {
+      text,
+      voice: voice.description || voice.name,
+      instruct: voice.instruct || '',
+      volume: config.volume,
+      ...ttsPayloadControls(config),
+      mode: 'design',
+    };
+  }
+
+  if (voice.kind === 'clone') {
+    return {
+      text,
+      voice: 'clone',
+      instruct: voice.instruct || '',
+      volume: config.volume,
+      ...ttsPayloadControls(config),
+      mode: 'clone',
+      embedding: voice.embedding,
+    };
+  }
+
+  return {
+    text,
+    voice: voice.presetName || voice.name,
+    instruct: voice.instruct || '',
+    volume: config.volume,
+    ...ttsPayloadControls(config),
+    mode: 'custom',
+  };
+}
+
+function buildDirectTtsSpeakPayload(
+  options: ResolveAndSpeakOptions,
+  text: string,
+  config: NormalizedTtsDaemonConfig,
+): TtsSpeakPayload | undefined {
+  if (!options.voice) return undefined;
+  return {
+    text,
+    voice: options.voice,
+    instruct: options.instruct || '',
+    volume: options.volume ?? config.volume,
+    ...ttsPayloadControls(config),
+    mode: options.mode || 'custom',
+    embedding: options.embedding,
+  };
+}
+
+async function postSpeakPayload(
+  payload: TtsSpeakPayload,
+  config: NormalizedTtsDaemonConfig,
+  deps: Pick<ResolveAndSpeakDeps, 'fetch' | 'timeoutMs'>,
+): Promise<TtsSpeakResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), deps.timeoutMs ?? 5_000);
+
+  try {
+    const response = await (deps.fetch ?? fetch)(`http://${config.daemonHost}:${config.daemonPort}/speak`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    return response.ok ? 'spoken' : 'daemon-unavailable';
+  } catch {
+    return 'daemon-unavailable';
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function resolveAndSpeak(
+  options: ResolveAndSpeakOptions,
+  deps: ResolveAndSpeakDeps,
+): Promise<TtsSpeakResult> {
+  const config = deps.config;
+
+  const text = truncateForTts(
+    options.eventType && config.utteranceTemplates[options.eventType]
+      ? renderTemplate(config.utteranceTemplates[options.eventType], options.issueId)
+      : options.text,
+    config,
+  );
+
+  const directPayload = buildDirectTtsSpeakPayload(options, text, config);
+  if (directPayload) return postSpeakPayload(directPayload, config, deps);
+
+  const isSavedVoicePreview = options.preview === true && typeof options.voiceId === 'string';
+  if (!isSavedVoicePreview) {
+    if (!config.enabled) return 'muted';
+    if (options.source && config.mutedSources.includes(options.source)) return 'muted';
+    if (options.issueId && config.mutedIssues.includes(options.issueId)) return 'muted';
+  }
+
+  const voiceId = resolveVoiceId(options, config).trim();
+  if (!voiceId) return 'no-voice';
+
+  const voice = await (deps.findVoiceById ?? findVoiceById)(voiceId);
+  if (!voice) return 'no-voice';
+
+  return postSpeakPayload(buildTtsSpeakPayload(voice, text, config), config, deps);
+}

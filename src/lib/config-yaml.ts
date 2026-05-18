@@ -9,7 +9,7 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 'fs';
-import { mkdir as mkdirAsync, readFile as readFileAsync, stat as statAsync, writeFile as writeFileAsync } from 'fs/promises';
+import { readFile as readFileAsync, writeFile as writeFileAsync, stat as statAsync, mkdir as mkdirAsync } from 'fs/promises';
 import { dirname, join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
@@ -94,6 +94,38 @@ export interface TtsSummarizerConfig {
   model?: ModelId;
   /** Seconds to batch activity before summarizing (default: 15) */
   batch_window_seconds?: number;
+}
+
+export interface TtsDaemonConfig {
+  enabled?: boolean;
+  voice?: string;
+  statusVoice?: string;
+  volume?: number;
+  rate?: number;
+  maxChars?: number;
+  dropInfoWhenFull?: boolean;
+  daemonPort?: number;
+  daemonHost?: string;
+  voiceMap?: Record<string, string>;
+  mutedSources?: string[];
+  utteranceTemplates?: Record<string, string>;
+  mutedIssues?: string[];
+}
+
+export interface NormalizedTtsDaemonConfig {
+  enabled: boolean;
+  voice: string;
+  statusVoice?: string;
+  volume: number;
+  rate: number;
+  maxChars: number;
+  dropInfoWhenFull: boolean;
+  daemonPort: number;
+  daemonHost: string;
+  voiceMap: Record<string, string>;
+  mutedSources: string[];
+  utteranceTemplates: Record<string, string>;
+  mutedIssues: string[];
 }
 
 export type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
@@ -259,8 +291,8 @@ export interface YamlConfig {
     caveman?: CavemanConfig;
   };
 
-  /** TTS summarizer configuration */
-  tts?: {
+  /** TTS configuration */
+  tts?: TtsDaemonConfig & {
     summarizer?: TtsSummarizerConfig;
   };
 
@@ -444,6 +476,9 @@ export interface NormalizedConfig {
 
   /** Caveman compressed output configuration (normalised, never undefined) */
   caveman: NormalizedCavemanConfig;
+
+  /** TTS daemon configuration (normalised, never undefined) */
+  tts: NormalizedTtsDaemonConfig;
 
   /** TTS summarizer configuration (normalised, never undefined) */
   ttsSummarizer: {
@@ -635,6 +670,20 @@ const DEFAULT_CONFIG: NormalizedConfig = {
       merge: 'full',
     },
   },
+  tts: {
+    enabled: false,
+    voice: '',
+    volume: 1,
+    rate: 1,
+    maxChars: 140,
+    dropInfoWhenFull: true,
+    daemonPort: 8787,
+    daemonHost: '127.0.0.1',
+    voiceMap: {},
+    mutedSources: [],
+    utteranceTemplates: {},
+    mutedIssues: [],
+  },
   ttsSummarizer: {
     enabled: false,
     model: 'gpt-5.4-mini',
@@ -722,14 +771,21 @@ function loadYamlFile(filePath: string): YamlConfig | null {
 function findProjectRoot(startDir: string = process.cwd()): string | null {
   let currentDir = startDir;
 
-  while (currentDir !== '/') {
+  while (true) {
     if (existsSync(join(currentDir, '.git'))) {
       return currentDir;
     }
-    currentDir = join(currentDir, '..');
-  }
 
-  return null;
+    const parent = dirname(currentDir);
+    if (parent === currentDir) return null;
+    currentDir = parent;
+  }
+}
+
+export function stripProjectTtsEndpoint(config: YamlConfig | null): YamlConfig | null {
+  if (!config?.tts) return config;
+  const { daemonHost: _daemonHost, daemonPort: _daemonPort, ...tts } = config.tts;
+  return { ...config, tts };
 }
 
 /**
@@ -743,7 +799,7 @@ function loadProjectConfig(): YamlConfig | null {
 
   const newConfigPath = join(projectRoot, '.pan.yaml');
   if (existsSync(newConfigPath)) {
-    return loadYamlFile(newConfigPath);
+    return stripProjectTtsEndpoint(loadYamlFile(newConfigPath));
   }
 
   const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
@@ -751,7 +807,7 @@ function loadProjectConfig(): YamlConfig | null {
     process.stderr.write(
       `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
     );
-    return loadYamlFile(legacyConfigPath);
+    return stripProjectTtsEndpoint(loadYamlFile(legacyConfigPath));
   }
 
   return null;
@@ -883,6 +939,51 @@ function mergeCavemanConfig(
   }
 }
 
+function mergeTtsConfig(result: NormalizedTtsDaemonConfig, config: YamlConfig | null): void {
+  const tts = config?.tts;
+  if (!tts) return;
+
+  if (tts.enabled !== undefined) result.enabled = tts.enabled;
+  if (tts.voice !== undefined) result.voice = tts.voice;
+  if (tts.statusVoice !== undefined) result.statusVoice = tts.statusVoice;
+  if (tts.volume !== undefined) result.volume = tts.volume;
+  if (tts.rate !== undefined) result.rate = tts.rate;
+  if (tts.maxChars !== undefined) result.maxChars = tts.maxChars;
+  if (tts.dropInfoWhenFull !== undefined) result.dropInfoWhenFull = tts.dropInfoWhenFull;
+  if (tts.daemonPort !== undefined) result.daemonPort = tts.daemonPort;
+  if (tts.daemonHost !== undefined) result.daemonHost = tts.daemonHost;
+  if (tts.voiceMap !== undefined) result.voiceMap = { ...tts.voiceMap };
+  if (tts.mutedSources !== undefined) result.mutedSources = [...tts.mutedSources];
+  if (tts.utteranceTemplates !== undefined) result.utteranceTemplates = { ...tts.utteranceTemplates };
+  if (tts.mutedIssues !== undefined) result.mutedIssues = [...tts.mutedIssues];
+}
+
+export function getDefaultTtsDaemonConfig(): NormalizedTtsDaemonConfig {
+  return {
+    enabled: DEFAULT_CONFIG.tts.enabled,
+    voice: DEFAULT_CONFIG.tts.voice,
+    statusVoice: DEFAULT_CONFIG.tts.statusVoice,
+    volume: DEFAULT_CONFIG.tts.volume,
+    rate: DEFAULT_CONFIG.tts.rate,
+    maxChars: DEFAULT_CONFIG.tts.maxChars,
+    dropInfoWhenFull: DEFAULT_CONFIG.tts.dropInfoWhenFull,
+    daemonPort: DEFAULT_CONFIG.tts.daemonPort,
+    daemonHost: DEFAULT_CONFIG.tts.daemonHost,
+    voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
+    mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
+    utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },
+    mutedIssues: [...DEFAULT_CONFIG.tts.mutedIssues],
+  };
+}
+
+export function mergeTtsDaemonConfigs(...configs: (YamlConfig | null)[]): NormalizedTtsDaemonConfig {
+  const result = getDefaultTtsDaemonConfig();
+  for (const config of configs) {
+    mergeTtsConfig(result, config);
+  }
+  return result;
+}
+
 function isWorkhorseRef(ref: ModelRef): boolean {
   return ref.startsWith('workhorse:');
 }
@@ -1009,6 +1110,20 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       enabled: DEFAULT_CONFIG.caveman.enabled,
       abTest: DEFAULT_CONFIG.caveman.abTest,
       modes: { ...DEFAULT_CONFIG.caveman.modes },
+    },
+    tts: {
+      enabled: DEFAULT_CONFIG.tts.enabled,
+      voice: DEFAULT_CONFIG.tts.voice,
+      volume: DEFAULT_CONFIG.tts.volume,
+      rate: DEFAULT_CONFIG.tts.rate,
+      maxChars: DEFAULT_CONFIG.tts.maxChars,
+      dropInfoWhenFull: DEFAULT_CONFIG.tts.dropInfoWhenFull,
+      daemonPort: DEFAULT_CONFIG.tts.daemonPort,
+      daemonHost: DEFAULT_CONFIG.tts.daemonHost,
+      voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
+      mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
+      utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },
+      mutedIssues: [...DEFAULT_CONFIG.tts.mutedIssues],
     },
     ttsSummarizer: {
       enabled: DEFAULT_CONFIG.ttsSummarizer.enabled,
@@ -1300,6 +1415,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge caveman configuration
     mergeCavemanConfig(result.caveman, config);
+
+    // Merge TTS daemon configuration
+    mergeTtsConfig(result.tts, config);
 
     // Merge TTS summarizer configuration
     if (config.tts?.summarizer) {

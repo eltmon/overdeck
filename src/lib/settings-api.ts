@@ -20,6 +20,7 @@ import {
   type RolesConfig,
   type WorkhorsesConfig,
   type WorkhorseSlot,
+  type TtsDaemonConfig,
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
@@ -33,6 +34,76 @@ export interface ApiDeprecationWarning {
   workType: string;
   from: string;
   to: string;
+}
+
+export type ApiTtsConfig = Omit<TtsDaemonConfig, 'daemonPort' | 'daemonHost'>;
+
+const API_TTS_KEYS = [
+  'enabled',
+  'voice',
+  'statusVoice',
+  'volume',
+  'rate',
+  'maxChars',
+  'dropInfoWhenFull',
+  'voiceMap',
+  'mutedSources',
+  'utteranceTemplates',
+  'mutedIssues',
+] as const satisfies readonly (keyof ApiTtsConfig)[];
+
+const API_TTS_KEY_SET = new Set<string>(API_TTS_KEYS);
+
+function unknownApiTtsKeys(tts: Record<string, unknown>): string[] {
+  return Object.keys(tts).filter((key) => !API_TTS_KEY_SET.has(key));
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string');
+}
+
+function validateApiTtsConfigFields(tts: Record<string, unknown>, errors: string[]): void {
+  const unknownKeys = unknownApiTtsKeys(tts);
+  if (unknownKeys.length > 0) {
+    errors.push(`Unknown tts setting(s): ${unknownKeys.join(', ')}`);
+  }
+
+  if (tts.enabled !== undefined && typeof tts.enabled !== 'boolean') errors.push('tts.enabled must be a boolean');
+  if (tts.dropInfoWhenFull !== undefined && typeof tts.dropInfoWhenFull !== 'boolean') errors.push('tts.dropInfoWhenFull must be a boolean');
+  if (tts.voice !== undefined && typeof tts.voice !== 'string') errors.push('tts.voice must be a string');
+  if (tts.statusVoice !== undefined && typeof tts.statusVoice !== 'string') errors.push('tts.statusVoice must be a string');
+  if (tts.volume !== undefined && (typeof tts.volume !== 'number' || tts.volume < 0 || tts.volume > 1)) {
+    errors.push('tts.volume must be between 0 and 1');
+  }
+  if (tts.rate !== undefined && (typeof tts.rate !== 'number' || tts.rate <= 0)) {
+    errors.push('tts.rate must be greater than 0');
+  }
+  if (tts.maxChars !== undefined && (typeof tts.maxChars !== 'number' || tts.maxChars <= 0)) {
+    errors.push('tts.maxChars must be greater than 0');
+  }
+  if (tts.voiceMap !== undefined && !isStringRecord(tts.voiceMap)) errors.push('tts.voiceMap must be a string record');
+  if (tts.utteranceTemplates !== undefined && !isStringRecord(tts.utteranceTemplates)) errors.push('tts.utteranceTemplates must be a string record');
+  if (tts.mutedSources !== undefined && !isStringArray(tts.mutedSources)) errors.push('tts.mutedSources must be an array of strings');
+  if (tts.mutedIssues !== undefined && !isStringArray(tts.mutedIssues)) errors.push('tts.mutedIssues must be an array of strings');
+}
+
+function sanitizeApiTtsConfig(tts: ApiTtsConfig | undefined): ApiTtsConfig | undefined {
+  if (tts === undefined) return undefined;
+  if (!isRecord(tts)) throw new Error('tts must be an object');
+
+  const errors: string[] = [];
+  validateApiTtsConfigFields(tts, errors);
+  if (errors.length > 0) throw new Error(errors.join('; '));
+
+  return Object.fromEntries(
+    API_TTS_KEYS
+      .filter((key) => tts[key] !== undefined)
+      .map((key) => [key, tts[key]]),
+  ) as ApiTtsConfig;
 }
 
 // API format matches frontend SettingsConfig interface
@@ -87,6 +158,7 @@ export interface ApiSettingsConfig {
     openrouter?: string;
     nous?: string;
   };
+  tts?: ApiTtsConfig;
   openrouter?: {
     favorites?: string[];
   };
@@ -168,6 +240,22 @@ function seededRoles(config: Pick<ReturnType<typeof loadConfig>['config'], 'role
     };
   }
   return roles;
+}
+
+function toApiTtsConfig(config: ReturnType<typeof loadConfig>['config']['tts']): ApiTtsConfig {
+  return {
+    enabled: config.enabled,
+    voice: config.voice,
+    statusVoice: config.statusVoice,
+    volume: config.volume,
+    rate: config.rate,
+    maxChars: config.maxChars,
+    dropInfoWhenFull: config.dropInfoWhenFull,
+    voiceMap: { ...config.voiceMap },
+    mutedSources: [...config.mutedSources],
+    utteranceTemplates: { ...config.utteranceTemplates },
+    mutedIssues: [...config.mutedIssues],
+  };
 }
 
 function pruneUndefined<T>(value: T): T {
@@ -379,6 +467,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
       default_conversation_model: getDefaultConversationModelApi(),
     },
     api_keys: config.apiKeys,
+    tts: toApiTtsConfig(config.tts),
     openrouter: {
       favorites: config.openrouterFavorites,
     },
@@ -452,6 +541,12 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     }
   }
 
+  if (config.tts !== undefined) {
+    for (const [key, value] of Object.entries(config.tts)) {
+      doc.setIn(['tts', key], value);
+    }
+  }
+
   await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
 }
 
@@ -505,6 +600,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
       openrouter: settings.api_keys.openrouter,
       nous: settings.api_keys.nous,
     },
+    tts: sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
     tmux: settings.tmux,
     conversations: settings.conversations,
@@ -549,6 +645,10 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
     api_keys: {
       ...current.api_keys,
       ...updates.api_keys,
+    },
+    tts: {
+      ...current.tts,
+      ...sanitizeApiTtsConfig(updates.tts),
     },
     openrouter: {
       ...current.openrouter,
@@ -659,6 +759,14 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
       if (ccc !== undefined && typeof ccc !== 'boolean') {
         errors.push('experimental.claudeCodeChannels must be a boolean');
       }
+    }
+  }
+
+  if (settings.tts !== undefined) {
+    if (!isRecord(settings.tts)) {
+      errors.push('tts must be an object');
+    } else {
+      validateApiTtsConfigFields(settings.tts, errors);
     }
   }
 

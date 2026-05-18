@@ -79,6 +79,8 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     utterance: `${issueId} planning is done, awaiting your approval`,
     priority: 1,
     issueId,
+    source: 'planning-agent',
+    eventType: 'planning.finalized',
   });
 
   if (options.json) {

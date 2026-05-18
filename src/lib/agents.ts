@@ -2651,6 +2651,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     utterance: `Work agent started for ${options.issueId}`,
     priority: 2,
     issueId: options.issueId,
+    source: 'work-agent',
+    eventType: 'workAgent.started',
   });
 
   return state;

@@ -76,6 +76,20 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
       },
       experimental: { claudeCodeChannels: false },
       claude: { permissionMode: 'auto' },
+      tts: {
+        enabled: false,
+        voice: '',
+        volume: 1,
+        rate: 1,
+        maxChars: 140,
+        dropInfoWhenFull: true,
+        daemonPort: 8787,
+        daemonHost: '127.0.0.1',
+        voiceMap: {},
+        mutedSources: [],
+        utteranceTemplates: {},
+        mutedIssues: [],
+      },
       ...overrides,
     },
   };
@@ -178,6 +192,43 @@ describe('loadSettingsApi', () => {
     expect(settings.workhorses?.expensive).toBe('claude-opus-4-7');
     expect(settings.roles?.work?.sub?.inspect?.model).toBe('claude-haiku-4-5');
   });
+
+  it('loads tts daemon settings from normalized config', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({
+      tts: {
+        enabled: true,
+        voice: 'voice-main',
+        statusVoice: 'voice-status',
+        volume: 0.6,
+        rate: 1.2,
+        maxChars: 180,
+        dropInfoWhenFull: false,
+        daemonPort: 8787,
+        daemonHost: '127.0.0.1',
+        voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+        mutedSources: ['merge-agent'],
+        utteranceTemplates: { readyForMerge: '{issueId} ready' },
+        mutedIssues: ['PAN-123'],
+      },
+    }));
+
+    const { loadSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    expect(settings.tts).toEqual({
+      enabled: true,
+      voice: 'voice-main',
+      statusVoice: 'voice-status',
+      volume: 0.6,
+      rate: 1.2,
+      maxChars: 180,
+      dropInfoWhenFull: false,
+      voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+      mutedSources: ['merge-agent'],
+      utteranceTemplates: { readyForMerge: '{issueId} ready' },
+      mutedIssues: ['PAN-123'],
+    });
+  });
 });
 
 describe('saveSettingsApi', () => {
@@ -208,6 +259,53 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('inspect:');
     expect(written).not.toContain('overrides:');
     expect(mockClearConfigCache).toHaveBeenCalledOnce();
+  });
+
+  it('rejects untrusted tts daemon endpoint keys at runtime', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await expect(saveSettingsApi({
+      ...settings,
+      tts: {
+        ...settings.tts,
+        daemonHost: '169.254.169.254',
+      } as typeof settings.tts,
+    })).rejects.toThrow('Unknown tts setting(s): daemonHost');
+
+    expect(mockWriteFile).not.toHaveBeenCalled();
+  });
+
+  it('writes tts daemon settings without removing tts.summarizer', async () => {
+    mockReadFile.mockResolvedValue('tts:\n  summarizer:\n    enabled: true\n    model: claude-haiku-4-5\n');
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({
+      ...settings,
+      tts: {
+        ...settings.tts,
+        enabled: true,
+        voice: 'voice-main',
+        volume: 0.75,
+        rate: 1.1,
+        maxChars: 180,
+        dropInfoWhenFull: false,
+        voiceMap: { 'reviewStatus.passed': 'voice-review' },
+        mutedSources: ['test-specialist'],
+        utteranceTemplates: { readyForMerge: '{issueId} ready' },
+        mutedIssues: ['PAN-123'],
+      },
+    });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('summarizer:');
+    expect(written).toContain('enabled: true');
+    expect(written).toContain('voice: voice-main');
+    expect(written).toContain('volume: 0.75');
+    expect(written).toContain('reviewStatus.passed: voice-review');
+    expect(written).toContain('mutedSources:');
+    expect(written).toContain('PAN-123');
   });
 });
 
@@ -287,5 +385,63 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toContain('Invalid model reference "not-a-model" at workhorses.mid');
     expect(result.errors).toContain('roles.plan.model references unknown workhorse slot "missing"');
     expect(result.errors).toContain('Invalid model reference "not-a-model" at roles.work.model');
+  });
+
+  it('rejects unknown tts settings', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      tts: {
+        enabled: true,
+        daemonPort: 22,
+      } as never,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('Unknown tts setting(s): daemonPort');
+  });
+
+  it('rejects invalid tts field types', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      tts: {
+        enabled: 'yes',
+        dropInfoWhenFull: 'no',
+        voice: 1,
+        statusVoice: 2,
+        voiceMap: { good: 'voice-1', bad: 3 },
+        utteranceTemplates: [],
+        mutedSources: {},
+        mutedIssues: [1],
+      } as never,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('tts.enabled must be a boolean');
+    expect(result.errors).toContain('tts.dropInfoWhenFull must be a boolean');
+    expect(result.errors).toContain('tts.voice must be a string');
+    expect(result.errors).toContain('tts.statusVoice must be a string');
+    expect(result.errors).toContain('tts.voiceMap must be a string record');
+    expect(result.errors).toContain('tts.utteranceTemplates must be a string record');
+    expect(result.errors).toContain('tts.mutedSources must be an array of strings');
+    expect(result.errors).toContain('tts.mutedIssues must be an array of strings');
+  });
+
+  it('rejects invalid tts numeric settings', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      tts: {
+        volume: 1.2,
+        rate: 0,
+        maxChars: 0,
+      },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('tts.volume must be between 0 and 1');
+    expect(result.errors).toContain('tts.rate must be greater than 0');
+    expect(result.errors).toContain('tts.maxChars must be greater than 0');
   });
 });

@@ -953,6 +953,8 @@ function announceMerge(
     utterance: ttsUtterance,
     priority: status === 'failed' ? 0 : 1,
     issueId,
+    source: 'merge-agent',
+    eventType: `mergeStatus.${status === 'completed' ? 'merged' : status === 'started' ? 'merging' : 'failed'}`,
   });
 }
 

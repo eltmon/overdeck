@@ -21,6 +21,7 @@ import {
   Play,
   GitMerge,
   GitPullRequest,
+  VolumeX,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
@@ -48,6 +49,7 @@ import { SensitiveText } from './SensitiveText';
 import type { Harness } from './shared/ModelPicker';
 import { useActivityQuery, usePrQuery } from './CommandDeck/ZoneCOverviewTabs/queries';
 import { getWorkSessionLabel, isAgentSessionAttachable } from '../lib/swarmSlots';
+import { useTtsIssueMute } from '../hooks/useTtsIssueMute';
 
 function formatCost(cost: number): string {
   if (cost >= 100) return `$${cost.toFixed(0)}`;
@@ -131,6 +133,7 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
   } | null>(null);
 
   const tmuxCommand = agent ? `tmux attach -t ${agent.id}` : '';
+  const ttsMute = useTtsIssueMute(issueId);
   const awaitingInput = hasActualPendingQuestion(agent);
   const awaitingInputTitle = getPendingQuestionTitle(agent);
   const awaitingInputPrompt = agent?.pendingQuestionPrompt?.trim();
@@ -772,6 +775,21 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
                 </span>
               ))}
             </div>
+            <button
+              type="button"
+              onClick={() => ttsMute.toggle()}
+              disabled={ttsMute.loading || ttsMute.pending}
+              className={`mt-2 flex w-full items-center justify-between gap-2 rounded-lg border px-2 py-1.5 text-xs transition-colors disabled:opacity-50 ${
+                ttsMute.muted
+                  ? 'border-warning/50 bg-warning/10 text-warning hover:bg-warning/15'
+                  : 'border-border bg-card text-muted-foreground hover:text-foreground hover:bg-popover'
+              }`}
+              aria-pressed={ttsMute.muted}
+              data-testid={`inspector-tts-mute-${issueId}`}
+            >
+              <span>{ttsMute.muted ? 'Unmute TTS for this issue' : 'Mute TTS for this issue'}</span>
+              <VolumeX className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
 

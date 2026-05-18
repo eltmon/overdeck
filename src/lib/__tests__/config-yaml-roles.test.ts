@@ -7,6 +7,7 @@ import {
   derefWorkhorse,
   mergeConfigs,
   resolveModel,
+  stripProjectTtsEndpoint,
   type NormalizedConfig,
 } from '../config-yaml.js';
 import type { Role } from '../agents.js';
@@ -165,5 +166,100 @@ describe('role model configuration', () => {
       mid: 'gpt-5.4-mini',
     });
     expect(resolveModel('work', undefined, config)).toBe('gpt-5.4-mini');
+  });
+});
+
+describe('tts daemon configuration', () => {
+  it('returns daemon defaults when config omits the tts section', () => {
+    const { config } = mergeConfigs({});
+
+    expect(config.tts).toEqual({
+      enabled: false,
+      voice: '',
+      volume: 1,
+      rate: 1,
+      maxChars: 140,
+      dropInfoWhenFull: true,
+      daemonPort: 8787,
+      daemonHost: '127.0.0.1',
+      voiceMap: {},
+      mutedSources: [],
+      utteranceTemplates: {},
+      mutedIssues: [],
+    });
+  });
+
+  it('merges daemon tts fields over defaults', () => {
+    const { config } = mergeConfigs({
+      tts: {
+        enabled: true,
+        voice: 'voice-system',
+        statusVoice: 'voice-status',
+        volume: 0.5,
+        rate: 1.25,
+        maxChars: 220,
+        dropInfoWhenFull: false,
+        daemonPort: 8788,
+        daemonHost: 'localhost',
+        voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+        mutedSources: ['merge-agent'],
+        utteranceTemplates: { readyForMerge: '{issueId} can merge' },
+        mutedIssues: ['PAN-123'],
+      },
+    });
+
+    expect(config.tts).toEqual({
+      enabled: true,
+      voice: 'voice-system',
+      statusVoice: 'voice-status',
+      volume: 0.5,
+      rate: 1.25,
+      maxChars: 220,
+      dropInfoWhenFull: false,
+      daemonPort: 8788,
+      daemonHost: 'localhost',
+      voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+      mutedSources: ['merge-agent'],
+      utteranceTemplates: { readyForMerge: '{issueId} can merge' },
+      mutedIssues: ['PAN-123'],
+    });
+  });
+
+  it('strips daemon endpoints from project-scoped tts config', () => {
+    expect(stripProjectTtsEndpoint({
+      tts: {
+        enabled: true,
+        voice: 'voice-system',
+        daemonHost: 'attacker.example',
+        daemonPort: 80,
+      },
+    })).toEqual({
+      tts: {
+        enabled: true,
+        voice: 'voice-system',
+      },
+    });
+  });
+
+  it('keeps tts.summarizer separate from daemon tts fields', () => {
+    const { config } = mergeConfigs({
+      tts: {
+        enabled: true,
+        voice: 'voice-system',
+        summarizer: {
+          enabled: true,
+          model: 'claude-haiku-4-5',
+          batch_window_seconds: 30,
+        },
+      },
+    });
+
+    expect(config.tts.enabled).toBe(true);
+    expect(config.tts.voice).toBe('voice-system');
+    expect(config.ttsSummarizer).toEqual({
+      enabled: true,
+      model: 'claude-haiku-4-5',
+      batchWindowSeconds: 30,
+    });
   });
 });

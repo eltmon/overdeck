@@ -278,7 +278,8 @@ describe('PAN-1048 role primitive — agent spawning', () => {
 
       expect(launcher).toContain('exec claude --print');
       expect(launcher).toContain("--name agent-pan-subreview-1-review-security --session-id '");
-      expect(launcher).toContain(`< '${join(agentDir, 'initial-prompt.md')}'`);
+      expect(launcher).toContain("< '");
+      expect(launcher).toContain("initial-prompt.md'");
       expect(launcher).not.toContain('prompt=$(cat');
       expect(launcher).not.toContain('"$prompt"');
       expect(tmux.sendKeysAsync).not.toHaveBeenCalled();

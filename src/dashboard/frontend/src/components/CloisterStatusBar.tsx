@@ -23,6 +23,19 @@ interface CloisterStatus {
   agentsNeedingAttention: string[];
 }
 
+interface DashboardSettings {
+  tts?: {
+    enabled?: boolean;
+  };
+}
+
+interface TtsHealthStatus {
+  ok: boolean;
+  queue?: unknown;
+  model?: unknown;
+  error?: string;
+}
+
 async function fetchCloisterStatus(): Promise<CloisterStatus> {
   const res = await fetch('/api/cloister/status');
   if (!res.ok) throw new Error('Failed to fetch Cloister status');
@@ -49,6 +62,30 @@ async function fetchConversations(): Promise<{ sessionAlive: boolean }[]> {
   const res = await fetch('/api/conversations');
   if (!res.ok) return [];
   return res.json();
+}
+
+async function fetchDashboardSettings(): Promise<DashboardSettings> {
+  const res = await fetch('/api/settings');
+  if (!res.ok) throw new Error('Failed to fetch settings');
+  return res.json();
+}
+
+async function fetchTtsHealth(): Promise<TtsHealthStatus> {
+  const res = await fetch('/api/tts/health');
+  if (!res.ok) throw new Error('Failed to fetch TTS health');
+  return res.json();
+}
+
+function formatTtsHealthTitle(health: TtsHealthStatus | undefined, failed: boolean): string {
+  if (failed) return 'TTS: Health check failed';
+  if (!health) return 'TTS: Checking daemon';
+  if (!health.ok) return health.error ? `TTS: ${health.error}` : 'TTS: Daemon offline';
+
+  const details = [
+    health.model !== undefined ? `model: ${String(health.model)}` : undefined,
+    health.queue !== undefined ? `queue: ${String(health.queue)}` : undefined,
+  ].filter(Boolean);
+  return details.length > 0 ? `TTS: Running (${details.join(', ')})` : 'TTS: Running';
 }
 
 export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
@@ -82,6 +119,21 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
     queryKey: ['conversations'],
     queryFn: fetchConversations,
     refetchInterval: 10000,
+  });
+
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: fetchDashboardSettings,
+    retry: false,
+  });
+  const ttsEnabled = settings?.tts?.enabled === true;
+
+  const { data: ttsHealth, isError: ttsHealthFailed } = useQuery({
+    queryKey: ['tts-health'],
+    queryFn: fetchTtsHealth,
+    enabled: ttsEnabled,
+    refetchInterval: 10000,
+    retry: false,
   });
 
   const agents = useDashboardStore(selectAgentList);
@@ -162,6 +214,11 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
 
   const hasWarnings = status.summary.warning > 0 || status.summary.stuck > 0;
   const needsAttention = status.agentsNeedingAttention.length;
+  const ttsDotClass = ttsHealthFailed
+    ? 'bg-destructive'
+    : ttsHealth?.ok
+    ? 'bg-success'
+    : 'bg-muted-foreground';
 
   return (
     <div className="flex items-center gap-1.5 shrink-0">
@@ -204,6 +261,17 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
       {hasWarnings && (
         <span title={`${needsAttention} agent${needsAttention !== 1 ? 's' : ''} need attention`}>
           <AlertTriangle className="w-3.5 h-3.5 text-warning" />
+        </span>
+      )}
+
+      {ttsEnabled && (
+        <span
+          data-testid="tts-health-badge"
+          className="flex items-center gap-1 rounded bg-popover px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+          title={formatTtsHealthTitle(ttsHealth, ttsHealthFailed)}
+        >
+          <span data-testid="tts-health-dot" className={`h-1.5 w-1.5 rounded-full ${ttsDotClass}`} />
+          TTS
         </span>
       )}
 

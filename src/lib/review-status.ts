@@ -299,15 +299,21 @@ export function setReviewStatus(
   // Emit activity log entries for meaningful pipeline state transitions.
   // Each transition produces one entry so the ActivityPanel shows live pipeline progress.
   if (update.verificationStatus && update.verificationStatus !== status.verificationStatus) {
-    const vMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
+    const vMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string; ttsPriority?: number }> = {
       running:  { level: 'info',    msg: `${issueId} — verification running`, tts: `${issueId} verification running` },
       passed:   { level: 'success', msg: `${issueId} — verification passed`, tts: `${issueId} verification passed` },
       failed:   { level: 'error',   msg: `${issueId} — verification failed`, tts: `${issueId} verification failed` },
-      skipped:  { level: 'info',    msg: `${issueId} — verification skipped` },
+      skipped:  { level: 'info',    msg: `${issueId} — verification skipped`, tts: `${issueId} verification skipped`, ttsPriority: 2 },
     };
     const entry = vMap[update.verificationStatus];
     if (entry) emitActivityEntry({ source: 'cloister', level: entry.level, message: entry.msg, details: update.verificationNotes, issueId });
-    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
+    if (entry?.tts) emitActivityTts({
+      utterance: entry.tts,
+      priority: entry.ttsPriority ?? (entry.level === 'error' ? 0 : 1),
+      issueId,
+      source: 'cloister',
+      eventType: `verificationStatus.${update.verificationStatus}`,
+    });
   }
   if (update.reviewStatus && update.reviewStatus !== status.reviewStatus) {
     let reviewMsg = `${issueId} — review started`;
@@ -325,35 +331,59 @@ export function setReviewStatus(
     };
     const entry = rMap[update.reviewStatus];
     if (entry) emitActivityEntry({ source: 'review', level: entry.level, message: entry.msg, details: update.reviewNotes, issueId });
-    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
+    if (entry?.tts) emitActivityTts({
+      utterance: entry.tts,
+      priority: entry.level === 'error' ? 0 : 1,
+      issueId,
+      source: 'review-specialist',
+      eventType: `reviewStatus.${update.reviewStatus}`,
+    });
   }
   if (update.testStatus && update.testStatus !== status.testStatus) {
-    const tMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
-      testing:         { level: 'info',    msg: `${issueId} — tests running` },
+    const tMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string; ttsPriority?: number }> = {
+      testing:         { level: 'info',    msg: `${issueId} — tests running`, tts: `${issueId} tests running`, ttsPriority: 2 },
       passed:          { level: 'success', msg: `${issueId} — tests passed`, tts: `${issueId} tests passed` },
       failed:          { level: 'error',   msg: `${issueId} — tests failed`, tts: `${issueId} tests failed` },
-      skipped:         { level: 'info',    msg: `${issueId} — tests skipped` },
-      dispatch_failed: { level: 'warn',    msg: `${issueId} — test dispatch failed` },
+      skipped:         { level: 'info',    msg: `${issueId} — tests skipped`, tts: `${issueId} tests skipped`, ttsPriority: 2 },
+      dispatch_failed: { level: 'warn',    msg: `${issueId} — test dispatch failed`, tts: `${issueId} test dispatch failed`, ttsPriority: 1 },
     };
     const entry = tMap[update.testStatus];
     if (entry) emitActivityEntry({ source: 'test', level: entry.level, message: entry.msg, details: update.testNotes, issueId });
-    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
+    if (entry?.tts) emitActivityTts({
+      utterance: entry.tts,
+      priority: entry.ttsPriority ?? (entry.level === 'error' ? 0 : 1),
+      issueId,
+      source: 'test-specialist',
+      eventType: `testStatus.${update.testStatus}`,
+    });
   }
   if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
-    const mMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
-      queued:    { level: 'info',    msg: `${issueId} — queued for merge` },
-      merging:   { level: 'info',    msg: `${issueId} — merge in progress` },
-      verifying: { level: 'info',    msg: `${issueId} — post-merge verification` },
+    const mMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string; ttsPriority?: number }> = {
+      queued:    { level: 'info',    msg: `${issueId} — queued for merge`, tts: `${issueId} queued for merge`, ttsPriority: 2 },
+      merging:   { level: 'info',    msg: `${issueId} — merge in progress`, tts: `${issueId} merge in progress`, ttsPriority: 2 },
+      verifying: { level: 'info',    msg: `${issueId} — post-merge verification`, tts: `${issueId} post-merge verification running`, ttsPriority: 2 },
       merged:    { level: 'success', msg: `${issueId} — merged`, tts: `${issueId} merged to main` },
       failed:    { level: 'error',   msg: `${issueId} — merge failed`, tts: `${issueId} merge failed` },
     };
     const entry = mMap[update.mergeStatus];
     if (entry) emitActivityEntry({ source: 'ship', level: entry.level, message: entry.msg, details: update.mergeNotes, issueId });
-    if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
+    if (entry?.tts) emitActivityTts({
+      utterance: entry.tts,
+      priority: entry.ttsPriority ?? (entry.level === 'error' ? 0 : 1),
+      issueId,
+      source: 'merge-agent',
+      eventType: `mergeStatus.${update.mergeStatus}`,
+    });
   }
   if (update.readyForMerge === true && !status.readyForMerge) {
     emitActivityEntry({ source: 'cloister', level: 'success', message: `${issueId} — ready for merge`, issueId });
-    emitActivityTts({ utterance: `${issueId} ready for merge`, priority: 1, issueId });
+    emitActivityTts({
+      utterance: `${issueId} ready for merge`,
+      priority: 1,
+      issueId,
+      source: 'cloister',
+      eventType: 'readyForMerge',
+    });
   }
 
   // Reactive Cloister owns review→test and test→ship scheduling. setReviewStatus

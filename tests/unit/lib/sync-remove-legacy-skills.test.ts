@@ -128,6 +128,7 @@ describe('removeLegacySkills070', () => {
     const firstRun = removeLegacySkills070();
     expect(firstRun.sort()).toEqual(['pan-setup']);
 
+
     expect(readdirSync(mockClaudeSkills)).toEqual(['pan-tldr']);
 
     const secondRun = removeLegacySkills070();
