@@ -2,8 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { KanbanBoard } from './components/KanbanBoard';
-import { AgentList } from './components/AgentList';
-import { AgentOutputPanel } from './components/AgentOutputPanel';
+import { FleetAgentsView } from './components/Agents/FleetAgentsView';
 import { HealthDashboard } from './components/HealthDashboard';
 import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
@@ -269,7 +268,7 @@ export default function App() {
   }
 
   const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);
-  const [selectedAgent, setSelectedAgentState] = useState<string | null>(() => {
+  const [, setSelectedAgentState] = useState<string | null>(() => {
     const hash = window.location.hash;
     if (hash.startsWith('#agent=')) return decodeURIComponent(hash.slice(7));
     return null;
@@ -915,18 +914,8 @@ export default function App() {
         )}
         {activeTab === 'agents' && (
           <BootstrapGate fallback={<AgentListSkeleton />}>
-            <div className="flex w-full h-full overflow-hidden">
-              <div className={`${selectedAgent ? 'w-1/2 lg:w-5/12' : 'w-full'} overflow-y-auto p-6`}>
-                <AgentList
-                  selectedAgent={selectedAgent}
-                  onSelectAgent={setSelectedAgent}
-                />
-              </div>
-              {selectedAgent && (
-                <div className="flex-1 min-w-0 h-full flex flex-col border-l border-border">
-                  <AgentOutputPanel agentId={selectedAgent} />
-                </div>
-              )}
+            <div className="h-full w-full overflow-y-auto">
+              <FleetAgentsView />
             </div>
           </BootstrapGate>
         )}

@@ -203,13 +203,12 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-ltqb default-route flip is implemented and verified; inspection is skipped because requiresInspection=false. Continue the next ready PAN-1148 bead from bd ready.",
+    "description": "workspace-u9u7 Agents fleet replacement is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
     "beadId": "pending",
     "filesToRead": [
-      "src/dashboard/frontend/src/App.tsx",
-      "src/dashboard/frontend/src/App.test.tsx",
-      "src/dashboard/frontend/src/components/Sidebar.tsx",
-      "src/dashboard/frontend/src/components/Sidebar.test.tsx"
+      "src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx",
+      "src/dashboard/frontend/src/components/primitives/AgentCard.tsx",
+      "src/dashboard/frontend/src/App.tsx"
     ]
   },
   "beadsMapping": {},
@@ -446,6 +445,11 @@
     "b4-board-drawer-wiring": "completed",
     "b4-board-drawer-wiring.ac1": "completed",
     "b4-board-drawer-wiring.ac2": "completed",
-    "b4-board-drawer-wiring.ac3": "completed"
+    "b4-board-drawer-wiring.ac3": "completed",
+    "a1-agents-fleet-grid": "completed",
+    "a1-agents-fleet-grid.ac1": "completed",
+    "a1-agents-fleet-grid.ac2": "completed",
+    "a1-agents-fleet-grid.ac3": "completed",
+    "a1-agents-fleet-grid.ac4": "completed"
   }
 }

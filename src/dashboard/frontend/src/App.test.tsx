@@ -36,8 +36,7 @@ vi.mock('./components/KanbanBoard', () => ({
     <button onClick={() => onSelectIssue?.('PAN-123')}>Open issue</button>
   ),
 }));
-vi.mock('./components/AgentList', () => ({ AgentList: () => null }));
-vi.mock('./components/AgentOutputPanel', () => ({ AgentOutputPanel: () => null }));
+vi.mock('./components/Agents/FleetAgentsView', () => ({ FleetAgentsView: () => null }));
 vi.mock('./components/HealthDashboard', () => ({ HealthDashboard: () => null }));
 vi.mock('./components/SkillsList', () => ({ SkillsList: () => null }));
 vi.mock('./components/ActivityPanel', () => ({ ActivityPanel: () => null }));
