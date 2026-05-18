@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-18T04:46:14.779Z",
-    "updated": "2026-05-18T05:57:14.921Z",
+    "updated": "2026-05-18T06:06:03.776Z",
     "author": "panopticon-cli/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-1170: TTS daemon lifecycle: install, start/stop, supervision",
     "inspectionPolicy": "never"
@@ -13,9 +13,9 @@
     "status": "proposed",
     "uid": "09723c30-56eb-49ab-bffb-a3c515c00a04",
     "author": "panopticon-cli/auto-start",
-    "sequence": 29,
+    "sequence": 34,
     "created": "2026-05-18T04:46:14.779Z",
-    "updated": "2026-05-18T05:57:14.921Z",
+    "updated": "2026-05-18T06:06:03.776Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1170",
@@ -32,55 +32,55 @@
         "phase": "review",
         "issueId": "PAN-1170",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-18T05:57:14.921Z",
+        "updatedAt": "2026-05-18T06:06:03.767Z",
         "work": {
-          "updatedAt": "2026-05-18T05:57:14.921Z",
+          "updatedAt": "2026-05-18T06:06:03.767Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-18T05:57:14.921Z",
+          "updatedAt": "2026-05-18T06:06:03.767Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-18T05:57:14.921Z"
+              "at": "2026-05-18T06:06:03.767Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-05-18T05:57:14.921Z",
-          "notes": "Watchdog restarts daemon after intentional pan tts stop — tts.enabled used as auto-start signal instead of daemonAutoStart",
+          "status": "reviewing",
+          "updatedAt": "2026-05-18T06:06:03.767Z",
+          "notes": "Agent re-review request (4/25): Fixed review issues",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-05-18T05:57:14.921Z",
-              "notes": "Watchdog restarts daemon after intentional pan tts stop — tts.enabled used as auto-start signal instead of daemonAutoStart"
+              "status": "reviewing",
+              "at": "2026-05-18T06:06:03.767Z",
+              "notes": "Agent re-review request (4/25): Fixed review issues"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-18T05:57:14.921Z",
+          "updatedAt": "2026-05-18T06:06:03.767Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-18T05:57:14.921Z"
+              "at": "2026-05-18T06:06:03.767Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-18T05:57:14.921Z",
+          "updatedAt": "2026-05-18T06:06:03.767Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-18T05:57:14.921Z",
+          "updatedAt": "2026-05-18T06:06:03.767Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-18T05:57:14.921Z"
+              "at": "2026-05-18T06:06:03.767Z"
             }
           ],
           "readyForMerge": false,
