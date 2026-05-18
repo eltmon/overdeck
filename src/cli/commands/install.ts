@@ -33,6 +33,7 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-mkcert', 'Skip mkcert/HTTPS setup')
     .option('--skip-docker', 'Skip Docker network setup')
     .option('--skip-beads', 'Skip beads CLI installation')
+    .option('--skip-moonshine', 'Skip Moonshine voice sidecar build (AutoPreso + Voice STT will not work without it)')
     .action(installCommand);
 }
 
@@ -42,6 +43,7 @@ interface InstallOptions {
   skipMkcert?: boolean;
   skipDocker?: boolean;
   skipBeads?: boolean;
+  skipMoonshine?: boolean;
 }
 
 interface PrereqResult {
@@ -465,6 +467,33 @@ async function installCommand(options: InstallOptions): Promise<void> {
       spinner.warn('beads version check or upgrade failed - install manually: curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash');
     }
     }
+  }
+
+  // Step 5d: Build Moonshine voice sidecar (AutoPreso + Voice STT)
+  // Linux x64 only — the build script enforces this. Skip silently on other platforms.
+  if (options.skipMoonshine) {
+    spinner.info('Skipping Moonshine sidecar build (--skip-moonshine)');
+  } else if (process.platform === 'linux' && process.arch === 'x64') {
+    const repoRoot = process.cwd();
+    const moonshineBin = join(repoRoot, 'packages', 'moonshine-linux-x64', 'bin', 'moonshine-sidecar');
+    if (existsSync(moonshineBin)) {
+      spinner.info('Moonshine sidecar already built (delete packages/moonshine-linux-x64/bin/moonshine-sidecar to rebuild)');
+    } else {
+      const hasPython = checkCommand('python3');
+      if (!hasPython) {
+        spinner.warn('python3 not found — skipping Moonshine sidecar build (install python3 then run `npm run build:sidecar`)');
+      } else {
+        spinner.start('Building Moonshine voice sidecar (creates venv + pyinstaller bundle, ~2-3 min on first run)...');
+        try {
+          execSync('npm run build:sidecar', { stdio: 'pipe', timeout: 600000, cwd: repoRoot });
+          spinner.succeed('Moonshine sidecar built (AutoPreso + Voice STT ready)');
+        } catch (error) {
+          spinner.warn('Moonshine sidecar build failed — AutoPreso and Voice STT will not work. Re-run: npm run build:sidecar');
+        }
+      }
+    }
+  } else {
+    spinner.info(`Skipping Moonshine sidecar build (platform=${process.platform}/${process.arch}, only linux/x64 supported)`);
   }
 
   // Step 6: Setup Traefik configuration
