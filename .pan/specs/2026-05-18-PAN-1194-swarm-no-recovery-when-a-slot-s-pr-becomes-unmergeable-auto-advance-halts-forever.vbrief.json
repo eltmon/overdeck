@@ -4,7 +4,7 @@
     "created": "2026-05-18T22:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1194: Swarm: no recovery when a slot's PR becomes unmergeable — auto-advance halts forever",
-    "updated": "2026-05-18T23:06:43.722Z"
+    "updated": "2026-05-18T23:11:53.562Z"
   },
   "plan": {
     "id": "pan-1194",
@@ -457,7 +457,7 @@
       {
         "id": "frontend-visual",
         "title": "Render `failed-merge` slot status visually in the dashboard with PR link and failure reason",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-18T22:40:00.000Z",
         "metadata": {
@@ -473,7 +473,7 @@
           {
             "id": "frontend-visual.ac1",
             "title": "A SwarmState with one `failed-merge` slot renders a distinct error pill (not the existing `failed` styling) in the dashboard. Verified by React Testing Library snapshot test asserting the new label appears.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -481,7 +481,7 @@
           {
             "id": "frontend-visual.ac2",
             "title": "`prUrl` (when present) renders as an `<a target='_blank' rel='noopener noreferrer'>` link. Missing prUrl renders no link (no broken-link placeholder).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -489,7 +489,7 @@
           {
             "id": "frontend-visual.ac3",
             "title": "`failureReason` text is rendered verbatim (text-content only, no HTML interpretation) below the slot title.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -497,7 +497,7 @@
           {
             "id": "frontend-visual.ac4",
             "title": "Swarm-level panel surfaces `lastAutoAdvanceError` and `autoAdvanceFailureCount` (when > 0) in a visible banner — not behind a tooltip — so an operator scanning the dashboard sees the halt context immediately.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -505,7 +505,7 @@
           {
             "id": "frontend-visual.ac5",
             "title": "Type-check passes: the widened `SlotAssignment.status` union surfaces correctly into the frontend (whether via packages/contracts re-export or local type duplication).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -513,7 +513,7 @@
           {
             "id": "frontend-visual.ac6",
             "title": "Frontend lint and vitest pass after the changes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

@@ -2816,8 +2816,8 @@
     "hash": "c035904b746f125da8019de1c298d26a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/frontend/src/components/InspectorPanel.tsx": {
-    "mtime": 1779142045.6343696,
-    "hash": "76c312417f4da470159661a75e91b6e0"
+    "mtime": 1779145753.3758276,
+    "hash": "7466f32c1dafe6977d4266a06d9d4309"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/frontend/src/components/DeepWipeDialog.tsx": {
     "mtime": 1779142045.6330063,
@@ -3582,6 +3582,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/frontend/src/components/search/SearchResults.tsx": {
     "mtime": 1779142045.6407933,
     "hash": "82c38946666d4afc14ab200a1de36320"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/frontend/src/components/__tests__/InspectorPanel.swarm.test.tsx": {
+    "mtime": 1779145784.1208522,
+    "hash": "529557f48e9130ed77b3f3739ffa9552"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/frontend/src/components/__tests__/DetailPanelLayout.test.tsx": {
     "mtime": 1779142045.6388717,

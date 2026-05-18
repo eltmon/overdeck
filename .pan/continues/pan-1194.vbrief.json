@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1194",
   "created": "2026-05-18T22:07:39.007Z",
-  "updated": "2026-05-18T23:06:43.722Z",
+  "updated": "2026-05-18T23:11:53.562Z",
   "gitState": {
     "branch": "feature/pan-1194",
     "dirty": true
@@ -107,11 +107,11 @@
     }
   ],
   "resumePoint": {
-    "description": "poll-integration bead workspace-hpjl implemented: auto-advance and manual swarm refresh run mergeability detection before persistence/failure handling. Commit this bead, close it, then continue to the next ready bead because inspection is not required.",
-    "beadId": "workspace-hpjl",
+    "description": "frontend-visual bead workspace-zu3p implemented: InspectorPanel renders failed-merge swarm runtime state, PR link, failure reason, and auto-advance failure banner. Commit and close the bead; inspection is not required.",
+    "beadId": "workspace-zu3p",
     "filesToRead": [
-      "src/dashboard/server/routes/swarm.ts",
-      "src/dashboard/server/routes/__tests__/swarm.test.ts",
+      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
+      "src/dashboard/frontend/src/components/__tests__/InspectorPanel.swarm.test.tsx",
       ".pan/specs/2026-05-18-PAN-1194-swarm-no-recovery-when-a-slot-s-pr-becomes-unmergeable-auto-advance-halts-forever.vbrief.json"
     ]
   },
@@ -146,6 +146,12 @@
       "timestamp": "2026-05-18T23:06:43.722Z",
       "reason": "end",
       "note": "Implemented poll-integration: pollSwarmAutoAdvance and manual swarm state refresh now run refreshSwarmSlotMergeability after tmux status refresh and before a single saveSwarmState persist; failed-merge slots record a slot-specific auto-advance error and emit one ship/error activity entry per transition. Ran targeted swarm tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:11:53.562Z",
+      "reason": "end",
+      "note": "Implemented frontend-visual: InspectorPanel now fetches swarm runtime state and renders failed-merge slots with a distinct pill, failure reason, optional PR link, and visible auto-advance failure banner. Added React Testing Library snapshot coverage. Ran frontend focused test, swarm server test, typecheck, lint, frontend build, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],
