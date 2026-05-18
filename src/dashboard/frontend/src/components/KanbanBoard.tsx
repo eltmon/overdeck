@@ -21,7 +21,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 */
-import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState, type StartAgentResponse } from '../types';
+import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw, Radio, VolumeX, Unlock } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
@@ -31,7 +31,6 @@ import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/
 // derive directly from role-tagged AgentSnapshots (review / test / ship).
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
-import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useUIPreferences } from '../hooks/useUIPreferences';
 import { ResetIssueButton } from './ResetIssueButton';
@@ -49,7 +48,6 @@ import { BulkActionBar } from './BulkActionBar';
 import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';
 import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgress';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
-import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
 import { useTtsIssueMute } from '../hooks/useTtsIssueMute';
 import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
 import { NO_RESUME_QUERY_KEY, type NoResumeMode } from './NoResumeBanner';
@@ -2736,12 +2734,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const [showCostModal, setShowCostModal] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const { prefs: _prefs } = useUIPreferences();
-  const { groups: modelGroups, defaultModel, harnessPolicy } = useAvailableModels();
   const stackHealth = workspaceProp?.stackHealth;
   const isStackUnhealthy = stackHealth?.healthy === false;
   const stackHealthDetails = stackHealth?.reasons.join('; ');
-  const [launchModel, setLaunchModel] = useState(defaultModel);
-  const [launchHarness, setLaunchHarness] = useState<Harness>('claude-code');
   const ttsMute = useTtsIssueMute(issue.identifier || '');
 
   // Auto-scroll into view when selected via search
@@ -2850,12 +2845,6 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const agentGatingTitle = agentGatingReason === 'Boot --no-resume' && noResumeMode?.since
     ? `No-resume mode active since ${formatRelativeTime(noResumeMode.since, new Date())}`
     : agentGatingReason;
-  const isAgentStartGated = controlledAgent?.paused === true || controlledAgent?.troubled === true;
-  const startGateTitle = controlledAgent?.paused === true
-    ? 'Unpause the agent before starting'
-    : controlledAgent?.troubled === true
-      ? 'Clear troubled state before starting'
-      : undefined;
   const cardTone = isStackUnhealthy || isPipelineStuck
     ? 'from-destructive/12 via-destructive/5 to-transparent'
     : isReadyToMerge
@@ -3045,112 +3034,15 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     }
   };
 
-  const [isStarting, setIsStarting] = useState(false);
-  const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const confirm = useConfirm();
-
-  const acknowledgeGuardrailWarnings = useCallback(async (data: StartAgentResponse | undefined) => {
-    const warnings = data?.guardrails?.warnings ?? [];
-    if (warnings.length === 0) return false;
-    if (!data?.requiresAcknowledgement) return true;
-    return confirm({
-      title: 'Start agent with warnings?',
-      message: warnings.map((warning) => `• ${warning.message}`).join('\n'),
-      variant: 'destructive',
-      confirmLabel: 'Start anyway',
-    });
-  }, [confirm]);
-
-  const startAgentMutation = useMutation<StartAgentResponse, Error, boolean>({
-    mutationFn: async (autoStart = false) => {
-      // PAN-1048 + PAN-1055: role-aware spawn body that also threads the
-      // user-selected model + harness from the launch panel.
-      const requestBody = {
-        issueId: issue.identifier,
-        role: 'work',
-        model: launchModel,
-        harness: launchHarness,
-        auto: autoStart,
-      };
-      let lastRequestBody: Record<string, unknown> = requestBody;
-      let res = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(lastRequestBody),
-      });
-      let text = await res.text();
-      let data: StartAgentResponse = {};
-      try {
-        data = JSON.parse(text);
-      } catch {}
-      if (res.status === 409 && data.requiresAcknowledgement) {
-        const confirmed = await acknowledgeGuardrailWarnings(data);
-        if (!confirmed) throw new Error('Agent start canceled');
-        lastRequestBody = { ...requestBody, guardrailAcknowledged: true };
-        res = await fetch('/api/agents', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(lastRequestBody),
-        });
-        text = await res.text();
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = {};
-        }
-      }
-      if (!res.ok) {
-        if (isCodexBlockedResponse(res, data)) {
-          setPendingCodexSpawn(lastRequestBody);
-          throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
-        }
-        let message = `Failed to start agent (${res.status})`;
-        if (typeof (data as any).error === 'string' && (data as any).error.length > 0) {
-          message = (data as any).error;
-        } else if (typeof data.hint === 'string' && data.hint.length > 0) {
-          message = data.hint;
-        } else if (text.length < 200) {
-          message = text;
-        }
-        throw new Error(message);
-      }
-      return data;
-    },
-    onSuccess: async (data) => {
-      setIsStarting(true);
-      if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
-      startTimeoutRef.current = setTimeout(() => setIsStarting(false), 60000);
-      await refreshDashboardState(queryClient);
-      if (data.guardrails?.warnings?.length) {
-        toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
-      }
-    },
-    onError: (err: Error) => {
-      setIsStarting(false);
-      showAlert({ message: `Failed to start agent: ${err.message}`, variant: 'error' });
-    },
-  });
-
-  const startButtonDisabled = startAgentMutation.isPending || isStarting || isAgentStartGated;
-  const startButtonTitle = startAgentMutation.isPending || isStarting
-    ? 'Starting...'
-    : startGateTitle ?? 'Start Agent';
-  const autoStartButtonTitle = startGateTitle ?? 'Synthesize a minimal vBRIEF from the issue and start the agent';
-
   const [isResuming, setIsResuming] = useState(false);
   const resumingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear transitional start/resume states once the agent is actually running, or after the safety valve
   useEffect(() => {
-    if (isStarting && isRunning) {
-      setIsStarting(false);
-      if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
-    }
     if (isResuming && isRunning) {
       setIsResuming(false);
       if (resumingTimeoutRef.current) clearTimeout(resumingTimeoutRef.current);
     }
-  }, [isStarting, isResuming, isRunning]);
+  }, [isResuming, isRunning]);
 
   const resumeSessionMutation = useMutation({
     mutationFn: async () => {
@@ -3201,13 +3093,6 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const isSessionLost = !isRunning && !isResuming && activeAgent?.status === 'stopped'
     && canonical === 'in_review'
     && activeAgent?.runtimeState !== 'completed';
-
-  const startButtonRef = useRef<HTMLButtonElement | null>(null);
-
-  const handleStartAgent = (e: React.MouseEvent, autoStart = false) => {
-    e.stopPropagation();
-    startAgentMutation.mutate(autoStart);
-  };
 
   const handlePlan = (e: React.MouseEvent, autoStart = false) => {
     e.stopPropagation();
@@ -3403,10 +3288,10 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '300ms' }} />
               </div>
             )}
-            {(isStarting || isResuming) && (
+            {isResuming && (
               <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded badge-bg-primary text-primary-foreground">
                 <Loader2 className="w-3 h-3 animate-spin" />
-                {isResuming ? 'Resuming…' : 'Starting…'}
+                Resuming…
               </span>
             )}
             {isSessionLost && (
@@ -3499,7 +3384,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
             {planningComplete && !isRunning && !isTerminal && (
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold badge-bg-success text-success-foreground border badge-border-success uppercase tracking-wide"
-                title="Planning complete — click Start Agent to begin implementation"
+                title="Planning complete — open the drawer to start implementation"
               >
                 <Sparkles className="w-3 h-3" />
                 Ready
@@ -3911,40 +3796,6 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
             <>
               {artifactLinks}
               {agentLifecycleControls}
-              <div className="min-w-[220px]" onClick={(e) => e.stopPropagation()}>
-                <ModelHarnessPicker
-                  model={launchModel}
-                  harness={launchHarness}
-                  onModelChange={setLaunchModel}
-                  onHarnessChange={setLaunchHarness}
-                  groups={modelGroups}
-                  harnessPolicy={harnessPolicy}
-                  modelLabel="Agent model"
-                />
-              </div>
-              <div className="inline-flex items-center rounded overflow-hidden">
-                <button
-                  ref={startButtonRef}
-                  onClick={(e) => handleStartAgent(e)}
-                  disabled={startButtonDisabled}
-                  className="flex items-center gap-1 text-xs font-semibold bg-success hover:bg-success/90 text-foreground transition-colors px-2 py-1 disabled:opacity-50"
-                  title={startButtonTitle}
-                  data-testid={`card-start-agent-${issue.identifier}`}
-                >
-                  {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                  <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start'}</span>
-                </button>
-                <button
-                  onClick={(e) => handleStartAgent(e, true)}
-                  disabled={startButtonDisabled}
-                  className="flex items-center gap-1 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground transition-colors border-l border-background/20 px-2 py-1 disabled:opacity-50"
-                  title={autoStartButtonTitle}
-                  data-testid={`card-auto-start-agent-${issue.identifier}`}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Auto-start
-                </button>
-              </div>
             </>
           )}
           {STATUS_LABELS[issue.status] === 'todo' && <BacklogButton issue={issue} />}
@@ -3969,10 +3820,8 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
           )}
           {artifactLinks}
           {agentLifecycleControls}
-          {/* Resume Session only when there's an actual prior work agent to resume.
-              For freshly-planned issues with no work agent yet, show Start Agent
-              instead (gated on beads existing). */}
-          {activeAgent?.lifecycle?.canResumeSession ? (
+          {/* Resume Session only when there's an actual prior work agent to resume. */}
+          {activeAgent?.lifecycle?.canResumeSession && (
             <button
               onClick={handleResumeSession}
               disabled={resumeSessionMutation.isPending}
@@ -3983,44 +3832,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
               {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
             </button>
-          ) : hasBeads ? (
-            <>
-              <div className="min-w-[220px]" onClick={(e) => e.stopPropagation()}>
-                <ModelHarnessPicker
-                  model={launchModel}
-                  harness={launchHarness}
-                  onModelChange={setLaunchModel}
-                  onHarnessChange={setLaunchHarness}
-                  groups={modelGroups}
-                  harnessPolicy={harnessPolicy}
-                  modelLabel="Agent model"
-                />
-              </div>
-              <div className="inline-flex items-center rounded overflow-hidden">
-                <button
-                  ref={startButtonRef}
-                  onClick={(e) => handleStartAgent(e)}
-                  disabled={startButtonDisabled}
-                  className="flex items-center gap-1 text-xs font-semibold bg-success text-success-foreground hover:bg-emerald-500 transition-colors px-2 py-1 disabled:opacity-50"
-                  title={startButtonTitle}
-                  data-testid={`card-start-agent-${issue.identifier}`}
-                >
-                  {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                  <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start'}</span>
-                </button>
-                <button
-                  onClick={(e) => handleStartAgent(e, true)}
-                  disabled={startButtonDisabled}
-                  className="flex items-center gap-1 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground transition-colors border-l border-background/20 px-2 py-1 disabled:opacity-50"
-                  title={autoStartButtonTitle}
-                  data-testid={`card-auto-start-agent-${issue.identifier}`}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Auto-start
-                </button>
-              </div>
-            </>
-          ) : null}
+          )}
           <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
         </div>
       )}

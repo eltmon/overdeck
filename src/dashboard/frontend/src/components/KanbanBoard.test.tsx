@@ -673,38 +673,15 @@ describe('IssueCard', () => {
     expect(onPlan).toHaveBeenCalledWith(true);
   });
 
-  it('sends auto=true when Auto-start is clicked', async () => {
-    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
-      const url = input.toString();
-      if (url === '/api/settings' && init?.method === 'PUT') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response);
-      }
-      if (url === '/api/settings') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ tts: { mutedIssues: [] } }) } as Response);
-      }
-      if (url === '/api/settings/available-models') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
-      }
-      return Promise.resolve({
-        ok: true,
-        text: () => Promise.resolve(JSON.stringify({ success: true })),
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
+  it('does not render Board card launch controls after planning completes', () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo', hasPlan: true, hasBeads: true }),
       planningState: { hasPlan: true, hasBeads: true, planningComplete: true },
     });
 
-    fireEvent.click(screen.getByTestId('card-auto-start-agent-TEST-123'));
-
-    await waitFor(() => {
-      const startCall = fetchMock.mock.calls.find(([url]) => url === '/api/agents');
-      expect(startCall).toBeTruthy();
-      expect(JSON.parse((startCall?.[1] as RequestInit).body as string)).toMatchObject({ auto: true });
-    });
+    expect(screen.queryByTestId('card-start-agent-TEST-123')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('card-auto-start-agent-TEST-123')).not.toBeInTheDocument();
+    expect(screen.queryByText('Agent model')).not.toBeInTheDocument();
   });
 
   it('toggles issue TTS mute from the card without selecting the card', async () => {
