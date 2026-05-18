@@ -365,6 +365,8 @@ program
 program
   .command('resume <id>')
   .description('Resume from saved Claude session')
+  .option('--host', 'Bypass workspace docker stack-health gate and resume on the host')
+  .option('--yes', 'Confirm --host in non-interactive contexts')
   .action(resumeCommand);
 
 program

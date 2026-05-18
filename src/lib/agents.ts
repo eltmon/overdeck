@@ -3130,7 +3130,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
  * - Specialists: When queued work arrives
  * - Work agents: When message is sent via /work-tell
  */
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; allowHost?: boolean }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const requestedModel = normalizeModelOverride(opts?.model);
   logAgentLifecycle(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'})`);
@@ -3190,7 +3190,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     await assertWorkspaceStackHealthyForSpawn(
       agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
       agentState.role ?? 'work',
-      agentState.hostOverride === true,
+      opts?.allowHost === true || agentState.hostOverride === true,
       agentState.workspace,
     );
   } catch (error) {
