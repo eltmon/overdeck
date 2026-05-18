@@ -4,7 +4,7 @@
     "created": "2026-05-18T05:10:55.134Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
-    "updated": "2026-05-18T05:19:53.958Z"
+    "updated": "2026-05-18T05:41:26.404Z"
   },
   "plan": {
     "id": "pan-1148",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T05:19:53.958Z",
+    "updated": "2026-05-18T05:41:26.404Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -123,7 +123,7 @@
       {
         "id": "f1-verb-badge",
         "title": "Add VerbBadge primitive component (10 variants, optional pulse)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -139,7 +139,7 @@
           {
             "id": "f1-verb-badge.ac1",
             "title": "VerbBadge.tsx exports default component with strict union variant prop covering all 10 PRD §4.7.7 verbs and rejects unknown variants at type level",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -147,7 +147,7 @@
           {
             "id": "f1-verb-badge.ac2",
             "title": "Each variant uses the correct color tokens per PRD §4.7.7 table (info/8% bg + info/32% border + --info-foreground for WORK RUNNING, etc.); no hardcoded colors",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -155,7 +155,7 @@
           {
             "id": "f1-verb-badge.ac3",
             "title": "Pulse dot animation (1.6s ease-out infinite) renders for WORK RUNNING, REVIEW RUNNING, SHIP RUNNING, PLANNING, INPUT only; never for MERGED, READY TO MERGE, CHANGES REQUESTED, STUCK · Nh, QUEUED FOR PLAN",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -163,7 +163,7 @@
           {
             "id": "f1-verb-badge.ac4",
             "title": "STUCK · Nh variant accepts an `hours` numeric prop and renders `STUCK · ${hours}h` in the label",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -171,7 +171,7 @@
           {
             "id": "f1-verb-badge.ac5",
             "title": "Storybook-style demo route or vitest snapshot covers all 10 variants visually",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -179,7 +179,7 @@
           {
             "id": "f1-verb-badge.ac6",
             "title": "Root element carries `data-component=\"verb-badge\"` and a `data-variant` matching the variant prop",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
