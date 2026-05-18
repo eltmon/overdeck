@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T09:53:28.460Z",
+  "updated": "2026-05-18T21:18:20.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "59d0ce7c3",
+    "sha": "1fb5536f4",
     "dirty": false
   },
   "decisions": [
@@ -195,13 +195,21 @@
       "id": "H13",
       "summary": "bd close treated workspace-hu0c as blocked by open downstream beads even though bd dep tree shows those beads are dependents marked [blocks].",
       "mitigation": "For completed upstream foundation beads, verify bd dep tree before using bd close --force; do not force-close beads that are genuinely waiting on blockers."
+    },
+    {
+      "id": "H14",
+      "summary": "workspace-ltqb was listed ready even though workspace-1aqz had been closed without leaving a Pipeline tab, /pipeline route, or PipelineView.tsx in the workspace.",
+      "mitigation": "Reopened workspace-1aqz and returned workspace-ltqb to open with blocker comments; do not flip / to Pipeline until the Pipeline shell bead is actually implemented."
     }
   ],
   "resumePoint": {
-    "description": "workspace-tjhs is closed and inspection was skipped because requiresInspection=false. Run bd ready -l pan-1148 and claim the next unblocked PAN-1148 bead.",
+    "description": "workspace-mofs is closed and inspection was skipped because requiresInspection=false. workspace-ltqb is blocked until reopened workspace-1aqz implements the Pipeline shell; continue with an actually unblocked PAN-1148 bead.",
     "beadId": null,
     "filesToRead": [
-      ".pan/spec.vbrief.json"
+      ".pan/spec.vbrief.json",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/components/Header.tsx",
+      "src/dashboard/frontend/src/components/Sidebar.tsx"
     ]
   },
   "beadsMapping": {},
@@ -282,6 +290,12 @@
       "timestamp": "2026-05-18T09:19:20.982Z",
       "reason": "end",
       "note": "Slot 5 beads complete: c1-command-deck-right-pane-reframe + workspace-6qm7 drawer wiring"
+    },
+    {
+      "timestamp": "2026-05-18T21:18:20.000Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-mofs after tightening IssueRow grid/label tokens, adding focused tests, running IssueRow test, typecheck, lint, and graphify update. Reopened workspace-1aqz and unclaimed workspace-ltqb because Pipeline route prerequisites were missing.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": [],
