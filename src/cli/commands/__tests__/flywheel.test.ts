@@ -5,8 +5,10 @@ import { Readable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 import type { FlywheelStatus } from '@panctl/contracts';
+import { writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
 import {
   emitStatusCommand,
+  flywheelStatusCommand,
   parseFlywheelStatusJson,
   readFlywheelStatusJson,
   registerFlywheelCommands,
@@ -55,6 +57,7 @@ describe('flywheel CLI commands', () => {
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'pan-flywheel-'));
     process.exitCode = undefined;
+    process.env.PANOPTICON_HOME = tempDir;
     process.env.PANOPTICON_DASHBOARD_URL = 'http://dashboard.test';
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -63,6 +66,7 @@ describe('flywheel CLI commands', () => {
   afterEach(async () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    delete process.env.PANOPTICON_HOME;
     delete process.env.PANOPTICON_DASHBOARD_URL;
     process.exitCode = undefined;
     await rm(tempDir, { recursive: true, force: true });
@@ -106,12 +110,47 @@ describe('flywheel CLI commands', () => {
     expect(() => parseFlywheelStatusJson(raw)).toThrow(/Invalid JSON/);
   });
 
-  it('registers flywheel emit-status with the --file flag', () => {
+  it('renders human-readable active run status', async () => {
+    await writeLatestFlywheelStatus(validStatus);
+
+    await flywheelStatusCommand({});
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Run: RUN-1'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Elapsed: 1s'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Bugs fixed: 1'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('SWARM items: 2/3'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('PRs merged: 4'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Awaiting UAT: 5'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Active agents: 1/8'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('RAM: 1024 MiB used / 4096 MiB total'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Last tick: 2026-05-18T12:00:00.000Z'));
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('emits raw FlywheelStatus JSON with --json', async () => {
+    await writeLatestFlywheelStatus(validStatus);
+
+    await flywheelStatusCommand({ json: true });
+
+    const output = logSpy.mock.calls[0][0] as string;
+    expect(JSON.parse(output)).toEqual(validStatus);
+  });
+
+  it('exits 1 when no active run exists', async () => {
+    await flywheelStatusCommand({});
+
+    expect(process.exitCode).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith('no active flywheel run');
+  });
+
+  it('registers flywheel subcommands with their flags', () => {
     const program = new Command();
     registerFlywheelCommands(program);
 
     const flywheel = program.commands.find(command => command.name() === 'flywheel');
     const emitStatus = flywheel?.commands.find(command => command.name() === 'emit-status');
+    const status = flywheel?.commands.find(command => command.name() === 'status');
     expect(emitStatus?.options.map(option => option.long)).toContain('--file');
+    expect(status?.options.map(option => option.long)).toContain('--json');
   });
 });

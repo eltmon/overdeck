@@ -2,11 +2,16 @@ import { readFile } from 'node:fs/promises';
 import { Schema } from 'effect';
 import { Command } from 'commander';
 import { FlywheelStatus } from '@panctl/contracts';
+import { getFlywheelRunDetail, listFlywheelRuns } from '../../dashboard/server/services/flywheel-run-state.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
 
 interface EmitStatusOptions {
   file: string;
+}
+
+interface StatusOptions {
+  json?: boolean;
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
@@ -69,6 +74,55 @@ export async function emitStatusCommand(options: EmitStatusOptions): Promise<voi
   }
 }
 
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+async function loadActiveFlywheelStatus(): Promise<FlywheelStatus | null> {
+  const runs = await listFlywheelRuns();
+  const activeRun = runs.find((run) => run.status === 'running');
+  if (!activeRun) return null;
+  const detail = await getFlywheelRunDetail(activeRun.id);
+  return detail?.latest ?? null;
+}
+
+export function formatFlywheelStatus(status: FlywheelStatus): string {
+  return [
+    `Run: ${status.runId}`,
+    `Elapsed: ${formatElapsed(status.elapsedMs)}`,
+    `Bugs fixed: ${status.headline.bugsFixed}`,
+    `SWARM items: ${status.headline.swarmItemsMerged}/${status.headline.swarmItemsTotal}`,
+    `PRs merged: ${status.headline.prsMerged}`,
+    `Awaiting UAT: ${status.headline.awaitingUat}`,
+    `Active agents: ${status.system.agentsActive}/${status.system.agentsCap}`,
+    `RAM: ${status.system.ramUsedMb} MiB used / ${status.system.ramTotalMb} MiB total`,
+    `Main HEAD: ${status.system.mainHead.slice(0, 7)}`,
+    `Last tick: ${status.lastTickAt}`,
+  ].join('\n');
+}
+
+export async function flywheelStatusCommand(options: StatusOptions): Promise<void> {
+  try {
+    const status = await loadActiveFlywheelStatus();
+    if (!status) {
+      console.error('no active flywheel run');
+      process.exitCode = 1;
+      return;
+    }
+
+    console.log(options.json ? JSON.stringify(status, null, 2) : formatFlywheelStatus(status));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
 export function registerFlywheelCommands(program: Command): void {
   const flywheel = program
     .command('flywheel')
@@ -79,4 +133,10 @@ export function registerFlywheelCommands(program: Command): void {
     .description('Validate and publish a FlywheelStatus JSON snapshot to the local dashboard')
     .requiredOption('--file <path>', 'Path to FlywheelStatus JSON, or - to read from stdin')
     .action(emitStatusCommand);
+
+  flywheel
+    .command('status')
+    .description('Show the active Flywheel run status')
+    .option('--json', 'Emit the raw FlywheelStatus JSON')
+    .action(flywheelStatusCommand);
 }
