@@ -27,6 +27,7 @@ import { archivePlanning, findWorkspacePath } from './archive-planning.js';
 import { closeIssue, type CloseIssueOptions } from './close-issue.js';
 import { teardownWorkspace } from './teardown-workspace.js';
 import { compactBeads } from './compact-beads.js';
+import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumber, extractPrefix } from '../issue-id.js';
 
 const execAsync = promisify(exec);
@@ -163,7 +164,11 @@ export function closeOut(
     }
 
     // 4+5. Teardown workspace + agent state
-    const teardownSteps = yield* teardownWorkspace(ctx, { deleteBranches: true });
+    const closeOutConfig = loadCloisterConfig().close_out;
+    const teardownSteps = yield* teardownWorkspace(ctx, {
+      deleteWorkspace: closeOutConfig?.remove_workspace ?? false,
+      deleteBranches: closeOutConfig?.delete_feature_branch ?? false,
+    });
     allSteps.push(...teardownSteps);
 
     // 6+7. Close issue + apply label

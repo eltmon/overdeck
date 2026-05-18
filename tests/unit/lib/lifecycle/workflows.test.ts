@@ -189,6 +189,29 @@ describe('workflows', () => {
       // Should complete without abort since skipped == success
       expect(result.steps.some(s => s.step === 'close-out:abort')).toBe(false);
     });
+
+    it('should preserve workspace and branches by default', async () => {
+      const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
+      mkdirSync(wsPath, { recursive: true });
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx);
+
+      expect(result.steps.find(s => s.step === 'teardown:branches')).toBeUndefined();
+      expect(existsSync(wsPath)).toBe(true);
+    });
+
+    it('should honor close_out branch deletion config', async () => {
+      writeFileSync(
+        join(PANOPTICON_HOME, 'cloister.toml'),
+        '[close_out]\nremove_workspace = false\ndelete_feature_branch = true\nauto = false\nauto_delay_minutes = 60\n',
+      );
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx);
+
+      expect(result.steps.find(s => s.step === 'teardown:branches')).toBeDefined();
+    });
   });
 
   describe('deepWipe', () => {

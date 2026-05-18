@@ -210,6 +210,13 @@ export interface RetentionConfig {
   health_staleness_hours: number; // Hours before hiding stale agents in health API (default: 24)
 }
 
+export interface CloseOutConfig {
+  remove_workspace: boolean;
+  delete_feature_branch: boolean;
+  auto: boolean;
+  auto_delay_minutes: number;
+}
+
 /**
  * Complete Cloister configuration
  */
@@ -226,6 +233,7 @@ export interface CloisterConfig {
   auto_restart?: AutoRestartConfig;
   cost_limits?: CostLimitsConfig;
   retention?: RetentionConfig;
+  close_out?: CloseOutConfig;
 }
 
 /**
@@ -334,6 +342,12 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     agent_state_days: 7,
     reviewer_state_days: 1,
     health_staleness_hours: 24,
+  },
+  close_out: {
+    remove_workspace: false,
+    delete_feature_branch: false,
+    auto: false,
+    auto_delay_minutes: 60,
   },
 };
 
