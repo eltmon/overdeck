@@ -956,7 +956,7 @@
     "hash": "dd52649bc1aacbe76d12527406c1922b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/scripts/record-cost-event.d.ts": {
-    "mtime": 1779086339.1406162,
+    "mtime": 1779087233.9204297,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/scripts/notify-complete": {
@@ -2664,16 +2664,16 @@
     "hash": "32e5e79dff63eaa46f77ac2a96ed2aad"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/supervisor/tts-watchdog.ts": {
-    "mtime": 1779084163.0065374,
-    "hash": "5948d27b87b76b8ab552f05eb3ddf354"
+    "mtime": 1779087798.2366524,
+    "hash": "383be52aaa67f63a064d06b44d448cd3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/supervisor/watchdog.ts": {
     "mtime": 1779079561.5171034,
     "hash": "cd47701351ddf7a77fa922c8679b1d49"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/supervisor/__tests__/tts-watchdog.test.ts": {
-    "mtime": 1779083948.4721987,
-    "hash": "e17caf1f462d7b7431f6aec4888387aa"
+    "mtime": 1779087820.923407,
+    "hash": "0314797ea04b4844cff31f073025e0f2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/supervisor/__tests__/watchdog.test.ts": {
     "mtime": 1779079561.5171034,
@@ -4264,8 +4264,8 @@
     "hash": "6e1b0483b32593e0f0ed25d009a5f9a5"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/tts.ts": {
-    "mtime": 1779086886.5237858,
-    "hash": "18029a01eb96110fdef215d03182a852"
+    "mtime": 1779087843.8861701,
+    "hash": "9146cff8d5b4da73b440babf226a630a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/agents.ts": {
     "mtime": 1779079561.4764404,
@@ -4444,8 +4444,8 @@
     "hash": "f1fe165dec85b1719b899baccd983efc"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/__tests__/tts.test.ts": {
-    "mtime": 1779086929.664412,
-    "hash": "96badb691483e0cd158905af4542ac0d"
+    "mtime": 1779087871.8890994,
+    "hash": "e05c7433b452747d0cdf08b65a393552"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/__tests__/buildRichPRBody.test.ts": {
     "mtime": 1779079561.476357,

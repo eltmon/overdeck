@@ -11,6 +11,7 @@ import {
   parseCreateTtsVoiceInput,
   parseExtractEmbeddingInput,
   parseSpeakTtsInput,
+  readCappedTtsBodyText,
   removeTtsVoice,
   speakTts,
 } from '../tts.js';
@@ -71,6 +72,28 @@ describe('checkTtsHealth', () => {
       daemonPort: 8787,
       ttsEnabled: false,
       error: 'daemon unreachable',
+    });
+  });
+});
+
+describe('TTS request body limits', () => {
+  it('rejects chunked request streams before buffering beyond the route cap', async () => {
+    const request = new Request('http://localhost/api/tts/speak', {
+      method: 'POST',
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array(32));
+          controller.enqueue(new Uint8Array(33));
+          controller.close();
+        },
+      }),
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' });
+
+    await expect(readCappedTtsBodyText({ source: request }, 64)).resolves.toEqual({
+      ok: false,
+      status: 413,
+      error: 'TTS request too large',
     });
   });
 });

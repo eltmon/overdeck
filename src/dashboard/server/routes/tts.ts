@@ -131,6 +131,39 @@ function ttsPayloadTooLargeResponse(request: HttpServerRequest.HttpServerRequest
   return undefined;
 }
 
+type CappedBodyReadResult =
+  | { ok: true; text: string }
+  | { ok: false; status: 413; error: string };
+
+export async function readCappedTtsBodyText(
+  request: Pick<HttpServerRequest.HttpServerRequest, 'source'>,
+  maxBytes = TTS_ROUTE_BODY_MAX_BYTES,
+): Promise<CappedBodyReadResult> {
+  if (!request.source.body) return { ok: true, text: '' };
+
+  const reader = request.source.body.getReader();
+  const decoder = new TextDecoder();
+  let bytesRead = 0;
+  let text = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytesRead += value.byteLength;
+      if (bytesRead > maxBytes) {
+        await reader.cancel();
+        return { ok: false, status: 413, error: 'TTS request too large' };
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return { ok: true, text };
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export function toPublicVoice(voice: TtsVoice): PublicTtsVoice {
   const { embedding: _embedding, ...publicVoice } = voice;
   return publicVoice;
@@ -344,9 +377,9 @@ const postTtsVoiceRoute = HttpRouter.add(
     const payloadTooLarge = ttsPayloadTooLargeResponse(request);
     if (payloadTooLarge) return payloadTooLarge;
 
-    const bodyText = yield* request.text;
-    if (bodyText.length > TTS_ROUTE_BODY_MAX_BYTES) return jsonResponse({ error: 'TTS request too large' }, { status: 413 });
-    const body = parseJsonBody(bodyText);
+    const bodyRead = yield* Effect.promise(() => readCappedTtsBodyText(request));
+    if (!bodyRead.ok) return jsonResponse({ error: bodyRead.error }, { status: bodyRead.status });
+    const body = parseJsonBody(bodyRead.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
     const input = parseCreateTtsVoiceInput(body);
@@ -395,9 +428,9 @@ const postTtsSpeakRoute = HttpRouter.add(
     const payloadTooLarge = ttsPayloadTooLargeResponse(request);
     if (payloadTooLarge) return payloadTooLarge;
 
-    const bodyText = yield* request.text;
-    if (bodyText.length > TTS_ROUTE_BODY_MAX_BYTES) return jsonResponse({ error: 'TTS request too large' }, { status: 413 });
-    const body = parseJsonBody(bodyText);
+    const bodyRead = yield* Effect.promise(() => readCappedTtsBodyText(request));
+    if (!bodyRead.ok) return jsonResponse({ error: bodyRead.error }, { status: bodyRead.status });
+    const body = parseJsonBody(bodyRead.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
     const input = parseSpeakTtsInput(body);
@@ -418,9 +451,9 @@ const postExtractEmbeddingRoute = HttpRouter.add(
     const payloadTooLarge = ttsPayloadTooLargeResponse(request);
     if (payloadTooLarge) return payloadTooLarge;
 
-    const bodyText = yield* request.text;
-    if (bodyText.length > TTS_ROUTE_BODY_MAX_BYTES) return jsonResponse({ error: 'TTS request too large' }, { status: 413 });
-    const body = parseJsonBody(bodyText);
+    const bodyRead = yield* Effect.promise(() => readCappedTtsBodyText(request));
+    if (!bodyRead.ok) return jsonResponse({ error: bodyRead.error }, { status: bodyRead.status });
+    const body = parseJsonBody(bodyRead.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
     const input = parseExtractEmbeddingInput(body);

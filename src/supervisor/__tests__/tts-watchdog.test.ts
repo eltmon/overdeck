@@ -93,4 +93,29 @@ describe('TtsWatchdog', () => {
     expect(watchdog.status().active).toBe(false);
     expect(mocks.startDaemon).not.toHaveBeenCalled();
   });
+
+  it('does not schedule another poll when stopped during an in-flight tick', async () => {
+    vi.useFakeTimers();
+    let resolveManualStop!: (value: boolean) => void;
+    mocks.isManuallyStopped.mockReturnValue(new Promise<boolean>((resolve) => {
+      resolveManualStop = resolve;
+    }));
+    const watchdog = new TtsWatchdog({
+      config: { enabled: true, pollMs: 100, failThreshold: 1, maxRestarts: 3, windowMs: 60_000, startTimeoutMs: 25_000 },
+      log: vi.fn(),
+    });
+
+    try {
+      watchdog.start();
+      await vi.advanceTimersByTimeAsync(100);
+      watchdog.stop();
+      resolveManualStop(false);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(watchdog.status().nextPollAt).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

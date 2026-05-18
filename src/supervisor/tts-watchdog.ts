@@ -34,6 +34,7 @@ export function readTtsWatchdogConfig(env: NodeJS.ProcessEnv = process.env): Tts
 
 export class TtsWatchdog {
   private timer: NodeJS.Timeout | null = null;
+  private running = false;
   private ticking = false;
   private consecutiveFailures = 0;
   private restartAttempts: number[] = [];
@@ -49,11 +50,13 @@ export class TtsWatchdog {
   }) {}
 
   start(): void {
-    if (!this.options.config.enabled || this.timer) return;
+    if (!this.options.config.enabled || this.running) return;
+    this.running = true;
     this.schedule();
   }
 
   stop(): void {
+    this.running = false;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     this.nextPollAt = null;
@@ -74,10 +77,13 @@ export class TtsWatchdog {
   }
 
   private schedule(): void {
+    if (!this.running || this.timer) return;
     this.nextPollAt = new Date(Date.now() + this.options.config.pollMs).toISOString();
     this.timer = setTimeout(() => {
       this.timer = null;
-      void this.tick().finally(() => this.schedule());
+      void this.tick().finally(() => {
+        if (this.running) this.schedule();
+      });
     }, this.options.config.pollMs);
   }
 
