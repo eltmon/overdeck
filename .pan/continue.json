@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1169",
   "created": "2026-05-18T08:34:50.104Z",
-  "updated": "2026-05-18T09:24:29.680Z",
+  "updated": "2026-05-18T09:36:30.947Z",
   "gitState": {
     "branch": "feature/pan-1169",
     "sha": "eb39b987e",
@@ -132,5 +132,22 @@
       "agentModel": "gpt-5.5"
     }
   ],
-  "feedback": []
+  "feedback": [],
+  "statusOverrides": {
+    "fail-init-on-unresolved-import": "completed",
+    "fail-init-on-unresolved-import.ac1": "completed",
+    "fail-init-on-unresolved-import.ac2": "completed",
+    "fail-init-on-unresolved-import.ac3": "completed",
+    "fail-init-on-unresolved-import.ac4": "completed",
+    "fail-init-on-unresolved-import.ac5": "completed",
+    "fail-init-on-unresolved-import.ac6": "completed",
+    "drop-filter-from-init": "completed",
+    "drop-filter-from-init.ac1": "completed",
+    "drop-filter-from-init.ac2": "completed",
+    "drop-filter-from-init.ac3": "completed",
+    "drop-filter-from-init.ac4": "completed",
+    "drop-filter-from-init.ac5": "completed",
+    "drop-filter-from-init.ac6": "completed",
+    "drop-filter-from-init.ac7": "completed"
+  }
 }
