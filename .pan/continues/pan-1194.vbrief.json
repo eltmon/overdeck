@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1194",
   "created": "2026-05-18T22:07:39.007Z",
-  "updated": "2026-05-18T23:22:16.395Z",
+  "updated": "2026-05-18T23:42:44.764Z",
   "gitState": {
     "branch": "feature/pan-1194",
     "dirty": true
@@ -107,12 +107,12 @@
     }
   ],
   "resumePoint": {
-    "description": "recovery-endpoint bead workspace-bjtb implemented: POST /api/swarm/:issueId/slot/:slotId/recover handles retry/drop/handoff, persists recovery state, updates vBRIEF for retry/drop before runtime state, and resumes or disables auto-advance as appropriate. Commit, close bead, then run required fast inspection.",
-    "beadId": "workspace-bjtb",
+    "description": "cli-recover bead workspace-cyit implemented: pan swarm recover now registers as a nested subcommand, validates slot/action inputs, prompts or requires --yes for drop, POSTs to the dashboard recovery endpoint with the internal token, and surfaces success/server errors via ora. Close bead, then check for remaining PAN-1194 beads before final issue handoff.",
+    "beadId": "workspace-cyit",
     "filesToRead": [
-      "src/dashboard/server/routes/swarm.ts",
-      "src/dashboard/server/routes/__tests__/swarm.test.ts",
-      "src/lib/vbrief/continue-state.ts",
+      "src/cli/commands/swarm.ts",
+      "src/cli/index.ts",
+      "src/cli/commands/__tests__/swarm.test.ts",
       ".pan/specs/2026-05-18-PAN-1194-swarm-no-recovery-when-a-slot-s-pr-becomes-unmergeable-auto-advance-halts-forever.vbrief.json"
     ]
   },
@@ -159,6 +159,12 @@
       "timestamp": "2026-05-18T23:22:16.395Z",
       "reason": "end",
       "note": "Implemented recovery-endpoint: added internal-token-protected POST /api/swarm/:issueId/slot/:slotId/recover with retry/drop/handoff actions, recovery metadata persistence, auto-advance failure clearing, handoff warning activity, and tests for successful actions, idempotency, and vBRIEF failure ordering. Ran focused swarm route tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:42:44.764Z",
+      "reason": "end",
+      "note": "Implemented cli-recover: registered pan swarm recover <issueId> <slotId>, added client-side action and slot validation, internal-token dashboard POST, destructive drop confirmation/--yes handling, server-error reporting, focused Vitest coverage, built help smoke check, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],

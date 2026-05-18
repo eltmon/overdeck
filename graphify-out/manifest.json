@@ -4724,8 +4724,8 @@
     "hash": "024dca58ca35a466dcb447d43e5accdb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/index.ts": {
-    "mtime": 1779142045.6283243,
-    "hash": "0ada296834979f2ab6f3f80bc29681d1"
+    "mtime": 1779147645.109346,
+    "hash": "dd3cdaa5a45abae18d1bac4b430bbc1b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/commands/fork.ts": {
     "mtime": 1779142045.626358,
@@ -4904,8 +4904,8 @@
     "hash": "99caafccb0ccba30127b877db86991bd"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/commands/swarm.ts": {
-    "mtime": 1779142045.628268,
-    "hash": "36b1d39e3be11d9699e5575967121cdc"
+    "mtime": 1779147662.4939344,
+    "hash": "65ab20c0d3892552fbf366518e0e2e18"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/commands/triage.ts": {
     "mtime": 1779142045.628268,
@@ -5158,6 +5158,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/commands/__tests__/tts.test.ts": {
     "mtime": 1779142045.6257286,
     "hash": "6f312f5d2c8174089e8cc44c1871822d"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/commands/__tests__/swarm.test.ts": {
+    "mtime": 1779147690.5018823,
+    "hash": "24206253f8ef5164a49a3b86556af81f"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/cli/commands/__tests__/workspace-reap.test.ts": {
     "mtime": 1779142045.6257286,
