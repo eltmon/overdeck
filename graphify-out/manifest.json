@@ -956,7 +956,7 @@
     "hash": "dd52649bc1aacbe76d12527406c1922b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/scripts/record-cost-event.d.ts": {
-    "mtime": 1779084995.4396875,
+    "mtime": 1779085825.6081839,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/scripts/notify-complete": {
@@ -1872,8 +1872,8 @@
     "hash": "f22ef8fd59f55cffb12b60ee2ebbc300"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/cloister/merge-agent.ts": {
-    "mtime": 1779079561.5024414,
-    "hash": "582c663962cedfb5c7d3352c47d36dbc"
+    "mtime": 1779085789.222139,
+    "hash": "53dd91969e6ab792d22fc1d768448e94"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/cloister/config.ts": {
     "mtime": 1779079561.5014415,
@@ -2332,8 +2332,8 @@
     "hash": "b483e56dd26e06dee628945f27eb91be"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/__tests__/agent-state-role.test.ts": {
-    "mtime": 1779079561.497772,
-    "hash": "7817f6a1c9585d8254900cd46e0fa5a5"
+    "mtime": 1779085936.6003628,
+    "hash": "7f13a33e73fc87c29129226d2b547032"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/__tests__/tts-daemon.test.ts": {
     "mtime": 1779085641.4718795,
@@ -4340,8 +4340,8 @@
     "hash": "dd13fbeadece3a88305c8f7acb15c250"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/swarm.ts": {
-    "mtime": 1779079561.4794407,
-    "hash": "50918e8d96cca0e2b642962a286fa6a3"
+    "mtime": 1779085789.222139,
+    "hash": "3b5a7f98f46d4a22d1da0839b08f29eb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/origin-validation.ts": {
     "mtime": 1779079561.4784405,
@@ -4456,8 +4456,8 @@
     "hash": "46bdee8405d46f2035d36739b8981e6d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/__tests__/swarm.test.ts": {
-    "mtime": 1779079561.476357,
-    "hash": "4d6d887682c86f007bba8502912ccba7"
+    "mtime": 1779085789.221139,
+    "hash": "fded9c6c1d751c5495ebf9809853ad98"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/__tests__/costs-experiments.test.ts": {
     "mtime": 1779079561.476357,
