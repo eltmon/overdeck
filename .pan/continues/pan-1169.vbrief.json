@@ -95,6 +95,12 @@
       "note": "Marked PAN-1169 vBRIEF acceptance criteria completed after template scope cleanup, restored-filter verification, and local quality gates passed.",
       "timestamp": "2026-05-18T11:45:00.000Z",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "reason": "verification-fix",
+      "note": "Restored workspace-local vBRIEF acceptance-criteria status overrides after the merge rebase removed the ignored continue file.",
+      "timestamp": "2026-05-18T12:30:00.000Z",
+      "agentModel": "gpt-5.5"
     }
   ],
   "statusOverrides": {
