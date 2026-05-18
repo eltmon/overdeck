@@ -35,6 +35,7 @@ describe('checkTtsHealth', () => {
       pid: null,
       daemonHost: '127.0.0.1',
       daemonPort: 8787,
+      ttsEnabled: false,
       queue: 2,
       queueDepth: 2,
       model: 'qwen3-tts',
@@ -53,6 +54,7 @@ describe('checkTtsHealth', () => {
       pid: null,
       daemonHost: '127.0.0.1',
       daemonPort: 8787,
+      ttsEnabled: false,
       error: 'daemon unreachable',
     });
   });
@@ -66,6 +68,7 @@ describe('checkTtsHealth', () => {
       pid: null,
       daemonHost: '127.0.0.1',
       daemonPort: 8787,
+      ttsEnabled: false,
       error: 'daemon unreachable',
     });
   });
@@ -291,7 +294,7 @@ describe('TTS embedding extraction route helpers', () => {
     expect(EXTRACT_EMBEDDING_TIMEOUT_MS).toBe(60_000);
     expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:8787/extract-embedding', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-Panopticon-TTS-Token': expect.any(String) }),
       body: JSON.stringify({ design: 'warm narrator', text: 'sample text' }),
       signal: expect.any(AbortSignal),
     });

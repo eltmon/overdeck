@@ -11,13 +11,13 @@ import {
   type TtsVoice,
 } from '../../../lib/tts-voices.js';
 import { jsonResponse } from '../http-helpers.js';
-import { getTtsDaemonStatus, startTtsDaemon, type TtsDaemonStartResult, type TtsDaemonStatus } from '../../../lib/tts-daemon.js';
+import { getTtsDaemonAuthHeaders, getTtsDaemonStatus, startTtsDaemon, type TtsDaemonStartResult, type TtsDaemonStatus } from '../../../lib/tts-daemon.js';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export const EXTRACT_EMBEDDING_TIMEOUT_MS = 60_000;
 
-export type TtsHealthResult = TtsDaemonStatus;
+export type TtsHealthResult = TtsDaemonStatus & { ttsEnabled: boolean };
 
 export interface CheckTtsHealthOptions {
   fetch?: FetchLike;
@@ -34,18 +34,10 @@ export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promi
     daemonPort: options.port ?? runtimeConfig.daemonPort,
   };
 
-  if (options.host === undefined && options.port === undefined && !runtimeConfig.enabled) {
-    return {
-      ok: false,
-      running: false,
-      pid: null,
-      daemonHost: config.daemonHost,
-      daemonPort: config.daemonPort,
-      error: 'tts disabled in settings',
-    };
+  if (!options.fetch) {
+    const status = await getTtsDaemonStatus(config);
+    return { ...status, ttsEnabled: runtimeConfig.enabled };
   }
-
-  if (!options.fetch) return getTtsDaemonStatus(config);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 2_000);
@@ -53,7 +45,7 @@ export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promi
   try {
     const response = await options.fetch(`http://${config.daemonHost}:${config.daemonPort}/health`, { signal: controller.signal });
     if (!response.ok) {
-      return { ok: false, running: false, pid: null, daemonHost: config.daemonHost, daemonPort: config.daemonPort, error: 'daemon unreachable' };
+      return { ok: false, running: false, pid: null, daemonHost: config.daemonHost, daemonPort: config.daemonPort, ttsEnabled: runtimeConfig.enabled, error: 'daemon unreachable' };
     }
     const body = await response.json() as { queue?: unknown; model?: unknown };
     return {
@@ -62,12 +54,13 @@ export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promi
       pid: null,
       daemonHost: config.daemonHost,
       daemonPort: config.daemonPort,
+      ttsEnabled: runtimeConfig.enabled,
       queue: body.queue,
       queueDepth: typeof body.queue === 'number' ? body.queue : undefined,
       model: body.model,
     };
   } catch {
-    return { ok: false, running: false, pid: null, daemonHost: config.daemonHost, daemonPort: config.daemonPort, error: 'daemon unreachable' };
+    return { ok: false, running: false, pid: null, daemonHost: config.daemonHost, daemonPort: config.daemonPort, ttsEnabled: runtimeConfig.enabled, error: 'daemon unreachable' };
   } finally {
     clearTimeout(timeout);
   }
@@ -258,7 +251,7 @@ export async function extractTtsEmbedding(
   try {
     const response = await (deps.fetch ?? fetch)(`http://${host}:${port}/extract-embedding`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...await getTtsDaemonAuthHeaders() },
       body: JSON.stringify(input),
       signal: controller.signal,
     });

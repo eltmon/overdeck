@@ -156,7 +156,7 @@ The skill also bundles `scripts/say.sh` for one-off utterances that bypass Panop
 ./scripts/say.sh "Pan 672 merged to main."
 ```
 
-The script POSTs to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (override via `QWEN_TTS_ENDPOINT`). It waits for the daemon to acknowledge the request (up to 5 s); audio then plays asynchronously in the daemon's worker thread. Keep utterances short (under ~200 characters); the daemon's queue caps at 6.
+The script POSTs to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (override via `QWEN_TTS_ENDPOINT`) and sends the daemon token from `~/.panopticon/secrets/qwen-tts.token`. It waits for the daemon to acknowledge the request (up to 5 s); audio then plays asynchronously in the daemon's worker thread. Keep utterances short (under ~200 characters); the daemon's queue caps at 6.
 
 Use ad-hoc speak sparingly — the built-in dashboard playback service or optional SSE sidecar already speaks activity TTS events. Ad-hoc speak is for:
 - Announcements that don't warrant a dashboard activity entry (local test runs, meta-commentary)

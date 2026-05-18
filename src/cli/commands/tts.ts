@@ -7,6 +7,7 @@ import { clearConfigCache, getGlobalConfigPath, loadConfig, type NormalizedTtsDa
 import { buildTtsSpeakPayload as buildRuntimeTtsSpeakPayload, type TtsSpeakPayload } from '../../lib/tts-speak.js';
 import { deleteVoice, findVoiceById, findVoiceByName, loadVoices, type TtsVoice } from '../../lib/tts-voices.js';
 import {
+  getTtsDaemonAuthHeaders,
   getTtsDaemonStatus,
   installTtsSystemdUnit,
   runTtsDaemonForeground,
@@ -159,7 +160,7 @@ async function postTtsSpeakPayload(
   try {
     const response = await (deps.fetch ?? fetch)(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...await getTtsDaemonAuthHeaders() },
       body: JSON.stringify(payload),
     });
 

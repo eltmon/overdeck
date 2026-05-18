@@ -1,5 +1,6 @@
 import { spawn, execFile } from 'node:child_process';
-import { access, mkdir, open, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { access, chmod, mkdir, open, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,9 @@ const execFileAsync = promisify(execFile);
 
 export const QWEN_TTS_PID_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts.pid');
 export const QWEN_TTS_STATE_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts.json');
+export const QWEN_TTS_START_LOCK_PATH = join(PANOPTICON_HOME, 'pids', 'qwen-tts.start.lock');
+export const QWEN_TTS_AUTH_TOKEN_PATH = join(PANOPTICON_HOME, 'secrets', 'qwen-tts.token');
+export const QWEN_TTS_AUTH_HEADER = 'X-Panopticon-TTS-Token';
 export const QWEN_TTS_LOG_PATH = join(LOGS_DIR, 'qwen-tts.log');
 
 export interface TtsDaemonState {
@@ -144,6 +148,83 @@ async function writeState(state: TtsDaemonState): Promise<void> {
   await writeFile(QWEN_TTS_STATE_PATH, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
 }
 
+export async function hasTtsDaemonState(): Promise<boolean> {
+  return (await readPid()) !== null || (await readState()) !== null;
+}
+
+export async function getTtsDaemonAuthToken(): Promise<string> {
+  if (process.env.QWEN_TTS_AUTH_TOKEN?.trim()) return process.env.QWEN_TTS_AUTH_TOKEN.trim();
+
+  try {
+    const existing = (await readFile(QWEN_TTS_AUTH_TOKEN_PATH, 'utf8')).trim();
+    if (existing) {
+      await chmod(QWEN_TTS_AUTH_TOKEN_PATH, 0o600).catch(() => undefined);
+      return existing;
+    }
+  } catch {
+    // create below
+  }
+
+  const token = randomBytes(32).toString('base64url');
+  await mkdir(dirname(QWEN_TTS_AUTH_TOKEN_PATH), { recursive: true, mode: 0o700 });
+  try {
+    await writeFile(QWEN_TTS_AUTH_TOKEN_PATH, `${token}\n`, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    await chmod(QWEN_TTS_AUTH_TOKEN_PATH, 0o600).catch(() => undefined);
+    return token;
+  } catch (error: any) {
+    if (error?.code !== 'EEXIST') throw error;
+    const existing = (await readFile(QWEN_TTS_AUTH_TOKEN_PATH, 'utf8')).trim();
+    if (!existing) throw new Error(`TTS daemon auth token file is empty: ${QWEN_TTS_AUTH_TOKEN_PATH}`);
+    await chmod(QWEN_TTS_AUTH_TOKEN_PATH, 0o600).catch(() => undefined);
+    return existing;
+  }
+}
+
+export async function getTtsDaemonAuthHeaders(): Promise<Record<string, string>> {
+  return { [QWEN_TTS_AUTH_HEADER]: await getTtsDaemonAuthToken() };
+}
+
+function defaultAllowedOrigins(): string {
+  const port = Number.parseInt(process.env.API_PORT ?? process.env.PORT ?? '3011', 10);
+  const origins = new Set<string>();
+  const dashboardUrl = process.env.DASHBOARD_URL;
+  if (dashboardUrl) origins.add(dashboardUrl);
+  origins.add(`http://localhost:${port}`);
+  origins.add(`http://127.0.0.1:${port}`);
+  for (const origin of process.env.PANOPTICON_TRUSTED_ORIGINS?.split(',') ?? []) {
+    const trimmed = origin.trim();
+    if (trimmed) origins.add(trimmed);
+  }
+  return Array.from(origins).join(',');
+}
+
+async function acquireStartLock(): Promise<void> {
+  await mkdir(dirname(QWEN_TTS_START_LOCK_PATH), { recursive: true });
+  while (true) {
+    try {
+      await mkdir(QWEN_TTS_START_LOCK_PATH, { mode: 0o700 });
+      return;
+    } catch (error: any) {
+      if (error?.code !== 'EEXIST') throw error;
+      try {
+        const lockStat = await stat(QWEN_TTS_START_LOCK_PATH);
+        if (Date.now() - lockStat.mtimeMs > 180_000) {
+          await rm(QWEN_TTS_START_LOCK_PATH, { recursive: true, force: true });
+          continue;
+        }
+      } catch (statError: any) {
+        if (statError?.code === 'ENOENT') continue;
+        throw statError;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
+
+async function releaseStartLock(): Promise<void> {
+  await rm(QWEN_TTS_START_LOCK_PATH, { recursive: true, force: true });
+}
+
 async function clearState(): Promise<void> {
   await Promise.all([
     rm(QWEN_TTS_PID_PATH, { force: true }),
@@ -249,55 +330,65 @@ export async function startTtsDaemon(options: TtsDaemonStartOptions): Promise<Tt
     return { ok: false, pid: null, alreadyRunning: false, error: `Qwen TTS daemon is only supported on Linux (current platform: ${process.platform})` };
   }
 
-  const existing = await getTtsDaemonStatus(config);
-  if (existing.running) {
-    if (!waitForHealth || existing.ok) return { ok: existing.ok, pid: existing.pid, alreadyRunning: true, status: existing };
-    const healthy = await waitForTtsDaemonHealth(config, options.timeoutMs);
-    return { ok: healthy.ok, pid: healthy.pid, alreadyRunning: true, status: healthy, error: healthy.ok ? undefined : healthy.error };
+  let spawnedPid: number | null = null;
+  let alreadyRunning = false;
+  await acquireStartLock();
+  try {
+    const existing = await getTtsDaemonStatus(config);
+    if (existing.running) {
+      alreadyRunning = true;
+      spawnedPid = existing.pid;
+    } else {
+      const python = await getTtsDaemonPython();
+      const script = await resolveTtsDaemonScript();
+      if (!(await pathExists(python))) {
+        return { ok: false, pid: null, alreadyRunning: false, error: `TTS daemon venv not found at ${python}; run pan install` };
+      }
+
+      const authToken = await getTtsDaemonAuthToken();
+      let logFile: Awaited<ReturnType<typeof open>> | undefined;
+      if (detach) {
+        await mkdir(LOGS_DIR, { recursive: true });
+        logFile = await open(QWEN_TTS_LOG_PATH, 'a');
+      }
+      const child = spawn(python, [script], {
+        detached: detach,
+        stdio: detach ? ['ignore', logFile!.fd, logFile!.fd] : 'inherit',
+        env: {
+          ...process.env,
+          QWEN_TTS_HOST: config.daemonHost,
+          QWEN_TTS_PORT: String(config.daemonPort),
+          QWEN_TTS_AUTH_TOKEN: authToken,
+          QWEN_TTS_ALLOWED_ORIGINS: process.env.QWEN_TTS_ALLOWED_ORIGINS ?? defaultAllowedOrigins(),
+        },
+      });
+
+      if (!child.pid) {
+        await logFile?.close();
+        return { ok: false, pid: null, alreadyRunning: false, error: 'failed to spawn TTS daemon' };
+      }
+
+      spawnedPid = child.pid;
+      await writeState({
+        pid: child.pid,
+        startedAt: new Date().toISOString(),
+        host: config.daemonHost,
+        port: config.daemonPort,
+      });
+
+      if (detach) child.unref();
+      await logFile?.close();
+    }
+  } finally {
+    await releaseStartLock();
   }
-
-  const python = await getTtsDaemonPython();
-  const script = await resolveTtsDaemonScript();
-  if (!(await pathExists(python))) {
-    return { ok: false, pid: null, alreadyRunning: false, error: `TTS daemon venv not found at ${python}; run pan install` };
-  }
-
-  let logFile: Awaited<ReturnType<typeof open>> | undefined;
-  if (detach) {
-    await mkdir(LOGS_DIR, { recursive: true });
-    logFile = await open(QWEN_TTS_LOG_PATH, 'a');
-  }
-  const child = spawn(python, [script], {
-    detached: detach,
-    stdio: detach ? ['ignore', logFile!.fd, logFile!.fd] : 'inherit',
-    env: {
-      ...process.env,
-      QWEN_TTS_HOST: config.daemonHost,
-      QWEN_TTS_PORT: String(config.daemonPort),
-    },
-  });
-
-  if (!child.pid) {
-    await logFile?.close();
-    return { ok: false, pid: null, alreadyRunning: false, error: 'failed to spawn TTS daemon' };
-  }
-
-  await writeState({
-    pid: child.pid,
-    startedAt: new Date().toISOString(),
-    host: config.daemonHost,
-    port: config.daemonPort,
-  });
-
-  if (detach) child.unref();
-  await logFile?.close();
 
   if (!waitForHealth) {
-    return { ok: true, pid: child.pid, alreadyRunning: false, status: await getTtsDaemonStatus(config) };
+    return { ok: true, pid: spawnedPid, alreadyRunning, status: await getTtsDaemonStatus(config) };
   }
 
   const status = await waitForTtsDaemonHealth(config, options.timeoutMs);
-  return { ok: status.ok, pid: child.pid, alreadyRunning: false, status, error: status.ok ? undefined : status.error };
+  return { ok: status.ok, pid: status.pid ?? spawnedPid, alreadyRunning, status, error: status.ok ? undefined : status.error };
 }
 
 export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig): Promise<TtsDaemonForegroundResult> {
@@ -311,23 +402,32 @@ export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig):
     throw new Error(`TTS daemon venv not found at ${python}; run pan install`);
   }
 
-  const child = spawn(python, [script], {
-    detached: false,
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      QWEN_TTS_HOST: config.daemonHost,
-      QWEN_TTS_PORT: String(config.daemonPort),
-    },
-  });
+  const authToken = await getTtsDaemonAuthToken();
+  await acquireStartLock();
+  let child: ReturnType<typeof spawn>;
+  try {
+    child = spawn(python, [script], {
+      detached: false,
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        QWEN_TTS_HOST: config.daemonHost,
+        QWEN_TTS_PORT: String(config.daemonPort),
+        QWEN_TTS_AUTH_TOKEN: authToken,
+        QWEN_TTS_ALLOWED_ORIGINS: process.env.QWEN_TTS_ALLOWED_ORIGINS ?? defaultAllowedOrigins(),
+      },
+    });
 
-  if (!child.pid) return { pid: null, exitCode: 1, signal: null };
-  await writeState({
-    pid: child.pid,
-    startedAt: new Date().toISOString(),
-    host: config.daemonHost,
-    port: config.daemonPort,
-  });
+    if (!child.pid) return { pid: null, exitCode: 1, signal: null };
+    await writeState({
+      pid: child.pid,
+      startedAt: new Date().toISOString(),
+      host: config.daemonHost,
+      port: config.daemonPort,
+    });
+  } finally {
+    await releaseStartLock();
+  }
 
   return await new Promise<TtsDaemonForegroundResult>((resolve, reject) => {
     child.once('error', reject);

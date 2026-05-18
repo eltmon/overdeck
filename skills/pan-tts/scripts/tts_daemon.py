@@ -48,6 +48,12 @@ DEFAULT_INSTRUCT = os.environ.get(
 )
 DEFAULT_MAX_QUEUE = 6
 MAX_QUEUE_ENV = os.environ.get("QWEN_TTS_MAX_QUEUE", str(DEFAULT_MAX_QUEUE))
+AUTH_TOKEN = os.environ.get("QWEN_TTS_AUTH_TOKEN", "").strip()
+ALLOWED_ORIGINS = {
+    origin.strip()
+    for origin in os.environ.get("QWEN_TTS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+}
 SAMPLE_RATE = 24000
 PLAYER_IDLE_TIMEOUT = 10.0  # seconds to keep pw-play open after last utterance
 
@@ -331,10 +337,23 @@ def worker() -> None:
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
+    def _origin_allowed(self) -> bool:
+        origin = self.headers.get("Origin")
+        return not origin or origin in ALLOWED_ORIGINS
+
+    def _authorized(self) -> bool:
+        header_token = self.headers.get("X-Panopticon-TTS-Token", "").strip()
+        auth_header = self.headers.get("Authorization", "").strip()
+        bearer_token = auth_header.removeprefix("Bearer ").strip() if auth_header.startswith("Bearer ") else ""
+        return bool(AUTH_TOKEN) and (header_token == AUTH_TOKEN or bearer_token == AUTH_TOKEN)
+
     def _cors(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin")
+        if origin and origin in ALLOWED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Panopticon-TTS-Token, Authorization")
 
     def _json(self, status: int, body: dict[str, Any]) -> None:
         payload = json.dumps(body).encode("utf-8")
@@ -346,6 +365,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_OPTIONS(self) -> None:  # noqa: N802
+        if not self._origin_allowed():
+            self._json(403, {"error": "origin_not_allowed"})
+            return
         self.send_response(204)
         self._cors()
         self.end_headers()
@@ -369,6 +391,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return {}
 
     def do_POST(self) -> None:  # noqa: N802
+        if not self._origin_allowed():
+            self._json(403, {"error": "origin_not_allowed"})
+            return
+        if not self._authorized():
+            self._json(401, {"error": "unauthorized"})
+            return
+
         body = self._read_body()
         if not isinstance(body, dict):
             self._json(400, {"error": "expected_object"})
@@ -461,6 +490,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 def main() -> int:
     global PORT, MAX_QUEUE, WORK_QUEUE
+
+    if not AUTH_TOKEN:
+        log("QWEN_TTS_AUTH_TOKEN is required")
+        return 1
 
     try:
         PORT = parse_int_env("QWEN_TTS_PORT", PORT_ENV, minimum=1, maximum=65535)

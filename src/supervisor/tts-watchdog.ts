@@ -1,5 +1,5 @@
 import { loadConfig } from '../lib/config-yaml.js';
-import { getTtsDaemonStatus, startTtsDaemon } from '../lib/tts-daemon.js';
+import { getTtsDaemonStatus, hasTtsDaemonState, startTtsDaemon } from '../lib/tts-daemon.js';
 
 export interface TtsWatchdogConfig {
   enabled: boolean;
@@ -24,11 +24,11 @@ export interface TtsWatchdogStatus {
 export function readTtsWatchdogConfig(env: NodeJS.ProcessEnv = process.env): TtsWatchdogConfig {
   return {
     enabled: env.PANOPTICON_TTS_WATCHDOG !== '0',
-    pollMs: Number(env.PANOPTICON_TTS_WATCHDOG_POLL_MS ?? 10_000),
-    failThreshold: Number(env.PANOPTICON_TTS_WATCHDOG_FAIL_THRESHOLD ?? 2),
+    pollMs: Number(env.PANOPTICON_TTS_WATCHDOG_POLL_MS ?? 5_000),
+    failThreshold: Number(env.PANOPTICON_TTS_WATCHDOG_FAIL_THRESHOLD ?? 1),
     maxRestarts: Number(env.PANOPTICON_TTS_WATCHDOG_MAX_RESTARTS ?? 3),
     windowMs: Number(env.PANOPTICON_TTS_WATCHDOG_WINDOW_MS ?? 10 * 60_000),
-    startTimeoutMs: Number(env.PANOPTICON_TTS_WATCHDOG_START_TIMEOUT_MS ?? 30_000),
+    startTimeoutMs: Number(env.PANOPTICON_TTS_WATCHDOG_START_TIMEOUT_MS ?? 25_000),
   };
 }
 
@@ -91,7 +91,7 @@ export class TtsWatchdog {
     this.ticking = true;
     try {
       const ttsConfig = loadConfig().config.tts;
-      this.active = ttsConfig.enabled || ttsConfig.daemonAutoStart;
+      this.active = ttsConfig.enabled || ttsConfig.daemonAutoStart || await hasTtsDaemonState();
       if (!this.active) {
         this.consecutiveFailures = 0;
         return;
