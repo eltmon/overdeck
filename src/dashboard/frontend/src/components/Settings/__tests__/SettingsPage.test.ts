@@ -85,7 +85,7 @@ describe('SettingsPage role model routing panels', () => {
     expect(SETTINGS_PAGE_SOURCE).toContain('pendingTtsSaveRef = useRef<TtsConfig | null>(null)');
     expect(SETTINGS_PAGE_SOURCE).toContain('ttsSaveInFlightRef');
     expect(SETTINGS_PAGE_SOURCE).toContain('const latest = await fetchSettings()');
-    expect(SETTINGS_PAGE_SOURCE).toContain('saveMutation.mutateAsync(buildTtsAutosavePayload(latest, snapshot))');
+    expect(SETTINGS_PAGE_SOURCE).toContain('saveSettings(buildTtsAutosavePayload(latest, snapshot))');
     expect(SETTINGS_PAGE_SOURCE).toContain('scheduleTtsSave(nextTts, options.debounce === true)');
   });
 
