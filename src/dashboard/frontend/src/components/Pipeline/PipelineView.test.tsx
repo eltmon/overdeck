@@ -27,11 +27,29 @@ describe('PipelineView', () => {
       drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [
         issue({ identifier: 'PAN-1', title: 'Ready to ship', priority: 1, labels: ['ship'], project: { id: 'pan', name: 'Panopticon', color: '#fff' } }),
-        issue({ identifier: 'PAN-2', title: 'Active work', priority: 2, status: 'In Progress', state: 'in_progress' }),
-        issue({ identifier: 'PAN-3', title: 'Planned work', priority: 3, hasPlan: true }),
+        issue({ identifier: 'PAN-2', title: 'Active work', priority: 2, status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
+        issue({ identifier: 'PAN-3', title: 'Planned work', priority: 3, hasPlan: true, project: { id: 'pan', name: 'Panopticon', color: '#fff' } }),
+        issue({ identifier: 'PAN-4', title: 'Blocked merge', priority: 2, project: { id: 'ops', name: 'Operations', color: '#fff' } }),
+        issue({ identifier: 'PAN-5', title: 'Open PR', priority: 2, project: { id: 'ops', name: 'Operations', color: '#fff' } }),
       ],
       reviewStatusByIssueId: {
         'PAN-1': { issueId: 'PAN-1', readyForMerge: true, mergeStatus: 'pending', updatedAt: '2026-05-18T01:00:00.000Z' },
+        'PAN-4': {
+          issueId: 'PAN-4',
+          readyForMerge: false,
+          mergeStatus: 'pending',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          blockerReasons: ['github-checks'],
+          updatedAt: '2026-05-18T01:00:00.000Z',
+        },
+        'PAN-5': {
+          issueId: 'PAN-5',
+          readyForMerge: false,
+          mergeStatus: 'pending',
+          prUrl: 'https://example.com/pr/5',
+          updatedAt: '2026-05-18T01:00:00.000Z',
+        },
       },
       agentsById: {
         'agent-pan-2': {
@@ -82,5 +100,41 @@ describe('PipelineView', () => {
     useDashboardStore.getState().closeIssue();
 
     expect(scroller.scrollTop).toBe(160);
+  });
+
+  it('syncs phase and project filters to the URL', () => {
+    render(<PipelineView />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'work' }));
+    expect(window.location.search).toBe('?phase=work');
+    expect(screen.getByText('Active work')).toBeInTheDocument();
+    expect(screen.queryByText('Ready to ship')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Panopticon' }));
+    expect(window.location.search).toBe('?projects=pan');
+    expect(screen.getByText('Ready to ship')).toBeInTheDocument();
+    expect(screen.getByText('Planned work')).toBeInTheDocument();
+    expect(screen.queryByText('Active work')).toBeNull();
+  });
+
+  it('maps ship modifiers to the legacy merge subviews', () => {
+    const { unmount } = render(<PipelineView />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Blocked' }));
+    expect(new URLSearchParams(window.location.search).get('phase')).toBe('ship');
+    expect(new URLSearchParams(window.location.search).has('blocked')).toBe(true);
+    expect(screen.getByText('Blocked merge')).toBeInTheDocument();
+    expect(screen.queryByText('Ready to ship')).toBeNull();
+
+    unmount();
+    window.history.replaceState(null, '', '/');
+    render(<PipelineView />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'No PR' }));
+    expect(new URLSearchParams(window.location.search).get('phase')).toBe('ship');
+    expect(new URLSearchParams(window.location.search).has('noPr')).toBe(true);
+    expect(screen.getByText('Open PR')).toBeInTheDocument();
+    expect(screen.queryByText('Ready to ship')).toBeNull();
   });
 });

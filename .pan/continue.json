@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T21:58:30.000Z",
+  "updated": "2026-05-18T22:04:30.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "515cb4f3a",
+    "sha": "809a3f29b",
     "dirty": false
   },
   "decisions": [
@@ -424,6 +424,11 @@
     "d1-drawer-shell-store.ac9": "completed",
     "p5-pipeline-drawer-wiring": "completed",
     "p5-pipeline-drawer-wiring.ac1": "completed",
-    "p5-pipeline-drawer-wiring.ac2": "completed"
+    "p5-pipeline-drawer-wiring.ac2": "completed",
+    "p4-pipeline-cross-project-filter": "completed",
+    "p4-pipeline-cross-project-filter.ac1": "completed",
+    "p4-pipeline-cross-project-filter.ac2": "completed",
+    "p4-pipeline-cross-project-filter.ac3": "completed",
+    "p4-pipeline-cross-project-filter.ac4": "completed"
   }
 }
