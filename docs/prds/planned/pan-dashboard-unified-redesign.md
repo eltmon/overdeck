@@ -220,6 +220,229 @@ Surface-specific entry behaviors:
 - **From Agents:** click "Open issue" link → drawer scrolled to the Active Agent section, focused on that agent.
 - **From Pipeline:** click row → drawer.
 
+### 4.7 Detailed component specification
+
+The values below are the literal contract — what an implementer follows when neither the mock nor the style guide is open. Where a value references a token, the token (not the resolved value) is the contract. Tokens come from [`design/style-guide/STYLE-GUIDE.md`](../../../design/style-guide/STYLE-GUIDE.md) §3 (color) and §5 (radius).
+
+**Universal rules.** Body font is **DM Sans**, mono is **SF Mono**, display (Space Grotesk) is reserved for the sidebar wordmark only. Default transition is `200ms ease-in-out`. Hover on any clickable surface adds `background: var(--accent)` (4% overlay). The fractal-noise body overlay (3.5% opacity, fixed-position SVG turbulence at 256px tile) is applied to every page.
+
+#### 4.7.1 Sidebar (left rail)
+
+| Property | Value |
+|---|---|
+| Width | 232px expanded · 48px collapsed |
+| Background | `var(--card)` |
+| Border | `border-right: 1px solid var(--border)` |
+| Padding | `14px 12px` |
+| Workspace mark | 28×28, `var(--radius-md)`, label uses Space Grotesk 14px weight 600 letter-spacing `-0.01em` |
+| Filter box | 30px height, `var(--radius-lg)`, 12px font, `border: 1px solid var(--input)`, muted placeholder |
+| Group label | 11px DM Sans weight 500, **uppercase**, letter-spacing `0.12em`, color muted, padding `0 10px`, 4px margin-bottom |
+| Nav item | 13px font, gap 10px between icon and label, padding `6px 10px`, radius `var(--radius-lg)`, color muted |
+| Nav item hover | `background: var(--accent)`, color foreground, 200ms |
+| Nav item active | Same + `::before` left accent bar — 2px wide, `var(--primary)`, inset 6px top/bottom |
+| Nav count | 11px mono, muted, right-aligned |
+| Project mark | 14×14 rounded 3px square; color = project's signal token |
+| Footer | `margin-top: auto`, padding `8px 10px 0`, kbd chip uses SF Mono 10px in a 4px-radius accent pill |
+
+#### 4.7.2 Top bar
+
+| Property | Value |
+|---|---|
+| Height | 52px (Pipeline) / 48px (other surfaces) |
+| Padding | `10px 22px` |
+| Border | `border-bottom: 1px solid var(--border)` |
+| Gap between elements | 12px |
+| Breadcrumb font | 13px DM Sans; muted segments are `var(--muted-foreground)`, current segment is `var(--foreground)` weight 500 |
+| Breadcrumb separator | `/` in muted color at 50% opacity |
+| Meta chip | 11px, padding `2px 6px`, radius `var(--radius-sm)`, `background: var(--accent)`, color muted |
+| Search input | 32px height, min-width 280px, radius `var(--radius-lg)`, 12px font, muted placeholder |
+| Segmented control | 32px height, radius `var(--radius-lg)`, 12px font weight 500; active button uses `background: var(--accent)`, color foreground; dividers are 1px borders |
+| Primary button | 32px height, padding `0 14px`, radius `var(--radius-lg)`, 12px font weight 500, `background: var(--primary)`, color `var(--primary-foreground)`, inset highlight `0 1px 0 rgb(255 255 255 / 6%)` |
+| Ghost button | Same dims, transparent background, `border: 1px solid var(--input)`, color muted; hover → accent + foreground |
+
+#### 4.7.3 Metric strip (Pipeline, Agents)
+
+| Property | Value |
+|---|---|
+| Layout | `grid-template-columns: repeat(5, 1fr)` on Pipeline · `repeat(6, 1fr)` on Agents · gap 12px |
+| Padding | `14px 22px` (Pipeline) / `0` inside scroll (Agents — already padded) |
+| Border | `border-bottom: 1px solid var(--border)` on Pipeline |
+| Tile background | `var(--card)`, `border: 1px solid var(--border)`, radius `var(--radius-2xl)` (18px) |
+| Tile padding | `14px 16px` (Pipeline) / `12px 14px` (Agents) |
+| Eyebrow row | 11px DM Sans weight 500, **uppercase**, letter-spacing `0.06em`, color muted, 14×14 icon at the start |
+| Eyebrow icon color | Inherits the metric's signal token (`--info-foreground` for machine, `--warning-foreground` for review, `--signal-review-foreground` for ship/plan, `--signal-cost-foreground` for spend, `--destructive-foreground` for stuck, `--muted-foreground` for queue/backlog). **The number stays `--foreground`** — only the icon carries signal color. |
+| Value | 22px (Pipeline) / 20px (Agents), DM Sans weight 500, `line-height: 1`, `font-variant-numeric: tabular-nums` |
+| Sub line | 11px (Pipeline) / 10px (Agents), muted |
+| Delta | 11px inline-flex with 2px gap, color `var(--success-foreground)` for positive (cost down), `var(--destructive-foreground)` for negative |
+
+#### 4.7.4 Phase header (group header used in Pipeline + scoped Command Deck)
+
+| Property | Value |
+|---|---|
+| Layout | `display: flex; align-items: center; gap: 12px` |
+| Padding | `12px 22px 10px` (Pipeline) / `10px 22px 8px` (Command Deck) |
+| Background | `color-mix(in srgb, var(--background) 92%, var(--color-white))` |
+| Backdrop | `backdrop-filter: blur(6px)` (keeps it legible when rows scroll under it) |
+| Position | `sticky; top: 0; z-index: 2` |
+| Border-top | 2px solid — color per phase: Ship=success, Review=warning, Work=info, Plan=signal-review, Todo=`rgb(255 255 255 / 15%)` |
+| Border-bottom | `1px solid var(--border)` |
+| Phase dot | 8×8 circle, color matches the top border |
+| Title | 14px DM Sans weight 500, foreground |
+| Count chip | 11px, padding `1px 6px`, radius `var(--radius-sm)`, `background: var(--accent)`, muted |
+| Sub | 12px muted, margin-left 4px |
+| Right meta | `margin-left: auto`, 11px mono muted, `font-variant-numeric: tabular-nums` |
+
+#### 4.7.5 Issue Row (Pipeline + Command Deck)
+
+| Property | Value |
+|---|---|
+| Grid | `grid-template-columns: 14px 78px 14px 1fr 220px 84px 30px` (Pipeline) — priority · id · phase glyph · title · agent · ledger · avatar |
+| Grid (Command Deck) | `14px 78px 14px 1fr 220px 84px 26px` — same shape, slightly tighter avatar column |
+| Gap | 14px (Pipeline) / 12px (Command Deck) |
+| Padding | `10px 22px 10px 18px` (Pipeline) / `9px 22px 9px 18px` (Command Deck) |
+| Border-bottom | `1px solid var(--border)` (except last row in group) |
+| Hover | `background: var(--accent)`, 200ms |
+| Priority left border | `::before` pseudo, 2px wide, inset 8px top/bottom, radius 2px. Urgent=destructive, High=warning, Medium=`rgb(255 255 255 / 22%)`, Low=transparent |
+| Issue ID | SF Mono 11px muted, letter-spacing `0.02em` |
+| Phase glyph | 14×14 SVG; color = phase-foreground token (todo/progress/review/ship/done) |
+| Title text | 13px DM Sans foreground, single-line ellipsis |
+| Title row gap | 8px between text and verb badge |
+| Label row | 6px gap, 11px muted; chips at 10px weight 500, padding `1px 6px`, radius `var(--radius-sm)`, `background: rgb(255 255 255 / 5%)`, `border: 1px solid var(--border)`, color muted |
+| Project tag | 11px muted with 14×14 square mark (`var(--proj-mark-*)`), gap 6px |
+| Inline separator | 3×3 dot, `var(--muted-foreground)` at 50% opacity |
+| Agent cell | Two-line stack, 3px gap, both lines mono, min-width 0 for ellipsis. Name: 11px foreground. Sub: 10px muted. Empty state: name in italic DM Sans 11px muted, sub still mono 10px |
+| Ledger cell | Two-line stack, 2px gap, right-aligned, mono, `font-variant-numeric: tabular-nums`. Runtime: 11px muted. Cost: 10px `var(--signal-cost-foreground)`. Empty: both lines `—`, 55% opacity |
+| Avatar | 22×22 circle, `border: 1px solid var(--border)`, 9px font weight 600 white, gradient fills from a 5-tone palette (purple→cyan, amber→red, emerald→cyan, blue→purple, red→amber) |
+
+#### 4.7.6 Issue Card (Board)
+
+| Property | Value |
+|---|---|
+| Background | `color-mix(in srgb, var(--background) 92%, var(--color-white))` (slightly lighter than card surface — visual lift) |
+| Border | `1px solid var(--border)`, radius `var(--radius-xl)` (14px) |
+| Padding | `12px 12px 10px` |
+| Hover | `border-color: rgb(255 255 255 / 14%)` |
+| Priority left border | Same `::before` pseudo as Issue Row, inset 12px top/bottom |
+| Stuck card | Border becomes `color-mix(in srgb, var(--destructive) 32%, transparent)` |
+| Merge-ready card | Border becomes `color-mix(in srgb, var(--success) 32%, transparent)` |
+| Row 1 | Project mark (8×8 square, radius 2px) + ID (SF Mono 10px muted) + spacer + verb badge |
+| Title | 13px line-height 1.35 foreground, 2-line clamp (`-webkit-line-clamp: 2`) |
+| Labels | 4px gap, wrap, same chip styling as Issue Row labels |
+| Bead progress | Row of: label (10px muted, e.g. "Beads 7/12") + 3px-tall track (`background: var(--accent)`, radius 2px) with phase-colored fill |
+| Foot | 8px top padding, 1px top border, agent two-line cell on the left + runtime mono on the right + 18×18 avatar |
+
+#### 4.7.7 Verb badges
+
+Universal: 10px DM Sans weight 500, letter-spacing `0.05em`, **uppercase**, padding `2px 6px`, radius `var(--radius-sm)`, `border: 1px solid`, inline-flex gap 5px with optional pulse dot.
+
+| Variant | Background | Border | Text | Pulse? |
+|---|---|---|---|---|
+| `WORK RUNNING` | `info / 8%` | `info / 32%` | `--info-foreground` | ✓ |
+| `REVIEW RUNNING` | `warning / 8%` | `warning / 32%` | `--warning-foreground` | ✓ |
+| `SHIP RUNNING` | `signal-review / 8%` | `signal-review / 32%` | `--signal-review-foreground` | ✓ |
+| `PLANNING` | `signal-review / 8%` | `signal-review / 32%` | `--signal-review-foreground` | ✓ |
+| `INPUT` | `warning / 8%` | `warning / 32%` | `--warning-foreground` | ✓ |
+| `READY TO MERGE` | `success / 8%` | `success / 32%` | `--success-foreground` | — |
+| `MERGED` | `success / 8%` | `success / 32%` | `--success-foreground` | — |
+| `CHANGES REQUESTED` | `destructive / 8%` | `destructive / 32%` | `--destructive-foreground` | — |
+| `STUCK · Nh` | `destructive / 8%` | `destructive / 32%` | `--destructive-foreground` | — |
+| `QUEUED FOR PLAN` | transparent | `var(--border)` | muted | — |
+
+**Pulse dot:** 6×6 circle, color `currentColor`. Animation `pulse 1.6s ease-out infinite` — keyframes ramp `box-shadow: 0 0 0 0 → 0 0 0 6px transparent` while opacity drops to 50% at 80% and returns. Pulse never applies to terminal states (MERGED, READY TO MERGE, CHANGES REQUESTED, STUCK).
+
+#### 4.7.8 Issue Detail drawer
+
+| Property | Value |
+|---|---|
+| Width | 980px max, `max-width: calc(100vw - 48px)` |
+| Surface | `background: var(--background)`, full-height pinned right |
+| Border | `border-left: 1px solid var(--border)` |
+| Shadow | `box-shadow: -24px 0 64px rgb(0 0 0 / 40%)` |
+| Backdrop | `rgb(0 0 0 / 32%)` with `backdrop-filter: blur(2px)`, z-index 50 |
+| Header padding | `16px 22px 0` |
+| Title | Space Grotesk 22px weight 600 letter-spacing `-0.01em`, foreground |
+| ID chip | SF Mono 13px muted; priority is rendered as a 4×28 left bar at row start |
+| Header meta row | 12px muted, inline chips at `var(--accent)` + `var(--radius-md)`, 8px gap; cost figure uses `var(--signal-cost-foreground)` |
+
+**Phase timeline:** `grid-template-columns: repeat(6, 1fr)`, gap 0, 6 steps. Each step has a 2px top accent (transparent → success once `done`; `signal-review` for `current`). Per step: 10px uppercase lbl muted (or signal-colored for the active state) over 11px when-stamp mono over 10px sub. The current step's when-stamp goes foreground weight 500.
+
+**Tabs:** padding `10px 14px`, 13px DM Sans weight 500, color muted (hover/active foreground). Active tab gets a 2px `var(--primary)` underline inset 14px from each side. Count chips are 10px SF Mono in a 5px-padded accent pill.
+
+**Body grid:** `grid-template-columns: 1fr 320px` — main + side rail.
+
+**Active-agent card (inside drawer):**
+- `background: var(--card)`, `border: 1px solid var(--border)`, radius `var(--radius-xl)`, padding 14px
+- 3px `signal-review` left accent inset 14px top/bottom
+- Row 1: 8px phase dot + SF Mono 13px name + small verb badge (9px instead of 10px) + right-aligned mono meta (model · runtime · spend)
+- Stream excerpt: SF Mono 11px in a `rgb(0 0 0 / 32%)` panel with `border: 1px solid var(--border)`, radius `var(--radius-md)`, padding `10px 12px`, line-height 1.55, max-height 180px scroll. Inline color helpers: `.verb-line` signal-review, `.ok` success, `.warn` warning, `.err` destructive, `.neutral` foreground
+- Tell input row: 32px input + 32px primary "Send" button, gap 8px
+
+**Verification gates:** `grid-template-columns: repeat(4, 1fr)`, gap 8px. Each gate: card surface, padding `10px 12px`, radius `var(--radius-lg)`. Pass borders use `color-mix(success / 32%)`, fail use `color-mix(destructive / 32%)`. Value: 14px weight 500 in the matching `*-foreground` token. Sub: 10px mono muted.
+
+**Beads list:** wrapped in a single card surface with `border-radius: var(--radius-xl) overflow: hidden`. Each row: `grid-template-columns: 18px 1fr auto auto`, padding `9px 14px`, 1px bottom border (except last). Check circle: 14×14, 1.5px border. Done: filled success, white checkmark 9px. Current: filled info + animated 1.5px ring `ping 1.6s ease-out infinite` (scale 1 → 1.5, opacity 1 → 0). Done titles get `text-decoration: line-through` at 18% white. ID column: SF Mono 10px muted. Duration: SF Mono 10px muted tabular.
+
+**Review specialists list:** card surface with rows of `grid-template-columns: 14px 1fr auto auto`, padding `8px 0`, 1px bottom border. 8×8 status dot (run/idle/done/fail) + SF Mono 11px name + SF Mono 10px meta + SF Mono 10px duration.
+
+**Side rail (live activity):** `border-left: 1px solid var(--border)`, background `color-mix(in srgb, var(--background) 97%, var(--color-white))`, padding `16px 18px`, overflow-y auto. Stream items: `grid-template-columns: 14px 1fr`, gap 10px, padding-bottom 10px, 1px bottom border. 8×8 status dot (work/review/ship/done/info) + 12px text foreground with a 10px mono muted "when" line below.
+
+**Action bar (drawer footer):** padding `12px 22px`, 1px top border, background `color-mix(in srgb, var(--background) 96%, var(--color-white))`. Ghost buttons left, spacer, ghost "View PR" + primary "Merge to main" (primary uses `background: var(--success)`, color `#000` for contrast).
+
+#### 4.7.9 Agent Card (Agents view)
+
+| Property | Value |
+|---|---|
+| Grid container | `grid-template-columns: repeat(auto-fill, minmax(360px, 1fr))`, gap 14px |
+| Card | `background: var(--card)`, `border: 1px solid var(--border)`, radius `var(--radius-2xl)`, padding 14px, vertical stack with 12px gap |
+| Left accent | 3px `::before` inset 14px top/bottom, color per phase (work=info, review=warning, ship/plan=signal-review, stuck=destructive) |
+| Stuck card | Border becomes `color-mix(destructive / 32%)` |
+| H1 row | Phase dot + SF Mono 13px name + verb badge (right) + 22×22 menu icon button |
+| Issue panel | `background: rgb(0 0 0 / 20%)`, `border: 1px solid var(--border)`, radius `var(--radius-md)`, padding `10px 12px`, contains project mark + ID/title (12px foreground 2-line clamp) |
+| Meta tri-column | `grid-template-columns: 1fr 1fr 1fr`, gap 8px. Per cell: 9px uppercase lbl muted over 11px mono val foreground (cost uses signal-cost; warn uses warning-foreground) |
+| Stream excerpt | `background: rgb(0 0 0 / 28%)`, `border: 1px solid var(--border)`, radius `var(--radius-md)`, SF Mono 10.5px line-height 1.55, padding `8px 10px`, max-height 84px, **fade-out gradient** via `::after` (24px tall, linear gradient transparent → var(--card)) |
+| Stuck banner | Inline `display: flex` row, padding `6px 10px`, radius `var(--radius-md)`, `background: color-mix(destructive / 8%)`, `border: color-mix(destructive / 32%)`, 11px text in `--destructive-foreground` |
+| Foot | 8px top padding, 1px top border, gap 6px. Links: 11px, padding `4px 8px`, radius `var(--radius-md)`. Primary actions use `--info-foreground`, danger uses `--destructive-foreground` (right-aligned via `margin-left: auto`) |
+
+#### 4.7.10 Command Deck — project tree
+
+| Property | Value |
+|---|---|
+| Pane width | 280px |
+| Background | `var(--card)`, `border-right: 1px solid var(--border)` |
+| Tree-head padding | `14px 14px 10px` |
+| Tree title | Space Grotesk 14px weight 600 letter-spacing `-0.01em` |
+| Tree sub | 10px uppercase muted letter-spaced 0.12em |
+| Search | 30px height, radius `var(--radius-lg)`, 12px font, slightly transparent bg `rgb(255 255 255 / 3%)` |
+| Section label | 11px uppercase letter-spaced 0.12em muted, padding `6px 6px 4px`, right-aligned counts at 11px muted |
+| Project item | 13px DM Sans, gap 8px, padding `6px 8px`, radius `var(--radius-lg)`. Includes 12×12 chevron (rotated 90° when active), 14×14 project mark, label, monospace tag pill on the right (10px in 4px-radius accent pill) |
+| Active project item | `background: var(--accent)`, color foreground, with a 2px primary left accent positioned at `left: -4px` |
+| Feature list (nested) | 22px indent, 2px gap between rows |
+| Feature item | 12px DM Sans, gap 8px, padding `5px 8px`, radius `var(--radius-md)`. Includes 6×6 phase indicator dot (todo/progress/review/ship/done) + 10px mono ID (min-width 54px) + ellipsised title |
+| Selected feature item | `background: var(--accent)`, color foreground, with a 2px primary left accent at `left: -2px` |
+
+#### 4.7.11 Animation contract
+
+| Pattern | Duration | Easing |
+|---|---|---|
+| Hover state change (color / background) | 200ms | ease-in-out |
+| Drawer open / close | 200ms | ease-in-out; scale 0.98 → 1, opacity 0 → 1 |
+| Tooltip appear | 150ms | ease-in-out; same scale/opacity ramp |
+| Sidebar collapse width | 200ms | ease-in-out |
+| Verb badge pulse | 1.6s | ease-out, infinite |
+| Bead "current" ring ping | 1.6s | ease-out, infinite |
+| Theme toggle | 0ms (transitions suppressed via `.no-transitions` for one rAF) | — |
+
+No bounce, no spring, no elastic — per style-guide §12.3.
+
+#### 4.7.12 Surface-by-surface chrome reference
+
+| Surface | Top-bar height | Has metric strip? | Has filter row? | Layout |
+|---|---|---|---|---|
+| Pipeline | 52px | 5-tile strip below top bar | — | Sidebar (232px) + main |
+| Board | 52px | — | Cycle pills + project pills + filters + group | Sidebar (232px) + main with 4-column grid |
+| Command Deck | 48px (within feature header) | 5-tile mini stats in feature header | Per-tab toolbar | App rail (48px) + tree (280px) + feature detail |
+| Agents | 52px | 6-tile strip | Phase pills + project/model dropdowns | App rail (48px) + main |
+| Issue Detail | — | — | — | Drawer over any surface, 980px |
+
 ## 5. Data & API
 
 ### 5.1 No new endpoints
