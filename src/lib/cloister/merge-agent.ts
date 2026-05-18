@@ -21,6 +21,7 @@ import {
 import { resolveGitHubIssue } from '../tracker-utils.js';
 
 import { resolveProjectFromIssue } from '../projects.js';
+import { restoreTrackedBeadsExport } from '../beads-restore.js';
 import { runMergeValidation, autoRevertMerge, runQualityGates } from './validation.js';
 import { loadProjectsConfig } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
@@ -1147,9 +1148,17 @@ async function spawnShipRoleForTask(options: {
 
   try {
     const { spawnRun } = await import('../agents.js');
+    // Ship role delivers its rebase prompt through the work-agent's tmux session and
+    // performs git operations against the host worktree — it does not depend on the
+    // workspace's docker-compose services (server/frontend) being healthy. Pass
+    // `allowHost: true` so the stack-health pre-flight does not block ship when an
+    // ancillary container has exited (e.g. server-1 crashing on a stale init build).
+    // Blocking ship on those failures was forcing humans into a manual
+    // rebuild-and-retry loop for every merge — see PAN-1141 incident 2026-05-17.
     const run = await spawnRun(options.issueId, 'ship', {
       workspace,
       prompt: options.prompt,
+      allowHost: true,
     });
     return {
       success: true,
@@ -1435,6 +1444,13 @@ export async function syncMainIntoWorkspace(
 ): Promise<SyncMainResult> {
   console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
   logActivity('sync_main_start', `Starting sync for ${issueId}`);
+
+  // PAN-1158 safety net: a workspace bd dolt DB that briefly went empty can
+  // leave `.beads/issues.jsonl` reported as deleted by `git status`. The
+  // auto-commit below would then propagate that deletion onto the feature
+  // branch. Restore the tracked export first so the auto-commit only sees
+  // intentional changes.
+  await restoreTrackedBeadsExport(projectPath);
 
   // Pre-flight: auto-commit uncommitted changes before merge
   try {

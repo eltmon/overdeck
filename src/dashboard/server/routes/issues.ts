@@ -1129,10 +1129,6 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         console.log(`[complete-planning] Project root not on main (${currentBranch}) — pan spec updated on disk but not committed on main`);
       }
 
-      try {
-        await withBdMutex(() => execFileAsync('bd', ['sync'], { cwd: gitRoot, encoding: 'utf-8', timeout: 10000 }));
-      } catch { /* bd might not be installed */ }
-
       const isGitRepo = existsSync(join(gitRoot, '.git'));
       if (!isGitRepo) {
         await execFileAsync('git', ['init'], { cwd: gitRoot, encoding: 'utf-8' });

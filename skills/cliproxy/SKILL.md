@@ -123,11 +123,12 @@ ChatGPT subscription tokens expire. This avoids requiring the user to run
    Dashboard calls `POST /api/settings/codex-reauth` (idempotent — returns an
    existing live session if one is already running).
 3. **Terminal login** — Backend spawns a tmux session named `reauth-<uuid>`
-   running `codex login` (or `codex login --device-auth` when headless). The
-   frontend opens `/terminal/<sessionName>?token=<token>` so the user can
-   complete OAuth in a live terminal panel.
-4. **Polling** — Frontend polls `GET /api/settings/codex-reauth/status?session=<name>`
-   every 3 s. The session is considered complete when the tmux pane exits.
+   running `codex login` (or `codex login --device-auth` when headless), sets an
+   HttpOnly `pan_codex_reauth` cookie for `/ws/terminal`, and the frontend opens
+   `/terminal/<sessionName>` so the user can complete OAuth in a live terminal panel.
+4. **Polling** — Frontend polls `POST /api/settings/codex-reauth/status` with the
+   session name and status token every 3 s. The session is considered complete when
+   the tmux pane exits.
 5. **Bridge** — On completion, the backend calls `bridgeCodexAuthToCliproxyAsync()`
    to rewrite `~/.panopticon/cliproxy/auth/codex-primary.json` from the fresh
    `~/.codex/auth.json`, then returns the updated auth status.
@@ -136,8 +137,8 @@ ChatGPT subscription tokens expire. This avoids requiring the user to run
 
 ### Security
 
-- Re-auth session tokens are single-use UUIDs invalidated on the first
-  WebSocket attach (`/ws/terminal?session=reauth-xxx&token=...`).
+- Re-auth terminal tokens are short-lived UUIDs stored only in an HttpOnly
+  cookie scoped to `/ws/terminal`; they are required for `reauth-*` WebSockets.
 - Sessions expire from the in-memory registry after 1 hour.
 - The tmux session name is a random UUID — not guessable.
 
@@ -146,8 +147,8 @@ ChatGPT subscription tokens expire. This avoids requiring the user to run
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/settings/codex-auth` | Current auth status (`valid`/`expired`/etc.) |
-| `POST` | `/api/settings/codex-reauth` | Spawn (or reuse) a re-auth tmux session |
-| `GET` | `/api/settings/codex-reauth/status?session=<name>` | Poll for completion |
+| `POST` | `/api/settings/codex-reauth` | Spawn (or reuse) a re-auth tmux session and set the terminal cookie |
+| `POST` | `/api/settings/codex-reauth/status` | Poll for completion with `{ session, token }` |
 
 ### Manual Fallback
 

@@ -112,82 +112,62 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
   const planEdges = plan.edges ?? [];
   const inspectionPolicy = doc.vBRIEFInfo.inspectionPolicy ?? 'auto';
 
-  // Verify db connectivity. A worktree's .beads/ is supposed to consist of a single
-  // `redirect` file (set up by workspace-manager.ts) that points bd at the main repo's
-  // shared Dolt DB. Running `bd init` inside a redirect-managed worktree creates a
-  // competing self-contained local DB and clobbers the redirect — if that init then
-  // fails partway, the worktree is left with metadata.json pointing at a schema-less
-  // local DB and every subsequent bd call errors with "table not found".
-  //
-  // Recovery rules:
-  //   - redirect exists → never bd init here. Probe failure means main beads is
-  //     unreachable (or local artifacts are shadowing the redirect); surface it.
-  //   - no redirect, no main beads → bd init here is the only option.
-  //   - no redirect but main beads exists → the earlier setup block (above) should
-  //     have created the redirect; if it didn't, that's a separate setup bug.
   const issueLabel = plan.id.toLowerCase();
   const redirectExists = existsSync(redirectPath);
   try {
-    await execFileAsync('bd', ['list', '--json', '--limit', '0'], {
+    await execFileAsync('bd', ['ping', '--json'], {
       encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
     });
   } catch (connectErr: any) {
     const connectErrMsg = String(connectErr?.message ?? connectErr?.stderr ?? '');
     const firstLine = connectErrMsg.split('\n')[0] || 'unknown connectivity error';
+    const projectRoot = resolve(workspacePath, '..', '..');
+    const mainBeadsDir = join(projectRoot, '.beads');
 
-    if (redirectExists) {
-      // Check whether stale local-DB artifacts are shadowing the redirect. A clean
-      // redirect-managed worktree has only: redirect, issues.jsonl, config.yaml,
-      // README.md, .gitignore. Anything else (metadata.json, dolt/, embeddeddolt/,
-      // dolt-server.*, .local_version, hooks/) is the residue of a prior errant
-      // `bd init` and will cause bd to ignore the redirect.
-      const staleArtifacts = ['metadata.json', 'dolt', 'embeddeddolt', '.local_version', 'hooks',
-        'dolt-server.pid', 'dolt-server.port', 'dolt-server.lock', 'dolt-server.log'];
-      const presentStale = staleArtifacts.filter(n => existsSync(join(beadsDir, n)));
-      if (presentStale.length > 0) {
-        const detail = `beads probe failed (${firstLine}) — workspace has redirect to main beads but ` +
-          `stale local-DB artifacts are shadowing it: ${presentStale.join(', ')}. ` +
-          `Remove them from ${beadsDir} so bd follows the redirect.`;
+    // beads v1.0.3 auto-recovers corrupt Dolt manifests, and v1.0.4 repairs
+    // .beads permissions. Let `bd doctor --fix` own recovery instead of
+    // duplicating stale-artifact heuristics in Panopticon.
+    console.warn(`[beads] bd ping failed (${firstLine}); running bd doctor --fix before retry`);
+    try {
+      await execFileAsync('bd', ['doctor', '--fix'], {
+        encoding: 'utf-8', cwd: workspacePath, timeout: 30000,
+      });
+    } catch (doctorErr: any) {
+      const doctorErrMsg = String(doctorErr?.message ?? doctorErr?.stderr ?? '');
+      const doctorFirstLine = doctorErrMsg.split('\n')[0] || 'unknown doctor error';
+      console.warn(`[beads] bd doctor --fix failed: ${doctorFirstLine}`);
+    }
+
+    try {
+      await execFileAsync('bd', ['ping', '--json'], {
+        encoding: 'utf-8', cwd: workspacePath, timeout: 8000,
+      });
+    } catch (retryErr: any) {
+      if (!redirectExists && !existsSync(mainBeadsDir)) {
+        const prefix = deriveProjectPrefix(workspacePath);
+        console.log(`[beads] No redirect and no main beads — bd init --prefix ${prefix}`);
+        try {
+          await execFileAsync('bd', ['init', '--prefix', prefix], {
+            encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
+          });
+          await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
+          await execFileAsync('bd', ['config', 'set', 'export.git-add', 'false'], {
+            encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
+          }).catch(() => {});
+          console.log(`[beads] bd init succeeded for prefix ${prefix}`);
+        } catch (initErr: any) {
+          const initErrMsg = String(initErr?.message ?? initErr?.stderr ?? '');
+          const detail = `database init failed: ${initErrMsg.split('\n')[0]}`;
+          console.warn(`[beads] ${detail}`);
+          return { success: false, created: [], errors: [detail], beadIds };
+        }
+      } else {
+        const retryErrMsg = String(retryErr?.message ?? retryErr?.stderr ?? '');
+        const retryFirstLine = retryErrMsg.split('\n')[0] || 'unknown connectivity error';
+        const detail = `beads probe failed after recovery (${retryFirstLine})`;
         console.warn(`[beads] ${detail}`);
         return { success: false, created: [], errors: [detail], beadIds };
       }
-      // Redirect is clean but the main beads DB itself is unreachable. Do NOT bd init
-      // here — that would clobber the redirect. Caller must investigate the main repo.
-      const mainBeadsTarget = resolve(beadsDir, '..', '..', '.beads');
-      const detail = `beads probe failed (${firstLine}) — workspace redirect points at ${mainBeadsTarget} ` +
-        `but it is unreachable. Check the main repo's beads DB; do not bd init in the worktree.`;
-      console.warn(`[beads] ${detail}`);
-      return { success: false, created: [], errors: [detail], beadIds };
-    }
-
-    // No redirect — either no main beads (true fresh install) or setup failed earlier.
-    // Init locally only if there is genuinely no main beads to redirect to.
-    const projectRoot = resolve(workspacePath, '..', '..');
-    const mainBeadsDir = join(projectRoot, '.beads');
-    if (existsSync(mainBeadsDir)) {
-      const detail = `beads probe failed (${firstLine}) — main repo beads exists at ${mainBeadsDir} ` +
-        `but worktree has no redirect. Workspace setup is incomplete; refusing to bd init locally ` +
-        `because that would diverge from the main beads DB.`;
-      console.warn(`[beads] ${detail}`);
-      return { success: false, created: [], errors: [detail], beadIds };
-    }
-
-    const prefix = deriveProjectPrefix(workspacePath);
-    console.log(`[beads] No redirect and no main beads — bd init --prefix ${prefix}`);
-    try {
-      await execFileAsync('bd', ['init', '--prefix', prefix], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: 20000,
-      });
-      await execFileAsync('git', ['config', 'beads.role', 'contributor'], { cwd: workspacePath }).catch(() => {});
-      await execFileAsync('bd', ['config', 'set', 'export.git-add', 'false'], {
-        encoding: 'utf-8', cwd: workspacePath, timeout: 10000,
-      }).catch(() => {});
-      console.log(`[beads] bd init succeeded for prefix ${prefix}`);
-    } catch (initErr: any) {
-      const initErrMsg = String(initErr?.message ?? initErr?.stderr ?? '');
-      const detail = `database init failed: ${initErrMsg.split('\n')[0]}`;
-      console.warn(`[beads] ${detail}`);
-      return { success: false, created: [], errors: [detail], beadIds };
     }
   }
 

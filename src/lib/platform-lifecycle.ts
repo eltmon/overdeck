@@ -125,6 +125,15 @@ async function waitForPortFree(port: number, timeoutMs: number): Promise<boolean
   return false;
 }
 
+async function describePid(pid: number): Promise<string> {
+  try {
+    const { stdout } = await execAsync(`ps -p ${pid} -o pid=,cmd=`);
+    return stdout.trim().replace(/\s+/g, ' ') || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 /**
@@ -160,8 +169,22 @@ export async function stopDashboard(
   }
   if (stubbornPids.size > 0) {
     killPidsSync([...stubbornPids], 'SIGKILL');
-    // Short final wait — if SIGKILL didn't free the port, something is very wrong.
-    await Promise.all(ports.map((p) => waitForPortFree(p, 2000)));
+    const finalFreed = await Promise.all(ports.map((p) => waitForPortFree(p, 2000)));
+    if (finalFreed.every(Boolean)) return;
+
+    const stillHeld: string[] = [];
+    for (const [index, port] of ports.entries()) {
+      if (finalFreed[index]) continue;
+      for (const pid of await pidsOnPort(port)) {
+        stillHeld.push(`port ${port} still held by PID ${pid} (cmd: ${await describePid(pid)})`);
+      }
+    }
+    if (stillHeld.length > 0) {
+      throw new StageError({
+        stage: 'dashboard',
+        reason: stillHeld.join('; '),
+      });
+    }
   }
 }
 

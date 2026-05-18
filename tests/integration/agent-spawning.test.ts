@@ -246,7 +246,8 @@ describe('PAN-1048 role primitive — agent spawning', () => {
         prompt: 'review this diff',
       });
 
-      const launcher = readFileSync(join(getAgentDir('agent-pan-subreview-1-review-security'), 'launcher.sh'), 'utf8');
+      const agentDir = getAgentDir('agent-pan-subreview-1-review-security');
+      const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
 
       expect(launcher).toContain('exec claude --print');
       expect(launcher).toContain("--name agent-pan-subreview-1-review-security --session-id '");
@@ -275,6 +276,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(launcher).not.toContain('exec claude');
       expect(launcher).toContain("trap '' HUP");
       expect(launcher).toContain('timeout 1200 claude --print');
+      expect(launcher).toContain(`< '${join(agentDir, 'initial-prompt.md')}'`);
       expect(launcher).toContain('CLAUDE_EXIT=$?');
       expect(launcher).toContain(`echo $$ > '${join(agentDir, 'reviewer-launcher.pid')}'`);
       expect(launcher).toContain('"REVIEWER_READY correctness /tmp/out/review-correctness.md"');

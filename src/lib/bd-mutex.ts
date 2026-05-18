@@ -10,6 +10,11 @@
  * preventing lock contention and process pile-up.
  */
 
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
 let pending: Promise<void> = Promise.resolve();
 
 /**
@@ -26,4 +31,22 @@ export async function withBdMutex<T>(fn: () => Promise<T>): Promise<T> {
   // Update pending to track this operation's completion (success or failure)
   pending = result.then(() => {}, () => {});
   return result;
+}
+
+// PAN-1158 superseded the inline copy of restoreTrackedBeadsExport with the
+// shared helper in beads-restore.ts (HEAD-source restore covers staged
+// deletions too). Re-export so call sites that imported from bd-mutex keep
+// working.
+export { restoreTrackedBeadsExport } from './beads-restore.js';
+
+import { restoreTrackedBeadsExport as restoreBeads } from './beads-restore.js';
+
+export async function withWorkspaceBdMutex<T>(workspacePath: string, fn: () => Promise<T>): Promise<T> {
+  return withBdMutex(async () => {
+    try {
+      return await fn();
+    } finally {
+      await restoreBeads(workspacePath);
+    }
+  });
 }
