@@ -12,6 +12,7 @@ export type Tab =
   | 'metrics'
   | 'costs'
   | 'awaiting-merge'
+  | 'autopreso'
   | 'settings'
   | 'god-view'
   | 'sessions';

@@ -125,9 +125,8 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3011
-      # Single-deacon invariant: the host's `pan up` owns agent lifecycle.
-      # Workspace devcontainers must not mount ~/.panopticon; the container
-      # dashboard runs as a read/UI peer only.
+      # Single-deacon invariant: see .claude/rules/single-deacon-invariant.md.
+      # The host's `pan up` owns agent lifecycle; container dashboard runs as a read/UI peer only.
       - PANOPTICON_DISABLE_DEACON=1
       - LINEAR_API_KEY=${LINEAR_API_KEY}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
