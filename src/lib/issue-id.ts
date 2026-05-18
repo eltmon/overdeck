@@ -126,6 +126,59 @@ export function resolveIssueId(input: string): string {
 }
 
 /**
+ * Resolve a possibly-bare numeric ID (e.g., "1148") to a fully-prefixed
+ * canonical ID (e.g., "PAN-1148") by probing the local agent state directory.
+ *
+ * Strategy:
+ *   1. If input already has a prefix (PAN-1148, agent-pan-1148, F29698, etc.),
+ *      delegate to resolveIssueId and return.
+ *   2. If input is bare digits, scan ~/.panopticon/agents/ for state dirs
+ *      matching `agent-<prefix>-<num>` with a valid state.json. If exactly
+ *      one matches, return `<PREFIX>-<num>`.
+ *   3. If zero matches → return null (caller decides how to fail).
+ *   4. If multiple matches → return null (ambiguous; caller errors).
+ *
+ * Pure-sync, safe to call from CLI entry points. Reads filesystem only.
+ */
+export function resolveBareNumericId(input: string, panopticonHome?: string): string | null {
+  if (/^\d+$/.test(input)) {
+    const home = panopticonHome ?? `${process.env.HOME}/.panopticon`;
+    const agentsDir = `${home}/agents`;
+    let dirents: string[];
+    try {
+      // Sync FS is acceptable in CLI entry points (server code uses fs/promises).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('node:fs') as typeof import('node:fs');
+      if (!fs.existsSync(agentsDir)) return null;
+      dirents = fs.readdirSync(agentsDir);
+      const matches: string[] = [];
+      const suffix = `-${input}`;
+      for (const name of dirents) {
+        if (!name.startsWith('agent-')) continue;
+        if (!name.endsWith(suffix)) continue;
+        const stateJson = `${agentsDir}/${name}/state.json`;
+        if (!fs.existsSync(stateJson)) continue;
+        // Extract the issueId from inside state.json — authoritative.
+        try {
+          const raw = fs.readFileSync(stateJson, 'utf-8');
+          const parsed = JSON.parse(raw) as { issueId?: string };
+          if (parsed.issueId && parsed.issueId.endsWith(`-${input}`)) {
+            matches.push(parsed.issueId);
+          }
+        } catch {
+          // Skip unreadable state files.
+        }
+      }
+      if (matches.length === 1) return matches[0];
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  return resolveIssueId(input);
+}
+
+/**
  * Extract prefix from a standard format issue ID (PREFIX-NUMBER).
  * Returns null for non-standard formats like Rally IDs.
  * Use extractPrefix() for unified handling of all formats.

@@ -20,6 +20,7 @@ import { getShadowState } from '../../lib/shadow-state.js';
 import { pingAgent } from '../../lib/health.js';
 import { getAgentCV } from '../../lib/cv.js';
 import { getAgentRuntimeState } from '../../lib/agents.js';
+import { resolveBareNumericId } from '../../lib/issue-id.js';
 
 interface ShowOptions {
   shadow?: boolean;
@@ -46,9 +47,20 @@ function relativeTime(iso: string | null | undefined): string {
 export async function showCommand(id: string, options: ShowOptions = {}): Promise<void> {
   const { shadow, cv, context, health, json } = options;
 
-  // Normalize input: accept both bare issue IDs (PAN-821) and prefixed agent IDs (agent-pan-821)
-  const normalizedId = id.toLowerCase().replace(/^agent-/, '');
-  const issueId = normalizedId.toUpperCase();
+  // Normalize input: accept bare numbers (1148), prefixed issue IDs (PAN-1148),
+  // and prefixed agent IDs (agent-pan-1148). Bare numbers are resolved by probing
+  // ~/.panopticon/agents/ for a unique state dir, since the CLI doesn't otherwise
+  // know which project a bare number belongs to.
+  const resolved = resolveBareNumericId(id);
+  if (!resolved) {
+    console.error(chalk.red(`Could not resolve issue ID "${id}"`));
+    console.error(chalk.dim(
+      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
+    ));
+    return;
+  }
+  const normalizedId = resolved.toLowerCase();
+  const issueId = resolved;
   const agentId = `agent-${normalizedId}`;
 
   // Scoped views delegate to the full sub-commands

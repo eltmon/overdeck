@@ -20,6 +20,7 @@ import { existsSync } from 'fs';
 import { createInterface } from 'readline/promises';
 import { getDashboardApiUrl } from '../../lib/config.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
+import { resolveBareNumericId } from '../../lib/issue-id.js';
 import { readWorkspacePlan } from '../../lib/vbrief/io.js';
 import { groupItemsByWave, getDispatchableItems, createActiveSlice, verifyActiveSlicePromptReduction, isTaskCommand, type TaskCommand, type Wave } from '../../lib/vbrief/dag.js';
 import { runTaskCommand } from '../../lib/vbrief/dag-cli.js';
@@ -112,7 +113,15 @@ export async function swarmCommand(
   id: string,
   options: SwarmCommandOptions,
 ): Promise<void> {
-  const issueId = id.toUpperCase();
+  const resolved = resolveBareNumericId(id);
+  if (!resolved) {
+    console.error(chalk.red(`Could not resolve issue ID "${id}"`));
+    console.error(chalk.dim(
+      'Pass a fully-qualified ID like "PAN-1148", or ensure the agent state dir exists at ~/.panopticon/agents/agent-<prefix>-<num>/',
+    ));
+    process.exit(1);
+  }
+  const issueId = resolved;
 
   parseFiniteInteger(options.wave, '--wave');
   parseFiniteInteger(options.maxSlots, '--max-slots');
