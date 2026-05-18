@@ -28,6 +28,7 @@ import {
   Wrench,
   Monitor,
   ShieldCheck,
+  Mic,
 } from 'lucide-react';
 import { SettingsConfig, Provider, ModelId } from './types';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
@@ -136,6 +137,85 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
   return res.json();
 }
 
+interface VoiceSettings {
+  stt: {
+    provider: 'moonshine' | 'google-cloud';
+    moonshine: { model: string };
+    googleCloud: { apiKey: string; model: string };
+  };
+  autopreso: {
+    provider: 'openai' | 'codex' | 'ollama';
+    model: string;
+  };
+}
+
+const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
+  stt: {
+    provider: 'moonshine',
+    moonshine: { model: 'base' },
+    googleCloud: { apiKey: '', model: 'latest_long' },
+  },
+  autopreso: {
+    provider: 'openai',
+    model: 'gpt-4.1-mini',
+  },
+};
+
+interface VoiceHardwareSettings {
+  inputDevice: string;
+  outputDevice: string;
+  volume: number;
+}
+
+const DEFAULT_VOICE_HARDWARE_SETTINGS: VoiceHardwareSettings = {
+  inputDevice: '',
+  outputDevice: '',
+  volume: 1,
+};
+
+const VOICE_HARDWARE_STORAGE_KEY = 'panopticon.voice.hardwareSettings';
+
+function loadVoiceHardwareSettings(): VoiceHardwareSettings {
+  try {
+    const raw = window.localStorage.getItem(VOICE_HARDWARE_STORAGE_KEY);
+    if (!raw) return DEFAULT_VOICE_HARDWARE_SETTINGS;
+    const parsed = JSON.parse(raw) as Partial<VoiceHardwareSettings>;
+    return {
+      inputDevice: typeof parsed.inputDevice === 'string' ? parsed.inputDevice : '',
+      outputDevice: typeof parsed.outputDevice === 'string' ? parsed.outputDevice : '',
+      volume: typeof parsed.volume === 'number' ? Math.max(0, Math.min(1, parsed.volume)) : 1,
+    };
+  } catch {
+    return DEFAULT_VOICE_HARDWARE_SETTINGS;
+  }
+}
+
+function normalizeVoiceSettings(settings: Partial<VoiceSettings>): VoiceSettings {
+  return {
+    stt: settings.stt ?? DEFAULT_VOICE_SETTINGS.stt,
+    autopreso: settings.autopreso ?? DEFAULT_VOICE_SETTINGS.autopreso,
+  };
+}
+
+async function fetchVoiceSettings(): Promise<VoiceSettings> {
+  const res = await fetch('/api/voice/settings');
+  if (!res.ok) throw new Error('Failed to fetch voice settings');
+  return normalizeVoiceSettings(await res.json() as Partial<VoiceSettings>);
+}
+
+async function saveVoiceSettings(settings: VoiceSettings): Promise<VoiceSettings> {
+  const res = await fetch('/api/voice/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) {
+    const error = await res.text();
+    throw new Error(error || 'Failed to save voice settings');
+  }
+  return res.json();
+}
+
 /** Pure merge: apply MiniMax model preset while preserving all non-model settings. */
 export function buildMiniMaxFormData(
   formData: SettingsConfig | null,
@@ -205,6 +285,7 @@ const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'model-routing', label: 'Model Routing', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
+  { id: 'voice', label: 'Voice', icon: Mic },
   { id: 'conversations', label: 'Conversations', icon: MessageCircle },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
   { id: 'tracker-keys', label: 'Tracker Keys', icon: GitBranch },
@@ -223,9 +304,20 @@ export function SettingsPage() {
     queryKey: ['settings'],
     queryFn: fetchSettings,
   });
+  const {
+    data: voiceSettings,
+    isLoading: voiceSettingsLoading,
+    error: voiceSettingsError,
+  } = useQuery({
+    queryKey: ['voice-settings'],
+    queryFn: fetchVoiceSettings,
+  });
 
   const [formData, setFormData] = useState<SettingsConfig | null>(null);
+  const [voiceFormData, setVoiceFormData] = useState<VoiceSettings | null>(null);
+  const [voiceHardwareSettings, setVoiceHardwareSettings] = useState<VoiceHardwareSettings>(loadVoiceHardwareSettings);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
+  const [showVoiceApiKey, setShowVoiceApiKey] = useState(false);
   const [showTrackerKey, setShowTrackerKey] = useState<Record<string, boolean>>({});
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
@@ -296,12 +388,36 @@ export function SettingsPage() {
     }
   }, [settings, formData]);
 
+  useEffect(() => {
+    if (voiceSettings && !voiceFormData) {
+      setVoiceFormData(voiceSettings);
+    }
+  }, [voiceSettings, voiceFormData]);
+
+  useEffect(() => {
+    window.localStorage.setItem(VOICE_HARDWARE_STORAGE_KEY, JSON.stringify(voiceHardwareSettings));
+  }, [voiceHardwareSettings]);
+
   const saveMutation = useMutation({
-    mutationFn: saveSettings,
-    onSuccess: (response) => {
+    mutationFn: async ({
+      settings: nextSettings,
+      voiceSettings: nextVoiceSettings,
+    }: {
+      settings: SettingsConfig;
+      voiceSettings: VoiceSettings;
+    }) => {
+      const [response, savedVoiceSettings] = await Promise.all([
+        saveSettings(nextSettings),
+        saveVoiceSettings(nextVoiceSettings),
+      ]);
+      return { response, savedVoiceSettings };
+    },
+    onSuccess: ({ response, savedVoiceSettings }) => {
       invalidateAvailableModelsCache();
       queryClient.invalidateQueries({ queryKey: ['settings'] });
+      queryClient.setQueryData(['voice-settings'], savedVoiceSettings);
       queryClient.invalidateQueries({ queryKey: ['tracker-status'] });
+      setVoiceFormData(savedVoiceSettings);
 
       // Show success toast
       toast.success('Settings saved successfully');
@@ -318,7 +434,7 @@ export function SettingsPage() {
     },
   });
 
-  if (isLoading) {
+  if (isLoading || voiceSettingsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
@@ -326,15 +442,19 @@ export function SettingsPage() {
     );
   }
 
-  if (error || !formData) {
+  if (error || voiceSettingsError || !formData || !voiceFormData) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-destructive">Error: {(error as Error)?.message || 'Failed to load settings'}</div>
+        <div className="text-destructive">
+          Error: {(error as Error)?.message || (voiceSettingsError as Error)?.message || 'Failed to load settings'}
+        </div>
       </div>
     );
   }
 
-  const hasChanges = JSON.stringify(formData) !== JSON.stringify(settings);
+  const hasSettingsChanges = JSON.stringify(formData) !== JSON.stringify(settings);
+  const hasVoiceSettingsChanges = JSON.stringify(voiceFormData) !== JSON.stringify(voiceSettings);
+  const hasChanges = hasSettingsChanges || hasVoiceSettingsChanges;
 
   const handleProviderToggle = (provider: Provider) => {
     setFormData({
@@ -377,6 +497,82 @@ export function SettingsPage() {
         ...formData.tmux,
         config_mode: configMode,
       },
+    });
+  };
+
+  const handleVoiceProviderChange = (provider: VoiceSettings['stt']['provider']) => {
+    setVoiceFormData({
+      ...voiceFormData,
+      stt: {
+        ...voiceFormData.stt,
+        provider,
+      },
+    });
+  };
+
+  const handleMoonshineModelChange = (model: string) => {
+    setVoiceFormData({
+      ...voiceFormData,
+      stt: {
+        ...voiceFormData.stt,
+        moonshine: { model },
+      },
+    });
+  };
+
+  const handleGoogleCloudApiKeyChange = (apiKey: string) => {
+    setVoiceFormData({
+      ...voiceFormData,
+      stt: {
+        ...voiceFormData.stt,
+        googleCloud: {
+          ...voiceFormData.stt.googleCloud,
+          apiKey,
+        },
+      },
+    });
+  };
+
+  const handleGoogleCloudModelChange = (model: string) => {
+    setVoiceFormData({
+      ...voiceFormData,
+      stt: {
+        ...voiceFormData.stt,
+        googleCloud: {
+          ...voiceFormData.stt.googleCloud,
+          model,
+        },
+      },
+    });
+  };
+
+  const handleAutoPresoProviderChange = (provider: VoiceSettings['autopreso']['provider']) => {
+    setVoiceFormData({
+      ...voiceFormData,
+      autopreso: {
+        ...voiceFormData.autopreso,
+        provider,
+      },
+    });
+  };
+
+  const handleAutoPresoModelChange = (model: string) => {
+    setVoiceFormData({
+      ...voiceFormData,
+      autopreso: {
+        ...voiceFormData.autopreso,
+        model,
+      },
+    });
+  };
+
+  const handleVoiceHardwareChange = <K extends keyof VoiceHardwareSettings>(
+    key: K,
+    value: VoiceHardwareSettings[K],
+  ) => {
+    setVoiceHardwareSettings({
+      ...voiceHardwareSettings,
+      [key]: value,
     });
   };
 
@@ -429,7 +625,10 @@ export function SettingsPage() {
       },
     };
     setFormData(next);
-    saveMutation.mutate(next);
+    saveMutation.mutate({
+      settings: next,
+      voiceSettings: voiceFormData,
+    });
   };
 
   const handlePermissionModeChange = (mode: 'auto' | 'bypass') => {
@@ -441,12 +640,21 @@ export function SettingsPage() {
       },
     };
     setFormData(next);
-    saveMutation.mutate(next);
+    saveMutation.mutate({
+      settings: next,
+      voiceSettings: voiceFormData,
+    });
   };
 
 
-  const handleSave = () => saveMutation.mutate(formData);
-  const handleReset = () => setFormData(settings || null);
+  const handleSave = () => saveMutation.mutate({
+    settings: formData,
+    voiceSettings: voiceFormData,
+  });
+  const handleReset = () => {
+    setFormData(settings || null);
+    setVoiceFormData(voiceSettings || DEFAULT_VOICE_SETTINGS);
+  };
 
 
   const handleTestApiKey = async (provider: Provider) => {
@@ -928,6 +1136,196 @@ export function SettingsPage() {
               </button>
             );
           })}
+        </div>
+      </section>
+
+      {/* Voice */}
+      <section id="voice" className="py-6 scroll-mt-4">
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
+          <Mic className="w-4 h-4 text-muted-foreground" />
+          Voice
+        </h2>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">STT provider</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Speech-to-text backend used by the voice widget and AutoPreso
+              </p>
+            </div>
+            <select
+              value={voiceFormData.stt.provider}
+              onChange={(e) => handleVoiceProviderChange(e.target.value as VoiceSettings['stt']['provider'])}
+              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+            >
+              <option value="moonshine">Moonshine</option>
+              <option value="google-cloud">Google Cloud STT</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">AutoPreso provider</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Whiteboard agent backend used for live diagram updates
+              </p>
+            </div>
+            <select
+              value={voiceFormData.autopreso.provider}
+              onChange={(e) => handleAutoPresoProviderChange(e.target.value as VoiceSettings['autopreso']['provider'])}
+              className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+            >
+              <option value="openai">OpenAI</option>
+              <option value="codex">Codex</option>
+              <option value="ollama">Ollama</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">AutoPreso model</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Model passed to the whiteboard agent
+              </p>
+            </div>
+            <input
+              type="text"
+              value={voiceFormData.autopreso.model}
+              onChange={(e) => handleAutoPresoModelChange(e.target.value)}
+              placeholder="gpt-4.1-mini"
+              className="w-[260px] bg-background border border-border rounded-md px-2.5 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          {voiceFormData.stt.provider === 'moonshine' ? (
+            <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-foreground">Moonshine model</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Tiny is faster; base is more accurate
+                </p>
+              </div>
+              <select
+                value={voiceFormData.stt.moonshine.model}
+                onChange={(e) => handleMoonshineModelChange(e.target.value)}
+                className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+              >
+                <option value="tiny">Tiny</option>
+                <option value="base">Base</option>
+              </select>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-foreground">Google Cloud API key</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Used only when Google Cloud STT is selected
+                  </p>
+                </div>
+                <div className="relative w-[260px] shrink-0">
+                  <input
+                    type={showVoiceApiKey ? 'text' : 'password'}
+                    value={voiceFormData.stt.googleCloud.apiKey}
+                    onChange={(e) => handleGoogleCloudApiKeyChange(e.target.value)}
+                    placeholder="Google Cloud API key"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-form-type="other"
+                    className="w-full bg-background border border-border rounded-md px-2.5 py-1.5 pr-8 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
+                  />
+                  {voiceFormData.stt.googleCloud.apiKey && (
+                    <button
+                      type="button"
+                      onClick={() => setShowVoiceApiKey(!showVoiceApiKey)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showVoiceApiKey ? 'Hide Google Cloud API key' : 'Show Google Cloud API key'}
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-foreground">Google Cloud model</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Recognition model passed to Google Cloud STT
+                  </p>
+                </div>
+                <select
+                  value={voiceFormData.stt.googleCloud.model}
+                  onChange={(e) => handleGoogleCloudModelChange(e.target.value)}
+                  className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                >
+                  <option value="latest_long">Latest long</option>
+                  <option value="latest_short">Latest short</option>
+                  <option value="command_and_search">Command and search</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Input device</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Browser microphone device ID stored on this machine
+              </p>
+            </div>
+            <input
+              type="text"
+              value={voiceHardwareSettings.inputDevice}
+              onChange={(e) => handleVoiceHardwareChange('inputDevice', e.target.value)}
+              placeholder="Default microphone"
+              className="w-[260px] bg-background border border-border rounded-md px-2.5 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Output device</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Browser speaker device ID stored on this machine
+              </p>
+            </div>
+            <input
+              type="text"
+              value={voiceHardwareSettings.outputDevice}
+              onChange={(e) => handleVoiceHardwareChange('outputDevice', e.target.value)}
+              placeholder="Default speaker"
+              className="w-[260px] bg-background border border-border rounded-md px-2.5 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+            <div className="min-w-0">
+              <span className="text-sm font-medium text-foreground">Voice volume</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Playback volume stored on this machine
+              </p>
+            </div>
+            <div className="flex items-center gap-3 w-[260px] shrink-0">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={voiceHardwareSettings.volume}
+                onChange={(e) => handleVoiceHardwareChange('volume', Number(e.target.value))}
+                aria-label="Voice volume"
+                className="flex-1 accent-primary"
+              />
+              <span className="text-xs text-muted-foreground tabular-nums w-9 text-right">
+                {Math.round(voiceHardwareSettings.volume * 100)}%
+              </span>
+            </div>
+          </div>
         </div>
       </section>
 

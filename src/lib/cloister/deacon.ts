@@ -1923,6 +1923,14 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
       const lastNudged = unsignaledReviewNudges.get(latestDir);
       if (lastNudged && now - lastNudged < 30 * 60 * 1000) continue;
 
+      const reviewSession = `agent-${issueId.toLowerCase()}-review`;
+      const sessionAlive = sessionExists(reviewSession);
+      const paneDead = sessionAlive ? await isPaneDeadAsync(reviewSession).catch(() => true) : true;
+      const activeReviewState = sessionAlive && !paneDead ? getAgentState(reviewSession) : null;
+      if (activeReviewState?.reviewRunId && latestDir !== join(reviewBaseDir, activeReviewState.reviewRunId)) {
+        continue;
+      }
+
       const synthesisPath = join(latestDir, 'synthesis.md');
       let verdict: 'passed' | 'blocked' | 'failed' | null = null;
       let topBlocker = '';
@@ -1941,10 +1949,6 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         continue;
       }
       if (!verdict) continue;
-
-      const reviewSession = `agent-${issueId.toLowerCase()}-review`;
-      const sessionAlive = sessionExists(reviewSession);
-      const paneDead = sessionAlive ? await isPaneDeadAsync(reviewSession).catch(() => true) : true;
 
       if (sessionAlive && !paneDead) {
         // If we already nudged once and 30+ min have passed with no signal,

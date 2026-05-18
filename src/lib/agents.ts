@@ -8,7 +8,7 @@ import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
 import { getClaudePermissionFlagsString, resolvePermissionMode, bypassPrefixForAgentFlag } from './claude-permissions.js';
-import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
+import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt, setOptionAsync } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
@@ -29,7 +29,7 @@ import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScript } from './launcher-generator.js';
-import { createConversation } from './database/conversations-db.js';
+import { createConversation, getConversationByName, reactivateConversationForSpawn } from './database/conversations-db.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge-token.js';
@@ -59,15 +59,16 @@ async function writeLauncherScriptAtomic(launcherScript: string, content: string
 }
 
 /**
- * BFS-walk a process subtree rooted at `rootPid` looking for the Claude Code
- * runtime (comm == 'claude'). Returns true if any process in the tree matches,
+ * BFS-walk a process subtree rooted at `rootPid` looking for the active agent
+ * runtime. Returns true if any process in the tree matches the expected harness,
  * false if the tree exists but no match, false on any error.
  *
  * Used by sendAgentMessage zombie detection. pane_pid is the tmux pane's root
- * process, which is bash for work-agent launchers (`bash launcher.sh`) but
- * claude directly for specialists (`exec claude ...`).
+ * process, which is bash for work-agent launchers (`bash launcher.sh`) but can
+ * be the runtime directly for specialists (`exec claude ...` / `exec pi ...`).
  */
-async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
+async function hasAgentRuntimeInSubtree(rootPid: string, harness: 'claude-code' | 'pi' = 'claude-code'): Promise<boolean> {
+  const expectedProcessNames = harness === 'pi' ? new Set(['pi']) : new Set(['claude']);
   const queue: string[] = [rootPid];
   const seen = new Set<string>();
   while (queue.length > 0) {
@@ -78,7 +79,7 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
     try {
       const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
       const name = comm.trim();
-      if (name === 'claude') return true;
+      if (expectedProcessNames.has(name)) return true;
     } catch {
       continue;
     }
@@ -2227,7 +2228,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (isSpecialistRole) {
     sessionId = randomUUID();
     try {
-      createConversation({
+      const conversation = {
         name: agentId,
         tmuxSession: agentId,
         cwd: workspace,
@@ -2235,10 +2236,15 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
         claudeSessionId: sessionId,
         model: selectedModel,
         harness: resolvedHarness,
-      });
+      };
+      if (getConversationByName(agentId)) {
+        reactivateConversationForSpawn(conversation);
+      } else {
+        createConversation(conversation);
+      }
     } catch (err) {
       // Non-fatal: the specialist still runs, but without a conversation record
-      console.warn(`[spawnRun] Failed to create conversation for ${agentId}:`, err instanceof Error ? err.message : String(err));
+      console.warn(`[spawnRun] Failed to register conversation for ${agentId}:`, err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -2261,13 +2267,11 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
-  // PAN-1059 / PAN-977: specialist roles (test, ship, and interactive review
-  // roles) must not pass the prompt as a positional argument to Claude Code.
-  // Headless Claude Code review sub-roles are different: they run `claude --print`
-  // and must receive the prompt on stdin because there is no interactive TUI to
-  // wait for before tmux delivery.
-  const shouldUsePromptFileStdin = isClaudeCodeReviewSubRole;
-  const shouldDeliverPromptViaTmux = isSpecialistRole && !shouldUsePromptFileStdin;
+  // PAN-1059 / PAN-977: interactive Claude Code specialist roles avoid positional prompts
+  // by delivering through tmux after Claude boots. Headless review sub-roles run
+  // `claude --print`, so they must receive the prompt on stdin instead.
+  const shouldDeliverPromptViaTmux = isSpecialistRole && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
+  const shouldDeliverPromptViaPi = isSpecialistRole && resolvedHarness === 'pi';
 
   const launcherContent = generateLauncherScript({
     role,
@@ -2277,7 +2281,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     setTerminalEnv: true,
     providerExports,
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
-    promptFileMode: shouldUsePromptFileStdin ? 'stdin' : undefined,
+    promptFileMode: isClaudeCodeReviewSubRole ? 'stdin' : undefined,
     panopticonEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole),
     sessionId,
@@ -2312,29 +2316,38 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       ...providerEnv,
     },
   });
+  await setOptionAsync(agentId, 'destroy-unattached', 'off');
+  await setOptionAsync(agentId, 'remain-on-exit', 'on');
 
-  // Deliver prompt via tmux for specialist roles after Claude boots.
-  if (shouldDeliverPromptViaTmux && options.prompt) {
-    let ready = false;
-    for (let i = 0; i < 30; i++) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
-      if (!(await sessionExistsAsync(agentId))) {
-        console.error(`[${agentId}] Tmux session died before becoming ready`);
-        break;
-      }
+  if (options.prompt) {
+    if (shouldDeliverPromptViaPi) {
       try {
-        const pane = await capturePaneAsync(agentId, 200);
-        if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
-          ready = true;
+        await writePiAgentPrompt(agentId, options.prompt);
+      } catch (err) {
+        console.error(`[${agentId}] Pi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
+      }
+    } else if (shouldDeliverPromptViaTmux) {
+      let ready = false;
+      for (let i = 0; i < 30; i++) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+        if (!(await sessionExistsAsync(agentId))) {
+          console.error(`[${agentId}] Tmux session died before becoming ready`);
           break;
         }
-      } catch { /* non-fatal */ }
-    }
-    if (ready) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 500));
-      await deliverAgentMessage(agentId, options.prompt, 'spawnRun:initial-prompt');
-    } else {
-      console.error(`[${agentId}] Claude did not become ready within 30s`);
+        try {
+          const pane = await capturePaneAsync(agentId, 200);
+          if (pane.includes('bypass permissions on') || pane.includes('Claude Code')) {
+            ready = true;
+            break;
+          }
+        } catch { /* non-fatal */ }
+      }
+      if (ready) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 500));
+        await deliverAgentMessage(agentId, options.prompt, 'spawnRun:initial-prompt');
+      } else {
+        console.error(`[${agentId}] Claude did not become ready within 30s`);
+      }
     }
   }
 
@@ -3062,10 +3075,11 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   // Launchers differ: specialists `exec claude` so pane_pid IS claude, but
   // work-agent launchers run `bash launcher.sh` so pane_pid is bash and claude
   // runs as a descendant. Walk the pane's process subtree and treat the pane
-  // as live if any descendant is a claude runtime.
+  // as live if any descendant is the expected runtime for the saved harness.
   const panePids = await listPaneValuesAsync(normalizedId, '#{pane_pid}');
-  if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0]))) {
-    console.warn(`[agents] ${normalizedId} tmux session is a zombie (no Claude) — attempting resume`);
+  const expectedHarness = agentState?.harness ?? 'claude-code';
+  if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0], expectedHarness))) {
+    console.warn(`[agents] ${normalizedId} tmux session is a zombie (no ${expectedHarness} runtime) — attempting resume`);
     const resumeResult = await resumeAgent(normalizedId, message);
     if (resumeResult.success) {
       return;

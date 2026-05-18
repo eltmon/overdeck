@@ -1,0 +1,20 @@
+{
+  "name": "moonshine-linux-x64",
+  "version": "0.1.0",
+  "description": "Linux x64 Moonshine speech-to-text sidecar for Panopticon",
+  "license": "MIT",
+  "type": "module",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "bin": {
+    "moonshine-sidecar": "bin/moonshine-sidecar"
+  },
+  "files": [
+    "bin/moonshine-sidecar",
+    "README.md"
+  ]
+}

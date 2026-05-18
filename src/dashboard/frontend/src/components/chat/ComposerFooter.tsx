@@ -11,12 +11,13 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { SendHorizontal, X, Loader2 } from 'lucide-react';
+import { AlertCircle, Mic, MicOff, SendHorizontal, X, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import type { LexicalEditor } from 'lexical';
-import { $getRoot } from 'lexical';
+import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { ComposerPromptEditor } from './ComposerPromptEditor';
+import { VoiceWidget } from './VoiceWidget';
 import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredHarness, saveStoredModel } from './ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
@@ -162,6 +163,8 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
+  const [isVoiceWidgetOpen, setIsVoiceWidgetOpen] = useState(false);
+  const [voiceState, setVoiceState] = useState<{ isListening: boolean; error: string | null }>({ isListening: false, error: null });
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const editorRef = useRef<LexicalEditor | null>(null);
   const pendingImagesRef = useRef<PendingImage[]>([]);
@@ -379,7 +382,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
     }
   }, []);
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (directMessageText?: string) => {
     const editor = editorRef.current;
     if (!editor) {
       console.warn('[ComposerFooter] handleSubmit: editor ref not ready');
@@ -390,11 +393,12 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
       return;
     }
 
-    // Read text directly from Lexical — don't trust React state which may be stale
-    let messageText = '';
-    editor.read(() => {
-      messageText = $getRoot().getTextContent().trim();
-    });
+    let messageText = directMessageText?.trim() ?? '';
+    if (directMessageText === undefined) {
+      editor.read(() => {
+        messageText = $getRoot().getTextContent().trim();
+      });
+    }
 
     const submitConversationName = conversation.name;
 
@@ -468,7 +472,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
       // Refocus editor
       editor.focus();
     }
-  }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend, onSendFailed]);
+  }, [agentId, conversation.model, conversation.name, conversation.sessionAlive, harness, isDisabled, model, onSend, onSendFailed, sending]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -514,6 +518,23 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
       }
     };
   }, [deleteUploadedImage]);
+
+  const insertVoiceText = useCallback((voiceText: string) => {
+    const trimmed = voiceText.trim();
+    if (!trimmed) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.update(() => {
+      const root = $getRoot();
+      const existing = root.getTextContent().trim();
+      root.clear();
+      const paragraph = $createParagraphNode();
+      paragraph.append($createTextNode([existing, trimmed].filter(Boolean).join(existing ? '\n' : '')));
+      root.append(paragraph);
+    });
+    setText((existing) => [existing.trim(), trimmed].filter(Boolean).join(existing.trim() ? '\n' : ''));
+    editor.focus();
+  }, []);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
@@ -585,6 +606,16 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
           <div className={styles.composerToolbarSpacer} />
 
           <button
+            className={isVoiceWidgetOpen ? styles.voiceToolbarButtonActive : styles.voiceToolbarButton}
+            onClick={() => setIsVoiceWidgetOpen((open) => !open)}
+            disabled={isDisabled}
+            type="button"
+            title={voiceState.error ? `Voice error: ${voiceState.error}` : voiceState.isListening ? 'Voice input listening' : 'Toggle voice input'}
+          >
+            {voiceState.error ? <AlertCircle size={16} /> : voiceState.isListening ? <MicOff size={16} /> : <Mic size={16} />}
+          </button>
+
+          <button
             className={styles.sendButton}
             onClick={() => void handleSubmit()}
             disabled={(isEmpty && pendingImages.filter((image) => !!image.serverPath).length === 0) || isDisabled}
@@ -594,6 +625,14 @@ export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: 
             <SendHorizontal size={16} />
           </button>
         </div>
+        {isVoiceWidgetOpen && (
+          <VoiceWidget
+            conversation={conversation}
+            onInsert={insertVoiceText}
+            onSendDirect={(voiceText) => void handleSubmit(voiceText)}
+            onStateChange={setVoiceState}
+          />
+        )}
       </div>
     </div>
   );
