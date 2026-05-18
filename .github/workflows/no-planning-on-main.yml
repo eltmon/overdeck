@@ -7,7 +7,7 @@
 # workspace, cross-contaminating their planning context (#888).
 #
 # The merge pipeline strips .planning/ from feature branches before
-# `gh pr merge --squash` runs (see strip-planning-from-branch.ts). This workflow
+# `gh pr merge --squash` runs (see workspaces.ts ~line 5071). This workflow
 # is a final guardrail — if anything bypasses the merge pipeline (manual push,
 # admin override, future regression), this fails the workflow on main and the
 # branch protection rule blocks the push.

@@ -96,6 +96,8 @@ const SLASH_COMMANDS: SlashCommand[] = [
   // ─── Core System ─────────────────────────────────────────────────────────────
   { id: 'pan-up', label: 'pan up', description: 'Start dashboard and Traefik', insert: 'pan up', category: 'Core' },
   { id: 'pan-down', label: 'pan down', description: 'Stop dashboard and Traefik', insert: 'pan down', category: 'Core' },
+  { id: 'pan-reload', label: 'pan reload', description: 'Rebuild then restart the dashboard if build succeeds', insert: 'pan reload', category: 'Core' },
+  { id: 'pan-restart', label: 'pan restart', description: 'Restart dashboard (use --full for entire stack)', insert: 'pan restart', category: 'Core' },
   { id: 'pan-status', label: 'pan status', description: 'Show running agents', insert: 'pan status', category: 'Core' },
   { id: 'pan-init', label: 'pan init', description: 'Initialize Panopticon', insert: 'pan init', category: 'Core' },
   { id: 'pan-sync', label: 'pan sync', description: 'Sync skills/agents/rules to devroot', insert: 'pan sync', category: 'Core' },
