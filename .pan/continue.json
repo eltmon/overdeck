@@ -1,0 +1,194 @@
+{
+  "version": "1",
+  "issueId": "PAN-1148",
+  "created": "2026-05-18T05:07:18.265Z",
+  "updated": "2026-05-18T05:10:55.134Z",
+  "gitState": {
+    "branch": "feature/pan-1148",
+    "sha": "2df1f56ae",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Primitives live in src/dashboard/frontend/src/components/primitives/, NOT packages/contracts.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §6 step 1 allows either location; desktop sharing is out of scope, so co-locate with the only consumer. Avoids packaging churn and contract re-publish."
+    },
+    {
+      "id": "D2",
+      "summary": "Issue Detail drawer state is a slice on the existing Zustand store (src/dashboard/frontend/src/lib/store.ts), not a new store.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "The drawer needs to react to existing domain events (review status, agents, beads). Adding a separate store would require cross-store synchronization. PRD §4.3 specifies 'owned by a single global store slice'."
+    },
+    {
+      "id": "D3",
+      "summary": "Drawer addressing uses query string ?issue=<id>&tab=<tab>, layered over the existing tab/path routing — not a nested route.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §4.6 + §5.3 explicitly call out ?issue=<id>&tab=<tab>. Layering on top of the existing path-based tab routing keeps the parent surface scroll position when closing (browser back stays on the host page)."
+    },
+    {
+      "id": "D4",
+      "summary": "Default route flip: '/' renders Pipeline (was Board). '/board' is added as the explicit Board route. Sidebar logo click goes to Pipeline.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §5.3 routes table. Sidebar.tsx line 139 currently routes logo click to 'kanban' tab; that handler needs to point at the new default."
+    },
+    {
+      "id": "D5",
+      "summary": "Sidebar Operations group order: Pipeline, Board, Command Deck, Agents. Awaiting Merge entry is removed. AutoPreso stays.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §4.1 information architecture. Pipeline first because it is the new default landing. AutoPreso is out of scope per PRD non-goals and not listed for removal."
+    },
+    {
+      "id": "D6",
+      "summary": "InspectorPanel retirement is gated by a written feature-parity audit. The audit ships as its own bead before any removal bead.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §7 risk row 5 mandates 'audit Inspector Panel usages before deletion; explicit feature parity checklist'. InspectorPanel.tsx is 1387 LOC and used by KanbanBoard, BulkActionBar, AwaitingMergePage and others — silent regressions would be expensive."
+    },
+    {
+      "id": "D7",
+      "summary": "Board card swap is a swap, not a rewrite. KanbanBoard.tsx (4268 LOC) retains drag-to-reorder, filters, bulk actions, status counters — only the card render call and the drag-to-phase wiring change.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §6 step 4: 'Replace the existing kanban card with the new Issue Card. … Drop drag-to-phase wiring; keep drag-to-reorder within a column.' Limiting scope to the card slot keeps the diff reviewable."
+    },
+    {
+      "id": "D8",
+      "summary": "Command Deck right pane reframe reuses existing tab content components from ZoneCOverviewTabs (OverviewTab, BeadsTab, VBriefTab, ActivityTab, DiscussionsTab, CostsTab, PrDiffTab). Only the shell that hosts them changes.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §6 step 5: 'Preserve the existing conversation thread component inside the Conversations tab — no rewrite of conversation rendering.' Tab content is already partitioned; this is a shell reframe, not a content rewrite."
+    },
+    {
+      "id": "D9",
+      "summary": "/awaiting-merge → /pipeline?phase=ship redirect ships in the same bead as the route-table change. AwaitingMergePage.tsx file deletion ships in a follow-up bead once no inbound references remain.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "Two-step retirement protects user muscle memory (PRD §7 risk row 3). Splitting the redirect from the file delete also keeps the rollback surface small — a regression in the new Pipeline view can be reverted without restoring the AwaitingMerge component."
+    },
+    {
+      "id": "D10",
+      "summary": "Verb badge component does NOT require inspection. The verb→token mapping is fully specified in PRD §4.4 / §4.7.7 and is enforced as a TypeScript discriminated union. Lint/typecheck catches taxonomy drift.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "Per work.inspect criteria, mechanically-spec'd primitives do not earn the inspection cost. Foundation status alone does not warrant inspection — only foundation + judgment-call risk does."
+    },
+    {
+      "id": "D11",
+      "summary": "Drawer shell+store and drawer subscription contract are the only two beads with requiresInspection=true (both at depth 'deep'). Everything else is requiresInspection=false.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "Drawer shell encodes the single-instance/URL contract that every surface composes — wrong shape here cascades to 5 surfaces. Subscription contract is a cross-cutting protocol other drawer subsections produce/consume. Per the planning template: 'most plans will have 0-2 beads with requiresInspection: true'."
+    },
+    {
+      "id": "D12",
+      "summary": "Drawer data subscriptions filter at the server side by issueId. The drawer client opens one Effect-managed subscription that is torn down on close.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §5.2: 'server-side filtering by issue id, not new transports'. Client-side filtering of the full domain-event stream would balloon when many issues are active. The contract bead is the place this gets pinned down."
+    },
+    {
+      "id": "D13",
+      "summary": "Styleguide-conformance Playwright test asserts that the SAME primitive class signatures (data-component attributes) appear on Pipeline, Board, Command Deck, and Agents. Existing tests stay; this is one new spec.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §8 success metrics: 'visually unified (verified by a styleguide-conformance Playwright test that asserts component class usage across pages).' Implementation: tag each primitive with data-component=verb-badge|issue-row|issue-card|agent-card and the test asserts presence."
+    },
+    {
+      "id": "D14",
+      "summary": "⌘K command palette result click opens the drawer instead of navigating to a route. Existing CommandPalette.tsx handler is rewired.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §4.6 explicitly lists ⌘K as a drawer entry: '⌘K command palette is the universal jump: type ID, branch, or fragment of a title to land in the drawer from anywhere.'"
+    },
+    {
+      "id": "D15",
+      "summary": "Deacon status UI moves from Agents view to Health page. The component (DeaconStatus.tsx in CommandDeck) is relocated, not duplicated; AgentList.tsx's deacon section is removed.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §4.1 'What's preserved' bullet: 'Deacon status — moved to Health'. Health page (HealthDashboard.tsx) is the natural home; CloisterStatusBar already lives in the sidebar separately."
+    },
+    {
+      "id": "D16",
+      "summary": "Where the PRD and the mock HTML disagree, mock wins for visual layout (spacing, color, typography), PRD wins for behavior and data contracts.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §4.2 establishes this rule explicitly. Encoded here so the work agent does not need to re-derive it."
+    },
+    {
+      "id": "D17",
+      "summary": "Phased delivery is forbidden — every bead in this plan must land before pan done. The PRD's 7-step migration is implementation sequencing, not separate releases.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "CLAUDE.md 'Deliver Complete Features' rule + PRD §6 opening line: 'a feature is a feature — the redesign ships as one initiative.' Each individual bead may be independently mergeable to keep diffs reviewable, but the issue itself only closes when all 40+ beads ship."
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "PR #1160 (reconcileClosedPrReadyForMerge patrol) is a prerequisite for READY TO MERGE badge freshness. Without it, closed-without-merge PRs (cancel flow, manual gh pr close, branch deleted) leave a phantom badge.",
+      "mitigation": "Work agent: check whether PR #1160 is merged before starting board-card-swap. If not merged AND this initiative reaches the badge wiring beads first, duplicate the reconciliation logic inline (clear readyForMerge=false when PR state != OPEN) and flag the duplication for removal once #1160 lands. See eltmon comment 2026-05-17 on issue."
+    },
+    {
+      "id": "H2",
+      "summary": "KanbanBoard.tsx is 4268 LOC. The card swap risks regressing drag-to-reorder, status filters, bulk actions, queue counters, and stuck-issue handling.",
+      "mitigation": "Before the board-card-swap bead, snapshot KanbanBoard.test.tsx coverage. The card swap bead's acceptance criteria require: (a) all existing KanbanBoard tests still pass, (b) drag-to-reorder within a column verified manually in browser, (c) the bulk action bar (BulkActionBar.tsx) still receives selection events from the new card."
+    },
+    {
+      "id": "H3",
+      "summary": "InspectorPanel.tsx is 1387 LOC and referenced from KanbanBoard, BulkActionBar, AwaitingMergePage, and elsewhere. Pre-emptive deletion would regress unscoped features.",
+      "mitigation": "The inspector-parity-audit bead is a deliverable in its own right: produces docs/design/inspector-parity-checklist.md mapping every InspectorPanel feature to either (a) its new location in the drawer, (b) its new location elsewhere in the redesign, or (c) explicit out-of-scope flag. The inspector-panel-retirement bead may not start until this checklist is complete and every item is in category (a) or (b)."
+    },
+    {
+      "id": "H4",
+      "summary": "Drawer subscription fan-out — repeatedly opening/closing the drawer or rapidly switching between issues could leak streams or fire redundant subscribe/unsubscribe calls.",
+      "mitigation": "drawer-shell-and-store bead's AC includes: (a) single store-owned drawer instance — opening drawer for issue B while A is open replaces, does not stack, (b) integration test asserting subscription teardown on drawer close, (c) test for rapid open→close→open burst (50 iterations) showing no orphan subscriptions in the Effect runtime."
+    },
+    {
+      "id": "H5",
+      "summary": "/awaiting-merge URL is in operator muscle memory and may be bookmarked. A hard-removal would 404.",
+      "mitigation": "awaiting-merge-redirect bead ships before awaiting-merge-component-removal. Redirect is browser-level (window.history.replaceState) or React Router-level so existing share links resolve to /pipeline?phase=ship. Sidebar tooltip on Pipeline reads 'Awaiting Merge → filter on Pipeline' for one release (added to sidebar-nav-reshuffle bead AC)."
+    },
+    {
+      "id": "H6",
+      "summary": "Command Deck right pane reframe could accidentally rewrite ZoneCOverviewTabs content (the tabs already exist as separate components).",
+      "mitigation": "command-deck-right-pane-reframe bead's AC explicitly forbids edits to OverviewTab.tsx, BeadsTab.tsx, VBriefTab.tsx, ActivityTab.tsx, DiscussionsTab.tsx, CostsTab.tsx, PrDiffTab.tsx, MarkdownTab.tsx. The bead changes only the shell composition (which tab host renders these and what wraps them)."
+    },
+    {
+      "id": "H7",
+      "summary": "Cost figure (--signal-cost / cyan) is the single style-guide-mandated exception to 'one colored signal per element' (PRD §4.5 / §4.7.5 'Ledger cell'). Reviewers seeing two colored elements on a row may flag this as a violation.",
+      "mitigation": "Verb-badge bead and issue-row bead AC both reference PRD §4.5 explicitly in the implementation file's docstring. styleguide-conformance-playwright-test bead asserts that a row showing both a verb badge AND a cost figure is the only legal multi-color row case."
+    },
+    {
+      "id": "H8",
+      "summary": "Default route flip ('/' → Pipeline) breaks anyone who has bookmarked '/' expecting Board. App.tsx TAB_PATHS table (line 62) needs careful coordination with PATH_TO_TAB inverse map and getTabFromPath() fallback (line 86 returns 'command-deck' default — needs update).",
+      "mitigation": "default-route-flip bead's AC covers: (a) TAB_PATHS['kanban'] = '/board' (was '/'), (b) new TAB_PATHS entry for 'pipeline' = '/' (and '/pipeline'), (c) getTabFromPath default updated to 'pipeline', (d) Sidebar.tsx line 139 + 155 logo-click handler updated, (e) test in App.test.tsx for path→tab resolution."
+    },
+    {
+      "id": "H9",
+      "summary": "Awaiting Merge has ~3 distinct sub-views in the current page (awaiting / blocked / open merge requests — selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests). The redirect maps to only one filter; some signal may be lost.",
+      "mitigation": "pipeline-cross-project-filter bead must expose at minimum: phase=ship (default for redirect), phase=ship AND blocked, phase=ship AND no-pr. The redirect bead's AC covers all three legacy views by mapping each to a deeper-link filter combination."
+    },
+    {
+      "id": "H10",
+      "summary": "Drawer interplay with currently-open conversation views in CommandDeck — Command Deck has its own selection/routing (selectedConvId, ZoneCConversation, ZoneCOverview). Opening the drawer from a CommandDeck row should not collide with conversation routing.",
+      "mitigation": "command-deck-drawer-wiring bead AC: tree selection persists, conversation route persists, drawer opens as overlay with ?issue=<id> appended to whatever the existing search params are. Closing the drawer restores both selection and conversation state."
+    },
+    {
+      "id": "H11",
+      "summary": "GodView retains its scoped tokens (PRD §3 explicitly out of scope). Surrounding-surface refresh may make GodView visually drift further.",
+      "mitigation": "Acceptable per PRD §7 risk row 4. styleguide-conformance-playwright-test bead's surface list MUST exclude /god-view. No changes to GodView code in this initiative."
+    },
+    {
+      "id": "H12",
+      "summary": "AgentList.tsx serves both the standalone /agents route AND is referenced from App.tsx line 904. The agents-fleet-grid bead must replace BOTH while preserving any selection-handling props that App.tsx passes through (e.g., onSelectAgent for inspector wiring).",
+      "mitigation": "agents-fleet-grid bead AC: (a) new component file FleetAgentsView.tsx is the route content for /agents, (b) App.tsx import swap from AgentList → FleetAgentsView, (c) selection handler swap routes to drawer-open instead of inspector, (d) AgentList.tsx and GodView/AgentGrid.tsx files marked for removal in agents-cleanup sub-step."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
+      "timestamp": "2026-05-18T05:07:18.265Z"
+    },
+    {
+      "timestamp": "2026-05-18T05:10:55.134Z",
+      "reason": "planning",
+      "note": "Auto-mode planning complete. 17 decisions recorded, 12 hazards flagged. vBRIEF decomposes the redesign into 43 beads across foundation primitives, drawer, four surfaces (Pipeline, Board, Command Deck, Agents), Awaiting Merge retirement, and styleguide-conformance test. 2 beads carry requiresInspection=true (both 'deep'): drawer shell+store and drawer subscription contract.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
