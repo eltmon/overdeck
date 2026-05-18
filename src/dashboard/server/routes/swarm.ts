@@ -1597,29 +1597,32 @@ const readJsonBody = Effect.gen(function* () {
 const DEFAULT_SWARM_MODEL = 'kimi-k2.6';
 
 async function resolveParentFeatureBranch(
-  projectPath: string,
+  _projectPath: string,
   issueUpper: string,
   localList: string[],
   remoteList: string[],
 ): Promise<string> {
-  const { stdout } = await execFileAsync('git', ['branch', '--show-current'], { cwd: projectPath });
-  const currentBranch = stdout.trim();
-  if (!currentBranch) {
-    throw new Error('Cannot resolve swarm parent branch: workspace is not on a named branch');
-  }
-  if (!currentBranch.startsWith('feature/') || currentBranch.includes('/slot-')) {
-    throw new Error(`Cannot dispatch swarm from non-feature parent branch ${currentBranch}`);
-  }
+  // PAN-1175: the previous implementation called `git branch --show-current`
+  // on the MAIN project path and required it to be on `feature/<issue>`. That
+  // is structurally impossible — feature branches live in worktrees, and git
+  // forbids the same branch being checked out in two working trees, so the
+  // main repo can never have the feature branch checked out. The intent was
+  // to verify a feature branch EXISTS for this issue; do that directly
+  // against the branch list the caller already computed.
   const issueNumber = issueUpper.split('-').at(-1);
   const legacyIssueBranch = `feature/${issueUpper.toLowerCase()}`;
   const numericIssueBranch = issueNumber ? `feature/${issueNumber.toLowerCase()}` : null;
-  if (currentBranch !== legacyIssueBranch && currentBranch !== numericIssueBranch) {
-    throw new Error(`Workspace branch ${currentBranch} does not match issue ${issueUpper}`);
+  const candidates = [legacyIssueBranch, numericIssueBranch].filter((c): c is string => Boolean(c));
+
+  for (const candidate of candidates) {
+    if (localList.includes(candidate) || remoteList.includes(`origin/${candidate}`)) {
+      return candidate;
+    }
   }
-  if (!localList.includes(currentBranch) && !remoteList.includes(`origin/${currentBranch}`)) {
-    throw new Error(`Workspace branch ${currentBranch} does not exist locally or on origin`);
-  }
-  return currentBranch;
+  throw new Error(
+    `No feature branch found for ${issueUpper} (looked for ${candidates.join(', ')}). ` +
+      `Start an agent for this issue first (\`pan start ${issueUpper}\`) so the workspace and feature branch exist.`,
+  );
 }
 
 async function createSlotWorktree(
