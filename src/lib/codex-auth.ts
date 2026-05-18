@@ -180,7 +180,11 @@ async function applyBurnedTokenOverride(
   // A successful LLM call came AFTER the burn line → auto-retry worked.
   if (lastSuccessIdx > lastBurnIdx) return baseStatus;
 
-  if (lastBurnTimestamp !== null && options.ignoreBurnBefore !== undefined && lastBurnTimestamp < options.ignoreBurnBefore) {
+  // Burn log lines carry second-precision timestamps. If credentials are written
+  // later in the same second as the burn line, the second-boundary timestamp can
+  // appear stale against ignoreBurnBefore. Pad by 999ms so a same-second burn is
+  // still considered "current" relative to a credential-write cutoff.
+  if (lastBurnTimestamp !== null && options.ignoreBurnBefore !== undefined && lastBurnTimestamp + 999 < options.ignoreBurnBefore) {
     return baseStatus;
   }
 
