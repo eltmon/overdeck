@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T22:13:00.000Z",
+  "updated": "2026-05-18T22:24:00.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "81e2464b7",
-    "dirty": false
+    "sha": "b8f596f2b",
+    "dirty": true
   },
   "decisions": [
     {
@@ -438,6 +438,10 @@
     "p2-pipeline-metric-strip": "completed",
     "p2-pipeline-metric-strip.ac1": "completed",
     "p2-pipeline-metric-strip.ac2": "completed",
-    "p2-pipeline-metric-strip.ac3": "completed"
+    "p2-pipeline-metric-strip.ac3": "completed",
+    "i3-command-palette-drawer-integration": "completed",
+    "i3-command-palette-drawer-integration.ac1": "completed",
+    "i3-command-palette-drawer-integration.ac2": "completed",
+    "i3-command-palette-drawer-integration.ac3": "completed"
   }
 }

@@ -63,6 +63,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
   const [query, setQuery] = useState('');
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
   const issues = useDashboardStore(selectIssues) as Issue[];
+  const openIssue = useDashboardStore((state) => state.openIssue);
 
   // Reset query when opened
   useEffect(() => {
@@ -188,20 +189,28 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
 
   const activeAgents = agents.filter((a) => a.status !== 'dead');
   const activeIssueIds = new Set(activeAgents.map((a) => a.issueId?.toLowerCase()).filter(Boolean));
+  const branchByIssueId = new Map(
+    activeAgents
+      .filter((agent) => agent.issueId && agent.git?.branch)
+      .map((agent) => [agent.issueId!.toLowerCase(), agent.git!.branch]),
+  );
 
   const workspaceActions: PaletteAction[] = issues
     .filter((issue) => activeIssueIds.has(issue.identifier.toLowerCase()))
-    .map((issue) => ({
-      id: `workspace-${issue.identifier}`,
-      label: issue.identifier,
-      description: issue.title,
-      icon: FolderOpen,
-      group: 'Active Workspaces',
-      keywords: [issue.identifier.toLowerCase(), issue.title.toLowerCase()],
-      onSelect: () => {
-        onNavigate('kanban', issue.identifier);
-      },
-    }));
+    .map((issue) => {
+      const branch = branchByIssueId.get(issue.identifier.toLowerCase());
+      return {
+        id: `workspace-${issue.identifier}`,
+        label: issue.identifier,
+        description: branch ? `${issue.title} · ${branch}` : issue.title,
+        icon: FolderOpen,
+        group: 'Active Workspaces',
+        keywords: [issue.identifier, issue.title, branch ?? ''].filter(Boolean),
+        onSelect: () => {
+          openIssue(issue.identifier);
+        },
+      };
+    });
 
   // ─── Dynamic: running agents ─────────────────────────────────────────────────
 
@@ -211,9 +220,9 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     description: agent.issueId ? `Working on ${agent.issueId}` : agent.status,
     icon: User,
     group: 'Running Agents',
-    keywords: [agent.id, agent.issueId ?? '', agent.status],
+    keywords: [agent.id, agent.issueId ?? '', agent.git?.branch ?? '', agent.status],
     onSelect: () => {
-      if (agent.issueId) onNavigate('kanban', agent.issueId);
+      if (agent.issueId) openIssue(agent.issueId);
       else onNavigate('agents');
     },
   }));
