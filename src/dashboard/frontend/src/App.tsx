@@ -260,6 +260,12 @@ export default function App() {
     return <StandaloneTerminalRoute sessionName={sessionName} token={token} />;
   }
 
+  // Legacy route redirect: /awaiting-merge → /pipeline?phase=ship (PAN-1148)
+  if (terminalPath === '/awaiting-merge' || terminalPath === '/awaiting-merge/') {
+    window.location.replace('/pipeline?phase=ship');
+    return null;
+  }
+
   const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);
   const [selectedAgent, setSelectedAgentState] = useState<string | null>(() => {
     const hash = window.location.hash;
