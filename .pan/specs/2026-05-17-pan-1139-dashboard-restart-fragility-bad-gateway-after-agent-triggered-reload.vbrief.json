@@ -4,17 +4,17 @@
     "created": "2026-05-17T14:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1139: Dashboard restart fragility: Bad Gateway after agent-triggered reload",
-    "updated": "2026-05-17T16:35:18.385Z"
+    "updated": "2026-05-18T01:04:35.489Z"
   },
   "plan": {
     "id": "pan-1139",
     "title": "Dashboard restart fragility: Bad Gateway after agent-triggered reload",
-    "status": "proposed",
+    "status": "completed",
     "uid": "e1f8d420-9c2a-4c2e-8b21-7a3e2f9d0c01",
     "author": "agent:claude-opus-4-7",
-    "sequence": 54,
+    "sequence": 58,
     "created": "2026-05-17T14:30:00.000Z",
-    "updated": "2026-05-17T16:35:18.385Z",
+    "updated": "2026-05-18T01:04:35.489Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1139",
@@ -548,56 +548,62 @@
     "metadata": {
       "canonicalFilename": "2026-05-17-PAN-1139-dashboard-restart-fragility-bad-gateway-after-agent-triggered-reload.vbrief.json",
       "pipeline": {
-        "phase": "work",
+        "phase": "done",
         "issueId": "PAN-1139",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-17T16:35:18.385Z",
+        "updatedAt": "2026-05-18T01:04:31.270Z",
         "work": {
-          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "updatedAt": "2026-05-18T01:04:31.270Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "status": "failed",
+          "updatedAt": "2026-05-18T01:04:31.270Z",
+          "notes": "Verification FAILED at lint (16580ms):\n\n[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (70%)\n  - rolldown-plugin-dts:fake-js (17%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nsrc/dashboard/server/event-store.ts (124:38) \u001b[33m[UNRESOLVED_IMPORT] Warning:\u001b[0m Could not resolve 'bun:sqlite' in src/dashboard/server/event-store.ts\n     \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/event-store.ts:124:39 \u001b[38;5;246m]\u001b[0m\n     \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m124 │\u001b[0m \u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mc\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mn\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m{\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mD\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mb\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249me\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m=\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mw\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249mp\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m(\u001b[0m'bun:sqlite'\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m    │\u001b[0m                                       ──────┬─────  \n \u001b[38;5;240m    │\u001b[0m                                             ╰─────── Module not found, treating it as an external dependency\n\u001b[38;5;246m─────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (64%)\n  - tsdown:deps (35%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-17T16:35:18.385Z"
+              "status": "failed",
+              "at": "2026-05-18T01:04:31.270Z",
+              "notes": "Verification FAILED at lint (16580ms):\n\n[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (70%)\n  - rolldown-plugin-dts:fake-js (17%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\nsrc/dashboard/server/event-store.ts (124:38) \u001b[33m[UNRESOLVED_IMPORT] Warning:\u001b[0m Could not resolve 'bun:sqlite' in src/dashboard/server/event-store.ts\n     \u001b[38;5;246m╭\u001b[0m\u001b[38;5;246m─\u001b[0m\u001b[38;5;246m[\u001b[0m src/dashboard/server/event-store.ts:124:39 \u001b[38;5;246m]\u001b[0m\n     \u001b[38;5;246m│\u001b[0m\n \u001b[38;5;246m124 │\u001b[0m \u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mc\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mn\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m{\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mD\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mb\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249ms\u001b[0m\u001b[38;5;249me\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m}\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249m=\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mw\u001b[0m\u001b[38;5;249ma\u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m \u001b[0m\u001b[38;5;249mi\u001b[0m\u001b[38;5;249mm\u001b[0m\u001b[38;5;249mp\u001b[0m\u001b[38;5;249mo\u001b[0m\u001b[38;5;249mr\u001b[0m\u001b[38;5;249mt\u001b[0m\u001b[38;5;249m(\u001b[0m'bun:sqlite'\u001b[38;5;249m)\u001b[0m\u001b[38;5;249m;\u001b[0m\n \u001b[38;5;240m    │\u001b[0m                                       ──────┬─────  \n \u001b[38;5;240m    │\u001b[0m                                             ╰─────── Module not found, treating it as an external dependency\n\u001b[38;5;246m─────╯\u001b[0m\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/cloister/service.ts is dynamically imported by src/lib/cloister/deacon.ts but also statically imported by src/cli/commands/cloister/start.ts, src/cli/commands/cloister/status.ts, src/cli/commands/cloister/stop.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (64%)\n  - tsdown:deps (35%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n"
             }
           ]
         },
         "review": {
-          "status": "pending",
-          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "status": "passed",
+          "updatedAt": "2026-05-18T01:04:31.270Z",
+          "notes": "Review role spawn failed: Workspace docker stack for PAN-1139 is not healthy: panopticon-feature-pan-1139-server-1 service exited (1). Run 'pan workspace rebuild PAN-1139' or retry with --host to override.",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-17T16:35:18.385Z"
+              "status": "passed",
+              "at": "2026-05-18T01:04:31.270Z",
+              "notes": "Review role spawn failed: Workspace docker stack for PAN-1139 is not healthy: panopticon-feature-pan-1139-server-1 service exited (1). Run 'pan workspace rebuild PAN-1139' or retry with --host to override."
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "status": "passed",
+          "updatedAt": "2026-05-18T01:04:31.270Z",
+          "notes": "Skipped: issue is already merged",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-17T16:35:18.385Z"
+              "status": "passed",
+              "at": "2026-05-18T01:04:31.270Z",
+              "notes": "Skipped: issue is already merged"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "updatedAt": "2026-05-18T01:04:31.270Z",
           "history": []
         },
         "merge": {
-          "status": "pending",
-          "updatedAt": "2026-05-17T16:35:18.385Z",
+          "status": "merged",
+          "updatedAt": "2026-05-18T01:04:31.270Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-17T16:35:18.385Z"
+              "status": "merged",
+              "at": "2026-05-18T01:04:31.270Z"
             }
           ],
           "readyForMerge": false,
@@ -606,5 +612,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
