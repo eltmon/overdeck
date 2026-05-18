@@ -50,6 +50,7 @@ import {
   SettingsSidebarNav,
   type NavItem,
 } from './primitives';
+import { ensureDashboardSession } from '../../lib/wsTransport';
 
 // OpenRouter types matching OpenRouterModelBrowser
 interface OpenRouterModelCatalog {
@@ -110,8 +111,26 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
       workhorses?: unknown;
       roles?: unknown;
     };
+    const parentConversationPatch: SettingsConfig['conversations'] = {
+      ...(settings.conversations?.compaction_model !== undefined
+        ? { compaction_model: settings.conversations.compaction_model }
+        : {}),
+      ...(settings.conversations?.manual_compact_mode !== undefined
+        ? { manual_compact_mode: settings.conversations.manual_compact_mode }
+        : {}),
+      ...(settings.conversations?.rich_compaction !== undefined
+        ? { rich_compaction: settings.conversations.rich_compaction }
+        : {}),
+      ...(settings.conversations?.title_model !== undefined
+        ? { title_model: settings.conversations.title_model }
+        : {}),
+    };
     merged = {
       ...settings,
+      conversations: {
+        ...latest.conversations,
+        ...parentConversationPatch,
+      },
       ...(latestRouting.workhorses !== undefined
         ? { workhorses: latestRouting.workhorses }
         : {}),
@@ -346,6 +365,18 @@ export function SettingsPage() {
     }
   }, []);
 
+  // ── Conversations & Search (embedding) config ──────────────────────────────
+  const [convConfig, setConvConfig] = useState<{
+    embeddings: boolean;
+    embeddingProvider: string;
+    embeddingModel: string;
+    embeddingAutoOnDeep: boolean;
+  } | null>(null);
+  const [convConfigDirty, setConvConfigDirty] = useState(false);
+  const [convConfigSaving, setConvConfigSaving] = useState(false);
+  const [embeddingTestResult, setEmbeddingTestResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
+  const [testingEmbedding, setTestingEmbedding] = useState(false);
+
   const fetchClaudeAuth = async () => {
     try {
       const res = await fetch('/api/settings/claude-auth');
@@ -354,6 +385,78 @@ export function SettingsPage() {
   };
 
   useEffect(() => { void fetchClaudeAuth(); }, []);
+
+  useEffect(() => {
+    ensureDashboardSession()
+      .then(() => fetch('/api/discovered-sessions/config', { credentials: 'include' }))
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setConvConfig(d); })
+      .catch(() => undefined);
+  }, []);
+
+  const handleConvConfigChange = (patch: Partial<typeof convConfig>) => {
+    setConvConfig((prev) => prev ? { ...prev, ...patch } : null);
+    setConvConfigDirty(true);
+    setEmbeddingTestResult(null);
+  };
+
+  const handleSaveConvConfig = async () => {
+    if (!convConfig) return;
+    setConvConfigSaving(true);
+    try {
+      await ensureDashboardSession();
+      const res = await fetch('/api/discovered-sessions/config', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(convConfig),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
+      setFormData((prev) => prev ? {
+        ...prev,
+        conversations: {
+          ...prev.conversations,
+          embeddings: convConfig.embeddings,
+          embedding_provider: convConfig.embeddingProvider as 'openai' | 'voyage' | 'ollama',
+          embedding_model: convConfig.embeddingModel,
+          embedding_auto_on_deep: convConfig.embeddingAutoOnDeep,
+        },
+      } : prev);
+      setConvConfigDirty(false);
+      toast.success('Embedding settings saved');
+    } catch (err) {
+      toast.error(`Failed to save embedding settings: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setConvConfigSaving(false);
+    }
+  };
+
+  const handleTestEmbeddingConnection = async () => {
+    if (!convConfig) return;
+    setTestingEmbedding(true);
+    setEmbeddingTestResult(null);
+    try {
+      await ensureDashboardSession();
+      const res = await fetch('/api/discovered-sessions/test-connection', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: convConfig.embeddingProvider,
+          model: convConfig.embeddingModel,
+        }),
+      });
+      const result = await res.json();
+      setEmbeddingTestResult(result);
+    } catch (err) {
+      setEmbeddingTestResult({ ok: false, error: String(err) });
+    } finally {
+      setTestingEmbedding(false);
+    }
+  };
 
   useEffect(() => {
     fetchOpenRouterCatalog().then(setOrCatalog);
@@ -1430,6 +1533,150 @@ export function SettingsPage() {
               }`} />
             </button>
           </div>
+
+          <div className="border-t border-border my-2" />
+
+          {!convConfig ? (
+            <div className="flex items-center gap-2 px-4 py-3 text-xs text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Loading embedding settings…
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-foreground">Semantic embeddings</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Store vector embeddings for semantic conversation search. Non-local providers receive session-derived summaries, tags, workspace paths, and tool names.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={convConfig.embeddings}
+                  aria-label="Toggle semantic embeddings"
+                  onClick={() => handleConvConfigChange({ embeddings: !convConfig.embeddings })}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                    convConfig.embeddings ? 'bg-primary' : 'bg-muted'
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    convConfig.embeddings ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                  }`} />
+                </button>
+              </div>
+
+              {convConfig.embeddings && (
+                <>
+                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-foreground">Embedding provider</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">Which API generates embeddings</p>
+                    </div>
+                    <select
+                      value={convConfig.embeddingProvider}
+                      onChange={(e) => {
+                        const provider = e.target.value;
+                        const defaultModel = provider === 'openai'
+                          ? 'text-embedding-3-small'
+                          : provider === 'voyage'
+                            ? 'voyage-code-3'
+                            : 'nomic-embed-text';
+                        handleConvConfigChange({ embeddingProvider: provider, embeddingModel: defaultModel });
+                      }}
+                      className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="voyage">Voyage AI</option>
+                      <option value="ollama">Ollama (local)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-foreground">Embedding model</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">Model name for the selected provider</p>
+                    </div>
+                    <input
+                      type="text"
+                      value={convConfig.embeddingModel}
+                      onChange={(e) => handleConvConfigChange({ embeddingModel: e.target.value })}
+                      className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary w-[220px]"
+                      placeholder="text-embedding-3-small"
+                    />
+                  </div>
+
+                  {convConfig.embeddingProvider !== 'ollama' && (
+                    <div className="px-4 py-3 rounded-lg bg-muted/20">
+                      <p className="text-xs text-muted-foreground">
+                        API key is read from{' '}
+                        <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">
+                          {convConfig.embeddingProvider === 'openai' ? 'OPENAI_API_KEY' : 'VOYAGE_API_KEY'}
+                        </code>{' '}
+                        or <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">~/.panopticon.env</code>.
+                        Session-derived summaries, tags, workspace paths, and tool names are sent to this provider.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-foreground">Auto-embed after deep enrichment</span>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Generate embeddings when a session is enriched at tier 2 or 3
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={convConfig.embeddingAutoOnDeep}
+                      aria-label="Toggle auto-embed after deep enrichment"
+                      onClick={() => handleConvConfigChange({ embeddingAutoOnDeep: !convConfig.embeddingAutoOnDeep })}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                        convConfig.embeddingAutoOnDeep ? 'bg-primary' : 'bg-muted'
+                      }`}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                        convConfig.embeddingAutoOnDeep ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                      }`} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleTestEmbeddingConnection}
+                        disabled={testingEmbedding}
+                        className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md border border-border hover:bg-muted/30 text-foreground transition-colors disabled:opacity-50"
+                      >
+                        {testingEmbedding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                        Test connection
+                      </button>
+                      {embeddingTestResult && (
+                        <span className={`text-xs flex items-center gap-1 ${embeddingTestResult.ok ? 'text-success' : 'text-destructive'}`}>
+                          {embeddingTestResult.ok
+                            ? <><CheckCircle className="w-3.5 h-3.5" /> Connected ({embeddingTestResult.latencyMs}ms)</>
+                            : <><AlertTriangle className="w-3.5 h-3.5" /> {embeddingTestResult.error}</>}
+                        </span>
+                      )}
+                    </div>
+                    {convConfigDirty && (
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveConvConfig()}
+                        disabled={convConfigSaving}
+                        className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                      >
+                        {convConfigSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                        Save embeddings
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
       </section>
 

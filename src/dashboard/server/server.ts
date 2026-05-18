@@ -58,6 +58,9 @@ import { hooksRouteLayer } from './routes/hooks.js';
 import { diffsRouteLayer } from './routes/diffs.js';
 import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { swarmRouteLayer } from './routes/swarm.js';
+import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
+import { dashboardSessionCookieHeader, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
+import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -99,6 +102,84 @@ const healthRouteLayer = HttpRouter.add(
   'GET',
   '/api/health',
   jsonResponse({ status: 'ok' }),
+);
+
+function requestHeader(request: HttpServerRequest.HttpServerRequest, name: string): string | undefined {
+  const value = (request.headers as Record<string, string | string[] | undefined>)[name];
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function allowDashboardSessionCors(
+  response: typeof HttpServerResponse.Type,
+  request: HttpServerRequest.HttpServerRequest,
+): typeof HttpServerResponse.Type {
+  const origin = requestHeader(request, 'origin');
+  if (!origin) return response;
+  return HttpServerResponse.setHeader(
+    HttpServerResponse.setHeader(
+      HttpServerResponse.setHeader(
+        HttpServerResponse.setHeader(response, 'Access-Control-Allow-Origin', origin),
+        'Access-Control-Allow-Credentials',
+        'true',
+      ),
+      'Access-Control-Allow-Headers',
+      'x-panopticon-internal-token, authorization, content-type',
+    ),
+    'Vary',
+    'Origin',
+  );
+}
+
+function isHttpsRequest(request: HttpServerRequest.HttpServerRequest): boolean {
+  const forwardedProto = requestHeader(request, 'x-forwarded-proto');
+  if (forwardedProto?.split(',')[0]?.trim().toLowerCase() === 'https') return true;
+  return HttpServerRequest.toURL(request).pipe(Option.match({
+    onNone: () => false,
+    onSome: (url) => url.protocol === 'https:',
+  }));
+}
+
+const dashboardSessionPreflightRouteLayer = HttpRouter.add(
+  'OPTIONS',
+  '/api/dashboard/session',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    return allowDashboardSessionCors(
+      HttpServerResponse.setHeader(jsonResponse({ ok: true }), 'Access-Control-Allow-Methods', 'POST, OPTIONS'),
+      request,
+    );
+  }),
+);
+
+const dashboardSessionRouteLayer = HttpRouter.add(
+  'POST',
+  '/api/dashboard/session',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const authError = rejectUnauthorizedDashboardSessionMintRequest(request);
+    if (authError) return authError;
+
+    return allowDashboardSessionCors(
+      HttpServerResponse.setHeader(
+        HttpServerResponse.setHeader(
+          jsonResponse({ ok: true }),
+          'Set-Cookie',
+          dashboardSessionCookieHeader({ secure: isHttpsRequest(request) }),
+        ),
+        'Cache-Control',
+        'no-store',
+      ),
+      request,
+    );
+  }),
 );
 
 // ─── Static file route ────────────────────────────────────────────────────────
@@ -174,9 +255,7 @@ const staticRouteLayer = HttpRouter.add(
       // change on every build. If the browser caches an old index.html, it will
       // load stale JS bundles and the user sees outdated UI.
       return yield* HttpServerResponse.file(indexPath).pipe(
-        Effect.map((res) =>
-          HttpServerResponse.setHeader(res, 'Cache-Control', 'no-cache, no-store, must-revalidate'),
-        ),
+        Effect.map((res) => HttpServerResponse.setHeader(res, 'Cache-Control', 'no-cache, no-store, must-revalidate')),
         Effect.catch(() =>
           Effect.succeed(HttpServerResponse.text('Internal Server Error', { status: 500 })),
         ),
@@ -204,6 +283,8 @@ const staticRouteLayer = HttpRouter.add(
 
 export const makeRoutesLayer = Layer.mergeAll(
   healthRouteLayer,
+  dashboardSessionPreflightRouteLayer,
+  dashboardSessionRouteLayer,
   websocketRpcRouteLayer,
   issuesRouteLayer,
   agentsRouteLayer,
@@ -231,6 +312,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   diffsRouteLayer,
   codexAuthRouteLayer,
   swarmRouteLayer,
+  discoveredSessionsRouteLayer,
   staticRouteLayer,
 );
 

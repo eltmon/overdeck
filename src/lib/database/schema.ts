@@ -10,7 +10,144 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 35;
+export const SCHEMA_VERSION = 38;
+
+function parseArrayColumn(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string' && item.length > 0) : [];
+  } catch {
+    return [];
+  }
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function backfillDiscoveredSessionArrayIndexes(db: Database.Database): void {
+  const rows = db.prepare(`SELECT id, tools_used, files_touched, tags FROM discovered_sessions`).all() as Array<{
+    id: number;
+    tools_used: string | null;
+    files_touched: string | null;
+    tags: string | null;
+  }>;
+  const deleteTags = db.prepare(`DELETE FROM discovered_session_tags WHERE session_id = ?`);
+  const deleteTools = db.prepare(`DELETE FROM discovered_session_tools WHERE session_id = ?`);
+  const deleteFiles = db.prepare(`DELETE FROM discovered_session_files WHERE session_id = ?`);
+  const insertTag = db.prepare(`INSERT OR IGNORE INTO discovered_session_tags (session_id, tag) VALUES (?, ?)`);
+  const insertTool = db.prepare(`INSERT OR IGNORE INTO discovered_session_tools (session_id, tool) VALUES (?, ?)`);
+  const insertFile = db.prepare(`INSERT OR IGNORE INTO discovered_session_files (session_id, file_path) VALUES (?, ?)`);
+
+  const replaceRow = db.transaction((row: typeof rows[number]) => {
+    deleteTags.run(row.id);
+    deleteTools.run(row.id);
+    deleteFiles.run(row.id);
+    for (const tag of uniqueStrings(parseArrayColumn(row.tags))) insertTag.run(row.id, tag);
+    for (const tool of uniqueStrings(parseArrayColumn(row.tools_used))) insertTool.run(row.id, tool);
+    for (const file of uniqueStrings(parseArrayColumn(row.files_touched))) insertFile.run(row.id, file);
+  });
+
+  for (const row of rows) replaceRow(row);
+}
+
+export function initDiscoveredSessionsSchema(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS discovered_sessions (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      jsonl_path        TEXT    NOT NULL UNIQUE,
+      session_id        TEXT,
+      workspace_path    TEXT,
+      workspace_hash    TEXT,
+      message_count     INTEGER NOT NULL DEFAULT 0,
+      first_ts          TEXT,
+      last_ts           TEXT,
+      models_used       TEXT,
+      primary_model     TEXT,
+      token_input       INTEGER NOT NULL DEFAULT 0,
+      token_output      INTEGER NOT NULL DEFAULT 0,
+      estimated_cost    REAL    NOT NULL DEFAULT 0,
+      tools_used        TEXT,
+      files_touched     TEXT,
+      tags              TEXT,
+      summary           TEXT,
+      summary_detailed  TEXT,
+      enrichment_level  INTEGER NOT NULL DEFAULT 0,
+      enrichment_model  TEXT,
+      enriched_at       TEXT,
+      enrichment_failed INTEGER NOT NULL DEFAULT 0,
+      panopticon_managed INTEGER NOT NULL DEFAULT 0,
+      pan_issue_id      TEXT,
+      pan_agent_id      TEXT,
+      file_size         INTEGER,
+      file_mtime        TEXT,
+      scanned_at        TEXT    NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
+    CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
+    CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
+    CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+    CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_tags (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      tag        TEXT    NOT NULL,
+      PRIMARY KEY (session_id, tag)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_tags_tag
+      ON discovered_session_tags(tag, session_id);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_tools (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      tool       TEXT    NOT NULL,
+      PRIMARY KEY (session_id, tool)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_tools_tool
+      ON discovered_session_tools(tool, session_id);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_files (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      file_path  TEXT    NOT NULL,
+      PRIMARY KEY (session_id, file_path)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_files_file_path
+      ON discovered_session_files(file_path, session_id);
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+      summary,
+      summary_detailed,
+      tags,
+      files_touched,
+      content='discovered_sessions',
+      content_rowid='id'
+    );
+
+    CREATE TABLE IF NOT EXISTS session_embeddings (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL
+                   REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      model      TEXT    NOT NULL,
+      dim        INTEGER NOT NULL,
+      embedding  BLOB    NOT NULL,
+      created_at TEXT    NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
+      ON session_embeddings(session_id, model);
+
+    CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
+      ON session_embeddings(model, session_id);
+  `);
+}
+
+export function initWorkspaceDiscoveredSessionsSchema(db: Database.Database): void {
+  initDiscoveredSessionsSchema(db);
+}
 
 /**
  * Initialize the complete database schema.
@@ -328,7 +465,82 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
+
+    -- ===== Discovered Sessions (PAN-457: conversation discovery & indexing) =====
+    CREATE TABLE IF NOT EXISTS discovered_sessions (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      jsonl_path        TEXT    NOT NULL UNIQUE,
+      session_id        TEXT,
+      workspace_path    TEXT,
+      workspace_hash    TEXT,
+      message_count     INTEGER NOT NULL DEFAULT 0,
+      first_ts          TEXT,
+      last_ts           TEXT,
+      models_used       TEXT,
+      primary_model     TEXT,
+      token_input       INTEGER NOT NULL DEFAULT 0,
+      token_output      INTEGER NOT NULL DEFAULT 0,
+      estimated_cost    REAL    NOT NULL DEFAULT 0,
+      tools_used        TEXT,
+      files_touched     TEXT,
+      tags              TEXT,
+      summary           TEXT,
+      summary_detailed  TEXT,
+      enrichment_level  INTEGER NOT NULL DEFAULT 0,
+      enrichment_model  TEXT,
+      enriched_at       TEXT,
+      enrichment_failed INTEGER NOT NULL DEFAULT 0,
+      panopticon_managed INTEGER NOT NULL DEFAULT 0,
+      pan_issue_id      TEXT,
+      pan_agent_id      TEXT,
+      file_size         INTEGER,
+      file_mtime        TEXT,
+      scanned_at        TEXT    NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_workspace
+      ON discovered_sessions(workspace_path);
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_last_ts
+      ON discovered_sessions(last_ts);
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_enrichment
+      ON discovered_sessions(enrichment_level, enriched_at);
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_managed
+      ON discovered_sessions(panopticon_managed, pan_issue_id);
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_model
+      ON discovered_sessions(primary_model);
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+      summary,
+      summary_detailed,
+      tags,
+      files_touched,
+      content='discovered_sessions',
+      content_rowid='id'
+    );
+
+    -- ===== Session Embeddings (PAN-457: semantic search) =====
+    CREATE TABLE IF NOT EXISTS session_embeddings (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL
+                   REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      model      TEXT    NOT NULL,
+      dim        INTEGER NOT NULL,
+      embedding  BLOB    NOT NULL,
+      created_at TEXT    NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
+      ON session_embeddings(session_id, model);
+
+    CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
+      ON session_embeddings(model, session_id);
   `);
+
+  initDiscoveredSessionsSchema(db);
 
   // Record schema version
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
@@ -628,7 +840,7 @@ export function runMigrations(db: Database.Database): void {
     } catch { /* already exists */ }
   }
 
-  // v18 → v19: add fork_status + fork_error columns to conversations (async fork provisioning)
+  // v18 → v19: add fork_status/fork_error to conversations + create discovered_sessions tables
   if (currentVersion < 19) {
     try {
       db.exec(`ALTER TABLE conversations ADD COLUMN fork_status TEXT`);
@@ -636,6 +848,57 @@ export function runMigrations(db: Database.Database): void {
     try {
       db.exec(`ALTER TABLE conversations ADD COLUMN fork_error TEXT`);
     } catch { /* already exists */ }
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS discovered_sessions (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        jsonl_path        TEXT    NOT NULL UNIQUE,
+        session_id        TEXT,
+        workspace_path    TEXT,
+        workspace_hash    TEXT,
+        message_count     INTEGER NOT NULL DEFAULT 0,
+        first_ts          TEXT,
+        last_ts           TEXT,
+        models_used       TEXT,
+        primary_model     TEXT,
+        token_input       INTEGER NOT NULL DEFAULT 0,
+        token_output      INTEGER NOT NULL DEFAULT 0,
+        estimated_cost    REAL    NOT NULL DEFAULT 0,
+        tools_used        TEXT,
+        files_touched     TEXT,
+        tags              TEXT,
+        summary           TEXT,
+        summary_detailed  TEXT,
+        enrichment_level  INTEGER NOT NULL DEFAULT 0,
+        enrichment_model  TEXT,
+        enriched_at       TEXT,
+        enrichment_failed INTEGER NOT NULL DEFAULT 0,
+        panopticon_managed INTEGER NOT NULL DEFAULT 0,
+        pan_issue_id      TEXT,
+        pan_agent_id      TEXT,
+        file_size         INTEGER,
+        file_mtime        TEXT,
+        scanned_at        TEXT    NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
+      CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
+      CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
+      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+      CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+      CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+        summary, summary_detailed, tags, files_touched,
+        content='discovered_sessions', content_rowid='id'
+      );
+      CREATE TABLE IF NOT EXISTS session_embeddings (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+        model      TEXT    NOT NULL,
+        dim        INTEGER NOT NULL,
+        embedding  BLOB    NOT NULL,
+        created_at TEXT    NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
+        ON session_embeddings(session_id, model);
+    `);
   }
 
   // v19 → v20: add persistent stuck state columns to review_status (PAN-653)
@@ -788,6 +1051,75 @@ export function runMigrations(db: Database.Database): void {
   // v34 → v35: add spawn_error column for background spawn failures (quota, auth, etc.)
   if (currentVersion < 35) {
     try { db.exec(`ALTER TABLE conversations ADD COLUMN spawn_error TEXT`); } catch { /* already exists */ }
+  }
+
+  // v35 → v36: ensure PAN-457 conversation discovery tables exist for upgraded databases
+  if (currentVersion < 36) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS discovered_sessions (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        jsonl_path        TEXT    NOT NULL UNIQUE,
+        session_id        TEXT,
+        workspace_path    TEXT,
+        workspace_hash    TEXT,
+        message_count     INTEGER NOT NULL DEFAULT 0,
+        first_ts          TEXT,
+        last_ts           TEXT,
+        models_used       TEXT,
+        primary_model     TEXT,
+        token_input       INTEGER NOT NULL DEFAULT 0,
+        token_output      INTEGER NOT NULL DEFAULT 0,
+        estimated_cost    REAL    NOT NULL DEFAULT 0,
+        tools_used        TEXT,
+        files_touched     TEXT,
+        tags              TEXT,
+        summary           TEXT,
+        summary_detailed  TEXT,
+        enrichment_level  INTEGER NOT NULL DEFAULT 0,
+        enrichment_model  TEXT,
+        enriched_at       TEXT,
+        enrichment_failed INTEGER NOT NULL DEFAULT 0,
+        panopticon_managed INTEGER NOT NULL DEFAULT 0,
+        pan_issue_id      TEXT,
+        pan_agent_id      TEXT,
+        file_size         INTEGER,
+        file_mtime        TEXT,
+        scanned_at        TEXT    NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
+      CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
+      CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
+      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+      CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+      CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+        summary, summary_detailed, tags, files_touched,
+        content='discovered_sessions', content_rowid='id'
+      );
+      CREATE TABLE IF NOT EXISTS session_embeddings (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+        model      TEXT    NOT NULL,
+        dim        INTEGER NOT NULL,
+        embedding  BLOB    NOT NULL,
+        created_at TEXT    NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
+        ON session_embeddings(session_id, model);
+    `);
+  }
+
+  // v36 → v37: add model-leading embedding index for semantic search scans
+  if (currentVersion < 37) {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
+        ON session_embeddings(model, session_id)
+    `);
+  }
+
+  // v37 → v38: normalize discovered-session arrays into indexed lookup tables
+  if (currentVersion < 38) {
+    initDiscoveredSessionsSchema(db);
+    backfillDiscoveredSessionArrayIndexes(db);
   }
 
   // After all migrations, set the version

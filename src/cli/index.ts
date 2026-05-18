@@ -71,6 +71,7 @@ import { destroyCommand as destroyWorkspaceCommand, registerWorkspaceCommands } 
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
+import { registerConversationsCommands } from './commands/conversations/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { systemHealthCommand } from './commands/system-health.js';
@@ -463,6 +464,9 @@ registerReleaseCommands(program);
 
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)
 registerAdminCommands(program);
+
+// Register conversations commands (pan conversations scan, search, list, show, cost, enrich)
+registerConversationsCommands(program);
 
 // Register install command
 registerInstallCommand(program);
@@ -870,6 +874,15 @@ program
       return 'node'; // fall back to PATH
     })();
 
+    const dashboardOriginEnv = traefikEnabled
+      ? {
+          DASHBOARD_URL: `https://${traefikDomain}`,
+          PANOPTICON_TRAEFIK_ENABLED: '1',
+          PANOPTICON_TRAEFIK_DOMAIN: traefikDomain,
+          PANOPTICON_TRUSTED_ORIGINS: [process.env.PANOPTICON_TRUSTED_ORIGINS, `https://${traefikDomain}`].filter(Boolean).join(','),
+        }
+      : {};
+
     if (options.detach) {
       // Run in background
       const { openDashboardLogStdio } = await import('../lib/platform-lifecycle.js');
@@ -878,6 +891,7 @@ program
             stdio: openDashboardLogStdio(),
             env: {
               ...process.env,
+              ...dashboardOriginEnv,
               DASHBOARD_PORT: String(dashboardPort),
               API_PORT: String(dashboardApiPort),
               PORT: String(dashboardApiPort),
@@ -936,6 +950,7 @@ program
             stdio: 'inherit',
             env: {
               ...process.env,
+              ...dashboardOriginEnv,
               DASHBOARD_PORT: String(dashboardPort),
               API_PORT: String(dashboardApiPort),
               PORT: String(dashboardApiPort),
@@ -1189,7 +1204,8 @@ program
   .description('Start the dashboard server and open it in the default browser (npx launcher)')
   .option('--port <port>', 'Port to listen on', '3011')
   .action(async (options: { port: string }) => {
-    const { spawn, execSync } = await import('child_process');
+    const { spawn } = await import('child_process');
+    const { randomBytes } = await import('crypto');
     const { join, dirname } = await import('path');
     const { fileURLToPath } = await import('url');
     const { existsSync } = await import('fs');
@@ -1213,6 +1229,8 @@ program
     const bundledFrontendIndex = join(__dirname, '..', 'dashboard', 'public', 'index.html');
     const port = parseInt(options.port, 10) || 3011;
     const url = `http://localhost:${port}`;
+    const internalToken = process.env.PANOPTICON_INTERNAL_TOKEN || randomBytes(32).toString('hex');
+    const browserUrl = `${url}#panopticon_token=${encodeURIComponent(internalToken)}`;
 
     if (!existsSync(bundledServer) || !existsSync(bundledFrontendIndex)) {
       console.error(chalk.red('Error: Dashboard bundle not found.'));
@@ -1225,7 +1243,7 @@ program
 
     const server = spawn(process.execPath, [bundledServer], {
       stdio: 'inherit',
-      env: { ...process.env, PORT: String(port) },
+      env: { ...process.env, PORT: String(port), PANOPTICON_INTERNAL_TOKEN: internalToken },
     });
 
     server.on('error', (err) => {
@@ -1238,10 +1256,10 @@ program
       console.log(`  ${chalk.cyan(url)}`);
       try {
         const { openBrowser } = await import('../lib/browser.js');
-        await openBrowser(url);
+        await openBrowser(browserUrl);
       } catch {
         // If openBrowser fails, show URL for manual opening
-        console.log(chalk.dim(`  Open your browser to: ${url}`));
+        console.log(chalk.dim(`  Open your browser to: ${browserUrl}`));
       }
     }, 1_500);
   });

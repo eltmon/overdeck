@@ -37,6 +37,8 @@ Commands:
   admin                        Plumbing commands: watchdog, specialists, infra,
                                db, config, and more
   convoy                       Multi-agent convoy orchestration
+  conversations|conv           Discover, index, and search Claude Code session
+                               history
   install [options]            Install Panopticon prerequisites
   inspect [options] <issueId>  Request inspection of a completed bead before
                                proceeding to the next

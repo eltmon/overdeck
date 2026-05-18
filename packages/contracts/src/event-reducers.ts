@@ -59,6 +59,54 @@ export interface ReadModelState {
   /** Bumped whenever a conversation is created, so the sidebar list can refresh
    * immediately instead of waiting for its poll tick. */
   conversationsListRevision: number
+  /** PAN-457 — active scan progress snapshot */
+  scanProgress: ScanProgressSnapshot | null
+  /** PAN-457 — latest enrichment stats */
+  enrichStats: EnrichStatsSnapshot | null
+  /** PAN-457 — latest per-session enrichment progress */
+  enrichProgressBySessionId: Record<number, EnrichProgressSnapshot>
+  /** PAN-457 — latest per-session embedding progress */
+  embedProgressBySessionId: Record<number, EmbedProgressSnapshot>
+}
+
+export interface ScanProgressSnapshot {
+  active: boolean
+  mode: 'targeted' | 'watched' | 'system'
+  dirs: string[]
+  dirsProcessed: number
+  dirsTotal: number
+  sessionsFound: number
+  elapsedMs: number
+  inserted: number
+  updated: number
+  skipped: number
+  errors: number
+  durationMs: number
+}
+
+export interface EnrichStatsSnapshot {
+  processed: number
+  totalCost: number
+  failures: number
+  durationMs: number
+}
+
+export interface EnrichProgressSnapshot {
+  sessionId: number
+  level: number
+  model: string
+  cost: number
+  success: boolean
+  error?: string
+  timestamp: string
+}
+
+export interface EmbedProgressSnapshot {
+  sessionId: number
+  model: string
+  success: boolean
+  error?: string
+  timestamp: string
 }
 
 export interface DashboardLifecycleState {
@@ -92,6 +140,10 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   conversationsCompactingByName: {},
   conversationsAwaitingPermissionByName: {},
   conversationsListRevision: 0,
+  scanProgress: null,
+  enrichStats: null,
+  enrichProgressBySessionId: {},
+  embedProgressBySessionId: {},
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -110,6 +162,7 @@ const MAX_AGENT_OUTPUT_LINES = 200
 const MAX_ACTIVITY_ENTRIES = 50
 const MAX_DETAILED_ENTRIES = 200
 const MAX_TTS_ENTRIES = 50
+const MAX_SESSION_PROGRESS_ENTRIES = 100
 export const DEFAULT_MAX_TURN_DIFF_SUMMARIES_PER_AGENT = 200
 
 export function getMaxTurnDiffSummariesPerAgent(): number {
@@ -125,6 +178,23 @@ export function isTerminalTurnDiffSummaryStatus(status: unknown): boolean {
 export function trimTurnDiffSummaries(summaries: TurnDiffSummary[]): TurnDiffSummary[] {
   const max = getMaxTurnDiffSummariesPerAgent()
   return summaries.length > max ? summaries.slice(-max) : summaries
+}
+
+function upsertBoundedSessionProgress<T extends { sessionId: number; timestamp: string }>(
+  bySessionId: Record<number, T>,
+  progress: T,
+): Record<number, T> {
+  const existing = bySessionId[progress.sessionId]
+  const entries = Object.values(bySessionId)
+  if (existing || entries.length < MAX_SESSION_PROGRESS_ENTRIES) {
+    return { ...bySessionId, [progress.sessionId]: progress }
+  }
+  const keep = entries
+    .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+    .slice(-(MAX_SESSION_PROGRESS_ENTRIES - 1))
+  const next: Record<number, T> = {}
+  for (const entry of [...keep, progress]) next[entry.sessionId] = entry
+  return next
 }
 
 export function omitTurnDiffSummariesForAgent(
@@ -195,6 +265,10 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     resolvedChannelPermissionDecisionIdsByAgentId: {},
     resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
+    scanProgress: snapshot.scanProgress ?? null,
+    enrichStats: snapshot.enrichStats ?? null,
+    enrichProgressBySessionId: snapshot.enrichProgressBySessionId ?? {},
+    embedProgressBySessionId: snapshot.embedProgressBySessionId ?? {},
   }
 }
 
@@ -1048,6 +1122,103 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return {
         ...state,
         conversationsAwaitingPermissionByName: { ...state.conversationsAwaitingPermissionByName, [conversationName]: true },
+      }
+    }
+
+    // ─── Scan events (PAN-457) ───────────────────────────────────────────────
+
+    case 'scan.started': {
+      const { mode, dirs } = event.payload
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        scanProgress: {
+          active: true,
+          mode,
+          dirs,
+          dirsProcessed: 0,
+          dirsTotal: 0,
+          sessionsFound: 0,
+          elapsedMs: 0,
+          inserted: 0,
+          updated: 0,
+          skipped: 0,
+          errors: 0,
+          durationMs: 0,
+        },
+      }
+    }
+
+    case 'scan.progress': {
+      if (!state.scanProgress) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      const { dirsProcessed, dirsTotal, sessionsFound, elapsedMs } = event.payload
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        scanProgress: {
+          ...state.scanProgress,
+          dirsProcessed,
+          dirsTotal,
+          sessionsFound,
+          elapsedMs,
+        },
+      }
+    }
+
+    case 'scan.complete': {
+      if (!state.scanProgress) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      const { inserted, updated, skipped, errors, durationMs } = event.payload
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        scanProgress: {
+          ...state.scanProgress,
+          active: false,
+          inserted,
+          updated,
+          skipped,
+          errors,
+          durationMs,
+        },
+      }
+    }
+
+    // ─── Enrich events (PAN-457) ─────────────────────────────────────────────
+
+    case 'enrich.progress': {
+      const { sessionId, level, model, cost, success, error } = event.payload
+      const prev = state.enrichStats ?? { processed: 0, totalCost: 0, failures: 0, durationMs: 0 }
+      const progress = { sessionId, level, model, cost, success, error, timestamp: event.timestamp }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        enrichStats: {
+          processed: prev.processed + 1,
+          totalCost: prev.totalCost + (success ? cost : 0),
+          failures: prev.failures + (success ? 0 : 1),
+          durationMs: 0,
+        },
+        enrichProgressBySessionId: upsertBoundedSessionProgress(state.enrichProgressBySessionId, progress),
+      }
+    }
+
+    case 'enrich.complete': {
+      const { processed, totalCost, failures, durationMs } = event.payload
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        enrichStats: { processed, totalCost, failures, durationMs },
+        enrichProgressBySessionId: {},
+      }
+    }
+
+    case 'embed.progress': {
+      const { sessionId, model, success, error } = event.payload
+      const progress = { sessionId, model, success, error, timestamp: event.timestamp }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        embedProgressBySessionId: upsertBoundedSessionProgress(state.embedProgressBySessionId, progress),
       }
     }
 

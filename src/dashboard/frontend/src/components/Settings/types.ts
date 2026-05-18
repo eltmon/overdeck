@@ -84,6 +84,18 @@ export interface SettingsConfig {
     manual_compact_mode?: 'claude-code' | 'panopticon-native';
     rich_compaction?: boolean;
     title_model?: ModelId;
+    watch_dirs?: string[];
+    scan_max_parallel?: number | null;
+    embeddings?: boolean;
+    embedding_provider?: 'openai' | 'voyage' | 'ollama';
+    embedding_model?: string;
+    embedding_auto_on_deep?: boolean;
+    enrichment?: {
+      quick_model?: string | null;
+      deep_model?: string | null;
+      max_parallel?: number;
+      cost_confirm_threshold?: number;
+    };
   };
   experimental?: {
     /** Use Claude Code Channels (research-preview) for prompt delivery to eligible work agents. */

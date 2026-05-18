@@ -2186,8 +2186,13 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // so we never block the Node event loop.
   await saveAgentStateAsync(state);
 
+  const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
+  const isClaudeCodeReviewSubRole = role === 'review' && !!options.subRole && resolvedHarness === 'claude-code';
+  const shouldDeliverPromptViaTmux = isSpecialistRole && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
+  const shouldDeliverPromptViaPi = isSpecialistRole && resolvedHarness === 'pi';
+
   let promptFile: string | undefined;
-  if (options.prompt) {
+  if (options.prompt && !shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi) {
     promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
     await writeFileAsync(promptFile, options.prompt);
   }
@@ -2223,7 +2228,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // Excluding the orchestrator here previously forced AgentOutputPanel to
   // synthesize a Conversation whose sessionAlive came from `agent.status`, and
   // stale snapshots made active synthesizers render as "Starting…".
-  const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
   let sessionId: string | undefined;
   if (isSpecialistRole) {
     sessionId = randomUUID();
@@ -2253,7 +2257,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // not Deacon's patrol — owns the REVIEWER_READY/FAILED/TIMEOUT signal. The
   // launcher signals deterministically on process exit and touches a marker
   // file; Deacon only steps in if that bash process was SIGKILLed.
-  const isClaudeCodeReviewSubRole = role === 'review' && !!options.subRole && resolvedHarness === 'claude-code';
   const reviewSignal = isClaudeCodeReviewSubRole && options.reviewSynthesisAgentId && options.reviewOutputPath
     ? {
         synthesisAgentId: options.reviewSynthesisAgentId,
@@ -2270,8 +2273,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // PAN-1059 / PAN-977: interactive Claude Code specialist roles avoid positional prompts
   // by delivering through tmux after Claude boots. Headless review sub-roles run
   // `claude --print`, so they must receive the prompt on stdin instead.
-  const shouldDeliverPromptViaTmux = isSpecialistRole && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
-  const shouldDeliverPromptViaPi = isSpecialistRole && resolvedHarness === 'pi';
+  const shouldUsePromptFileStdin = isClaudeCodeReviewSubRole;
 
   const launcherContent = generateLauncherScript({
     role,

@@ -58,6 +58,11 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
         <span className={styles.conversationTerminalTitle}>
           {conversation.name}
         </span>
+        {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
+          <span className={styles.featureCost}>
+            {conversation.totalCost < 0.01 ? '<$0.01' : `$${conversation.totalCost.toFixed(2)}`}
+          </span>
+        )}
         <span className={styles.conversationTerminalStatus}>
           <Circle
             size={7}

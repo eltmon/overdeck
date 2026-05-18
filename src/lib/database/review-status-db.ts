@@ -224,6 +224,47 @@ export function getAllReviewStatusesFromDb(): Record<string, ReviewStatus> {
   return result;
 }
 
+export function getReviewStatusesFromDb(issueIds: string[]): Record<string, ReviewStatus> {
+  const normalizedIds = [...new Set(issueIds.map((id) => id.toUpperCase()).filter(Boolean))];
+  if (normalizedIds.length === 0) return {};
+
+  const db = getDatabase();
+  const placeholders = normalizedIds.map(() => '?').join(', ');
+  const rows = db.prepare(`
+    SELECT * FROM review_status
+    WHERE issue_id IN (${placeholders})
+    ORDER BY updated_at DESC
+  `).all(...normalizedIds) as DbReviewStatusRow[];
+
+  if (rows.length === 0) return {};
+
+  const historyRows = db.prepare(`
+    SELECT issue_id, type, status, timestamp, notes
+    FROM status_history
+    WHERE issue_id IN (${placeholders})
+    ORDER BY issue_id, timestamp ASC
+  `).all(...normalizedIds) as Array<{ issue_id: string; type: string; status: string; timestamp: string; notes: string | null }>;
+
+  const historyByIssue = new Map<string, StatusHistoryEntry[]>();
+  for (const row of historyRows) {
+    const bucket = historyByIssue.get(row.issue_id) ?? [];
+    bucket.push({
+      type: row.type as StatusHistoryEntry['type'],
+      status: row.status,
+      timestamp: row.timestamp,
+      ...(row.notes ? { notes: row.notes } : {}),
+    });
+    historyByIssue.set(row.issue_id, bucket);
+  }
+
+  const result: Record<string, ReviewStatus> = {};
+  for (const row of rows) {
+    result[row.issue_id] = rowToReviewStatus(row, historyByIssue.get(row.issue_id) ?? []);
+  }
+
+  return result;
+}
+
 /**
  * Get history entries for an issue.
  */

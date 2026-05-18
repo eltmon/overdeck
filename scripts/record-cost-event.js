@@ -326,6 +326,128 @@ function getPricing(provider, model) {
 	return pricing || null;
 }
 join(COSTS_DIR, "budgets.json");
+function parseArrayColumn(value) {
+	if (!value) return [];
+	try {
+		const parsed = JSON.parse(value);
+		return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string" && item.length > 0) : [];
+	} catch {
+		return [];
+	}
+}
+function uniqueStrings(values) {
+	return [...new Set(values)];
+}
+function backfillDiscoveredSessionArrayIndexes(db) {
+	const rows = db.prepare(`SELECT id, tools_used, files_touched, tags FROM discovered_sessions`).all();
+	const deleteTags = db.prepare(`DELETE FROM discovered_session_tags WHERE session_id = ?`);
+	const deleteTools = db.prepare(`DELETE FROM discovered_session_tools WHERE session_id = ?`);
+	const deleteFiles = db.prepare(`DELETE FROM discovered_session_files WHERE session_id = ?`);
+	const insertTag = db.prepare(`INSERT OR IGNORE INTO discovered_session_tags (session_id, tag) VALUES (?, ?)`);
+	const insertTool = db.prepare(`INSERT OR IGNORE INTO discovered_session_tools (session_id, tool) VALUES (?, ?)`);
+	const insertFile = db.prepare(`INSERT OR IGNORE INTO discovered_session_files (session_id, file_path) VALUES (?, ?)`);
+	const replaceRow = db.transaction((row) => {
+		deleteTags.run(row.id);
+		deleteTools.run(row.id);
+		deleteFiles.run(row.id);
+		for (const tag of uniqueStrings(parseArrayColumn(row.tags))) insertTag.run(row.id, tag);
+		for (const tool of uniqueStrings(parseArrayColumn(row.tools_used))) insertTool.run(row.id, tool);
+		for (const file of uniqueStrings(parseArrayColumn(row.files_touched))) insertFile.run(row.id, file);
+	});
+	for (const row of rows) replaceRow(row);
+}
+function initDiscoveredSessionsSchema(db) {
+	db.exec(`
+    CREATE TABLE IF NOT EXISTS discovered_sessions (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      jsonl_path        TEXT    NOT NULL UNIQUE,
+      session_id        TEXT,
+      workspace_path    TEXT,
+      workspace_hash    TEXT,
+      message_count     INTEGER NOT NULL DEFAULT 0,
+      first_ts          TEXT,
+      last_ts           TEXT,
+      models_used       TEXT,
+      primary_model     TEXT,
+      token_input       INTEGER NOT NULL DEFAULT 0,
+      token_output      INTEGER NOT NULL DEFAULT 0,
+      estimated_cost    REAL    NOT NULL DEFAULT 0,
+      tools_used        TEXT,
+      files_touched     TEXT,
+      tags              TEXT,
+      summary           TEXT,
+      summary_detailed  TEXT,
+      enrichment_level  INTEGER NOT NULL DEFAULT 0,
+      enrichment_model  TEXT,
+      enriched_at       TEXT,
+      enrichment_failed INTEGER NOT NULL DEFAULT 0,
+      panopticon_managed INTEGER NOT NULL DEFAULT 0,
+      pan_issue_id      TEXT,
+      pan_agent_id      TEXT,
+      file_size         INTEGER,
+      file_mtime        TEXT,
+      scanned_at        TEXT    NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
+    CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
+    CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
+    CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+    CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_tags (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      tag        TEXT    NOT NULL,
+      PRIMARY KEY (session_id, tag)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_tags_tag
+      ON discovered_session_tags(tag, session_id);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_tools (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      tool       TEXT    NOT NULL,
+      PRIMARY KEY (session_id, tool)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_tools_tool
+      ON discovered_session_tools(tool, session_id);
+
+    CREATE TABLE IF NOT EXISTS discovered_session_files (
+      session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      file_path  TEXT    NOT NULL,
+      PRIMARY KEY (session_id, file_path)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_session_files_file_path
+      ON discovered_session_files(file_path, session_id);
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+      summary,
+      summary_detailed,
+      tags,
+      files_touched,
+      content='discovered_sessions',
+      content_rowid='id'
+    );
+
+    CREATE TABLE IF NOT EXISTS session_embeddings (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL
+                   REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      model      TEXT    NOT NULL,
+      dim        INTEGER NOT NULL,
+      embedding  BLOB    NOT NULL,
+      created_at TEXT    NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
+      ON session_embeddings(session_id, model);
+
+    CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
+      ON session_embeddings(model, session_id);
+  `);
+}
 /**
 * Initialize the complete database schema.
 * Idempotent — uses CREATE TABLE IF NOT EXISTS throughout.
@@ -642,8 +764,82 @@ function initSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
+
+    -- ===== Discovered Sessions (PAN-457: conversation discovery & indexing) =====
+    CREATE TABLE IF NOT EXISTS discovered_sessions (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      jsonl_path        TEXT    NOT NULL UNIQUE,
+      session_id        TEXT,
+      workspace_path    TEXT,
+      workspace_hash    TEXT,
+      message_count     INTEGER NOT NULL DEFAULT 0,
+      first_ts          TEXT,
+      last_ts           TEXT,
+      models_used       TEXT,
+      primary_model     TEXT,
+      token_input       INTEGER NOT NULL DEFAULT 0,
+      token_output      INTEGER NOT NULL DEFAULT 0,
+      estimated_cost    REAL    NOT NULL DEFAULT 0,
+      tools_used        TEXT,
+      files_touched     TEXT,
+      tags              TEXT,
+      summary           TEXT,
+      summary_detailed  TEXT,
+      enrichment_level  INTEGER NOT NULL DEFAULT 0,
+      enrichment_model  TEXT,
+      enriched_at       TEXT,
+      enrichment_failed INTEGER NOT NULL DEFAULT 0,
+      panopticon_managed INTEGER NOT NULL DEFAULT 0,
+      pan_issue_id      TEXT,
+      pan_agent_id      TEXT,
+      file_size         INTEGER,
+      file_mtime        TEXT,
+      scanned_at        TEXT    NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_workspace
+      ON discovered_sessions(workspace_path);
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_last_ts
+      ON discovered_sessions(last_ts);
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_enrichment
+      ON discovered_sessions(enrichment_level, enriched_at);
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_managed
+      ON discovered_sessions(panopticon_managed, pan_issue_id);
+
+    CREATE INDEX IF NOT EXISTS idx_discovered_model
+      ON discovered_sessions(primary_model);
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+      summary,
+      summary_detailed,
+      tags,
+      files_touched,
+      content='discovered_sessions',
+      content_rowid='id'
+    );
+
+    -- ===== Session Embeddings (PAN-457: semantic search) =====
+    CREATE TABLE IF NOT EXISTS session_embeddings (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL
+                   REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+      model      TEXT    NOT NULL,
+      dim        INTEGER NOT NULL,
+      embedding  BLOB    NOT NULL,
+      created_at TEXT    NOT NULL
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
+      ON session_embeddings(session_id, model);
+
+    CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
+      ON session_embeddings(model, session_id);
   `);
-	db.pragma(`user_version = 35`);
+	initDiscoveredSessionsSchema(db);
+	db.pragma(`user_version = 38`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -651,7 +847,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 35) return;
+	if (currentVersion === 38) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -847,6 +1043,57 @@ function runMigrations(db) {
 		try {
 			db.exec(`ALTER TABLE conversations ADD COLUMN fork_error TEXT`);
 		} catch {}
+		db.exec(`
+      CREATE TABLE IF NOT EXISTS discovered_sessions (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        jsonl_path        TEXT    NOT NULL UNIQUE,
+        session_id        TEXT,
+        workspace_path    TEXT,
+        workspace_hash    TEXT,
+        message_count     INTEGER NOT NULL DEFAULT 0,
+        first_ts          TEXT,
+        last_ts           TEXT,
+        models_used       TEXT,
+        primary_model     TEXT,
+        token_input       INTEGER NOT NULL DEFAULT 0,
+        token_output      INTEGER NOT NULL DEFAULT 0,
+        estimated_cost    REAL    NOT NULL DEFAULT 0,
+        tools_used        TEXT,
+        files_touched     TEXT,
+        tags              TEXT,
+        summary           TEXT,
+        summary_detailed  TEXT,
+        enrichment_level  INTEGER NOT NULL DEFAULT 0,
+        enrichment_model  TEXT,
+        enriched_at       TEXT,
+        enrichment_failed INTEGER NOT NULL DEFAULT 0,
+        panopticon_managed INTEGER NOT NULL DEFAULT 0,
+        pan_issue_id      TEXT,
+        pan_agent_id      TEXT,
+        file_size         INTEGER,
+        file_mtime        TEXT,
+        scanned_at        TEXT    NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
+      CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
+      CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
+      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+      CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+      CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+        summary, summary_detailed, tags, files_touched,
+        content='discovered_sessions', content_rowid='id'
+      );
+      CREATE TABLE IF NOT EXISTS session_embeddings (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+        model      TEXT    NOT NULL,
+        dim        INTEGER NOT NULL,
+        embedding  BLOB    NOT NULL,
+        created_at TEXT    NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
+        ON session_embeddings(session_id, model);
+    `);
 	}
 	if (currentVersion < 20) {
 		try {
@@ -973,7 +1220,66 @@ function runMigrations(db) {
 	if (currentVersion < 35) try {
 		db.exec(`ALTER TABLE conversations ADD COLUMN spawn_error TEXT`);
 	} catch {}
-	db.pragma(`user_version = 35`);
+	if (currentVersion < 36) db.exec(`
+      CREATE TABLE IF NOT EXISTS discovered_sessions (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        jsonl_path        TEXT    NOT NULL UNIQUE,
+        session_id        TEXT,
+        workspace_path    TEXT,
+        workspace_hash    TEXT,
+        message_count     INTEGER NOT NULL DEFAULT 0,
+        first_ts          TEXT,
+        last_ts           TEXT,
+        models_used       TEXT,
+        primary_model     TEXT,
+        token_input       INTEGER NOT NULL DEFAULT 0,
+        token_output      INTEGER NOT NULL DEFAULT 0,
+        estimated_cost    REAL    NOT NULL DEFAULT 0,
+        tools_used        TEXT,
+        files_touched     TEXT,
+        tags              TEXT,
+        summary           TEXT,
+        summary_detailed  TEXT,
+        enrichment_level  INTEGER NOT NULL DEFAULT 0,
+        enrichment_model  TEXT,
+        enriched_at       TEXT,
+        enrichment_failed INTEGER NOT NULL DEFAULT 0,
+        panopticon_managed INTEGER NOT NULL DEFAULT 0,
+        pan_issue_id      TEXT,
+        pan_agent_id      TEXT,
+        file_size         INTEGER,
+        file_mtime        TEXT,
+        scanned_at        TEXT    NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_discovered_workspace ON discovered_sessions(workspace_path);
+      CREATE INDEX IF NOT EXISTS idx_discovered_last_ts ON discovered_sessions(last_ts);
+      CREATE INDEX IF NOT EXISTS idx_discovered_enrichment ON discovered_sessions(enrichment_level, enriched_at);
+      CREATE INDEX IF NOT EXISTS idx_discovered_managed ON discovered_sessions(panopticon_managed, pan_issue_id);
+      CREATE INDEX IF NOT EXISTS idx_discovered_model ON discovered_sessions(primary_model);
+      CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
+        summary, summary_detailed, tags, files_touched,
+        content='discovered_sessions', content_rowid='id'
+      );
+      CREATE TABLE IF NOT EXISTS session_embeddings (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL REFERENCES discovered_sessions(id) ON DELETE CASCADE,
+        model      TEXT    NOT NULL,
+        dim        INTEGER NOT NULL,
+        embedding  BLOB    NOT NULL,
+        created_at TEXT    NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_session_embeddings_session_model
+        ON session_embeddings(session_id, model);
+    `);
+	if (currentVersion < 37) db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_session_embeddings_model_session
+        ON session_embeddings(model, session_id)
+    `);
+	if (currentVersion < 38) {
+		initDiscoveredSessionsSchema(db);
+		backfillDiscoveredSessionArrayIndexes(db);
+	}
+	db.pragma(`user_version = 38`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
@@ -7867,6 +8173,32 @@ function appendCostEvent(event) {
 * Manages llm-tldr daemon lifecycle for project root and workspaces.
 * Provides code analysis and summarization for token-efficient agent work.
 */
+function readMetricsCheckpoint(checkpointFile) {
+	if (!existsSync(checkpointFile)) return null;
+	try {
+		return JSON.parse(readFileSync(checkpointFile, "utf-8"));
+	} catch {
+		return null;
+	}
+}
+function readLogLines(logFile, startByte, startLine = 0) {
+	if (!existsSync(logFile)) return {
+		lines: [],
+		size: 0
+	};
+	const size = statSync(logFile).size;
+	if (startByte !== void 0) {
+		const safeStart = startByte <= size ? Math.max(0, startByte) : 0;
+		return {
+			lines: readFileSync(logFile).subarray(safeStart).toString("utf-8").split("\n").filter((l) => l.trim()),
+			size
+		};
+	}
+	return {
+		lines: readFileSync(logFile, "utf-8").split("\n").filter((l) => l.trim()).slice(startLine),
+		size
+	};
+}
 /**
 * Read TLDR session metrics for a workspace from log files.
 *
@@ -7878,14 +8210,12 @@ function getTldrMetrics(workspacePath, sinceCheckpoint = false) {
 	const interceptionsLog = join(tldrDir, "interceptions.log");
 	const bypassesLog = join(tldrDir, "bypasses.log");
 	const checkpointFile = join(tldrDir, "metrics-checkpoint.json");
-	let interceptionsStartLine = 0;
-	let bypassesStartLine = 0;
-	if (sinceCheckpoint && existsSync(checkpointFile)) try {
-		const checkpoint = JSON.parse(readFileSync(checkpointFile, "utf-8"));
-		interceptionsStartLine = checkpoint.interceptionsLine || 0;
-		bypassesStartLine = checkpoint.bypassesLine || 0;
-	} catch {}
-	const newInterceptions = (existsSync(interceptionsLog) ? readFileSync(interceptionsLog, "utf-8").split("\n").filter((l) => l.trim()) : []).slice(interceptionsStartLine);
+	const checkpoint = sinceCheckpoint ? readMetricsCheckpoint(checkpointFile) : null;
+	const interceptionsStartByte = checkpoint?.interceptionsByte;
+	const bypassesStartByte = checkpoint?.bypassesByte;
+	const interceptionsStartLine = checkpoint?.interceptionsLine ?? 0;
+	const bypassesStartLine = checkpoint?.bypassesLine ?? 0;
+	const newInterceptions = readLogLines(interceptionsLog, sinceCheckpoint ? interceptionsStartByte : void 0, sinceCheckpoint && interceptionsStartByte === void 0 ? interceptionsStartLine : 0).lines;
 	let estimatedTokensSaved = 0;
 	const filesAnalyzed = [];
 	for (const line of newInterceptions) {
@@ -7898,7 +8228,7 @@ function getTldrMetrics(workspacePath, sinceCheckpoint = false) {
 			if (relPath && !filesAnalyzed.includes(relPath)) filesAnalyzed.push(relPath);
 		}
 	}
-	const newBypasses = (existsSync(bypassesLog) ? readFileSync(bypassesLog, "utf-8").split("\n").filter((l) => l.trim()) : []).slice(bypassesStartLine);
+	const newBypasses = readLogLines(bypassesLog, sinceCheckpoint ? bypassesStartByte : void 0, sinceCheckpoint && bypassesStartByte === void 0 ? bypassesStartLine : 0).lines;
 	const bypassReasons = {};
 	for (const line of newBypasses) {
 		const parts = line.trim().split(" ");
@@ -7931,9 +8261,16 @@ function captureTldrMetrics(workspacePath) {
 	const interceptionsLog = join(tldrDir, "interceptions.log");
 	const bypassesLog = join(tldrDir, "bypasses.log");
 	const checkpointFile = join(tldrDir, "metrics-checkpoint.json");
+	const previous = readMetricsCheckpoint(checkpointFile);
+	const interceptionsByte = existsSync(interceptionsLog) ? statSync(interceptionsLog).size : 0;
+	const bypassesByte = existsSync(bypassesLog) ? statSync(bypassesLog).size : 0;
+	const previousInterceptionsLine = previous?.interceptionsByte !== void 0 && previous.interceptionsByte > interceptionsByte ? 0 : previous?.interceptionsLine ?? 0;
+	const previousBypassesLine = previous?.bypassesByte !== void 0 && previous.bypassesByte > bypassesByte ? 0 : previous?.bypassesLine ?? 0;
 	const checkpoint = {
-		interceptionsLine: existsSync(interceptionsLog) ? readFileSync(interceptionsLog, "utf-8").split("\n").filter((l) => l.trim()).length : 0,
-		bypassesLine: existsSync(bypassesLog) ? readFileSync(bypassesLog, "utf-8").split("\n").filter((l) => l.trim()).length : 0,
+		interceptionsLine: previousInterceptionsLine + metrics.interceptions,
+		bypassesLine: previousBypassesLine + metrics.bypasses,
+		interceptionsByte,
+		bypassesByte,
 		capturedAt: (/* @__PURE__ */ new Date()).toISOString()
 	};
 	try {

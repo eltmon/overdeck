@@ -177,6 +177,21 @@ describe('captureTldrMetrics', () => {
     );
     expect(checkpoint.interceptionsLine).toBe(2);
     expect(checkpoint.bypassesLine).toBe(1);
+    expect(checkpoint.interceptionsByte).toBeGreaterThan(0);
+    expect(checkpoint.bypassesByte).toBeGreaterThan(0);
+  });
+
+  it('uses byte checkpoints for subsequent captures', () => {
+    writeInterceptions(['1700000001 8000 src/lib/agents.ts']);
+    captureTldrMetrics(TEST_WORKSPACE);
+    writeInterceptions([
+      '1700000001 8000 src/lib/agents.ts',
+      '1700000002 8000 src/lib/new.ts',
+    ]);
+
+    const second = captureTldrMetrics(TEST_WORKSPACE)!;
+    expect(second.interceptions).toBe(1);
+    expect(second.filesAnalyzed).toEqual(['src/lib/new.ts']);
   });
 
   it('returns zero delta on second capture with no new events', () => {

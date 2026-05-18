@@ -46,6 +46,39 @@ export function shouldSkipCheckpointReconciliation(agent: Pick<AgentSnapshot, 's
 // ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
 let _cachedEventStore: any = null;
 
+type Jsonish = null | boolean | number | string | Jsonish[] | { [key: string]: Jsonish };
+
+function toJsonish(value: unknown, seen = new WeakSet<object>()): Jsonish | undefined {
+  if (value == null) return null;
+  if (typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) {
+    const next: Jsonish[] = [];
+    for (const item of value) {
+      const clean = toJsonish(item, seen);
+      if (clean !== undefined) next.push(clean);
+    }
+    return next;
+  }
+  if (typeof value === 'object') {
+    if (seen.has(value)) return null;
+    seen.add(value);
+    const next: { [key: string]: Jsonish } = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      const clean = toJsonish(item, seen);
+      if (clean !== undefined) next[key] = clean;
+    }
+    seen.delete(value);
+    return next;
+  }
+  return undefined;
+}
+
+function cleanIssues(issues: unknown[]): DashboardSnapshot['issues'] {
+  return issues.map((issue) => toJsonish(issue) ?? null);
+}
+
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
@@ -195,6 +228,10 @@ export const ReadModelServiceLive = Layer.effect(
         channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
         issues: state.issuesRaw,
         resources: state.resources ?? undefined,
+        scanProgress: state.scanProgress,
+        enrichStats: state.enrichStats,
+        enrichProgressBySessionId: state.enrichProgressBySessionId,
+        embedProgressBySessionId: state.embedProgressBySessionId,
         timestamp: new Date().toISOString(),
       };
     }
@@ -214,7 +251,7 @@ export const ReadModelServiceLive = Layer.effect(
           () => import('./services/issue-service-singleton.js'),
         );
         const issueService = getSharedIssueService();
-        const currentIssues = JSON.parse(JSON.stringify(issueService.getIssues()));
+        const currentIssues = cleanIssues(issueService.getIssues());
         if (currentIssues.length > 0 || state.issuesRaw.length === 0) {
           state = { ...state, issuesRaw: currentIssues };
         }
@@ -614,7 +651,7 @@ export const ReadModelServiceLive = Layer.effect(
         const issueService = getSharedIssueService();
 
         // Get current issues (may already have fresh data from background fetch)
-        const currentIssues = JSON.parse(JSON.stringify(issueService.getIssues()));
+        const currentIssues = cleanIssues(issueService.getIssues());
         if (currentIssues.length > 0 || !usedProjectionCache) {
           state = { ...state, issuesRaw: currentIssues };
         }
@@ -623,7 +660,7 @@ export const ReadModelServiceLive = Layer.effect(
         // update the read model directly AND emit to event store for
         // WebSocket subscribers (PAN-433).
         issueService.onIssuesChanged((issues) => {
-          const cleaned = JSON.parse(JSON.stringify(issues));
+          const cleaned = cleanIssues(issues);
           state = { ...state, issuesRaw: cleaned };
           // Persist updated snapshot to projection cache
           projectionCache?.save(buildSnapshot());

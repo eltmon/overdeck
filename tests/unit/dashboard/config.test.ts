@@ -91,9 +91,9 @@ describe('ServerConfig', () => {
   });
 
   describe('host', () => {
-    it('defaults to 0.0.0.0', async () => {
+    it('defaults to 127.0.0.1', async () => {
       const cfg = await getConfig();
-      expect(cfg.host).toBe('0.0.0.0');
+      expect(cfg.host).toBe('127.0.0.1');
     });
 
     it('reads HOST env var', async () => {

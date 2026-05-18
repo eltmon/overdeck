@@ -7,7 +7,7 @@
  */
 
 import { Effect, Layer, Queue, Stream } from 'effect';
-import { HttpRouter } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panctl/contracts';
 import { PanOpen } from './services/open.js';
@@ -19,8 +19,18 @@ import { parseConversationMessages, watchConversation } from './services/convers
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNamesAsync } from '../../lib/tmux.js';
 import { listProjects } from '../../lib/projects.js';
-import type { AgentStatus, ConversationEvent, DomainEvent, SessionTreeDelta } from '@panctl/contracts';
+import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionTreeDelta } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
+import { parseRelativeTime } from '../../lib/conversations/search.js';
+import type { SearchResult } from '../../lib/conversations/search.js';
+import { CostThresholdError } from '../../lib/conversations/enrichment/index.js';
+import { getConversationsConfigAsync } from '../../lib/config-yaml.js';
+import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
+import type { ConversationFilter, DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
+import { validateOrigin } from './routes/origin-validation.js';
+import { rejectUnauthorizedDashboardRequest } from './routes/dashboard-auth.js';
+import { jsonResponse } from './http-helpers.js';
+import { runDashboardDbJob } from './services/dashboard-db-task.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -31,6 +41,128 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
     timestamp: stored.timestamp,
     payload: stored.payload,
   } as DomainEvent;
+}
+
+function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
+  return {
+    id: session.id,
+    jsonlPath: session.jsonlPath,
+    sessionId: session.sessionId ?? undefined,
+    workspacePath: session.workspacePath ?? undefined,
+    workspaceHash: session.workspaceHash ?? undefined,
+    messageCount: session.messageCount,
+    firstTs: session.firstTs ?? undefined,
+    lastTs: session.lastTs ?? undefined,
+    modelsUsed: session.modelsUsed,
+    primaryModel: session.primaryModel ?? undefined,
+    tokenInput: session.tokenInput,
+    tokenOutput: session.tokenOutput,
+    estimatedCost: session.estimatedCost,
+    toolsUsed: session.toolsUsed,
+    filesTouched: session.filesTouched,
+    tags: session.tags,
+    summary: session.summary ?? undefined,
+    summaryDetailed: session.summaryDetailed ?? undefined,
+    enrichmentLevel: session.enrichmentLevel,
+    enrichmentModel: session.enrichmentModel ?? undefined,
+    enrichedAt: session.enrichedAt ?? undefined,
+    enrichmentFailed: session.enrichmentFailed,
+    panopticonManaged: session.panopticonManaged,
+    panIssueId: session.panIssueId ?? undefined,
+    panAgentId: session.panAgentId ?? undefined,
+    scannedAt: session.scannedAt,
+  };
+}
+
+const DEFAULT_CONVERSATION_LIMIT = 50;
+const MAX_CONVERSATION_LIMIT = 500;
+
+type EnrichSessionsRpcInput = {
+  level?: number;
+  ids?: number[];
+  filter?: ConversationFilter;
+  limit?: number;
+  model?: string;
+  customPrompt?: string;
+  upgrade?: boolean;
+  confirmed?: boolean;
+  force?: boolean;
+  fullTranscript?: boolean;
+};
+
+export function buildEnrichSessionsJobPayload(input: EnrichSessionsRpcInput, config: RuntimeConversationsConfig) {
+  return {
+    tier: input.level,
+    sessionIds: input.ids,
+    filter: input.filter,
+    limit: input.limit,
+    maxParallel: config.enrichment.maxParallel,
+    modelOverride: input.model,
+    promptSuffix: input.customPrompt,
+    fullTranscript: input.fullTranscript,
+    skipAlreadyEnriched: input.upgrade !== true,
+    force: input.confirmed === true || input.force === true,
+    config,
+  };
+}
+
+function normalizeConversationPagination(limit: number | undefined, offset: number | undefined): { limit: number; offset: number } {
+  const normalizedLimit = limit ?? DEFAULT_CONVERSATION_LIMIT;
+  const normalizedOffset = offset ?? 0;
+  if (!Number.isFinite(normalizedLimit) || normalizedLimit < 0) {
+    throw new PanRpcError({ message: 'Invalid limit', code: 'INVALID_LIMIT' });
+  }
+  if (!Number.isFinite(normalizedOffset) || normalizedOffset < 0) {
+    throw new PanRpcError({ message: 'Invalid offset', code: 'INVALID_OFFSET' });
+  }
+  return {
+    limit: Math.min(normalizedLimit, MAX_CONVERSATION_LIMIT),
+    offset: normalizedOffset,
+  };
+}
+
+function normalizeConversationFilter(input: {
+  workspacePath?: string;
+  primaryModel?: string;
+  managed?: boolean;
+  unmanaged?: boolean;
+  since?: string;
+  before?: string;
+  after?: string;
+  minCost?: number;
+  maxCost?: number;
+  minMessages?: number;
+  tags?: string[];
+  tools?: string[];
+  files?: string[];
+  issueId?: string;
+  enrichmentLevel?: number;
+  enriched?: boolean;
+  notEnriched?: boolean;
+  limit?: number;
+  offset?: number;
+}): ConversationFilter {
+  return {
+    workspacePath: input.workspacePath,
+    primaryModel: input.primaryModel,
+    managed: input.managed,
+    unmanaged: input.unmanaged,
+    since: input.since ? parseRelativeTime(input.since) : undefined,
+    before: input.before ? parseRelativeTime(input.before) : undefined,
+    after: input.after ? parseRelativeTime(input.after) : undefined,
+    minCost: input.minCost,
+    maxCost: input.maxCost,
+    minMessages: input.minMessages,
+    tags: input.tags,
+    tools: input.tools,
+    files: input.files,
+    issueId: input.issueId,
+    enrichmentLevel: input.enrichmentLevel,
+    enriched: input.enriched,
+    notEnriched: input.notEnriched,
+    limit: input.limit,
+    offset: input.offset,
+  };
 }
 
 // ─── Session Tree Subscription Helpers (PAN-821) ──────────────────────────────
@@ -425,6 +557,195 @@ const PanRpcLayer = PanRpcGroup.toLayer(
         panOpen.getAvailableEditors().pipe(
           Effect.map((editors) => ({ editors })),
         ),
+
+      [WS_METHODS.scanConversations]: (input) =>
+        Effect.promise(async () => {
+          const config = await getConversationsConfigAsync();
+          await Effect.runPromise(eventStore.appendAsync({
+            type: 'scan.started',
+            timestamp: new Date().toISOString(),
+            payload: { mode: input.mode, dirs: input.dirs ?? [] },
+          } as ScanStartedEvent));
+          let lastProgressEmit = 0;
+          const result = await runDashboardDbJob<{
+            inserted: number;
+            updated: number;
+            skipped: number;
+            errors: number;
+            durationMs: number;
+          }>('scanConversations', {
+            mode: input.mode,
+            dirs: input.dirs,
+            dryRun: input.dryRun,
+            watchDirs: config.watchDirs,
+            maxParallel: config.scanMaxParallel,
+          }, async (rawProgress) => {
+            const progress = rawProgress as {
+              dirsProcessed: number;
+              dirsTotal: number;
+              sessionsFound: number;
+              elapsedMs: number;
+            };
+            const now = Date.now();
+            const complete = progress.dirsProcessed >= progress.dirsTotal;
+            if (!complete && now - lastProgressEmit < 500) return;
+            lastProgressEmit = now;
+            await Effect.runPromise(eventStore.appendAsync({
+              type: 'scan.progress',
+              timestamp: new Date().toISOString(),
+              payload: progress,
+            } as ScanProgressEvent));
+          });
+          await Effect.runPromise(eventStore.appendAsync({
+            type: 'scan.complete',
+            timestamp: new Date().toISOString(),
+            payload: {
+              inserted: result.inserted,
+              updated: result.updated,
+              skipped: result.skipped,
+              errors: result.errors,
+              durationMs: result.durationMs,
+            },
+          } as ScanCompleteEvent));
+          return result;
+        }),
+
+      [WS_METHODS.searchConversations]: (input) =>
+        Effect.promise(async () => {
+          const config = await getConversationsConfigAsync();
+          const pagination = normalizeConversationPagination(input.limit, input.offset);
+          const filter = { ...normalizeConversationFilter(input), ...pagination };
+          try {
+            const operation = input.semantic === true ? 'searchSessionsSemantic' : 'searchSessions';
+            const result = await runDashboardDbJob<SearchResult>(operation, {
+              q: input.semantic === true ? undefined : input.query,
+              semanticQuery: input.semantic === true ? input.query : undefined,
+              similarTo: input.similarTo,
+              filter,
+              limit: pagination.limit,
+              offset: pagination.offset,
+              config,
+            });
+            return {
+              ...result,
+              sessions: result.sessions.map(toDiscoveredSessionSnapshot),
+            };
+          } catch (err) {
+            if (input.semantic === true) {
+              return {
+                sessions: [],
+                total: 0,
+                mode: 'semantic',
+                durationMs: 0,
+                error: err instanceof Error ? err.message : String(err),
+              };
+            }
+            throw err;
+          }
+        }),
+
+      [WS_METHODS.listDiscoveredSessions]: (input) =>
+        Effect.promise(async () => {
+          const filter = {
+            ...normalizeConversationFilter(input),
+            ...normalizeConversationPagination(input.limit, input.offset),
+          };
+          const { sessions, total } = await runDashboardDbJob<{ sessions: DiscoveredSession[]; total: number }>('listDiscoveredSessions', filter);
+          return { sessions: sessions.map(toDiscoveredSessionSnapshot), count: sessions.length, total };
+        }),
+
+      [WS_METHODS.getDiscoveredSession]: (input) =>
+        Effect.promise(async () => {
+          const session = await runDashboardDbJob<DiscoveredSession | null>('getDiscoveredSessionById', input.id);
+          if (!session) {
+            throw new PanRpcError({ message: `Session ${input.id} not found`, code: 'NOT_FOUND' });
+          }
+          return toDiscoveredSessionSnapshot(session);
+        }).pipe(
+          Effect.mapError((cause) => cause instanceof PanRpcError
+            ? cause
+            : new PanRpcError({ message: String(cause), code: 'GET_DISCOVERED_SESSION_FAILED' })),
+        ),
+
+      [WS_METHODS.enrichSessions]: (input) =>
+        Effect.promise(async () => {
+          const config = await getConversationsConfigAsync();
+          try {
+            const result = await runDashboardDbJob<{
+              enriched: number;
+              errors: number;
+              estimatedCost: number;
+              actualCost: number | null;
+              durationMs: number;
+            }>('enrichSessions', buildEnrichSessionsJobPayload(input, config), async (rawProgress) => {
+              const progress = rawProgress as {
+                session?: { sessionId: number; tier: number; model: string; cost?: number; success: boolean; error?: string };
+              };
+              if (!progress.session) return;
+              const { session } = progress;
+              await Effect.runPromise(eventStore.appendAsync({
+                type: 'enrich.progress',
+                timestamp: new Date().toISOString(),
+                payload: {
+                  sessionId: session.sessionId,
+                  level: session.tier,
+                  model: session.model,
+                  cost: session.cost ?? 0,
+                  success: session.success,
+                  error: session.error,
+                },
+              } as EnrichProgressEvent));
+            });
+            const processed = result.enriched + result.errors;
+            await Effect.runPromise(eventStore.appendAsync({
+              type: 'enrich.complete',
+              timestamp: new Date().toISOString(),
+              payload: { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors, durationMs: result.durationMs },
+            } as EnrichCompleteEvent));
+            return { processed, totalCost: result.actualCost ?? result.estimatedCost, failures: result.errors };
+          } catch (err) {
+            if (err instanceof CostThresholdError) {
+              throw new PanRpcError({
+                message: err.message,
+                code: `COST_THRESHOLD:${err.estimatedCost}:${err.threshold}:${err.sessionCount}`,
+              });
+            }
+            throw err;
+          }
+        }),
+
+      [WS_METHODS.embedSessions]: (input) =>
+        Effect.promise(async () => {
+          const config = await getConversationsConfigAsync();
+          const result = await runDashboardDbJob<{ embedded: number; skipped: number; errors: number }>('embedSessions', {
+            sessionIds: input.ids,
+            regenerate: input.regenerate,
+            config,
+          }, async (rawProgress) => {
+            const progress = rawProgress as {
+              session?: { sessionId: number; model: string; success: boolean; error?: string };
+            };
+            if (!progress.session) return;
+            await Effect.runPromise(eventStore.appendAsync({
+              type: 'embed.progress',
+              timestamp: new Date().toISOString(),
+              payload: progress.session,
+            } as EmbedProgressEvent));
+          });
+          return { total: result.embedded + result.skipped + result.errors, embedded: result.embedded, model: config.embeddingModel };
+        }),
+
+      [WS_METHODS.getConversationCost]: (input) =>
+        Effect.promise(async () => runDashboardDbJob('aggregateDiscoveredSessionCost', normalizeConversationFilter(input))),
+
+      [WS_METHODS.getConversationCostByWorkspace]: (input) =>
+        Effect.promise(async () => runDashboardDbJob('aggregateDiscoveredSessionCostBy', {
+          groupBy: 'workspace',
+          filter: normalizeConversationFilter(input),
+        })),
+
+      [WS_METHODS.getConversationStats]: () =>
+        Effect.promise(async () => runDashboardDbJob('getDiscoveredStats')),
     });
   }),
 );
@@ -447,6 +768,15 @@ export const websocketRpcRouteLayer = Layer.unwrap(
       ),
     );
 
-    return HttpRouter.add('GET', '/ws/rpc', rpcWebSocketHttpEffect);
+    return HttpRouter.add('GET', '/ws/rpc', Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const originCheck = validateOrigin(request);
+      if (!originCheck.ok) {
+        return jsonResponse({ error: originCheck.error }, { status: 403 });
+      }
+      const authError = rejectUnauthorizedDashboardRequest(request);
+      if (authError) return authError;
+      return yield* rpcWebSocketHttpEffect;
+    }));
   }),
 );

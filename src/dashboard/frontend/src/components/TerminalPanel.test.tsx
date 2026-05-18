@@ -11,6 +11,12 @@ vi.mock('./XTerminal', () => ({
   ),
 }));
 
+vi.mock('./CommandDeck/ActivityView', () => ({
+  ActivityView: ({ issueId }: { issueId: string }) => (
+    <div data-testid="activity-view" data-issue={issueId} />
+  ),
+}));
+
 vi.stubGlobal('fetch', vi.fn((_url: string) =>
   Promise.resolve({ ok: true, json: () => Promise.resolve({ alive: true }) } as Response)
 ));
@@ -37,7 +43,7 @@ function renderTerminalPanel(agent: Agent) {
   );
 }
 
-describe('TerminalPanel — renders XTerminal for all agent types', () => {
+describe('TerminalPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -56,23 +62,42 @@ describe('TerminalPanel — renders XTerminal for all agent types', () => {
     expect(screen.getByTestId('xterm')).toBeInTheDocument();
   });
 
-  it('renders XTerminal for a planning agent matched by id prefix', () => {
+  it('renders ActivityView for a planning agent matched by id prefix', () => {
     const agent = makeAgent({ id: 'planning-pan-503', issueId: 'PAN-503' });
     renderTerminalPanel(agent);
 
-    expect(screen.getByTestId('xterm')).toBeInTheDocument();
-    expect(screen.getByTestId('xterm')).toHaveAttribute('data-session', 'planning-pan-503');
+    expect(screen.getByTestId('activity-view')).toHaveAttribute('data-issue', 'PAN-503');
+    expect(screen.queryByTestId('xterm')).not.toBeInTheDocument();
   });
 
-  it('renders XTerminal when agentPhase is "planning"', () => {
+  it('renders ActivityView when agentPhase is "planning"', () => {
     const agent = makeAgent({ id: 'agent-pan-503', agentPhase: 'planning', issueId: 'PAN-503' });
     renderTerminalPanel(agent);
+
+    expect(screen.getByTestId('activity-view')).toHaveAttribute('data-issue', 'PAN-503');
+  });
+
+  it('transitions between planning and terminal branches without hook-order failure', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <TerminalPanel agent={makeAgent({ id: 'agent-pan-503', agentPhase: 'planning', issueId: 'PAN-503' })} onClose={vi.fn()} />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByTestId('activity-view')).toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <TerminalPanel agent={makeAgent({ id: 'agent-pan-503', agentPhase: undefined, issueId: 'PAN-503' })} onClose={vi.fn()} />
+      </QueryClientProvider>
+    );
 
     expect(screen.getByTestId('xterm')).toBeInTheDocument();
   });
 
   it('shows the popout button for live agents', () => {
-    const agent = makeAgent({ id: 'planning-pan-503', issueId: 'PAN-503' });
+    const agent = makeAgent({ id: 'agent-pan-503', issueId: 'PAN-503' });
     renderTerminalPanel(agent);
 
     expect(screen.getByTitle('Pop out terminal')).toBeInTheDocument();
