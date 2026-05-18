@@ -75,6 +75,23 @@ const deepWipe = (...args: Parameters<typeof deepWipeEffect>) => Effect.runPromi
 const close = (...args: Parameters<typeof closeEffect>) => Effect.runPromise(closeEffect(...args));
 const resetToTodo = (...args: Parameters<typeof resetToTodoEffect>) => Effect.runPromise(resetToTodoEffect(...args));
 import { AGENTS_DIR, PANOPTICON_HOME } from '../../../../src/lib/paths.js';
+import { findSpecByIssue, writeSpecForIssue } from '../../../../src/lib/pan-dir/specs.js';
+import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+
+function makeVBrief(issueId: string, status = 'running'): VBriefDocument {
+  return {
+    vBRIEFInfo: { version: '0.5', created: '2026-05-18T00:00:00Z' },
+    plan: {
+      id: issueId,
+      title: `Plan for ${issueId}`,
+      status,
+      sequence: 1,
+      created: '2026-05-18T00:00:00Z',
+      items: [],
+      edges: [],
+    },
+  };
+}
 
 describe('workflows', () => {
   let testDir: string;
@@ -211,6 +228,35 @@ describe('workflows', () => {
       const result = await closeOut(ctx);
 
       expect(result.steps.find(s => s.step === 'teardown:branches')).toBeDefined();
+    });
+
+    it('should complete vBRIEF status and prune checkpoint refs during close-out', async () => {
+      writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx);
+
+      expect(result.steps.find(s => s.step === 'close-out:vbrief-completed')).toBeDefined();
+      expect(result.steps.find(s => s.step === 'teardown:checkpoint-refs')).toBeDefined();
+
+      const spec = findSpecByIssue(testDir, 'PAN-100');
+      expect(spec?.status).toBe('completed');
+      expect(spec?.document.plan.status).toBe('completed');
+    });
+
+    it('should remove verifying labels when applying the closed-out label', async () => {
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+      };
+
+      await closeOut(ctx);
+
+      const commands = mockExecAsync.mock.calls.map(([command]) => String(command));
+      expect(commands.some(command => command.includes('--add-label "closed-out"'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label "verifying-on-main"'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
     });
   });
 

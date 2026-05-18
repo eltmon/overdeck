@@ -163,6 +163,14 @@ export function closeOut(
       return buildResult('close-out', ctx.issueId, allSteps, start);
     }
 
+    // 3. Mark the vBRIEF completed on main before teardown removes local state.
+    const vbriefStep = yield* Effect.promise(() => completeVBriefStep(ctx));
+    allSteps.push(vbriefStep);
+    if (!vbriefStep.success && !vbriefStep.skipped) {
+      allSteps.push(stepFailed('close-out:abort', 'Stopped — vBRIEF completion failed, workspace preserved'));
+      return buildResult('close-out', ctx.issueId, allSteps, start);
+    }
+
     // 4+5. Teardown workspace + agent state
     const closeOutConfig = loadCloisterConfig().close_out;
     const teardownSteps = yield* teardownWorkspace(ctx, {
@@ -308,6 +316,32 @@ export function cancelIssueWorkflow(
 }
 
 // --- Internal helpers ---
+
+async function completeVBriefStep(ctx: LifecycleContext): Promise<StepResult> {
+  const step = 'close-out:vbrief-completed';
+  try {
+    const { transitionVBriefOnMain } = await import('../vbrief/lifecycle-io.js');
+    const result = await transitionVBriefOnMain(
+      ctx.projectPath,
+      ctx.issueId,
+      'completed',
+      'completed',
+      `scope: complete ${ctx.issueId.toUpperCase()} vBRIEF`,
+    );
+    const details = [
+      result.moved ? 'Updated vBRIEF lifecycle to completed' : 'vBRIEF lifecycle already completed',
+      result.statusUpdated ? 'Updated plan.status to completed' : 'plan.status already completed',
+    ];
+    if (result.committed) details.push('Committed vBRIEF completion on main');
+    return stepOk(step, details);
+  } catch (err) {
+    const message = (err as Error).message;
+    if (message.includes('No vBRIEF found')) {
+      return stepSkipped(step, [`No vBRIEF found for ${ctx.issueId}`]);
+    }
+    return stepFailed(step, `vBRIEF completion failed: ${message}`);
+  }
+}
 
 /**
  * Verify feature branch is merged into main.
@@ -567,6 +601,7 @@ async function clearReviewStatusStepImpl(issueId: string): Promise<StepResult> {
 }
 
 export const __testInternals = {
+  completeVBriefStep,
   verifyBranchMerged,
 };
 

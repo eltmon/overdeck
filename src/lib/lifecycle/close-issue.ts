@@ -25,7 +25,7 @@ const execAsync = promisify(exec);
 
 const CLOSED_OUT_LABEL = 'closed-out';
 const CLOSED_OUT_COLOR = '1d4ed8';
-const WORKFLOW_LABELS = ['in-progress', 'in-review', 'needs-close-out'];
+const WORKFLOW_LABELS = ['in-progress', 'in-review', 'needs-close-out', 'verifying-on-main'];
 
 /** Options for close-issue */
 export interface CloseIssueOptions {
