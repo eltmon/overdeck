@@ -21,6 +21,7 @@ import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
 import { ConversationsPage } from './components/conversations/ConversationsPage';
 import { AutoPresoView } from './components/autopreso/AutoPresoView';
+import { PipelineView } from './components/Pipeline/PipelineView';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { BootstrapGate } from './components/BootstrapGate';
@@ -60,6 +61,7 @@ interface TrackerStatus {
 
 const TAB_PATHS: Record<Tab, string> = {
   kanban: '/',
+  pipeline: '/pipeline',
   'command-deck': '/command-deck',
   agents: '/agents',
   resources: '/resources',
@@ -978,6 +980,11 @@ export default function App() {
               <GodViewPage />
             </div>
           </BootstrapGate>
+        )}
+        {activeTab === 'pipeline' && (
+          <div className="w-full h-full overflow-hidden">
+            <PipelineView />
+          </div>
         )}
         </main>
       </div>

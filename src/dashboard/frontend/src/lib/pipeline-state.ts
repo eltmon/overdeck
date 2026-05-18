@@ -1,5 +1,20 @@
 import type { Agent } from '../types';
 
+export type PipelineLifecyclePhase = 'todo' | 'plan' | 'work' | 'review' | 'ship' | 'done';
+
+export interface IssuePhaseInput {
+  identifier: string;
+  state?: string;
+  hasPlan?: boolean;
+  planningComplete?: boolean;
+}
+
+export interface AgentPhaseInput {
+  issueId?: string;
+  role?: 'plan' | 'work' | 'review' | 'test' | 'ship';
+  status: string;
+}
+
 type PipelineStateLike = {
   reviewStatus?: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus?: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
@@ -100,4 +115,59 @@ export function isPendingReviewStranded(status?: PipelineStateLike | null, now =
  */
 export function isDeaconIgnored(status?: PipelineStateLike | null): boolean {
   return status?.deaconIgnored === true;
+}
+
+/**
+ * Classify an issue into its lifecycle phase for the Pipeline page.
+ * Uses existing pipeline-state helpers so status-checking logic is not duplicated.
+ *
+ * Precedence: done → ship → review → work → plan → todo.
+ */
+export function getIssuePhase(
+  issue: IssuePhaseInput,
+  reviewStatus?: PipelineStateLike | null,
+  agents?: readonly AgentPhaseInput[] | null,
+): PipelineLifecyclePhase {
+  // Done
+  if (issue.state === 'canceled' || issue.state === 'done' || reviewStatus?.mergeStatus === 'merged') {
+    return 'done';
+  }
+
+  // Ship
+  if (
+    reviewStatus?.readyForMerge === true ||
+    reviewStatus?.mergeStatus === 'queued' ||
+    reviewStatus?.mergeStatus === 'merging' ||
+    reviewStatus?.mergeStatus === 'verifying'
+  ) {
+    return 'ship';
+  }
+
+  // Review
+  if (reviewStatus?.reviewStatus && reviewStatus.reviewStatus !== 'pending') {
+    return 'review';
+  }
+
+  // Work / Plan — based on agents
+  if (agents) {
+    const issueAgents = agents.filter(
+      (a) => a.issueId?.toLowerCase() === issue.identifier.toLowerCase(),
+    );
+    const hasActiveWork = issueAgents.some(
+      (a) => a.role === 'work' && a.status !== 'stopped' && a.status !== 'dead',
+    );
+    if (hasActiveWork) return 'work';
+
+    const hasActivePlan = issueAgents.some(
+      (a) => a.role === 'plan' && a.status !== 'stopped' && a.status !== 'dead',
+    );
+    if (hasActivePlan) return 'plan';
+  }
+
+  // Has plan but no active agent
+  if (issue.hasPlan || issue.planningComplete) {
+    return 'plan';
+  }
+
+  return 'todo';
 }
