@@ -1,0 +1,743 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-18T13:30:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1191: Create workspace docker stack on Start (not Plan), with progress dialog",
+    "updated": "2026-05-18T13:19:27.000Z"
+  },
+  "plan": {
+    "id": "pan-1191",
+    "title": "Create workspace docker stack on Start (not Plan), with progress dialog",
+    "status": "proposed",
+    "uid": "5b3d8ac2-fc94-44fd-a6bf-a618ee9ddaf5",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-18T13:30:00.000Z",
+    "updated": "2026-05-18T13:19:27.000Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1191",
+        "label": "PAN-1191",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1169",
+        "label": "PAN-1169 (related)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1189",
+        "label": "PAN-1189 (related)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "workspace",
+      "docker",
+      "ux",
+      "regression-fix",
+      "lifecycle"
+    ],
+    "narratives": {
+      "Problem": "Clicking dashboard Start on a fresh issue (PAN-1189, PAN-1190, PAN-1169) fails with `Failed to start agent: Workspace docker stack for PAN-NNN is not healthy: No Docker containers found for workspace stack pan-NNN`. The only workarounds today are `pan workspace rebuild PAN-NNN` (manual CLI step the dashboard never advertises) or `pan start PAN-NNN --host --yes` (bypasses container isolation, doesn't match prod). Three of the four issues worked on tonight hit this. The root cause: workspace docker stacks used to be provisioned during planning, that step was removed, but the corresponding provision-on-Start work never landed. The 422 stack-health gate in POST /api/agents (agents.ts:2430-2455) fires before anything attempts to bring the stack up, and the existing background container-up path (agents.ts:2830+) only triggers when `.devcontainer/dev` already exists.",
+      "Proposal": "Move docker stack provisioning to Start time. Extract a single async helper `provisionWorkspaceStack(issueId, { force?, onStep })` from the existing `workspace-rebuild` command. The helper checks stack health first (idempotent skip when healthy), renders `.devcontainer/` from template if missing, runs `docker compose up -d --build`, and waits for healthy. Per-issue in-process mutex serializes concurrent calls. Introduce a typed contract event `workspace.provisioning_step` so the frontend can render a progress dialog with step-by-step status, elapsed time per step, and on failure offers Retry / Force rebuild / Switch to --host (advanced) remediations. CLI `pan start` (without `--host`) calls the same helper and streams identical step text to stdout via `ora`. `pan workspace rebuild` is refactored to delegate to the helper with `force: true` so rebuild semantics live in one place. Remove the 422 pre-flight gate and the existing background-container path — they're replaced by the helper. Healthy pre-existing stacks short-circuit cleanly. Out of scope: replacing docker-compose, per-issue template customization, pre-warming."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use a NEW typed contract event `workspace.provisioning_step` rather than re-purposing `activity.entry` payloads.",
+        "rationale": "Typed events make the frontend dialog trivial to render, snapshot-test, and reason about. The contract cost (one schema + one reducer case) is paid once and pays back across the lifetime of the feature. Free-form `activity.entry` would couple the dialog to string parsing."
+      },
+      {
+        "summary": "Provisioning kicks off inside POST /api/agents (returns 202 with `provisioning: true, agentId`); no new endpoint.",
+        "rationale": "The user clicks Start once; the dialog is the natural surface for kickoff state. A separate provisioning endpoint would split the action across two clicks and split server logic across two handlers. Retry / Force rebuild / Switch to --host all re-POST the same endpoint with different flags."
+      },
+      {
+        "summary": "Per-issue in-process mutex serializes provisioning within the dashboard process; cross-process concurrency is left to docker-compose's own serialization on a given project name.",
+        "rationale": "Cross-process file-system locking is out of scope for a UX feature. The realistic concurrency problem is double-clicks on Start within the dashboard; the realistic cross-process concurrency (CLI race) is bounded by docker daemon serialization on a given project name. If observed to be a real problem, a future bead can add a global concurrent-build semaphore."
+      },
+      {
+        "summary": "Canonical step sequence: `ensure-devcontainer` → optional `compose-down` (when force) → `compose-up` → `wait-healthy` → `cleanup-node-modules` → `verify-health`. Each emits started + completed/failed.",
+        "rationale": "Mirrors what `pan workspace rebuild` already does today plus the post-bring-up cleanup currently inlined at agents.ts:3007. Centralizing into one sequence eliminates the two-code-path drift between rebuild and start. The sequence is pinned by a snapshot test (B10)."
+      },
+      {
+        "summary": "Failure dialog gates `Switch to --host (advanced)` behind a second confirmation (matches existing `--host --yes` CLI safety gate).",
+        "rationale": "The CLI already requires `--yes` for non-interactive --host. The dashboard should not be a one-click escape hatch around container isolation. Two clicks is a low cost for an explicit safety affordance."
+      },
+      {
+        "summary": "Keep `evaluateWorkspaceStackHealth` semantics unchanged (still returns healthy when `.devcontainer/` is missing).",
+        "rationale": "The current behavior is depended on by the kanban tooltip and inspector badge. The new behavior is that the start path renders `.devcontainer/` proactively before consulting health, so the no-`.devcontainer/` short-circuit no longer races with the spawn. Less risk, narrower blast radius."
+      },
+      {
+        "summary": "Do NOT change `useWorkspaceStackHealthQuery`, `KanbanBoard` stack-health rendering, or `InspectorPanel` stack-health rendering.",
+        "rationale": "Those surfaces are independent of the start-agent route — they poll stack health separately and surface it. Touching them here expands scope and adds regression risk to working UI."
+      }
+    ],
+    "items": [
+      {
+        "id": "b1-contract-event",
+        "title": "Add `workspace.provisioning_step` contract event + reducer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-18T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1191",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Define a typed event `workspace.provisioning_step` in `packages/contracts/src/events.ts` with payload `{ id: string, issueId: IssueId, stepId: string, stepLabel: string, status: 'started'|'completed'|'failed'|'skipped', startedAt: string, endedAt?: string, error?: string, hint?: string }`. Add a reducer case in `packages/contracts/src/event-reducers.ts` that appends the step into a `workspaceProvisioning: Record<IssueId, ProvisioningStep[]>` slice. Run `bun --filter @panctl/contracts build` so the dashboard server picks up the new types. This is foundation for B5 (route emits the events), B6 (store aggregates them), B7 (modal renders them). Inspection required because every downstream bead encodes assumptions about this schema."
+        },
+        "subItems": [
+          {
+            "id": "b1-contract-event.ac1",
+            "title": "`packages/contracts/src/events.ts` exports `WorkspaceProvisioningStepEvent` schema with the field shape above.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-contract-event.ac2",
+            "title": "`packages/contracts/src/event-reducers.ts` has a case for `workspace.provisioning_step` that appends to a per-issue array and supersedes any prior step with the same `stepId` (replace, not duplicate).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-contract-event.ac3",
+            "title": "Vitest in `packages/contracts/src/__tests__/event-reducers.test.ts` (or sibling) covers: append new step, replace existing step, multiple issues isolated.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b1-contract-event.ac4",
+            "title": "`bun --filter @panctl/contracts build` succeeds and the dist exports the new type.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b2-provision-helper",
+        "title": "Extract `provisionWorkspaceStack` helper in `src/lib/workspace/provision-stack.ts`",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-18T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1191",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `src/lib/workspace/provision-stack.ts` exporting `async function provisionWorkspaceStack(issueId, opts: { force?: boolean; onStep?: (step) => void; workspacePath?: string }): Promise<{ healthy: true } | { healthy: false; failedStep: string; reason: string }>`. Implementation: (1) resolve project and workspace path; (2) acquire per-issue in-process mutex (Map<issueId, Promise>); (3) emit step `verify-health` started — call `getWorkspaceStackHealth`; if healthy AND `.devcontainer/` exists AND `force !== true`, emit all subsequent steps as `skipped` and return `{ healthy: true }`; (4) emit step `ensure-devcontainer` — call existing `ensureDevcontainer`; (5) if `force === true`, emit step `compose-down` and run `docker compose down -v --remove-orphans`; (6) emit step `compose-up` and run `docker compose up -d --build`; (7) emit step `wait-healthy` and poll `docker ps --filter name=<projectName> --format '{{.Names}}|{{.Status}}'` for up to 180s (matches existing agents.ts:2955 timeout); (8) emit step `cleanup-node-modules` and remove Docker-created root-owned empty `node_modules` (matches agents.ts:3007); (9) emit step `verify-health` (final) — call `getWorkspaceStackHealth` again; return result. Foundation for B3/B4/B5, so `requiresInspection: true`."
+        },
+        "subItems": [
+          {
+            "id": "b2-provision-helper.ac1",
+            "title": "Helper file exists at `src/lib/workspace/provision-stack.ts` and exports `provisionWorkspaceStack` with the signature above.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-provision-helper.ac2",
+            "title": "When called against a healthy stack, helper short-circuits and emits the remaining steps as `skipped` (does not run `docker compose up`).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-provision-helper.ac3",
+            "title": "When called against a workspace with no `.devcontainer/`, helper renders it first via `ensureDevcontainer` before running compose-up.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-provision-helper.ac4",
+            "title": "When called twice concurrently for the same issueId, the second call awaits the first call's promise (per-issue mutex).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-provision-helper.ac5",
+            "title": "Helper uses `execAsync` / `spawn` / `fs/promises` — NO `execSync`/`readFileSync`/`writeFileSync`/`rmSync` (CLAUDE.md no-blocking-calls rule). `existsSync` is permitted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b2-provision-helper.ac6",
+            "title": "Vitest in `src/lib/workspace/__tests__/provision-stack.test.ts` covers: already-healthy short-circuit, unhealthy provisioning happy-path, force-rebuild path, mutex serialization, error path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b3-refactor-workspace-rebuild",
+        "title": "Refactor `pan workspace rebuild` CLI to delegate to `provisionWorkspaceStack({ force: true })`",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-18T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Rewrite `src/cli/commands/workspace-rebuild.ts` so `workspaceRebuildCommand(issueId)` calls `provisionWorkspaceStack(issueId, { force: true, onStep })` where the `onStep` callback drives an `ora` spinner with the current step label. Remove the inline `dockerCompose` + `ensureDevcontainer` + `rmSync('.devcontainer/')` logic — those now live in the helper. Keep the `composeProjectNameForWorkspace` validator export since it's used elsewhere. The existing `src/cli/commands/__tests__/workspace-rebuild.test.ts` must still pass (or be updated to mock the helper if it currently mocks docker)."
+        },
+        "subItems": [
+          {
+            "id": "b3-refactor-workspace-rebuild.ac1",
+            "title": "`workspace-rebuild.ts` no longer contains `dockerCompose` or `ensureDevcontainer` calls — only delegates to `provisionWorkspaceStack`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-refactor-workspace-rebuild.ac2",
+            "title": "`composeProjectNameForWorkspace` is still exported (other call sites depend on it).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-refactor-workspace-rebuild.ac3",
+            "title": "Existing `workspace-rebuild.test.ts` passes (or is updated to reflect the new delegation pattern, with the original behavior covered by `provision-stack.test.ts`).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b3-refactor-workspace-rebuild.ac4",
+            "title": "Manual UAT: `pan workspace rebuild <existing-workspace>` tears the stack down and rebuilds it, with `ora` spinner showing the step sequence; identical to current behavior.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b4-pan-start-cli-provision",
+        "title": "Wire `pan start <id>` CLI to call `provisionWorkspaceStack` before spawn",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-18T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In `src/cli/commands/start.ts`, before the spawn call, when `!options.host` and the issue's project has `workspace.docker.compose_template`, call `provisionWorkspaceStack(issueId, { onStep })` with an `ora`-driven callback. On `failed` step, print the step label + error and exit non-zero with hint to retry or pass `--host`. On healthy/completed, proceed to spawn as before. `pan start --host` skips provisioning entirely (matches today's behavior)."
+        },
+        "subItems": [
+          {
+            "id": "b4-pan-start-cli-provision.ac1",
+            "title": "`pan start PAN-NNN` against an unprovisioned workspace runs through the provisioning step sequence and prints each step's label as it begins; ends with the agent spawn.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-pan-start-cli-provision.ac2",
+            "title": "`pan start PAN-NNN` against an already-healthy workspace prints `stack already healthy — skipping` and proceeds directly to spawn.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-pan-start-cli-provision.ac3",
+            "title": "`pan start PAN-NNN --host` still bypasses provisioning entirely (no behavior change for the host path).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b4-pan-start-cli-provision.ac4",
+            "title": "On provisioning failure, the CLI exits non-zero with the failed step label, the error, and a hint suggesting `--host` or `pan workspace rebuild <id> --force`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b5-dashboard-route-provision",
+        "title": "Wire dashboard `POST /api/agents` to provision via `provisionWorkspaceStack` and emit step events",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-18T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1191",
+          "requiresInspection": true,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In `src/dashboard/server/routes/agents.ts`: (1) REMOVE the pre-flight 422 stack-health gate at ~line 2430-2455. (2) REMOVE the existing background container-up path at ~line 2830-3057 (everything inside `if (existsSync(workspacePath) && existsSync(devScript))`). (3) After the provider health check and before the spawn, call `provisionWorkspaceStack(issueId, { force: body.forceRebuild === true, onStep })` where `onStep` writes a `workspace.provisioning_step` event to the event store via `eventStore.append(...)`. (4) When provisioning is needed (i.e. stack not already healthy OR `forceRebuild`), spawn the helper in the background and return 202 immediately with `{ success: true, provisioning: true, agentId, issueId }`. (5) When provisioning short-circuits (healthy + not forced), proceed inline and return 200 with `{ success: true, provisioning: false, ... }` same as today. (6) Handle the new flags: `body.forceRebuild` and the existing `body.allowHost` plus a new `body.hostConfirmed: true` requirement when `body.allowHost` is set from the dashboard (matches CLI `--host --yes`). Inspection required: this is the integration point where the contract from B1 meets the helper from B2; downstream beads (B7 modal, B8 failure UI) depend on the response shape and event-emission timing being right."
+        },
+        "subItems": [
+          {
+            "id": "b5-dashboard-route-provision.ac1",
+            "title": "POST /api/agents against a workspace with no `.devcontainer/` returns 202 with `{ provisioning: true, agentId, issueId }` (was 422 before).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-dashboard-route-provision.ac2",
+            "title": "Each step of provisioning emits a `workspace.provisioning_step` event observable via the event store (asserted by reading back events after the call).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-dashboard-route-provision.ac3",
+            "title": "POST /api/agents against a workspace with a healthy stack returns 200 with `{ provisioning: false, ... }` and proceeds inline.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-dashboard-route-provision.ac4",
+            "title": "POST /api/agents with `body.forceRebuild: true` triggers `provisionWorkspaceStack({ force: true })` even when stack is currently healthy.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-dashboard-route-provision.ac5",
+            "title": "POST /api/agents with `body.allowHost: true` but missing `body.hostConfirmed: true` returns 422 with `{ error: 'Host mode requires explicit confirmation' }`. With both flags, it bypasses provisioning entirely.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-dashboard-route-provision.ac6",
+            "title": "The legacy 422 gate at ~line 2430-2455 and the legacy background container-up path at ~line 2830-3057 are REMOVED (not just bypassed) — the route has exactly one provisioning code path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-dashboard-route-provision.ac7",
+            "title": "On provisioning failure, the route emits a final `workspace.provisioning_step` with `status: 'failed'` and writes `state.json` with `status: 'error'` so the frontend can surface the error.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b5-dashboard-route-provision.ac8",
+            "title": "All new code in the route uses `execAsync` / `spawn` / `fs/promises` — no `execSync`/`readFileSync`/`writeFileSync` (CLAUDE.md no-blocking-calls rule, .claude/rules/no-execsync-server.md).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b6-frontend-store-slice",
+        "title": "Frontend Zustand store: subscribe to `workspace.provisioning_step` events and aggregate per-issue step list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-18T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In the frontend Zustand store (whichever slice already aggregates domain events — likely in `src/dashboard/frontend/src/store/`), add a `workspaceProvisioning: Record<IssueId, ProvisioningStep[]>` slice that consumes `workspace.provisioning_step` events from the EventRouter. Same replace-by-stepId semantics as the contract reducer (B1.ac2). Expose a selector `selectProvisioningStepsForIssue(issueId)` for the modal."
+        },
+        "subItems": [
+          {
+            "id": "b6-frontend-store-slice.ac1",
+            "title": "Store slice `workspaceProvisioning` exists and is populated by `workspace.provisioning_step` events arriving via the `/ws/rpc` event stream.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b6-frontend-store-slice.ac2",
+            "title": "Selector `selectProvisioningStepsForIssue(issueId)` returns the steps in order they were emitted, with replace-by-stepId semantics (no duplicate steps).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b6-frontend-store-slice.ac3",
+            "title": "Vitest covers: append step, replace step with same `stepId`, multi-issue isolation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b7-frontend-modal",
+        "title": "Frontend `WorkspaceProvisionDialog` component",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-18T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/frontend/src/components/WorkspaceProvisionDialog.tsx`. Opens when the start-agent mutation response has `{ provisioning: true }`. Subscribes to `selectProvisioningStepsForIssue(issueId)` from B6. Renders a step list with: status icon (`⟳` for started, `✓` for completed, `✗` for failed, `–` for skipped), step label, elapsed time updated every 1s from `startedAt`/`endedAt`. On the last step `verify-health` completing successfully, closes the modal and lets the existing terminal transition take over. Uses the existing `DialogProvider`/`Dialog` UI primitives from `src/dashboard/frontend/src/components/ui/` (matching the style of other dialogs in the codebase such as `BeadsDialog`, `PlanDialog`)."
+        },
+        "subItems": [
+          {
+            "id": "b7-frontend-modal.ac1",
+            "title": "Dialog opens when the start-agent mutation response contains `{ provisioning: true }`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-frontend-modal.ac2",
+            "title": "Step list renders with the canonical step labels: Render .devcontainer/, Tear down existing stack (if force), Start containers, Wait for healthy, Clean up node_modules, Verify health.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-frontend-modal.ac3",
+            "title": "Each step shows status icon, label, and elapsed time (updated every 1s). On `completed`/`failed`, elapsed time freezes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-frontend-modal.ac4",
+            "title": "On final `verify-health` completing successfully, the dialog closes automatically and falls through to the existing terminal-pane transition.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b7-frontend-modal.ac5",
+            "title": "React Testing Library test covers: dialog renders steps from store, status icons update, elapsed time updates, auto-close on final success.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b8-failure-remediation-ui",
+        "title": "Failure remediation UI: Retry / Force rebuild / Switch to --host (advanced) buttons in dialog",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-18T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Extend `WorkspaceProvisionDialog` so when any step reaches `status: 'failed'`, the dialog renders the full step error + hint, plus three buttons: (1) **Retry** — re-POSTs `/api/agents` with the original body; (2) **Force rebuild** — re-POSTs with `forceRebuild: true`; (3) **Switch to --host (advanced)** — opens a `ConfirmationDialog` (existing) with destructive variant. On confirm, re-POSTs with `allowHost: true, hostConfirmed: true`. The --host button label includes the word 'advanced' and the confirmation explains that container isolation is bypassed."
+        },
+        "subItems": [
+          {
+            "id": "b8-failure-remediation-ui.ac1",
+            "title": "On a failed step, the dialog shows the error text and three buttons: Retry, Force rebuild, Switch to --host (advanced).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b8-failure-remediation-ui.ac2",
+            "title": "Retry re-POSTs `/api/agents` with the original request body and resets the step list for the new attempt.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b8-failure-remediation-ui.ac3",
+            "title": "Force rebuild re-POSTs with `forceRebuild: true` and the next provisioning run includes the `compose-down` step.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b8-failure-remediation-ui.ac4",
+            "title": "Switch to --host opens a destructive-variant `ConfirmationDialog`; only on confirm does the new request fire with `allowHost: true, hostConfirmed: true`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b8-failure-remediation-ui.ac5",
+            "title": "React Testing Library test covers: failure renders three buttons, Retry re-fires mutation, Force rebuild adds the flag, --host requires confirmation before firing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b9-kanban-start-wiring",
+        "title": "Wire KanbanBoard Start button to open `WorkspaceProvisionDialog` on `provisioning: true` response",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-18T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In `src/dashboard/frontend/src/components/KanbanBoard.tsx` (and any other Start button call sites — `ActionsSection.tsx`, `ZoneActionStrip.tsx`, `useZoneAActions.ts`, `FeatureItem.tsx`), update the `startAgentMutation.onSuccess` handler to open the new dialog when the response contains `{ provisioning: true }`. Keep the existing terminal-transition behavior when `provisioning: false`. The dialog ownership lives at the App or KanbanBoard level so it can render once per issue regardless of which Start button was clicked."
+        },
+        "subItems": [
+          {
+            "id": "b9-kanban-start-wiring.ac1",
+            "title": "Clicking Start on any of the four call sites (KanbanBoard card, InspectorPanel, ZoneActionStrip, FeatureItem) opens the new dialog when the response is `provisioning: true`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b9-kanban-start-wiring.ac2",
+            "title": "When the response is `provisioning: false`, the existing flow (terminal transition, refresh dashboard state) is preserved — no dialog opens.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b10-step-sequence-snapshot",
+        "title": "Vitest snapshot of canonical provisioning step sequence",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-18T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a vitest snapshot test in `src/lib/workspace/__tests__/provision-stack.snapshot.test.ts` that runs `provisionWorkspaceStack` against a fake docker (mocked `execFile`) and asserts the emitted event sequence — stepIds, statuses, ordering. Pins the canonical step sequence from D9 so future refactors can't accidentally drop or reorder a step. Includes both the healthy short-circuit case (verify-health → skipped × 5) and the full unhealthy provisioning case (all 6 steps)."
+        },
+        "subItems": [
+          {
+            "id": "b10-step-sequence-snapshot.ac1",
+            "title": "Snapshot for healthy-skip path matches: verify-health(started) → verify-health(completed:healthy=true) → ensure-devcontainer(skipped) → compose-up(skipped) → wait-healthy(skipped) → cleanup-node-modules(skipped).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b10-step-sequence-snapshot.ac2",
+            "title": "Snapshot for unhealthy-full path matches: verify-health → ensure-devcontainer → compose-up → wait-healthy → cleanup-node-modules → verify-health (each started+completed in order).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b10-step-sequence-snapshot.ac3",
+            "title": "Snapshot for force-rebuild path matches: verify-health → ensure-devcontainer → compose-down → compose-up → wait-healthy → cleanup-node-modules → verify-health.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "b11-playwright-uat",
+        "title": "Playwright UAT for click-Start → modal → success → terminal flow (isolated browser context)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-18T13:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1191",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Add a Playwright UAT test (or extend the existing dashboard UAT harness) that: (1) creates a fresh browser context via `browser.newContext()` — no shared state with other agents per the planning template's Playwright Isolation rule; (2) opens https://pan.localhost; (3) clicks Start on a test issue whose workspace has no `.devcontainer/`; (4) asserts the `WorkspaceProvisionDialog` appears with the expected step list; (5) waits for the success transition (final step completed, dialog closes); (6) asserts the terminal panel is visible. Cleans up the test workspace stack afterwards (`docker compose down`). The test scenario for PAN-1189 / PAN-1190 / PAN-1169 referenced in the issue body is verified by extension."
+        },
+        "subItems": [
+          {
+            "id": "b11-playwright-uat.ac1",
+            "title": "UAT test runs against a fresh `browser.newContext()` and does not depend on any other agent's Playwright session or stored cookies.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b11-playwright-uat.ac2",
+            "title": "Test asserts the dialog appears after Start click with the canonical step labels visible.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b11-playwright-uat.ac3",
+            "title": "Test waits for the dialog to close on success and asserts the terminal panel is then visible.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "b11-playwright-uat.ac4",
+            "title": "Test cleans up the test workspace stack on teardown (`docker compose down -v --remove-orphans`) regardless of pass/fail.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "b1-contract-event",
+        "to": "b5-dashboard-route-provision",
+        "type": "blocks"
+      },
+      {
+        "from": "b1-contract-event",
+        "to": "b6-frontend-store-slice",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-provision-helper",
+        "to": "b3-refactor-workspace-rebuild",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-provision-helper",
+        "to": "b4-pan-start-cli-provision",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-provision-helper",
+        "to": "b5-dashboard-route-provision",
+        "type": "blocks"
+      },
+      {
+        "from": "b2-provision-helper",
+        "to": "b10-step-sequence-snapshot",
+        "type": "blocks"
+      },
+      {
+        "from": "b5-dashboard-route-provision",
+        "to": "b7-frontend-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "b5-dashboard-route-provision",
+        "to": "b9-kanban-start-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "b5-dashboard-route-provision",
+        "to": "b11-playwright-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "b6-frontend-store-slice",
+        "to": "b7-frontend-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "b7-frontend-modal",
+        "to": "b8-failure-remediation-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "b7-frontend-modal",
+        "to": "b9-kanban-start-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "b9-kanban-start-wiring",
+        "to": "b11-playwright-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "b10-step-sequence-snapshot",
+        "to": "b7-frontend-modal",
+        "type": "informs"
+      },
+      {
+        "from": "b8-failure-remediation-ui",
+        "to": "b11-playwright-uat",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-18-PAN-1191-create-workspace-docker-stack-on-start-not-plan-with-progress-dialog.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
