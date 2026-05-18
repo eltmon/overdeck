@@ -147,9 +147,15 @@ export interface RoleSubConfig {
   model: ModelRef;
 }
 
+export type RoleEffort = 'low' | 'medium' | 'high';
+export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
+
 export interface RoleConfig {
   model: ModelRef;
   harness?: 'claude-code' | 'pi';
+  effort?: RoleEffort;
+  maxAgents?: number;
+  scope?: FlywheelScope;
   sub?: Record<string, RoleSubConfig>;
 }
 
@@ -161,6 +167,7 @@ export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
   review: 'workhorse:expensive',
   test: 'workhorse:mid',
   ship: 'workhorse:mid',
+  flywheel: 'claude-opus-4-7',
 };
 
 export const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
@@ -190,6 +197,13 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
   },
   test: { model: 'workhorse:mid' },
   ship: { model: 'workhorse:mid' },
+  flywheel: {
+    harness: 'claude-code',
+    model: 'claude-opus-4-7',
+    effort: 'high',
+    maxAgents: 8,
+    scope: 'pan-only',
+  },
 };
 
 function cloneRoles(roles: RolesConfig): RolesConfig {
@@ -1065,15 +1079,31 @@ function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): v
     result.roles = { ...(result.roles ?? {}) };
     for (const [role, roleConfig] of Object.entries(config.roles) as Array<[Role, RoleConfig]>) {
       const existing = result.roles[role];
+      const sub = {
+        ...(existing?.sub ?? {}),
+        ...(roleConfig.sub ?? {}),
+      };
       result.roles[role] = {
         ...existing,
         ...roleConfig,
-        sub: {
-          ...(existing?.sub ?? {}),
-          ...(roleConfig.sub ?? {}),
-        },
+        sub: Object.keys(sub).length > 0 ? sub : undefined,
       };
     }
+  }
+}
+
+function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
+  if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'pi') {
+    throw new Error(`config.yaml: roles.${role}.harness must be claude-code or pi`);
+  }
+  if (roleConfig.effort !== undefined && roleConfig.effort !== 'low' && roleConfig.effort !== 'medium' && roleConfig.effort !== 'high') {
+    throw new Error(`config.yaml: roles.${role}.effort must be low, medium, or high`);
+  }
+  if (roleConfig.maxAgents !== undefined && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) {
+    throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
+  }
+  if (roleConfig.scope !== undefined && roleConfig.scope !== 'pan-only' && roleConfig.scope !== 'all-tracked-projects') {
+    throw new Error(`config.yaml: roles.${role}.scope must be pan-only or all-tracked-projects`);
   }
 }
 
@@ -1086,6 +1116,7 @@ function validateRoleModelRefs(config: NormalizedConfig): void {
   }
 
   for (const [role, roleConfig] of Object.entries(config.roles ?? {}) as Array<[Role, RoleConfig]>) {
+    validateRoleFields(role, roleConfig);
     if (roleConfig.model) {
       derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
     }

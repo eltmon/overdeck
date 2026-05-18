@@ -20,6 +20,7 @@ vi.mock('../config-yaml.js', () => ({
     review: 'workhorse:expensive',
     test: 'workhorse:mid',
     ship: 'workhorse:mid',
+    flywheel: 'claude-opus-4-7',
   },
   DEFAULT_WORKHORSES: {
     expensive: 'claude-opus-4-7',
@@ -32,6 +33,7 @@ vi.mock('../config-yaml.js', () => ({
     review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' }, synthesis: { model: 'workhorse:expensive' } } },
     test: { model: 'workhorse:mid' },
     ship: { model: 'workhorse:mid' },
+    flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
   },
   loadConfig: () => mockLoadConfig(),
   getGlobalConfigPath: () => '/tmp/config.yaml',
@@ -175,6 +177,7 @@ describe('loadSettingsApi', () => {
       },
       test: { model: 'workhorse:mid' },
       ship: { model: 'workhorse:mid' },
+      flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
     });
     expect(settings.models).not.toHaveProperty('overrides');
   });
@@ -191,6 +194,32 @@ describe('loadSettingsApi', () => {
     expect(settings.workhorses?.mid).toBe('gpt-5.5-mini');
     expect(settings.workhorses?.expensive).toBe('claude-opus-4-7');
     expect(settings.roles?.work?.sub?.inspect?.model).toBe('claude-haiku-4-5');
+  });
+
+  it('exposes flywheel role config helpers', async () => {
+    mockReadFile.mockResolvedValue('{}\n');
+    const { getRoleConfig, setRoleConfig } = await import('../settings-api.js');
+
+    expect(getRoleConfig('flywheel')).toEqual({
+      harness: 'claude-code',
+      model: 'claude-opus-4-7',
+      effort: 'high',
+      maxAgents: 8,
+      scope: 'pan-only',
+    });
+
+    await setRoleConfig('flywheel', {
+      harness: 'pi',
+      model: 'claude-sonnet-4-6',
+      effort: 'medium',
+      maxAgents: 4,
+      scope: 'all-tracked-projects',
+    });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('flywheel:');
+    expect(written).toContain('harness: pi');
+    expect(written).toContain('maxAgents: 4');
   });
 
   it('loads tts daemon settings from normalized config', async () => {
@@ -322,6 +351,7 @@ describe('validateSettingsApi', () => {
       review: { model: 'workhorse:expensive', sub: { security: { model: 'claude-opus-4-7' }, synthesis: { model: 'workhorse:expensive' } } },
       test: { model: 'workhorse:mid' },
       ship: { model: 'workhorse:mid' },
+      flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
     },
     models: {
       providers: {
@@ -385,6 +415,23 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toContain('Invalid model reference "not-a-model" at workhorses.mid');
     expect(result.errors).toContain('roles.plan.model references unknown workhorse slot "missing"');
     expect(result.errors).toContain('Invalid model reference "not-a-model" at roles.work.model');
+  });
+
+  it('rejects invalid flywheel role fields', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({
+      ...validSettings,
+      roles: {
+        ...validSettings.roles,
+        flywheel: { model: 'claude-opus-4-7', harness: 'bad', effort: 'max', maxAgents: 0, scope: 'everything' } as never,
+      },
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('roles.flywheel.harness must be claude-code or pi');
+    expect(result.errors).toContain('roles.flywheel.effort must be low, medium, or high');
+    expect(result.errors).toContain('roles.flywheel.maxAgents must be a positive integer');
+    expect(result.errors).toContain('roles.flywheel.scope must be pan-only or all-tracked-projects');
   });
 
   it('rejects unknown tts settings', async () => {

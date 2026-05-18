@@ -214,7 +214,7 @@ export function getDefaultConversationModelApi(): ModelId {
   return resolveModelId('claude-sonnet-4-6');
 }
 
-const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship'];
+const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel'];
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
 const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
   work: ['inspect', 'inspect-deep'],
@@ -340,6 +340,28 @@ function validateModelRef(
   }
 }
 
+function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
+  const harness = roleConfig.harness;
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'pi') {
+    errors.push(`${fieldPath}.harness must be claude-code or pi`);
+  }
+
+  const effort = roleConfig.effort;
+  if (effort !== undefined && effort !== 'low' && effort !== 'medium' && effort !== 'high') {
+    errors.push(`${fieldPath}.effort must be low, medium, or high`);
+  }
+
+  const maxAgents = roleConfig.maxAgents;
+  if (maxAgents !== undefined && (typeof maxAgents !== 'number' || !Number.isInteger(maxAgents) || maxAgents < 1)) {
+    errors.push(`${fieldPath}.maxAgents must be a positive integer`);
+  }
+
+  const scope = roleConfig.scope;
+  if (scope !== undefined && scope !== 'pan-only' && scope !== 'all-tracked-projects') {
+    errors.push(`${fieldPath}.scope must be pan-only or all-tracked-projects`);
+  }
+}
+
 function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[], warnings: string[]): void {
   const effectiveWorkhorses: WorkhorsesConfig = { ...DEFAULT_WORKHORSES };
 
@@ -374,6 +396,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
         }
 
         validateModelRef(`roles.${role}.model`, rawRoleConfig.model, effectiveWorkhorses, errors, warnings, true);
+        validateRoleFields(`roles.${role}`, rawRoleConfig, errors);
 
         if (rawRoleConfig.sub !== undefined) {
           if (!isRecord(rawRoleConfig.sub)) {
@@ -679,6 +702,14 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
   // Save and return
   await saveSettingsApi(merged);
   return merged;
+}
+
+export function getRoleConfig(role: Role): RoleConfig | undefined {
+  return loadSettingsApi().roles?.[role];
+}
+
+export async function setRoleConfig(role: Role, roleConfig: RoleConfig): Promise<ApiSettingsConfig> {
+  return updateSettingsApi({ roles: { [role]: roleConfig } });
 }
 
 export async function updateProviderApiKey(

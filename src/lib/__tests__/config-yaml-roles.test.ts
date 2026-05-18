@@ -33,13 +33,14 @@ function roleConfig(): Pick<NormalizedConfig, 'workhorses' | 'roles'> {
       },
       test: { model: 'gemini-3.1-pro-preview' },
       ship: { model: 'workhorse:mid', harness: 'pi' },
+      flywheel: { harness: 'claude-code', model: 'claude-opus-4-7', effort: 'high', maxAgents: 8, scope: 'pan-only' },
     },
   };
 }
 
 describe('role model configuration', () => {
-  it('exports default model refs for exactly the five roles', () => {
-    expect(Object.keys(DEFAULT_MODEL_REFS).sort()).toEqual(['plan', 'review', 'ship', 'test', 'work']);
+  it('exports default model refs for every role', () => {
+    expect(Object.keys(DEFAULT_MODEL_REFS).sort()).toEqual(['flywheel', 'plan', 'review', 'ship', 'test', 'work']);
   });
 
   it('dereferences workhorse refs and passes literal model ids through', () => {
@@ -57,6 +58,7 @@ describe('role model configuration', () => {
       review: 'claude-opus-4-7',
       test: 'gemini-3.1-pro-preview',
       ship: 'claude-sonnet-4-6',
+      flywheel: 'claude-opus-4-7',
     };
 
     for (const role of Object.keys(expected) as Role[]) {
@@ -148,6 +150,37 @@ describe('role model configuration', () => {
     expect(config.roles?.work?.sub?.['inspect-deep']?.model).toBe('workhorse:mid');
     expect(config.roles?.plan).toEqual(DEFAULT_ROLES.plan);
     expect(config.roles?.ship).toEqual(DEFAULT_ROLES.ship);
+    expect(config.roles?.flywheel).toEqual(DEFAULT_ROLES.flywheel);
+  });
+
+  it('accepts and validates flywheel role fields', () => {
+    const { config } = mergeConfigs({
+      roles: {
+        flywheel: {
+          harness: 'pi',
+          model: 'claude-sonnet-4-6',
+          effort: 'medium',
+          maxAgents: 4,
+          scope: 'all-tracked-projects',
+        },
+      },
+    });
+
+    expect(config.roles?.flywheel).toEqual({
+      harness: 'pi',
+      model: 'claude-sonnet-4-6',
+      effort: 'medium',
+      maxAgents: 4,
+      scope: 'all-tracked-projects',
+    });
+  });
+
+  it('rejects invalid flywheel role fields', () => {
+    expect(() => mergeConfigs({
+      roles: {
+        flywheel: { model: 'claude-opus-4-7', maxAgents: 0 },
+      },
+    })).toThrow('config.yaml: roles.flywheel.maxAgents must be a positive integer');
   });
 
   it('seeds missing workhorse slots while preserving user-defined slots', () => {

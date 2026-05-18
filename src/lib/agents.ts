@@ -43,7 +43,7 @@ import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.j
 
 const execAsync = promisify(exec);
 
-export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship';
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel';
 
 /**
  * Write an agent launcher script atomically. Every agent shares a fixed
