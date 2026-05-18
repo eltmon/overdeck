@@ -42,8 +42,8 @@ export type IssueRowProps = {
 };
 
 const GRID_TEMPLATES = {
-  pipeline: '14px 78px 14px minmax(0, 1fr) 220px 84px 30px',
-  'command-deck': '14px 78px 14px minmax(0, 1fr) 220px 84px 26px',
+  pipeline: '14px 78px 14px 1fr 220px 84px 30px',
+  'command-deck': '14px 78px 14px 1fr 220px 84px 26px',
 } satisfies Record<IssueRowVariant, string>;
 
 const ROW_CLASSES = {
@@ -140,7 +140,7 @@ export default function IssueRow({
           {labels.map((label, index) => (
             <span
               key={index}
-              className="rounded-[var(--radius-sm)] border border-border bg-[rgb(255_255_255_/_5%)] px-[6px] py-[1px] text-[10px] font-medium leading-none text-muted-foreground"
+              className="rounded-[var(--radius-sm)] border border-border bg-muted px-[6px] py-[1px] text-[10px] font-medium leading-none text-muted-foreground"
             >
               {label}
             </span>

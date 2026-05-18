@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T06:00:10.000Z",
+    "updated": "2026-05-18T21:16:15.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -323,7 +323,7 @@
       {
         "id": "f5-issue-row",
         "title": "Add IssueRow primitive (Pipeline / Command Deck row, composes VerbBadge + PhaseGlyph)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -339,68 +339,77 @@
           {
             "id": "f5-issue-row.ac1",
             "title": "IssueRow grid layout matches PRD §4.7.5 exactly for both pipeline and command-deck variants",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:16:15.000Z"
           },
           {
             "id": "f5-issue-row.ac2",
             "title": "Priority left border uses ::before pseudo with the correct color per priority level; no inline color hacks",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:16:15.000Z"
           },
           {
             "id": "f5-issue-row.ac3",
             "title": "Composes VerbBadge for the one colored badge slot; composes PhaseGlyph for the phase column",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:16:15.000Z"
           },
           {
             "id": "f5-issue-row.ac4",
             "title": "Ledger cell renders runtime in muted, cost in --signal-cost-foreground; empty state renders `—` at 55% opacity",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:16:15.000Z"
           },
           {
             "id": "f5-issue-row.ac5",
             "title": "Label chips use bg-muted + muted-foreground; never status-colored (PRD §4.5 'labels are taxonomy, never status')",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:16:15.000Z"
           },
           {
             "id": "f5-issue-row.ac6",
             "title": "Avatar gradient renders one of 5 deterministic tones based on assignee name hash",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:16:15.000Z"
           },
           {
             "id": "f5-issue-row.ac7",
             "title": "Root element carries `data-component=\"issue-row\"` for styleguide-conformance test",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:16:15.000Z"
           },
           {
             "id": "f5-issue-row.ac8",
             "title": "Click handler accepts an issueId-based onOpen callback; component itself does not own routing",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:16:15.000Z"
           }
-        ]
+        ],
+        "updated": "2026-05-18T21:16:15.000Z"
       },
       {
         "id": "f6-issue-card",
