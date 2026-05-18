@@ -16,7 +16,8 @@ type AutoPresoMessage =
 type VoiceMessage =
   | { type: 'transcript:partial'; text: string }
   | { type: 'transcript:committed'; text: string }
-  | { type: 'transcript:finalized' };
+  | { type: 'transcript:finalized' }
+  | { type: 'error'; error: string };
 
 const MAX_SOCKET_BUFFERED_AUDIO_BYTES = 250_000;
 const VOICE_STOP_TIMEOUT_MS = 6000;
@@ -34,6 +35,7 @@ export function useAutoPresoWebSocket() {
   const [partialText, setPartialText] = useState('');
   const [committedTurns, setCommittedTurns] = useState<TranscriptTurn[]>([]);
   const [isListening, setIsListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
   const whiteboardSocketRef = useRef<WebSocket | null>(null);
   const voiceSocketRef = useRef<WebSocket | null>(null);
@@ -121,6 +123,7 @@ export function useAutoPresoWebSocket() {
 
   const startListening = useCallback(async () => {
     if (isListening) return;
+    setVoiceError(null);
     let stream: MediaStream | null = null;
     let audioContext: AudioContext | null = null;
     let source: MediaStreamAudioSourceNode | null = null;
@@ -146,6 +149,7 @@ export function useAutoPresoWebSocket() {
           setCommittedTurns((turns) => [...turns, { text: message.text, timestamp: new Date() }].slice(-MAX_COMMITTED_TURNS));
         }
         if (message.type === 'transcript:finalized') finalizeResolverRef.current?.();
+        if (message.type === 'error') setVoiceError(message.error);
       };
       socket.onclose = () => {
         if (voiceSocketRef.current === socket) void stopListening(false);
@@ -182,7 +186,7 @@ export function useAutoPresoWebSocket() {
       analyser?.disconnect();
       void audioContext?.close();
       stream?.getTracks().forEach((track) => track.stop());
-      throw error;
+      setVoiceError(error instanceof Error ? error.message : 'Unable to start voice input');
     }
   }, [isListening, stopListening]);
 
@@ -193,6 +197,7 @@ export function useAutoPresoWebSocket() {
     partialText,
     committedTurns,
     isListening,
+    voiceError,
     startListening,
     stopListening,
     analyserNode,

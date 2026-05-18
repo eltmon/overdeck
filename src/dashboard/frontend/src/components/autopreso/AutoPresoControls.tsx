@@ -16,6 +16,7 @@ export function AutoPresoControls({
   onBackToStaging,
   onReset,
   onToggleMic,
+  voiceError,
 }: {
   mode: AutoPresoMode;
   warmupStatus: WarmupStatus;
@@ -24,6 +25,7 @@ export function AutoPresoControls({
   onBackToStaging: () => void;
   onReset: () => void;
   onToggleMic: () => void;
+  voiceError: string | null;
 }) {
   return (
     <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -64,13 +66,11 @@ export function AutoPresoControls({
         <p className="mt-1 text-xs text-muted-foreground">The whiteboard agent uses the staged canvas as context before live transcription starts.</p>
       </div>
 
-      <label className="mt-4 block text-sm font-medium text-foreground">
-        Agent instructions
-        <textarea
-          className="mt-2 min-h-24 w-full resize-y rounded-lg border border-border bg-background p-3 text-sm outline-none focus:ring-2 focus:ring-primary/40"
-          placeholder="Describe the diagram style, layout preferences, or constraints for the whiteboard agent."
-        />
-      </label>
+      {voiceError && (
+        <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          {voiceError}
+        </div>
+      )}
 
       <button
         type="button"

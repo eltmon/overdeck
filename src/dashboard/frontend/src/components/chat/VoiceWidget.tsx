@@ -119,13 +119,6 @@ export function VoiceWidget({
             ))}
           </select>
         </label>
-        <label className={styles.voiceFieldLabel}>
-          Model
-          <select className={styles.voiceSelect} defaultValue="base">
-            <option value="tiny">tiny</option>
-            <option value="base">base</option>
-          </select>
-        </label>
       </div>
 
       <canvas ref={canvasRef} className={styles.voiceWaveformCanvas} width={480} height={56} aria-label="Voice waveform" />

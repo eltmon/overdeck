@@ -19,6 +19,7 @@ export function AutoPresoView() {
     partialText,
     committedTurns,
     isListening,
+    voiceError,
     startListening,
     stopListening,
   } = useAutoPresoWebSocket();
@@ -90,6 +91,7 @@ export function AutoPresoView() {
           onBackToStaging={handleBackToStaging}
           onReset={handleReset}
           onToggleMic={handleToggleMic}
+          voiceError={voiceError}
         />
         <TranscriptPanel
           turns={committedTurns}

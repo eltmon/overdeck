@@ -33,6 +33,7 @@ function isTrustedWebSocketOrigin(request: http.IncomingMessage): boolean {
 export function setupVoiceWebSocket(server: http.Server): void {
   const wss = new WebSocketServer({ noServer: true });
   const originalOn = server.on.bind(server);
+  let activeVoiceSocket: WebSocket | null = null;
 
   server.on = function(event: string, listener: (...args: unknown[]) => void) {
     if (event === 'upgrade') {
@@ -60,6 +61,13 @@ export function setupVoiceWebSocket(server: http.Server): void {
   });
 
   wss.on('connection', (ws: WebSocket) => {
+    if (activeVoiceSocket?.readyState === WebSocket.OPEN || activeVoiceSocket?.readyState === WebSocket.CONNECTING) {
+      sendJson(ws, { type: 'error', error: 'Another voice transcription session is already active' });
+      ws.close(1013, 'Voice transcription session already active');
+      return;
+    }
+    activeVoiceSocket = ws;
+
     let manager: TranscriptionManager | null = null;
     let turnQueue: TurnQueue | null = null;
     let finalizeTimer: NodeJS.Timeout | null = null;
@@ -158,6 +166,7 @@ export function setupVoiceWebSocket(server: http.Server): void {
     });
 
     const closeTranscription = () => {
+      if (activeVoiceSocket === ws) activeVoiceSocket = null;
       unsubscribeSettings();
       if (finalizeTimer) clearTimeout(finalizeTimer);
       finalizeTimer = null;

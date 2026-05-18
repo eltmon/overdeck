@@ -116,7 +116,6 @@ import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
-import { restoreTrackedBeadsExport } from '../../../lib/bd-mutex.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
