@@ -24,6 +24,7 @@ describe('IssueDrawer', () => {
       drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [issue],
       agentsById: {},
+      reviewStatusByIssueId: {},
       recentActivity: [],
       detailedActivity: [],
     } as Parameters<typeof useDashboardStore.setState>[0]);
@@ -111,5 +112,38 @@ describe('IssueDrawer', () => {
 
     await waitFor(() => expect(scrollArea.scrollTop).toBe(0));
     expect(screen.getByTestId('drawer-activity-dot-review')).toHaveClass('bg-signal-review');
+  });
+
+  it('renders four review specialist rows from drawer data with status dots', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          reviewStatus: 'reviewing',
+          testStatus: 'pending',
+          readyForMerge: false,
+          updatedAt: '2026-05-18T00:00:00.000Z',
+          reviewSessionNames: ['agent-pan-1-review-security'],
+          reviewSubStatuses: {
+            'review.security': 'running',
+            'review.correctness': 'done',
+            'review.performance': 'failed',
+          } as never,
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    render(<IssueDrawer />);
+
+    expect(screen.getByTestId('drawer-review-specialists')).toBeInTheDocument();
+    expect(screen.getByText('review.security')).toBeInTheDocument();
+    expect(screen.getByText('review.correctness')).toBeInTheDocument();
+    expect(screen.getByText('review.performance')).toBeInTheDocument();
+    expect(screen.getByText('review.requirements')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-review-specialist-dot-run')).toHaveClass('bg-info');
+    expect(screen.getByTestId('drawer-review-specialist-dot-done')).toHaveClass('bg-success');
+    expect(screen.getByTestId('drawer-review-specialist-dot-fail')).toHaveClass('bg-destructive');
+    expect(screen.getByTestId('drawer-review-specialist-dot-idle')).toHaveClass('bg-muted-foreground');
   });
 });

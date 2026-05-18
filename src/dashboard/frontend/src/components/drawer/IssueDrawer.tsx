@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import { useDashboardStore } from '../../lib/store';
 import DrawerActivityRail from './DrawerActivityRail';
+import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import { useDrawerData } from './useDrawerData';
 
 export function IssueDrawer() {
@@ -61,13 +62,16 @@ export function IssueDrawer() {
         </header>
         <div className="grid h-[calc(100vh-52px)] grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 overflow-auto px-[22px] py-[18px]">
-            <div className="rounded-[var(--radius)] border border-border bg-card p-[18px]">
-              <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                {drawer.tab}
+            <div className="space-y-[14px]">
+              <div className="rounded-[var(--radius)] border border-border bg-card p-[18px]">
+                <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                  {drawer.tab}
+                </div>
+                <p className="text-[13px] leading-6 text-muted-foreground">
+                  Issue details will appear here as data streams in.
+                </p>
               </div>
-              <p className="text-[13px] leading-6 text-muted-foreground">
-                Issue details will appear here as data streams in.
-              </p>
+              <DrawerReviewSpecialists />
             </div>
           </div>
           <DrawerActivityRail />

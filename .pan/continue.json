@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T23:31:30.000Z",
+  "updated": "2026-05-18T23:36:00.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "sha": "71aab7899",
@@ -203,11 +203,11 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-tlov drawer Live Activity rail is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
+    "description": "workspace-30xk drawer Review Specialists list is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
     "beadId": "pending",
     "filesToRead": [
       "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx",
-      "src/dashboard/frontend/src/components/drawer/DrawerActivityRail.tsx",
+      "src/dashboard/frontend/src/components/drawer/DrawerReviewSpecialists.tsx",
       "src/dashboard/frontend/src/components/drawer/useDrawerData.ts"
     ]
   },
@@ -324,6 +324,12 @@
       "timestamp": "2026-05-18T23:31:30.000Z",
       "reason": "bead-close",
       "note": "Implemented workspace-tlov drawer Live Activity rail with a 320px right column, issue-scoped useDrawerData activity selector, most-recent-first stream items, scroll-to-top on new activity, phase dot colors, focused drawer tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:36:00.000Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-30xk drawer Review Specialists list with four sub-role rows, status dot colors, useDrawerData-derived review specialist state, focused drawer tests, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],
@@ -485,6 +491,9 @@
     "d9-drawer-live-activity-rail": "completed",
     "d9-drawer-live-activity-rail.ac1": "completed",
     "d9-drawer-live-activity-rail.ac2": "completed",
-    "d9-drawer-live-activity-rail.ac3": "completed"
+    "d9-drawer-live-activity-rail.ac3": "completed",
+    "d8-drawer-review-specialists": "completed",
+    "d8-drawer-review-specialists.ac1": "completed",
+    "d8-drawer-review-specialists.ac2": "completed"
   }
 }
