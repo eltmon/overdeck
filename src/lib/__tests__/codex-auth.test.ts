@@ -65,7 +65,7 @@ describe('checkCodexAuthStatus', () => {
       access_token: 'fresh-token',
       email: 'user@example.com',
     }));
-    mocks.stat.mockResolvedValue({ mtimeMs: burnSecondStart + 900 });
+    mocks.stat.mockResolvedValue({ mtimeMs: burnSecondStart + 999.5 });
     mocks.decodeJwtPayload.mockReturnValue({ exp: Math.floor((Date.now() + 3_600_000) / 1000) });
     mockLog([
       `[${timestamp(burnMs)}] openai_auth.go refresh token has already been used`,

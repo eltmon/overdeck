@@ -14,9 +14,11 @@ export function useCodexAutoRetry() {
   const { data: authStatus } = useCodexAuthStatus();
   const queryClient = useQueryClient();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryInFlightRef = useRef(false);
 
   // Poll the re-auth completion endpoint when a pending spawn has a session name.
   useEffect(() => {
+    if (retryInFlightRef.current) return;
     const pending = getPendingCodexSpawn();
     if (!pending?.reauthSessionName || !pending.reauthStatusToken) return;
     const reauthSessionName = pending.reauthSessionName;
@@ -27,6 +29,7 @@ export function useCodexAutoRetry() {
     }
 
     intervalRef.current = setInterval(async () => {
+      if (retryInFlightRef.current) return;
       try {
         const res = await fetch('/api/settings/codex-reauth/status', {
           method: 'POST',
@@ -54,12 +57,21 @@ export function useCodexAutoRetry() {
             await refreshDashboardState(queryClient);
             return;
           }
-          if (pending.requestBody) {
-            retryPendingSpawn(pending.requestBody, queryClient);
+          // Guard before updating the auth cache so a later poll cycle cannot
+          // observe valid auth + pending spawn and launch a duplicate retry.
+          retryInFlightRef.current = true;
+          queryClient.setQueryData(['codex-auth-status'], data.authStatus);
+          const currentPending = getPendingCodexSpawn();
+          if (currentPending?.requestBody) {
+            void retryPendingSpawn(currentPending.requestBody, queryClient)
+              .finally(() => {
+                retryInFlightRef.current = false;
+              });
           } else {
             clearPendingCodexSpawn();
             toast.success('Codex re-authentication completed');
             await refreshDashboardState(queryClient);
+            retryInFlightRef.current = false;
           }
         }
       } catch {
@@ -77,41 +89,45 @@ export function useCodexAutoRetry() {
 
   // Fallback: retry when auth status becomes valid without a re-auth session.
   useEffect(() => {
+    if (retryInFlightRef.current) return;
     const pending = getPendingCodexSpawn();
     if (!pending?.requestBody || pending.reauthSessionName) return;
     if (authStatus?.status !== 'valid') return;
 
-    retryPendingSpawn(pending.requestBody, queryClient);
+    retryInFlightRef.current = true;
+    void retryPendingSpawn(pending.requestBody, queryClient)
+      .finally(() => {
+        retryInFlightRef.current = false;
+      });
   }, [authStatus?.status, queryClient]);
 }
 
-function retryPendingSpawn(
+async function retryPendingSpawn(
   requestBody: Record<string, unknown>,
   queryClient: ReturnType<typeof useQueryClient>,
-) {
-  clearPendingCodexSpawn();
-
-  fetch('/api/agents', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-  })
-    .then(async (res) => {
-      const data = (await res.json().catch(() => ({}))) as StartAgentResponse;
-      if (!res.ok) {
-        throw new Error(
-          data.error || data.hint || `Failed to start agent (${res.status})`,
-        );
-      }
-      toast.success(
-        'Agent started automatically after Codex re-authentication',
-      );
-      await refreshDashboardState(queryClient);
-    })
-    .catch((err) => {
-      toast.error(
-        `Auto-retry failed: ${err instanceof Error ? err.message : String(err)}`,
-        { duration: 8000 },
-      );
+): Promise<void> {
+  try {
+    const res = await fetch('/api/agents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
     });
+    const data = (await res.json().catch(() => ({}))) as StartAgentResponse;
+    if (!res.ok) {
+      throw new Error(
+        data.error || data.hint || `Failed to start agent (${res.status})`,
+      );
+    }
+    clearPendingCodexSpawn();
+    toast.success(
+      'Agent started automatically after Codex re-authentication',
+    );
+    await refreshDashboardState(queryClient);
+  } catch (err) {
+    clearPendingCodexReauthSession();
+    toast.error(
+      `Auto-retry failed: ${err instanceof Error ? err.message : String(err)}`,
+      { duration: 8000 },
+    );
+  }
 }
