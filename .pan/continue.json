@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T05:50:48.314Z",
+  "updated": "2026-05-18T05:57:09.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "4fb10acfe",
+    "sha": "3d937ef87",
     "dirty": false
   },
   "decisions": [
@@ -122,6 +122,12 @@
       "summary": "PhaseGlyph supports plan as a typed phase in addition to todo/work/review/ship/done, reusing the signal-review token.",
       "recordedAt": "2026-05-18T05:46:41.560Z",
       "rationale": "The bead title lists five glyph phases, but its action text explicitly maps ship/plan to --signal-review-foreground and PhaseHeader uses Plan as a lifecycle group."
+    },
+    {
+      "id": "D20",
+      "summary": "MetricStrip accepts typed tile data and applies its Pipeline/Agents variant to each MetricTile it composes.",
+      "recordedAt": "2026-05-18T05:57:09.000Z",
+      "rationale": "The PRD defines strip-level density differences, so keeping variant at the strip boundary prevents consumers from repeating density props on every tile."
     }
   ],
   "hazards": [
@@ -192,8 +198,8 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-3mr2 is closed and inspection was skipped because requiresInspection=false. Run bd ready -l pan-1148 and claim the next unblocked PAN-1148 bead in vBRIEF sequence.",
-    "beadId": null,
+    "description": "workspace-5tj2 is closed and inspection was skipped because requiresInspection=false. User idle-nudge selected workspace-tjhs as the next ready PAN-1148 bead to claim.",
+    "beadId": "workspace-tjhs",
     "filesToRead": [
       ".pan/spec.vbrief.json"
     ]
@@ -246,6 +252,18 @@
       "timestamp": "2026-05-18T05:50:48.314Z",
       "reason": "bead-close",
       "note": "Closed workspace-3mr2. bd required --force because downstream dependents were reported as blockers, matching the dependency-direction issue recorded in H13.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:56:18.000Z",
+      "reason": "bead",
+      "note": "Implemented workspace-5tj2 / f4-metric-tile: added MetricTile and MetricStrip primitives, signal-scoped icon coloring, strip-level Pipeline/Agents density, delta colors, focused tests, and completed vBRIEF statuses.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:57:09.000Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-5tj2. Inspection skipped because requiresInspection=false; bd required --force because downstream dependents were reported as blockers, matching H13.",
       "agentModel": "gpt-5.5"
     }
   ],
