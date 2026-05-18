@@ -26,7 +26,8 @@ import { getEventStore } from './event-store.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 import { getCloisterService } from '../../lib/cloister/service.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
-import { setAgentStoppedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
+import { setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
+import { getAgentStateAsync, type AgentState } from '../../lib/agents.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
@@ -218,22 +219,69 @@ setPipelineHandler((event) => {
 });
 console.log('[panopticon] Pipeline notifier → domain events wired');
 
+function toAgentStatusPayload(status: AgentState['status'] | undefined) {
+  return status === 'starting' || status === 'running' || status === 'stopped' || status === 'error'
+    ? status
+    : 'unknown';
+}
+
+function buildAgentStatusChangedPayload(state: AgentState, previousStatus?: AgentState['status']) {
+  return {
+    agentId: state.id,
+    issueId: state.issueId,
+    status: toAgentStatusPayload(state.status),
+    previousStatus: previousStatus ? toAgentStatusPayload(previousStatus) : undefined,
+    paused: state.paused === true,
+    pausedReason: state.pausedReason ?? null,
+    pausedAt: state.pausedAt ?? null,
+    troubled: state.troubled === true,
+    troubledAt: state.troubledAt ?? null,
+    consecutiveFailures: state.consecutiveFailures ?? 0,
+    firstFailureInRunAt: state.firstFailureInRunAt ?? null,
+    lastFailureAt: state.lastFailureAt ?? null,
+    lastFailureReason: state.lastFailureReason ?? null,
+    lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
+  };
+}
+
 // Wire up deacon → domain events for orphaned agent recovery.
-// When deacon detects a running agent with no tmux session, it resets to stopped.
-// This notifier emits agent.stopped so the read model and frontend update immediately.
+// When deacon resets agent state directly, publish the saved state to live clients.
 setAgentStoppedNotifier((agentId) => {
+  void (async () => {
+    try {
+      const es = getEventStore();
+      const state = await getAgentStateAsync(agentId);
+      if (state) {
+        es.append({
+          type: 'agent.status_changed',
+          timestamp: new Date().toISOString(),
+          payload: buildAgentStatusChangedPayload(state),
+        } as any);
+        return;
+      }
+      es.append({
+        type: 'agent.stopped',
+        timestamp: new Date().toISOString(),
+        payload: { agentId },
+      } as any);
+    } catch (err) {
+      console.error('[pipeline] Failed to append agent stopped/status event:', err);
+    }
+  })();
+});
+setAgentStatusChangedNotifier((state, previousStatus) => {
   try {
     const es = getEventStore();
     es.append({
-      type: 'agent.stopped',
+      type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
-      payload: { agentId },
+      payload: buildAgentStatusChangedPayload(state, previousStatus),
     } as any);
   } catch (err) {
-    console.error('[pipeline] Failed to append agent.stopped event:', err);
+    console.error('[pipeline] Failed to append agent.status_changed event:', err);
   }
 });
-console.log('[panopticon] Agent stopped notifier → domain events wired');
+console.log('[panopticon] Agent stopped/status notifiers → domain events wired');
 
 // Wire deacon merge-ready reminder → domain events so the frontend re-reads the
 // Awaiting Merge list when deacon fires its 1h staleness reminder.
@@ -292,22 +340,19 @@ const emitShutdownActivity = () => {
     });
   } catch { /* non-fatal */ }
 };
-process.once('SIGTERM', () => {
+const handleShutdownSignal = (signal: NodeJS.Signals) => {
+  console.log(`[panopticon] received ${signal} (pid=${process.pid} ppid=${process.ppid}) — shutting down`);
   emitShutdownActivity();
   clearInterval(attachmentCleanupTimer);
   stopAgentEnrichmentService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
   stopTtsPlayback();
-});
-process.once('SIGINT', () => {
-  emitShutdownActivity();
-  clearInterval(attachmentCleanupTimer);
-  stopAgentEnrichmentService();
-  stopConversationLifecycleService();
-  stopTtsSummarizer();
-  stopTtsPlayback();
-});
+  process.exit(0);
+};
+process.once('SIGTERM', () => handleShutdownSignal('SIGTERM'));
+process.once('SIGINT', () => handleShutdownSignal('SIGINT'));
+process.once('SIGHUP', () => handleShutdownSignal('SIGHUP'));
 
 // Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
 clearStuckMergeStatuses();

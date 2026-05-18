@@ -80,8 +80,20 @@ export const AgentStatusChangedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     agentId: AgentId,
+    issueId: Schema.optional(IssueId),
     status: AgentStatus,
     previousStatus: Schema.optional(AgentStatus),
+    stoppedByUser: Schema.optional(Schema.Boolean),
+    paused: Schema.optional(Schema.Boolean),
+    pausedReason: Schema.optional(Schema.NullOr(Schema.String)),
+    pausedAt: Schema.optional(Schema.NullOr(Schema.String)),
+    troubled: Schema.optional(Schema.Boolean),
+    troubledAt: Schema.optional(Schema.NullOr(Schema.String)),
+    consecutiveFailures: Schema.optional(Schema.Number),
+    firstFailureInRunAt: Schema.optional(Schema.NullOr(Schema.String)),
+    lastFailureAt: Schema.optional(Schema.NullOr(Schema.String)),
+    lastFailureReason: Schema.optional(Schema.NullOr(Schema.String)),
+    lastFailureNextRetryAt: Schema.optional(Schema.NullOr(Schema.String)),
   }),
 })
 export type AgentStatusChangedEvent = typeof AgentStatusChangedEvent.Type

@@ -3,7 +3,8 @@
     "version": "0.5",
     "created": "2026-04-12T00:00:00Z",
     "author": "panopticon-cli/0.6.0",
-    "description": "Plan for PAN-457: Conversation discovery — index sessions inside and outside Panopticon"
+    "description": "Plan for PAN-457: Conversation discovery — index sessions inside and outside Panopticon",
+    "updated": "2026-05-17T04:52:04.844Z"
   },
   "plan": {
     "id": "pan-457",
@@ -11,9 +12,9 @@
     "status": "completed",
     "uid": "11a0ca78-86d3-4568-9fe8-a99ad5d0eb16",
     "author": "agent:claude-opus-4-6",
-    "sequence": 2,
+    "sequence": 136,
     "created": "2026-04-12T00:00:00Z",
-    "updated": "2026-04-20T19:14:39.650802Z",
+    "updated": "2026-05-17T04:52:04.844Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/457",
@@ -1241,7 +1242,68 @@
         "to": "integration-tests",
         "type": "informs"
       }
-    ]
+    ],
+    "metadata": {
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-457",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-17T04:52:04.836Z",
+        "work": {
+          "updatedAt": "2026-05-17T04:52:04.836Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-17T04:52:04.836Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-17T04:52:04.836Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "blocked",
+          "updatedAt": "2026-05-17T04:52:04.836Z",
+          "notes": "C-1/C-2 correctness bugs + R-1/R-2/R-3/R-4 requirements gaps: unchanged-scan correlation refresh missing, cache tokens dropped, tag/file/tool filters absent, files_touched not shown, workspace schema init unconfirmed, custom model missing",
+          "history": [
+            {
+              "status": "blocked",
+              "at": "2026-05-17T04:52:04.836Z",
+              "notes": "C-1/C-2 correctness bugs + R-1/R-2/R-3/R-4 requirements gaps: unchanged-scan correlation refresh missing, cache tokens dropped, tag/file/tool filters absent, files_touched not shown, workspace schema init unconfirmed, custom model missing"
+            }
+          ],
+          "approval": "changes_requested"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-17T04:52:04.836Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-17T04:52:04.836Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-17T04:52:04.836Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-17T04:52:04.836Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-17T04:52:04.836Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/717"
+        }
+      }
+    }
   },
   "status": "completed"
 }

@@ -12,6 +12,25 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): (.
   };
 }
 
+// Optional /ws/terminal cold-path profiling. Enable with
+// `localStorage.PANOPTICON_TERMINAL_PROFILE = '1'` (then reload) — pairs with
+// the server-side PANOPTICON_TERMINAL_PROFILE env var.
+const TERMINAL_PROFILE_ENABLED = (() => {
+  try {
+    return localStorage.getItem('PANOPTICON_TERMINAL_PROFILE') === '1';
+  } catch {
+    return false;
+  }
+})();
+function profMark(sessionName: string, t0: number, label: string, extra?: string): void {
+  if (!TERMINAL_PROFILE_ENABLED) return;
+  const now = performance.now();
+  const ms = now - t0;
+  const clickT = (window as unknown as { __panTerminalClickAt?: number }).__panTerminalClickAt;
+  const sinceClick = clickT ? ` clickΔ=${(now - clickT).toFixed(1)}ms` : '';
+  console.log(`[xterm-prof] ${sessionName} +${ms.toFixed(1)}ms t=${now.toFixed(1)}${sinceClick} ${label}${extra ? ' ' + extra : ''}`);
+}
+
 interface XTerminalProps {
   sessionName: string;
   token?: string;
@@ -247,6 +266,8 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
 
   const connect = useCallback(() => {
     if (!terminalRef.current || !sessionName) return;
+    const tProf = performance.now();
+    profMark(sessionName, tProf, 'connect() entered');
 
     // Clear any pending reconnect timer
     if (reconnectTimer.current) {
@@ -258,9 +279,11 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     const container = terminalRef.current;
     if (container.clientWidth === 0 || container.clientHeight === 0) {
       console.warn('XTerminal: Container has no size, retrying in 100ms');
+      profMark(sessionName, tProf, 'container 0x0, retry in 100ms');
       setTimeout(() => connect(), 100);
       return;
     }
+    profMark(sessionName, tProf, 'container sized', `${container.clientWidth}x${container.clientHeight}`);
 
     console.log('XTerminal: Creating terminal, container size:', container.clientWidth, 'x', container.clientHeight);
 
@@ -399,6 +422,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       wsUrl += `&token=${encodeURIComponent(token)}`;
     }
 
+    profMark(sessionName, tProf, 'new WebSocket()');
     const ws = new WebSocket(wsUrl);
     // IMPORTANT: Use arraybuffer for synchronous binary processing
     // Default 'blob' requires async handling which can cause out-of-order writes
@@ -406,6 +430,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     wsRef.current = ws;
 
     ws.onopen = () => {
+      profMark(sessionName, tProf, 'ws.onopen');
       console.log('XTerminal: WebSocket opened');
       readyForLiveData.current = false;
       remoteSize.current = null;
@@ -414,6 +439,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       requestedSize.current = measured;
       console.log('XTerminal: Sending attach dimensions:', measured.cols, 'x', measured.rows);
       ws.send(JSON.stringify({ type: 'attach', cols: measured.cols, rows: measured.rows }));
+      profMark(sessionName, tProf, 'attach sent', `${measured.cols}x${measured.rows}`);
     };
 
     // DEBUG: Enable detailed logging to diagnose terminal corruption
@@ -456,7 +482,13 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       term.write(data);
     };
 
+    let firstMessageLogged = false;
+    let firstLiveByteLogged = false;
     ws.onmessage = (event) => {
+      if (!firstMessageLogged) {
+        firstMessageLogged = true;
+        profMark(sessionName, tProf, 'first ws message received');
+      }
       let dataStr = '';
 
       // Normalize data to string
@@ -485,6 +517,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         }
 
         if (control?.type === 'snapshot') {
+          profMark(sessionName, tProf, 'snapshot decoded', `cols=${control.cols} rows=${control.rows} bytes=${control.data.length}`);
           remoteSize.current = { cols: control.cols, rows: control.rows };
           requestedSize.current = { cols: control.cols, rows: control.rows };
           readyForLiveData.current = false;
@@ -495,13 +528,16 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           // Kick off snapshot write; don't wait for xterm.js callback to send ready.
           // In background tabs xterm.js's setTimeout-based parser stalls, which would
           // let the server's pending buffer grow unbounded and then flood us on resume.
+          const tWrite = performance.now();
           term!.write(control.data, () => {
+            profMark(sessionName, tProf, 'snapshot xterm-parse done', `took=${(performance.now() - tWrite).toFixed(1)}ms`);
             term!.scrollToBottom();
             readyForLiveData.current = true;
             sendResizeIfNeeded();
           });
           reconnectAttempts.current = 0;
           ws.send(JSON.stringify({ type: 'ready' }));
+          profMark(sessionName, tProf, 'ready sent');
           return;
         }
 
@@ -514,6 +550,10 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         }
       }
 
+      if (!firstLiveByteLogged) {
+        firstLiveByteLogged = true;
+        profMark(sessionName, tProf, 'first live data byte', `len=${dataStr.length}`);
+      }
       queueLiveData(dataStr);
     };
 
@@ -597,21 +637,17 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyDown, handleContextMenu, handleTerminalWheel, getMeasuredSize, sendResizeIfNeeded]);
 
   useEffect(() => {
-    let cancelled = false;
-    let cleanupFn: (() => void) | undefined;
-
-    const timeoutId = setTimeout(() => {
-      if (!cancelled) {
-        cleanupFn = connect();
-      }
-    }, 50);
-
+    const tMount = performance.now();
+    profMark(sessionName, tMount, 'XTerminal mount effect');
+    // The container-zero-size race the old 50ms setTimeout guarded against is
+    // already handled by the clientWidth/Height check inside connect() (which
+    // retries every 100ms until sized). Connecting synchronously saves 50ms on
+    // every Terminal click.
+    const cleanupFn = connect();
     return () => {
-      cancelled = true;
-      clearTimeout(timeoutId);
       cleanupFn?.();
     };
-  }, [connect]);
+  }, [connect, sessionName]);
 
   useEffect(() => {
     const debouncedFit = debounce(() => {

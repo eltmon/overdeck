@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync,
 import { join, basename } from 'path'
 
 import { ensurePanDirs } from './specs.js'
+import { queueAutoCommit } from './auto-commit.js'
 
 export function getContinuesDir(projectRoot: string): string {
   return join(projectRoot, '.pan', 'continues')
@@ -25,6 +26,11 @@ export function writeContinueFile(projectRoot: string, issueId: string, content:
   ensurePanDirs(projectRoot)
   const path = getContinueFilePath(projectRoot, issueId)
   writeFileSync(path, content, 'utf-8')
+  queueAutoCommit({
+    projectRoot,
+    paths: [path],
+    subject: `chore(state): update continue for ${issueId.toUpperCase()}`,
+  })
   return path
 }
 
@@ -44,6 +50,11 @@ export function deleteContinueFile(projectRoot: string, issueId: string): boolea
     const deletedDir = join(getContinuesDir(projectRoot), 'deleted')
     mkdirSync(deletedDir, { recursive: true })
     renameSync(path, join(deletedDir, `${issueId.toLowerCase()}-${Date.now()}.vbrief.json`))
+    queueAutoCommit({
+      projectRoot,
+      paths: [path],
+      subject: `chore(state): remove continue for ${issueId.toUpperCase()}`,
+    })
     return true
   } catch {
     return false

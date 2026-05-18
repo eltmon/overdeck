@@ -15,11 +15,12 @@
  * continue file — they cannot mutate the spec on main.
  */
 
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { findSpecByIssue, findSpecByIssueAsync } from '../pan-dir/specs.js';
 import { readWorkspaceContinue, readWorkspaceContinueAsync, writeWorkspaceContinue } from '../pan-dir/continue.js';
+import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
 
 /**
@@ -37,16 +38,62 @@ function projectRootFromWorkspace(workspacePath: string): string {
   return resolve(workspacePath, '..', '..');
 }
 
+function workspaceDraftPath(workspacePath: string): string {
+  return join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
+}
+
+export function findWorkspaceDraftPlan(workspacePath: string): string | null {
+  const path = workspaceDraftPath(workspacePath);
+  if (!existsSync(path)) return null;
+
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return path;
+
+  try {
+    const doc = readPlan(path);
+    const planIssueId = doc.plan?.id;
+    if (planIssueId && planIssueId.toLowerCase() !== issueId.toLowerCase()) return null;
+  } catch {
+    return path;
+  }
+
+  return path;
+}
+
+export async function findWorkspaceDraftPlanAsync(workspacePath: string): Promise<string | null> {
+  const path = workspaceDraftPath(workspacePath);
+  try {
+    await readFile(path, 'utf-8');
+  } catch (error: any) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+
+  const issueId = issueIdFromWorkspacePath(workspacePath);
+  if (!issueId) return path;
+
+  try {
+    const doc = await readPlanAsync(path);
+    const planIssueId = doc.plan?.id;
+    if (planIssueId && planIssueId.toLowerCase() !== issueId.toLowerCase()) return null;
+  } catch {
+    return path;
+  }
+
+  return path;
+}
+
 /**
- * Returns the path to the canonical vBRIEF spec on main for this workspace's issue.
- * Returns null if no spec exists — callers must handle the missing-spec case.
+ * Returns the path to this workspace's vBRIEF source. The canonical main-side
+ * spec wins after promotion; before first promotion, the workspace draft is the
+ * only valid source.
  */
 export function findPlan(workspacePath: string): string | null {
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return null;
   const projectRoot = projectRootFromWorkspace(workspacePath);
   const entry = findSpecByIssue(projectRoot, issueId);
-  return entry ? entry.path : null;
+  return entry ? entry.path : findWorkspaceDraftPlan(workspacePath);
 }
 
 /** Async variant of findPlan — safe to call from dashboard server code. */
@@ -55,7 +102,7 @@ export async function findPlanAsync(workspacePath: string): Promise<string | nul
   if (!issueId) return null;
   const projectRoot = projectRootFromWorkspace(workspacePath);
   const entry = await findSpecByIssueAsync(projectRoot, issueId);
-  return entry ? entry.path : null;
+  return entry ? entry.path : findWorkspaceDraftPlanAsync(workspacePath);
 }
 
 /**
@@ -131,7 +178,11 @@ export function applyStatusOverrides(doc: VBriefDocument, overrides: Record<stri
       const itemId = key.slice(0, dotIndex);
       const subId = key.slice(dotIndex + 1);
       const item = merged.plan.items.find(i => i.id === itemId);
-      const sub = item?.subItems?.find(s => s.id === subId);
+      // SubItem IDs use format "parentId.subId" (e.g. "auto-start.ac1"),
+      // but updateSubItemStatus passes only the subId portion. Reconstruct the full
+      // ID for the lookup.
+      const fullSubId = `${itemId}.${subId}`;
+      const sub = item?.subItems?.find(s => s.id === fullSubId);
       if (sub) {
         sub.status = status as VBriefItemStatus;
         if (status === 'completed' && !sub.completed) {
@@ -191,6 +242,10 @@ export function isPlanningProposed(workspacePath: string, planningDir?: string):
   return checkPlanStatus(workspacePath, planningDir, status => status === 'proposed');
 }
 
+export function isPlanningProposedAsync(workspacePath: string, planningDir?: string): Promise<boolean> {
+  return checkPlanStatusAsync(workspacePath, planningDir, status => status === 'proposed');
+}
+
 /**
  * Check whether planning has finished for this workspace — i.e., beads have
  * been generated and the agent can (or already did) start work.
@@ -202,6 +257,10 @@ export function isPlanningComplete(workspacePath: string, planningDir?: string):
   return checkPlanStatus(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
 }
 
+export function isPlanningCompleteAsync(workspacePath: string, planningDir?: string): Promise<boolean> {
+  return checkPlanStatusAsync(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
+}
+
 function checkPlanStatus(
   workspacePath: string,
   _planningDir: string | undefined,
@@ -211,6 +270,24 @@ function checkPlanStatus(
   if (!planPath) return false;
   try {
     const doc = readPlan(planPath);
+    const status = doc.plan?.status;
+    if (status && matchStatus(status)) return true;
+    if (status) return false;
+  } catch {
+    // Corrupt / unreadable plan
+  }
+  return false;
+}
+
+async function checkPlanStatusAsync(
+  workspacePath: string,
+  _planningDir: string | undefined,
+  matchStatus: (status: string) => boolean,
+): Promise<boolean> {
+  const planPath = await findPlanAsync(workspacePath);
+  if (!planPath) return false;
+  try {
+    const doc = await readPlanAsync(planPath);
     const status = doc.plan?.status;
     if (status && matchStatus(status)) return true;
     if (status) return false;
@@ -273,7 +350,9 @@ export function updateSubItemStatus(
   const item = doc.plan.items.find(i => i.id === itemId);
   if (!item?.subItems) return;
 
-  const subItem = item.subItems.find(s => s.id === subItemId);
+  // Normalize subItemId before validation — spec uses "parentId.subId" format
+  const fullSubId = subItemId.includes('.') ? subItemId : `${itemId}.${subItemId}`;
+  const subItem = item.subItems.find(s => s.id === subItemId || s.id === fullSubId);
   if (!subItem) return;
 
   const continueState = readWorkspaceContinue(workspacePath) ?? {
@@ -290,7 +369,7 @@ export function updateSubItemStatus(
   };
 
   const overrides = { ...continueState.statusOverrides };
-  overrides[`${itemId}.${subItemId}`] = status;
+  overrides[fullSubId] = status;
   continueState.statusOverrides = overrides;
 
   writeWorkspaceContinue(workspacePath, continueState);

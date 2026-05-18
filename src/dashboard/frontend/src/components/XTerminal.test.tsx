@@ -255,8 +255,9 @@ describe('XTerminal', () => {
       expect(screen.getByTitle('Terminal settings')).toBeInTheDocument();
     });
 
-    // Should use prop value (true) instead of localStorage (false)
-    expect(localStorageMock.getItem).not.toHaveBeenCalled();
+    // Should use prop value (true) instead of reading the auto-copy key.
+    // (Unrelated localStorage reads — e.g. the optional profiling flag — are fine.)
+    expect(localStorageMock.getItem).not.toHaveBeenCalledWith('panopticon.terminal.autoCopyOnSelect');
   });
 
   it('sends attach with measured dimensions on connect', async () => {

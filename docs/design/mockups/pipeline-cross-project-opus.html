@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pipeline · Panopticon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --color-white:#fff; --color-black:#000;
+      --color-neutral-100:#f5f5f4; --color-neutral-400:#a3a3a3; --color-neutral-500:#737373;
+      --color-neutral-800:#292524; --color-neutral-950:#0c0a09;
+      --color-red-400:#f87171; --color-red-500:#ef4444;
+      --color-amber-400:#fbbf24; --color-amber-500:#f59e0b;
+      --color-emerald-400:#34d399; --color-emerald-500:#10b981;
+      --color-blue-400:#60a5fa; --color-blue-500:#3b82f6;
+      --color-purple-400:#c084fc; --color-purple-500:#a855f7;
+      --color-cyan-400:#22d3ee; --color-cyan-500:#06b6d4;
+
+      --background: color-mix(in srgb, var(--color-neutral-950) 95%, var(--color-white));
+      --foreground: var(--color-neutral-100);
+      --card: color-mix(in srgb, var(--background) 98%, var(--color-white));
+      --muted-foreground: color-mix(in srgb, var(--color-neutral-500) 90%, var(--color-white));
+      --accent: rgb(255 255 255 / 4%);
+      --border: rgb(255 255 255 / 6%);
+      --input: rgb(255 255 255 / 8%);
+
+      --primary: oklch(0.588 0.217 264);
+      --primary-foreground: var(--color-white);
+      --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
+      --destructive-foreground: var(--color-red-400);
+      --info: var(--color-blue-500); --info-foreground: var(--color-blue-400);
+      --success: var(--color-emerald-500); --success-foreground: var(--color-emerald-400);
+      --warning: var(--color-amber-500); --warning-foreground: var(--color-amber-400);
+      --signal-review: var(--color-purple-500); --signal-review-foreground: var(--color-purple-400);
+      --signal-cost: var(--color-cyan-500); --signal-cost-foreground: var(--color-cyan-400);
+
+      --radius: 0.625rem;
+      --radius-sm: calc(var(--radius) - 4px);
+      --radius-md: calc(var(--radius) - 2px);
+      --radius-lg: var(--radius);
+      --radius-xl: calc(var(--radius) + 4px);
+      --radius-2xl: calc(var(--radius) + 8px);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;height:100%;background:var(--background);color:var(--foreground);font-family:"DM Sans",system-ui,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+    body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:256px 256px;z-index:9999}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.18)}
+    .mono{font-family:"SF Mono",SFMono-Regular,Consolas,"Liberation Mono",monospace}
+
+    .app{display:grid;grid-template-columns:232px 1fr;height:100vh;overflow:hidden}
+
+    /* Sidebar */
+    .sidebar{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:14px 12px;gap:4px;overflow-y:auto}
+    .ws-pill{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:var(--radius-lg);margin-bottom:10px}
+    .ws-mark{width:28px;height:28px;border-radius:var(--radius-md);background:transparent;color:var(--foreground);display:grid;place-items:center;border:1px solid var(--border)}
+    .ws-mark svg{width:18px;height:18px}
+    .ws-title{font-family:"Space Grotesk",sans-serif;font-weight:600;letter-spacing:-.01em;font-size:14px}
+    .ws-sub{font-size:10px;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.12em}
+    .filter-box{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--radius-lg);background:rgb(255 255 255 / 3%);border:1px solid var(--input);color:var(--muted-foreground);font-size:12px;margin-bottom:10px}
+
+    .nav-group{margin-top:12px}
+    .nav-label{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:var(--muted-foreground);padding:0 10px;margin:0 0 4px}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:6px 10px;font-size:13px;color:var(--muted-foreground);border-radius:var(--radius-lg);cursor:pointer;transition:background-color 200ms,color 200ms;position:relative}
+    .nav-item:hover{background:var(--accent);color:var(--foreground)}
+    .nav-item .icon{width:14px;height:14px;stroke-width:2}
+    .nav-item .nav-count{margin-left:auto;font-size:11px;color:var(--muted-foreground)}
+    .nav-item.active{background:var(--accent);color:var(--foreground)}
+    .nav-item.active::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--primary)}
+
+    .dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--muted-foreground)}
+    .dot.todo{background:rgb(255 255 255 / 25%)}
+    .dot.progress{background:var(--info)}
+    .dot.review{background:var(--warning)}
+    .dot.ship{background:var(--signal-review)}
+    .dot.done{background:var(--success)}
+
+    .project-mark{width:14px;height:14px;border-radius:3px;display:inline-block}
+    .project-mark.min{background:var(--info)}
+    .project-mark.pan{background:var(--signal-review)}
+    .project-mark.aur{background:var(--success)}
+    .project-mark.krx{background:var(--warning)}
+    .project-mark.ocw{background:var(--signal-cost)}
+
+    .sidebar-footer{margin-top:auto;padding:8px 10px 0;color:var(--muted-foreground);font-size:11px;display:flex;justify-content:space-between;align-items:center}
+    .kbd-chip{font-family:"SF Mono",monospace;font-size:10px;padding:1px 5px;border-radius:4px;background:var(--accent);color:var(--muted-foreground)}
+
+    /* Main */
+    .main{display:flex;flex-direction:column;min-width:0;background:var(--background)}
+    .topbar{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--border);height:52px;flex-shrink:0}
+    .breadcrumb{display:flex;align-items:center;gap:8px;font-size:13px}
+    .breadcrumb .muted{color:var(--muted-foreground)}
+    .breadcrumb .sep{color:var(--muted-foreground)}
+    .breadcrumb .title{font-weight:500}
+    .breadcrumb .meta{font-size:11px;color:var(--muted-foreground);padding:2px 6px;border-radius:var(--radius-sm);background:var(--accent)}
+
+    .topbar-spacer{flex:1}
+    .search{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;border-radius:var(--radius-lg);background:var(--card);border:1px solid var(--input);color:var(--muted-foreground);font-size:12px;min-width:280px}
+    .seg{display:flex;background:var(--card);border:1px solid var(--input);border-radius:var(--radius-lg);overflow:hidden;height:32px}
+    .seg button{background:transparent;border:none;color:var(--muted-foreground);font:inherit;font-size:12px;font-weight:500;padding:0 12px;cursor:pointer;font-family:inherit}
+    .seg button.active{background:var(--accent);color:var(--foreground)}
+    .seg .div{width:1px;background:var(--border)}
+    .btn-primary{height:32px;padding:0 14px;display:flex;align-items:center;gap:6px;background:var(--primary);color:var(--primary-foreground);border:none;border-radius:var(--radius-lg);font:inherit;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;box-shadow:0 1px 0 rgb(255 255 255 / 6%) inset}
+
+    /* Metric strip */
+    .metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;padding:14px 18px;border-bottom:1px solid var(--border)}
+    .metric{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-2xl);padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+    .metric .row1{display:flex;align-items:center;gap:8px;color:var(--muted-foreground);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+    .metric .row1 .ico{width:14px;height:14px}
+    .metric .ico.machine{color:var(--info-foreground)}
+    .metric .ico.review{color:var(--warning-foreground)}
+    .metric .ico.ship{color:var(--signal-review-foreground)}
+    .metric .ico.cost{color:var(--signal-cost-foreground)}
+    .metric .ico.queue{color:var(--muted-foreground)}
+    .metric .value{font-size:22px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums}
+    .metric .sub{font-size:11px;color:var(--muted-foreground)}
+    .metric .delta{display:inline-flex;align-items:center;gap:2px;color:var(--success-foreground)}
+
+    /* Scroll area */
+    .scroll{flex:1;overflow-y:auto}
+
+    /* Pipeline phase group */
+    .phase{border-bottom:1px solid var(--border)}
+    .phase-head{display:flex;align-items:center;gap:12px;padding:12px 18px 10px;background:color-mix(in srgb, var(--background) 92%, var(--color-white));backdrop-filter:blur(6px);border-bottom:1px solid var(--border);border-top:2px solid transparent;position:sticky;top:0;z-index:2}
+    .phase.ship   .phase-head{border-top-color:var(--success)}
+    .phase.review .phase-head{border-top-color:var(--warning)}
+    .phase.work   .phase-head{border-top-color:var(--info)}
+    .phase.plan   .phase-head{border-top-color:var(--signal-review)}
+    .phase.todo   .phase-head{border-top-color:rgb(255 255 255 / 15%)}
+
+    .phase-title{font-size:14px;font-weight:500;color:var(--foreground)}
+    .phase-count{font-size:11px;color:var(--muted-foreground);padding:1px 6px;border-radius:var(--radius-sm);background:var(--accent)}
+    .phase-sub{font-size:12px;color:var(--muted-foreground);margin-left:4px}
+    .phase-right{margin-left:auto;font-size:11px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+
+    /* Row */
+    .row{display:grid;grid-template-columns:14px 78px 14px 1fr 220px 84px 30px;align-items:center;gap:14px;padding:10px 18px 10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background-color 200ms;position:relative}
+    .row:hover{background:var(--accent)}
+    .row:last-child{border-bottom:none}
+    .row::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;background:transparent}
+    .row.p-urgent::before{background:var(--destructive)}
+    .row.p-high::before{background:var(--warning)}
+    .row.p-medium::before{background:rgb(255 255 255 / 22%)}
+    .row.p-low::before{background:transparent}
+
+    .prio{width:12px;height:12px}
+    .prio.urgent{color:var(--destructive-foreground)}
+    .prio.high  {color:var(--warning-foreground)}
+    .prio.medium{color:var(--muted-foreground)}
+    .prio.low   {color:var(--muted-foreground);opacity:.5}
+
+    .issue-id{font-family:"SF Mono",monospace;font-size:11px;color:var(--muted-foreground);letter-spacing:.02em}
+
+    .sglyph{width:14px;height:14px}
+    .sglyph.todo    {color:var(--muted-foreground)}
+    .sglyph.progress{color:var(--info-foreground)}
+    .sglyph.review  {color:var(--warning-foreground)}
+    .sglyph.ship    {color:var(--signal-review-foreground)}
+    .sglyph.done    {color:var(--success-foreground)}
+
+    .title-cell{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .title-row1{display:flex;align-items:center;gap:8px;min-width:0}
+    .title-text{font-size:13px;color:var(--foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .title-row2{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted-foreground);min-width:0}
+    .title-row2 .label{font-size:10px;font-weight:500;padding:1px 6px;border-radius:var(--radius-sm);background:rgb(255 255 255 / 5%);color:var(--muted-foreground);border:1px solid var(--border);white-space:nowrap}
+    .title-row2 .proj{display:flex;align-items:center;gap:6px}
+    .title-row2 .div-dot{width:3px;height:3px;border-radius:50%;background:var(--muted-foreground);opacity:.5}
+
+    .agent-cell{display:flex;flex-direction:column;gap:3px;min-width:0}
+    .agent-name{font-family:"SF Mono",monospace;font-size:11px;color:var(--foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .agent-sub{font-family:"SF Mono",monospace;font-size:10px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .agent-cell.empty .agent-name{color:var(--muted-foreground);font-style:italic;font-family:"DM Sans",sans-serif;font-size:11px}
+
+    .runtime{font-family:"SF Mono",monospace;font-size:11px;color:var(--muted-foreground);text-align:right;font-variant-numeric:tabular-nums}
+
+    .avatar{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#a855f7,#06b6d4);display:grid;place-items:center;color:#fff;font-size:9px;font-weight:600;border:1px solid var(--border)}
+    .avatar.b{background:linear-gradient(135deg,#f59e0b,#ef4444)}
+    .avatar.c{background:linear-gradient(135deg,#10b981,#06b6d4)}
+    .avatar.d{background:linear-gradient(135deg,#60a5fa,#a855f7)}
+    .avatar.e{background:linear-gradient(135deg,#ef4444,#f59e0b)}
+
+    /* Verb badges (one per row, semantic color OK — live state) */
+    .verb{font-size:10px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:var(--radius-sm);border:1px solid;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+    .verb .pulse{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 0 0 currentColor;animation:pulse 1.6s ease-out infinite}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 currentColor;opacity:1}80%{box-shadow:0 0 0 6px transparent;opacity:.5}100%{box-shadow:0 0 0 0 transparent;opacity:1}}
+    .verb.work   {background:color-mix(in srgb,var(--info) 8%,transparent);border-color:color-mix(in srgb,var(--info) 32%,transparent);color:var(--info-foreground)}
+    .verb.review {background:color-mix(in srgb,var(--warning) 8%,transparent);border-color:color-mix(in srgb,var(--warning) 32%,transparent);color:var(--warning-foreground)}
+    .verb.ship   {background:color-mix(in srgb,var(--signal-review) 8%,transparent);border-color:color-mix(in srgb,var(--signal-review) 32%,transparent);color:var(--signal-review-foreground)}
+    .verb.merge  {background:color-mix(in srgb,var(--success) 8%,transparent);border-color:color-mix(in srgb,var(--success) 32%,transparent);color:var(--success-foreground)}
+    .verb.stuck  {background:color-mix(in srgb,var(--destructive) 8%,transparent);border-color:color-mix(in srgb,var(--destructive) 32%,transparent);color:var(--destructive-foreground)}
+    .verb.queued {background:transparent;border-color:var(--border);color:var(--muted-foreground)}
+    .verb.queued .pulse{display:none}
+
+    /* Mock-navigator footer */
+    .mock-chrome{position:fixed;bottom:14px;right:14px;z-index:100;display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--background) 96%,var(--color-white));border:1px solid var(--border);border-radius:var(--radius-2xl);padding:8px 14px;font-size:11px;color:var(--muted-foreground);box-shadow:0 8px 24px rgb(0 0 0 / 32%)}
+    .mock-chrome a{color:var(--muted-foreground);text-decoration:none;font-weight:500;padding:4px 8px;border-radius:var(--radius-md);transition:background-color 200ms,color 200ms}
+    .mock-chrome a:hover{background:var(--accent);color:var(--foreground)}
+    .mock-chrome a.current{color:var(--foreground);background:var(--accent)}
+    .mock-chrome .mock-label{color:var(--muted-foreground);font-size:10px;text-transform:uppercase;letter-spacing:.1em}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="ws-pill">
+        <div class="ws-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+        </div>
+        <div>
+          <div class="ws-title">Panopticon</div>
+          <div class="ws-sub">Pipeline</div>
+        </div>
+      </div>
+
+      <div class="filter-box">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Filter projects, agents…
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">Operations</div>
+        <div class="nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m14.5 9.5-2.5 5-5 2.5 2.5-5z" fill="currentColor"/></svg>
+          Command Deck
+        </div>
+        <div class="nav-item active">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
+          Pipeline
+          <span class="nav-count">14</span>
+        </div>
+        <div class="nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="11" rx="1"/></svg>
+          Board
+        </div>
+        <div class="nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>
+          Agents
+          <span class="nav-count">7</span>
+        </div>
+        <div class="nav-item">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          Handoffs
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">Filter phase</div>
+        <div class="nav-item"><span class="dot"></span> All phases <span class="nav-count">14</span></div>
+        <div class="nav-item"><span class="dot todo"></span> Todo <span class="nav-count">3</span></div>
+        <div class="nav-item"><span class="dot progress"></span> In Progress <span class="nav-count">4</span></div>
+        <div class="nav-item"><span class="dot review"></span> In Review <span class="nav-count">2</span></div>
+        <div class="nav-item"><span class="dot ship"></span> Ship validation <span class="nav-count">2</span></div>
+        <div class="nav-item"><span class="dot done"></span> Done · 7d <span class="nav-count">12</span></div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">Projects</div>
+        <div class="nav-item"><span class="project-mark pan"></span> Panopticon CLI <span class="nav-count mono">PAN</span></div>
+        <div class="nav-item"><span class="project-mark min"></span> Mind Your Now <span class="nav-count mono">MIN</span></div>
+        <div class="nav-item"><span class="project-mark aur"></span> Auricle <span class="nav-count mono">AUR</span></div>
+        <div class="nav-item"><span class="project-mark krx"></span> Krux <span class="nav-count mono">KRX</span></div>
+        <div class="nav-item"><span class="project-mark ocw"></span> OpenClaw <span class="nav-count mono">OCW</span></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <span>Shortcuts</span>
+        <span class="kbd-chip">⌘ K</span>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <section class="main">
+      <header class="topbar">
+        <div class="breadcrumb">
+          <span class="muted">Eltmon</span>
+          <span class="sep">/</span>
+          <span class="title">Pipeline</span>
+          <span class="meta">14 active · 5 projects</span>
+        </div>
+        <div class="topbar-spacer"></div>
+        <div class="search">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          Search issues, agents, branches…
+        </div>
+        <div class="seg">
+          <button class="active">List</button>
+          <div class="div"></div>
+          <button>Board</button>
+          <div class="div"></div>
+          <button>Analytics</button>
+        </div>
+        <button class="btn-primary">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 4 19 12 5 20Z" fill="currentColor"/></svg>
+          Start agent
+        </button>
+      </header>
+
+      <!-- Metric strip -->
+      <div class="metrics">
+        <div class="metric">
+          <div class="row1">
+            <svg class="ico machine" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M8 6V3M16 6V3M3 10h18"/></svg>
+            Machine working
+          </div>
+          <div class="value">4</div>
+          <div class="sub">work agents active</div>
+        </div>
+        <div class="metric">
+          <div class="row1">
+            <svg class="ico review" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 21a7 7 0 0 1 14 0"/></svg>
+            Human attention
+          </div>
+          <div class="value">2</div>
+          <div class="sub">awaiting your action</div>
+        </div>
+        <div class="metric">
+          <div class="row1">
+            <svg class="ico ship" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M9 21V12h6v9"/></svg>
+            Ship validation
+          </div>
+          <div class="value">2</div>
+          <div class="sub">ship agents running</div>
+        </div>
+        <div class="metric">
+          <div class="row1">
+            <svg class="ico cost" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Spend · 24h
+          </div>
+          <div class="value">$18.42</div>
+          <div class="sub"><span class="delta">▼ 11%</span> vs yesterday</div>
+        </div>
+        <div class="metric">
+          <div class="row1">
+            <svg class="ico queue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+            Backlog
+          </div>
+          <div class="value">28</div>
+          <div class="sub">issues ready to plan</div>
+        </div>
+      </div>
+
+      <div class="scroll">
+        <!-- ─ Ship validation ─ -->
+        <div class="phase ship">
+          <div class="phase-head">
+            <span class="dot ship"></span>
+            <span class="phase-title">Ship validation</span>
+            <span class="phase-count">2</span>
+            <span class="phase-sub">Merge gate · rebase, push, await human merge</span>
+            <span class="phase-right">2 ship agents running</span>
+          </div>
+
+          <div class="row p-high">
+            <svg class="prio high" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg>
+            <span class="issue-id">PAN-1052</span>
+            <svg class="sglyph ship" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Activity feed: per-turn observations with time-bucketed sidebar</span>
+                <span class="verb ship"><span class="pulse"></span>SHIP RUNNING</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">dashboard</span>
+                <span class="label">observability</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark pan"></span> Panopticon CLI</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">agent-pan-1052-ship</div>
+              <div class="agent-sub">claude-opus-4-7 · ship</div>
+            </div>
+            <div class="runtime">19 min</div>
+            <div class="avatar c">EB</div>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">PAN-1111</span>
+            <svg class="sglyph ship" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Upgrade beads to v1.0.4 and remove redundant wrapper scaffolding</span>
+                <span class="verb merge">READY TO MERGE</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">refactor</span>
+                <span class="label">beads</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark pan"></span> Panopticon CLI</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">agent-pan-1111-ship</div>
+              <div class="agent-sub">gpt-5.5 · ship · idle</div>
+            </div>
+            <div class="runtime">2 min</div>
+            <div class="avatar c">EB</div>
+          </div>
+        </div>
+
+        <!-- ─ In Review ─ -->
+        <div class="phase review">
+          <div class="phase-head">
+            <span class="dot review"></span>
+            <span class="phase-title">In Review</span>
+            <span class="phase-count">2</span>
+            <span class="phase-sub">Specialists running · correctness, security, perf, requirements</span>
+            <span class="phase-right">amber = waiting on human</span>
+          </div>
+
+          <div class="row p-high">
+            <svg class="prio high" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg>
+            <span class="issue-id">MIN-794</span>
+            <svg class="sglyph review" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Project Rosie: Managed OpenClaw Agent for MYN customers</span>
+                <span class="verb review"><span class="pulse"></span>REVIEW RUNNING</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">managed</span>
+                <span class="label">multi-agent</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark min"></span> Mind Your Now</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">convoy-min-794-review</div>
+              <div class="agent-sub">4 specialists · sonnet-4-6</div>
+            </div>
+            <div class="runtime">38 min</div>
+            <div class="avatar c">EB</div>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">PAN-1053</span>
+            <svg class="sglyph review" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback</span>
+                <span class="verb stuck">CHANGES REQUESTED</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">stt</span>
+                <span class="label">whiteboard</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark pan"></span> Panopticon CLI</span>
+              </div>
+            </div>
+            <div class="agent-cell empty">
+              <div class="agent-name">awaiting agent restart</div>
+              <div class="agent-sub mono">last: convoy-pan-1053-review</div>
+            </div>
+            <div class="runtime">3h 12m</div>
+            <div class="avatar d">EB</div>
+          </div>
+        </div>
+
+        <!-- ─ In Progress ─ -->
+        <div class="phase work">
+          <div class="phase-head">
+            <span class="dot progress"></span>
+            <span class="phase-title">In Progress</span>
+            <span class="phase-count">4</span>
+            <span class="phase-sub">Work agents writing code in their workspaces</span>
+            <span class="phase-right">blue = machine working</span>
+          </div>
+
+          <div class="row p-urgent">
+            <svg class="prio urgent" viewBox="0 0 24 24" fill="currentColor"><rect x="11" y="3" width="2" height="11" rx="1"/><circle cx="12" cy="18" r="1.5"/></svg>
+            <span class="issue-id">MIN-846</span>
+            <svg class="sglyph progress" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Fizzy Integration (Master): bi-directional sync, @Kaia, SSO pass-through</span>
+                <span class="verb work"><span class="pulse"></span>WORK RUNNING</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">integration</span>
+                <span class="label">epic</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark min"></span> Mind Your Now</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">agent-min-846</div>
+              <div class="agent-sub">sonnet-4-6 · bead 7/12</div>
+            </div>
+            <div class="runtime">2h 41m</div>
+            <div class="avatar b">EB</div>
+          </div>
+
+          <div class="row p-high">
+            <svg class="prio high" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg>
+            <span class="issue-id">MIN-847</span>
+            <svg class="sglyph progress" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Health &amp; Life Journal — daily mood, energy, sleep capture</span>
+                <span class="verb work"><span class="pulse"></span>WORK RUNNING</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">feature</span>
+                <span class="label">frontend</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark min"></span> Mind Your Now</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">agent-min-847</div>
+              <div class="agent-sub">opus-4-7 · bead 3/8</div>
+            </div>
+            <div class="runtime">1h 18m</div>
+            <div class="avatar d">EB</div>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">MIN-848</span>
+            <svg class="sglyph progress" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Deprecate infra/new-feature shell template render — delegate to pan workspace create</span>
+                <span class="verb work"><span class="pulse"></span>WORK RUNNING</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">infra</span>
+                <span class="label">cleanup</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark min"></span> Mind Your Now</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">agent-min-848</div>
+              <div class="agent-sub">haiku-4-5 · bead 2/4</div>
+            </div>
+            <div class="runtime">22 min</div>
+            <div class="avatar">EB</div>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">AUR-4</span>
+            <svg class="sglyph progress" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Now Playing API endpoint + OBS overlay integration</span>
+                <span class="verb work"><span class="pulse"></span>WORK RUNNING</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">api</span>
+                <span class="label">streaming</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark aur"></span> Auricle</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">agent-aur-4</div>
+              <div class="agent-sub">sonnet-4-6 · bead 1/3</div>
+            </div>
+            <div class="runtime">14 min</div>
+            <div class="avatar">EB</div>
+          </div>
+        </div>
+
+        <!-- ─ Planning ─ -->
+        <div class="phase plan">
+          <div class="phase-head">
+            <span class="dot ship"></span>
+            <span class="phase-title">Planning</span>
+            <span class="phase-count">2</span>
+            <span class="phase-sub">vBRIEF in progress · scoping, beads being written</span>
+            <span class="phase-right">purple = planning agent</span>
+          </div>
+
+          <div class="row p-high">
+            <svg class="prio high" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg>
+            <span class="issue-id">MIN-845</span>
+            <svg class="sglyph review" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><circle cx="12" cy="12" r="9"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Fizzy SSO pass-through: auto-login to fizzy.mindyournow.com from MYN</span>
+                <span class="verb" style="color:var(--signal-review-foreground);background:color-mix(in srgb,var(--signal-review) 8%,transparent);border-color:color-mix(in srgb,var(--signal-review) 32%,transparent)"><span class="pulse"></span>PLANNING</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">integration</span>
+                <span class="label">auth</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark min"></span> Mind Your Now</span>
+              </div>
+            </div>
+            <div class="agent-cell">
+              <div class="agent-name">planning-min-845</div>
+              <div class="agent-sub">opus-4-7 · 8 questions answered</div>
+            </div>
+            <div class="runtime">12 min</div>
+            <div class="avatar b">EB</div>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">PAN-1124</span>
+            <svg class="sglyph review" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><circle cx="12" cy="12" r="9"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Decouple specs and PRDs from workspaces — write directly to main</span>
+                <span class="verb queued">QUEUED FOR PLAN</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">architecture</span>
+                <span class="label">vbrief</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark pan"></span> Panopticon CLI</span>
+              </div>
+            </div>
+            <div class="agent-cell empty">
+              <div class="agent-name">no active agent</div>
+              <div class="agent-sub mono">awaiting capacity</div>
+            </div>
+            <div class="runtime">—</div>
+            <div class="avatar">EB</div>
+          </div>
+        </div>
+
+        <!-- ─ Todo ─ -->
+        <div class="phase todo">
+          <div class="phase-head">
+            <span class="dot todo"></span>
+            <span class="phase-title">Todo</span>
+            <span class="phase-count">3</span>
+            <span class="phase-sub">Triaged, ready for planning</span>
+            <span class="phase-right">no agent activity</span>
+          </div>
+
+          <div class="row p-urgent">
+            <svg class="prio urgent" viewBox="0 0 24 24" fill="currentColor"><rect x="11" y="3" width="2" height="11" rx="1"/><circle cx="12" cy="18" r="1.5"/></svg>
+            <span class="issue-id">MIN-833</span>
+            <svg class="sglyph todo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><circle cx="12" cy="12" r="9"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">POST /api/v2/debrief/generate returns 500 on concurrent requests (lock contention)</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">bug</span>
+                <span class="label">backend</span>
+                <span class="label">p0</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark min"></span> Mind Your Now</span>
+              </div>
+            </div>
+            <div class="agent-cell empty">
+              <div class="agent-name">no active agent</div>
+              <div class="agent-sub mono">GitHub issue open</div>
+            </div>
+            <div class="runtime">—</div>
+            <div class="avatar e">EB</div>
+          </div>
+
+          <div class="row p-high">
+            <svg class="prio high" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg>
+            <span class="issue-id">MIN-816</span>
+            <svg class="sglyph todo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><circle cx="12" cy="12" r="9"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Scheduler hangs in late afternoon — Google Calendar API call blocks planning indefinitely</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">bug</span>
+                <span class="label">scheduler</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark min"></span> Mind Your Now</span>
+              </div>
+            </div>
+            <div class="agent-cell empty">
+              <div class="agent-name">no active agent</div>
+              <div class="agent-sub mono">Linear issue open</div>
+            </div>
+            <div class="runtime">—</div>
+            <div class="avatar c">EB</div>
+          </div>
+
+          <div class="row p-medium">
+            <svg class="prio medium" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="4" height="6" rx="1"/><rect x="10" y="10" width="4" height="10" rx="1" opacity=".6"/><rect x="17" y="6" width="4" height="14" rx="1" opacity=".25"/></svg>
+            <span class="issue-id">PAN-1129</span>
+            <svg class="sglyph todo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2"><circle cx="12" cy="12" r="9"/></svg>
+            <div class="title-cell">
+              <div class="title-row1">
+                <span class="title-text">Review-request route pushes wrong branch name: feature/977 instead of feature/pan-977</span>
+              </div>
+              <div class="title-row2">
+                <span class="label">bug</span>
+                <span class="label">review-pipeline</span>
+                <span class="div-dot"></span>
+                <span class="proj"><span class="project-mark pan"></span> Panopticon CLI</span>
+              </div>
+            </div>
+            <div class="agent-cell empty">
+              <div class="agent-name">no active agent</div>
+              <div class="agent-sub mono">GitHub #1129</div>
+            </div>
+            <div class="runtime">—</div>
+            <div class="avatar d">EB</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="mock-chrome">
+    <span class="mock-label">Opus mocks</span>
+    <a href="pipeline-cross-project-opus.html" class="current">Pipeline</a>
+    <a href="board-opus.html">Board</a>
+    <a href="pipeline-command-deck-opus.html">Command Deck</a>
+    <a href="agents-opus.html">Agents</a>
+    <a href="issue-detail-opus.html">Issue Detail</a>
+    <a href="system-map-opus.html">System Map</a>
+  </div>
+</body>
+</html>

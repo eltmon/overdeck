@@ -7,6 +7,7 @@ import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
  * Workspaces + lifecycle + review HTTP routes.
  *
  * Workspace data endpoints (/api/workspaces/):
+ *   GET    /api/workspace-stack-health
  *   GET    /api/workspaces/:issueId
  *   POST   /api/workspaces
  *   GET    /api/workspaces/:issueId/plan
@@ -53,6 +54,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import {
   resolveProjectFromIssue,
+  getProject,
   listProjects,
   findProjectByTeam,
   extractTeamPrefix,
@@ -91,7 +93,7 @@ import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js
 import { getCostsForIssue } from '../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { findPlan, readPlan, readPlanAsync, readWorkspacePlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { findPlanAsync, readPlanAsync, isPlanningCompleteAsync } from '../../../lib/vbrief/io.js';
 import { VBRIEF_INSPECTION_POLICIES } from '../../../lib/vbrief/types.js';
 import type { VBriefDocument, VBriefInspectionPolicy } from '../../../lib/vbrief/types.js';
 import { findVBriefByIssueAsync, readVBriefDocumentAsync } from '../../../lib/vbrief/vbrief-index.js';
@@ -107,6 +109,7 @@ import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js
 import { extractPrefix, extractNumber, parseIssueId } from '../../../lib/issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
+import { collectDockerContainerLifecycleSnapshot, getWorkspaceStackHealth } from '../../../lib/workspace/stack-health.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
@@ -118,6 +121,7 @@ const execFileAsync = promisify(execFile);
 const MAX_PROBED_PORTS = 5;
 const MAX_PROBED_CONTAINERS = 10;
 const PROBE_CACHE_TTL_MS = 30_000;
+const PROBE_CACHE_MAX_ENTRIES = MAX_PROBED_CONTAINERS * MAX_PROBED_PORTS * 20;
 
 function safeToISOString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -133,18 +137,45 @@ interface ProbeCacheEntry {
 
 const probeCache = new Map<string, ProbeCacheEntry>();
 
+function pruneProbeCache(
+  now = Date.now(),
+  runningNames?: Set<string>,
+  shouldPruneContainer?: (containerName: string) => boolean,
+): void {
+  for (const [key, entry] of probeCache) {
+    const containerName = key.split('::', 1)[0] ?? '';
+    const expired = now - entry.cachedAt > PROBE_CACHE_TTL_MS;
+    const absent = runningNames && shouldPruneContainer?.(containerName) === true && !runningNames.has(containerName);
+    if (expired || absent) {
+      probeCache.delete(key);
+    }
+  }
+
+  while (probeCache.size > PROBE_CACHE_MAX_ENTRIES) {
+    const oldestKey = probeCache.keys().next().value;
+    if (typeof oldestKey !== 'string') break;
+    probeCache.delete(oldestKey);
+  }
+}
+
 function getCachedProbe(key: string): { healthy: boolean; reason?: string } | undefined {
   const entry = probeCache.get(key);
   if (!entry) return undefined;
-  if (Date.now() - entry.cachedAt > PROBE_CACHE_TTL_MS) {
+  const now = Date.now();
+  if (now - entry.cachedAt > PROBE_CACHE_TTL_MS) {
     probeCache.delete(key);
     return undefined;
   }
+  probeCache.delete(key);
+  probeCache.set(key, entry);
   return entry.result;
 }
 
 function setCachedProbe(key: string, result: { healthy: boolean; reason?: string }): void {
-  probeCache.set(key, { result, cachedAt: Date.now() });
+  const now = Date.now();
+  pruneProbeCache(now);
+  probeCache.set(key, { result, cachedAt: now });
+  pruneProbeCache(now);
 }
 
 export function getWorkspacePathForIssue(projectPath: string, rawIssueId: string): { parsedIssueId: string; workspacePath: string } {
@@ -310,7 +341,7 @@ export async function isBranchAlreadyRebased(
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PORT = parseInt(process.env.API_PORT || process.env.PORT || '3011', 10);
-const MAX_AUTO_REQUEUE = 7;
+const MAX_AUTO_REQUEUE = 25;
 
 // Track server-managed merges — imported from specialists.ts (single source of truth).
 // Previously this was a local Set that was never in sync with specialists.ts's export (PAN-632).
@@ -706,6 +737,11 @@ async function getContainerStatusAsync(
     const runningNames = Object.entries(result)
       .filter(([, info]) => info.running)
       .map(([name]) => name);
+    pruneProbeCache(
+      Date.now(),
+      new Set(runningNames),
+      (containerName) => containerName.toLowerCase().includes(search),
+    );
 
     if (runningNames.length > 0) {
       let inspectByName = new Map<string, any>();
@@ -954,7 +990,7 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
 
   // Acceptance criteria checklist from vBRIEF plan items
   try {
-    const planPath = findPlan(workspacePath);
+    const planPath = await findPlanAsync(workspacePath);
     if (planPath && existsSync(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);
@@ -1272,6 +1308,108 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
+// ─── Route: GET /api/workspace-stack-health ──────────────────────────────────
+
+const getWorkspaceStackHealthBatchRoute = HttpRouter.add(
+  'GET',
+  '/api/workspace-stack-health',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = new URL(request.url, 'http://localhost');
+    const issueIds = Array.from(new Set((url.searchParams.get('issueIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean)))
+      .slice(0, 100);
+
+    const parsedIds = issueIds.map((issueId) => ({ issueId, parsed: parseIssueId(issueId) }));
+    const invalid = parsedIds.find(({ parsed }) => !parsed);
+    if (invalid) {
+      return jsonResponse({ error: `Invalid issue ID: ${invalid.issueId}` }, { status: 400 });
+    }
+
+    const workspaceRequests = parsedIds.map(({ parsed }) => {
+      const normalizedIssueId = parsed!.raw.toUpperCase();
+      const workspaceMetadata = (() => {
+        try {
+          return loadWorkspaceMetadata(normalizedIssueId);
+        } catch {
+          return null;
+        }
+      })();
+      if (workspaceMetadata?.location === 'remote') {
+        return {
+          kind: 'response' as const,
+          normalizedIssueId,
+          response: { exists: true, issueId: normalizedIssueId, location: 'remote', isRemote: true },
+        };
+      }
+
+      const resolved = resolveProjectFromIssue(normalizedIssueId);
+      if (!resolved) {
+        return {
+          kind: 'response' as const,
+          normalizedIssueId,
+          response: { exists: false, issueId: normalizedIssueId },
+        };
+      }
+
+      const projectConfig = getProject(resolved.projectKey);
+      const workspacePath = join(
+        resolved.projectPath,
+        projectConfig.workspace?.workspaces_dir ?? 'workspaces',
+        `feature-${parsed!.normalized}`,
+      );
+      if (!existsSync(workspacePath)) {
+        return {
+          kind: 'response' as const,
+          normalizedIssueId,
+          response: { exists: false, issueId: normalizedIssueId },
+        };
+      }
+
+      return {
+        kind: 'local' as const,
+        normalizedIssueId,
+        projectConfig,
+        projectPath: resolved.projectPath,
+        workspacePath,
+      };
+    });
+
+    const entries = yield* Effect.promise(async () => {
+      const containers = workspaceRequests.some((request) =>
+        request.kind === 'local' && Boolean(request.projectConfig.workspace?.docker?.compose_template)
+      )
+        ? await collectDockerContainerLifecycleSnapshot()
+        : undefined;
+
+      return Promise.all(workspaceRequests.map(async (request) => {
+        if (request.kind === 'response') {
+          return [request.normalizedIssueId, request.response] as const;
+        }
+
+        const stackHealth = await getWorkspaceStackHealth(request.normalizedIssueId, {
+          projectConfig: { ...request.projectConfig, path: request.projectPath },
+          workspacePath: request.workspacePath,
+          containers,
+        });
+
+        return [request.normalizedIssueId, {
+          exists: true,
+          issueId: request.normalizedIssueId,
+          path: request.workspacePath,
+          stackHealth,
+          hasDocker: Boolean(request.projectConfig.workspace?.docker?.compose_template),
+          location: 'local',
+        }] as const;
+      }));
+    });
+
+    return jsonResponse({ workspaces: Object.fromEntries(entries) });
+  })),
+);
+
 // ─── Route: GET /api/workspaces/:issueId ─────────────────────────────────────
 
 const getWorkspaceRoute = HttpRouter.add(
@@ -1414,10 +1552,11 @@ const getWorkspaceRoute = HttpRouter.add(
         const canContainerize = false;
 
         const agentSession = `agent-${issueLower}`;
-        const [git, repoGit, containers, mrUrl, sessionNames, paneOutput] = yield* Effect.promise(() => Promise.all([
+        const [git, repoGit, containers, stackHealth, mrUrl, sessionNames, paneOutput] = yield* Effect.promise(() => Promise.all([
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
+          getWorkspaceStackHealth(issueId, { projectConfig, emitTransitionActivity: true }),
           getMrUrlAsync(issueId, workspacePath),
           listSessionNamesAsync(),
           capturePaneAsync(agentSession, 50).catch(() => ''),
@@ -1460,9 +1599,9 @@ const getWorkspaceRoute = HttpRouter.add(
           .filter(isSalvageableStash)
           .filter((entry) => entry.issueId === issueId.toUpperCase());
 
-        const planPath = findPlan(workspacePath);
+        const planPath = yield* Effect.promise(() => findPlanAsync(workspacePath));
         const hasPlan = planPath !== null;
-        const planningComplete = hasPlan ? isPlanningComplete(workspacePath) : false;
+        const planningComplete = hasPlan ? yield* Effect.promise(() => isPlanningCompleteAsync(workspacePath)) : false;
         const hasBeads = planningComplete;
 
         const issueData = getCostsForIssue(issueId);
@@ -1488,6 +1627,7 @@ const getWorkspaceRoute = HttpRouter.add(
           repoGit,
           services,
           containers,
+          stackHealth,
           hasDocker,
           canContainerize,
           pendingOperation,
@@ -1651,7 +1791,7 @@ function resolvePlanLocation(projectPath: string, issueId: string): Promise<{ pa
 
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planPath = findPlan(workspacePath);
+    const planPath = await findPlanAsync(workspacePath);
     if (!planPath) return null;
     return {
       path: planPath,
@@ -5829,6 +5969,7 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
 );
 
 export const workspacesRouteLayer = Layer.mergeAll(
+  getWorkspaceStackHealthBatchRoute,
   getWorkspaceRoute,
   postWorkspacesRoute,
   getWorkspaceStateMdRoute,

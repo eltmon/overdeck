@@ -67,23 +67,28 @@ const getResourcesRoute = HttpRouter.add(
     const agentsDir = join(homedir(), '.panopticon', 'agents');
     const agents: Record<string, unknown>[] = [];
 
-    const agentsDirExists = yield* Effect.tryPromise({
-      try: () => access(agentsDir).then(() => true, () => false),
-      catch: () => false as false,
-    });
+    // Wrap I/O so its fallback lives in the SUCCESS channel — using
+    // `Effect.tryPromise({ catch: () => fallback })` instead routes `fallback`
+    // through the FAILURE channel, so `yield*` re-raises and the surrounding
+    // `if (!stateText) continue;` is dead code. That bug fired on every poll
+    // where any agent's state.json was missing or briefly being rewritten, and
+    // since this route is polled every 5s, it manufactured a steady stream of
+    // `Effect.fail(null)` defects that hit `httpHandler`'s catchCause and spammed
+    // the dashboard log + stole event-loop time formatting Cause.pretty.
+    const agentsDirExists = yield* Effect.promise(() =>
+      access(agentsDir).then(() => true, () => false),
+    );
 
     if (agentsDirExists) {
-      const names = yield* Effect.tryPromise({
-        try: () => readdir(agentsDir),
-        catch: () => [] as string[],
-      });
+      const names = yield* Effect.promise(() =>
+        readdir(agentsDir).catch(() => [] as string[]),
+      );
 
       for (const name of names) {
         const stateFile = join(agentsDir, name, 'state.json');
-        const stateText = yield* Effect.tryPromise({
-          try: () => readFile(stateFile, 'utf-8'),
-          catch: () => null as null | string,
-        });
+        const stateText = yield* Effect.promise(() =>
+          readFile(stateFile, 'utf-8').catch(() => null as string | null),
+        );
         if (!stateText) continue;
         try {
           const state = JSON.parse(stateText) as Record<string, unknown>;

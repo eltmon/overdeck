@@ -9,12 +9,23 @@
  */
 
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { XTerminal } from './XTerminal';
 import { ActivityView } from './CommandDeck/ActivityView';
 import { ConversationPanel } from './chat/ConversationPanel';
 import type { Conversation } from './CommandDeck/ConversationList';
 import { useDashboardStore, selectAgentById } from '../lib/store';
 import styles from './CommandDeck/styles/command-deck.module.css';
+
+async function fetchAgentConversation(agentId: string): Promise<Conversation | null> {
+  // The list endpoint (/api/conversations) filters out agent/planning/specialist
+  // rows so the human conversations sidebar stays clean. AgentOutputPanel needs
+  // the row anyway for its liveness signal — fetch it directly by name.
+  const res = await fetch(`/api/conversations/${encodeURIComponent(agentId)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Failed to fetch conversation for ${agentId}`);
+  return res.json();
+}
 
 interface AgentOutputPanelProps {
   agentId: string;
@@ -70,13 +81,45 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
     setTerminalFailed(false);
   }
 
-  // Determine specialist running state from agent snapshot status
-  // (the old /api/specialists/:project/:issueId/:type/status endpoint was retired in PAN-1048)
-  const specialistIsRunning = specialist && agent?.status === 'running';
+  // Liveness for specialist agents must come from the conversation-lifecycle
+  // service's tmux poll (the ground-truth probe), NOT from `agent.status` —
+  // the latter is a state-machine field that lags during dashboard restarts,
+  // snapshot refresh gaps, and recovery cycles, and made active synthesizers
+  // render as "Starting…" when the snapshot was stale.
+  //
+  // Specialist rows are created at spawn (src/lib/agents.ts spawnRun) and
+  // backfilled by the conversation-lifecycle service for any tmux session
+  // that's missing one. They're excluded from the public list endpoint so
+  // they don't clutter the sidebar, so we fetch by name directly here.
+  const { data: realConversation } = useQuery({
+    queryKey: ['conversation', agentId],
+    queryFn: () => fetchAgentConversation(agentId),
+    enabled: !!specialist,
+    refetchInterval: (query) => {
+      // Poll faster while the row is still missing (just-spawned race) and
+      // slower once we have it (lifecycle poll handles the alive/ended
+      // transitions server-side).
+      const data = query.state.data as Conversation | null | undefined;
+      if (data == null) return 2000;
+      if (data.sessionAlive) return 5000;
+      return 10000;
+    },
+  });
 
-  // Build a Conversation object for specialists so ConversationPanel can fetch the JSONL
+  // If the row hasn't appeared yet (brief race after spawn, or pre-fix
+  // orchestrator agents that were spawned before this code shipped), fall
+  // back to a presence signal that's stronger than `agent.status`: the
+  // snapshot knowing about the agent at all is evidence the spawn happened.
+  const specialistIsRunning = specialist && (
+    realConversation ? realConversation.sessionAlive : !!agent
+  );
+
+  // Build a Conversation object for ConversationPanel. Prefer the real row;
+  // synthesize only when we have no row yet so the JSONL replay path still has
+  // something to render.
   const specialistConversation = useMemo<Conversation | null>(() => {
     if (!specialist) return null;
+    if (realConversation) return realConversation;
     return {
       id: 0,
       name: agentId,
@@ -87,10 +130,10 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
       createdAt: new Date().toISOString(),
       endedAt: specialistIsRunning ? null : new Date().toISOString(),
       lastAttachedAt: null,
-      sessionAlive: specialistIsRunning ?? false,
-      sessionFile: null, // Backend resolves this from the specialist .session file
+      sessionAlive: !!specialistIsRunning,
+      sessionFile: null,
     };
-  }, [specialist, agentId, specialistIsRunning]);
+  }, [specialist, agentId, realConversation, specialistIsRunning]);
 
   // Role runs are identified by the persisted role field; the planning- prefix is
   // retained only as a fallback for sessions missing from the dashboard store.

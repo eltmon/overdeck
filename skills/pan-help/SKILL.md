@@ -66,6 +66,8 @@ Panopticon is a multi-agent orchestration framework for AI coding assistants. Th
 | `pan workspace create <id>` | Create workspace for issue (without spawning agent) | `pan workspace create PAN-3` |
 | `pan workspace list` | List all workspaces | `pan workspace list` |
 | `pan workspace destroy <id>` | Destroy workspace and containers | `pan workspace destroy PAN-3` |
+| `pan workspace rebuild <id>` | Reset one workspace Docker stack from the template | `pan workspace rebuild PAN-3` |
+| `pan workspace reap` | Dry-run cleanup candidates for stuck Docker stacks | `pan workspace reap --days 7` |
 
 ### Configuration
 

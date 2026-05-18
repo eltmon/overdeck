@@ -14,6 +14,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   POST /api/health/agents/:id/ping
  *   GET  /api/tracker-status
  *   POST /api/rally/validate
+ *   GET  /api/no-resume-mode
  *   GET  /api/deacon/status
  *   GET  /api/deacon/logs
  *   POST /api/deacon/patrol
@@ -50,6 +51,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
+import { getNoResumeMode } from '../../../lib/cloister/no-resume-mode.js';
 import { createSessionAsync, killSessionAsync, listSessionNamesAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import { getClaudePermissionFlagsString } from '../../../lib/claude-permissions.js';
@@ -65,7 +67,7 @@ import { loadConfig as loadPanConfig } from '../../../lib/config.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../../lib/health-filtering.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
-import { findPlan, isPlanningComplete, isPlanningProposed } from '../../../lib/vbrief/io.js';
+import { findPlanAsync, isPlanningCompleteAsync, isPlanningProposedAsync } from '../../../lib/vbrief/io.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
@@ -662,6 +664,14 @@ const postRallyValidateRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: GET /api/no-resume-mode ─────────────────────────────────────────
+
+const getNoResumeModeRoute = HttpRouter.add(
+  'GET',
+  '/api/no-resume-mode',
+  Effect.sync(() => jsonResponse(getNoResumeMode())),
+);
+
 // ─── Route: GET /api/deacon/status ───────────────────────────────────────────
 
 const getDeaconStatusRoute = HttpRouter.add(
@@ -982,17 +992,17 @@ const getPlanningStatusRoute = HttpRouter.add(
         const panDir = join(workspacePath, PAN_DIRNAME);
         const panContinueFile = join(panDir, PAN_CONTINUE_FILENAME);
         const hasContinueFile = existsSync(panContinueFile);
-        const hasPlanningState = hasContinueFile || findPlan(workspacePath) !== null;
+        const hasPlanningState = hasContinueFile || await findPlanAsync(workspacePath) !== null;
         const hasPromptFile = hasPlanningState;
         // hasCompletionMarker means `plan.status === 'proposed'` (gates the
         // dashboard Done button which should hide once the user has approved).
         // planningCompleted means `plan.status` indicates planning has finished
         // (any of proposed/approved/pending/running/completed/blocked).
         const hasCompletionMarker = existsSync(panDir)
-          ? isPlanningProposed(workspacePath, panDir)
+          ? await isPlanningProposedAsync(workspacePath, panDir)
           : false;
         const planningCompleted = existsSync(panDir)
-          ? isPlanningComplete(workspacePath, panDir)
+          ? await isPlanningCompleteAsync(workspacePath, panDir)
           : false;
 
         return jsonResponse({
@@ -1693,6 +1703,7 @@ export const miscRouteLayer = Layer.mergeAll(
   postHealthAgentPingRoute,
   getTrackerStatusRoute,
   postRallyValidateRoute,
+  getNoResumeModeRoute,
   getDeaconStatusRoute,
   getDeaconLogsRoute,
   postDeaconPatrolRoute,

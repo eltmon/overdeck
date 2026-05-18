@@ -29,6 +29,7 @@ import { readContinueStateAsync, writeContinueStateAsync, type ContinueState, ty
 import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, compileGlob, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
 import type { VBriefDocument, VBriefItem } from '../../../lib/vbrief/types.js';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
+import { normalizeModelOverride } from '../../../lib/model-validation.js';
 import { listSessionNamesAsync, isPaneDeadAsync, killSessionAsync, listPaneValuesAsync } from '../../../lib/tmux.js';
 
 const execFileAsync = promisify(execFile);
@@ -74,6 +75,7 @@ interface SwarmState {
   totalWaves: number;
   model: string;
   autoAdvance?: boolean;
+  hostOverride?: boolean;
   autoAdvanceFailureCount?: number;
   autoAdvanceRetryAfter?: string;
   lastAutoAdvanceError?: string;
@@ -89,14 +91,12 @@ interface SwarmDispatchRequest {
   model?: string;
   maxSlots?: number;
   autoAdvance?: boolean;
+  host?: boolean;
+  allowHost?: boolean;
+  hostOverrideConfirmation?: string;
 }
 
 const ISSUE_KEY_PATTERN = /^[A-Z][A-Z0-9]*-\d+$/;
-// Strict, conservative grammar for model identifiers passed to runtime launchers.
-// Runtime launchers (claude/pi/codex) interpolate `model` into shell command strings,
-// so we MUST refuse anything outside this safe alphabet at the API boundary to defeat
-// command injection. This is the only place model strings cross the dashboard API.
-const MODEL_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,63})$/;
 
 function canonicalIssueId(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -104,15 +104,16 @@ function canonicalIssueId(value: unknown): string | null {
   return ISSUE_KEY_PATTERN.test(canonical) ? canonical : null;
 }
 
+function buildHostOverrideConfirmation(issueId: string): string {
+  return `I understand this bypasses workspace isolation for ${issueId.toUpperCase()}`;
+}
+
 function validateModelId(value: unknown): { ok: true; value: string | undefined } | { ok: false; error: string } {
-  if (value === undefined) return { ok: true, value: undefined };
-  if (typeof value !== 'string') return { ok: false, error: 'model must be a string.' };
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return { ok: true, value: undefined };
-  if (!MODEL_ID_PATTERN.test(trimmed)) {
-    return { ok: false, error: 'model must match [A-Za-z0-9._-]{1,64} (no whitespace, slashes, or shell metacharacters).' };
+  try {
+    return { ok: true, value: normalizeModelOverride(value) };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
-  return { ok: true, value: trimmed };
 }
 
 function assertPathInside(parent: string, child: string): void {
@@ -255,6 +256,7 @@ function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
     totalWaves: runtime.totalWaves ?? 0,
     model: runtime.model,
     autoAdvance: runtime.autoAdvance,
+    hostOverride: runtime.hostOverride,
     autoAdvanceFailureCount: runtime.autoAdvanceFailureCount,
     autoAdvanceRetryAfter: runtime.autoAdvanceRetryAfter,
     lastAutoAdvanceError: runtime.lastAutoAdvanceError,
@@ -288,6 +290,7 @@ function runtimeFromState(state: SwarmState, existing?: SwarmRuntime): SwarmRunt
     currentWave: state.currentWave,
     totalWaves: state.totalWaves,
     autoAdvance: state.autoAdvance,
+    hostOverride: state.hostOverride,
     autoAdvanceFailureCount: state.autoAdvanceFailureCount,
     autoAdvanceRetryAfter: state.autoAdvanceRetryAfter,
     lastAutoAdvanceError: state.lastAutoAdvanceError,
@@ -565,7 +568,7 @@ async function refreshSwarmSlotStatuses(
 async function dispatchSwarmWave(
   request: SwarmDispatchRequest,
 ): Promise<{ status: number; body: SwarmDispatchResponseBody }> {
-  const { wave: requestedWave, model: requestedModel, maxSlots, autoAdvance } = request;
+  const { wave: requestedWave, model: requestedModel, maxSlots, autoAdvance, allowHost } = request;
   const issueUpper = canonicalIssueId(request.issueId);
   if (!issueUpper) {
     return { status: 400, body: { error: 'issueId must be a tracker key like PAN-977.' } };
@@ -1004,6 +1007,7 @@ async function dispatchSwarmWave(
           swarmItemId: item.id,
           prompt: itemPrompt,
           phase: dispatchSynthesisFirst ? 'synthesis' : 'implementation',
+          ...(allowHost ? { allowHost: true } : {}),
         };
 
         await spawnAgent(spawnOptions);
@@ -1081,6 +1085,7 @@ async function dispatchSwarmWave(
     totalWaves: waves.length,
     model: swarmModel,
     autoAdvance: autoAdvance ?? existingState?.autoAdvance ?? false,
+    hostOverride: allowHost || existingState?.hostOverride || false,
     autoAdvanceFailureCount: 0,
     autoAdvanceRetryAfter: undefined,
     lastAutoAdvanceError: undefined,
@@ -1297,7 +1302,7 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
       // dispatchSwarmWave with an undefined `wave` falls through to
       // getDispatchableItems(), which reflects the durable mutation we just
       // applied above.
-      const result = await dispatchSwarmWave({ issueId: issueUpper, model: nextState.model, autoAdvance: true });
+      const result = await dispatchSwarmWave({ issueId: issueUpper, model: nextState.model, autoAdvance: true, allowHost: nextState.hostOverride });
       if (result.status >= 400) ensureSwarmAutoAdvanceLoop();
       else dispatched = true;
     }
@@ -1510,6 +1515,7 @@ async function pollSwarmAutoAdvance(): Promise<void> {
         issueId: state.issueId,
         model: state.model,
         autoAdvance: true,
+        allowHost: state.hostOverride,
       });
       if (result.status >= 400) {
         const error = result.body.error ?? 'unknown error';
@@ -1716,7 +1722,8 @@ const postSwarmRoute = HttpRouter.add(
 
     const body = yield* readJsonBody;
     const { wave, model, maxSlots, autoAdvance } = body as SwarmDispatchRequest;
-    const issueId = canonicalIssueId((body as Record<string, unknown>)['issueId']);
+    const rawBody = body as Record<string, unknown>;
+    const issueId = canonicalIssueId(rawBody['issueId']);
 
     if (!issueId) {
       return jsonResponse({ error: 'issueId must be a tracker key like PAN-977.' }, { status: 400 });
@@ -1731,6 +1738,18 @@ const postSwarmRoute = HttpRouter.add(
     if (!modelCheck.ok) {
       return jsonResponse({ error: modelCheck.error }, { status: 400 });
     }
+    const requestedHostOverride = rawBody.host === true || rawBody.allowHost === true;
+    const hostOverrideConfirmation = buildHostOverrideConfirmation(issueId);
+    const allowHost = requestedHostOverride && rawBody.hostOverrideConfirmation === hostOverrideConfirmation;
+    if (requestedHostOverride && !allowHost) {
+      return jsonResponse({
+        success: false,
+        error: 'host_override_confirmation_required',
+        requiresHostConfirmation: true,
+        confirmation: hostOverrideConfirmation,
+        hint: `Host override bypasses workspace isolation. Retry only after explicitly confirming: ${hostOverrideConfirmation}`,
+      }, { status: 409 });
+    }
 
     const result = yield* Effect.promise(() => dispatchSwarmWave({
       issueId,
@@ -1738,6 +1757,7 @@ const postSwarmRoute = HttpRouter.add(
       model: modelCheck.value,
       maxSlots,
       autoAdvance,
+      allowHost,
     }));
 
     return jsonResponse(result.body, { status: result.status });

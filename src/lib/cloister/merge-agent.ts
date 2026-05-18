@@ -575,8 +575,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     const issueLower = issueId.toLowerCase();
     const workspacePath = findWorkspacePath(projectPath, issueLower);
     if (workspacePath) {
-      const projName = basename(projectPath);
-      const dockerResult = await stopWorkspaceDocker(workspacePath, projName, issueLower);
+      const dockerResult = await stopWorkspaceDocker(workspacePath, issueLower);
       if (dockerResult.containersFound) {
         console.log(`[merge-agent] ✓ Stopped Docker containers: ${dockerResult.steps.join('; ')}`);
         logActivity('docker_cleanup', `Stopped Docker for ${issueId}: ${dockerResult.steps.join('; ')}`);

@@ -34,6 +34,22 @@ describe('markAgentRunning', () => {
     markAgentRunning(state);
     expect(state.stoppedByUser).toBeUndefined();
   });
+
+  it('refuses to run paused agents', () => {
+    const state = { ...baseState(), status: 'stopped' as const, paused: true, pausedReason: 'manual inspection' };
+
+    expect(() => markAgentRunning(state)).toThrow(/agent is paused/);
+    expect(state.status).toBe('stopped');
+    expect(state.paused).toBe(true);
+  });
+
+  it('refuses to run troubled agents', () => {
+    const state = { ...baseState(), status: 'stopped' as const, troubled: true, consecutiveFailures: 3 };
+
+    expect(() => markAgentRunning(state)).toThrow(/agent is troubled/);
+    expect(state.status).toBe('stopped');
+    expect(state.troubled).toBe(true);
+  });
 });
 
 describe('markAgentStopped', () => {
