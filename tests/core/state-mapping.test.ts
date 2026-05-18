@@ -86,6 +86,10 @@ describe('state-mapping', () => {
       expect(mapGitHubStateToCanonical('open', ['needs-close-out'])).toBe('verifying_on_main');
     });
 
+    it('should return in_progress for reopened issues with stale closed-out label', () => {
+      expect(mapGitHubStateToCanonical('open', ['closed-out'])).toBe('in_progress');
+    });
+
     it('should prefer verifying_on_main over the legacy merged label on open issues', () => {
       expect(mapGitHubStateToCanonical('open', ['merged', 'verifying-on-main'])).toBe('verifying_on_main');
       expect(mapGitHubStateToCanonical('open', ['merged', 'needs-close-out'])).toBe('verifying_on_main');

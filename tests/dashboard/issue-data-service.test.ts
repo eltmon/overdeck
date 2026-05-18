@@ -41,6 +41,12 @@ describe('getCanonicalStatus', () => {
     expect(getCanonicalStatus('QA')).toBe('in_review');
   });
 
+  it('should map verifying states', () => {
+    expect(getCanonicalStatus('Verifying')).toBe('verifying_on_main');
+    expect(getCanonicalStatus('Verifying On Main')).toBe('verifying_on_main');
+    expect(getCanonicalStatus('verifying_on_main')).toBe('verifying_on_main');
+  });
+
   it('should map done states', () => {
     expect(getCanonicalStatus('Done')).toBe('done');
     expect(getCanonicalStatus('Completed')).toBe('done');
@@ -210,6 +216,27 @@ describe('IssueDataService - getIssues cycle filter', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].identifier).toBe('TEST-2');
+    });
+
+    it('should restore verifying state for reopened issues with merged review status', () => {
+      const issues = [
+        { id: '1', identifier: 'PAN-1190', status: 'In Progress', state: 'in_progress', updatedAt: new Date().toISOString() },
+      ];
+      injectIssues(issues);
+      // @ts-ignore - injecting review-status cache for a hot-path unit test
+      service.reviewStatusesCache = {
+        'PAN-1190': { mergeStatus: 'merged' },
+      };
+
+      const result = service.getIssues({ cycle: 'all' });
+
+      expect(result[0]).toMatchObject({
+        identifier: 'PAN-1190',
+        status: 'Verifying',
+        state: 'verifying_on_main',
+        canonicalStatus: 'verifying_on_main',
+        mergeStatus: 'merged',
+      });
     });
   });
 });

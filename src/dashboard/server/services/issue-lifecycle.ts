@@ -147,12 +147,12 @@ function findLinearState(states: ReadonlyArray<LinearState>, state: IssueState):
 // ─── GitHub label helpers ─────────────────────────────────────────────────────
 
 const GITHUB_STATE_LABELS: Record<IssueState, { add: string[]; remove: string[] }> = {
-  open: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
-  in_planning: { add: ['planned'], remove: ['in-progress', 'in-review', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
-  in_progress: { add: ['in-progress'], remove: ['planned', 'in-planning', 'in-review', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
-  in_review: { add: ['in-review'], remove: ['in-progress', 'planned', 'in-planning', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
-  closed: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'needs-close-out', 'wontfix', 'duplicate'] },
-  canceled: { add: ['wontfix'], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'needs-close-out', 'duplicate'] },
+  open: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  in_planning: { add: ['planned'], remove: ['in-progress', 'in-review', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  in_progress: { add: ['in-progress'], remove: ['planned', 'in-planning', 'in-review', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  in_review: { add: ['in-review'], remove: ['in-progress', 'planned', 'in-planning', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  closed: { add: [], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'wontfix', 'duplicate'] },
+  canceled: { add: ['wontfix'], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'duplicate'] },
 };
 
 // ─── Live layer implementation ────────────────────────────────────────────────

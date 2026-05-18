@@ -318,6 +318,9 @@ export function mapGitHubStateToCanonical(state: string, labels: string[]): Cano
   if (labelNames.some(l => l === 'verifying-on-main' || l === 'needs-close-out')) {
     return 'verifying_on_main';
   }
+  if (labelNames.some(l => l === 'closed-out')) {
+    return 'in_progress';
+  }
   // merged = legacy postMergeLifecycle label; issue may still be open if auto-close failed
   if (labelNames.some(l => l === 'merged')) {
     return 'done';
