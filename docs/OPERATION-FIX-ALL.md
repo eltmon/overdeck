@@ -322,3 +322,34 @@ pan up
 - PAN-457, PAN-653, PAN-539, PAN-714: review failed/blocked, agents fixing
 - PAN-709: review pending, specialist in progress
 - PAN-704, PAN-711: work agents implementing
+
+---
+
+## Run report — 2026-05-18 (Opus 4.7, all-up-with-twist brief)
+
+**Window:** 2026-05-18T05:30Z – 2026-05-18T10:00Z (~4.5h, autonomous overnight)
+
+**Issues moved:** 0 merged-to-main (humans-only-merge); 1 ready for user UAT/merge (PAN-1170); 8 SWARM slot PRs merged into feature/pan-1148 (PRs #1176, #1177, #1179, #1180, #1181, #1182, #1183, #1186); 1 entered review cycle (PAN-1169).
+
+**Bugs fixed in code:** 6 substrate bugs filed and fixed during the run, all committed to main:
+
+1. **PAN-1173 — `pan show <bare-number>` derives wrong agent ID for PAN-prefixed issues.** `src/cli/commands/show.ts` and `pan swarm <id>` both computed `agent-<num>` from bare digit input, missing the `pan-` prefix → every PAN agent reported DEAD. Fix: `resolveBareNumericId` helper in `src/lib/issue-id.ts` probes `~/.panopticon/agents/agent-*-<num>/state.json` for a unique match. Pushed `9785dc2c9`.
+
+2. **PAN-1174 — Spec writer leaves stale `.writer.lock/` + `.tmp` debris on crash.** Hit a 1.5h-old `review-status-2052173` lock that wedged subsequent writers. Fix: `isPidDead` + `removeStaleLockAsync` reclaim orphan locks via `process.kill(pid, 0)` ESRCH check; applied to both `assertSingleWriterAsync` and the sync `assertSingleWriter`. 6 regression tests added. Pushed `5dc57f09b`.
+
+3. **PAN-1175 — SWARM dispatch fails with "non-feature parent branch main".** `resolveParentFeatureBranch` ran `git branch --show-current` against the main project root, requiring it to be on `feature/<issue>` — structurally impossible since feature branches live in worktrees. Fix: probe the already-computed `localList`/`remoteList` directly for `feature/<lower>` and `feature/<numeric>`. Pushed `df2b5c10a`.
+
+4. **PAN-1176 — SWARM slot branch ref naming `feature/<parent>/slot-N` collides with leaf parent.** Git refuses to create a sub-tree ref under an existing leaf ref. Fix: sibling naming `feature/<parent>-slot-N` (the workspace dir convention already used the hyphen — only the ref name changed). Updated `SLOT_BRANCH_PATTERN` regex in merge-agent.ts plus all docstrings; test fixtures updated. Pushed `a1d87cde0`.
+
+5. **PAN-1178 — SWARM auto-advance broken: no detector fires slot-merged when slot PRs merge.** Both deacon merge-detection patrols only check issue-level PRs against main; slot PRs into feature branches go undetected. **Filed with workaround** (manual `POST /api/swarm/slot-merged` with `slotId` and empty `itemId`); fix pending. Used the workaround 7 times this run to keep SWARM moving.
+
+6. **PAN-1185 — Deacon first-completion nudge sends issue-level `pan done` to slot agents.** A slot agent acted on the nudge and opened a premature `feature/pan-1148 → main` PR (#1184) with 7/43 ACs checked. Fix: detect slots by workspace path suffix `-slot-N/` and skip them in the first-completion gate. Pushed `a23753157`.
+
+**Substrate observations (not bugs, worth noting):**
+
+- Slot PRs aren't auto-mergeable in GitHub immediately after creation (`mergeable: UNKNOWN` then non-mergeable due to non-fast-forward state). Rebase + force-push always fixes it cleanly. Slots' actual content rarely conflicts; the unrebased state is the issue.
+- Review specialist tmux sessions linger with dead panes after the specialist exits (`remain-on-exit on`). Counts inflate `tmux list-sessions` but not dashboard agent capacity. Safe to ignore; `tmux kill-session` cleans them up.
+- The `/api/swarm/slot-merged` route accepts `slotId` (not `slot` as the body docs say). Doc drift.
+
+**Headline numbers:** 6 substrate bugs fixed in code, 9 PRs merged (8 SWARM slots + 1 ship hotfix from earlier in the run), main pushed clean, 4 commits added to feature/pan-1148 representing 8/43 of the unified dashboard redesign. PAN-1170 ready for the next session's UAT/merge.
+

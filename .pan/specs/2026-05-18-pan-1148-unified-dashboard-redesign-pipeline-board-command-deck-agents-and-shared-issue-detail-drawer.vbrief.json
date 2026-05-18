@@ -4,7 +4,7 @@
     "created": "2026-05-18T05:10:55.134Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
-    "updated": "2026-05-18T09:26:44.883Z"
+    "updated": "2026-05-18T09:53:28.459Z"
   },
   "plan": {
     "id": "pan-1148",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "4506a8e9-5388-424a-8301-87772aa05925",
     "author": "agent:claude-opus-4-7",
-    "sequence": 29,
+    "sequence": 34,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T09:26:44.883Z",
+    "updated": "2026-05-18T09:53:28.459Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -443,7 +443,7 @@
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "statusReason": "Swarm slot 1 merged into feature branch",
-          "statusUpdatedAt": "2026-05-18T08:39:11.958Z"
+          "statusUpdatedAt": "2026-05-18T09:53:28.459Z"
         },
         "narrative": {
           "Action": "Create src/dashboard/frontend/src/components/primitives/IssueCard.tsx implementing PRD §4.7.6 exactly: 14px radius, padding 12px 12px 10px, lighter card surface (color-mix background 92% + white), priority left border identical to IssueRow, stuck/merge-ready border color overrides, project mark + ID + verb badge in row 1, 2-line clamped title, label chips, bead progress bar with phase-colored fill, footer with agent meta + runtime + 18px avatar. Tag root with `data-component=\"issue-card\"`."
@@ -456,7 +456,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-18T08:39:11.958Z"
+            "completed": "2026-05-18T09:53:28.459Z"
           },
           {
             "id": "f6-issue-card.ac2",
@@ -465,7 +465,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-18T08:39:11.958Z"
+            "completed": "2026-05-18T09:53:28.459Z"
           },
           {
             "id": "f6-issue-card.ac3",
@@ -474,7 +474,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-18T08:39:11.958Z"
+            "completed": "2026-05-18T09:53:28.459Z"
           },
           {
             "id": "f6-issue-card.ac4",
@@ -483,7 +483,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-18T08:39:11.958Z"
+            "completed": "2026-05-18T09:53:28.459Z"
           },
           {
             "id": "f6-issue-card.ac5",
@@ -492,10 +492,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-18T08:39:11.958Z"
+            "completed": "2026-05-18T09:53:28.459Z"
           }
         ],
-        "completed": "2026-05-18T08:39:11.958Z"
+        "completed": "2026-05-18T09:53:28.459Z"
       },
       {
         "id": "f7-agent-card",
@@ -2170,14 +2170,16 @@
       {
         "id": "i1-inspector-parity-audit",
         "title": "Audit InspectorPanel feature parity against new drawer; produce written checklist",
-        "status": "pending",
+        "status": "running",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 1 dispatched",
+          "statusUpdatedAt": "2026-05-18T09:30:09.660Z"
         },
         "narrative": {
           "Action": "Enumerate every feature in InspectorPanel.tsx (1387 LOC) and every section in inspector/* (AgentInfoSection, ReviewPipelineSection, ContainerSection, ActionsSection, MergedSummaryCard, StatusHistory, TerminalTabs, TerminalSessionWrapper). For each feature, map to: (a) its new location in the drawer (which subsection), (b) its new location elsewhere in the redesign, or (c) explicit out-of-scope flag. Produce docs/design/inspector-parity-checklist.md as the deliverable. This bead does NOT delete any code — it gates the next bead (i2)."
@@ -2320,14 +2322,16 @@
       {
         "id": "t1-styleguide-conformance-test",
         "title": "Add styleguide-conformance Playwright test (asserts shared primitive class signatures across surfaces)",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 2 dispatched",
+          "statusUpdatedAt": "2026-05-18T09:30:20.907Z"
         },
         "narrative": {
           "Action": "Add a Playwright test (e.g., tests/e2e/styleguide-conformance.spec.ts) that loads Pipeline, Board, Command Deck, and Agents in an isolated browser context, and asserts each surface contains: at least one [data-component=\"verb-badge\"], the expected row/card primitive ([data-component=\"issue-row\"] for Pipeline + Command Deck, [data-component=\"issue-card\"] for Board, [data-component=\"agent-card\"] for Agents). Excludes /god-view per PRD §3 non-goal. Test must run in isolated browser (per planning template Playwright Isolation guidance) and not depend on shared session state."
