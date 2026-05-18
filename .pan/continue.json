@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1169",
   "created": "2026-05-18T08:34:50.104Z",
-  "updated": "2026-05-18T09:03:37.004Z",
+  "updated": "2026-05-18T09:24:29.680Z",
   "gitState": {
     "branch": "feature/pan-1169",
-    "sha": "19373e1c0",
+    "sha": "eb39b987e",
     "dirty": false
   },
   "decisions": [
@@ -96,8 +96,8 @@
     ]
   },
   "beadsMapping": {
-    "drop-filter-from-init": "workspace-0bdf",
-    "fail-init-on-unresolved-import": "workspace-ya3b"
+    "drop-filter-from-init": "workspace-68ho",
+    "fail-init-on-unresolved-import": "workspace-8lfs"
   },
   "agentModel": "agent:claude-opus-4-7",
   "sessionHistory": [
@@ -123,6 +123,12 @@
       "timestamp": "2026-05-18T09:03:37.004Z",
       "reason": "bead-complete",
       "note": "Completed workspace-8lfs: added an init guard that captures dashboard server build output, preserves build exit status under busybox sh, and fails init when UNRESOLVED_IMPORT appears. Clean guarded init passed; synthetic missing top-level dependency injection produced UNRESOLVED_IMPORT and init exit 1; busybox sh non-zero status handling was verified with alpine.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T09:24:29.680Z",
+      "reason": "handoff-fix",
+      "note": "Corrected stale beadsMapping from planning IDs workspace-0bdf/workspace-ya3b to actual closed bead IDs workspace-68ho/workspace-8lfs so pan done checks the completed bead records.",
       "agentModel": "gpt-5.5"
     }
   ],
