@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-18T04:46:14.779Z",
-    "updated": "2026-05-18T06:06:03.776Z",
+    "updated": "2026-05-18T06:22:53.340Z",
     "author": "panopticon-cli/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-1170: TTS daemon lifecycle: install, start/stop, supervision",
     "inspectionPolicy": "never"
@@ -13,9 +13,9 @@
     "status": "proposed",
     "uid": "09723c30-56eb-49ab-bffb-a3c515c00a04",
     "author": "panopticon-cli/auto-start",
-    "sequence": 34,
+    "sequence": 41,
     "created": "2026-05-18T04:46:14.779Z",
-    "updated": "2026-05-18T06:06:03.776Z",
+    "updated": "2026-05-18T06:22:53.340Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1170",
@@ -32,55 +32,55 @@
         "phase": "review",
         "issueId": "PAN-1170",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-18T06:06:03.767Z",
+        "updatedAt": "2026-05-18T06:22:53.339Z",
         "work": {
-          "updatedAt": "2026-05-18T06:06:03.767Z",
+          "updatedAt": "2026-05-18T06:22:53.339Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-18T06:06:03.767Z",
+          "updatedAt": "2026-05-18T06:22:53.339Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-18T06:06:03.767Z"
+              "at": "2026-05-18T06:22:53.339Z"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-05-18T06:06:03.767Z",
-          "notes": "Agent re-review request (4/25): Fixed review issues",
+          "status": "blocked",
+          "updatedAt": "2026-05-18T06:22:53.339Z",
+          "notes": "getTtsDaemonStatus() clearState() races with watchdog, breaking AC4 crash-restart when dashboard polls /api/tts/health before watchdog tick",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-05-18T06:06:03.767Z",
-              "notes": "Agent re-review request (4/25): Fixed review issues"
+              "status": "blocked",
+              "at": "2026-05-18T06:22:53.339Z",
+              "notes": "getTtsDaemonStatus() clearState() races with watchdog, breaking AC4 crash-restart when dashboard polls /api/tts/health before watchdog tick"
             }
           ],
-          "approval": "pending"
+          "approval": "changes_requested"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-18T06:06:03.767Z",
+          "updatedAt": "2026-05-18T06:22:53.339Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-18T06:06:03.767Z"
+              "at": "2026-05-18T06:22:53.339Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-18T06:06:03.767Z",
+          "updatedAt": "2026-05-18T06:22:53.339Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-18T06:06:03.767Z",
+          "updatedAt": "2026-05-18T06:22:53.339Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-18T06:06:03.767Z"
+              "at": "2026-05-18T06:22:53.339Z"
             }
           ],
           "readyForMerge": false,

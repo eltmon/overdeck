@@ -2,13 +2,21 @@
   "version": "1",
   "issueId": "PAN-1170",
   "created": "2026-05-18T05:24:08.776Z",
-  "updated": "2026-05-18T06:05:49.126Z",
+  "updated": "2026-05-18T06:22:53.931Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
   "beadsMapping": {},
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-18T06:22:53Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1170\n\n# Review Synthesis — PAN-1170\n\n**Run:** agent-pan-1170-review-cccd170a\n**Branch:** feature/pan-1170\n**Date:** 2026-05-18\n\n## Verdict: BLOCKED (2 blockers)\n\n---\n\n## Layer-by-Layer Verdicts\n\n| Role | Verdict | Blockers | Advisories |\n|---|---|---|---|\n| Security | :white_check_mark: PASSED | 0 | 0 |\n| Correctness | :x: BLOCKED | 1 | 1 |\n| Performance | :x: BLOCKED | 1 | 1 |\n| Requirements | :white_check_mark: PASSED | 0 | 0 |\n\n---\n\n## Security — PASSED\n\nNo security blockers or advisories. Local daemon auth, origin checks on dashboard TTS mutations, non-shell process spawning, and project-scope endpoint isolation all reviewed clean.\n\n---\n\n## Correctness — BLOCKED\n\n### Blocker 1: Read-only status poll erases crash marker before watchdog can restart\n\n**File:** `src/lib/tts-daemon.ts:311`\n**Evidence tier:** Tier 1\n\n`getTtsDaemonStatus()` calls `clearState()` whenever a PID file exists but `isProcessAlive(pid)` is false. The dashboard's `/api/tts/health` (polling every 10s via Settings + status bar) and the supervisor watchdog (polling every 5s) both call this. If a health poll wins the race against the watchdog after the daemon is killed, `clearState()` removes the PID/state files. The next watchdog tick sees `hasTtsDaemonState() === false`, marks itself inactive, and does not restart the daemon — leaving it down indefinitely instead of restarting within 30 seconds as required by AC4.\n\n**Fix:** Make `getTtsDaemonStatus()` read-only — report stale PID/state without deleting it. Lifecycle owners (stop, foreground close, watchdog crash handling) should be the only callers permitted to clear state.\n\n### Advisory 1: Async project config loader bypasses TTS endpoint stripping\n\n**File:** `src/lib/config-yaml.ts:855`\n**Evidence tier:** Tier 1\n\nThe sync loader strips `tts.daemonHost`/`tts.daemonPort` via `stripProjectTtsEndpoint()` before returning. The async loader (`loadProjectConfigAsync()`) returns the raw parsed YAML and does not apply the same strip, but both share `configCache`. If an async conversation-config route populates the cache first, project-scope TTS endpoint fields remain in the shared config, causing health/start to route to the wrong daemon depending on request order.\n\n**Fix:** Apply `stripProjectTtsEndpoint()` in `loadProjectConfigAsync()` before returning, matching the sync path.\n\n---\n\n## Performance — BLOCKED\n\n### Blocker 1: `/extract-embedding` bypasses bounded queue, creates unbounded GPU work\n\n**File:** `skills/pan-tts/scripts/tts_daemon.py:434`\n**Evidence tier:** Tier 1\n\n`/extract-embedding` performs `load_design_model()`, `MODEL_DESIGN.generate_voice_design()`, `load_base_model()`, and `MODEL_BASE.create_voice_clone_prompt()` directly inside the `ThreadingHTTPServer` request thread — no `WORK_QUEUE.put_nowait()` or any backpressure gate. `/speak` correctly uses bounded queue + 429 on overflow; embedding extraction does not. At high concurrency, this accumulates blocked request threads holding sockets, exhausts daemon threads/memory, and makes `/health` and `/speak` contend with extraction traffic.\n\n**Fix:** Gate embedding extraction behind the same bounded work queue as `/speak`, returning 429/503 when the queue is full.\n\n### Advisory 1: `nvidia-smi` spawned for every health/status poll\n\n**File:** `src/lib/tts-daemon.ts:258`\n**Evidence tier:** Tier 1\n\n`getTtsDaemonStatus()` unconditionally calls `getGpuMemoryUsedMb(pid)` which shells out to `nvidia-smi`. The dashboard status bar polls every 10s, Settings every 10s, and the watchdog every 5s — producing dozens of `nvidia-smi` invocations per minute at scale.\n\n**Fix:** Cache GPU memory sampling with a short TTL, or split VRAM into a separate slow-path diagnostic endpoint.\n\n---\n\n## Requirements — PASSED\n\nAll 6 acceptance criteria are implemented and evidenced:\n\n| # | Criterion | Status |\n|---|---|---|\n| 1 | Fresh install → working daemon | Implemented |\n| 2 | start/stop/status/restart + test phrase | Implemented |\n| 3 | Dashboard TTS tab live status + Start button | Implemented |\n| 4 | Crash → watchdog restart within 30s | Implemented (watchdog 5s poll, 25s start timeout) |\n| 5 | `--skip-tts-daemon` skips CUDA torch | Implemented |\n| 6 | Non-Linux platforms see clear skip message | Implemented |\n\n---\n\n## Top Blockers (must fix before re-review)\n\n1. **[Correctness] `getTtsDaemonStatus()` side-effect race** — AC4 crash-restart path fails when dashboard is open and `/api/tts/health` polls before the watchdog ticks. Make status reporting read-only.\n2. **[Performance] `/extract-embedding` unbounded GPU work** — no backpressure, bypasses the bounded queue model that `/speak` correctly uses. Gate behind bounded queue with 429/503 on overflow.\n\n---\n\n## Passengers (advisories, non-blocking)\n\n- Async config loader TTS endpoint stripping gap — request-order dependent misroute risk\n- `nvidia-smi` per-poll overhead — additive process churn, not correctness-affecting\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/.pan/review/agent-pan-1170-review-cccd170a/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1170 -m \"Fixed review issues\"`"
+    }
+  ],
   "sessionHistory": [
     {
       "reason": "feedback",
@@ -34,6 +42,16 @@
       "reason": "feedback",
       "note": "[2026-05-18T05:57Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-18T05:57:15.558Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-18T06:12Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-18T06:12:03.978Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-18T06:22Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-18T06:22:53.931Z"
     }
   ]
 }

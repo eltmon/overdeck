@@ -4,7 +4,7 @@
     "created": "2026-05-18T05:10:55.134Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
-    "updated": "2026-05-18T06:06:50.877Z"
+    "updated": "2026-05-18T06:25:36.650Z"
   },
   "plan": {
     "id": "pan-1148",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "4506a8e9-5388-424a-8301-87772aa05925",
     "author": "agent:claude-opus-4-7",
-    "sequence": 7,
+    "sequence": 9,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T06:06:50.877Z",
+    "updated": "2026-05-18T06:25:36.650Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -434,14 +434,16 @@
       {
         "id": "f6-issue-card",
         "title": "Add IssueCard primitive (Board card, composes VerbBadge)",
-        "status": "pending",
+        "status": "running",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 1 dispatched",
+          "statusUpdatedAt": "2026-05-18T06:25:36.650Z"
         },
         "narrative": {
           "Action": "Create src/dashboard/frontend/src/components/primitives/IssueCard.tsx implementing PRD §4.7.6 exactly: 14px radius, padding 12px 12px 10px, lighter card surface (color-mix background 92% + white), priority left border identical to IssueRow, stuck/merge-ready border color overrides, project mark + ID + verb badge in row 1, 2-line clamped title, label chips, bead progress bar with phase-colored fill, footer with agent meta + runtime + 18px avatar. Tag root with `data-component=\"issue-card\"`."
@@ -492,14 +494,16 @@
       {
         "id": "f7-agent-card",
         "title": "Add AgentCard primitive (Agents fleet card, composes VerbBadge)",
-        "status": "pending",
+        "status": "running",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 2 dispatched",
+          "statusUpdatedAt": "2026-05-18T06:25:36.642Z"
         },
         "narrative": {
           "Action": "Create src/dashboard/frontend/src/components/primitives/AgentCard.tsx implementing PRD §4.7.9 exactly: card surface with 18px radius, 3px ::before left accent per phase, stuck border override, name + verb badge + menu button row, issue panel with project mark + ID/title (2-line clamp), tri-column meta (lbl/val pairs), stream excerpt with fade-out gradient and 84px max-height, optional stuck banner, footer with primary/danger action links. Tag root with `data-component=\"agent-card\"`."
