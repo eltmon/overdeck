@@ -66,6 +66,8 @@ vi.mock('fs', async (importOriginal) => {
 vi.mock('../../../src/lib/tmux.js', () => ({
   sendKeysAsync: vi.fn().mockResolvedValue(undefined),
   sessionExists: vi.fn().mockReturnValue(false),
+  sessionExistsAsync: vi.fn().mockResolvedValue(false),
+  listSessionNamesAsync: vi.fn().mockResolvedValue([]),
   killSession: vi.fn(),
   killSessionAsync: vi.fn().mockResolvedValue(undefined),
 }));

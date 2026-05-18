@@ -1,6 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const execMock = vi.hoisted(() => vi.fn());
+const setAgentPausedMock = vi.hoisted(() => vi.fn(() => true));
+const setReviewStatusMock = vi.hoisted(() => vi.fn());
+const resolveGitHubIssueMock = vi.hoisted(() => vi.fn(() => ({ isGitHub: false })));
+const tmuxMocks = vi.hoisted(() => ({
+  killSession: vi.fn(),
+  killSessionAsync: vi.fn(async () => {}),
+  listSessionNamesAsync: vi.fn(async () => [] as string[]),
+  sessionExists: vi.fn(() => false),
+}));
+const closeIssueMock = vi.hoisted(() => vi.fn(async () => []));
+const transitionVBriefOnMainMock = vi.hoisted(() => vi.fn(async () => ({})));
+const teardownWorkspaceMock = vi.hoisted(() => vi.fn(async () => []));
+const movePrdMock = vi.hoisted(() => vi.fn(async () => ({ success: true, skipped: false, details: [] })));
+const pruneCheckpointRefsForAgentsMock = vi.hoisted(() => vi.fn(async () => 0));
 
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
@@ -16,11 +30,20 @@ vi.mock('../specialists.js', () => ({
 }));
 vi.mock('../review-agent.js', () => ({ killAllReviewerSessions: vi.fn(async () => ({ killed: [] })) }));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitActivityTts: vi.fn(), emitDashboardLifecycle: vi.fn() }));
-vi.mock('../../tmux.js', () => ({ capturePaneAsync: vi.fn(async () => ''), listSessionNamesAsync: vi.fn(async () => []), sendKeysAsync: vi.fn(async () => {}), sessionExists: vi.fn(() => false), sessionExistsAsync: vi.fn(async () => false), killSession: vi.fn() }));
+vi.mock('../../tmux.js', () => ({
+  capturePaneAsync: vi.fn(async () => ''),
+  listSessionNamesAsync: tmuxMocks.listSessionNamesAsync,
+  sendKeysAsync: vi.fn(async () => {}),
+  sessionExists: tmuxMocks.sessionExists,
+  sessionExistsAsync: vi.fn(async () => false),
+  killSession: tmuxMocks.killSession,
+  killSessionAsync: tmuxMocks.killSessionAsync,
+}));
 vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon', projectPath: '/tmp/workspace' })), loadProjectsConfig: vi.fn(() => ({ projects: {} })) }));
 vi.mock('../../agents.js', () => ({
   spawnRun: vi.fn(async () => ({ id: 'agent-pan-1-ship' })),
   getAgentState: vi.fn(() => null),
+  setAgentPaused: setAgentPausedMock,
 }));
 vi.mock('../validation.js', () => ({
   runMergeValidation: vi.fn(async () => ({ valid: true, skipped: true })),
@@ -30,7 +53,7 @@ vi.mock('../validation.js', () => ({
 vi.mock('../../git-utils.js', () => ({ cleanupStaleLocks: vi.fn(async () => ({ found: [], removed: [], errors: [] })) }));
 vi.mock('../prompts.js', () => ({ renderPrompt: vi.fn(() => 'merge prompt') }));
 vi.mock('../../git/operations.js', () => ({ gitPush: vi.fn(), gitForcePush: vi.fn(), MainDivergedError: class MainDivergedError extends Error {} }));
-vi.mock('../../review-status.js', () => ({ markWorkspaceStuck: vi.fn(), setReviewStatus: vi.fn() }));
+vi.mock('../../review-status.js', () => ({ markWorkspaceStuck: vi.fn(), setReviewStatus: setReviewStatusMock }));
 vi.mock('../../git-activity.js', () => ({ appendGitOperation: vi.fn() }));
 vi.mock('../../stashes.js', () => ({
   buildStashMessage: vi.fn(() => 'pre-merge:PAN-1:2026-04-27T14:15:16Z'),
@@ -39,7 +62,15 @@ vi.mock('../../stashes.js', () => ({
   popStash: vi.fn(async () => {}),
   listStashes: vi.fn(async () => []),
 }));
-vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssue: vi.fn(() => ({ isGitHub: false })) }));
+vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssue: resolveGitHubIssueMock }));
+vi.mock('../../lifecycle/close-issue.js', () => ({ closeIssue: closeIssueMock }));
+vi.mock('../../vbrief/lifecycle-io.js', () => ({ transitionVBriefOnMain: transitionVBriefOnMainMock }));
+vi.mock('../../lifecycle/teardown-workspace.js', () => ({ teardownWorkspace: teardownWorkspaceMock }));
+vi.mock('../../lifecycle/archive-planning.js', () => ({
+  findWorkspacePath: vi.fn(() => undefined),
+  movePrd: movePrdMock,
+}));
+vi.mock('../../checkpoint/checkpoint-manager.js', () => ({ pruneCheckpointRefsForAgents: pruneCheckpointRefsForAgentsMock }));
 vi.mock('../../paths.js', () => ({ PANOPTICON_HOME: '/tmp/pan', AGENTS_DIR: '/tmp/agents', PROJECT_PRDS_ACTIVE_SUBDIR: 'active', PROJECT_PRDS_PLANNED_SUBDIR: 'planned', PROJECT_PRDS_COMPLETED_SUBDIR: 'completed', PROJECT_DOCS_SUBDIR: 'docs', PROJECT_PRDS_SUBDIR: 'prds' }));
 vi.mock('../../tldr-daemon.js', () => ({ getTldrDaemonService: vi.fn() }));
 vi.mock('fs/promises', async (importOriginal) => {
@@ -47,7 +78,7 @@ vi.mock('fs/promises', async (importOriginal) => {
   return { ...actual, writeFile: vi.fn(async () => {}), rm: vi.fn(async () => {}) };
 });
 
-import { postMergeLifecycle, spawnMergeAgentForBranches } from '../merge-agent.js';
+import { postMergeLifecycle, resetPostMergeState, spawnMergeAgentForBranches } from '../merge-agent.js';
 import { dropStash, listStashes } from '../../stashes.js';
 import { spawnRun } from '../../agents.js';
 
@@ -56,6 +87,11 @@ describe('merge-agent ship role and stash lifecycle', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetPostMergeState('PAN-1');
+    resolveGitHubIssueMock.mockReturnValue({ isGitHub: false });
+    tmuxMocks.sessionExists.mockReturnValue(false);
+    tmuxMocks.listSessionNamesAsync.mockResolvedValue([]);
+    setAgentPausedMock.mockReturnValue(true);
     setTimeoutSpy = vi.spyOn(global, 'setTimeout').mockImplementation(((fn: TimerHandler) => {
       if (typeof fn === 'function') fn();
       return 0 as any;
@@ -144,5 +180,49 @@ describe('merge-agent ship role and stash lifecycle', () => {
 
     expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'def456abc123def456abc123def456abc123def4');
     expect(dropStash).not.toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
+  });
+
+  it('performs a non-destructive verify-on-main handoff after merge', async () => {
+    resolveGitHubIssueMock.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1 });
+    tmuxMocks.sessionExists.mockReturnValue(true);
+    tmuxMocks.listSessionNamesAsync.mockResolvedValue([
+      'agent-pan-1-test',
+      'agent-pan-1-ship',
+      'agent-pan-1-review-synthesis',
+      'specialist-panopticon-pan-1-review-security',
+      'unrelated-session',
+    ]);
+    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
+      const callback = (typeof _opts === 'function' ? _opts : cb)!;
+      if (cmd.includes('git rev-parse --verify')) return callback(null, { stdout: 'branch-sha\n', stderr: '' });
+      if (cmd.includes('git merge-base --is-ancestor')) return callback(null, { stdout: '', stderr: '' });
+      if (cmd.includes('gh issue view')) return callback(null, { stdout: 'in-review\nin-progress\n', stderr: '' });
+      callback(null, { stdout: '', stderr: '' });
+    });
+
+    await postMergeLifecycle('PAN-1', '/tmp/workspace', 'feature/pan-1', { skipDeploy: true });
+
+    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-1', { mergeStatus: 'merged', readyForMerge: false });
+    expect(setAgentPausedMock).toHaveBeenCalledWith('agent-pan-1', 'awaiting close-out (verify on main)', true);
+    expect(setAgentPausedMock).toHaveBeenCalledWith('planning-pan-1', 'awaiting close-out (verify on main)', true);
+    expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-pan-1');
+    expect(tmuxMocks.killSession).toHaveBeenCalledWith('planning-pan-1');
+    expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-test');
+    expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-ship');
+    expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-review-synthesis');
+    expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('specialist-panopticon-pan-1-review-security');
+    expect(tmuxMocks.killSessionAsync).not.toHaveBeenCalledWith('unrelated-session');
+
+    const commands = execMock.mock.calls.map(([cmd]) => String(cmd));
+    expect(commands.some(command => command.includes('--add-label "verifying-on-main"'))).toBe(true);
+    expect(commands.some(command => command.includes('--remove-label "in-review"'))).toBe(true);
+    expect(commands.some(command => command.includes('--remove-label "in-progress"'))).toBe(true);
+    expect(commands.some(command => command.includes('gh issue close'))).toBe(false);
+    expect(commands.some(command => command.includes('--add-label "needs-close-out"'))).toBe(false);
+    expect(closeIssueMock).not.toHaveBeenCalled();
+    expect(transitionVBriefOnMainMock).not.toHaveBeenCalled();
+    expect(teardownWorkspaceMock).not.toHaveBeenCalled();
+    expect(movePrdMock).not.toHaveBeenCalled();
+    expect(pruneCheckpointRefsForAgentsMock).not.toHaveBeenCalled();
   });
 });

@@ -3,89 +3,16 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'fs';
-// PAN-1249: readFile / unlink consumed by `readFileEffect` / `unlinkEffect` helpers below.
-import { writeFile, readFile, unlink } from 'fs/promises';
+import { writeFile } from 'fs/promises';
 import { join, dirname, basename, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import {
-  FsError,
-  GitError,
-  ProcessSpawnError,
-  ProcessTimeoutError,
-  MergeConflictError,
-} from '../errors.js';
-import { capturePaneAsync, listSessionNamesAsync, sendKeysAsync, sessionExists, sessionExistsAsync } from '../tmux.js';
+import { capturePaneAsync, killSessionAsync, listSessionNamesAsync, sendKeysAsync, sessionExists, sessionExistsAsync } from '../tmux.js';
 import { emitActivityEntry, emitActivityTts, emitDashboardLifecycle } from '../activity-logger.js';
 
 const execAsync = promisify(exec);
-
-// ---------------------------------------------------------------------------
-// PAN-1249 Effect helpers (additive — internal use only)
-// ---------------------------------------------------------------------------
-
-/** Wrap `execAsync` in Effect with a typed `ProcessSpawnError`. */
-const execAsyncEffect = (
-  command: string,
-  options?: Parameters<typeof execAsync>[1],
-): Effect.Effect<{ stdout: string; stderr: string }, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const result = await execAsync(command, options);
-      return {
-        stdout: typeof result.stdout === 'string' ? result.stdout : result.stdout.toString('utf-8'),
-        stderr: typeof result.stderr === 'string' ? result.stderr : result.stderr.toString('utf-8'),
-      };
-    },
-    catch: (cause) =>
-      new ProcessSpawnError({
-        command,
-        args: [],
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Wrap a fs/promises read in Effect with a typed FsError. */
-const readFileEffect = (path: string): Effect.Effect<string, FsError> =>
-  Effect.tryPromise({
-    try: () => readFile(path, 'utf-8'),
-    catch: (cause) =>
-      new FsError({
-        path,
-        operation: 'readFile',
-        cause,
-      }),
-  });
-
-/** Wrap a fs/promises write in Effect with a typed FsError. */
-const writeFileEffect = (path: string, data: string): Effect.Effect<void, FsError> =>
-  Effect.tryPromise({
-    try: () => writeFile(path, data, 'utf-8'),
-    catch: (cause) =>
-      new FsError({
-        path,
-        operation: 'writeFile',
-        cause,
-      }),
-  });
-
-/** Wrap a fs/promises unlink in Effect with a typed FsError. */
-const unlinkEffect = (path: string): Effect.Effect<void, FsError> =>
-  Effect.tryPromise({
-    try: () => unlink(path),
-    catch: (cause) =>
-      new FsError({
-        path,
-        operation: 'unlink',
-        cause,
-      }),
-  });
-
-/** Re-export for symmetry with the additive pattern. */
-export { GitError, ProcessTimeoutError, MergeConflictError };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -153,18 +80,10 @@ interface MergeHistoryEntry {
 const MERGE_TIMEOUT_MS = 15 * 60 * 1000;
 
 /**
- * Notify TLDR daemon to reindex changed files after merge.
- *
- * PAN-1249: Internal implementation is Effect-based; the public Promise
- * signature is preserved via `Effect.runPromise` at the boundary. The Effect
- * never fails — TLDR notification is best-effort and any error is logged but
- * not propagated.
+ * Notify TLDR daemon to reindex changed files after merge
  */
-const notifyTldrDaemonEffect = (
-  projectPath: string,
-  _sourceBranch: string,
-): Effect.Effect<void, never> => {
-  const inner = Effect.gen(function* () {
+export async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
+  try {
     console.log(`[merge-agent] Notifying TLDR daemon to reindex changed files...`);
 
     // Check if TLDR daemon is available
@@ -175,16 +94,16 @@ const notifyTldrDaemonEffect = (
     }
 
     // Get changed files from the merge
-    const { stdout } = yield* execAsyncEffect(`git diff --name-only HEAD~1 HEAD`, {
+    const { stdout } = await execAsync(`git diff --name-only HEAD~1 HEAD`, {
       cwd: projectPath,
-      encoding: 'utf-8',
+      encoding: 'utf-8'
     });
 
     const changedFiles = stdout
       .trim()
       .split('\n')
-      .filter((f: string) => f.trim().length > 0)
-      .filter((f: string) => {
+      .filter(f => f.trim().length > 0)
+      .filter(f => {
         // Only include source code files (skip docs, configs, etc)
         const ext = f.split('.').pop()?.toLowerCase();
         return ext && ['ts', 'js', 'tsx', 'jsx', 'py', 'java', 'go', 'rs', 'cpp', 'c', 'h'].includes(ext);
@@ -197,56 +116,35 @@ const notifyTldrDaemonEffect = (
 
     console.log(`[merge-agent] Found ${changedFiles.length} changed source files to reindex`);
 
-    // Get TLDR daemon service + trigger warm. Wrapped in tryPromise so any
-    // failure flows into the outer Effect.catch.
-    const tldrOk = yield* Effect.tryPromise({
-      try: async () => {
-        const { getTldrDaemonService } = await import('../tldr-daemon.js');
-        const tldrService = getTldrDaemonService(projectPath, venvPath);
-        const status = await tldrService.getStatus();
-        if (!status.running) {
-          console.log(`[merge-agent] TLDR daemon not running, skipping notification`);
-          return false;
-        }
-        console.log(`[merge-agent] Triggering TLDR index warm...`);
-        await tldrService.warm(true); // background mode
-        return true;
-      },
-      catch: (cause) => cause as Error,
-    });
+    // Get TLDR daemon service
+    const { getTldrDaemonService } = await import('../tldr-daemon.js');
+    const tldrService = getTldrDaemonService(projectPath, venvPath);
 
-    if (tldrOk) {
-      console.log(`[merge-agent] ✓ TLDR daemon notified to reindex`);
-      logActivity('tldr_notified', `Notified TLDR daemon to reindex ${changedFiles.length} files`);
+    // Check if daemon is running
+    const status = await tldrService.getStatus();
+    if (!status.running) {
+      console.log(`[merge-agent] TLDR daemon not running, skipping notification`);
+      return;
     }
-  });
 
-  return inner.pipe(
-    Effect.catch((err: unknown) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[merge-agent] Failed to notify TLDR daemon: ${msg}`);
-      logActivity('tldr_notify_error', `TLDR notification failed: ${msg}`);
-      return Effect.void;
-    }),
-  );
-};
+    // Trigger warm to reindex (this will update the index incrementally)
+    console.log(`[merge-agent] Triggering TLDR index warm...`);
+    await tldrService.warm(true);  // background mode
 
-/**
- * Notify TLDR daemon to reindex changed files after merge.
- *
- * Public Promise-returning surface preserved for caller compatibility — this
- * is a thin Effect.runPromise wrapper around the Effect implementation.
- */
-export async function notifyTldrDaemon(projectPath: string, sourceBranch: string): Promise<void> {
-  return Effect.runPromise(notifyTldrDaemonEffect(projectPath, sourceBranch));
+    console.log(`[merge-agent] ✓ TLDR daemon notified to reindex`);
+    logActivity('tldr_notified', `Notified TLDR daemon to reindex ${changedFiles.length} files`);
+  } catch (error: any) {
+    // Non-fatal - log warning and continue
+    console.warn(`[merge-agent] Failed to notify TLDR daemon: ${error.message}`);
+    logActivity('tldr_notify_error', `TLDR notification failed: ${error.message}`);
+  }
 }
 
 /**
- * Post-merge cleanup: move PRD, close PR, move issue to Done, report merge, compact beads.
+ * Post-merge handoff: mark merged work as verifying on main and free runtime resources.
  *
- * Moves the issue to Done on the tracker so it appears in the Done column.
- * Does NOT tear down the workspace or apply the closed-out label — the human
- * close-out ceremony handles that separately.
+ * Leaves the issue, workspace, vBRIEF, branches, and agent state dirs intact.
+ * The explicit close-out ceremony performs final archival and destructive cleanup.
  *
  * IDEMPOTENT: Safe to call multiple times for the same issueId. Tracks completed
  * issues and returns immediately on re-entry. This is defense-in-depth against
@@ -256,12 +154,7 @@ export async function notifyTldrDaemon(projectPath: string, sourceBranch: string
 // Defense-in-depth: track issues that have completed postMergeLifecycle.
 // Prevents re-execution even if caller guards fail. Persists for server lifetime.
 const _completedPostMerge = new Set<string>();
-
-// Circuit breaker for issue tracker close operations.
-// After MAX_CLOSE_RETRIES consecutive failures, stop trying to close the issue
-// on the tracker. The issue can be closed manually via the dashboard close-out ceremony.
-const _closeIssueFailures = new Map<string, number>();
-const MAX_CLOSE_RETRIES = 3;
+const _postMergeInFlight = new Map<string, Promise<void>>();
 
 async function dropLingeringPreMergeStashes(issueId: string, projectPath: string): Promise<void> {
   try {
@@ -449,395 +342,289 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     return;
   }
 
-  const mergeVerification = await verifyMergedBeforeLifecycle(issueId, projectPath, sourceBranch);
-  if (!mergeVerification.merged) {
-    console.warn(`[merge-agent] Refusing post-merge lifecycle for ${issueId}: ${mergeVerification.reason}`);
-    return;
-  }
-  console.log(`[merge-agent] Verified merge before lifecycle for ${issueId}: ${mergeVerification.reason}`);
-
-  // Set mergeStatus='merged' after verifying the branch or PR actually landed.
-  try {
-    setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
-    console.log(`[merge-agent] ✓ mergeStatus set to 'merged' for ${issueId}`);
-  } catch (err: any) {
-    console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);
+  const inFlight = _postMergeInFlight.get(issueId);
+  if (inFlight) {
+    console.log(`[merge-agent] postMergeLifecycle already running for ${issueId}, joining in-flight run`);
+    return inFlight;
   }
 
-  // Step 0: Write pending lifecycle file and spawn detached deploy script.
-  // The deploy script rebuilds dist/, kills this server, and starts a fresh process.
-  // The fresh process reads the pending file on startup and runs the lifecycle steps
-  // with correct module chunk references (no ERR_MODULE_NOT_FOUND after merge).
-  //
-  // Skip this step when we ARE the fresh process (called from processPendingLifecycle) —
-  // dynamic imports already resolve correctly and spawning again would create an infinite loop.
-  if (!options?.skipDeploy) {
-    const pendingFile = join(PANOPTICON_HOME, 'pending-post-merge.json');
-    let repoRoot = __dirname.includes('/src/')
-      ? __dirname.replace(/\/src\/.*$/, '')
-      : __dirname.replace(/\/dist\/.*$/, '').replace(/\/lib\/.*$/, '');
-    // If running from a workspace (workspaces/feature-*/), resolve to the main repo root.
-    // Without this, the deploy script builds and npm-links from the workspace, hijacking
-    // the global `pan` CLI to point at stale workspace code.
-    const wsMatch = repoRoot.match(/^(.+)\/workspaces\/feature-[^/]+$/);
-    if (wsMatch) {
-      repoRoot = wsMatch[1];
-      console.log(`[merge-agent] Resolved workspace repoRoot to main repo: ${repoRoot}`);
-    }
-    const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
-
-    try {
-      const pendingData = JSON.stringify({
-        issueId,
-        projectPath,
-        sourceBranch: sourceBranch ?? '',
-        timestamp: Date.now(),
-        reason: 'post-merge',
-        trigger: 'merge-agent',
-      });
-      await writeFile(pendingFile, pendingData, 'utf-8');
-      console.log(`[merge-agent] Wrote pending lifecycle file: ${pendingFile}`);
-
-      // Pass 'post-merge' as the reason to the deploy script so it writes the
-      // restart marker. We spawn detached and return immediately — the deploy script
-      // kills this server. The new server reads the pending file on boot,
-      // emits lifecycle_started, and after processing emits lifecycle_complete/failed.
-      const child = spawn(deployScript, [repoRoot, issueId, projectPath, sourceBranch ?? '', 'post-merge'], {
-        detached: true,
-        stdio: 'ignore',
-      });
-      child.unref();
-      console.log(`[merge-agent] Spawned detached deploy script (pid ${child.pid}) — server will restart with new build`);
+  const run = (async () => {
+    const mergeVerification = await verifyMergedBeforeLifecycle(issueId, projectPath, sourceBranch);
+    if (!mergeVerification.merged) {
+      console.warn(`[merge-agent] Refusing post-merge lifecycle for ${issueId}: ${mergeVerification.reason}`);
       return;
+    }
+    console.log(`[merge-agent] Verified merge before lifecycle for ${issueId}: ${mergeVerification.reason}`);
+
+    // Set mergeStatus='merged' after verifying the branch or PR actually landed.
+    try {
+      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+      console.log(`[merge-agent] ✓ mergeStatus set to 'merged' for ${issueId}`);
     } catch (err: any) {
-      console.warn(`[merge-agent] Failed to spawn deploy script: ${err.message}. Falling through to in-process lifecycle (may fail on stale chunks).`);
+      console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);
     }
-  }
 
-  console.log(`[merge-agent] Running post-merge cleanup for ${issueId}`);
+    // Step 0: Write pending lifecycle file and spawn detached deploy script.
+    // The deploy script rebuilds dist/, kills this server, and starts a fresh process.
+    // The fresh process reads the pending file on startup and runs the lifecycle steps
+    // with correct module chunk references (no ERR_MODULE_NOT_FOUND after merge).
+    //
+    // Skip this step when we ARE the fresh process (called from processPendingLifecycle) —
+    // dynamic imports already resolve correctly and spawning again would create an infinite loop.
+    if (!options?.skipDeploy) {
+      const pendingFile = join(PANOPTICON_HOME, 'pending-post-merge.json');
+      let repoRoot = __dirname.includes('/src/')
+        ? __dirname.replace(/\/src\/.*$/, '')
+        : __dirname.replace(/\/dist\/.*$/, '').replace(/\/lib\/.*$/, '');
+      // If running from a workspace (workspaces/feature-*/), resolve to the main repo root.
+      // Without this, the deploy script builds and npm-links from the workspace, hijacking
+      // the global `pan` CLI to point at stale workspace code.
+      const wsMatch = repoRoot.match(/^(.+)\/workspaces\/feature-[^/]+$/);
+      if (wsMatch) {
+        repoRoot = wsMatch[1];
+        console.log(`[merge-agent] Resolved workspace repoRoot to main repo: ${repoRoot}`);
+      }
+      const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
 
-  await dropLingeringPreMergeStashes(issueId, projectPath);
+      try {
+        const pendingData = JSON.stringify({
+          issueId,
+          projectPath,
+          sourceBranch: sourceBranch ?? '',
+          timestamp: Date.now(),
+          reason: 'post-merge',
+          trigger: 'merge-agent',
+        });
+        await writeFile(pendingFile, pendingData, 'utf-8');
+        console.log(`[merge-agent] Wrote pending lifecycle file: ${pendingFile}`);
 
-  // 1. Move PRD from active to completed (via lifecycle module)
-  try {
-    const { movePrd } = await import('../lifecycle/archive-planning.js');
-    // PAN-1249: movePrd returns Effect<StepResult> (never fails — failures
-    // are captured into StepResult.error). Bridge to Promise here so the
-    // surrounding orchestration retains its Promise shape.
-    const prdResult = await Effect.runPromise(movePrd({ issueId, projectPath }));
-    if (prdResult.success && !prdResult.skipped) {
-      console.log(`[merge-agent] ✓ ${prdResult.details?.join('; ')}`);
-      logActivity('prd_moved', `Moved ${issueId} PRD to completed directory`);
-    } else if (prdResult.skipped) {
-      console.log(`[merge-agent] PRD move skipped: ${prdResult.details?.join('; ')}`);
-    } else {
-      console.warn(`[merge-agent] PRD move failed: ${prdResult.error}`);
+        // Pass 'post-merge' as the reason to the deploy script so it writes the
+        // restart marker. We spawn detached and return immediately — the deploy script
+        // kills this server. The new server reads the pending file on boot,
+        // emits lifecycle_started, and after processing emits lifecycle_complete/failed.
+        const child = spawn(deployScript, [repoRoot, issueId, projectPath, sourceBranch ?? '', 'post-merge'], {
+          detached: true,
+          stdio: 'ignore',
+        });
+        child.unref();
+        console.log(`[merge-agent] Spawned detached deploy script (pid ${child.pid}) — server will restart with new build`);
+        return;
+      } catch (err: any) {
+        console.warn(`[merge-agent] Failed to spawn deploy script: ${err.message}. Falling through to in-process lifecycle (may fail on stale chunks).`);
+      }
     }
-  } catch (err) {
-    console.warn(`[merge-agent] Could not move PRD: ${err}`);
-  }
 
-  // 2. Clean up workflow labels + apply 'merged' label (non-fatal)
-  // MUST run BEFORE closing the issue — once closed on GitHub, label edits fail silently.
-  // This was the root cause of in-review labels persisting after merge (PAN-453 incident).
-  try {
-    const { cleanupMergedLabels } = await import('../lifecycle/label-cleanup.js');
-    const ghResolved = resolveGitHubIssue(issueId);
-    const labelCtx = ghResolved.isGitHub
-      ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
-      : { issueId, projectPath };
-    // PAN-1249: cleanupMergedLabels returns Effect<StepResult>; bridge to
-    // Promise at this boundary.
-    const labelResult = await Effect.runPromise(cleanupMergedLabels(labelCtx));
-    if (labelResult.success && !labelResult.skipped) {
-      console.log(`[merge-agent] ✓ ${labelResult.details?.join('; ')}`);
-      logActivity('labels_cleaned', labelResult.details?.join('; ') || 'Labels cleaned');
-    } else if (labelResult.skipped) {
-      console.log(`[merge-agent] Label cleanup skipped: ${labelResult.details?.join('; ')}`);
-    } else {
-      console.warn(`[merge-agent] Label cleanup failed (non-fatal): ${labelResult.error}`);
-    }
-  } catch (err) {
-    console.warn(`[merge-agent] Could not clean labels: ${err}`);
-  }
+    console.log(`[merge-agent] Running post-merge verify handoff for ${issueId}`);
 
-  // 3b. Close issue on tracker (fire-and-forget with circuit breaker)
-  // This is decoupled from the merge lifecycle: failure to close the issue on the
-  // tracker does NOT block the merge or cause retries. The close-out ceremony handles
-  // any issues that weren't auto-closed.
-  closeIssueWithCircuitBreaker(issueId, projectPath);
+    await dropLingeringPreMergeStashes(issueId, projectPath);
 
-  // 3c. Create a workspace-scoped memory reset marker so old review-blocker noise stays archived but out of retrieval.
-  try {
-    const { createResetMarker } = await import('../memory/cli.js');
-    const timestamp = new Date().toISOString();
-    const marker = await createResetMarker({
-      projectId: basename(projectPath),
-      scope: 'workspace',
-      scopeId: `feature-${issueId.toLowerCase()}`,
-      reason: 'post-merge cleanup',
-      fromTimestamp: timestamp,
-      createdAt: timestamp,
-    });
-    console.log(`[merge-agent] ✓ Created memory reset marker ${marker.id} for ${marker.scope}:${marker.scopeId}`);
-  } catch (err) {
-    console.warn(`[merge-agent] Memory reset marker creation failed (non-fatal): ${err}`);
-  }
-
-  // 4. Compact old beads (via lifecycle module)
-  try {
-    const { compactBeads } = await import('../lifecycle/compact-beads.js');
-    // PAN-1249: compactBeads returns Effect<StepResult>; bridge here.
-    const beadsResult = await Effect.runPromise(compactBeads({ issueId, projectPath }));
-    if (beadsResult.success && !beadsResult.skipped) {
-      console.log(`[merge-agent] ✓ ${beadsResult.details?.join('; ')}`);
-      logActivity('beads_compaction_complete', beadsResult.details?.join('; ') || 'Beads compacted');
-    }
-  } catch (err) {
-    console.warn(`[merge-agent] Beads compaction failed: ${err}`);
-  }
-
-  // 5. Kill work agent tmux session to free resources (non-fatal)
-  // Stopped agents with live tmux sessions leak memory (Claude + MCP processes stay resident).
-  // Kill the session unconditionally if it exists — don't require agentState to exist first
-  // (state file may have been cleaned up already, leaving an orphaned session alive).
-  try {
-    const { getAgentState, markAgentStoppedState, saveAgentState } = await import('../agents.js');
-    const { killSession, sessionExists } = await import('../tmux.js');
-    const agentId = `agent-${issueId.toLowerCase()}`;
-    // Stamp merged: true on the agent state UNCONDITIONALLY (whether or not the
-    // tmux session is alive). autoResumeStoppedWorkAgents reads this flag as a
-    // hard "do-not-resume" signal — without it, an old state.json that says
-    // status='running' can get respawned by orphan recovery during a mergeStatus
-    // flap, putting a work agent on a long-merged issue (saw 10 of these tonight).
+    // 1. Clean up stale workflow labels and keep the legacy merged marker for history.
+    // verifying-on-main is applied next and takes precedence in canonical state mapping.
     try {
-      const agentState = getAgentState(agentId);
-      if (agentState) {
-        markAgentStoppedState(agentState);
-        (agentState as any).merged = true;
-        (agentState as any).mergedAt = new Date().toISOString();
-        saveAgentState(agentState);
-      }
-    } catch (stateErr) {
-      console.warn(`[merge-agent] Could not stamp merged flag on ${agentId}: ${stateErr}`);
-    }
-    if (sessionExists(agentId)) {
-      killSession(agentId);
-      console.log(`[merge-agent] ✓ Killed work agent session ${agentId} to free resources`);
-      logActivity('agent_session_killed', `Freed resources: killed tmux session for ${agentId}`);
-    }
-    // Also kill planning agent if it exists
-    const planningId = `planning-${issueId.toLowerCase()}`;
-    if (sessionExists(planningId)) {
-      killSession(planningId);
-      console.log(`[merge-agent] ✓ Killed planning agent session ${planningId}`);
-    }
-  } catch (err) {
-    console.warn(`[merge-agent] Could not kill agent sessions: ${err}`);
-  }
-
-  // 5a. Kill canonical reviewer/synthesis sessions (PAN-915).
-  // Sessions persist across review rounds to preserve reviewer context, so the
-  // merge is the right moment to tear them down. Issue is done — context value
-  // is zero, RSS leak risk is non-zero. Resolve projectKey from the project
-  // path so we don't depend on caller-supplied config.
-  try {
-    const { killAllReviewerSessions } = await import('./review-agent.js');
-    const { resolveProjectFromIssue } = await import('../projects.js');
-    const resolved = resolveProjectFromIssue(issueId);
-    const projectKey = resolved?.projectKey;
-    if (projectKey) {
-      const { killed } = await killAllReviewerSessions(projectKey, issueId);
-      if (killed.length > 0) {
-        console.log(`[merge-agent] ✓ Killed ${killed.length} canonical reviewer session(s) for ${issueId}`);
-        logActivity('reviewer_sessions_killed', `Killed ${killed.length} reviewer session(s) for ${issueId} on merge`);
-      }
-    }
-  } catch (err) {
-    console.warn(`[merge-agent] Could not kill canonical reviewer sessions: ${err}`);
-  }
-
-  // 5b. Delete work agent + planning + specialist state dirs from ~/.panopticon/agents/ (non-fatal)
-  // Event-driven cleanup — the merge is the moment the agent state becomes useless.
-  // See docs/REVIEW-AGENT-ARCHITECTURE.md "Dispatch mechanics" for the broader rule:
-  // state dirs are cleaned at the event that renders them obsolete, not by retention.
-  // The prefix sweep is required: review/test/ship specialists carry
-  // agent-<issue>-<role>[-<subRole>] state.json files that otherwise survive forever
-  // and resurface in the dashboard's StoppedAgentsBanner.
-  try {
-    const { rm, readdir } = await import('fs/promises');
-    const { AGENTS_DIR } = await import('../paths.js');
-    const issueLower = issueId.toLowerCase();
-    const entries = await readdir(AGENTS_DIR).catch(() => [] as string[]);
-    const work = `agent-${issueLower}`;
-    const planner = `planning-${issueLower}`;
-    const specialistPrefix = `agent-${issueLower}-`;
-    const targets = entries.filter(name =>
-      name === work || name === planner || name.startsWith(specialistPrefix),
-    );
-    for (const name of targets) {
-      await rm(join(AGENTS_DIR, name), { recursive: true, force: true }).catch(() => {});
-    }
-    console.log(`[merge-agent] ✓ Removed ${targets.length} agent state dir(s) for ${issueId}`);
-  } catch (err) {
-    console.warn(`[merge-agent] Could not remove agent state dirs: ${err}`);
-  }
-
-  // 5c. vBRIEF lifecycle transition: active/ → completed/ on main (PAN-946)
-  try {
-    const { transitionVBriefOnMain } = await import('../vbrief/lifecycle-io.js');
-    const result = await transitionVBriefOnMain(
-      projectPath,
-      issueId,
-      'completed',
-      'completed',
-      `scope: complete ${issueId.toUpperCase()} vBRIEF`,
-    );
-    if (result.moved) {
-      console.log(`[merge-agent] ✓ vBRIEF moved active → completed for ${issueId}`);
-    }
-    if (result.committed) {
-      console.log(`[merge-agent] ✓ Committed vBRIEF completion on main for ${issueId}`);
-    }
-  } catch (err) {
-    console.warn(`[merge-agent] vBRIEF completion transition failed (non-fatal): ${err}`);
-  }
-
-  // 6. Stop Docker containers + networks to prevent network pool exhaustion (non-fatal)
-  // Orphaned Docker networks accumulate when workspaces are merged but containers are never
-  // torn down, eventually exhausting Docker's address pool and blocking new workspace creation.
-  try {
-    const { findWorkspacePath } = await import('../lifecycle/archive-planning.js');
-    const { stopWorkspaceDocker } = await import('../workspace-manager.js');
-    const issueLower = issueId.toLowerCase();
-    const workspacePath = findWorkspacePath(projectPath, issueLower);
-    if (workspacePath) {
-      const dockerResult = await stopWorkspaceDocker(workspacePath, issueLower);
-      if (dockerResult.containersFound) {
-        console.log(`[merge-agent] ✓ Stopped Docker containers: ${dockerResult.steps.join('; ')}`);
-        logActivity('docker_cleanup', `Stopped Docker for ${issueId}: ${dockerResult.steps.join('; ')}`);
-      }
-    }
-  } catch (err) {
-    console.warn(`[merge-agent] Docker cleanup failed (non-fatal): ${err}`);
-  }
-
-  // 7. Teardown workspace directory + delete feature branches (PAN-925)
-  // Uses the consolidated teardownWorkspace module which handles: tmux sessions (idempotent
-  // with step 5), TLDR daemon, Docker (idempotent with step 6), worktree removal, agent
-  // state cleanup, and branch deletion. Steps already performed above are no-ops.
-  try {
-    const { teardownWorkspace } = await import('../lifecycle/teardown-workspace.js');
-    const ctx = { issueId, projectPath };
-    // PAN-1249: teardownWorkspace returns Effect<StepResult[]>; bridge here.
-    const teardownResults = await Effect.runPromise(teardownWorkspace(ctx, { deleteBranches: true }));
-    const completedSteps = teardownResults.filter(r => r.success && !r.skipped);
-    if (completedSteps.length > 0) {
-      const summary = completedSteps.map(r => r.details?.join('; ') || r.step).join(' | ');
-      console.log(`[merge-agent] ✓ Workspace teardown: ${summary}`);
-      logActivity('workspace_teardown', `Workspace teardown for ${issueId}: ${summary}`);
-    } else {
-      console.log(`[merge-agent] Workspace teardown: nothing to clean up for ${issueId}`);
-    }
-  } catch (err) {
-    console.warn(`[merge-agent] Workspace teardown failed (non-fatal): ${err}`);
-  }
-
-  // 7b. Prune checkpoint refs for this issue's agents (non-fatal)
-  // Refs are written per-turn into refs/pan/turn/<agentId>/<turnId> and accumulate in the
-  // main repo's ref store (worktrees share the parent .git). Delete them on merge so they
-  // don't pile up indefinitely.
-  try {
-    const { pruneCheckpointRefsForAgents } = await import('../checkpoint/checkpoint-manager.js');
-    const issueLower = issueId.toLowerCase();
-    const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`];
-    const pruned = await pruneCheckpointRefsForAgents(projectPath, agentIds);
-    console.log(`[merge-agent] ✓ Checkpoint ref prune: ${pruned} ref(s) removed for ${issueId}`);
-  } catch (err) {
-    console.warn(`[merge-agent] Checkpoint ref pruning failed (non-fatal): ${err}`);
-  }
-
-  // 8. Apply 'needs-close-out' label to signal the user that close-out ceremony is pending (PAN-925)
-  // The close-out ceremony is human-gated — it verifies PRD preservation, branch merge status,
-  // and applies the final 'closed-out' label. We don't auto-trigger it because the user must
-  // confirm the work is truly complete before final sign-off.
-  try {
-    const ghResolved = resolveGitHubIssue(issueId);
-    if (ghResolved.isGitHub) {
-      const { owner, repo, number } = ghResolved;
-      // Ensure the label exists (--force is idempotent)
-      await execAsync(
-        `gh label create "needs-close-out" --repo ${owner}/${repo} --color "fbca04" --description "Merged — awaiting close-out ceremony" --force 2>/dev/null || true`,
-      );
-      await execAsync(
-        `gh issue edit ${number} --repo ${owner}/${repo} --add-label "needs-close-out"`,
-      );
-      console.log(`[merge-agent] ✓ Applied 'needs-close-out' label on GitHub #${number}`);
-    }
-  } catch (err) {
-    console.warn(`[merge-agent] Could not apply needs-close-out label (non-fatal): ${err}`);
-  }
-
-  // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
-  _completedPostMerge.add(issueId);
-
-  console.log(`[merge-agent] Post-merge cleanup completed for ${issueId}. Issue moved to Done — awaiting close-out.`);
-  announceMerge('completed', issueId);
-  logActivity('merge_complete', `Merged ${issueId}. Issue moved to Done — awaiting close-out.`);
-}
-
-/**
- * Close issue on tracker with circuit breaker protection.
- * Fire-and-forget: runs asynchronously, never blocks the caller.
- * Stops retrying after MAX_CLOSE_RETRIES consecutive failures per issue.
- */
-function closeIssueWithCircuitBreaker(issueId: string, projectPath: string): void {
-  const failures = _closeIssueFailures.get(issueId) || 0;
-  if (failures >= MAX_CLOSE_RETRIES) {
-    console.log(`[merge-agent] Circuit breaker open for ${issueId} issue close (${failures} failures). Will be closed during close-out ceremony.`);
-    return;
-  }
-
-  // Fire-and-forget — errors are caught and logged, never propagated
-  (async () => {
-    try {
-      const { closeIssue } = await import('../lifecycle/close-issue.js');
+      const { cleanupMergedLabels } = await import('../lifecycle/label-cleanup.js');
       const ghResolved = resolveGitHubIssue(issueId);
-      const ctx = ghResolved.isGitHub
+      const labelCtx = ghResolved.isGitHub
         ? { issueId, projectPath, github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
         : { issueId, projectPath };
-      // PAN-1249: closeIssue returns Effect<StepResult[]>; bridge here.
-      const results = await Effect.runPromise(
-        closeIssue(ctx, { applyLabel: false, comment: 'Merged to main via Panopticon merge-agent' }),
-      );
-
-      let anyFailure = false;
-      for (const r of results) {
-        if (r.success && !r.skipped) {
-          console.log(`[merge-agent] ✓ ${r.details?.join('; ')}`);
-          logActivity(r.step, r.details?.join('; ') || r.step);
-        } else if (!r.skipped) {
-          console.warn(`[merge-agent] ✗ ${r.step} failed: ${r.error}`);
-          anyFailure = true;
-        }
-      }
-
-      if (anyFailure) {
-        const newCount = (_closeIssueFailures.get(issueId) || 0) + 1;
-        _closeIssueFailures.set(issueId, newCount);
-        if (newCount >= MAX_CLOSE_RETRIES) {
-          console.warn(`[merge-agent] Circuit breaker tripped for ${issueId} after ${newCount} failures. Issue close deferred to close-out ceremony.`);
-        }
+      // PAN-1249: cleanupMergedLabels returns Effect<StepResult>; bridge to Promise.
+      const labelResult = await Effect.runPromise(cleanupMergedLabels(labelCtx));
+      if (labelResult.success && !labelResult.skipped) {
+        console.log(`[merge-agent] ✓ ${labelResult.details?.join('; ')}`);
+        logActivity('labels_cleaned', labelResult.details?.join('; ') || 'Labels cleaned');
+      } else if (labelResult.skipped) {
+        console.log(`[merge-agent] Label cleanup skipped: ${labelResult.details?.join('; ')}`);
       } else {
-        // Success — clear failure counter
-        _closeIssueFailures.delete(issueId);
+        console.warn(`[merge-agent] Label cleanup failed (non-fatal): ${labelResult.error}`);
       }
     } catch (err) {
-      const newCount = (_closeIssueFailures.get(issueId) || 0) + 1;
-      _closeIssueFailures.set(issueId, newCount);
-      console.warn(`[merge-agent] Could not move issue to Done (attempt ${newCount}/${MAX_CLOSE_RETRIES}): ${err}`);
+      console.warn(`[merge-agent] Could not clean labels: ${err}`);
     }
-  })();
+
+    try {
+      await transitionIssueToVerifyingOnMain(issueId, projectPath);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[merge-agent] Could not transition issue to verifying_on_main: ${message}`);
+      try {
+        setReviewStatus(issueId, {
+          mergeStatus: 'failed',
+          readyForMerge: false,
+          mergeNotes: `Post-merge verifying_on_main transition failed: ${message}`,
+        });
+      } catch (statusErr: any) {
+        console.warn(`[merge-agent] Could not persist verifying_on_main transition failure: ${statusErr?.message ?? statusErr}`);
+      }
+      announceMerge('failed', issueId, `Post-merge verifying_on_main transition failed: ${message}`);
+      logActivity('merge_failed', `Post-merge verifying_on_main transition failed for ${issueId}: ${message}`);
+      throw err;
+    }
+
+    // 2. Compact old beads (via lifecycle module)
+    try {
+      const { compactBeads } = await import('../lifecycle/compact-beads.js');
+      // PAN-1249: compactBeads returns Effect<StepResult>; bridge to Promise.
+      const beadsResult = await Effect.runPromise(compactBeads({ issueId, projectPath }));
+      if (beadsResult.success && !beadsResult.skipped) {
+        console.log(`[merge-agent] ✓ ${beadsResult.details?.join('; ')}`);
+        logActivity('beads_compaction_complete', beadsResult.details?.join('; ') || 'Beads compacted');
+      }
+    } catch (err) {
+      console.warn(`[merge-agent] Beads compaction failed: ${err}`);
+    }
+
+    // 3. Pause work/planning agents and kill their tmux panes to free resources.
+    try {
+      const { setAgentPausedAsync } = await import('../agents.js');
+      const { killSessionAsync, sessionExistsAsync } = await import('../tmux.js');
+      const issueLower = issueId.toLowerCase();
+      const reason = 'awaiting close-out (verify on main)';
+      for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`]) {
+        const paused = await setAgentPausedAsync(agentId, reason, true);
+        if (paused) {
+          console.log(`[merge-agent] ✓ Paused ${agentId}: ${reason}`);
+        }
+        if (await sessionExistsAsync(agentId)) {
+          await killSessionAsync(agentId);
+          console.log(`[merge-agent] ✓ Killed ${agentId} tmux session to free resources`);
+          logActivity('agent_session_killed', `Freed resources: killed tmux session for ${agentId}`);
+        }
+      }
+    } catch (err) {
+      console.warn(`[merge-agent] Could not pause or kill agent sessions: ${err}`);
+    }
+
+    // 5a. Kill canonical reviewer/synthesis sessions (PAN-915).
+    // Sessions persist across review rounds to preserve reviewer context, so the
+    // merge is the right moment to tear them down. Issue is done — context value
+    // is zero, RSS leak risk is non-zero. Resolve projectKey from the project
+    // path so we don't depend on caller-supplied config.
+    try {
+      const { killAllReviewerSessions } = await import('./review-agent.js');
+      const { resolveProjectFromIssue } = await import('../projects.js');
+      const resolved = resolveProjectFromIssue(issueId);
+      const projectKey = resolved?.projectKey;
+      if (projectKey) {
+        const { killed } = await killAllReviewerSessions(projectKey, issueId);
+        if (killed.length > 0) {
+          console.log(`[merge-agent] ✓ Killed ${killed.length} canonical reviewer session(s) for ${issueId}`);
+          logActivity('reviewer_sessions_killed', `Killed ${killed.length} reviewer session(s) for ${issueId} on merge`);
+        }
+      }
+    } catch (err) {
+      console.warn(`[merge-agent] Could not kill canonical reviewer sessions: ${err}`);
+    }
+
+    await killPostMergeRoleSessions(issueId);
+
+    // 4. Stop Docker containers + networks to prevent network pool exhaustion (non-fatal)
+    // Orphaned Docker networks accumulate when workspaces are merged but containers are never
+    // torn down, eventually exhausting Docker's address pool and blocking new workspace creation.
+    try {
+      const { findWorkspacePath } = await import('../lifecycle/archive-planning.js');
+      const { stopWorkspaceDocker } = await import('../workspace-manager.js');
+      const issueLower = issueId.toLowerCase();
+      const workspacePath = findWorkspacePath(projectPath, issueLower);
+      if (workspacePath) {
+        const dockerResult = await stopWorkspaceDocker(workspacePath, issueLower);
+        if (dockerResult.containersFound) {
+          console.log(`[merge-agent] ✓ Stopped Docker containers: ${dockerResult.steps.join('; ')}`);
+          logActivity('docker_cleanup', `Stopped Docker for ${issueId}: ${dockerResult.steps.join('; ')}`);
+        }
+      }
+    } catch (err) {
+      console.warn(`[merge-agent] Docker cleanup failed (non-fatal): ${err}`);
+    }
+
+    await notifyTldrDaemon(projectPath, sourceBranch ?? '');
+
+    // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
+    _completedPostMerge.add(issueId);
+
+    console.log(`[merge-agent] Post-merge handoff completed for ${issueId}. Awaiting close-out (verify on main).`);
+    announceMerge('completed', issueId);
+    logActivity('merge_complete', `Merged ${issueId}. Awaiting close-out (verify on main).`);
+  })().finally(() => {
+    _postMergeInFlight.delete(issueId);
+  });
+  _postMergeInFlight.set(issueId, run);
+  return run;
+}
+
+async function transitionIssueToVerifyingOnMain(issueId: string, projectPath: string): Promise<void> {
+  const [effectModule, issueLifecycleModule, githubModule, linearModule, rallyModule, errorsModule] = await Promise.all([
+    import('effect'),
+    import('../../dashboard/server/services/issue-lifecycle.js'),
+    import('../../dashboard/server/services/github-client.js'),
+    import('../../dashboard/server/services/linear-client.js'),
+    import('../../dashboard/server/services/rally-client.js'),
+    import('../../dashboard/server/services/typed-errors.js'),
+  ]);
+  const { Effect, Layer } = effectModule;
+  const { IssueLifecycle, IssueLifecycleLive } = issueLifecycleModule;
+  const { GitHubClient } = githubModule;
+  const { LinearClientOptionalLive } = linearModule;
+  const { RallyClientOptionalLive } = rallyModule;
+  const { IssueNotFound } = errorsModule;
+  const gitHubRepo = (owner: string, repo: string) => shellQuote(`${owner}/${repo}`);
+  const githubLayer = Layer.succeed(GitHubClient, {
+    getIssue: (_owner: string, _repo: string, number: number) => Effect.fail(new IssueNotFound({ id: String(number) })),
+    closeIssue: (owner: string, repo: string, number: number) => Effect.promise(() => execAsync(`gh issue close ${number} --repo ${gitHubRepo(owner, repo)}`, { cwd: projectPath, encoding: 'utf-8' }).then(() => undefined)),
+    reopenIssue: (owner: string, repo: string, number: number) => Effect.promise(() => execAsync(`gh issue reopen ${number} --repo ${gitHubRepo(owner, repo)} 2>/dev/null || true`, { cwd: projectPath, encoding: 'utf-8' }).then(() => undefined)),
+    addLabel: (owner: string, repo: string, number: number, label: string) => Effect.promise(async () => {
+      if (label === 'verifying-on-main') {
+        await execAsync(`gh label create ${shellQuote(label)} --repo ${gitHubRepo(owner, repo)} --color "fbca04" --description "Merged — awaiting verification on main" --force 2>/dev/null || true`, { cwd: projectPath, encoding: 'utf-8' });
+      }
+      await execAsync(`gh issue edit ${number} --repo ${gitHubRepo(owner, repo)} --add-label ${shellQuote(label)}`, { cwd: projectPath, encoding: 'utf-8' });
+    }),
+    removeLabel: (owner: string, repo: string, number: number, label: string) => Effect.promise(() => execAsync(`gh issue edit ${number} --repo ${gitHubRepo(owner, repo)} --remove-label ${shellQuote(label)} 2>/dev/null || true`, { cwd: projectPath, encoding: 'utf-8' }).then(() => undefined)),
+    ensureLabel: (owner: string, repo: string, label: string, color = '0075ca', description = '') => Effect.promise(async () => {
+      await execAsync(`gh label create ${shellQuote(label)} --repo ${gitHubRepo(owner, repo)} --color ${shellQuote(color)} --description ${shellQuote(description)} --force 2>/dev/null || true`, { cwd: projectPath, encoding: 'utf-8' });
+      return { id: 0, name: label, color };
+    }),
+    addComment: () => Effect.void,
+    getComments: () => Effect.succeed([]),
+  });
+  const layer = IssueLifecycleLive.pipe(
+    Layer.provide(LinearClientOptionalLive),
+    Layer.provide(githubLayer),
+    Layer.provide(RallyClientOptionalLive),
+  );
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const lifecycle = yield* IssueLifecycle;
+      yield* lifecycle.transitionTo(issueId, 'verifying_on_main');
+    }).pipe(Effect.provide(layer)),
+  );
+  console.log(`[merge-agent] ✓ Transitioned ${issueId} to verifying_on_main`);
+}
+
+function isPostMergeRoleSession(sessionName: string, issueLower: string): boolean {
+  if ([`agent-${issueLower}-test`, `agent-${issueLower}-ship`, `agent-${issueLower}-merge`].includes(sessionName)) {
+    return true;
+  }
+  if (sessionName.startsWith(`agent-${issueLower}-review-`)) {
+    return true;
+  }
+  return sessionName.startsWith('specialist-')
+    && sessionName.includes(`-${issueLower}-`)
+    && /-(review|test|merge|ship)(?:-|$)/.test(sessionName);
+}
+
+async function killPostMergeRoleSessions(issueId: string): Promise<void> {
+  try {
+    const issueLower = issueId.toLowerCase();
+    const sessions = await listSessionNamesAsync();
+    const targets = sessions.filter((session) => isPostMergeRoleSession(session, issueLower));
+    for (const session of targets) {
+      await killSessionAsync(session);
+    }
+    if (targets.length > 0) {
+      console.log(`[merge-agent] ✓ Killed ${targets.length} review/test/ship session(s) for ${issueId}`);
+      logActivity('role_sessions_killed', `Killed ${targets.length} review/test/ship session(s) for ${issueId} on merge`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Could not kill role sessions for ${issueId}: ${err}`);
+  }
 }
 
 /**
@@ -845,7 +632,7 @@ function closeIssueWithCircuitBreaker(issueId: string, projectPath: string): voi
  */
 export function resetPostMergeState(issueId: string): void {
   _completedPostMerge.delete(issueId);
-  _closeIssueFailures.delete(issueId);
+  _postMergeInFlight.delete(issueId);
 }
 
 /**
@@ -1549,34 +1336,24 @@ export interface SyncMainResult {
 }
 
 /**
- * Scan workspace for leftover git conflict markers (Effect-typed core).
- *
- * PAN-1249: Internal implementation is Effect.gen; public Promise function
- * preserves caller compatibility via Effect.runPromise. Errors collapse to
- * an empty array (Effect.catch → `[]`).
- */
-const scanForConflictMarkersEffect = (projectPath: string): Effect.Effect<readonly string[], never> =>
-  execAsyncEffect('git diff --check 2>&1 || true', {
-    cwd: projectPath,
-    encoding: 'utf-8',
-  }).pipe(
-    Effect.map(({ stdout }) => {
-      const files = stdout
-        .split('\n')
-        .filter((line: string) => line.includes('leftover conflict marker'))
-        .map((line: string) => line.split(':')[0].trim())
-        .filter((f: string) => f.length > 0);
-      return [...new Set(files)];
-    }),
-    Effect.catch(() => Effect.succeed([] as readonly string[])),
-  );
-
-/**
- * Scan workspace for leftover git conflict markers (async).
+ * Scan workspace for leftover git conflict markers (async)
  */
 export async function scanForConflictMarkers(projectPath: string): Promise<string[]> {
-  const result = await Effect.runPromise(scanForConflictMarkersEffect(projectPath));
-  return [...result];
+  try {
+    // git diff --check exits non-zero and prints filenames when conflict markers exist
+    const { stdout } = await execAsync('git diff --check 2>&1 || true', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    const files = stdout
+      .split('\n')
+      .filter(line => line.includes('leftover conflict marker'))
+      .map(line => line.split(':')[0].trim())
+      .filter(f => f.length > 0);
+    return [...new Set(files)];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -1600,7 +1377,7 @@ export async function syncMainIntoWorkspace(
   // auto-commit below would then propagate that deletion onto the feature
   // branch. Restore the tracked export first so the auto-commit only sees
   // intentional changes.
-  await Effect.runPromise(restoreTrackedBeadsExport(projectPath));
+  await restoreTrackedBeadsExport(projectPath);
 
   // Pre-flight: auto-commit uncommitted changes before merge
   try {
