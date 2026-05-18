@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T21:21:10.000Z",
+    "updated": "2026-05-18T21:27:15.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -1096,7 +1096,7 @@
       {
         "id": "p1-pipeline-page-shell",
         "title": "Add Pipeline page shell + route (greenfield)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -1112,52 +1112,59 @@
           {
             "id": "p1-pipeline-page-shell.ac1",
             "title": "PipelineView.tsx renders at /pipeline route via App.tsx routing",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:27:15.000Z"
           },
           {
             "id": "p1-pipeline-page-shell.ac2",
             "title": "Composes TopBar primitive at 52px height with title 'Pipeline'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:27:15.000Z"
           },
           {
             "id": "p1-pipeline-page-shell.ac3",
             "title": "Reads issues + reviewStatusByIssueId from existing Zustand store; no new endpoints",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:27:15.000Z"
           },
           {
             "id": "p1-pipeline-page-shell.ac4",
             "title": "Phase classification uses src/dashboard/frontend/src/lib/pipeline-state.ts helpers (no duplicate logic)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:27:15.000Z"
           },
           {
             "id": "p1-pipeline-page-shell.ac5",
             "title": "Tab type in Header.tsx includes 'pipeline'; TAB_PATHS contains '/pipeline'; PATH_TO_TAB resolves '/pipeline' → 'pipeline'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:27:15.000Z"
           },
           {
             "id": "p1-pipeline-page-shell.ac6",
             "title": "Sidebar.tsx has a Pipeline nav entry above Board in the Operations group",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:27:15.000Z"
           }
-        ]
+        ],
+        "updated": "2026-05-18T21:27:15.000Z"
       },
       {
         "id": "p2-pipeline-metric-strip",

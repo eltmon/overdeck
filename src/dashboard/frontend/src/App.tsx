@@ -17,6 +17,7 @@ import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette } from './components/CommandPalette';
 import { CommandDeck } from './components/CommandDeck';
+import { PipelineView } from './components/Pipeline/PipelineView';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
 import { ConversationsPage } from './components/conversations/ConversationsPage';
@@ -60,6 +61,7 @@ interface TrackerStatus {
 }
 
 const TAB_PATHS: Record<Tab, string> = {
+  pipeline: '/pipeline',
   kanban: '/',
   'command-deck': '/command-deck',
   agents: '/agents',
@@ -858,6 +860,11 @@ export default function App() {
               />
             </div>
           )}
+        {activeTab === 'pipeline' && (
+          <div className="w-full h-full overflow-hidden">
+            <PipelineView />
+          </div>
+        )}
         {activeTab === 'kanban' && (
           <BootstrapGate fallback={
             <div className="flex-1 overflow-auto p-6 w-full">

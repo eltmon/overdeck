@@ -116,6 +116,9 @@ vi.mock('./components/CommandDeck', () => ({
     </div>
   ),
 }));
+vi.mock('./components/Pipeline/PipelineView', () => ({
+  PipelineView: () => <div data-testid="pipeline-view" />,
+}));
 
 function renderApp() {
   const client = new QueryClient({
@@ -196,6 +199,11 @@ describe('conversation route helpers', () => {
       convId: null,
     });
   });
+
+  it('resolves the Pipeline route to the pipeline tab', () => {
+    window.history.replaceState(null, '', '/pipeline');
+    expect(getConversationRouteState().tab).toBe('pipeline');
+  });
 });
 
 describe('App conversation view routing', () => {
@@ -252,6 +260,30 @@ describe('App conversation view routing', () => {
 
     expect(screen.getByTestId('view-mode')).toHaveTextContent('terminal');
     expect(window.location.search).toBe('?views=77:terminal,161:terminal');
+  });
+});
+
+describe('App Pipeline routing', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/pipeline');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/version') {
+        return new Response(JSON.stringify({ version: '0.5.0' }), { status: 200 });
+      }
+      if (url === '/api/tracker-status') {
+        return new Response(JSON.stringify({ primary: 'github', configured: [] }), { status: 200 });
+      }
+      if (url === '/api/confirmations') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    }));
+  });
+
+  it('renders PipelineView at /pipeline', () => {
+    renderApp();
+    expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
   });
 });
 
