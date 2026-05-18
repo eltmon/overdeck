@@ -28,7 +28,6 @@ import { getConversationsConfigAsync } from '../../lib/config-yaml.js';
 import type { RuntimeConversationsConfig } from '../../lib/config-yaml.js';
 import type { ConversationFilter, DiscoveredSession } from '../../lib/database/discovered-sessions-db.js';
 import { validateOrigin } from './routes/origin-validation.js';
-import { rejectUnauthorizedDashboardRequest } from './routes/dashboard-auth.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
 
@@ -770,12 +769,14 @@ export const websocketRpcRouteLayer = Layer.unwrap(
 
     return HttpRouter.add('GET', '/ws/rpc', Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
+      // Hotfix for #1166: PAN-457's cookie-auth gate is removed here for the
+      // same reason as ws-terminal — origin validation is the security
+      // boundary for browser callers, and the cookie can't be minted without
+      // the URL-hash bootstrap that only `pan up` injects.
       const originCheck = validateOrigin(request);
       if (!originCheck.ok) {
         return jsonResponse({ error: originCheck.error }, { status: 403 });
       }
-      const authError = rejectUnauthorizedDashboardRequest(request);
-      if (authError) return authError;
       return yield* rpcWebSocketHttpEffect;
     }));
   }),

@@ -22,10 +22,8 @@ import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 import { buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
 import { consumeReauthTerminalToken } from './routes/codex-auth.js';
-import { hasDashboardAuthHeaders } from './routes/dashboard-auth.js';
 import { validateOriginHeaders } from './routes/origin-validation.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
-import { getInternalToken } from '../../lib/internal-token.js';
 import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
 
 // Worst-case respawn window for switch-model / resume / restart-all is
@@ -68,19 +66,17 @@ function rejectUpgrade(socket: import('net').Socket, status: number, message: st
 }
 
 function authorizeTerminalUpgrade(request: http.IncomingMessage): { ok: true } | { ok: false; status: number; message: string } {
+  // Hotfix for #1166: PAN-457 added an internal-token + session-cookie gate
+  // here that broke every terminal panel when the dashboard is reached via
+  // Traefik (https://pan.localhost) instead of `pan up`'s bootstrapped URL.
+  // Origin validation is sufficient to block cross-origin browser attacks
+  // (a tab on evil.example.com cannot forge Origin: https://pan.localhost),
+  // which is the realistic threat model for a localhost dev tool. Re-add the
+  // gate properly per the acceptance criteria in #1166 before reintroducing.
   const originCheck = validateOriginHeaders(request.headers, request.method ?? 'GET');
   if (!originCheck.ok) {
     return { ok: false, status: 403, message: originCheck.error };
   }
-
-  if (!getInternalToken()) {
-    return { ok: false, status: 503, message: 'dashboard session token not configured' };
-  }
-
-  if (!hasDashboardAuthHeaders(request.headers)) {
-    return { ok: false, status: 401, message: 'unauthorized' };
-  }
-
   return { ok: true };
 }
 
