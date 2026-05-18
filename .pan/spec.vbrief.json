@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T21:16:15.000Z",
+    "updated": "2026-05-18T21:21:10.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -1990,7 +1990,7 @@
       {
         "id": "n1-sidebar-nav-reshuffle",
         "title": "Reshuffle Sidebar Operations group (Pipeline, Board, Command Deck, Agents) and remove Awaiting Merge entry",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -2006,36 +2006,41 @@
           {
             "id": "n1-sidebar-nav-reshuffle.ac1",
             "title": "Operations group order is Pipeline, Board, Command Deck, Agents (and AutoPreso last in the group)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:21:10.000Z"
           },
           {
             "id": "n1-sidebar-nav-reshuffle.ac2",
             "title": "Awaiting Merge nav entry is removed",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:21:10.000Z"
           },
           {
             "id": "n1-sidebar-nav-reshuffle.ac3",
             "title": "Pipeline nav item has title attribute 'Awaiting Merge → filter on Pipeline' (muscle-memory hint for one release)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:21:10.000Z"
           },
           {
             "id": "n1-sidebar-nav-reshuffle.ac4",
             "title": "Sidebar tests pass; collapsed-mode icons still render correctly",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:21:10.000Z"
           }
-        ]
+        ],
+        "updated": "2026-05-18T21:21:10.000Z"
       },
       {
         "id": "n2-default-route-flip",

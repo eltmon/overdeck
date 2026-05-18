@@ -3,7 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Eye, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
-  Zap, Compass, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
+  Zap, Compass, GitBranch, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
   Hammer, Loader2, History, Mic,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -25,6 +25,7 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   badge?: 'flywheel-live';
+  title?: string;
 }
 
 interface NavGroup {
@@ -36,8 +37,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Operations',
     items: [
-      { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
+      { id: 'pipeline' as Tab, label: 'Pipeline', icon: GitBranch, title: 'Awaiting Merge → filter on Pipeline' },
       { id: 'kanban' as Tab, label: 'Board', icon: LayoutGrid },
+      { id: 'command-deck' as Tab, label: 'Command Deck', icon: Compass },
       { id: 'agents' as Tab, label: 'Agents', icon: Bot },
       { id: 'autopreso' as Tab, label: 'AutoPreso', icon: Mic },
       { id: 'flywheel' as Tab, label: 'Flywheel', icon: Loader2, badge: 'flywheel-live' },
@@ -210,14 +212,14 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                 </p>
               )}
               {collapsed && <div className="h-px mx-2 bg-border my-2" />}
-              {group.items.map(({ id, label, icon: Icon, badge }) => {
+              {group.items.map(({ id, label, icon: Icon, badge, title }) => {
                 const isActive = activeTab === id;
                 const liveBadge = badge === 'flywheel-live' && hasActiveFlywheelRun;
                 return (
                   <button
                     key={id}
                     onClick={() => { onTabChange(id); setMobileOpen(false); }}
-                    title={collapsed ? label : undefined}
+                    title={title ?? (collapsed ? label : undefined)}
                     data-testid={`sidebar-${id}`}
                     className={`
                       w-full flex items-center gap-3 transition-colors duration-150 text-sm font-medium

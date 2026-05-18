@@ -1,83 +1,72 @@
+import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { Sidebar } from './Sidebar';
 import type { Tab } from './Header';
 
-vi.mock('./CloisterStatusBar', () => ({
-  CloisterStatusBar: () => <div data-testid="cloister-status" />,
-}));
-vi.mock('./FreshnessIndicator', () => ({
-  FreshnessIndicator: () => <div data-testid="freshness-indicator" />,
-}));
+vi.mock('./CloisterStatusBar', () => ({ CloisterStatusBar: () => <div data-testid="cloister-status" /> }));
+vi.mock('./FreshnessIndicator', () => ({ FreshnessIndicator: () => <div data-testid="freshness-indicator" /> }));
 vi.mock('./DeaconPauseToggle', () => ({
-  DeaconPauseToggle: () => <button type="button">Pause deacon</button>,
+  DeaconPauseToggle: () => <button type="button">Pause Deacon</button>,
 }));
 vi.mock('../hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
 }));
 
-function renderSidebar(options: { activeTab?: Tab; runs?: Array<{ id: string; status: string }> } = {}) {
+function renderSidebar(activeTab: Tab = 'pipeline') {
   const client = new QueryClient({
     defaultOptions: {
-      queries: { retry: false, staleTime: Infinity },
+      queries: { retry: false },
       mutations: { retry: false },
     },
   });
   const onTabChange = vi.fn();
   const onSearchOpen = vi.fn();
-  const runs = options.runs ?? [];
-  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-    const url = String(input);
-    if (url === '/api/version') {
-      return Response.json({ version: '0.5.0', isDev: false });
-    }
-    if (url === '/api/flywheel/runs?limit=10') {
-      return Response.json(runs);
-    }
-    return Response.json({});
-  });
-  vi.stubGlobal('fetch', fetchMock);
-
-  render(
+  const view = render(
     <QueryClientProvider client={client}>
-      <Sidebar activeTab={options.activeTab ?? 'command-deck'} onTabChange={onTabChange} onSearchOpen={onSearchOpen} />
+      <Sidebar activeTab={activeTab} onTabChange={onTabChange} onSearchOpen={onSearchOpen} />
     </QueryClientProvider>,
   );
 
-  return { onTabChange, fetchMock };
+  return { ...view, onTabChange, onSearchOpen };
 }
 
-describe('Sidebar', () => {
+describe('Sidebar navigation', () => {
   beforeEach(() => {
     localStorage.clear();
-    vi.restoreAllMocks();
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/version') {
+        return new Response(JSON.stringify({ version: '0.9.3', isDev: true }), { status: 200 });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    }));
   });
 
-  it('places Flywheel last in the Operations group and navigates to the flywheel tab', async () => {
-    const user = userEvent.setup();
-    const { onTabChange } = renderSidebar();
+  it('orders Operations as Pipeline, Board, Command Deck, Agents, AutoPreso with the migration tooltip', () => {
+    const { container, onTabChange } = renderSidebar('pipeline');
 
-    const operationsItems = ['Command Deck', 'Board', 'Awaiting Merge', 'Agents', 'AutoPreso', 'Flywheel'];
-    expect(operationsItems.map((label) => screen.getByText(label).textContent)).toEqual(operationsItems);
+    const operationLabels = Array.from(container.querySelectorAll('nav [data-testid^="sidebar-"]'))
+      .slice(0, 5)
+      .map((button) => button.textContent?.trim());
 
-    await user.click(screen.getByTestId('sidebar-flywheel'));
+    expect(operationLabels).toEqual(['Pipeline', 'Board', 'Command Deck', 'Agents', 'AutoPreso']);
+    expect(screen.getByTestId('sidebar-pipeline')).toHaveAttribute('title', 'Awaiting Merge → filter on Pipeline');
+    expect(screen.queryByTestId('sidebar-awaiting-merge')).toBeNull();
 
-    expect(onTabChange).toHaveBeenCalledWith('flywheel');
+    fireEvent.click(screen.getByTestId('sidebar-pipeline'));
+    expect(onTabChange).toHaveBeenCalledWith('pipeline');
   });
 
-  it('shows a live badge when a Flywheel run is active', async () => {
-    renderSidebar({ runs: [{ id: 'RUN-1', status: 'running' }] });
+  it('keeps collapsed-mode icons clickable', () => {
+    localStorage.setItem('panopticon.ui.sidebarCollapsed', 'true');
+    const { onTabChange } = renderSidebar('kanban');
 
-    await expect.poll(() => screen.queryByText('live')).toBeTruthy();
-  });
+    const pipelineButton = screen.getByTestId('sidebar-pipeline');
+    expect(pipelineButton).toHaveAttribute('title', 'Awaiting Merge → filter on Pipeline');
+    expect(pipelineButton).toHaveTextContent('');
 
-  it('does not show a live badge without an active Flywheel run', async () => {
-    const { fetchMock } = renderSidebar({ runs: [{ id: 'RUN-1', status: 'complete' }] });
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/runs?limit=10'));
-
-    expect(screen.queryByText('live')).toBeNull();
+    fireEvent.click(pipelineButton);
+    expect(onTabChange).toHaveBeenCalledWith('pipeline');
   });
 });
