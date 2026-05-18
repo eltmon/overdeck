@@ -295,6 +295,50 @@ async function findLatestReviewRunDir(
   }
 }
 
+/**
+ * Find the most recent role-report markdown file written by any review cycle.
+ *
+ * Review-run directories now use the pattern `agent-<issueId>-review-<sha8>`
+ * (see review-agent.ts:509), which `findLatestReviewRunDir` above does NOT
+ * match (it scans for the older `review-<issue>-<unixMillis>` convention).
+ * Rather than racing the two functions, walk the entire `.pan/review/`
+ * directory and pick the most-recently-modified `<role>.md` file directly.
+ *
+ * Used to populate the `transcript` field on dead/zombie specialist nodes so
+ * the dashboard's "Conversation" tab renders the verdict instead of
+ * "No conversation data available for this session." Without this, dead
+ * specialists have no surfaceable output even though their reports exist
+ * on disk.
+ */
+async function findLatestRoleReport(
+  workspacePath: string,
+  role: ReviewerRole,
+): Promise<string | null> {
+  try {
+    const reviewRoot = join(workspacePath, '.pan', 'review');
+    const entries = await readdir(reviewRoot, { withFileTypes: true });
+    let bestPath: string | null = null;
+    let bestMs = -Infinity;
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const reportPath = join(reviewRoot, entry.name, `${role}.md`);
+      if (!existsSync(reportPath)) continue;
+      try {
+        const { stat } = await import('node:fs/promises');
+        const st = await stat(reportPath);
+        const ms = st.mtimeMs;
+        if (ms > bestMs) {
+          bestMs = ms;
+          bestPath = reportPath;
+        }
+      } catch { /* ignore individual stat errors */ }
+    }
+    return bestPath;
+  } catch {
+    return null;
+  }
+}
+
 export async function readSynthesisRounds(
   issueId: string,
   projectKey: string,
@@ -393,6 +437,21 @@ export async function buildReviewerNodes(
           : (roundMetadata?.latestStatus ?? (jsonlPath ? 'completed' : opts.status));
       const status = normalizeAgentStatus(rawStatus);
 
+      // Transcript fallback for dead/zombie specialists without discoverable
+      // JSONL. Surface the most recent `<role>.md` from any review-run dir so
+      // the dashboard's Conversation tab shows the verdict markdown instead of
+      // "No conversation data available." Only loads when there's no JSONL —
+      // a live session or a session with its own JSONL prefers those.
+      let transcript: string | undefined;
+      if (!jsonlPath && presence === 'ended' && opts.workspacePath) {
+        const reportPath = await findLatestRoleReport(opts.workspacePath, role);
+        if (reportPath) {
+          try {
+            transcript = await readFile(reportPath, 'utf-8');
+          } catch { /* ignore read errors */ }
+        }
+      }
+
       const node: ReviewerNode = {
         type: 'reviewer',
         role,
@@ -412,6 +471,7 @@ export async function buildReviewerNodes(
         presence,
         hasJsonl: !!jsonlPath,
       };
+      if (transcript) node.transcript = transcript;
       if (roundMetadata) node.roundMetadata = roundMetadata;
       return node;
     }),
