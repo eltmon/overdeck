@@ -4,7 +4,7 @@
     "created": "2026-05-18T05:10:55.134Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
-    "updated": "2026-05-18T05:41:26.404Z"
+    "updated": "2026-05-18T05:46:05.288Z"
   },
   "plan": {
     "id": "pan-1148",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T05:41:26.404Z",
+    "updated": "2026-05-18T05:46:05.288Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -189,7 +189,7 @@
       {
         "id": "f2-phase-glyph",
         "title": "Add PhaseGlyph primitive (5 SVG glyphs for todo/work/review/ship/done)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -205,7 +205,7 @@
           {
             "id": "f2-phase-glyph.ac1",
             "title": "PhaseGlyph.tsx renders 14×14 SVG with stroke=currentColor for all 5 phases",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -213,7 +213,7 @@
           {
             "id": "f2-phase-glyph.ac2",
             "title": "Phase color matches the matching phase-foreground token; no hardcoded colors",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -221,7 +221,7 @@
           {
             "id": "f2-phase-glyph.ac3",
             "title": "Each glyph carries `data-phase` attribute matching the phase prop for stylegide-conformance and tests",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
