@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio } from 'lucide-react';
+import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio, RotateCcw, Pause, Unlock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSharedTick } from '../lib/useSharedTick';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
@@ -8,6 +8,7 @@ import { HandoffPanel } from './HandoffPanel';
 import { useConfirm, useAlert } from './DialogProvider';
 import { getHarness } from '@panctl/contracts';
 import { ModelHarnessPicker, useAvailableModels, type Harness } from './shared/ModelPicker';
+import { NO_RESUME_QUERY_KEY, type NoResumeMode } from './NoResumeBanner';
 
 export interface IssueAgent {
   id: string;
@@ -17,8 +18,18 @@ export interface IssueAgent {
   model: string;
   startedAt: string;
   consecutiveFailures: number;
+  stoppedByUser?: boolean;
+  paused?: boolean;
+  pausedReason?: string;
+  pausedAt?: string;
+  troubled?: boolean;
+  troubledAt?: string;
+  lastFailureAt?: string;
+  lastFailureReason?: string;
+  lastFailureNextRetryAt?: string;
   contextPercent?: number | null;
   initialContextPercent?: number | null;
+  runtimeState?: string;
 }
 
 export interface CloisterHealth {
@@ -94,6 +105,44 @@ async function resumeAgent(agentId: string, message?: string): Promise<void> {
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.error || 'Failed to resume agent');
+  }
+}
+
+type AgentPauseFields = Pick<IssueAgent, 'paused' | 'pausedReason' | 'pausedAt'>;
+
+async function pauseAgent(agentId: string, reason?: string): Promise<AgentPauseFields> {
+  const res = await fetch(`/api/agents/${agentId}/pause`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(reason ? { reason } : {}),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to pause agent');
+  }
+  const data = await res.json().catch(() => ({}));
+  return data.agent ?? {};
+}
+
+async function unpauseAgent(agentId: string): Promise<void> {
+  const res = await fetch(`/api/agents/${agentId}/unpause`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to unpause agent');
+  }
+}
+
+async function clearTroubledAgent(agentId: string): Promise<void> {
+  const res = await fetch(`/api/agents/${agentId}/untroubled`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to clear troubled state');
   }
 }
 
@@ -184,10 +233,14 @@ export function IssueAgentCard({
   const showAlert = useAlert();
   const [showHandoffPanel, setShowHandoffPanel] = useState(false);
   const [activityExpanded, setActivityExpanded] = useState(false);
+  const [showPauseReason, setShowPauseReason] = useState(false);
+  const [pauseReason, setPauseReason] = useState('');
   const { groups: modelGroups, defaultModel, harnessPolicy } = useAvailableModels();
   const [launchModel, setLaunchModel] = useState(agent.model || defaultModel);
   const [launchHarness, setLaunchHarness] = useState<Harness>(getHarness(agent) === 'pi' ? 'pi' : 'claude-code');
   const issueId = inferIssueId(agent);
+  const now = useSharedTick();
+  const noResumeMode = queryClient.getQueryData<NoResumeMode>(NO_RESUME_QUERY_KEY);
   const { data: costData } = useAgentCost(agent.id);
   const { data: activityData } = useActivity(agent.id, health?.isRunning || health?.state === 'suspended');
 
@@ -215,6 +268,74 @@ export function IssueAgentCard({
     },
     onError: (error: Error) => {
       showAlert({ message: `Failed to resume ${agent.id}: ${error.message}`, variant: 'error' });
+    },
+  });
+
+  const pauseMutation = useMutation({
+    mutationFn: (reason?: string) => pauseAgent(agent.id, reason),
+    onSuccess: (updated, reason) => {
+      queryClient.setQueryData<IssueAgent[]>(['agents'], (agents) => agents?.map((item) => (
+        item.id === agent.id
+          ? {
+              ...item,
+              paused: true,
+              pausedReason: updated.pausedReason ?? reason,
+              pausedAt: updated.pausedAt ?? new Date().toISOString(),
+            }
+          : item
+      )));
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      setShowPauseReason(false);
+      setPauseReason('');
+      showAlert({ message: `Paused ${agent.id}`, variant: 'success' });
+    },
+    onError: (error: Error) => {
+      showAlert({ message: `Failed to pause ${agent.id}: ${error.message}`, variant: 'error' });
+    },
+  });
+
+  const unpauseMutation = useMutation({
+    mutationFn: () => unpauseAgent(agent.id),
+    onSuccess: () => {
+      queryClient.setQueryData<IssueAgent[]>(['agents'], (agents) => agents?.map((item) => (
+        item.id === agent.id
+          ? {
+              ...item,
+              paused: false,
+              pausedReason: undefined,
+              pausedAt: undefined,
+            }
+          : item
+      )));
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      showAlert({ message: `Unpaused ${agent.id}`, variant: 'success' });
+    },
+    onError: (error: Error) => {
+      showAlert({ message: `Failed to unpause ${agent.id}: ${error.message}`, variant: 'error' });
+    },
+  });
+
+  const clearTroubledMutation = useMutation({
+    mutationFn: () => clearTroubledAgent(agent.id),
+    onSuccess: () => {
+      queryClient.setQueryData<IssueAgent[]>(['agents'], (agents) => agents?.map((item) => (
+        item.id === agent.id
+          ? {
+              ...item,
+              troubled: false,
+              troubledAt: undefined,
+              consecutiveFailures: 0,
+              lastFailureAt: undefined,
+              lastFailureReason: undefined,
+              lastFailureNextRetryAt: undefined,
+            }
+          : item
+      )));
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      showAlert({ message: `Cleared troubled state for ${agent.id}`, variant: 'success' });
+    },
+    onError: (error: Error) => {
+      showAlert({ message: `Failed to clear troubled state for ${agent.id}: ${error.message}`, variant: 'error' });
     },
   });
 
@@ -254,6 +375,34 @@ export function IssueAgentCard({
     onSelect?.();
   };
 
+  const handleShowPauseReason = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowPauseReason(true);
+  };
+
+  const handlePauseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const reason = pauseReason.trim();
+    pauseMutation.mutate(reason || undefined);
+  };
+
+  const handlePauseCancel = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowPauseReason(false);
+    setPauseReason('');
+  };
+
+  const handleUnpause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    unpauseMutation.mutate();
+  };
+
+  const handleClearTroubled = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    clearTroubledMutation.mutate();
+  };
+
   const handleStart = (e: React.MouseEvent) => {
     e.stopPropagation();
     startMutation.mutate();
@@ -265,6 +414,39 @@ export function IssueAgentCard({
   };
 
   const needsPoke = health?.state === 'warning' || health?.state === 'stuck';
+  const failureTitle = [
+    `${agent.consecutiveFailures} consecutive failure${agent.consecutiveFailures === 1 ? '' : 's'}`,
+    agent.lastFailureReason ? `Last reason: ${agent.lastFailureReason}` : undefined,
+    agent.lastFailureAt ? `Last failure: ${formatRelativeTime(agent.lastFailureAt, now)}` : undefined,
+    agent.lastFailureNextRetryAt ? `Next retry: ${formatRelativeTime(agent.lastFailureNextRetryAt, now)}` : undefined,
+  ].filter(Boolean).join('\n');
+  const pausedTitle = [
+    'Paused',
+    agent.pausedReason ? `Reason: ${agent.pausedReason}` : undefined,
+    agent.pausedAt ? `Paused: ${formatRelativeTime(agent.pausedAt, now)}` : undefined,
+  ].filter(Boolean).join('\n');
+  const isRunning = health?.isRunning === true || (health === undefined && agent.status === 'healthy');
+  const isCompletedStopped = agent.status === 'stopped' && agent.runtimeState === 'completed' && agent.paused !== true && agent.troubled !== true;
+  const gatingReason = !isRunning && !isCompletedStopped
+    ? agent.paused === true
+      ? 'Paused'
+      : agent.troubled === true
+        ? `Troubled (${agent.consecutiveFailures} failure${agent.consecutiveFailures === 1 ? '' : 's'})`
+        : noResumeMode?.active === true
+          ? 'Boot --no-resume'
+          : agent.stoppedByUser === true
+            ? 'Manual'
+            : undefined
+    : undefined;
+  const gatingTitle = gatingReason === 'Boot --no-resume' && noResumeMode?.since
+    ? `No-resume mode active since ${formatRelativeTime(noResumeMode.since, now)}`
+    : gatingReason;
+  const isStartGated = agent.paused === true || agent.troubled === true;
+  const startGateTitle = agent.paused === true
+    ? 'Unpause agent before starting'
+    : agent.troubled === true
+      ? 'Clear troubled state before starting'
+      : undefined;
 
   const toggleHandoffPanel = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -292,6 +474,24 @@ export function IssueAgentCard({
                   {HEALTH_STATE_EMOJI[health.state]}
                 </span>
               )}
+              {agent.paused === true && (
+                <span
+                  className="px-1.5 py-0.5 rounded border border-border bg-muted text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                  title={pausedTitle}
+                  data-testid="issue-agent-card-paused-badge"
+                >
+                  Paused
+                </span>
+              )}
+              {agent.troubled === true && (
+                <span
+                  className="px-1.5 py-0.5 rounded bg-destructive/15 text-[10px] font-medium uppercase tracking-wide text-destructive"
+                  title={failureTitle || 'Troubled'}
+                  data-testid="issue-agent-card-troubled-badge"
+                >
+                  Troubled
+                </span>
+              )}
             </div>
             <div className="text-sm text-muted-foreground flex items-center gap-2">
               <span
@@ -306,6 +506,15 @@ export function IssueAgentCard({
                 {getHarness(agent)}
               </span>
               <span>/ {agent.model}</span>
+              {gatingReason && (
+                <span
+                  className="px-1.5 py-0.5 rounded bg-orange-500/15 text-[10px] font-medium uppercase tracking-wide text-orange-300"
+                  title={gatingTitle}
+                  data-testid="issue-agent-card-gating-reason"
+                >
+                  {gatingReason}
+                </span>
+              )}
               {costData && costData.cost > 0 && (
                 <span
                   className="flex items-center gap-1 text-xs text-success"
@@ -351,7 +560,7 @@ export function IssueAgentCard({
               <LiveLastHeard lastActivity={health.lastActivity} />
             )}
             {agent.consecutiveFailures > 0 && (
-              <div className="flex items-center gap-1 text-sm text-warning-foreground">
+              <div className="flex items-center gap-1 text-sm text-warning-foreground" title={failureTitle}>
                 <AlertTriangle className="w-4 h-4" />
                 {agent.consecutiveFailures} failures
               </div>
@@ -383,6 +592,28 @@ export function IssueAgentCard({
               </button>
             )}
 
+            {agent.paused === true ? (
+              <button
+                onClick={handleUnpause}
+                disabled={unpauseMutation.isPending}
+                className="p-2 text-muted-foreground hover:text-success hover:bg-card rounded disabled:opacity-50"
+                title={agent.pausedReason ? `Unpause agent (${agent.pausedReason})` : 'Unpause agent'}
+                data-testid="issue-agent-card-unpause"
+              >
+                <Unlock className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={handleShowPauseReason}
+                disabled={pauseMutation.isPending}
+                className="p-2 text-muted-foreground hover:text-warning hover:bg-card rounded disabled:opacity-50"
+                title="Pause agent"
+                data-testid="issue-agent-card-pause"
+              >
+                <Pause className="w-4 h-4" />
+              </button>
+            )}
+
             {/* Resume button - only for suspended */}
             {health?.state === 'suspended' && (
               <button
@@ -407,6 +638,19 @@ export function IssueAgentCard({
               </button>
             )}
 
+            {/* Clear troubled state - only for troubled agents */}
+            {agent.troubled === true && (
+              <button
+                onClick={handleClearTroubled}
+                disabled={clearTroubledMutation.isPending}
+                className="p-2 text-muted-foreground hover:text-success hover:bg-card rounded disabled:opacity-50"
+                title={failureTitle ? `Clear troubled state\n${failureTitle}` : 'Clear troubled state'}
+                data-testid="issue-agent-card-clear-troubled"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            )}
+
             {/* Kill button - not for suspended or already stopped */}
             {health?.state !== 'suspended' && agent.status !== 'stopped' && (
               <button
@@ -422,6 +666,40 @@ export function IssueAgentCard({
         </div>
       </div>
 
+      {showPauseReason && agent.paused !== true && (
+        <form
+          className="mt-3 pt-3 border-t border-border flex items-center gap-2"
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={handlePauseSubmit}
+        >
+          <input
+            type="text"
+            value={pauseReason}
+            onChange={(e) => setPauseReason(e.target.value)}
+            placeholder="Reason (optional)"
+            className="min-w-0 flex-1 px-3 py-2 rounded bg-background border border-border text-sm"
+            disabled={pauseMutation.isPending}
+            data-testid="issue-agent-card-pause-reason"
+          />
+          <button
+            type="submit"
+            disabled={pauseMutation.isPending}
+            className="px-3 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 text-sm"
+            data-testid="issue-agent-card-pause-submit"
+          >
+            {pauseMutation.isPending ? 'Pausing…' : 'Pause'}
+          </button>
+          <button
+            type="button"
+            onClick={handlePauseCancel}
+            disabled={pauseMutation.isPending}
+            className="px-3 py-2 rounded bg-card text-muted-foreground hover:text-foreground disabled:opacity-50 text-sm"
+          >
+            Cancel
+          </button>
+        </form>
+      )}
+
       {agent.status === 'stopped' && (
         <div
           className="mt-3 pt-3 border-t border-border space-y-3"
@@ -436,12 +714,38 @@ export function IssueAgentCard({
             harnessPolicy={harnessPolicy}
             modelLabel="Agent model"
           />
+          {agent.paused === true && (
+            <button
+              type="button"
+              onClick={handleUnpause}
+              disabled={unpauseMutation.isPending}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded bg-success text-success-foreground hover:bg-success/90 disabled:opacity-50"
+              title={agent.pausedReason ? `Unpause agent (${agent.pausedReason})` : 'Unpause agent'}
+              data-testid="issue-agent-card-start-unpause"
+            >
+              <Unlock className="w-4 h-4" />
+              {unpauseMutation.isPending ? 'Unpausing…' : 'Unpause agent'}
+            </button>
+          )}
+          {agent.troubled === true && (
+            <button
+              type="button"
+              onClick={handleClearTroubled}
+              disabled={clearTroubledMutation.isPending}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded bg-success text-success-foreground hover:bg-success/90 disabled:opacity-50"
+              title={failureTitle ? `Clear troubled state\n${failureTitle}` : 'Clear troubled state'}
+              data-testid="issue-agent-card-start-clear-troubled"
+            >
+              <RotateCcw className="w-4 h-4" />
+              {clearTroubledMutation.isPending ? 'Clearing…' : 'Clear troubled state'}
+            </button>
+          )}
           <button
             type="button"
             onClick={handleStart}
-            disabled={startMutation.isPending || !issueId}
+            disabled={startMutation.isPending || !issueId || isStartGated}
             className="inline-flex items-center gap-2 px-3 py-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            title={issueId ? 'Start agent' : 'No issue ID available for this agent'}
+            title={startGateTitle ?? (issueId ? 'Start agent' : 'No issue ID available for this agent')}
             data-testid="issue-agent-card-start-agent"
           >
             <Play className="w-4 h-4" />

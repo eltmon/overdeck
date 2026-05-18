@@ -1,8 +1,10 @@
 import chalk from 'chalk';
 import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
-import { listRunningAgents, getAgentDir } from '../../lib/agents.js';
+import { listRunningAgents, getAgentDir, type AgentState } from '../../lib/agents.js';
 import { isShadowed, getShadowState } from '../../lib/shadow-state.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
+import { isNoResumeValueEnabled } from '../../lib/cloister/no-resume-mode.js';
 import { getTldrMetrics, getTldrDaemonService } from '../../lib/tldr-daemon.js';
 import {
   collectDockerContainerLifecycleSnapshot,
@@ -46,6 +48,35 @@ function renderRestartStatus(status: RestartStatus | null): void {
   console.log('');
 }
 
+async function isBootNoResumeModeActive(): Promise<boolean> {
+  if (isNoResumeValueEnabled(process.env.PANOPTICON_NO_RESUME)) return true;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 250);
+  try {
+    const response = await fetch(`${getDashboardApiUrl()}/api/no-resume-mode`, { signal: controller.signal });
+    if (!response.ok) return false;
+    const payload = await response.json() as { active?: unknown };
+    return payload.active === true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function formatGatingReason(agent: AgentState & { tmuxActive: boolean }, noResumeModeActive: boolean): string {
+  if (agent.tmuxActive) return '';
+  if (agent.paused === true) return agent.pausedReason ? `Paused (${agent.pausedReason})` : 'Paused';
+  if (agent.troubled === true) {
+    const failureCount = agent.consecutiveFailures ?? 0;
+    return `Troubled (${failureCount} failure${failureCount === 1 ? '' : 's'})`;
+  }
+  if (noResumeModeActive) return 'Boot --no-resume';
+  if (agent.stoppedByUser === true) return 'Manual';
+  return '';
+}
+
 export function readContextPercent(agentId: string): number | null {
   const ctxFile = join(getAgentDir(agentId), 'context-pct');
   try {
@@ -71,6 +102,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const agents = listRunningAgents().filter(agent =>
     agent.id && agent.issueId && agent.workspace
   );
+  const noResumeModeActive = await isBootNoResumeModeActive();
   const dockerContainers = await collectDockerContainerLifecycleSnapshot();
   const issueIds = new Map<string, string>();
   for (const agent of agents) {
@@ -104,6 +136,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
         shadowStatus: shadowState?.shadowStatus,
         trackerStatus: shadowState?.trackerStatus,
         stackHealth: agent.issueId ? stackHealthByIssue.get(issueKey(agent.issueId)) : undefined,
+        gatingReason: formatGatingReason(agent, noResumeModeActive) || undefined,
         ...(options.context ? { contextPercent: readContextPercent(agent.id) } : {}),
       };
     }));
@@ -134,9 +167,14 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     const shadowed = agent.issueId ? await isShadowed(agent.issueId) : false;
     const shadowState = shadowed && agent.issueId ? await getShadowState(agent.issueId) : null;
 
+    const gatingReason = formatGatingReason(agent, noResumeModeActive);
+
     console.log(`${chalk.cyan(agent.id)}`);
     console.log(`  Issue:    ${agent.issueId}`);
     console.log(`  Status:   ${statusColor(status)}`);
+    if (gatingReason) {
+      console.log(`  Gate:     ${chalk.yellow(gatingReason)}`);
+    }
 
     if (shadowed && shadowState) {
       const statusStr = `${shadowState.shadowStatus}${shadowState.trackerStatus !== shadowState.shadowStatus ? ` (tracker: ${shadowState.trackerStatus})` : ''}`;

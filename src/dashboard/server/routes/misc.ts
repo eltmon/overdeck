@@ -14,6 +14,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   POST /api/health/agents/:id/ping
  *   GET  /api/tracker-status
  *   POST /api/rally/validate
+ *   GET  /api/no-resume-mode
  *   GET  /api/deacon/status
  *   GET  /api/deacon/logs
  *   POST /api/deacon/patrol
@@ -50,6 +51,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
+import { getNoResumeMode } from '../../../lib/cloister/no-resume-mode.js';
 import { createSessionAsync, killSessionAsync, listSessionNamesAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import { getClaudePermissionFlagsString } from '../../../lib/claude-permissions.js';
@@ -660,6 +662,14 @@ const postRallyValidateRoute = HttpRouter.add(
         );
         }})
   }),
+);
+
+// ─── Route: GET /api/no-resume-mode ─────────────────────────────────────────
+
+const getNoResumeModeRoute = HttpRouter.add(
+  'GET',
+  '/api/no-resume-mode',
+  Effect.sync(() => jsonResponse(getNoResumeMode())),
 );
 
 // ─── Route: GET /api/deacon/status ───────────────────────────────────────────
@@ -1693,6 +1703,7 @@ export const miscRouteLayer = Layer.mergeAll(
   postHealthAgentPingRoute,
   getTrackerStatusRoute,
   postRallyValidateRoute,
+  getNoResumeModeRoute,
   getDeaconStatusRoute,
   getDeaconLogsRoute,
   postDeaconPatrolRoute,

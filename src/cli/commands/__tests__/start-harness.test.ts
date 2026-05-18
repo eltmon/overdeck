@@ -5,6 +5,11 @@ const readlineMocks = vi.hoisted(() => ({
   close: vi.fn(),
 }))
 
+const agentMocks = vi.hoisted(() => ({
+  getAgentState: vi.fn(),
+  clearAgentPaused: vi.fn(),
+}))
+
 vi.mock('readline/promises', () => ({
   createInterface: vi.fn(() => ({
     question: readlineMocks.question,
@@ -18,6 +23,8 @@ vi.mock('readline/promises', () => ({
 // spawnAgent without breaking the default path.
 vi.mock('../../../lib/agents.js', () => ({
   spawnAgent: vi.fn(async () => ({ id: 'agent-x', issueId: 'PAN-X', workspace: '/tmp', model: 'm', startedAt: new Date().toISOString() })),
+  getAgentState: agentMocks.getAgentState,
+  clearAgentPaused: agentMocks.clearAgentPaused,
   getProviderAuthMode: vi.fn(async () => 'subscription'),
   getProviderEnvForModel: vi.fn(async () => ({})),
   getProviderExportsForModel: vi.fn(async () => ''),
@@ -40,6 +47,8 @@ describe('pan start --harness flag (PAN-636)', () => {
     stdinIsTTYDescriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY')
     readlineMocks.question.mockReset()
     readlineMocks.close.mockReset()
+    agentMocks.getAgentState.mockReset()
+    agentMocks.clearAgentPaused.mockReset()
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
       throw new Error(`__exit__:${code}`)
     }) as never)
@@ -98,5 +107,27 @@ describe('pan start --harness flag (PAN-636)', () => {
     ).rejects.toThrow(/__exit__:1/)
     const written = stderrSpy.mock.calls.map(call => String(call[0])).join('')
     expect(written).toMatch(/Invalid --harness/)
+  })
+
+  it('refuses paused agents unless --force is passed', async () => {
+    agentMocks.getAgentState.mockReturnValueOnce({
+      id: 'agent-pan-x',
+      issueId: 'PAN-X',
+      paused: true,
+      pausedReason: 'needs inspection',
+    })
+
+    const { issueCommand } = await import('../start.js')
+    await expect(
+      issueCommand('PAN-X', {
+        model: '',
+      } as any),
+    ).rejects.toThrow(/__exit__:1/)
+
+    const written = stderrSpy.mock.calls.map(call => String(call[0])).join('')
+    expect(written).toContain('agent-pan-x')
+    expect(written).toContain('needs inspection')
+    expect(written).toContain('pan unpause PAN-X')
+    expect(agentMocks.clearAgentPaused).not.toHaveBeenCalled()
   })
 })

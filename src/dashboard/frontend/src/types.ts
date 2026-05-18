@@ -89,7 +89,17 @@ export interface Agent {
   pid?: number;
   startedAt: string;
   lastActivity?: string;
+  stoppedByUser?: boolean;
+  paused?: boolean;
+  pausedReason?: string;
+  pausedAt?: string;
+  troubled?: boolean;
+  troubledAt?: string;
   consecutiveFailures: number;
+  firstFailureInRunAt?: string;
+  lastFailureAt?: string;
+  lastFailureReason?: string;
+  lastFailureNextRetryAt?: string;
   killCount: number;
   workspace?: string;
   workspaceLocation?: 'local' | 'remote';

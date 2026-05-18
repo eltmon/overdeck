@@ -49,7 +49,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer, Option, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { DomainEvent } from '@panctl/contracts';
-import type { Role } from '@panctl/contracts';
+import type { AgentStatus, Role } from '@panctl/contracts';
 import { bodyToEvent, decodeDomainEvent } from '../services/agent-event-utils.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
@@ -59,7 +59,6 @@ import { performHandoff } from '../../../lib/cloister/handoff.js';
 import { getAgentHealth } from '../../../lib/cloister/health.js';
 import { getRuntimeForAgent } from '../../../lib/runtimes/index.js';
 import {
-  getAgentState,
   getAgentStateAsync,
   getAgentRuntimeState,
   getAgentRuntimeStateAsync,
@@ -67,10 +66,16 @@ import {
   saveAgentRuntimeState,
   saveAgentState,
   saveAgentStateAsync,
+  setAgentPausedAsync,
+  clearAgentPausedAsync,
+  clearAgentTroubledAsync,
+  markAgentStoppedState,
+  type AgentRuntimeState,
+  type AgentState,
   getActivity,
   saveSessionId,
   getSessionId,
-  getLatestSessionId,
+  getLatestSessionIdAsync,
   resumeAgent,
   restartAgent,
   messageAgent,
@@ -98,7 +103,7 @@ import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
-import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
+import { getWorkAgentLifecycleStateAsync, type WorkAgentLifecycleState, type WorkAgentRecommendedAction } from '../../../lib/work-agent-lifecycle.js';
 import { buildStashMessage, createNamedStash } from '../../../lib/stashes.js';
 import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
@@ -201,6 +206,133 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
+function toAgentStatusPayload(status: AgentState['status'] | undefined): AgentStatus {
+  return status === 'starting' || status === 'running' || status === 'stopped' || status === 'error'
+    ? status
+    : 'unknown';
+}
+
+function buildAgentControlEventPayload(state: AgentState, previousStatus?: AgentStatus) {
+  return {
+    agentId: state.id,
+    issueId: state.issueId,
+    status: toAgentStatusPayload(state.status),
+    previousStatus,
+    stoppedByUser: state.stoppedByUser === true,
+    paused: state.paused === true,
+    pausedReason: state.pausedReason ?? null,
+    pausedAt: state.pausedAt ?? null,
+    troubled: state.troubled === true,
+    troubledAt: state.troubledAt ?? null,
+    consecutiveFailures: state.consecutiveFailures ?? 0,
+    firstFailureInRunAt: state.firstFailureInRunAt ?? null,
+    lastFailureAt: state.lastFailureAt ?? null,
+    lastFailureReason: state.lastFailureReason ?? null,
+    lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
+  };
+}
+
+function buildAgentGateFailureSnapshot(state: Partial<AgentState>) {
+  return {
+    stoppedByUser: state.stoppedByUser === true,
+    paused: state.paused === true,
+    pausedReason: state.pausedReason ?? null,
+    pausedAt: state.pausedAt ?? null,
+    troubled: state.troubled === true,
+    troubledAt: state.troubledAt ?? null,
+    consecutiveFailures: state.consecutiveFailures ?? 0,
+    firstFailureInRunAt: state.firstFailureInRunAt ?? null,
+    lastFailureAt: state.lastFailureAt ?? null,
+    lastFailureReason: state.lastFailureReason ?? null,
+    lastFailureNextRetryAt: state.lastFailureNextRetryAt ?? null,
+  };
+}
+
+function buildStoppedAgentLifecycle(
+  agentOrIssueId: string,
+  state: Partial<AgentState>,
+  runtimeData: Partial<AgentRuntimeState>,
+): WorkAgentLifecycleState {
+  const agentId = normalizeAgentId(agentOrIssueId);
+  const hasAgentState = true;
+  const hasLiveTmuxSession = false;
+  const hasSavedSession = !!runtimeData.claudeSessionId;
+  const hasWorkspace = typeof state.workspace === 'string' && state.workspace.length > 0;
+  const agentStatus = state.status || 'unknown';
+  const runtime = runtimeData.state || 'uninitialized';
+  const isCompleted = runtimeData.resolution === 'completed';
+  const isPlaceholder = agentStatus === 'starting' && typeof state.model === 'string' && state.model.startsWith('pending-');
+  const isStopped = agentStatus === 'stopped' || agentStatus === 'error' || isCompleted || runtime === 'stopped' || runtime === 'idle' || runtime === 'suspended';
+  const isRunning = false;
+  const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
+  const isRunningButStuck = false;
+  const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const isOrphaned = !hasLiveTmuxSession && (
+    (hasSavedSession && !hasResumableBackingState)
+    || (hasAgentState && (!hasWorkspace || isPlaceholder))
+  );
+  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableBackingState && (isStopped || isCrashed);
+
+  let recommendedAction: WorkAgentRecommendedAction = 'start';
+  let reason: string | undefined;
+
+  if (isOrphaned) {
+    recommendedAction = 'start';
+    reason = hasSavedSession
+      ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
+      : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
+  } else if (requiresSessionResetBeforeFreshStart) {
+    recommendedAction = 'resume';
+    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it or 'pan review reset --session ${agentOrIssueId}' before starting fresh.`;
+  } else if (hasAgentState && !hasSavedSession && isStopped) {
+    recommendedAction = 'start';
+    reason = `Agent ${agentId} is stopped and has no saved Claude session. Start Agent will create a fresh session in the existing workspace.`;
+  }
+
+  return {
+    agentId,
+    hasAgentState,
+    hasLiveTmuxSession,
+    hasSavedSession,
+    hasWorkspace,
+    isPlaceholder,
+    isOrphaned,
+    isRunning,
+    isRunningButStuck,
+    isStopped,
+    isCompleted,
+    isCrashed,
+    runtimeState: runtime,
+    agentStatus,
+    canStartFresh: !requiresSessionResetBeforeFreshStart || isOrphaned,
+    canResumeSession: hasSavedSession && hasResumableBackingState && (isStopped || isCrashed),
+    canRestartWithContext: hasAgentState && hasWorkspace,
+    canResetSession: hasSavedSession && hasResumableBackingState,
+    requiresSessionResetBeforeFreshStart,
+    recommendedAction,
+    reason,
+  };
+}
+
+async function readPersistedAgentState(agentId: string): Promise<Partial<AgentState>> {
+  const stateFile = join(homedir(), '.panopticon', 'agents', agentId, 'state.json');
+  if (!existsSync(stateFile)) return {};
+  try {
+    return JSON.parse(await readFile(stateFile, 'utf-8')) as Partial<AgentState>;
+  } catch {
+    return {};
+  }
+}
+
+async function captureAgentOutputBeforeKill(agentId: string): Promise<void> {
+  const output = await capturePaneAsync(agentId, 5000).catch(() => '');
+  if (!output) return;
+
+  const agentDir = getAgentDir(agentId);
+  await mkdir(agentDir, { recursive: true });
+  await writeFile(join(agentDir, 'output.log'), output);
+}
+
 function buildHostOverrideConfirmation(issueId: string): string {
   return `I understand this bypasses workspace isolation for ${issueId.toUpperCase()}`;
 }
@@ -296,6 +428,62 @@ function resolveAgentCountEnv(varName: string, fallback: number): number {
   if (raw == null || raw.trim() === '') return fallback;
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : fallback;
+}
+
+export interface AgentStartGateDecision {
+  success: false;
+  blocked: true;
+  skipped: true;
+  error: string;
+  hint: string;
+  agentId: string;
+  paused: boolean;
+  troubled: boolean;
+}
+
+export function evaluateAgentStartGate(
+  agentId: string,
+  state: Pick<AgentState, 'paused' | 'pausedReason' | 'troubled' | 'consecutiveFailures'> | null | undefined,
+): AgentStartGateDecision | null {
+  if (state?.paused === true) {
+    const reason = state.pausedReason ? ` (${state.pausedReason})` : '';
+    return {
+      success: false,
+      blocked: true,
+      skipped: true,
+      error: `Agent ${agentId} is paused${reason}.`,
+      hint: `Run pan unpause ${agentId} before starting it from the dashboard.`,
+      agentId,
+      paused: true,
+      troubled: state.troubled === true,
+    };
+  }
+
+  if (state?.troubled === true) {
+    const failures = state.consecutiveFailures ?? 0;
+    return {
+      success: false,
+      blocked: true,
+      skipped: true,
+      error: `Agent ${agentId} is troubled (${failures} failure${failures === 1 ? '' : 's'}).`,
+      hint: `Investigate the crash cause, then run pan untroubled ${agentId} before starting it from the dashboard.`,
+      agentId,
+      paused: false,
+      troubled: true,
+    };
+  }
+
+  return null;
+}
+
+export function hasActiveAgentGateOrRetry(
+  state: Pick<AgentState, 'paused' | 'troubled' | 'lastFailureNextRetryAt'>,
+  nowMs: number = Date.now(),
+): boolean {
+  if (state.paused === true || state.troubled === true) return true;
+  if (!state.lastFailureNextRetryAt) return false;
+  const retryAtMs = Date.parse(state.lastFailureNextRetryAt);
+  return Number.isFinite(retryAtMs) && retryAtMs > nowMs;
 }
 
 export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuardrailDecision {
@@ -456,7 +644,7 @@ const getAgentsRoute = HttpRouter.add(
             const stateFile = join(homedir(), '.panopticon', 'agents', name, 'state.json');
             const healthFile = join(homedir(), '.panopticon', 'agents', name, 'health.json');
             let state: any = { model: isPlanning ? 'opus' : 'sonnet', workspace: process.cwd() };
-            let health: any = { consecutiveFailures: 0, killCount: 0 };
+            let health: any = { killCount: 0 };
 
             if (existsSync(stateFile)) {
               try { state = { ...state, ...JSON.parse(await readFile(stateFile, 'utf-8')) }; } catch {}
@@ -493,11 +681,11 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: name,
               issueId,
-              runtime: 'claude',
+              runtime: state.harness ?? 'claude-code',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'healthy' as const,
               startedAt,
-              consecutiveFailures: health.consecutiveFailures || 0,
+              ...buildAgentGateFailureSnapshot(state),
               killCount: health.killCount || 0,
               workspace: state.workspace || null,
               workspaceLocation,
@@ -522,16 +710,17 @@ const getAgentsRoute = HttpRouter.add(
             const isPlanning = name.startsWith('planning-');
             try {
               const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
-              const issueId = state.issueId?.toUpperCase() || name.replace(/^(agent-|planning-)/, '').toUpperCase();
+              const persistedState = await readPersistedAgentState(name);
+              const issueId = state.issueId?.toUpperCase() || persistedState.issueId?.toUpperCase() || name.replace(/^(agent-|planning-)/, '').toUpperCase();
               const workspaceLocation = await getWorkspaceLocation(issueId);
               return {
                 id: name,
                 issueId,
-                runtime: 'claude',
+                runtime: state.harness ?? persistedState.harness ?? 'claude-code',
                 model: state.model || (isPlanning ? 'opus' : 'sonnet'),
                 status: 'healthy' as const,
-                startedAt: state.startedAt || new Date().toISOString(),
-                consecutiveFailures: 0,
+                startedAt: state.startedAt || persistedState.startedAt || new Date().toISOString(),
+                ...buildAgentGateFailureSnapshot(persistedState),
                 killCount: 0,
                 workspace: `/workspace (${state.vmName})`,
                 workspaceLocation: 'remote',
@@ -574,21 +763,24 @@ const getAgentsRoute = HttpRouter.add(
               const isPlanning = dir.startsWith('planning-');
               const issueId = state.issueId?.toUpperCase() ||
                 (isPlanning ? dir.replace('planning-', '') : dir.replace('agent-', '')).toUpperCase();
-              const lastActivity = runtimeData.lastActivity || state.lastActivity;
-              const stoppedAt = lastActivity ? new Date(lastActivity) : null;
+              const stoppedTimestamp = state.stoppedAt || runtimeData.lastActivity || state.lastActivity;
+              const stoppedAt = stoppedTimestamp ? new Date(stoppedTimestamp) : null;
               const reviewStatus = getReviewStatus(issueId);
               const keepStoppedAgentVisible =
-                !!reviewStatus &&
-                reviewStatus.mergeStatus !== 'merged' &&
+                hasActiveAgentGateOrRetry(state, now) ||
                 (
-                  !!reviewStatus.prUrl ||
-                  reviewStatus.readyForMerge === true ||
-                  reviewStatus.reviewStatus !== 'pending' ||
-                  reviewStatus.testStatus !== 'pending' ||
-                  reviewStatus.mergeStatus === 'failed'
+                  !!reviewStatus &&
+                  reviewStatus.mergeStatus !== 'merged' &&
+                  (
+                    !!reviewStatus.prUrl ||
+                    reviewStatus.readyForMerge === true ||
+                    reviewStatus.reviewStatus !== 'pending' ||
+                    reviewStatus.testStatus !== 'pending' ||
+                    reviewStatus.mergeStatus === 'failed'
+                  )
                 );
               if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000 && !keepStoppedAgentVisible) continue;
-              const lifecycle = getWorkAgentLifecycleState(dir);
+              const lifecycle = buildStoppedAgentLifecycle(dir, state, runtimeData);
               const needsInput = runtimeData.resolution === 'needs_input';
               const pendingQuestionPrompt = needsInput
                 ? normalizeAwaitingInputPrompt(
@@ -602,11 +794,11 @@ const getAgentsRoute = HttpRouter.add(
               stoppedAgents.push({
                 id: dir,
                 issueId,
-                runtime: 'claude',
+                runtime: state.harness ?? 'claude-code',
                 model: state.model || (isPlanning ? 'opus' : 'sonnet'),
                 status: 'stopped' as const,
                 startedAt: state.startedAt || new Date().toISOString(),
-                consecutiveFailures: 0,
+                ...buildAgentGateFailureSnapshot(state),
                 killCount: 0,
                 workspace: state.workspace || null,
                 workspaceLocation: 'local',
@@ -636,11 +828,11 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: dir,
               issueId,
-              runtime: 'claude',
+              runtime: state.harness ?? 'claude-code',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'starting' as const,
               startedAt: state.startedAt || new Date().toISOString(),
-              consecutiveFailures: 0,
+              ...buildAgentGateFailureSnapshot(state),
               killCount: 0,
               workspace: state.workspace || null,
               workspaceLocation: 'local',
@@ -664,11 +856,11 @@ const getAgentsRoute = HttpRouter.add(
             return {
               id: dir,
               issueId,
-              runtime: 'claude',
+              runtime: state.harness ?? 'claude-code',
               model: state.model || (isPlanning ? 'opus' : 'sonnet'),
               status: 'error' as const,
               startedAt: state.startedAt || new Date().toISOString(),
-              consecutiveFailures: 0,
+              ...buildAgentGateFailureSnapshot(state),
               killCount: 0,
               workspace: state.workspace || null,
               workspaceLocation: state.location || 'local',
@@ -1350,6 +1542,143 @@ const postAgentSuspendRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/agents/:id/pause ────────────────────────────────────────
+
+const postAgentPauseRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/pause',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
+    }
+
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
+    const reason = (body as { reason?: unknown }).reason;
+
+    if (reason !== undefined && typeof reason !== 'string') {
+      return jsonResponse({ error: 'reason must be a string' }, { status: 400 });
+    }
+
+    const stateBeforePause = yield* Effect.promise(() => getAgentStateAsync(id));
+    if (!stateBeforePause) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    const previousStatus = toAgentStatusPayload(stateBeforePause.status);
+    const hasLiveSession = yield* Effect.promise(() => sessionExistsAsync(id));
+    const stoppedByPause = hasLiveSession || stateBeforePause.status === 'running' || stateBeforePause.status === 'starting';
+    let updatedState = yield* Effect.promise(() => setAgentPausedAsync(id, reason, stoppedByPause));
+    if (!updatedState) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    if (hasLiveSession) {
+      yield* Effect.promise(() => captureAgentOutputBeforeKill(id));
+      yield* Effect.promise(() => killSessionAsync(id));
+    }
+
+    if (hasLiveSession || updatedState.status === 'running' || updatedState.status === 'starting') {
+      updatedState = markAgentStoppedState(updatedState);
+      yield* Effect.promise(() => saveAgentStateAsync(updatedState));
+      yield* Effect.promise(() => saveAgentRuntimeState(id, {
+        state: 'stopped',
+        lastActivity: new Date().toISOString(),
+      }));
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.pause_requested', { reason }));
+    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+      type: 'agent.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: buildAgentControlEventPayload(updatedState, previousStatus),
+    })));
+
+    invalidateAgentsCache();
+    return jsonResponse({ success: true, agent: updatedState });
+  })),
+);
+
+// ─── Route: POST /api/agents/:id/unpause ──────────────────────────────────────
+
+const postAgentUnpauseRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/unpause',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
+    }
+
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const eventStore = yield* EventStoreService;
+
+    const stateBeforeUnpause = yield* Effect.promise(() => getAgentStateAsync(id));
+    if (!stateBeforeUnpause) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    const updatedState = yield* Effect.promise(() => clearAgentPausedAsync(id));
+    if (!updatedState) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.unpause_requested'));
+    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+      type: 'agent.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: buildAgentControlEventPayload(updatedState, toAgentStatusPayload(stateBeforeUnpause.status)),
+    })));
+
+    invalidateAgentsCache();
+    return jsonResponse({ success: true, agent: updatedState });
+  })),
+);
+
+// ─── Route: POST /api/agents/:id/untroubled ───────────────────────────────────
+
+const postAgentUntroubledRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/untroubled',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
+    }
+
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const eventStore = yield* EventStoreService;
+
+    const stateBeforeClear = yield* Effect.promise(() => getAgentStateAsync(id));
+    if (!stateBeforeClear) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    const updatedState = yield* Effect.promise(() => clearAgentTroubledAsync(id));
+    if (!updatedState) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.untroubled_requested'));
+    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+      type: 'agent.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: buildAgentControlEventPayload(updatedState, toAgentStatusPayload(stateBeforeClear.status)),
+    })));
+
+    invalidateAgentsCache();
+    return jsonResponse({ success: true, agent: updatedState });
+  })),
+);
+
 // ─── Route: POST /api/agents/:id/resume ──────────────────────────────────────
 
 const postAgentResumeRoute = HttpRouter.add(
@@ -1370,7 +1699,7 @@ const postAgentResumeRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     // Snapshot lifecycle state BEFORE taking any action so callers can see the
     // temporal context (why was this resume allowed) without recomputing state.
-    const lifecycleBefore = getWorkAgentLifecycleState(id);
+    const lifecycleBefore = yield* Effect.promise(() => getWorkAgentLifecycleStateAsync(id));
     if (!lifecycleBefore.canResumeSession && !lifecycleBefore.isRunningButStuck) {
       return jsonResponse({
         error: lifecycleBefore.reason || `Cannot resume agent ${lifecycleBefore.agentId}`,
@@ -1417,7 +1746,7 @@ const postAgentResumeRoute = HttpRouter.add(
       return jsonResponse({
         success: true,
         resumed: true,
-        lifecycle: { before: lifecycleBefore, after: getWorkAgentLifecycleState(id) },
+        lifecycle: { before: lifecycleBefore, after: yield* Effect.promise(() => getWorkAgentLifecycleStateAsync(id)) },
       });
     } else {
       yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_failed', {
@@ -1426,7 +1755,7 @@ const postAgentResumeRoute = HttpRouter.add(
       }));
       return jsonResponse({
         error: result.error,
-        lifecycle: { before: lifecycleBefore, after: getWorkAgentLifecycleState(id) },
+        lifecycle: { before: lifecycleBefore, after: yield* Effect.promise(() => getWorkAgentLifecycleStateAsync(id)) },
       }, { status: 400 });
     }
   })),
@@ -1484,7 +1813,7 @@ const postAgentRestartRoute = HttpRouter.add(
           const result = await restartAgent(id, { model: restartModel, harness, graceful: true, message });
 
           if (result.success) {
-            const updatedState = getAgentState(id);
+            const updatedState = await getAgentStateAsync(id);
             await Effect.runPromise(eventStore.append({
               type: 'agent.started',
               timestamp: new Date().toISOString(),
@@ -1861,6 +2190,16 @@ const postAgentsRoute = HttpRouter.add(
 
     const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
+    const startGateBlock = evaluateAgentStartGate(agentSessionName, yield* Effect.promise(() => getAgentStateAsync(agentSessionName)));
+    if (startGateBlock) {
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_gate', {
+        issueId,
+        paused: startGateBlock.paused,
+        troubled: startGateBlock.troubled,
+        reason: startGateBlock.error,
+      }));
+      return jsonResponse(startGateBlock, { status: 409 });
+    }
 
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
     const isRemote = workspaceMetadata?.location === 'remote';
@@ -2326,7 +2665,7 @@ const postAgentsRoute = HttpRouter.add(
       role,
     }));
 
-    const agentLifecycle = getWorkAgentLifecycleState(agentSessionName);
+    const agentLifecycle = yield* Effect.promise(() => getWorkAgentLifecycleStateAsync(agentSessionName));
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_lifecycle_evaluated', {
       issueId,
       lifecycle: agentLifecycle,
@@ -2922,7 +3261,7 @@ const getAgentHasSessionRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    const lifecycle = getWorkAgentLifecycleState(id);
+    const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleStateAsync(id));
     return jsonResponse({
       hasSession: lifecycle.canResumeSession,
       lifecycle,
@@ -2942,7 +3281,7 @@ const postAgentResetSessionRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    const lifecycle = getWorkAgentLifecycleState(id);
+    const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleStateAsync(id));
     const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found`, lifecycle }, { status: 404 });
@@ -2952,7 +3291,7 @@ const postAgentResetSessionRoute = HttpRouter.add(
       return jsonResponse({ error: `Agent ${id} is running. Stop it first.`, lifecycle }, { status: 409 });
     }
 
-    const previousSessionId = getLatestSessionId(id);
+    const previousSessionId = yield* Effect.promise(() => getLatestSessionIdAsync(id));
     if (!previousSessionId) {
       return jsonResponse({ error: `Agent ${id} has no saved session to reset`, lifecycle }, { status: 404 });
     }
@@ -2993,7 +3332,7 @@ const postAgentResetSessionRoute = HttpRouter.add(
 
     console.log(`[reset-session] Cleared session for ${id} (was: ${previousSessionId.slice(0, 8)}...)`);
     invalidateAgentsCache();
-    return jsonResponse({ success: true, agentId: id, previousSessionId, lifecycle: getWorkAgentLifecycleState(id) });
+    return jsonResponse({ success: true, agentId: id, previousSessionId, lifecycle: yield* Effect.promise(() => getWorkAgentLifecycleStateAsync(id)) });
   })),
 );
 
@@ -3067,7 +3406,7 @@ const postAgentSwitchModelRoute = HttpRouter.add(
     }
 
     const previousModel = agentState.model ?? '';
-    const lifecycle = getWorkAgentLifecycleState(id);
+    const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleStateAsync(id));
 
     // Stop running agent if alive
     if (lifecycle.hasLiveTmuxSession) {
@@ -3135,6 +3474,9 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentFilesRoute,
   getAgentTimelineRoute,
   postAgentSuspendRoute,
+  postAgentPauseRoute,
+  postAgentUnpauseRoute,
+  postAgentUntroubledRoute,
   postAgentResumeRoute,
   postAgentRestartRoute,
   getAgentCloisterHealthRoute,

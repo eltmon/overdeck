@@ -39,6 +39,7 @@ import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtime
 import { assertIssueHasBeads } from './beads-query.js';
 import { getWorkspaceStackHealth } from './workspace/stack-health.js';
 import { normalizeModelOverride, requireModelOverride, shellQuoteModelId } from './model-validation.js';
+import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.js';
 
 const execAsync = promisify(exec);
 
@@ -545,6 +546,17 @@ export interface AgentState {
    *  resume. Read by deacon's autoResumeStoppedWorkAgents to distinguish a
    *  deliberate stop from a crash/orphan. */
   stoppedByUser?: boolean;
+  stoppedByPause?: boolean;
+  paused?: boolean;
+  pausedReason?: string;
+  pausedAt?: string;
+  troubled?: boolean;
+  troubledAt?: string;
+  consecutiveFailures?: number;
+  firstFailureInRunAt?: string;
+  lastFailureAt?: string;
+  lastFailureReason?: string;
+  lastFailureNextRetryAt?: string;
   branch?: string; // Git branch name for this agent
   costSoFar?: number;
   sessionId?: string; // For resuming sessions after handoff
@@ -611,6 +623,17 @@ function cleanAgentState(raw: AgentState): AgentState {
     lastActivity: raw.lastActivity,
     stoppedAt: raw.stoppedAt,
     stoppedByUser: raw.stoppedByUser,
+    stoppedByPause: raw.stoppedByPause,
+    paused: raw.paused,
+    pausedReason: raw.pausedReason,
+    pausedAt: raw.pausedAt,
+    troubled: raw.troubled,
+    troubledAt: raw.troubledAt,
+    consecutiveFailures: raw.consecutiveFailures,
+    firstFailureInRunAt: raw.firstFailureInRunAt,
+    lastFailureAt: raw.lastFailureAt,
+    lastFailureReason: raw.lastFailureReason,
+    lastFailureNextRetryAt: raw.lastFailureNextRetryAt,
     branch: raw.branch,
     costSoFar: raw.costSoFar,
     sessionId: raw.sessionId,
@@ -717,6 +740,208 @@ export async function saveAgentStateAsync(state: AgentState): Promise<void> {
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateAsync)`);
   }
+}
+
+function clearFailureTrackingFields(state: AgentState): void {
+  state.consecutiveFailures = 0;
+  delete state.firstFailureInRunAt;
+  delete state.lastFailureAt;
+  delete state.lastFailureReason;
+  delete state.lastFailureNextRetryAt;
+}
+
+/** Sets the persistent manual pause gate used before stopping or suppressing resume. */
+function applyAgentPaused(state: AgentState, reason?: string, stoppedByPause = false): void {
+  if (!state.paused) {
+    state.pausedAt = new Date().toISOString();
+  }
+  state.paused = true;
+  if (stoppedByPause) {
+    state.stoppedByPause = true;
+  }
+  if (reason === undefined) {
+    delete state.pausedReason;
+  } else {
+    state.pausedReason = reason;
+  }
+}
+
+/** Sets the persistent manual pause gate used before stopping or suppressing resume. */
+export function setAgentPaused(agentId: string, reason?: string, stoppedByPause = false): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+
+  applyAgentPaused(state, reason, stoppedByPause);
+  saveAgentState(state);
+  return true;
+}
+
+/** Sets the persistent manual pause gate using async filesystem operations. */
+export async function setAgentPausedAsync(agentId: string, reason?: string, stoppedByPause = false): Promise<AgentState | null> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return null;
+
+  applyAgentPaused(state, reason, stoppedByPause);
+  await saveAgentStateAsync(state);
+  return state;
+}
+
+function applyAgentUnpaused(state: AgentState): void {
+  if (state.stoppedByPause === true) {
+    delete state.stoppedByUser;
+  }
+  delete state.stoppedByPause;
+  delete state.paused;
+  delete state.pausedReason;
+  delete state.pausedAt;
+}
+
+function isAgentPauseClear(state: AgentState): boolean {
+  return !state.paused && state.pausedReason === undefined && state.pausedAt === undefined;
+}
+
+/** Clears the persistent manual pause gate without spawning the agent. */
+export function clearAgentPaused(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+  if (isAgentPauseClear(state)) return true;
+
+  applyAgentUnpaused(state);
+  saveAgentState(state);
+  return true;
+}
+
+/** Clears the persistent manual pause gate using async filesystem operations. */
+export async function clearAgentPausedAsync(agentId: string): Promise<AgentState | null> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return null;
+  if (isAgentPauseClear(state)) return state;
+
+  applyAgentUnpaused(state);
+  await saveAgentStateAsync(state);
+  return state;
+}
+
+/** Marks an agent as troubled after repeated resume failures. */
+export function markAgentTroubled(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+
+  if (!state.troubled) {
+    state.troubledAt = new Date().toISOString();
+  }
+  state.troubled = true;
+  saveAgentState(state);
+  return true;
+}
+
+function isAgentTroubledClear(state: AgentState): boolean {
+  return !state.troubled && state.troubledAt === undefined && (state.consecutiveFailures ?? 0) === 0 && state.firstFailureInRunAt === undefined && state.lastFailureAt === undefined && state.lastFailureReason === undefined && state.lastFailureNextRetryAt === undefined;
+}
+
+function applyAgentUntroubled(state: AgentState): void {
+  delete state.troubled;
+  delete state.troubledAt;
+  clearFailureTrackingFields(state);
+}
+
+/** Clears the troubled gate and its accumulated failure state. */
+export function clearAgentTroubled(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+  if (isAgentTroubledClear(state)) return true;
+
+  applyAgentUntroubled(state);
+  saveAgentState(state);
+  return true;
+}
+
+/** Clears the troubled gate and accumulated failure state using async filesystem operations. */
+export async function clearAgentTroubledAsync(agentId: string): Promise<AgentState | null> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return null;
+  if (isAgentTroubledClear(state)) return state;
+
+  applyAgentUntroubled(state);
+  await saveAgentStateAsync(state);
+  return state;
+}
+
+function applyAgentFailure(state: AgentState, reason: string): void {
+  const config = resolveAutoResumeConfigForIssue(state.issueId);
+  const nowMs = Date.now();
+  const now = new Date(nowMs).toISOString();
+  const firstFailureMs = Date.parse(state.firstFailureInRunAt ?? '');
+  const hasValidFirstFailure = Number.isFinite(firstFailureMs);
+  const windowElapsed = hasValidFirstFailure
+    && nowMs - firstFailureMs > config.troubledWindowMs;
+
+  if (windowElapsed || !hasValidFirstFailure) {
+    state.consecutiveFailures = 1;
+    state.firstFailureInRunAt = now;
+  } else {
+    state.consecutiveFailures = (state.consecutiveFailures ?? 0) + 1;
+  }
+
+  const backoffSeconds = config.failureBackoffSchedule[
+    Math.min(state.consecutiveFailures - 1, config.failureBackoffSchedule.length - 1)
+  ];
+  state.lastFailureAt = now;
+  state.lastFailureReason = reason;
+  state.lastFailureNextRetryAt = new Date(nowMs + backoffSeconds * 1000).toISOString();
+
+  const firstFailureInRunMs = Date.parse(state.firstFailureInRunAt ?? '');
+  const shouldMarkTroubled = state.consecutiveFailures >= config.maxConsecutiveFailures
+    && Number.isFinite(firstFailureInRunMs)
+    && nowMs - firstFailureInRunMs <= config.troubledWindowMs;
+
+  if (shouldMarkTroubled) {
+    if (!state.troubled) {
+      state.troubledAt = now;
+    }
+    state.troubled = true;
+  }
+}
+
+/** Records one failed resume/crash observation for later backoff and troubled gating. */
+export function recordAgentFailure(agentId: string, reason: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+
+  applyAgentFailure(state, reason);
+  saveAgentState(state);
+  return true;
+}
+
+/** Records one failed resume/crash observation using async filesystem operations. */
+export async function recordAgentFailureAsync(agentId: string, reason: string): Promise<AgentState | null> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return null;
+
+  applyAgentFailure(state, reason);
+  await saveAgentStateAsync(state);
+  return state;
+}
+
+/** Resets failure tracking after an agent reaches running state. */
+export function resetAgentFailureCount(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+  if ((state.consecutiveFailures ?? 0) === 0 && state.firstFailureInRunAt === undefined && state.lastFailureAt === undefined && state.lastFailureReason === undefined && state.lastFailureNextRetryAt === undefined) return true;
+
+  clearFailureTrackingFields(state);
+  saveAgentState(state);
+  return true;
+}
+
+/** Reports whether callers should block start, resume, auto-resume, or message delivery on the manual pause gate. */
+export function isAgentPaused(agentId: string): boolean {
+  return getAgentState(agentId)?.paused === true;
+}
+
+/** Reports whether callers should block start, resume, auto-resume, or message delivery on the troubled gate. */
+export function isAgentTroubled(agentId: string): boolean {
+  return getAgentState(agentId)?.troubled === true;
 }
 
 /** Update just the delivery method on an agent's state file. */
@@ -1156,10 +1381,32 @@ export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
   console.log(`[${agentId}] channels:dismiss:dialog-not-detected`);
 }
 
+function getAgentResumeGateBlockReason(state: Pick<AgentState, 'paused' | 'pausedReason' | 'troubled' | 'consecutiveFailures'>): string | undefined {
+  if (state.paused === true) {
+    return state.pausedReason
+      ? `agent is paused (${state.pausedReason})`
+      : 'agent is paused';
+  }
+  if (state.troubled === true) {
+    const failures = state.consecutiveFailures ?? 0;
+    return `agent is troubled (${failures} failure${failures === 1 ? '' : 's'})`;
+  }
+  return undefined;
+}
+
+function assertAgentCanTransitionToRunning(state: AgentState): void {
+  const reason = getAgentResumeGateBlockReason(state);
+  if (reason) {
+    throw new Error(`Cannot run ${state.id}: ${reason}. Clear the gate before resuming.`);
+  }
+}
+
 function markAgentRunning(state: AgentState): void {
+  assertAgentCanTransitionToRunning(state);
   const oldStatus = state.status;
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
+  clearFailureTrackingFields(state);
   delete state.stoppedAt;
   // Clear user-stop intent so a later crash/orphan can be auto-resumed. Without
   // this the flag is sticky across the stop→resume→crash sequence and autoResume
@@ -1444,6 +1691,22 @@ export function getLatestSessionId(agentId: string): string | null {
   }
 
   return null;
+}
+
+export async function getLatestSessionIdAsync(agentId: string): Promise<string | null> {
+  const agentDir = getAgentDir(agentId);
+  try {
+    const sessionId = (await readFile(join(agentDir, 'session.id'), 'utf8')).trim();
+    if (sessionId) return sessionId;
+  } catch { /* non-fatal */ }
+
+  try {
+    const sessions = JSON.parse(await readFile(join(agentDir, 'sessions.json'), 'utf8'));
+    if (Array.isArray(sessions) && sessions.length > 0) return sessions[sessions.length - 1];
+  } catch { /* non-fatal */ }
+
+  const runtimeState = await getAgentRuntimeStateAsync(agentId);
+  return runtimeState?.claudeSessionId ?? null;
 }
 
 export interface SpawnOptions {
@@ -2077,8 +2340,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
-  state.status = 'running';
-  state.lastActivity = new Date().toISOString();
+  markAgentRunning(state);
 
   // Stamp the workspace HEAD this role run was launched against. The reactive
   // scheduler uses this to tell a still-relevant run from a zombie session
@@ -2626,8 +2888,26 @@ export async function stopAgentAsync(agentId: string): Promise<void> {
   });
 }
 
+function queueAgentMail(agentId: string, message: string): void {
+  const mailDir = join(getAgentDir(agentId), 'mail');
+  mkdirSync(mailDir, { recursive: true });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  writeFileSync(
+    join(mailDir, `${timestamp}.md`),
+    `# Message\n\n${message}\n`
+  );
+}
+
 export async function messageAgent(agentId: string, message: string): Promise<void> {
   const normalizedId = normalizeAgentId(agentId);
+  const agentState = getAgentState(normalizedId);
+  const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+  if (gateBlockReason) {
+    queueAgentMail(normalizedId, message);
+    logAgentLifecycle(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
+    console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
+    return;
+  }
 
   // Check if agent is suspended - auto-resume if so (PAN-80)
   const runtimeState = getAgentRuntimeState(normalizedId);
@@ -2657,20 +2937,13 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   // `remain-on-exit on` so the shell persists after the agent process exits, and
   // sessionExists() returns true for that dead shell. resumeAgent() kills the zombie
   // session before re-creating it.
-  const agentState = getAgentState(normalizedId);
   if (agentState && agentState.status === 'stopped') {
     console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${await sessionExistsAsync(normalizedId)})`);
 
     const resumeResult = await resumeAgent(normalizedId, message);
 
     // Save to mail queue regardless so the agent can re-read feedback if needed
-    const mailDir = join(getAgentDir(normalizedId), 'mail');
-    mkdirSync(mailDir, { recursive: true });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    writeFileSync(
-      join(mailDir, `${timestamp}.md`),
-      `# Message\n\n${message}\n`
-    );
+    queueAgentMail(normalizedId, message);
 
     if (resumeResult.success && resumeResult.messageDelivered !== false) {
       console.log(`[agents] Resumed ${normalizedId} and delivered feedback`);
@@ -2774,13 +3047,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     await sendToRemoteAgent(normalizedId, remoteState.vmName, message);
 
     // Also save to mail queue for persistence
-    const mailDir = join(getAgentDir(normalizedId), 'mail');
-    mkdirSync(mailDir, { recursive: true });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    writeFileSync(
-      join(mailDir, `${timestamp}.md`),
-      `# Message\n\n${message}\n`
-    );
+    queueAgentMail(normalizedId, message);
     return;
   }
 
@@ -2816,14 +3083,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   await deliverAgentMessage(normalizedId, message, 'messageAgent:pan-tell', deliveryMethod);
 
   // Also save to mail queue
-  const mailDir = join(getAgentDir(normalizedId), 'mail');
-  mkdirSync(mailDir, { recursive: true });
-
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  writeFileSync(
-    join(mailDir, `${timestamp}.md`),
-    `# Message\n\n${message}\n`
-  );
+  queueAgentMail(normalizedId, message);
 }
 
 /**
@@ -2844,6 +3104,12 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
   const runtimeState = getAgentRuntimeState(normalizedId);
   const agentState = getAgentState(normalizedId);
+  const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+  if (gateBlockReason) {
+    const reason = `Cannot resume ${normalizedId}: ${gateBlockReason}. Clear the gate before resuming.`;
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+    return { success: false, error: reason };
+  }
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
   const isPlaceholder = !!agentState && agentState.status === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
   const allowedRuntimeStates = ['suspended', 'idle'];
@@ -3041,6 +3307,12 @@ export async function restartAgent(
   if (!agentState) {
     return { success: false, error: `Agent ${normalizedId} not found` };
   }
+  const gateBlockReason = getAgentResumeGateBlockReason(agentState);
+  if (gateBlockReason) {
+    const reason = `Cannot restart ${normalizedId}: ${gateBlockReason}. Clear the gate before restarting.`;
+    logAgentLifecycle(normalizedId, `restartAgent BLOCKED: ${reason}`);
+    return { success: false, error: reason };
+  }
   if (!agentState.workspace || !existsSync(agentState.workspace)) {
     return { success: false, error: `Agent workspace missing: ${agentState.workspace}` };
   }
@@ -3201,6 +3473,11 @@ export async function recoverAgent(
 
   // Runtime state files may lack required fields (PAN-150)
   if (!state.id) state.id = normalizedId;
+  const gateBlockReason = getAgentResumeGateBlockReason(state);
+  if (gateBlockReason) {
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: Cannot recover ${normalizedId}: ${gateBlockReason}. Clear the gate before recovering.`);
+    return null;
+  }
   const modelOverride = normalizeModelOverride(opts.modelOverride);
   if (modelOverride) {
     state.model = modelOverride;

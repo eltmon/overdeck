@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-457",
   "created": "2026-05-06T02:00:42.665Z",
-  "updated": "2026-05-17T02:16:11.086Z",
+  "updated": "2026-05-17T04:52:05.385Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,7 +214,45 @@
       "reason": "feedback",
       "note": "[2026-05-17T01:57Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-05-17T01:57:10.229Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T02:27Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T02:27:29.229Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T02:44Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-17T02:44:50.548Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T03:03Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T03:03:38.777Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T03:38Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T03:38:03.771Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T04:09Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T04:09:59.722Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T04:52Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T04:52:05.385Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-17T04:52:05Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-457\n\n# PAN-457 Review Synthesis — 2026-05-17\n\n## Verdict: BLOCKED\n\nThe feature is substantially implemented — storage, scanning, correlation, CLI, search, enrichment, embeddings, RPC wiring, and dashboard UI are all present and passing typecheck/lint/tests and browser UAT. However, two correctness bugs and four requirements gaps prevent approval.\n\n---\n\n## Security — PASS (no findings)\n\nNo security blockers. Auth/origin validation, SQL bound parameters, secret redaction, and React-safe rendering all verified.\n\n---\n\n## Correctness — BLOCKED (2 findings)\n\n### C-1: Unchanged scans never refresh Panopticon correlation metadata — `scanner.ts:213`\n\n`correlationMap` is built from current `conversations`/`cost_events` rows at `scanner.ts:186`, but the unchanged-file early return at `scanner.ts:213-227` skips the later upsert where `panopticonManaged`, `panIssueId`, and `panAgentId` are written. Sessions indexed before their matching Panopticon rows exist will never get correlation metadata, even on subsequent scans.\n\n**Fix:** Move correlation resolution before the unchanged-file skip, or re-upsert when correlation fields differ.\n\n### C-2: Claude cache usage tokens are ignored — `jsonl-async.ts:157`\n\n`parseSessionJsonl()` only sums `input_tokens` and `output_tokens` at `jsonl-async.ts:157-162`, dropping `cache_creation_input_tokens` and `cache_read_input_tokens` that the cost subsystem already handles as billable. Indexed token totals and cost estimates are undercounted for cached sessions.\n\n**Fix:** Include cache read/write tokens in `SessionMetadata.tokenInput` or persist them separately and fold into `estimateCost()`.\n\n---\n\n## Performance — PASS (no blocking findings)\n\nFour non-blocking advisories: semantic search holds the single read worker during embedding latency; scan upserts are un-batched; enrichment limit is applied after materializing all rows; keyword search fires on every keystroke. None rise to blocking.\n\n---\n\n## Requirements — BLOCKED (4 must-have gaps)\n\n### R-1: Dashboard Sessions UI missing tag/tool/file filters\n\nThe vBRIEF narrative requires filtering by `workspace`, `model`, `managed`, `tag`, `tool`, `file`, and `since`. The frontend only exposes workspace, since, managed, enriched, model, min/maxCost, and enrichmentLevel. CLI and server search support tag/tool/file, but the dashboard UI does not wire them.\n\n### R-2: Session detail drawer missing files_touched display\n\n`files_touched` is parsed, persisted, and included in FTS, but `SessionDetail.tsx` has no visible files-touched rendering. Users cannot see what a session touched from the dashboard.\n\n### R-3: Per-workspace discovered-session schema initialization not confirmed\n\n`initDiscoveredSessionsSchema(db)` covers the main DB path. `initWorkspaceDiscoveredSessionsSchema(db)` exists but was not confirmed invoked in the workspace DB startup path.\n\n### R-4: Dashboard enrichment UI missing custom model selection\n\nCLI and backend support `--with <model>` override, but the dashboard detail flow only exposes L1/L2/L3/Embed controls. Browser UAT confirms the tier buttons but no custom model input.\n\n---\n\n## Non-blocking Notes (from individual reviews)\n\n- **Correctness:** `NotebookEdit` uses `notebook_path` but file_path/path check misses it from files_touched; Ollama IPv6 localhost regex only accepts unbracketed `::1`.\n- **Performance:** Semantic search holds the read worker across embedding latency; scan upserts are un-batched; enrichment limit applied after full materialization; keyword search fires on every keystroke.\n- **Requirements:** Cost aggregation day/month grouping may be CLI-help drift; embedding dimension assertions not confirmed in tests.\n\n---\n\n## Minimum closure set\n\n1. Fix scanner.ts: move correlation refresh before unchanged-file skip (C-1)\n2. Fix jsonl-async.ts: include cache read/write tokens in token totals (C-2)\n3. Wire `initWorkspaceDiscoveredSessionsSchema()` into workspace DB startup (R-3)\n4. Add dashboard tag/tool/file filter controls and search wiring (R-1)\n5. Expose `files_touched` in session detail drawer (R-2)\n6. Add dashboard custom model enrichment control, or document it as CLI-only (R-4)\n\n---\n\n## Reviewer signals received\n\n- security: REVIEWER_READY @ 2026-05-17T04:58:00Z — PASS\n- correctness: REVIEWER_READY @ 2026-05-17T00:00:00Z — BLOCKED\n- performance: REVIEWER_READY @ 2026-05-17T05:12:00Z — PASS\n- requirements: REVIEWER_READY @ 2026-05-17T05:15:00Z — BLOCKED\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-457/.pan/review/agent-pan-457-review-46035914/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-457 -m \"Fixed review issues\"`"
+    }
+  ]
 }

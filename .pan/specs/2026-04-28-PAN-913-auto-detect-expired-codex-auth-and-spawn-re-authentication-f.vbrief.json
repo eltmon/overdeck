@@ -4,7 +4,7 @@
     "created": "2026-04-28T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-913: Auto-detect expired Codex auth and spawn re-authentication flow",
-    "updated": "2026-04-29T01:13:23.141Z"
+    "updated": "2026-05-17T20:27:06.820Z"
   },
   "plan": {
     "id": "pan-913",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "40c9183c-d3c9-4f28-ba43-2eb1ae4b4287",
     "author": "agent:claude-opus-4-6",
-    "sequence": 50,
+    "sequence": 124,
     "created": "2026-04-28T18:00:00Z",
-    "updated": "2026-04-29T01:13:23.141Z",
+    "updated": "2026-05-17T20:27:06.820Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/913",
@@ -541,7 +541,70 @@
         "to": "documentation",
         "type": "informs"
       }
-    ]
+    ],
+    "metadata": {
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-913",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-17T20:27:06.820Z",
+        "work": {
+          "updatedAt": "2026-05-17T20:27:06.820Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-17T20:27:06.820Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-17T20:27:06.820Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "blocked",
+          "updatedAt": "2026-05-17T20:27:06.820Z",
+          "notes": "pan done open-bead gate passes on bd list timeout, can advance incomplete work to review",
+          "history": [
+            {
+              "status": "blocked",
+              "at": "2026-05-17T20:27:06.820Z",
+              "notes": "pan done open-bead gate passes on bd list timeout, can advance incomplete work to review"
+            }
+          ],
+          "approval": "changes_requested"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-17T20:27:06.820Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-17T20:27:06.820Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-17T20:27:06.820Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-17T20:27:06.820Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-17T20:27:06.820Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/916"
+        }
+      }
+    }
   },
   "status": "proposed"
 }

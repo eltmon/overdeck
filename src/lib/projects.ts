@@ -10,6 +10,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { PANOPTICON_HOME } from './paths.js';
 import { extractPrefix, parseIssueId } from './issue-id.js';
 import type { QualityGateConfig, RepoConfig } from './workspace-config.js';
+import type { AutoResumeConfig } from './cloister/auto-resume-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(PANOPTICON_HOME, 'projects.yaml');
 
@@ -114,6 +115,8 @@ export interface ProjectConfig {
   rally_project?: string;
   /** Specialist agent configuration */
   specialists?: SpecialistConfig;
+  /** Per-project auto-resume failure tracking and backoff overrides */
+  autoResume?: Partial<AutoResumeConfig>;
   /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
   quality_gates?: Record<string, QualityGateConfig>;
   /** Package manager for dependency installation in workspaces (bun, npm, pnpm) */
