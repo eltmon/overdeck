@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -288,6 +288,43 @@ describe('doneCommand dashboard-unreachable graceful path', () => {
 
     // Should not throw — dashboard unreachable is handled gracefully
     await expect(doneCommand('PAN-714', { force: true })).resolves.not.toThrow();
+  });
+
+  it('does not rewrite continue.json when the latest end entry already matches', async () => {
+    mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
+    mockExecFn.mockImplementation((_cmd: string, _opts: unknown, cb: Function) => {
+      cb(null, { stdout: '[]', stderr: '' });
+    });
+    mockShouldSkipTrackerUpdate.mockResolvedValue(true);
+    mockUpdateShadowState.mockResolvedValue(undefined);
+    mockGetDashboardApiUrl.mockReturnValue('http://localhost:19999');
+
+    const panDir = join(tempDir, '.pan');
+    mkdirSync(panDir, { recursive: true });
+    const continuePath = join(panDir, 'continue.json');
+    writeFileSync(continuePath, JSON.stringify({
+      version: '1',
+      issueId: 'PAN-714',
+      created: '2026-01-01T00:00:00.000Z',
+      updated: '2026-01-01T00:00:00.000Z',
+      gitState: {},
+      decisions: [],
+      hazards: [],
+      resumePoint: null,
+      beadsMapping: {},
+      sessionHistory: [{
+        timestamp: '2026-01-01T00:00:00.000Z',
+        reason: 'end',
+        note: 'Agent signaled work complete',
+      }],
+      feedback: [],
+    }, null, 2));
+    const before = readFileSync(continuePath, 'utf-8');
+
+    const { doneCommand } = await import('../../../../src/cli/commands/done.js');
+    await doneCommand('PAN-714', { force: true });
+
+    expect(readFileSync(continuePath, 'utf-8')).toBe(before);
   });
 
   it('does not skip review when stored merged status is stale', async () => {

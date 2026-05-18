@@ -427,18 +427,22 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     try {
       const continueState = readWorkspaceContinue(workspacePath);
       if (continueState) {
-        const now = new Date().toISOString();
-        writeWorkspaceContinue(workspacePath, {
-          ...continueState,
-          sessionHistory: [
-            ...continueState.sessionHistory,
-            {
-              timestamp: now,
-              reason: 'end',
-              note: options.comment || 'Agent signaled work complete',
-            },
-          ],
-        });
+        const note = options.comment || 'Agent signaled work complete';
+        const lastEntry = continueState.sessionHistory.at(-1);
+        if (lastEntry?.reason !== 'end' || lastEntry.note !== note) {
+          const now = new Date().toISOString();
+          writeWorkspaceContinue(workspacePath, {
+            ...continueState,
+            sessionHistory: [
+              ...continueState.sessionHistory,
+              {
+                timestamp: now,
+                reason: 'end',
+                note,
+              },
+            ],
+          });
+        }
       }
     } catch (continueErr: any) {
       console.warn(`[pan done] Failed to append end entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
