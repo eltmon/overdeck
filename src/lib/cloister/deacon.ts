@@ -3409,6 +3409,15 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
         }
       }
 
+      // PAN-1185: SWARM slot agents must NOT receive issue-level `pan done`
+      // nudges. They work on a single plan item; the issue-level done flow opens
+      // a premature feature → main PR. Detect slots by workspace path suffix
+      // `-slot-N/` — the workspace dir convention is stable across PAN-1176.
+      if (agentStateForGate?.workspace && /-slot-\d+\/?$/.test(agentStateForGate.workspace)) {
+        console.log(`[deacon] First-completion gate: skipping ${agent.id} — SWARM slot agent (workspace: ${agentStateForGate.workspace})`);
+        continue;
+      }
+
       // Check if the agent has commits (sign that work was done)
       const agentState = getAgentState(agent.id);
       if (!agentState?.workspace || !existsSync(agentState.workspace)) continue;
