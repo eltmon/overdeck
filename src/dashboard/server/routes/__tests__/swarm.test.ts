@@ -12,6 +12,7 @@ import * as vbriefIo from '../../../../lib/vbrief/io.js';
 import * as agents from '../../../../lib/agents.js';
 import * as tmux from '../../../../lib/tmux.js';
 import * as trackerUtils from '../../../../lib/tracker-utils.js';
+import * as activityLogger from '../../../../lib/activity-logger.js';
 
 const ghExecFileMock = vi.hoisted(() => vi.fn());
 
@@ -33,6 +34,10 @@ vi.mock('../../../../lib/projects.js', () => ({
 
 vi.mock('../../../../lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn(),
+}));
+
+vi.mock('../../../../lib/activity-logger.js', () => ({
+  emitActivityEntry: vi.fn(),
 }));
 
 // PAN-977: createSlotWorktree shells out to `git fetch`/`git worktree add`. The
@@ -784,6 +789,67 @@ describe('swarm route helpers', () => {
     expect(agents.spawnAgent).not.toHaveBeenCalled();
     const nextState = (await __testInternals.loadSwarmState('PAN-971'))!;
     expect(nextState.slots.some((s) => s.itemId === 'wave-1-item')).toBe(false);
+  });
+
+  it('halts auto-advance and emits one activity entry when a slot PR becomes failed-merge', async () => {
+    mockGhPrList([{ number: 1188, mergeable: false, mergeableState: 'CONFLICTING', state: 'OPEN', url: 'https://github.com/owner/repo/pull/1188' }]);
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    writeFileSync(swarmStatePath, JSON.stringify(baseSwarmState({ status: 'running' }), null, 2));
+
+    const { __testInternals } = await import('../swarm.js');
+    await __testInternals.pollSwarmAutoAdvance();
+    await __testInternals.pollSwarmAutoAdvance();
+    await __testInternals.pollSwarmAutoAdvance();
+
+    const failedState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(failedState.slots[0]).toMatchObject({
+      status: 'failed-merge',
+      prUrl: 'https://github.com/owner/repo/pull/1188',
+    });
+    expect(failedState.lastAutoAdvanceError).toContain('https://github.com/owner/repo/pull/1188');
+    expect(failedState.lastAutoAdvanceError).toContain('pan swarm recover PAN-971 1 --action <retry|drop|handoff>');
+    expect(failedState.autoAdvanceFailureCount).toBeGreaterThanOrEqual(1);
+    expect(activityLogger.emitActivityEntry).toHaveBeenCalledTimes(1);
+    expect(activityLogger.emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'ship',
+      level: 'error',
+      issueId: 'PAN-971',
+      message: expect.stringContaining('Swarm slot 1'),
+    }));
+  });
+
+  it('records a failed-merge error instead of looping forever on completed conflicting slots', async () => {
+    mockGhPrList([{ number: 1188, mergeable: false, mergeableState: 'CONFLICTING', state: 'OPEN', url: 'https://github.com/owner/repo/pull/1188' }]);
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    writeFileSync(swarmStatePath, JSON.stringify({
+      ...baseSwarmState({ consecutiveConflictCount: 1 }),
+      slots: [
+        {
+          ...baseSwarmState({ consecutiveConflictCount: 1 }).slots[0],
+        },
+        {
+          slot: 2,
+          itemId: 'already-merged',
+          itemTitle: 'Already merged sibling',
+          sessionName: 'agent-pan-971-2',
+          workspace: '/tmp/feature-pan-971-slot-2',
+          status: 'merged' as const,
+          phase: 'implementation' as const,
+        },
+      ],
+    }, null, 2));
+
+    const { __testInternals } = await import('../swarm.js');
+    await __testInternals.pollSwarmAutoAdvance();
+    await __testInternals.pollSwarmAutoAdvance();
+
+    const failedState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(failedState.slots[0]).toMatchObject({
+      status: 'failed-merge',
+      failureReason: 'PR #1188 not mergeable: CONFLICTING',
+    });
+    expect(failedState.lastAutoAdvanceError).toContain('Prepare slot input');
+    expect(agents.spawnAgent).not.toHaveBeenCalled();
   });
 
   // PAN-977 round-15 blocker: when a synthesis slot for itemX has completed

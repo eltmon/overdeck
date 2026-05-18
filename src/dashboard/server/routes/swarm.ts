@@ -30,6 +30,7 @@ import { readContinueStateAsync, writeContinueStateAsync, type ContinueState, ty
 import { getDispatchableItems, groupItemsByWave, hasFileOverlap, blockingParentCount, deriveSynthesisMetadata, applyTaskOperationToPlanFileAsync, compileGlob, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
 import type { VBriefDocument, VBriefItem } from '../../../lib/vbrief/types.js';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
+import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { normalizeModelOverride } from '../../../lib/model-validation.js';
 import { listSessionNamesAsync, isPaneDeadAsync, killSessionAsync, listPaneValuesAsync } from '../../../lib/tmux.js';
 
@@ -499,6 +500,50 @@ function recordAutoAdvanceFailure(state: SwarmState, error: string, now = Date.n
   };
 }
 
+function slotBranch(issueId: string, slotId: number): string {
+  return `feature/${issueId.toLowerCase()}-slot-${slotId}`;
+}
+
+function failedMergeMessage(state: SwarmState, slot: SlotAssignment): string {
+  const branch = slotBranch(state.issueId, slot.slot);
+  const pr = slot.prUrl ? ` PR ${slot.prUrl}` : '';
+  const reason = slot.failureReason ?? 'slot PR is not mergeable';
+  return `Swarm slot ${slot.slot} (${slot.itemTitle}) branch ${branch}${pr} unmergeable: ${reason}. Recover with: pan swarm recover ${state.issueId} ${slot.slot} --action <retry|drop|handoff>`;
+}
+
+function firstFailedSlot(state: SwarmState): SlotAssignment | undefined {
+  return state.slots.find((slot) => slot.status === 'failed' || slot.status === 'failed-merge');
+}
+
+function newlyFailedMergeSlots(before: SwarmState, after: SwarmState): SlotAssignment[] {
+  return after.slots.filter((slot, index) => slot.status === 'failed-merge' && before.slots[index]?.status !== 'failed-merge');
+}
+
+function emitFailedMergeTransitions(before: SwarmState, after: SwarmState): void {
+  for (const slot of newlyFailedMergeSlots(before, after)) {
+    emitActivityEntry({
+      source: 'ship',
+      level: 'error',
+      issueId: after.issueId,
+      message: failedMergeMessage(after, slot),
+    });
+  }
+}
+
+async function refreshSwarmRuntimeState(
+  state: SwarmState,
+  sessions?: string[],
+  projectPath?: string,
+): Promise<{ state: SwarmState; changed: boolean }> {
+  const statusRefresh = await refreshSwarmSlotStatuses(state, sessions);
+  const mergeabilityRefresh = await refreshSwarmSlotMergeability(statusRefresh.state, projectPath);
+  emitFailedMergeTransitions(state, mergeabilityRefresh.state);
+  return {
+    state: mergeabilityRefresh.state,
+    changed: statusRefresh.changed || mergeabilityRefresh.changed,
+  };
+}
+
 async function refreshSwarmSlotStatuses(
   state: SwarmState,
   sessions?: string[],
@@ -697,7 +742,7 @@ async function refreshSwarmSlotMergeability(
     targets,
     SWARM_PANE_CHECK_CONCURRENCY,
     async ({ index, slot }) => {
-      const branch = `feature/${issueLower}-slot-${slot.slot}`;
+      const branch = slotBranch(state.issueId, slot.slot);
       try {
         const { stdout } = await execFileAsync(
           'gh',
@@ -1612,7 +1657,8 @@ async function pollSwarmAutoAdvance(): Promise<void> {
     if (autoAdvanceInFlight.has(loadedState.issueId)) continue;
     if (isAutoAdvanceCoolingDown(loadedState)) continue;
 
-    const { state, changed } = await refreshSwarmSlotStatuses(loadedState, sessions);
+    const project = resolveProjectFromIssue(loadedState.issueId);
+    const { state, changed } = await refreshSwarmRuntimeState(loadedState, sessions, project?.projectPath);
     // PAN-977 round-13 blocker #1: persistence MUST run before any final-wave
     // cleanup so a freshly-observed completed/failed slot status survives a
     // dashboard restart, even on the very last polling tick. Previously the
@@ -1631,9 +1677,15 @@ async function pollSwarmAutoAdvance(): Promise<void> {
       }
     }
 
-    if (state.slots.some((slot) => slot.status === 'failed')) {
+    const failedSlot = firstFailedSlot(state);
+    if (failedSlot) {
       if (!state.autoAdvanceRetryAfter && !state.lastAutoAdvanceError) {
-        await saveSwarmState(recordAutoAdvanceFailure(state, 'One or more swarm slots failed before completion was confirmed.'));
+        await saveSwarmState(recordAutoAdvanceFailure(
+          state,
+          failedSlot.status === 'failed-merge'
+            ? failedMergeMessage(state, failedSlot)
+            : 'One or more swarm slots failed before completion was confirmed.',
+        ));
       }
       // Failed-slot handling runs BEFORE final-wave registry cleanup so the
       // operator sees the recorded failure before the swarm leaves the active
@@ -2226,7 +2278,8 @@ const getSwarmRoute = HttpRouter.add(
     }
 
     const sessions = yield* Effect.promise(() => listSessionNamesAsync());
-    const refreshed = yield* Effect.promise(() => refreshSwarmSlotStatuses(state, sessions));
+    const project = yield* Effect.promise(() => Promise.resolve(resolveProjectFromIssue(issueId)));
+    const refreshed = yield* Effect.promise(() => refreshSwarmRuntimeState(state, sessions, project?.projectPath));
     if (refreshed.changed) {
       yield* Effect.promise(async () => {
         // PAN-977 round-11 high-2: saveSwarmState is the single canonical

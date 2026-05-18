@@ -4,7 +4,7 @@
     "created": "2026-05-18T22:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1194: Swarm: no recovery when a slot's PR becomes unmergeable — auto-advance halts forever",
-    "updated": "2026-05-18T23:00:14.442Z"
+    "updated": "2026-05-18T23:06:43.722Z"
   },
   "plan": {
     "id": "pan-1194",
@@ -243,7 +243,7 @@
       {
         "id": "poll-integration",
         "title": "Wire `refreshSwarmSlotMergeability` into `pollSwarmAutoAdvance` and treat `failed-merge` as a failure for halt + error reporting",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T22:40:00.000Z",
         "metadata": {
@@ -259,7 +259,7 @@
           {
             "id": "poll-integration.ac1",
             "title": "`pollSwarmAutoAdvance` calls `refreshSwarmSlotMergeability` after `refreshSwarmSlotStatuses` and before the saveSwarmState persistence. A single saveSwarmState call writes both passes' changes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -267,7 +267,7 @@
           {
             "id": "poll-integration.ac2",
             "title": "The existing failed-slot branch at swarm.ts:1467 is extended to match `slot.status === 'failed' || slot.status === 'failed-merge'`. recordAutoAdvanceFailure is called with a slot-specific message naming the PR URL when present.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -275,7 +275,7 @@
           {
             "id": "poll-integration.ac3",
             "title": "Activity log emits exactly one entry per failed-merge transition (idempotent): `{ source: 'ship', level: 'error', issueId, message: 'Swarm slot <N> PR <prUrl> unmergeable: <reason>. Recover with: pan swarm recover <ISSUE> <N> --action <retry|drop|handoff>' }`. Subsequent polls observing the same already-transitioned slot do NOT re-emit.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -283,7 +283,7 @@
           {
             "id": "poll-integration.ac4",
             "title": "`/api/swarm/refresh` route (POST) calls `refreshSwarmSlotMergeability` after `refreshSwarmSlotStatuses` and persists via the same saveSwarmState path. Manual operator refresh observes the same failed-merge detection as the auto-advance poll.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -291,7 +291,7 @@
           {
             "id": "poll-integration.ac5",
             "title": "Unit test (vi.useFakeTimers()): seed a SwarmState with one running implementation slot, mock gh to return CONFLICTING for two consecutive polls, run two ticks of pollSwarmAutoAdvance, assert the slot is `failed-merge`, `lastAutoAdvanceError` is populated, `autoAdvanceFailureCount >= 1`, and exactly one activity log entry was emitted.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -299,7 +299,7 @@
           {
             "id": "poll-integration.ac6",
             "title": "Regression test: pre-fix scenario (slot stuck at `completed` with PR CONFLICTING, other slots `merged`, autoAdvance=true) results in the swarm being halted with a clear lastAutoAdvanceError instead of looping forever. Asserts that after N ticks the swarm has NOT dispatched a new wave AND has a recorded failure.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

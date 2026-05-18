@@ -2,10 +2,9 @@
   "version": "1",
   "issueId": "PAN-1194",
   "created": "2026-05-18T22:07:39.007Z",
-  "updated": "2026-05-18T23:00:14.442Z",
+  "updated": "2026-05-18T23:06:43.722Z",
   "gitState": {
     "branch": "feature/pan-1194",
-    "sha": "fa2cd33e6",
     "dirty": true
   },
   "decisions": [
@@ -108,8 +107,8 @@
     }
   ],
   "resumePoint": {
-    "description": "mergeability-detector bead workspace-pqxu implemented: refreshSwarmSlotMergeability is covered by targeted tests, typecheck, lint, and graphify update. Commit this bead, close it, then run required deep inspection before proceeding.",
-    "beadId": "workspace-pqxu",
+    "description": "poll-integration bead workspace-hpjl implemented: auto-advance and manual swarm refresh run mergeability detection before persistence/failure handling. Commit this bead, close it, then continue to the next ready bead because inspection is not required.",
+    "beadId": "workspace-hpjl",
     "filesToRead": [
       "src/dashboard/server/routes/swarm.ts",
       "src/dashboard/server/routes/__tests__/swarm.test.ts",
@@ -141,6 +140,12 @@
       "timestamp": "2026-05-18T23:00:14.442Z",
       "reason": "end",
       "note": "Implemented mergeability-detector: added refreshSwarmSlotMergeability with GitHub PR-state checks, failed-merge debounce/metadata handling, transient gh error handling, latest-slot-history targeting, and regression tests. Ran targeted swarm tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:06:43.722Z",
+      "reason": "end",
+      "note": "Implemented poll-integration: pollSwarmAutoAdvance and manual swarm state refresh now run refreshSwarmSlotMergeability after tmux status refresh and before a single saveSwarmState persist; failed-merge slots record a slot-specific auto-advance error and emit one ship/error activity entry per transition. Ran targeted swarm tests, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],
