@@ -1,0 +1,171 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-18T04:46:14.779Z",
+    "updated": "2026-05-18T05:57:14.921Z",
+    "author": "panopticon-cli/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-1170: TTS daemon lifecycle: install, start/stop, supervision",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-1170",
+    "title": "TTS daemon lifecycle: install, start/stop, supervision",
+    "status": "proposed",
+    "uid": "09723c30-56eb-49ab-bffb-a3c515c00a04",
+    "author": "panopticon-cli/auto-start",
+    "sequence": 29,
+    "created": "2026-05-18T04:46:14.779Z",
+    "updated": "2026-05-18T05:57:14.921Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1170",
+        "label": "PAN-1170",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-18-PAN-1170-tts-daemon-lifecycle-install-start-stop-supervision.vbrief.json",
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-1170",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-18T05:57:14.921Z",
+        "work": {
+          "updatedAt": "2026-05-18T05:57:14.921Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-18T05:57:14.921Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-18T05:57:14.921Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "blocked",
+          "updatedAt": "2026-05-18T05:57:14.921Z",
+          "notes": "Watchdog restarts daemon after intentional pan tts stop — tts.enabled used as auto-start signal instead of daemonAutoStart",
+          "history": [
+            {
+              "status": "blocked",
+              "at": "2026-05-18T05:57:14.921Z",
+              "notes": "Watchdog restarts daemon after intentional pan tts stop — tts.enabled used as auto-start signal instead of daemonAutoStart"
+            }
+          ],
+          "approval": "changes_requested"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-18T05:57:14.921Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-18T05:57:14.921Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-18T05:57:14.921Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-18T05:57:14.921Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-18T05:57:14.921Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1172"
+        }
+      }
+    },
+    "narratives": {
+      "Problem": "## Problem\n\nPAN-829 wired the dashboard's in-process TTS subscriber (\\`startTtsPlayback\\`) but left the **Qwen3-TTS HTTP daemon** (\\`skills/pan-tts/scripts/tts_daemon.py\\`) as a manual-start, undocumented dependency. Every TTS feature in Panopticon — activity TTS playback, voice sampling, voice preset previews, AutoPreso voice feedback — POSTs to that daemon at \\`daemonHost:daemonPort/speak\\`. If the daemon isn't running, every TTS path fails with \\`daemon-unavailable\\` / \\`TTS daemon unavailable\\` and the user has no path-of-least-resistance to fix it.\n\nTonight a user hit:\n- \\\"daemon is not running\\\" in the TTS status indicator\n- \\`{\\\"spoken\\\":false,\\\"result\\\":\\\"daemon-unavailable\\\",\\\"error\\\":\\\"TTS daemon unavailable\\\"}\\` when trying to sample a voice preset\n\nIn both cases the actual fix was \\`cd ~/Projects/qwen-tts && nohup .venv/bin/python /path/to/skills/pan-tts/scripts/tts_daemon.py &\\`. That is not discoverable, and the dependency on a separate \\`~/Projects/qwen-tts\\` venv outside the panopticon-cli repo is even worse.\n\n## Scope (single issue, all phases)\n\n### 1. Install\n- Move daemon Python deps under panopticon-cli (or under \\`packages/qwen-tts-linux-x64/\\` like the Moonshine sidecar) instead of \\`~/Projects/qwen-tts/\\`.\n- Add \\`pan install\\` step that creates the daemon venv and installs \\`qwen-tts\\`, \\`torch\\` (with CUDA bindings), \\`soundfile\\`, \\`numpy\\`. Heavy — should be skippable via \\`--skip-tts-daemon\\` (heavy because of CUDA torch ~5GB).\n- Optional: detect GPU and skip / warn if no CUDA available (daemon won't run usefully on CPU at the model's size).\n- On non-Linux platforms, skip with a clear message.\n\n### 2. Start / stop CLI\n- \\`pan tts start\\` — launches the daemon (foreground or detached via \\`--detach\\`), waits for \\`/health\\` to return ok before exiting.\n- \\`pan tts stop\\` — graceful SIGTERM → SIGKILL with PID tracked under \\`~/.panopticon/pids/qwen-tts.pid\\`.\n- \\`pan tts status\\` — reports daemon PID, port, model, queue depth, uptime, GPU memory used.\n- \\`pan tts restart\\` — wraps stop + start.\n- All commands honor \\`tts.daemonHost\\` and \\`tts.daemonPort\\` from config.\n\n### 3. Lifecycle integration\n- \\`pan up\\` optionally launches the daemon (gated by \\`tts.daemon.autoStart\\` in config — default off because of the cold-start cost and VRAM footprint).\n- Optional systemd user unit installer (\\`pan tts install-systemd\\`) for users who want auto-start on boot. Template lives in repo, \\`pan install\\` doesn't enable it by default.\n- Dashboard supervisor / watchdog (extend the \\`src/supervisor/watchdog.ts\\` pattern from PAN-1139) detects daemon crash and restarts (with backoff and a give-up threshold so a misconfigured GPU doesn't restart-loop forever).\n\n### 4. UI surface\n- Dashboard Settings → TTS tab: \\\"Daemon: running on cuda:0 (4.2GB VRAM) | model loaded\\\" with a \\\"Start daemon\\\" button when it's down.\n- Health badge in the sidebar (existing CloisterStatusBar already shows TTS — point it at the new status payload).\n\n### 5. Docs\n- Update \\`skills/pan-tts/SKILL.md\\` with the new CLI surface and remove the manual \\`cd skills/pan-tts/scripts && python tts_daemon.py\\` instruction (it survives as the lowest-level escape hatch).\n- Add to \\`docs/PANOPTICON_DEV_SOP.md\\` (the doc PAN-1139 created) so post-restart troubleshooting includes \\`pan tts status\\`.\n\n## Out of scope\n- Replacing Qwen3-TTS with a different model.\n- Cross-machine daemon hosting (the existing pan-tts SSE subscriber already handles that).\n- Browser-side fallback synthesis (Web Speech API) for voice samples — keep the daemon as the single audio path so previews match what users hear in production.\n\n## Acceptance\n\n- [ ] Fresh \\`pan install\\` on a Linux/CUDA machine produces a working daemon (\\`pan tts start\\` → \\`/api/tts/health\\` returns ok).\n- [ ] \\`pan tts start\\`, stop, status, restart all work and round-trip a single test phrase via \\`pan tts test\\`.\n- [ ] Dashboard Settings TTS tab shows live daemon status and offers a one-click \\\"Start daemon\\\" when it's down.\n- [ ] Crash + restart: kill the daemon process, watchdog brings it back within 30s.\n- [ ] \\`pan install --skip-tts-daemon\\` completes without touching CUDA torch.\n- [ ] Non-Linux platforms see a clear skip message during install (no failure).\n\n## Why now\n\nTonight's session blocked at two separate points on the missing daemon — first \\\"TTS broken\\\" diagnosis, then \\\"voice sampling broken\\\" diagnosis — each requiring manual investigation. With \\`pan tts start\\` and the supervisor, both paths self-heal.\n\n## Related\n- PAN-829 (TTS lifecycle, merged) — shipped the in-process subscriber but didn't own the synth daemon.\n- PAN-1139 (dashboard restart watchdog) — supervisor pattern to reuse here.\n- PAN-1162 (ship-role allowHost) — example of a small substrate fix that unblocks a recurring failure mode.",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-18T04:46:14.779Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1170",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Problem\n\nPAN-829 wired the dashboard's in-process TTS subscriber (\\`startTtsPlayback\\`) but left the **Qwen3-TTS HTTP daemon** (\\`skills/pan-tts/scripts/tts_daemon.py\\`) as a manual-start, undocumented dependency. Every TTS feature in Panopticon — activity TTS playback, voice sampling, voice preset previews, AutoPreso voice feedback — POSTs to that daemon at \\`daemonHost:daemonPort/speak\\`. If the daemon isn't running, every TTS path fails with \\`daemon-unavailable\\` / \\`TTS daemon unavailable\\` and the user has no path-of-least-resistance to fix it.\n\nTonight a user hit:\n- \\\"daemon is not running\\\" in the TTS status indicator\n- \\`{\\\"spoken\\\":false,\\\"result\\\":\\\"daemon-unavailable\\\",\\\"error\\\":\\\"TTS daemon unavailable\\\"}\\` when trying to sample a voice preset\n\nIn both cases the actual fix was \\`cd ~/Projects/qwen-tts && nohup .venv/bin/python /path/to/skills/pan-tts/scripts/tts_daemon.py &\\`. That is not discoverable, and the dependency on a separate \\`~/Projects/qwen-tts\\` venv outside the panopticon-cli repo is even worse.\n\n## Scope (single issue, all phases)\n\n### 1. Install\n- Move daemon Python deps under panopticon-cli (or under \\`packages/qwen-tts-linux-x64/\\` like the Moonshine sidecar) instead of \\`~/Projects/qwen-tts/\\`.\n- Add \\`pan install\\` step that creates the daemon venv and installs \\`qwen-tts\\`, \\`torch\\` (with CUDA bindings), \\`soundfile\\`, \\`numpy\\`. Heavy — should be skippable via \\`--skip-tts-daemon\\` (heavy because of CUDA torch ~5GB).\n- Optional: detect GPU and skip / warn if no CUDA available (daemon won't run usefully on CPU at the model's size).\n- On non-Linux platforms, skip with a clear message.\n\n### 2. Start / stop CLI\n- \\`pan tts start\\` — launches the daemon (foreground or detached via \\`--detach\\`), waits for \\`/health\\` to return ok before exiting.\n- \\`pan tts stop\\` — graceful SIGTERM → SIGKILL with PID tracked under \\`~/.panopticon/pids/qwen-tts.pid\\`.\n- \\`pan tts status\\` — reports daemon PID, port, model, queue depth, uptime, GPU memory used.\n- \\`pan tts restart\\` — wraps stop + start.\n- All commands honor \\`tts.daemonHost\\` and \\`tts.daemonPort\\` from config.\n\n### 3. Lifecycle integration\n- \\`pan up\\` optionally launches the daemon (gated by \\`tts.daemon.autoStart\\` in config — default off because of the cold-start cost and VRAM footprint).\n- Optional systemd user unit installer (\\`pan tts install-systemd\\`) for users who want auto-start on boot. Template lives in repo, \\`pan install\\` doesn't enable it by default.\n- Dashboard supervisor / watchdog (extend the \\`src/supervisor/watchdog.ts\\` pattern from PAN-1139) detects daemon crash and restarts (with backoff and a give-up threshold so a misconfigured GPU doesn't restart-loop forever).\n\n### 4. UI surface\n- Dashboard Settings → TTS tab: \\\"Daemon: running on cuda:0 (4.2GB VRAM) | model loaded\\\" with a \\\"Start daemon\\\" button when it's down.\n- Health badge in the sidebar (existing CloisterStatusBar already shows TTS — point it at the new status payload).\n\n### 5. Docs\n- Update \\`skills/pan-tts/SKILL.md\\` with the new CLI surface and remove the manual \\`cd skills/pan-tts/scripts && python tts_daemon.py\\` instruction (it survives as the lowest-level escape hatch).\n- Add to \\`docs/PANOPTICON_DEV_SOP.md\\` (the doc PAN-1139 created) so post-restart troubleshooting includes \\`pan tts status\\`.\n\n## Out of scope\n- Replacing Qwen3-TTS with a different model.\n- Cross-machine daemon hosting (the existing pan-tts SSE subscriber already handles that).\n- Browser-side fallback synthesis (Web Speech API) for voice samples — keep the daemon as the single audio path so previews match what users hear in production.\n\n## Acceptance\n\n- [ ] Fresh \\`pan install\\` on a Linux/CUDA machine produces a working daemon (\\`pan tts start\\` → \\`/api/tts/health\\` returns ok).\n- [ ] \\`pan tts start\\`, stop, status, restart all work and round-trip a single test phrase via \\`pan tts test\\`.\n- [ ] Dashboard Settings TTS tab shows live daemon status and offers a one-click \\\"Start daemon\\\" when it's down.\n- [ ] Crash + restart: kill the daemon process, watchdog brings it back within 30s.\n- [ ] \\`pan install --skip-tts-daemon\\` completes without touching CUDA torch.\n- [ ] Non-Linux platforms see a clear skip message during install (no failure).\n\n## Why now\n\nTonight's session blocked at two separate points on the missing daemon — first \\\"TTS broken\\\" diagnosis, then \\\"voice sampling broken\\\" diagnosis — each requiring manual investigation. With \\`pan tts start\\` and the supervisor, both paths self-heal.\n\n## Related\n- PAN-829 (TTS lifecycle, merged) — shipped the in-process subscriber but didn't own the synth daemon.\n- PAN-1139 (dashboard restart watchdog) — supervisor pattern to reuse here.\n- PAN-1162 (ship-role allowHost) — example of a small substrate fix that unblocks a recurring failure mode."
+        },
+        "subItems": [
+          {
+            "id": "auto-start.ac1",
+            "title": "Fresh \\pan install\\ on a Linux/CUDA machine produces a working daemon (\\pan tts start\\ → \\/api/tts/health\\ returns ok).",
+            "status": "pending",
+            "created": "2026-05-18T04:46:14.779Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "\\pan tts start\\, stop, status, restart all work and round-trip a single test phrase via \\pan tts test\\.",
+            "status": "pending",
+            "created": "2026-05-18T04:46:14.779Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "Dashboard Settings TTS tab shows live daemon status and offers a one-click \\\"Start daemon\\\" when it's down.",
+            "status": "pending",
+            "created": "2026-05-18T04:46:14.779Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Crash + restart: kill the daemon process, watchdog brings it back within 30s.",
+            "status": "pending",
+            "created": "2026-05-18T04:46:14.779Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "\\pan install --skip-tts-daemon\\ completes without touching CUDA torch.",
+            "status": "pending",
+            "created": "2026-05-18T04:46:14.779Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "Non-Linux platforms see a clear skip message during install (no failure).",
+            "status": "pending",
+            "created": "2026-05-18T04:46:14.779Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}
