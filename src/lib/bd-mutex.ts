@@ -33,24 +33,20 @@ export async function withBdMutex<T>(fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
-export async function restoreTrackedBeadsExport(workspacePath: string): Promise<void> {
-  try {
-    const { stdout } = await execAsync('git status --porcelain -- .beads/issues.jsonl', {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-    });
-    if (stdout.split('\n').some((line) => line.slice(0, 2).includes('D'))) {
-      await execAsync('git restore -- .beads/issues.jsonl', { cwd: workspacePath });
-    }
-  } catch {}
-}
+// PAN-1158 superseded the inline copy of restoreTrackedBeadsExport with the
+// shared helper in beads-restore.ts (HEAD-source restore covers staged
+// deletions too). Re-export so call sites that imported from bd-mutex keep
+// working.
+export { restoreTrackedBeadsExport } from './beads-restore.js';
+
+import { restoreTrackedBeadsExport as restoreBeads } from './beads-restore.js';
 
 export async function withWorkspaceBdMutex<T>(workspacePath: string, fn: () => Promise<T>): Promise<T> {
   return withBdMutex(async () => {
     try {
       return await fn();
     } finally {
-      await restoreTrackedBeadsExport(workspacePath);
+      await restoreBeads(workspacePath);
     }
   });
 }
