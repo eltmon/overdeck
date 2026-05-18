@@ -37,6 +37,7 @@
 :root {
   color-scheme: light;
   --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
 
   /* Surfaces */
   --background: #ffffff;
@@ -239,6 +240,24 @@ body::after {
   }
   .badge-border-info {
     border-color: color-mix(in srgb, var(--info) 32%, transparent);
+  }
+  .verb-badge-pulse {
+    animation: verb-badge-pulse 1.6s ease-out infinite;
+  }
+}
+
+@keyframes verb-badge-pulse {
+  0% {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 1;
+  }
+  80% {
+    box-shadow: 0 0 0 6px transparent;
+    opacity: 0.5;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    opacity: 1;
   }
 }
 
