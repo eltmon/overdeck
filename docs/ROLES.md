@@ -22,6 +22,24 @@ A **Run** is a process playing a role: `(role, model, harness)`. Runs are epheme
 
 ---
 
+## `verifying_on_main` phase
+
+A merged issue is not done. After the human Merge button lands the prepared branch, Panopticon moves the issue into canonical state `verifying_on_main` and applies the GitHub label `verifying-on-main`. This phase keeps the issue open and visible while operators run post-merge UAT against `main`.
+
+Role responsibilities during this phase:
+
+| Role | Behavior |
+|------|----------|
+| `ship` | Prepares the branch for the human Merge button. It does not close the issue or tear down the workspace. |
+| merge handoff | `postMergeLifecycle()` marks `mergeStatus: "merged"`, applies `verifying-on-main`, frees runtime resources, and preserves workspace/state/vBRIEF/branches. |
+| `work` / `plan` | Remain paused so the operator can unpause for regression follow-up if verification fails. |
+| `review` / `test` | Their sessions may be killed after merge; the merged code is now evaluated on `main`, not by reusing pre-merge role sessions. |
+| close-out | `pan close <id>` or the dashboard Close Out action performs the final vBRIEF completion, archival, optional teardown/branch deletion, tracker close, and review-status clearing. |
+
+If `close_out.auto=true`, Deacon may run close-out automatically after `close_out.auto_delay_minutes`; otherwise close-out is an explicit operator ceremony.
+
+---
+
 ## Sub-roles
 
 A sub-role is a configuration slot under a role, not a separate pipeline stage. Today's sub-roles:

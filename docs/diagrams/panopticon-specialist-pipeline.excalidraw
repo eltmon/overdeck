@@ -259,7 +259,7 @@
       "y": 830,
       "width": 400,
       "height": 30,
-      "text": "triggerMerge() Pipeline",
+      "text": "triggerMerge() → verifying_on_main",
       "fontSize": 22,
       "createdAt": "2026-05-04T03:01:47.957Z",
       "updatedAt": "2026-05-04T03:01:47.957Z",
@@ -379,7 +379,7 @@
       "height": 50,
       "backgroundColor": "#d3f9d8",
       "label": {
-        "text": "8. Post-merge Cleanup"
+        "text": "8. Verify on Main"
       },
       "createdAt": "2026-05-04T03:01:47.957Z",
       "updatedAt": "2026-05-04T03:01:47.957Z",
