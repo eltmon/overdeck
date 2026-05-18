@@ -6,6 +6,8 @@ import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { ProjectLens } from './ProjectLens';
 import type { IssueCostBreakdown } from './ProjectOverview';
+import { IssueDrawer } from '../drawer/IssueDrawer';
+import { useDrawerUrlSync } from '../drawer/useDrawerUrlSync';
 import { DeaconStatus } from './DeaconStatus';
 import { IssueWorkbench } from './IssueWorkbench';
 import { BeadsDialog } from '../BeadsDialog';
@@ -242,6 +244,10 @@ export function CommandDeck({
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
   const [sidebarHarness, setSidebarHarness] = useState<Harness>(loadStoredHarness);
+
+  // Drawer overlay sync (PAN-1148)
+  useDrawerUrlSync();
+  const openDrawerIssue = useDashboardStore((s) => s.openDrawerIssue);
 
   // Per-issue session selection (PAN-830 pan-11sr) — slice keyed by issueId.
   // The tree highlight uses the value for whichever feature is currently active.
@@ -1207,6 +1213,7 @@ export function CommandDeck({
               issueCosts={issueCosts}
               issueCostDetails={issueCostDetails}
               onSelectFeature={(feature) => handleSelectFeature(feature.issueId)}
+              onOpenIssue={openDrawerIssue}
               issues={issues}
               agents={agents}
             />
@@ -1241,6 +1248,9 @@ export function CommandDeck({
           }}
         />
       )}
+
+      {/* Issue Detail Drawer (PAN-1148) */}
+      <IssueDrawer />
     </div>
   );
 }

@@ -36,6 +36,8 @@ interface ProjectLensProps {
   issueCosts: Record<string, number>;
   issueCostDetails?: Record<string, IssueCostBreakdown>;
   onSelectFeature?: (feature: ProjectFeature) => void;
+  /** Called when a Pipeline IssueRow is clicked to open the drawer overlay */
+  onOpenIssue?: (issueId: string) => void;
   /** Full issue records for priority/assignee/labels lookup */
   issues?: Issue[];
   /** Agents for the active issue overview tab */
@@ -221,6 +223,7 @@ export function ProjectLens({
   issueCosts,
   issueCostDetails,
   onSelectFeature,
+  onOpenIssue,
   issues = [],
   agents = [],
 }: ProjectLensProps) {
@@ -254,6 +257,10 @@ export function ProjectLens({
 
   const handleIssueClick = useCallback(
     (issueId: string) => {
+      if (onOpenIssue) {
+        onOpenIssue(issueId);
+        return;
+      }
       setActiveIssueId(issueId);
       writeStoredActiveIssue(projectName, issueId);
       // If the user is clicking an issue, also switch to Plans tab for detail viewing
@@ -265,7 +272,7 @@ export function ProjectLens({
         return prev;
       });
     },
-    [projectName],
+    [projectName, onOpenIssue],
   );
 
   // Build phase buckets

@@ -260,6 +260,29 @@ describe('ProjectLens', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Plans/i }));
     expect(screen.getByTestId('project-lens-no-issue')).toBeInTheDocument();
   });
+
+  it('calls onOpenIssue when IssueRow is clicked and prop is provided', () => {
+    const onOpenIssue = vi.fn();
+    renderLens({ onOpenIssue });
+
+    const pan2Row = screen.getAllByText('Feature Two')[0]?.closest('button');
+    expect(pan2Row).toBeTruthy();
+    fireEvent.click(pan2Row!);
+
+    expect(onOpenIssue).toHaveBeenCalledWith('PAN-2');
+    // Should NOT switch to Plans tab when onOpenIssue is provided
+    expect(screen.queryByTestId('overview-tab')).not.toBeInTheDocument();
+  });
+
+  it('falls back to Plans tab when IssueRow is clicked without onOpenIssue', () => {
+    renderLens();
+
+    const pan2Row = screen.getAllByText('Feature Two')[0]?.closest('button');
+    expect(pan2Row).toBeTruthy();
+    fireEvent.click(pan2Row!);
+
+    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
+  });
 });
 
 const PHASE_ORDER = ['ship', 'review', 'work', 'plan', 'todo'] as const;
