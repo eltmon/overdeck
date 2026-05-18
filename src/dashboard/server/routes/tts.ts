@@ -2,6 +2,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { resolveAndSpeak, type ResolveAndSpeakOptions, type TtsSpeakMode, type TtsSpeakResult } from '../../../lib/tts-speak.js';
 import { getTtsRuntimeConfig } from '../services/tts-runtime-config.js';
+import { isTtsPlaybackRunning } from '../services/tts-playback.js';
 import { validateOrigin } from './origin-validation.js';
 import {
   addVoice as addStoredVoice,
@@ -31,6 +32,20 @@ export interface CheckTtsHealthOptions {
 }
 
 export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promise<TtsHealthResult> {
+  // PAN-829 shipped TTS as an in-process service (startTtsPlayback). The legacy
+  // external daemon at config.daemonHost:config.daemonPort is now optional —
+  // most installs don't run it. Report the in-process state first so the
+  // dashboard's TTS status indicator stops yelling "daemon unreachable" at users
+  // who never had a daemon. The external probe is only consulted when caller
+  // pins host/port explicitly (settings panel "test connection" flow) or when
+  // the in-process service isn't running.
+  if (options.host === undefined && options.port === undefined) {
+    if (isTtsPlaybackRunning()) return { ok: true };
+    // In-process is off — still report disabled rather than probing the legacy
+    // daemon endpoint, because "tts.enabled=false" is the actual disabled state.
+    if (!getTtsRuntimeConfig().enabled) return { ok: false, error: 'tts disabled in settings' };
+  }
+
   let host = options.host;
   let port = options.port;
   if (host === undefined || port === undefined) {

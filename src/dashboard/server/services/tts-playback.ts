@@ -146,6 +146,17 @@ export function stopTtsPlayback(): void {
   }
 }
 
+/**
+ * True when the in-process TTS playback subscriber is active.
+ * Used by the health endpoint so the dashboard can report TTS status
+ * based on the in-process service that actually drives playback now,
+ * rather than the legacy external daemon at port 8787 (which most
+ * installs don't run).
+ */
+export function isTtsPlaybackRunning(): boolean {
+  return state.unsubscribe !== null;
+}
+
 export async function syncTtsPlaybackWithConfig(): Promise<void> {
   if (getTtsRuntimeConfig().enabled) {
     await startTtsPlayback();
