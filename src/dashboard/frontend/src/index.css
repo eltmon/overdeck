@@ -244,6 +244,20 @@ body::after {
   .verb-badge-pulse {
     animation: verb-badge-pulse 1.6s ease-out infinite;
   }
+  .drawer-bead-current-ping {
+    animation: drawer-bead-current-ping 1.6s ease-out infinite;
+  }
+}
+
+@keyframes drawer-bead-current-ping {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
 }
 
 @keyframes verb-badge-pulse {
@@ -351,7 +365,8 @@ body::after {
   .anim-stuck-shake,
   .anim-error-shake,
   .anim-row-flash,
-  .anim-round-active {
+  .anim-round-active,
+  .drawer-bead-current-ping {
     animation: none !important;
   }
   .anim-round-active {

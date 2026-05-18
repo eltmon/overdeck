@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -17,6 +18,34 @@ const issue: Issue = {
   updatedAt: '2026-05-18T00:00:00.000Z',
 };
 
+type TestBead = {
+  id: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  updatedAt?: string;
+  closedAt?: string;
+};
+
+function createQueryClient(beads: TestBead[] = []) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(['drawer-beads', 'PAN-1'], { tasks: beads });
+  return queryClient;
+}
+
+function drawerUi(queryClient: QueryClient) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <IssueDrawer />
+    </QueryClientProvider>
+  );
+}
+
+function renderDrawer(beads: TestBead[] = []) {
+  const queryClient = createQueryClient(beads);
+  return { queryClient, ...render(drawerUi(queryClient)) };
+}
+
 describe('IssueDrawer', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/');
@@ -33,7 +62,7 @@ describe('IssueDrawer', () => {
   it('opens from issue URL params on mount', async () => {
     window.history.replaceState(null, '', '/?issue=PAN-1&tab=activity');
 
-    render(<IssueDrawer />);
+    renderDrawer();
 
     expect(await screen.findByTestId('issue-drawer')).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Issue PAN-1' })).toBeInTheDocument();
@@ -44,7 +73,7 @@ describe('IssueDrawer', () => {
   it('closes from the X button and removes drawer URL params', async () => {
     useDashboardStore.getState().openIssue('PAN-1', 'plan');
 
-    render(<IssueDrawer />);
+    renderDrawer();
     fireEvent.click(screen.getByRole('button', { name: 'Close issue drawer' }));
 
     await waitFor(() => {
@@ -60,7 +89,7 @@ describe('IssueDrawer', () => {
     document.body.appendChild(scroller);
     useDashboardStore.getState().openIssue('PAN-1');
 
-    const { rerender } = render(<IssueDrawer />);
+    const { queryClient, rerender } = renderDrawer();
     fireEvent.click(screen.getByTestId('issue-drawer-scrim'));
 
     await waitFor(() => {
@@ -69,7 +98,7 @@ describe('IssueDrawer', () => {
     expect(scroller.scrollTop).toBe(120);
 
     useDashboardStore.getState().openIssue('PAN-1');
-    rerender(<IssueDrawer />);
+    rerender(drawerUi(queryClient));
     fireEvent.keyDown(window, { key: 'Escape' });
 
     await waitFor(() => {
@@ -89,7 +118,7 @@ describe('IssueDrawer', () => {
     } as Parameters<typeof useDashboardStore.setState>[0]);
     useDashboardStore.getState().openIssue('PAN-1', 'activity');
 
-    const { rerender } = render(<IssueDrawer />);
+    const { queryClient, rerender } = renderDrawer();
     const rail = screen.getByTestId('drawer-activity-rail');
     const scrollArea = screen.getByTestId('drawer-activity-rail-scroll');
 
@@ -108,10 +137,39 @@ describe('IssueDrawer', () => {
         ...useDashboardStore.getState().recentActivity,
       ],
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    rerender(<IssueDrawer />);
+    rerender(drawerUi(queryClient));
 
     await waitFor(() => expect(scrollArea.scrollTop).toBe(0));
     expect(screen.getByTestId('drawer-activity-dot-review')).toHaveClass('bg-signal-review');
+  });
+
+  it('renders drawer beads list from drawer data with done and current states', () => {
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer([
+      {
+        id: 'workspace-done',
+        title: 'PAN-1: Completed bead',
+        status: 'closed',
+        createdAt: '2026-05-18T00:00:00.000Z',
+        closedAt: '2026-05-18T00:05:00.000Z',
+      },
+      {
+        id: 'workspace-current',
+        title: 'PAN-1: Current bead',
+        status: 'in_progress',
+        createdAt: '2026-05-18T00:00:00.000Z',
+        updatedAt: '2026-05-18T00:03:00.000Z',
+      },
+    ]);
+
+    expect(screen.getByTestId('drawer-beads-list')).toBeInTheDocument();
+    expect(screen.getByText('Completed bead')).toHaveClass('line-through', 'decoration-[rgba(255,255,255,0.18)]');
+    expect(screen.getByText('workspace-done')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
+    expect(screen.getByText('5m')).toHaveClass('font-mono', 'text-[10px]', 'tabular-nums');
+    expect(screen.getByTestId('drawer-bead-status-done')).toHaveClass('bg-success', 'text-white', 'text-[9px]');
+    expect(screen.getByTestId('drawer-bead-status-current')).toHaveClass('relative');
+    expect(screen.getByTestId('drawer-bead-status-current').firstElementChild).toHaveClass('drawer-bead-current-ping', 'border-[1.5px]', 'border-info');
   });
 
   it('renders four review specialist rows from drawer data with status dots', () => {
@@ -134,7 +192,7 @@ describe('IssueDrawer', () => {
     } as Parameters<typeof useDashboardStore.setState>[0]);
     useDashboardStore.getState().openIssue('PAN-1');
 
-    render(<IssueDrawer />);
+    renderDrawer();
 
     expect(screen.getByTestId('drawer-review-specialists')).toBeInTheDocument();
     expect(screen.getByText('review.security')).toBeInTheDocument();

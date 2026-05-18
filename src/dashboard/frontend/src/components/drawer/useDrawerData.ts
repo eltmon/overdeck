@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 
@@ -24,6 +25,15 @@ export type DrawerReviewSpecialist = {
   duration: string;
 };
 
+export type DrawerBeadStatus = 'open' | 'current' | 'done';
+
+export type DrawerBeadItem = {
+  id: string;
+  title: string;
+  status: DrawerBeadStatus;
+  duration: string;
+};
+
 type ActivityEntry = {
   id?: string;
   timestamp?: string;
@@ -36,10 +46,25 @@ type ActivityEntry = {
   triggeringEvent?: string | null;
 };
 
+type BeadTask = {
+  id?: string;
+  title?: string;
+  name?: string;
+  status?: string;
+  createdAt?: string;
+  startedAt?: string;
+  updatedAt?: string;
+  closedAt?: string;
+};
+
+type BeadsResponse = {
+  tasks?: BeadTask[];
+};
+
 export type DrawerData = {
   issue: Issue | null;
   agents: Agent[];
-  beads: unknown[];
+  beads: DrawerBeadItem[];
   reviewSpecialists: DrawerReviewSpecialist[];
   verificationGates: unknown[];
   activityRail: DrawerActivityItem[];
@@ -120,6 +145,47 @@ function reviewSpecialists(reviewStatus: ReviewStatusSnapshot | undefined): Draw
   });
 }
 
+function beadStatus(status: string | undefined): DrawerBeadStatus {
+  if (status === 'closed') return 'done';
+  if (status === 'in_progress') return 'current';
+  return 'open';
+}
+
+function parseTime(value: string | undefined) {
+  if (!value) return null;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
+function formatDuration(startValue: string | undefined, endValue: string | undefined) {
+  const start = parseTime(startValue);
+  const end = parseTime(endValue);
+  if (start === null || end === null || end < start) return '—';
+
+  const minutes = Math.max(1, Math.round((end - start) / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+function beadTitle(bead: BeadTask, issueId: string) {
+  const title = bead.title ?? bead.name ?? bead.id ?? 'Untitled bead';
+  return title.replace(new RegExp(`^${issueId}:\\s*`, 'i'), '');
+}
+
+function normalizeBeads(tasks: BeadTask[] | undefined, issueId: string): DrawerBeadItem[] {
+  return (tasks ?? []).map((bead) => {
+    const status = beadStatus(bead.status);
+    return {
+      id: bead.id ?? bead.title ?? 'bead',
+      title: beadTitle(bead, issueId),
+      status,
+      duration: formatDuration(bead.startedAt ?? bead.createdAt, bead.closedAt ?? bead.updatedAt),
+    };
+  });
+}
+
 export function useDrawerData(): DrawerData {
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const issues = useDashboardStore(selectIssues) as Issue[];
@@ -127,6 +193,16 @@ export function useDrawerData(): DrawerData {
   const recentActivity = useDashboardStore((state) => state.recentActivity) as ActivityEntry[];
   const detailedActivity = useDashboardStore((state) => state.detailedActivity) as ActivityEntry[];
   const reviewStatus = useDashboardStore(selectReviewStatus(drawerIssueId ?? ''));
+  const { data: beadsData } = useQuery<BeadsResponse>({
+    queryKey: ['drawer-beads', drawerIssueId],
+    queryFn: async () => {
+      const response = await fetch(`/api/issues/${drawerIssueId}/beads`);
+      if (!response.ok) throw new Error('Failed to fetch drawer beads');
+      return response.json();
+    },
+    enabled: drawerIssueId !== null,
+    staleTime: 10_000,
+  });
 
   return useMemo(() => {
     if (!drawerIssueId) {
@@ -152,10 +228,10 @@ export function useDrawerData(): DrawerData {
     return {
       issue,
       agents: issueAgents,
-      beads: [],
+      beads: normalizeBeads(beadsData?.tasks, drawerIssueId),
       reviewSpecialists: reviewSpecialists(reviewStatus),
       verificationGates: [],
       activityRail,
     };
-  }, [agents, detailedActivity, drawerIssueId, issues, recentActivity, reviewStatus]);
+  }, [agents, beadsData, detailedActivity, drawerIssueId, issues, recentActivity, reviewStatus]);
 }
