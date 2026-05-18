@@ -2267,6 +2267,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // PAN-1059 / PAN-977: test/ship/top-level review runs use the interactive tmux
   // delivery path. Review sub-roles run headless via `claude --print`, so the
   // launcher passes their prompt file as the process argument.
+  const shouldUsePromptFileStdin = isClaudeCodeReviewSubRole;
 
   const launcherContent = generateLauncherScript({
     role,
