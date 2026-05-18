@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T22:34:00.000Z",
+  "updated": "2026-05-18T23:27:00.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "sha": "71aab7899",
@@ -203,12 +203,11 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-7qta Agents metric strip is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
+    "description": "workspace-i5mc Board card swap is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
     "beadId": "pending",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx",
-      "src/dashboard/frontend/src/components/Agents/FleetAgentsView.test.tsx",
-      "src/dashboard/frontend/src/components/primitives/MetricTile.tsx"
+      "src/dashboard/frontend/src/components/KanbanBoard.tsx",
+      "src/dashboard/frontend/src/components/primitives/IssueCard.tsx"
     ]
   },
   "beadsMapping": {},
@@ -312,6 +311,12 @@
       "timestamp": "2026-05-18T21:41:30.000Z",
       "reason": "bead-close",
       "note": "Implemented workspace-ltqb default route flip: / and /pipeline resolve to Pipeline, /board resolves to Board, sidebar logo clicks route to Pipeline, and focused App/Sidebar tests pass.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:27:00.000Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-i5mc Board card swap to the IssueCard primitive shell, restored dnd-kit wrappers around cards, preserved drawer/bulk selection handlers, added closed-not-merged readyForMerge display guard, and verified KanbanBoard tests, typecheck, lint, and graphify update. Browser smoke was attempted through the dev server but backend session bootstrap rejected the dev origin with Invalid origin.",
       "agentModel": "gpt-5.5"
     }
   ],
@@ -462,6 +467,13 @@
     "a2-agents-metric-strip": "completed",
     "a2-agents-metric-strip.ac1": "completed",
     "a2-agents-metric-strip.ac2": "completed",
-    "a2-agents-metric-strip.ac3": "completed"
+    "a2-agents-metric-strip.ac3": "completed",
+    "b1-board-card-swap": "completed",
+    "b1-board-card-swap.ac1": "completed",
+    "b1-board-card-swap.ac2": "completed",
+    "b1-board-card-swap.ac3": "completed",
+    "b1-board-card-swap.ac4": "completed",
+    "b1-board-card-swap.ac5": "completed",
+    "b1-board-card-swap.ac6": "completed"
   }
 }

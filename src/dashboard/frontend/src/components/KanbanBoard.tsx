@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback, useEffect, useRef, createContext, useCo
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAgentList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
-/* Drag-and-drop disabled pending rework (PAN-TODO)
 import {
   DndContext,
   DragOverlay,
@@ -11,16 +10,13 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragStartEvent,
-  DragEndEvent,
+  type DragStartEvent,
+  type DragEndEvent,
   defaultDropAnimationSideEffects,
-  DropAnimation,
-} from '@dnd-kit/core';
-import {
+  type DropAnimation,
   useDraggable,
   useDroppable,
 } from '@dnd-kit/core';
-*/
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw, Radio, VolumeX, Unlock } from 'lucide-react';
@@ -51,6 +47,7 @@ import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry
 import { useTtsIssueMute } from '../hooks/useTtsIssueMute';
 import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
 import { NO_RESUME_QUERY_KEY, type NoResumeMode } from './NoResumeBanner';
+import IssueCardPrimitive from './primitives/IssueCard';
 
 
 // Parity registry anchor — keeps the card action surface tied to the
@@ -1164,10 +1161,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     });
   }, []);
 
-  /* DnD state disabled pending rework
   const [activeDragIssue, setActiveDragIssue] = useState<Issue | null>(null);
-  const [activeDragStatus, setActiveDragStatus] = useState<CanonicalState | null>(null);
-  */
+  const [, setActiveDragStatus] = useState<CanonicalState | null>(null);
 
   // Undo state
   const [undoHistory, setUndoHistory] = useState<UndoEntry[]>([]);
@@ -1308,7 +1303,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     bulkSelection.clear();
   }, [bulkSelection]);
 
-  /* DnD sensors disabled pending rework
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -1317,7 +1311,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     }),
     useSensor(KeyboardSensor)
   );
-  */
 
   // Move status mutation
   const moveStatusMutation = useMutation({
@@ -1383,7 +1376,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     setUndoTimeoutId(timeoutId);
   }, [undoTimeoutId]);
 
-  /* Drag handlers disabled pending rework
   // Handle drag start
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const { active } = event;
@@ -1435,7 +1427,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     showUndoNotification(issue.identifier, currentStatus, targetStatus);
     moveStatusMutation.mutate({ issueId: issue.identifier, targetStatus });
   }, [issues, agents, moveStatusMutation, showUndoNotification]);
-  */
 
   // Confirm agent warning
   const confirmAgentMove = useCallback(() => {
@@ -1495,7 +1486,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     }
   }, [syncPromptDialog, moveStatusMutation, showUndoNotification, agents, queryClient]);
 
-  /* Drop animation config disabled pending rework
   const dropAnimation: DropAnimation = {
     sideEffects: defaultDropAnimationSideEffects({
       styles: {
@@ -1505,7 +1495,6 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       },
     }),
   };
-  */
 
   // Fetch costs for all issues
   const { data: issueCosts = {}, isLoading: costsLoading } = useQuery({
@@ -1886,21 +1875,26 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           )}
         </div>
       ) : (
-        /* Kanban columns - DnD disabled pending rework (PAN-TODO) */
-        <div className="flex gap-4 overflow-hidden pb-4">
-          {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => {
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 overflow-hidden pb-4">
+            {STATUS_ORDER.filter(s => s !== 'backlog').map((status) => {
             const columnIssueIds = sortedGrouped[status].map(i => i.identifier);
             const selectedInColumn = columnIssueIds.filter(id => bulkSelection.isSelected(id));
             const allSelected = columnIssueIds.length > 0 && selectedInColumn.length === columnIssueIds.length;
             const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
 
             return (
-              <div
-                key={status}
-                className="flex-1 min-w-0"
-                data-testid={`kanban-column-${status.replace(/_/g, '-')}`}
-              >
-                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-card rounded-lg transition-colors`}>
+              <DroppableColumn key={status} status={status}>
+                <div
+                  className="flex-1 min-w-0"
+                  data-testid={`kanban-column-${status.replace(/_/g, '-')}`}
+                >
+                  <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-card rounded-lg transition-colors`}>
                   <div className="px-4 py-3 border-b border-border bg-card">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -1945,11 +1939,16 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     planningStateById={planningStateById}
                     workspaceByIssueId={stackHealthByIssue}
                   />
+                  </div>
                 </div>
-              </div>
+              </DroppableColumn>
             );
           })}
-        </div>
+          </div>
+          <DragOverlay dropAnimation={dropAnimation}>
+            {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       {/* Undo Toast */}
@@ -2094,9 +2093,9 @@ function ColumnContent({
     );
 
     return (
-      <IssueCard
-        key={issue.id}
-        issue={issue}
+      <DraggableCardWrapper key={issue.id} issue={issue}>
+        <IssueCard
+          issue={issue}
         workAgent={workAgent}
         workAgents={workAgents}
         planningAgent={planningAgent}
@@ -2111,8 +2110,9 @@ function ColumnContent({
         isBulkSelected={bulkSelectedIds?.has(issue.identifier)}
         onBulkToggle={onBulkToggle ? () => onBulkToggle(issue.identifier) : undefined}
         planningState={planningStateById?.[issue.identifier]}
-        workspace={workspaceByIssueId?.[issue.identifier.toUpperCase()]}
-      />
+          workspace={workspaceByIssueId?.[issue.identifier.toUpperCase()]}
+        />
+      </DraggableCardWrapper>
     );
   };
 
@@ -2181,7 +2181,6 @@ function ColumnContent({
   );
 }
 
-/* DnD components disabled pending rework
 // DroppableColumn component
 function DroppableColumn({ status, children }: { status: CanonicalState; children: React.ReactNode }) {
   const { isOver, setNodeRef } = useDroppable({
@@ -2244,7 +2243,6 @@ function DragOverlayCard({ issue }: DragOverlayCardProps) {
     </div>
   );
 }
-*/
 
 // Agent Warning Dialog
 interface AgentWarningDialogProps {
@@ -2749,7 +2747,8 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   // Review status for merge-readiness badge
   const reviewStatus = useDashboardStore(selectReviewStatus(issue.identifier || ''));
   const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
-  const isReadyToMerge = !isMerged && reviewStatus?.readyForMerge === true;
+  const isClosedNotMerged = reviewStatus?.mergeStatus === 'failed' || issue.mergeStatus === 'failed';
+  const isReadyToMerge = !isMerged && !isClosedNotMerged && reviewStatus?.readyForMerge === true;
 
   // PAN-796: toast on pipeline recovery events
   const prevStuckRef = useRef(reviewStatus?.stuck);
@@ -2845,22 +2844,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const agentGatingTitle = agentGatingReason === 'Boot --no-resume' && noResumeMode?.since
     ? `No-resume mode active since ${formatRelativeTime(noResumeMode.since, new Date())}`
     : agentGatingReason;
-  const cardTone = isStackUnhealthy || isPipelineStuck
-    ? 'from-destructive/12 via-destructive/5 to-transparent'
-    : isReadyToMerge
-      ? 'from-warning/20 via-warning/6 to-transparent'
-      : isRunning
-        ? 'from-primary/16 via-primary/6 to-transparent'
-        : 'from-surface-overlay/60 via-surface/40 to-transparent';
   const actionBarClass = 'mt-3 flex items-center gap-2 flex-wrap rounded-xl border border-border/70 bg-card/80 px-2.5 py-2';
-
-  const priorityAccentColors: Record<number, string> = {
-    0: 'bg-border',
-    1: 'bg-destructive',
-    2: 'bg-warning',
-    3: 'bg-muted-foreground',
-    4: 'bg-border',
-  };
 
   // Planning-state is embedded in the issue from /api/issues (server-side
   // filesystem checks). No per-card fetch needed.
@@ -3142,33 +3126,20 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   // Deep wipe is now handled by the DeepWipeDialog component (PAN-461)
 
   return (
-    <div
+    <IssueCardPrimitive
       ref={cardRef}
-      data-testid={`issue-card-${issue.identifier}`}
+      testId={`issue-card-${issue.identifier}`}
+      issueId={issue.identifier}
+      priority={issue.priority}
+      selected={isSelected}
+      bulkSelected={isBulkSelected}
+      stuckCard={isStackUnhealthy || isPipelineStuck}
+      mergeReadyCard={isReadyToMerge}
+      runningCard={isRunning}
+      unhealthyCard={isStackUnhealthy}
+      sessionLostCard={isSessionLost}
       onClick={onSelect}
-      className={`group relative overflow-hidden rounded-2xl border cursor-pointer transition-all shadow-[0_6px_22px_rgba(0,0,0,0.08)] ${isSessionLost ? 'border-warning/50' : ''} ${
-        isSelected
-          ? 'ring-2 ring-warning/70 shadow-[0_12px_30px_rgba(245,158,11,0.18)]'
-          : isStackUnhealthy
-            ? 'border-destructive/60 bg-destructive/[0.03] shadow-[0_10px_26px_rgba(239,68,68,0.14)]'
-            : isBulkSelected
-              ? 'border-primary/50 bg-primary/[0.03] shadow-[0_6px_22px_rgba(0,0,0,0.08)]'
-              : 'hover:-translate-y-0.5 border-border/70 hover:border-border hover:shadow-[0_12px_28px_rgba(0,0,0,0.12)]'
-      } bg-[linear-gradient(145deg,var(--color-surface)_0%,rgba(255,255,255,0.03)_100%)]`}
     >
-      <div className={`pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br ${cardTone}`} />
-      <div
-        className={`absolute inset-y-0 left-0 w-1.5 ${
-          isStackUnhealthy || isPipelineStuck
-            ? 'bg-destructive'
-            : isReadyToMerge
-              ? 'bg-warning'
-              : isRunning
-                ? 'bg-primary'
-                : (priorityAccentColors[issue.priority] || 'bg-muted-foreground')
-        }`}
-      />
-
       <div className="relative p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -3902,7 +3873,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
         onClose={() => setShowCostModal(false)}
       />
       </div>
-    </div>
+    </IssueCardPrimitive>
   );
 }
 
