@@ -162,12 +162,12 @@ export interface FlywheelStatus {
   elapsedMs: number
   orchestrator: FlywheelOrchestrator
   headline: FlywheelHeadline
-  activePipeline: FlywheelPipelineItem[]
-  substrateBugs: FlywheelSubstrateBug[]
-  agents: FlywheelAgent[]
-  parked: FlywheelParkedItem[]
+  activePipeline: ReadonlyArray<FlywheelPipelineItem>
+  substrateBugs: ReadonlyArray<FlywheelSubstrateBug>
+  agents: ReadonlyArray<FlywheelAgent>
+  parked: ReadonlyArray<FlywheelParkedItem>
   system: FlywheelSystemStatus
-  openQuestions: string[]
+  openQuestions: ReadonlyArray<string>
   ticks: number
   lastTickAt: string
 }

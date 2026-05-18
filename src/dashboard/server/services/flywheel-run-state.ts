@@ -1,3 +1,4 @@
+import type { Dirent } from 'node:fs';
 import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -105,7 +106,7 @@ async function summarizeRun(runId: string, options: FlywheelRunStateOptions): Pr
 
 export async function listFlywheelRuns(options: FlywheelRunStateOptions = {}): Promise<FlywheelRunSummary[]> {
   const runsDir = getFlywheelRunsDir(options);
-  let entries: Awaited<ReturnType<typeof readdir>>;
+  let entries: Dirent[];
   try {
     entries = await readdir(runsDir, { withFileTypes: true });
   } catch (error) {

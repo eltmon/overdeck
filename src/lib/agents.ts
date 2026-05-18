@@ -1754,6 +1754,7 @@ export interface SpawnRunOptions {
   reviewSynthesisAgentId?: string;
   reviewOutputPath?: string;
   allowHost?: boolean;
+  registerConversation?: boolean;
 }
 
 /**
@@ -2186,9 +2187,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   await saveAgentStateAsync(state);
 
   const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
+  const shouldRegisterConversation = isSpecialistRole || options.registerConversation === true;
   const isClaudeCodeReviewSubRole = role === 'review' && !!options.subRole && resolvedHarness === 'claude-code';
-  const shouldDeliverPromptViaTmux = isSpecialistRole && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
-  const shouldDeliverPromptViaPi = isSpecialistRole && resolvedHarness === 'pi';
+  const shouldDeliverPromptViaTmux = shouldRegisterConversation && !isClaudeCodeReviewSubRole && resolvedHarness === 'claude-code';
+  const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'pi';
 
   let promptFile: string | undefined;
   if (options.prompt && !shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi) {
@@ -2228,7 +2230,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   // synthesize a Conversation whose sessionAlive came from `agent.status`, and
   // stale snapshots made active synthesizers render as "Starting…".
   let sessionId: string | undefined;
-  if (isSpecialistRole) {
+  if (shouldRegisterConversation) {
     sessionId = randomUUID();
 
     // Persist the pinned --session-id to <agentDir>/session.id so
