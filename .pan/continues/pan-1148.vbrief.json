@@ -1,0 +1,111 @@
+{
+  "version": "1",
+  "issueId": "PAN-1148",
+  "created": "2026-05-18T06:25:53.533Z",
+  "updated": "2026-05-18T08:40:02.659Z",
+  "gitState": {
+    "branch": "feature/pan-1148",
+    "dirty": false
+  },
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "sessionHistory": [],
+  "swarmRuntime": {
+    "model": "kimi-k2.6",
+    "slots": [
+      {
+        "slotId": 1,
+        "itemId": "f6-issue-card",
+        "itemTitle": "Add IssueCard primitive (Board card, composes VerbBadge)",
+        "sessionName": "agent-pan-1148-1",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148-slot-1",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-18T06:25:53.531Z",
+        "mergedAt": "2026-05-18T08:39:11.956Z"
+      },
+      {
+        "slotId": 2,
+        "itemId": "f7-agent-card",
+        "itemTitle": "Add AgentCard primitive (Agents fleet card, composes VerbBadge)",
+        "sessionName": "agent-pan-1148-2",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148-slot-2",
+        "status": "merged",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-18T06:25:53.532Z",
+        "mergedAt": "2026-05-18T08:39:40.184Z"
+      },
+      {
+        "slotId": 3,
+        "itemId": "f8-universal-chrome",
+        "itemTitle": "Add fractal-noise body overlay + shared top-bar styles for new chrome",
+        "sessionName": "agent-pan-1148-3",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148-slot-3",
+        "status": "running",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-18T08:39:34.788Z"
+      },
+      {
+        "slotId": 6,
+        "itemId": "p1-pipeline-page-shell",
+        "itemTitle": "Add Pipeline page shell + route (greenfield)",
+        "sessionName": "agent-pan-1148-6",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148-slot-6",
+        "status": "running",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-18T08:39:35.947Z"
+      },
+      {
+        "slotId": 4,
+        "itemId": "b3-board-drop-drag-to-phase",
+        "itemTitle": "Drop Board drag-to-phase wiring (explicitly out per PRD non-goal); keep drag-to-reorder within a column",
+        "sessionName": "agent-pan-1148-4",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148-slot-4",
+        "status": "running",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-18T08:40:02.068Z"
+      },
+      {
+        "slotId": 5,
+        "itemId": "c1-command-deck-right-pane-reframe",
+        "itemTitle": "Reframe Command Deck right pane as tabbed per-project lens (preserves all ZoneCOverviewTabs content components)",
+        "sessionName": "agent-pan-1148-5",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148-slot-5",
+        "status": "running",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-18T08:40:02.659Z"
+      },
+      {
+        "slotId": 7,
+        "itemId": "a4-agents-move-deacon-to-health",
+        "itemTitle": "Move Deacon status UI from Agents to Health page",
+        "sessionName": "agent-pan-1148-7",
+        "workspace": "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148-slot-7",
+        "status": "running",
+        "phase": "implementation",
+        "dispatchedAt": "2026-05-18T08:40:02.490Z"
+      }
+    ],
+    "currentWave": 0,
+    "totalWaves": 2,
+    "autoAdvance": true,
+    "hostOverride": false,
+    "autoAdvanceFailureCount": 0,
+    "deferred": [
+      {
+        "itemId": "i1-inspector-parity-audit",
+        "itemTitle": "Audit InspectorPanel feature parity against new drawer; produce written checklist"
+      },
+      {
+        "itemId": "t1-styleguide-conformance-test",
+        "itemTitle": "Add styleguide-conformance Playwright test (asserts shared primitive class signatures across surfaces)"
+      }
+    ],
+    "synthesisOutputs": {},
+    "createdAt": "2026-05-18T06:25:53.532Z",
+    "updatedAt": "2026-05-18T08:40:02.659Z"
+  },
+  "feedback": []
+}
