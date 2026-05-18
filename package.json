@@ -86,7 +86,7 @@
     "lint:permissions": "bash scripts/lint-permissions.sh",
     "prelint:skills": "npm run build:contracts && npm run build:cli",
     "lint:skills": "bash scripts/lint-skills.sh",
-    "pretest": "npm run build:contracts",
+    "pretest": "npm run build:contracts && npm run build:pi-extension",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
