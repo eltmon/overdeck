@@ -114,6 +114,12 @@ async function doProbe(
   // "Cannot reach Nous Portal: fetch failed" toast.
   if (provider.name === 'nous') {
     await ensureOpenAICompatibleProxyRunning();
+    // Use GET /v1/models instead of POST /v1/messages. The only Nous model
+    // (qwen/qwen3.6-plus) is a reasoning model that ignores max_tokens for
+    // its reasoning phase and routinely takes >8s to answer a one-character
+    // probe, blowing the timeout. /v1/models verifies network + auth without
+    // burning reasoning tokens.
+    return probeModelsEndpoint(provider, apiKey);
   }
 
   const providerEnv = getProviderEnv(provider, apiKey);
@@ -151,18 +157,52 @@ async function doProbe(
     return classifyError(response.status, body);
   } catch (err: unknown) {
     clearTimeout(timer);
-
-    if (err instanceof Error) {
-      if (err.name === 'AbortError') {
-        return { ok: false, kind: 'timeout', message: `Provider did not respond within ${PROBE_TIMEOUT_MS / 1000}s` };
-      }
-      if (err.message.includes('ECONNREFUSED') || err.message.includes('ENOTFOUND') || err.message.includes('fetch failed')) {
-        return { ok: false, kind: 'network', message: `Cannot reach ${provider.displayName}: ${err.message}` };
-      }
-    }
-
-    return { ok: false, kind: 'unknown', message: `Probe failed: ${(err as Error).message ?? err}` };
+    return classifyFetchError(err, provider);
   }
+}
+
+async function probeModelsEndpoint(
+  provider: ProviderConfig,
+  apiKey: string,
+): Promise<ProbeResult> {
+  const baseUrl = provider.baseUrl;
+  if (!baseUrl) return { ok: true };
+
+  const normalized = baseUrl.replace(/\/+$/, '');
+  const url = normalized.endsWith('/v1') ? `${normalized}/models` : `${normalized}/v1/models`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        accept: 'application/json',
+      },
+    });
+
+    clearTimeout(timer);
+    if (response.ok) return { ok: true };
+    return classifyError(response.status, await response.text());
+  } catch (err: unknown) {
+    clearTimeout(timer);
+    return classifyFetchError(err, provider);
+  }
+}
+
+function classifyFetchError(err: unknown, provider: ProviderConfig): ProbeResult {
+  if (err instanceof Error) {
+    if (err.name === 'AbortError') {
+      return { ok: false, kind: 'timeout', message: `Provider did not respond within ${PROBE_TIMEOUT_MS / 1000}s` };
+    }
+    if (err.message.includes('ECONNREFUSED') || err.message.includes('ENOTFOUND') || err.message.includes('fetch failed')) {
+      return { ok: false, kind: 'network', message: `Cannot reach ${provider.displayName}: ${err.message}` };
+    }
+  }
+  return { ok: false, kind: 'unknown', message: `Probe failed: ${(err as Error).message ?? err}` };
 }
 
 /**
