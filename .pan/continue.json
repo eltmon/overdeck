@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T21:34:42.474Z",
+  "updated": "2026-05-18T21:41:30.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "7ec1a9985",
+    "sha": "4c5dcf8f2",
     "dirty": false
   },
   "decisions": [
@@ -203,8 +203,8 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-1aqz Pipeline shell is implemented and verified; inspection is skipped because requiresInspection=false. Next prerequisite is workspace-ltqb to flip the default route to Pipeline and move Board to /board.",
-    "beadId": "workspace-ltqb",
+    "description": "workspace-ltqb default-route flip is implemented and verified; inspection is skipped because requiresInspection=false. Continue the next ready PAN-1148 bead from bd ready.",
+    "beadId": "pending",
     "filesToRead": [
       "src/dashboard/frontend/src/App.tsx",
       "src/dashboard/frontend/src/App.test.tsx",
@@ -308,6 +308,12 @@
       "reason": "bead-close",
       "note": "Implemented workspace-1aqz Pipeline shell with /pipeline routing, TopBar primitive, helper-based phase grouping, App/Pipeline tests, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T21:41:30.000Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-ltqb default route flip: / and /pipeline resolve to Pipeline, /board resolves to Board, sidebar logo clicks route to Pipeline, and focused App/Sidebar tests pass.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": [],
@@ -399,6 +405,12 @@
     "i1-inspector-parity-audit.ac1": "completed",
     "i1-inspector-parity-audit.ac2": "completed",
     "i1-inspector-parity-audit.ac3": "completed",
-    "i1-inspector-parity-audit.ac4": "completed"
+    "i1-inspector-parity-audit.ac4": "completed",
+    "n2-default-route-flip": "completed",
+    "n2-default-route-flip.n2-default-route-flip.ac1": "completed",
+    "n2-default-route-flip.n2-default-route-flip.ac2": "completed",
+    "n2-default-route-flip.n2-default-route-flip.ac3": "completed",
+    "n2-default-route-flip.n2-default-route-flip.ac4": "completed",
+    "n2-default-route-flip.n2-default-route-flip.ac5": "completed"
   }
 }
