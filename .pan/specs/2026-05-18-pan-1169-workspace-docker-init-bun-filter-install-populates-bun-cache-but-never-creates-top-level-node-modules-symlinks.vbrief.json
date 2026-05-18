@@ -1,0 +1,210 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-18T04:30:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1169: Workspace docker init: bun --filter install populates .bun cache but never creates top-level node_modules symlinks",
+    "updated": "2026-05-18T04:09:01.035Z"
+  },
+  "plan": {
+    "id": "pan-1169",
+    "title": "Workspace docker init: bun --filter install populates .bun cache but never creates top-level node_modules symlinks",
+    "status": "proposed",
+    "uid": "482220b8-9c46-4f63-98a5-28653fc83ff2",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-18T04:30:00.000Z",
+    "updated": "2026-05-18T04:09:01.035Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1169",
+        "label": "PAN-1169",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docker",
+      "workspace",
+      "bun",
+      "init",
+      "infra"
+    ],
+    "narratives": {
+      "Problem": "The workspace docker init service runs `bun install --filter '@panctl/cli' --filter '@panctl/contracts' --filter '@panopticon/pi-extension' --filter 'panopticon-server' --filter 'panopticon-dashboard'` against the `container-node-modules` named volume. Bun 1.3.13 populates the content-addressed cache at `node_modules/.bun/` but never creates the top-level `node_modules/<pkg>` symlinks (effect, yaml, @iarna/toml, etc.). The dashboard build's tsdown config externalizes these packages (only `@panctl/*` is bundled), so `dist/dashboard/server.js` requires them at runtime. With the hoist step missing, the `server` container immediately crashes with `ERR_MODULE_NOT_FOUND: Cannot find package 'effect'`. The init container exits 0 anyway because the bundler emits UNRESOLVED_IMPORT only as a warning, hiding the failure. Net effect: every freshly-built workspace from this template is broken until the user falls back to `pan start --host`.",
+      "Proposal": "Two-part, independent fix. (1) Drop the --filter arguments from the init service's `bun install` in `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` and from `postCreateCommand` in `infra/.devcontainer-template/devcontainer.json.template`. A plain `bun install` triggers the workspace-hoist phase and populates top-level node_modules correctly — this is the exact path the host-side `workspace-manager.ts` already uses successfully. (2) Add an UNRESOLVED_IMPORT guard inside the init's command pipeline so any future regression (Bun version, bundler config, etc.) that leaves the top-level node_modules incomplete fails the init container loudly during build, rather than silently passing init and crashing the server at runtime."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Drop --filter rather than switch to npm install or add a manual relink step.",
+        "rationale": "The host's `workspace-manager.ts` already runs plain `bun install` against a fresh node_modules and produces a correctly-hoisted tree — that path is proven. The issue body's suggested-fixes section also lists this as the first preference. npm-install would diverge from the host package manager and add lockfile-format drift. A manual relink step would paper over the same root cause that dropping --filter solves directly."
+      },
+      {
+        "summary": "Apply the --filter removal to BOTH docker-compose.devcontainer.yml.template AND devcontainer.json.template's postCreateCommand.",
+        "rationale": "Only the docker init path is observably broken today, but the postCreateCommand in devcontainer.json runs the same `bun install --filter ...` against the same named volume when a user opens the workspace in VS Code Dev Containers. Leaving it unfixed would re-introduce the defect on the VS Code attach path."
+      },
+      {
+        "summary": "Add the UNRESOLVED_IMPORT guard as a second, independent bead rather than rolling it into the template fix.",
+        "rationale": "The two changes are orthogonal. Bead 1 fixes the current bug; Bead 2 makes the system fail loudly on any future bug in the same class. Keeping them separate lets the template fix ship and verify on its own, and lets the guard land as a structural improvement that's reviewable on its own merits."
+      },
+      {
+        "summary": "Keep the existing bun-store cache volume mount; do not touch the container-node-modules volume definition.",
+        "rationale": "The bun-store volume is bun's content-addressed cache at `/root/.bun/install/cache`; it is independent of the hoist/symlink step and removing it would slow init for no benefit. The container-node-modules volume is the target of the broken hoist — the fix is in the install command, not the volume."
+      },
+      {
+        "summary": "Do not attempt to heal existing broken workspaces (PAN-1052, etc.) as part of this issue.",
+        "rationale": "The template fix prevents NEW workspaces from hitting the bug. Existing broken workspaces have a populated-but-broken named volume that needs `pan workspace rebuild <id>` to recreate. Encoding that as automatic healing logic is out of scope; it will be documented as a one-line operator note instead."
+      },
+      {
+        "summary": "Do not add a regression test under `src/lib/workspace/__tests__/` for the install behavior.",
+        "rationale": "The defect is a Bun-binary behavior interacting with a docker named-volume filesystem. There is no unit-test-friendly surface — verifying the fix requires actually spinning up the docker stack. Verification will be performed by the work agent against a freshly-rebuilt PAN-1169 workspace and asserted via the bead's acceptance criteria, with the UNRESOLVED_IMPORT guard (Bead 2) serving as the durable, automated defense against regressions."
+      }
+    ],
+    "items": [
+      {
+        "id": "drop-filter-from-init",
+        "title": "Drop --filter from workspace devcontainer templates' bun install commands",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-18T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1169",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Remove the --filter flag arguments from the `bun install` invocation in two template files so a plain `bun install` runs against the named volume and triggers bun's workspace-hoist phase, populating top-level node_modules/<pkg> entries that the pre-built dashboard server expects at runtime.\n\nFiles to edit:\n  1. `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` — `init.command` block. Change the line `bun install --filter '@panctl/cli' --filter '@panctl/contracts' --filter '@panopticon/pi-extension' --filter 'panopticon-server' --filter 'panopticon-dashboard' &&` to `bun install &&`.\n  2. `infra/.devcontainer-template/devcontainer.json.template` — `postCreateCommand`. Change the value from `bun install --filter '@panctl/cli' --filter '@panctl/contracts' --filter '@panopticon/pi-extension' --filter 'panopticon-server' --filter 'panopticon-dashboard'` to `bun install`.\n\nDo NOT change any volume mounts, environment variables, or other init steps. The `npm rebuild better-sqlite3` and dashboard build steps must remain in place and in the same order.\n\nAdd a brief comment above the changed line in the docker-compose template explaining that --filter was removed because it leaves the top-level node_modules un-hoisted on the named volume (reference PAN-1169) so a future engineer doesn't innocently re-add it."
+        },
+        "subItems": [
+          {
+            "id": "drop-filter-from-init.ac1",
+            "title": "In `infra/.devcontainer-template/docker-compose.devcontainer.yml.template`, the `init` service's `command:` block invokes `bun install` (no `--filter` flags, no workspace name arguments).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-filter-from-init.ac2",
+            "title": "In `infra/.devcontainer-template/devcontainer.json.template`, `postCreateCommand` is `bun install` (no `--filter` flags, no workspace name arguments).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-filter-from-init.ac3",
+            "title": "A short comment in the docker-compose template (adjacent to the changed `bun install` line) documents that `--filter` was removed because it leaves top-level node_modules un-hoisted on the named volume, and references PAN-1169.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-filter-from-init.ac4",
+            "title": "After a freshly-rebuilt workspace (`pan workspace rebuild PAN-1169` or equivalent fresh `docker compose up`), running `docker run --rm -v <stack>_container-node-modules:/nm alpine ls /nm` lists top-level package directories (must include at least `effect`, `yaml`, and `@iarna` — the three confirmed-missing in the issue body), not just `.bun`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-filter-from-init.ac5",
+            "title": "After the same fresh rebuild, the `server` container reaches a steady running state (no `ERR_MODULE_NOT_FOUND` in `docker logs panopticon-feature-pan-1169-server-1`, container does not exit within 60 seconds of starting).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-filter-from-init.ac6",
+            "title": "After the same fresh rebuild, `evaluateWorkspaceStackHealth('PAN-1169', ...)` returns `healthy: true` (no `stuck Created`, no `init exited non-zero`, no `service exited` reasons).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-filter-from-init.ac7",
+            "title": "No other files are modified by this bead. (Specifically: `infra/.devcontainer-template/Dockerfile`, `infra/.devcontainer-template/dev.template`, `src/lib/workspace/devcontainer-renderer.ts`, and `src/lib/workspace-manager.ts` are unchanged.)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fail-init-on-unresolved-import",
+        "title": "Fail init container loudly on UNRESOLVED_IMPORT warnings during dashboard build",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-18T04:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1169",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Modify the `init.command` shell pipeline in `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` so that the `npm run build:dashboard:server` step's combined stdout+stderr is captured and scanned for the literal token `UNRESOLVED_IMPORT`. If any line matches, the init container exits non-zero so the failure surfaces as a build error inside init rather than as a runtime `ERR_MODULE_NOT_FOUND` inside the server container at startup.\n\nKeep the change local to the existing inline shell command — do NOT introduce a separate script file. A reasonable shape:\n\n```\nnpm run build:dashboard:server 2>&1 | tee /tmp/dashboard-build.log\nif grep -q 'UNRESOLVED_IMPORT' /tmp/dashboard-build.log; then\n  echo 'ERROR: dashboard build emitted UNRESOLVED_IMPORT warnings — top-level node_modules is incomplete (see PAN-1169).' >&2\n  exit 1\nfi\n```\n\nThe `PIPESTATUS`/`pipefail` handling matters: a `| tee` pipeline can mask the underlying build's non-zero exit, so either set `pipefail` first or check `${PIPESTATUS[0]}` after the tee. Use whichever idiom is portable to the busybox `sh` that the alpine-based init container uses (the existing command runs under `sh -c`, not bash).\n\nAdd a comment in the template above the new block explaining that this guard exists to catch the class of failure described in PAN-1169 (top-level node_modules missing → externalized imports unresolved → server crashes at runtime), so a future engineer doesn't remove the grep as 'noise'."
+        },
+        "subItems": [
+          {
+            "id": "fail-init-on-unresolved-import.ac1",
+            "title": "The init service's `command:` in `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` captures the dashboard server build's stdout+stderr, scans it for the literal token `UNRESOLVED_IMPORT`, and exits the init container with non-zero status if any match is found.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fail-init-on-unresolved-import.ac2",
+            "title": "The exit-status handling is correct under busybox `sh -c`: a non-zero exit from `npm run build:dashboard:server` itself (not just the grep) must also fail init. This means either `set -o pipefail` is used (and works under the container's sh) or `${PIPESTATUS[0]}` is explicitly checked.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fail-init-on-unresolved-import.ac3",
+            "title": "A comment above the new guard in the template explains why it exists, references PAN-1169, and warns against removing it as 'noise'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fail-init-on-unresolved-import.ac4",
+            "title": "On a freshly-rebuilt PAN-1169 workspace with the Bead 1 fix in place, the init container exits 0 (no UNRESOLVED_IMPORT warnings, build completes cleanly) — i.e. the guard does not produce a false positive when the system is working.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fail-init-on-unresolved-import.ac5",
+            "title": "Manual injection test: when the init container is run with the Bead 1 fix REVERTED (i.e. --filter restored, top-level node_modules empty), the init container exits non-zero with a diagnostic message that references PAN-1169 and the UNRESOLVED_IMPORT warnings, instead of exiting 0 silently. Document the test method (e.g. local revert of the docker-compose change, rerun of init service) in the bead's completion notes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fail-init-on-unresolved-import.ac6",
+            "title": "No new files are added (no separate shell script). The change is entirely inside `infra/.devcontainer-template/docker-compose.devcontainer.yml.template`'s `init.command` block.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-18-PAN-1169-workspace-docker-init-bun-filter-install-populates-bun-cache-but-never-creates-top-level-node-modules-symlinks.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
