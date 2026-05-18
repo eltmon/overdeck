@@ -408,17 +408,27 @@ async function installCommand(options: InstallOptions): Promise<void> {
       if (match) {
         const [, major, minor, patch] = match.map(Number);
         const currentVersion = major * 10000 + minor * 100 + patch;
-        const recommendedVersion = 1 * 10000 + 0 * 100 + 2; // v1.0.2 required for batch, gate, rules
+        const recommendedVersion = 1 * 10000 + 0 * 100 + 4; // v1.0.4 required for ping, doctor, prune
         if (currentVersion < recommendedVersion) {
-          spinner.info(`beads v${major}.${minor}.${patch} installed (v1.0.2+ recommended for new features)`);
+          spinner.start(`Upgrading beads from v${major}.${minor}.${patch} to v1.0.4+...`);
+          const plat = detectPlatform();
+          if (plat === 'darwin') {
+            execSync('brew upgrade gastownhall/beads/bd', { stdio: 'pipe', timeout: 120000 });
+          } else {
+            execSync('curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash', {
+              stdio: 'pipe',
+              timeout: 120000,
+            });
+          }
+          spinner.succeed('beads upgraded');
         } else {
           spinner.info(`beads v${major}.${minor}.${patch} installed`);
         }
       } else {
         spinner.info('beads already installed');
       }
-    } catch {
-      spinner.info('beads already installed');
+    } catch (error) {
+      spinner.warn('beads version check or upgrade failed - install manually: curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash');
     }
     }
   }

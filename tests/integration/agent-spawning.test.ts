@@ -237,7 +237,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(state.harness).toBe(DEFAULT_ROLES[role].harness ?? 'claude-code');
     });
 
-    it('launches review sub-roles in headless print mode with the prompt as an argument', async () => {
+    it('launches review sub-roles in headless print mode with the prompt on stdin', async () => {
       const tmux = await import('../../src/lib/tmux.js');
 
       await spawnRun('PAN-SUBREVIEW-1', 'review', {
@@ -246,18 +246,15 @@ describe('PAN-1048 role primitive — agent spawning', () => {
         prompt: 'review this diff',
       });
 
-      const launcher = readFileSync(join(getAgentDir('agent-pan-subreview-1-review-security'), 'launcher.sh'), 'utf8');
+      const agentDir = getAgentDir('agent-pan-subreview-1-review-security');
+      const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
 
       expect(launcher).toContain('exec claude --print');
       expect(launcher).toContain("--name agent-pan-subreview-1-review-security --session-id '");
-      expect(launcher).toContain("prompt=$(cat '");
-      expect(launcher).toContain("initial-prompt.md')");
-      expect(launcher).toContain('"$prompt"');
-      expect(launcher).not.toContain("< '");
-      expect(tmux.sendKeysAsync).not.toHaveBeenCalledWith(
-        'agent-pan-subreview-1-review-security',
-        'review this diff',
-      );
+      expect(launcher).toContain(`< '${join(agentDir, 'initial-prompt.md')}'`);
+      expect(launcher).not.toContain('prompt=$(cat');
+      expect(launcher).not.toContain('"$prompt"');
+      expect(tmux.sendKeysAsync).not.toHaveBeenCalled();
     });
 
     it('review sub-role launcher owns the REVIEWER_READY/FAILED/TIMEOUT signal (PAN-977)', async () => {
@@ -278,6 +275,7 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       expect(launcher).not.toContain('exec claude');
       expect(launcher).toContain("trap '' HUP");
       expect(launcher).toContain('timeout 1200 claude --print');
+      expect(launcher).toContain(`< '${join(agentDir, 'initial-prompt.md')}'`);
       expect(launcher).toContain('CLAUDE_EXIT=$?');
       expect(launcher).toContain(`echo $$ > '${join(agentDir, 'reviewer-launcher.pid')}'`);
       expect(launcher).toContain('"REVIEWER_READY correctness /tmp/out/review-correctness.md"');

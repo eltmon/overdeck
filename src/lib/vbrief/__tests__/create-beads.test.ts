@@ -137,7 +137,7 @@ describe('createBeadsFromVBrief', () => {
 
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd list --json --limit 0
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd ping --json
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ...
       .mockResolvedValueOnce({ stdout: 'bead-001\n', stderr: '' });    // bd create
 
@@ -151,7 +151,7 @@ describe('createBeadsFromVBrief', () => {
     expect(result.created).toContain('PAN-500: First task');
   });
 
-  it('refuses to bd init when redirect exists and probe fails (would clobber redirect)', async () => {
+  it('returns an error after bd doctor when a redirect-managed probe still fails', async () => {
     const ws2 = createWorkspace('PAN-501');
     setupRedirect(ws2.workspacePath);
     writePlan(ws2.projectRoot, 'PAN-501', makeDoc('PAN-501', [{ id: 'item-1', title: 'Should not init' }]));
@@ -159,11 +159,18 @@ describe('createBeadsFromVBrief', () => {
     const dbError = new Error('Error 1146 (HY000): table not found: issues');
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
-      .mockRejectedValueOnce(dbError);                                 // bd list --json --limit 0 (probe)
+      .mockRejectedValueOnce(dbError)                                  // bd ping --json (probe)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd doctor --fix
+      .mockRejectedValueOnce(dbError);                                 // bd ping --json (retry)
 
     const result = await createBeadsFromVBrief(ws2.workspacePath);
 
-    // bd init must NOT have been called.
+    const doctorCalls = mockExecAsync.mock.calls.filter(
+      ([file, args]: [string, string[]]) =>
+        file === 'bd' && Array.isArray(args) && args[0] === 'doctor' && args[1] === '--fix',
+    );
+    expect(doctorCalls).toHaveLength(1);
+
     const initCall = mockExecAsync.mock.calls.find(
       ([file, args]: [string, string[]]) =>
         file === 'bd' && Array.isArray(args) && args[0] === 'init',
@@ -172,9 +179,70 @@ describe('createBeadsFromVBrief', () => {
 
     expect(result.success).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors[0]).toMatch(/redirect|main beads/i);
+    expect(result.errors[0]).toMatch(/failed after recovery/i);
 
     rmSync(ws2.projectRoot, { recursive: true, force: true });
+  });
+
+  it('runs bd doctor and continues when retry ping succeeds', async () => {
+    const ws3 = createWorkspace('PAN-502');
+    setupRedirect(ws3.workspacePath);
+    writePlan(ws3.projectRoot, 'PAN-502', makeDoc('PAN-502', [{ id: 'item-1', title: 'Recovered task' }]));
+
+    const dbError = new Error('Error 1146 (HY000): table not found: issues');
+    mockExecAsync
+      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
+      .mockRejectedValueOnce(dbError)                                  // bd ping --json (probe)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd doctor --fix
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd ping --json (retry)
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ... (idempotency)
+      .mockResolvedValueOnce({ stdout: 'bead-recovered\n', stderr: '' }); // bd create
+
+    const result = await createBeadsFromVBrief(ws3.workspacePath);
+
+    const doctorCalls = mockExecAsync.mock.calls.filter(
+      ([file, args]: [string, string[]]) =>
+        file === 'bd' && Array.isArray(args) && args[0] === 'doctor' && args[1] === '--fix',
+    );
+    expect(doctorCalls).toHaveLength(1);
+    expect(result.success).toBe(true);
+    expect(result.errors).toHaveLength(0);
+    expect(result.created).toContain('PAN-502: Recovered task');
+
+    rmSync(ws3.projectRoot, { recursive: true, force: true });
+  });
+
+  it('recovers from PAN-457 table-missing corruption and creates every plan item', async () => {
+    const ws9 = createWorkspace('PAN-509');
+    setupRedirect(ws9.workspacePath);
+    writePlan(ws9.projectRoot, 'PAN-509', makeDoc('PAN-509', [
+      { id: 'item-a', title: 'Recovered alpha' },
+      { id: 'item-b', title: 'Recovered beta' },
+    ]));
+
+    const tableMissing = Object.assign(new Error('table not found: issues'), {
+      stderr: 'table not found: issues',
+    });
+    mockExecAsync
+      .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })
+      .mockRejectedValueOnce(tableMissing)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'bead-alpha\n', stderr: '' })
+      .mockResolvedValueOnce({ stdout: 'bead-beta\n', stderr: '' });
+
+    const result = await createBeadsFromVBrief(ws9.workspacePath);
+
+    const createCalls = mockExecAsync.mock.calls.filter(
+      ([file, args]: [string, string[]]) => file === 'bd' && Array.isArray(args) && args[0] === 'create',
+    );
+    expect(result.success).toBe(true);
+    expect(createCalls).toHaveLength(2);
+    expect(result.created).toEqual(['PAN-509: Recovered alpha', 'PAN-509: Recovered beta']);
+    expect(result.errors.join('\n')).not.toMatch(/stale local-DB artifacts/i);
+
+    rmSync(ws9.projectRoot, { recursive: true, force: true });
   });
 
   it('runs bd init only when there is no redirect AND no main beads (true fresh install)', async () => {
@@ -188,7 +256,7 @@ describe('createBeadsFromVBrief', () => {
       .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd init --prefix <expectedPrefix> (early setup)
       .mockResolvedValueOnce({ stdout: '', stderr: '' })               // git config beads.role contributor
       .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd config set export.git-add false
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd list --json --limit 0 (probe — succeeds after init)
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd ping --json (probe — succeeds after init)
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ... (idempotency)
       .mockResolvedValueOnce({ stdout: 'bead-002\n', stderr: '' });    // bd create
 
@@ -217,7 +285,7 @@ describe('createBeadsFromVBrief', () => {
 
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })   // which bd
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd list --json --limit 0
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })               // bd ping --json
       .mockResolvedValueOnce({ stdout: '[]', stderr: '' })             // bd list --json -l ... (idempotency)
       .mockResolvedValueOnce({ stdout: 'bead-alpha\n', stderr: '' })  // bd create item-a
       .mockResolvedValueOnce({ stdout: 'bead-beta\n', stderr: '' });  // bd create item-b
@@ -241,7 +309,7 @@ describe('createBeadsFromVBrief', () => {
     const existingBeads = JSON.stringify([{ id: 'stale-bead-42' }, { id: 'stale-bead-43' }]);
     mockExecAsync
       .mockResolvedValueOnce({ stdout: '/usr/bin/bd', stderr: '' })    // which bd
-      .mockResolvedValueOnce({ stdout: '', stderr: '' })                // bd list --json --limit 0
+      .mockResolvedValueOnce({ stdout: '', stderr: '' })                // bd ping --json
       .mockResolvedValueOnce({ stdout: existingBeads, stderr: '' })    // bd list --json -l ... (idempotency)
       .mockResolvedValueOnce({ stdout: '', stderr: '' })                // bd delete stale-bead-42
       .mockResolvedValueOnce({ stdout: '', stderr: '' })                // bd delete stale-bead-43
