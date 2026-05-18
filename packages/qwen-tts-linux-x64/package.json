@@ -1,0 +1,16 @@
+{
+  "name": "qwen-tts-linux-x64",
+  "version": "0.1.0",
+  "description": "Linux x64 Qwen TTS daemon Python environment for Panopticon",
+  "license": "MIT",
+  "type": "module",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "package.json"
+  ]
+}

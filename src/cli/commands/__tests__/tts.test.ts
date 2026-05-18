@@ -3,11 +3,15 @@ import {
   buildTtsSpeakPayload,
   DEFAULT_TTS_TEST_TEXT,
   deleteTtsVoiceByName,
+  formatTtsDaemonStatus,
   formatVoiceDetails,
   formatVoicesTable,
   listTtsVoices,
   mapTtsVoice,
   playTtsVoice,
+  runTtsDaemonStart,
+  runTtsDaemonStatus,
+  runTtsDaemonStop,
   runTtsTest,
   setDefaultTtsVoice,
   showTtsVoice,
@@ -24,6 +28,7 @@ const CONFIG: NormalizedTtsDaemonConfig = {
   dropInfoWhenFull: true,
   daemonHost: '127.0.0.1',
   daemonPort: 8787,
+  daemonAutoStart: false,
   voiceMap: {},
   mutedSources: [],
   utteranceTemplates: {},
@@ -184,6 +189,73 @@ describe('pan tts voices', () => {
 
     expect(updateMock).toHaveBeenCalledWith({ voiceMap: { 'reviewStatus.passed': 'voice-1' } });
     expect(stdout.log).toHaveBeenCalledWith('Mapped reviewStatus.passed → System Voice');
+  });
+});
+
+describe('pan tts daemon lifecycle', () => {
+  it('formats daemon status with pid, queue, model, uptime, and GPU memory', () => {
+    const output = formatTtsDaemonStatus({
+      ok: true,
+      running: true,
+      pid: 1234,
+      daemonHost: '127.0.0.1',
+      daemonPort: 8787,
+      queueDepth: 2,
+      model: 'qwen3-tts',
+      uptimeSeconds: 65,
+      gpuMemoryUsedMb: 4200,
+    });
+
+    expect(output).toContain('Daemon:');
+    expect(output).toContain('Endpoint: 127.0.0.1:8787');
+    expect(output).toContain('PID: 1234');
+    expect(output).toContain('Model: qwen3-tts');
+    expect(output).toContain('Queue depth: 2');
+    expect(output).toContain('Uptime: 1m 5s');
+    expect(output).toContain('GPU memory: 4.1GB');
+  });
+
+  it('starts the daemon through injected lifecycle dependencies', async () => {
+    const startDaemon = vi.fn().mockResolvedValue({
+      ok: true,
+      pid: 1234,
+      alreadyRunning: false,
+      status: { ok: true, running: true, pid: 1234, daemonHost: '127.0.0.1', daemonPort: 8787 },
+    });
+    const stdout = { log: vi.fn() };
+
+    const result = await runTtsDaemonStart({ waitForHealth: true, timeoutMs: 10 }, {
+      config: CONFIG,
+      startDaemon,
+      stdout,
+      stderr: { error: vi.fn() },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(startDaemon).toHaveBeenCalledWith({ config: CONFIG, detach: undefined, waitForHealth: true, timeoutMs: 10 });
+    expect(stdout.log).toHaveBeenCalledWith(expect.stringContaining('TTS daemon started'));
+  });
+
+  it('stops the daemon through injected lifecycle dependencies', async () => {
+    const stopDaemon = vi.fn().mockResolvedValue({ stopped: true, pid: 1234 });
+    const stdout = { log: vi.fn() };
+
+    const result = await runTtsDaemonStop({ stopDaemon, stdout, stderr: { error: vi.fn() } });
+
+    expect(result).toEqual({ stopped: true, pid: 1234 });
+    expect(stopDaemon).toHaveBeenCalledOnce();
+    expect(stdout.log).toHaveBeenCalledWith(expect.stringContaining('Stopped TTS daemon'));
+  });
+
+  it('prints daemon status through injected lifecycle dependencies', async () => {
+    const getStatus = vi.fn().mockResolvedValue({ ok: false, running: false, pid: null, daemonHost: '127.0.0.1', daemonPort: 8787, error: 'daemon unreachable' });
+    const stdout = { log: vi.fn() };
+
+    const result = await runTtsDaemonStatus({ config: CONFIG, getStatus, stdout });
+
+    expect(result.ok).toBe(false);
+    expect(getStatus).toHaveBeenCalledWith(CONFIG);
+    expect(stdout.log).toHaveBeenCalledWith(expect.stringContaining('daemon unreachable'));
   });
 });
 

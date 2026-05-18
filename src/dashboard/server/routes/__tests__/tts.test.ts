@@ -31,7 +31,12 @@ describe('checkTtsHealth', () => {
 
     await expect(checkTtsHealth({ fetch: fetchImpl, host: '127.0.0.1', port: 8787 })).resolves.toEqual({
       ok: true,
+      running: true,
+      pid: null,
+      daemonHost: '127.0.0.1',
+      daemonPort: 8787,
       queue: 2,
+      queueDepth: 2,
       model: 'qwen3-tts',
     });
     expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:8787/health', expect.objectContaining({ signal: expect.any(AbortSignal) }));
@@ -44,6 +49,10 @@ describe('checkTtsHealth', () => {
 
     await expect(checkTtsHealth({ fetch: fetchImpl, host: '127.0.0.1', port: 8787 })).resolves.toEqual({
       ok: false,
+      running: false,
+      pid: null,
+      daemonHost: '127.0.0.1',
+      daemonPort: 8787,
       error: 'daemon unreachable',
     });
   });
@@ -53,6 +62,10 @@ describe('checkTtsHealth', () => {
 
     await expect(checkTtsHealth({ fetch: fetchImpl, host: '127.0.0.1', port: 8787 })).resolves.toEqual({
       ok: false,
+      running: false,
+      pid: null,
+      daemonHost: '127.0.0.1',
+      daemonPort: 8787,
       error: 'daemon unreachable',
     });
   });

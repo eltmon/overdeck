@@ -6,6 +6,16 @@ import { parseDocument } from 'yaml';
 import { clearConfigCache, getGlobalConfigPath, loadConfig, type NormalizedTtsDaemonConfig } from '../../lib/config-yaml.js';
 import { buildTtsSpeakPayload as buildRuntimeTtsSpeakPayload, type TtsSpeakPayload } from '../../lib/tts-speak.js';
 import { deleteVoice, findVoiceById, findVoiceByName, loadVoices, type TtsVoice } from '../../lib/tts-voices.js';
+import {
+  getTtsDaemonStatus,
+  installTtsSystemdUnit,
+  runTtsDaemonForeground,
+  startTtsDaemon,
+  stopTtsDaemon,
+  type TtsDaemonStartResult,
+  type TtsDaemonStatus,
+  type TtsDaemonStopResult,
+} from '../../lib/tts-daemon.js';
 
 export const DEFAULT_TTS_TEST_TEXT = 'The quick brown fox jumps over the lazy dog. Panopticon dashboard is now online.';
 
@@ -24,6 +34,17 @@ export interface TtsVoiceCommandDeps {
   deleteVoice?: (id: string) => Promise<boolean>;
   updateTtsConfig?: (updates: TtsConfigUpdate) => Promise<void>;
   fetch?: typeof fetch;
+  stdout?: Pick<typeof console, 'log'>;
+  stderr?: Pick<typeof console, 'error'>;
+}
+
+export interface TtsDaemonCommandDeps {
+  config?: NormalizedTtsDaemonConfig;
+  getStatus?: (config: NormalizedTtsDaemonConfig) => Promise<TtsDaemonStatus>;
+  startDaemon?: (options: { config: NormalizedTtsDaemonConfig; detach?: boolean; waitForHealth?: boolean; timeoutMs?: number }) => Promise<TtsDaemonStartResult>;
+  stopDaemon?: (timeoutMs?: number) => Promise<TtsDaemonStopResult>;
+  installSystemdUnit?: () => Promise<string>;
+  runForeground?: (config: NormalizedTtsDaemonConfig) => Promise<{ exitCode: number | null; signal: NodeJS.Signals | null }>;
   stdout?: Pick<typeof console, 'log'>;
   stderr?: Pick<typeof console, 'error'>;
 }
@@ -211,11 +232,172 @@ export async function mapTtsVoice(event: string, name: string, deps: TtsVoiceCom
   return voice;
 }
 
+function getTtsConfig(deps: TtsDaemonCommandDeps): NormalizedTtsDaemonConfig {
+  return deps.config ?? loadConfig().config.tts;
+}
+
+function formatSeconds(seconds: number | undefined): string | undefined {
+  if (seconds === undefined) return undefined;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m ${remainingSeconds}s`;
+  if (minutes > 0) return `${minutes}m ${remainingSeconds}s`;
+  return `${remainingSeconds}s`;
+}
+
+function formatMegabytes(mb: number | undefined): string | undefined {
+  if (mb === undefined) return undefined;
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)}GB` : `${mb}MB`;
+}
+
+export function formatTtsDaemonStatus(status: TtsDaemonStatus): string {
+  const state = status.ok ? chalk.green('healthy') : status.running ? chalk.yellow('unhealthy') : chalk.red('stopped');
+  const lines = [
+    `Daemon: ${state}`,
+    `Endpoint: ${status.daemonHost}:${status.daemonPort}`,
+    `PID: ${status.pid ?? '—'}`,
+  ];
+  if (status.model) lines.push(`Model: ${String(status.model)}`);
+  if (status.queueDepth !== undefined) lines.push(`Queue depth: ${status.queueDepth}`);
+  const uptime = formatSeconds(status.uptimeSeconds);
+  if (uptime) lines.push(`Uptime: ${uptime}`);
+  const gpuMemory = formatMegabytes(status.gpuMemoryUsedMb);
+  if (gpuMemory) lines.push(`GPU memory: ${gpuMemory}`);
+  if (status.error) lines.push(`Error: ${status.error}`);
+  return lines.join('\n');
+}
+
+export async function runTtsDaemonStatus(deps: TtsDaemonCommandDeps = {}): Promise<TtsDaemonStatus> {
+  const config = getTtsConfig(deps);
+  const status = await (deps.getStatus ?? getTtsDaemonStatus)(config);
+  (deps.stdout ?? console).log(formatTtsDaemonStatus(status));
+  return status;
+}
+
+export async function runTtsDaemonStart(
+  options: { detach?: boolean; waitForHealth?: boolean; timeoutMs?: number } = {},
+  deps: TtsDaemonCommandDeps = {},
+): Promise<TtsDaemonStartResult> {
+  const config = getTtsConfig(deps);
+  const result = await (deps.startDaemon ?? startTtsDaemon)({
+    config,
+    detach: options.detach,
+    waitForHealth: options.waitForHealth,
+    timeoutMs: options.timeoutMs,
+  });
+  const stdout = deps.stdout ?? console;
+  const stderr = deps.stderr ?? console;
+  if (result.ok) {
+    const prefix = result.alreadyRunning ? 'TTS daemon already running' : 'TTS daemon started';
+    stdout.log(chalk.green(`✓ ${prefix}${result.pid ? ` (pid ${result.pid})` : ''}`));
+  } else {
+    stderr.error(chalk.red(result.error ?? result.status?.error ?? 'Failed to start TTS daemon'));
+  }
+  if (result.status) stdout.log(formatTtsDaemonStatus(result.status));
+  return result;
+}
+
+export async function runTtsDaemonForegroundCommand(deps: TtsDaemonCommandDeps = {}): Promise<number> {
+  const config = getTtsConfig(deps);
+  const result = await (deps.runForeground ?? runTtsDaemonForeground)(config);
+  if (result.signal) (deps.stderr ?? console).error(chalk.yellow(`TTS daemon exited from ${result.signal}`));
+  return result.exitCode ?? (result.signal ? 1 : 0);
+}
+
+export async function runTtsDaemonStop(deps: TtsDaemonCommandDeps = {}): Promise<TtsDaemonStopResult> {
+  const result = await (deps.stopDaemon ?? stopTtsDaemon)();
+  const stdout = deps.stdout ?? console;
+  const stderr = deps.stderr ?? console;
+  if (result.stopped) stdout.log(chalk.green(`✓ Stopped TTS daemon${result.pid ? ` (pid ${result.pid})` : ''}`));
+  else stderr.error(chalk.red(result.error ?? 'TTS daemon did not stop'));
+  return result;
+}
+
+export async function runTtsDaemonRestart(
+  options: { detach?: boolean; waitForHealth?: boolean; timeoutMs?: number } = {},
+  deps: TtsDaemonCommandDeps = {},
+): Promise<TtsDaemonStartResult> {
+  await runTtsDaemonStop(deps);
+  return runTtsDaemonStart(options, deps);
+}
+
+export async function runTtsInstallSystemd(deps: TtsDaemonCommandDeps = {}): Promise<string> {
+  const unitPath = await (deps.installSystemdUnit ?? installTtsSystemdUnit)();
+  (deps.stdout ?? console).log(chalk.green(`✓ Installed systemd user unit at ${unitPath}`));
+  (deps.stdout ?? console).log('Enable it with: systemctl --user enable --now panopticon-qwen-tts.service');
+  return unitPath;
+}
+
+function parseTimeoutMs(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) throw new Error(`Invalid timeout: ${value}`);
+  return parsed;
+}
+
 export function registerTtsCommands(program: Command): void {
   const tts = program.command('tts').description('Local TTS daemon helpers');
   const voices = tts.command('voices').description('List and inspect saved TTS voices').action(async () => {
     await listTtsVoices();
   });
+
+  tts
+    .command('start')
+    .description('Start the local Qwen TTS daemon')
+    .option('--detach', 'Run the daemon detached in the background')
+    .option('--foreground', 'Run the daemon in the foreground')
+    .option('--no-wait-for-health', 'Return without waiting for /health')
+    .option('--timeout-ms <ms>', 'Health wait timeout in milliseconds')
+    .action(async (options: { detach?: boolean; foreground?: boolean; waitForHealth?: boolean; timeoutMs?: string }) => {
+      if (options.foreground) {
+        process.exitCode = await runTtsDaemonForegroundCommand();
+        return;
+      }
+      const result = await runTtsDaemonStart({
+        detach: true,
+        waitForHealth: options.waitForHealth,
+        timeoutMs: parseTimeoutMs(options.timeoutMs),
+      });
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  tts
+    .command('stop')
+    .description('Stop the local Qwen TTS daemon')
+    .action(async () => {
+      const result = await runTtsDaemonStop();
+      if (!result.stopped) process.exitCode = 1;
+    });
+
+  tts
+    .command('status')
+    .description('Show local Qwen TTS daemon status')
+    .action(async () => {
+      const status = await runTtsDaemonStatus();
+      if (!status.ok) process.exitCode = status.running ? 2 : 1;
+    });
+
+  tts
+    .command('restart')
+    .description('Restart the local Qwen TTS daemon')
+    .option('--no-wait-for-health', 'Return without waiting for /health')
+    .option('--timeout-ms <ms>', 'Health wait timeout in milliseconds')
+    .action(async (options: { waitForHealth?: boolean; timeoutMs?: string }) => {
+      const result = await runTtsDaemonRestart({
+        detach: true,
+        waitForHealth: options.waitForHealth,
+        timeoutMs: parseTimeoutMs(options.timeoutMs),
+      });
+      if (!result.ok) process.exitCode = 1;
+    });
+
+  tts
+    .command('install-systemd')
+    .description('Install a user systemd unit for the local Qwen TTS daemon')
+    .action(async () => {
+      await runTtsInstallSystemd();
+    });
 
   tts
     .command('test [text]')

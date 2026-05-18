@@ -65,10 +65,16 @@ The daemon loads `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` on `cuda:0` at startup a
 ### Running the daemon
 
 ```bash
-cd skills/pan-tts/scripts
-# assumes the qwen-tts venv is active (see eltmon-stream setup)
-python tts_daemon.py
+pan install                # creates packages/qwen-tts-linux-x64/.venv on Linux/CUDA
+pan install --skip-tts-daemon
+pan tts start
+pan tts status
+pan tts stop
+pan tts restart
+pan tts install-systemd
 ```
+
+`pan tts start` uses `tts.daemonHost` and `tts.daemonPort` from `~/.panopticon/config.yaml`, tracks the PID at `~/.panopticon/pids/qwen-tts.pid`, and waits for `/health` before returning. Set `tts.daemon.autoStart: true` to have `pan up` start the daemon automatically; the default is off because the model cold-start and VRAM footprint are expensive.
 
 The daemon auto-detects the default PipeWire sink and uses a **persistent `pw-play` stream** to avoid audio truncation caused by sink suspend/resume (see *PipeWire Suspend* below).
 
@@ -159,15 +165,16 @@ Use ad-hoc speak sparingly — the built-in dashboard playback service or option
 
 ## Verifying It
 
-1. Start the Qwen3-TTS daemon: `cd skills/pan-tts/scripts && python tts_daemon.py`.
-2. Set `tts.enabled: true` and a default voice in `~/.panopticon/config.yaml`.
-3. `pan up` — start the dashboard.
-4. In another terminal: `pan start PAN-XXX` and listen. You should hear dashboard-emitted `activity.tts` events.
-5. Optional external sidecar path: start `pan-tts` and watch `journalctl --user -u pan-tts -f`.
+1. Install the daemon venv: `pan install` on Linux/CUDA, or skip the heavy CUDA install with `pan install --skip-tts-daemon`.
+2. Start the daemon: `pan tts start`.
+3. Set `tts.enabled: true` and a default voice in `~/.panopticon/config.yaml`.
+4. `pan up` — start the dashboard; if `tts.daemon.autoStart: true`, this also starts the daemon.
+5. In another terminal: `pan start PAN-XXX` and listen. You should hear dashboard-emitted `activity.tts` events.
+6. Optional external sidecar path: start `pan-tts` and watch `journalctl --user -u pan-tts -f`.
 
 If nothing speaks:
 
-- Check the dashboard TTS badge and `GET /api/tts/health` to confirm the daemon is reachable.
+- Run `pan tts status` and check the dashboard TTS badge / `GET /api/tts/health` to confirm the daemon is reachable.
 - Check that `tts.voice` points at an existing voice in `~/.panopticon/tts-voices.json`.
 - For the optional sidecar path, check `curl -N http://127.0.0.1:3000/events/stream?types=activity.tts` directly.
 - Check `aplay -l` — make sure the default audio device is reachable from the user session.

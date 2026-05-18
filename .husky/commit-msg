@@ -18,6 +18,9 @@ fi
 
 version_changed=0
 for pkg in $staged_pkg_changes; do
+  if git diff --cached --name-status -- "$pkg" | grep -Eq '^A[[:space:]]'; then
+    continue
+  fi
   if git diff --cached -U0 "$pkg" | grep -E '^[-+]\s*"version"\s*:' >/dev/null; then
     version_changed=1
     break

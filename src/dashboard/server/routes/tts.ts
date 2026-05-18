@@ -11,17 +11,13 @@ import {
   type TtsVoice,
 } from '../../../lib/tts-voices.js';
 import { jsonResponse } from '../http-helpers.js';
+import { getTtsDaemonStatus, startTtsDaemon, type TtsDaemonStartResult, type TtsDaemonStatus } from '../../../lib/tts-daemon.js';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export const EXTRACT_EMBEDDING_TIMEOUT_MS = 60_000;
 
-export interface TtsHealthResult {
-  ok: boolean;
-  queue?: unknown;
-  model?: unknown;
-  error?: string;
-}
+export type TtsHealthResult = TtsDaemonStatus;
 
 export interface CheckTtsHealthOptions {
   fetch?: FetchLike;
@@ -31,39 +27,47 @@ export interface CheckTtsHealthOptions {
 }
 
 export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promise<TtsHealthResult> {
-  // TTS architecture (PAN-829 + skill pan-tts):
-  // 1. The in-process subscriber (startTtsPlayback) listens for activity.tts events.
-  // 2. When an event fires, it POSTs to the Qwen3-TTS daemon at daemonHost:daemonPort/speak.
-  // 3. The daemon synthesizes audio and plays it through PipeWire.
-  //
-  // The voice-sample preview path ALSO POSTs directly to /speak — so if the
-  // daemon is down, both paths fail. Health here probes the daemon so the
-  // dashboard's TTS indicator accurately reflects whether audio will actually
-  // come out. If tts.enabled=false in settings, surface that as the reason
-  // first so users don't think the daemon is broken when they just turned it off.
-  if (options.host === undefined && options.port === undefined && !getTtsRuntimeConfig().enabled) {
-    return { ok: false, error: 'tts disabled in settings' };
+  const runtimeConfig = getTtsRuntimeConfig();
+  const config = {
+    ...runtimeConfig,
+    daemonHost: options.host ?? runtimeConfig.daemonHost,
+    daemonPort: options.port ?? runtimeConfig.daemonPort,
+  };
+
+  if (options.host === undefined && options.port === undefined && !runtimeConfig.enabled) {
+    return {
+      ok: false,
+      running: false,
+      pid: null,
+      daemonHost: config.daemonHost,
+      daemonPort: config.daemonPort,
+      error: 'tts disabled in settings',
+    };
   }
 
-  let host = options.host;
-  let port = options.port;
-  if (host === undefined || port === undefined) {
-    const config = getTtsRuntimeConfig();
-    host = config.daemonHost;
-    port = config.daemonPort;
-  }
+  if (!options.fetch) return getTtsDaemonStatus(config);
 
-  const fetchImpl = options.fetch ?? fetch;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 2_000);
 
   try {
-    const response = await fetchImpl(`http://${host}:${port}/health`, { signal: controller.signal });
-    if (!response.ok) return { ok: false, error: 'daemon unreachable' };
+    const response = await options.fetch(`http://${config.daemonHost}:${config.daemonPort}/health`, { signal: controller.signal });
+    if (!response.ok) {
+      return { ok: false, running: false, pid: null, daemonHost: config.daemonHost, daemonPort: config.daemonPort, error: 'daemon unreachable' };
+    }
     const body = await response.json() as { queue?: unknown; model?: unknown };
-    return { ok: true, queue: body.queue, model: body.model };
+    return {
+      ok: true,
+      running: true,
+      pid: null,
+      daemonHost: config.daemonHost,
+      daemonPort: config.daemonPort,
+      queue: body.queue,
+      queueDepth: typeof body.queue === 'number' ? body.queue : undefined,
+      model: body.model,
+    };
   } catch {
-    return { ok: false, error: 'daemon unreachable' };
+    return { ok: false, running: false, pid: null, daemonHost: config.daemonHost, daemonPort: config.daemonPort, error: 'daemon unreachable' };
   } finally {
     clearTimeout(timeout);
   }
@@ -232,6 +236,10 @@ export async function speakTts(input: ResolveAndSpeakOptions, deps: SpeakTtsDeps
   };
 }
 
+export async function startTtsDaemonFromDashboard(): Promise<TtsDaemonStartResult> {
+  return startTtsDaemon({ config: getTtsRuntimeConfig(), detach: true, timeoutMs: 120_000 });
+}
+
 export async function extractTtsEmbedding(
   input: ExtractEmbeddingInput,
   deps: ExtractEmbeddingDeps = {},
@@ -283,6 +291,19 @@ const getTtsHealthRoute = HttpRouter.add(
   Effect.promise(() => checkTtsHealth()).pipe(
     Effect.map((health) => jsonResponse(health)),
   ),
+);
+
+const postTtsStartRoute = HttpRouter.add(
+  'POST',
+  '/api/tts/start',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = originErrorResponse(request);
+    if (originError) return originError;
+
+    const result = yield* Effect.promise(() => startTtsDaemonFromDashboard());
+    return jsonResponse(result, { status: result.ok ? 200 : 503 });
+  }),
 );
 
 const getTtsVoicesRoute = HttpRouter.add(
@@ -380,6 +401,7 @@ const postExtractEmbeddingRoute = HttpRouter.add(
 
 export const ttsRouteLayer = Layer.mergeAll(
   getTtsHealthRoute,
+  postTtsStartRoute,
   getTtsVoicesRoute,
   postTtsVoiceRoute,
   deleteTtsVoicesRoute,

@@ -10,7 +10,7 @@ Use `pan up` after a reboot or when you want the normal local Panopticon stack.
 pan up
 ```
 
-`pan up` starts the bundled dashboard from `dist/dashboard/server.js` under Node 22. This is the only supported production-like dashboard path. It also starts the supervisor sidecar, which provides restart fallback and watchdog recovery.
+`pan up` starts the bundled dashboard from `dist/dashboard/server.js` under Node 22. This is the only supported production-like dashboard path. It also starts the supervisor sidecar, which provides restart fallback and watchdog recovery. If `tts.daemon.autoStart: true` is set in `~/.panopticon/config.yaml`, `pan up` also starts the Qwen TTS daemon.
 
 Do not start the dashboard with Bun. The terminal WebSocket depends on a native Node PTY addon, and the built bundle avoids source-mode ESM cycle failures.
 
@@ -49,17 +49,20 @@ Restart operations are serialized by `${PANOPTICON_HOME}/restart.lock`. The lock
 
 The supervisor watchdog polls the dashboard API health endpoint every 10 seconds by default. After three consecutive failures, it spawns `pan restart --dashboard`. It allows three watchdog-triggered restarts within a five-minute rolling window. If the cap is reached, it logs `WATCHDOG GIVING UP — manual intervention required` and stops attempting until a healthy poll clears the state.
 
+The supervisor also polls the Qwen TTS daemon every 10 seconds when TTS is enabled or `tts.daemon.autoStart` is true. After two failed health checks it runs the same daemon start path as `pan tts start`, with a three-restart cap in a ten-minute rolling window.
+
 The latest restart outcome is written to `${PANOPTICON_HOME}/restart-status.json`. `pan status` renders that state, including failures and watchdog give-up alarms.
 
 ## Failure triage
 
-Start with `pan status`.
+Start with `pan status` and, for audio issues, `pan tts status`.
 
 ```bash
 pan status
+pan tts status
 ```
 
-Check the restart-status line first. It shows the latest dashboard restart trigger, age, duration, success or failure, and error text when available.
+Check the restart-status line first. It shows the latest dashboard restart trigger, age, duration, success or failure, and error text when available. `pan tts status` shows the Qwen daemon PID, endpoint, model, queue depth, uptime, and GPU memory use.
 
 If `pan status` shows a watchdog failure or give-up, inspect the supervisor log next.
 

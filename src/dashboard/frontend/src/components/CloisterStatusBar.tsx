@@ -31,8 +31,13 @@ interface DashboardSettings {
 
 interface TtsHealthStatus {
   ok: boolean;
+  running: boolean;
+  pid: number | null;
   queue?: unknown;
+  queueDepth?: number;
   model?: unknown;
+  uptimeSeconds?: number;
+  gpuMemoryUsedMb?: number;
   error?: string;
 }
 
@@ -83,7 +88,9 @@ function formatTtsHealthTitle(health: TtsHealthStatus | undefined, failed: boole
 
   const details = [
     health.model !== undefined ? `model: ${String(health.model)}` : undefined,
-    health.queue !== undefined ? `queue: ${String(health.queue)}` : undefined,
+    health.queueDepth !== undefined ? `queue: ${String(health.queueDepth)}` : health.queue !== undefined ? `queue: ${String(health.queue)}` : undefined,
+    health.pid !== null ? `pid: ${health.pid}` : undefined,
+    health.gpuMemoryUsedMb !== undefined ? `VRAM: ${health.gpuMemoryUsedMb}MB` : undefined,
   ].filter(Boolean);
   return details.length > 0 ? `TTS: Running (${details.join(', ')})` : 'TTS: Running';
 }

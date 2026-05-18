@@ -53,6 +53,7 @@
       },
       "optionalDependencies": {
         "moonshine-linux-x64": "workspace:*",
+        "qwen-tts-linux-x64": "workspace:*",
       },
     },
     "apps/desktop": {
@@ -103,6 +104,10 @@
         "typescript": "catalog:",
         "vitest": "^4.1.6",
       },
+    },
+    "packages/qwen-tts-linux-x64": {
+      "name": "qwen-tts-linux-x64",
+      "version": "0.1.0",
     },
     "src/dashboard/frontend": {
       "name": "panopticon-dashboard",
@@ -2319,6 +2324,8 @@
     "queue-microtask": ["queue-microtask@1.2.3", "", {}, "sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A=="],
 
     "quick-lru": ["quick-lru@5.1.1", "", {}, "sha512-WuyALRjWPDGtt/wzJiadO5AXY+8hZ80hVpe6MyivgraREW751X3SbhRvG3eLKOYN+8VEvqLcf3wdnt44Z4S4SA=="],
+
+    "qwen-tts-linux-x64": ["qwen-tts-linux-x64@workspace:packages/qwen-tts-linux-x64"],
 
     "range-parser": ["range-parser@1.2.1", "", {}, "sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg=="],
 

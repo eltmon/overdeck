@@ -24,12 +24,14 @@ import { appendFile } from 'node:fs/promises';
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../lib/restart-lock.js';
 import { readPlatformConfig } from '../lib/platform-lifecycle.js';
 import { readWatchdogConfig, SupervisorWatchdog, type SpawnRestartResult } from './watchdog.js';
+import { readTtsWatchdogConfig, TtsWatchdog } from './tts-watchdog.js';
 
 const SUPERVISOR_PORT = Number(process.env.PANOPTICON_SUPERVISOR_PORT || 3012);
 const PAN_BINARY = process.env.PANOPTICON_PAN_BINARY || 'pan';
 const LOG_FILE = path.join(os.homedir(), '.panopticon', 'logs', 'supervisor.log');
 const platformConfig = readPlatformConfig();
 const watchdogConfig = readWatchdogConfig(process.env, platformConfig.dashboardApiPort);
+const ttsWatchdogConfig = readTtsWatchdogConfig(process.env);
 
 async function log(msg: string): Promise<void> {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
@@ -139,6 +141,10 @@ const watchdog = new SupervisorWatchdog({
   spawnRestart,
   log,
 });
+const ttsWatchdog = new TtsWatchdog({
+  config: ttsWatchdogConfig,
+  log,
+});
 
 const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') {
@@ -155,6 +161,11 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'GET' && req.url === '/status') {
     sendJson(req, res, 200, watchdog.status());
+    return;
+  }
+
+  if (req.method === 'GET' && req.url === '/tts-status') {
+    sendJson(req, res, 200, ttsWatchdog.status());
     return;
   }
 
@@ -191,11 +202,18 @@ server.listen(SUPERVISOR_PORT, '127.0.0.1', () => {
     } else {
       await log('watchdog disabled by PANOPTICON_SUPERVISOR_WATCHDOG=0');
     }
+    if (ttsWatchdogConfig.enabled) {
+      ttsWatchdog.start();
+      await log(`tts watchdog polling every ${ttsWatchdogConfig.pollMs}ms`);
+    } else {
+      await log('tts watchdog disabled by PANOPTICON_TTS_WATCHDOG=0');
+    }
   })();
 });
 
 const shutdown = (): void => {
   watchdog.stop();
+  ttsWatchdog.stop();
   void (async () => {
     await log('shutting down');
     server.close(() => process.exit(0));
