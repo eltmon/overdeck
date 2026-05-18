@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-18T04:46:14.779Z",
-    "updated": "2026-05-18T08:28:08.163Z",
+    "updated": "2026-05-18T12:38:18.355Z",
     "author": "panopticon-cli/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-1170: TTS daemon lifecycle: install, start/stop, supervision",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-1170",
     "title": "TTS daemon lifecycle: install, start/stop, supervision",
-    "status": "proposed",
+    "status": "completed",
     "uid": "09723c30-56eb-49ab-bffb-a3c515c00a04",
     "author": "panopticon-cli/auto-start",
-    "sequence": 87,
+    "sequence": 100,
     "created": "2026-05-18T04:46:14.779Z",
-    "updated": "2026-05-18T08:28:08.163Z",
+    "updated": "2026-05-18T12:38:18.355Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1170",
@@ -29,63 +29,59 @@
     "metadata": {
       "canonicalFilename": "2026-05-18-PAN-1170-tts-daemon-lifecycle-install-start-stop-supervision.vbrief.json",
       "pipeline": {
-        "phase": "merge",
+        "phase": "done",
         "issueId": "PAN-1170",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-18T08:28:08.150Z",
+        "updatedAt": "2026-05-18T12:38:12.532Z",
         "work": {
-          "updatedAt": "2026-05-18T08:28:08.150Z",
+          "updatedAt": "2026-05-18T12:38:12.532Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-18T08:28:08.150Z",
+          "updatedAt": "2026-05-18T12:38:12.532Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-18T08:28:08.150Z"
+              "at": "2026-05-18T12:38:12.532Z"
             }
           ]
         },
         "review": {
-          "status": "passed",
-          "updatedAt": "2026-05-18T08:28:08.150Z",
-          "notes": "Passed: 0 security, 0 correctness, 0 performance blockers; 1 advisory (template autosave debounce)",
+          "status": "pending",
+          "updatedAt": "2026-05-18T12:38:12.532Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-18T08:28:08.150Z",
-              "notes": "Passed: 0 security, 0 correctness, 0 performance blockers; 1 advisory (template autosave debounce)"
+              "status": "pending",
+              "at": "2026-05-18T12:38:12.532Z"
             }
           ],
-          "approval": "approved"
+          "approval": "pending"
         },
         "test": {
-          "status": "passed",
-          "updatedAt": "2026-05-18T08:28:08.150Z",
-          "notes": "Skipped: no code changed since pre-review verification gate",
+          "status": "pending",
+          "updatedAt": "2026-05-18T12:38:12.532Z",
           "history": [
             {
-              "status": "passed",
-              "at": "2026-05-18T08:28:08.150Z",
-              "notes": "Skipped: no code changed since pre-review verification gate"
+              "status": "pending",
+              "at": "2026-05-18T12:38:12.532Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-18T08:28:08.150Z",
+          "updatedAt": "2026-05-18T12:38:12.532Z",
           "history": []
         },
         "merge": {
-          "status": "pending",
-          "updatedAt": "2026-05-18T08:28:08.150Z",
+          "status": "merged",
+          "updatedAt": "2026-05-18T12:38:12.532Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-18T08:28:08.150Z"
+              "status": "merged",
+              "at": "2026-05-18T12:38:12.532Z"
             }
           ],
-          "readyForMerge": true,
+          "readyForMerge": false,
           "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1172"
         }
       }
@@ -169,5 +165,6 @@
       }
     ],
     "edges": []
-  }
+  },
+  "status": "completed"
 }
