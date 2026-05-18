@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T05:10:55.134Z",
+  "updated": "2026-05-18T05:44:04.606Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "2df1f56ae",
-    "dirty": false
+    "sha": "010a65efc",
+    "dirty": true
   },
   "decisions": [
     {
@@ -110,6 +110,12 @@
       "summary": "Phased delivery is forbidden — every bead in this plan must land before pan done. The PRD's 7-step migration is implementation sequencing, not separate releases.",
       "recordedAt": "2026-05-18T05:10:55.134Z",
       "rationale": "CLAUDE.md 'Deliver Complete Features' rule + PRD §6 opening line: 'a feature is a feature — the redesign ships as one initiative.' Each individual bead may be independently mergeable to keep diffs reviewable, but the issue itself only closes when all 40+ beads ship."
+    },
+    {
+      "id": "D18",
+      "summary": "VerbBadge variants use the PRD literal verb strings as the TypeScript discriminant, including STUCK · Nh for the hours-bearing stuck badge.",
+      "recordedAt": "2026-05-18T05:42:56.951Z",
+      "rationale": "The styleguide-conformance test needs data-variant to match the variant prop exactly, and literal PRD labels make unknown variants fail at compile time."
     }
   ],
   "hazards": [
@@ -172,9 +178,20 @@
       "id": "H12",
       "summary": "AgentList.tsx serves both the standalone /agents route AND is referenced from App.tsx line 904. The agents-fleet-grid bead must replace BOTH while preserving any selection-handling props that App.tsx passes through (e.g., onSelectAgent for inspector wiring).",
       "mitigation": "agents-fleet-grid bead AC: (a) new component file FleetAgentsView.tsx is the route content for /agents, (b) App.tsx import swap from AgentList → FleetAgentsView, (c) selection handler swap routes to drawer-open instead of inspector, (d) AgentList.tsx and GodView/AgentGrid.tsx files marked for removal in agents-cleanup sub-step."
+    },
+    {
+      "id": "H13",
+      "summary": "bd close treated workspace-hu0c as blocked by open downstream beads even though bd dep tree shows those beads are dependents marked [blocks].",
+      "mitigation": "For completed upstream foundation beads, verify bd dep tree before using bd close --force; do not force-close beads that are genuinely waiting on blockers."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "workspace-hu0c is closed and inspection was skipped because requiresInspection=false. Run bd ready -l pan-1148 and claim the next unblocked PAN-1148 bead.",
+    "beadId": null,
+    "filesToRead": [
+      ".pan/spec.vbrief.json"
+    ]
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
   "sessionHistory": [
@@ -188,6 +205,18 @@
       "reason": "planning",
       "note": "Auto-mode planning complete. 17 decisions recorded, 12 hazards flagged. vBRIEF decomposes the redesign into 43 beads across foundation primitives, drawer, four surfaces (Pipeline, Board, Command Deck, Agents), Awaiting Merge retirement, and styleguide-conformance test. 2 beads carry requiresInspection=true (both 'deep'): drawer shell+store and drawer subscription contract.",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-18T05:42:56.951Z",
+      "reason": "bead",
+      "note": "Implemented workspace-hu0c / f1-verb-badge: added VerbBadge primitive, pulse animation utility, radius-sm token, visual snapshot coverage, and completed vBRIEF statuses.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:44:04.606Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-hu0c. bd required --force because downstream dependents were reported as blockers despite dep tree showing workspace-hu0c as their upstream [blocks] dependency.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []
