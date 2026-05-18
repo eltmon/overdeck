@@ -3,12 +3,13 @@ import ora, { type Ora } from 'ora';
 import { existsSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
 import { exec, execFile, execFileSync } from 'child_process';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-import { spawnAgent } from '../../lib/agents.js';
+import { clearAgentPaused, getAgentState, spawnAgent } from '../../lib/agents.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
@@ -78,6 +79,7 @@ import { isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
 import { assertCanStartFresh } from '../../lib/work-agent-lifecycle.js';
+import { normalizeModelOverride } from '../../lib/model-validation.js';
 
 interface IssueOptions {
   model: string;
@@ -88,6 +90,9 @@ interface IssueOptions {
   remote?: boolean;
   local?: boolean;
   auto?: boolean;
+  host?: boolean;
+  yes?: boolean;
+  force?: boolean;
 }
 
 /**
@@ -116,6 +121,27 @@ function determineWorkspaceLocation(options: IssueOptions): 'local' | 'remote' |
 
   // Default: check both (local takes precedence if both exist)
   return null;
+}
+
+async function confirmHostOverride(options: IssueOptions): Promise<boolean> {
+  if (!options.host) return true;
+
+  if (!process.stdin.isTTY) {
+    if (options.yes) {
+      console.warn(chalk.yellow('--host --yes given in a non-interactive context; bypassing workspace isolation.'));
+      return true;
+    }
+    console.error(chalk.red('Error: --host requires an interactive confirmation, or pass --yes for non-interactive use.'));
+    return false;
+  }
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question(chalk.bold('Are you sure? This bypasses workspace isolation. (y/N) '))).trim().toLowerCase();
+    return answer === 'y' || answer === 'yes';
+  } finally {
+    rl.close();
+  }
 }
 
 /**
@@ -251,7 +277,8 @@ async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIs
 async function handleRemoteWorkspace(
   issueId: string,
   options: IssueOptions,
-  spinner: Ora
+  spinner: Ora,
+  clearPauseBeforeSpawn: boolean
 ): Promise<void> {
   const config = loadConfig();
 
@@ -343,6 +370,10 @@ async function handleRemoteWorkspace(
   spinner.text = 'Spawning remote agent...';
 
   try {
+    if (clearPauseBeforeSpawn) {
+      clearAgentPaused(agentId);
+    }
+
     const remoteAgent = await spawnRemoteAgent({
       issueId,
       workspace: remoteMetadata,
@@ -499,12 +530,12 @@ import {
  * Uses `bd list` to query the beads database directly (storage-backend agnostic).
  * Exported for testing.
  */
-export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean {
+export function countBeadsTasks(workspacePath: string, issueId?: string): number {
   const label = issueId?.toLowerCase();
   try {
     const args = label
-      ? ['list', '--json', '-l', label, '--status', 'all', '--limit', '1']
-      : ['list', '--json', '--limit', '1'];
+      ? ['list', '--json', '-l', label, '--status', 'all', '--limit', '0']
+      : ['list', '--json', '--limit', '0'];
     const output = execFileSync('bd', args, {
       cwd: workspacePath,
       encoding: 'utf-8',
@@ -512,24 +543,29 @@ export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean 
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     const tasks = JSON.parse(output.trim() || '[]');
-    return tasks.length > 0;
+    return Array.isArray(tasks) ? tasks.length : 0;
   } catch {
     const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!existsSync(jsonlPath)) return false;
-    if (!label) return readFileSync(jsonlPath, 'utf-8').trim().length > 0;
+    if (!existsSync(jsonlPath)) return 0;
+    if (!label) return readFileSync(jsonlPath, 'utf-8').split('\n').filter((line) => line.trim()).length;
 
+    let count = 0;
     for (const line of readFileSync(jsonlPath, 'utf-8').split('\n')) {
       if (!line.trim()) continue;
       try {
         const entry = JSON.parse(line);
         const labels: string[] = Array.isArray(entry.labels) ? entry.labels : [];
         if (labels.some((candidate) => candidate.toLowerCase() === label || candidate.toLowerCase() === `workspace:${label}`)) {
-          return true;
+          count += 1;
         }
       } catch { /* skip malformed lines */ }
     }
-    return false;
+    return count;
   }
+}
+
+export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean {
+  return countBeadsTasks(workspacePath, issueId) > 0;
 }
 
 /**
@@ -556,6 +592,22 @@ function validatePlanMatchesIssue(workspacePath: string, issueId: string): { val
   }
 
   return { valid: true };
+}
+
+export function validateBeadsMatchPlan(workspacePath: string, issueId: string): { valid: boolean; beadCount: number; planItemCount: number } {
+  const planPath = findPlan(workspacePath);
+  const beadCount = countBeadsTasks(workspacePath, issueId);
+  if (!planPath) return { valid: true, beadCount, planItemCount: 0 };
+
+  try {
+    const raw = readFileSync(planPath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    const planItemCount = Array.isArray(parsed?.plan?.items) ? parsed.plan.items.length : 0;
+    if (planItemCount === 0) return { valid: true, beadCount, planItemCount };
+    return { valid: beadCount === planItemCount, beadCount, planItemCount };
+  } catch {
+    return { valid: true, beadCount, planItemCount: 0 };
+  }
 }
 
 /**
@@ -624,6 +676,18 @@ async function failPostCreateValidation(options: PostCreateValidationFailureOpti
 }
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
+  try {
+    const model = normalizeModelOverride(options.model);
+    if (model) options.model = model;
+  } catch (err) {
+    process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(1);
+  }
+
+  if (!(await confirmHostOverride(options))) {
+    process.exit(1);
+  }
+
   // PAN-636 — validate --harness up front. canUseHarness gates the
   // {harness, model, authMode} combination; invalid combos exit non-zero
   // with the human-readable reason text on stderr (no spinner, no
@@ -644,11 +708,32 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
   }
 
+  // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
+  const normalizedId = id.toLowerCase();
+  const agentId = `agent-${normalizedId}`;
+  const existingAgentState = getAgentState(agentId);
+  const shouldClearPauseBeforeSpawn = existingAgentState?.paused === true && options.force === true;
+  if (existingAgentState?.paused === true && !options.force) {
+    process.stderr.write(chalk.red(`Agent ${agentId} is paused and will not be started.\n`));
+    if (existingAgentState.pausedReason) {
+      process.stderr.write(chalk.red(`Pause reason: ${existingAgentState.pausedReason}\n`));
+    }
+    process.stderr.write(chalk.red(`Run pan unpause ${id} to clear the pause, or pan start ${id} --force to override.\n`));
+    process.exit(1);
+  }
+  if (existingAgentState?.troubled === true) {
+    const failures = existingAgentState.consecutiveFailures ?? 0;
+    process.stderr.write(chalk.red(`Agent ${agentId} is troubled (${failures} failure${failures === 1 ? '' : 's'}) and will not be started.\n`));
+    if (existingAgentState.lastFailureReason) {
+      process.stderr.write(chalk.red(`Last failure: ${existingAgentState.lastFailureReason}\n`));
+    }
+    process.stderr.write(chalk.red(`Investigate the crash cause, then run pan untroubled ${id} before starting.\n`));
+    process.exit(1);
+  }
+
   const spinner = ora(`Preparing workspace for ${id}...`).start();
 
   try {
-    // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
-    const normalizedId = id.toLowerCase();
 
     // Determine workspace location preference
     const locationPreference = determineWorkspaceLocation(options);
@@ -665,7 +750,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Refuse fresh start when a resumable session already exists.
     // Users must choose resume or reset-session explicitly.
     try {
-      assertCanStartFresh(id);
+      assertCanStartFresh(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
     } catch (error) {
       if (workspacePath || isRemote) {
         throw error;
@@ -674,7 +759,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Handle remote workspace
     if (isRemote || (locationPreference === 'remote' && !workspacePath)) {
-      await handleRemoteWorkspace(id, options, spinner);
+      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn);
       return;
     }
 
@@ -928,11 +1013,31 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
 
+    const beadCoverage = validateBeadsMatchPlan(workspace, id);
+    if (!beadCoverage.valid) {
+      await failPostCreateValidation({
+        spinner,
+        issueId: id,
+        projectRoot,
+        workspaceCreatedThisRun,
+        message: `Beads count (${beadCoverage.beadCount}) does not match vBRIEF plan items (${beadCoverage.planItemCount}) for ${id}`,
+        printDetails: () => {
+          console.log('');
+          console.log(chalk.red('Work agents require one bead per vBRIEF plan item.'));
+          console.log(chalk.dim('Re-run planning finalization so beads are materialized from the current vBRIEF before starting work.'));
+        },
+      });
+    }
+
     spinner.text = 'Building agent prompt with planning context...';
     const trackerContext = await getTrackerContext(id, workspace);
     const prompt = await buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
 
     spinner.text = 'Spawning agent...';
+
+    if (shouldClearPauseBeforeSpawn) {
+      clearAgentPaused(agentId);
+    }
 
     const agent = await spawnAgent({
       issueId: id,
@@ -941,6 +1046,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       model: options.model,
       role: 'work',
       prompt,
+      allowHost: options.host,
     });
 
     spinner.succeed(`Agent spawned: ${agent.id}`);

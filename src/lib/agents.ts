@@ -37,6 +37,9 @@ import { canUseHarness } from './harness-policy.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { createPiFifo, piFifoPaths, writePiCommand, PiNotReady } from './runtimes/pi-fifo.js';
 import { assertIssueHasBeads } from './beads-query.js';
+import { getWorkspaceStackHealth } from './workspace/stack-health.js';
+import { normalizeModelOverride, requireModelOverride, shellQuoteModelId } from './model-validation.js';
+import { resolveAutoResumeConfigForIssue } from './cloister/auto-resume-config.js';
 
 const execAsync = promisify(exec);
 
@@ -212,12 +215,14 @@ export async function getAgentRuntimeBaseCommand(
   agentDefinition?: string,
   harness: 'claude-code' | 'pi' = 'claude-code',
 ): Promise<string> {
+  const validatedModel = requireModelOverride(model);
+  const quotedModel = shellQuoteModelId(validatedModel);
   if (harness === 'pi') {
-    return `pi --mode rpc --model ${model}`;
+    return `pi --mode rpc --model ${quotedModel}`;
   }
 
 
-  const provider = getProviderForModel(model);
+  const provider = getProviderForModel(validatedModel);
   const permissionFlags = getClaudePermissionFlagsString();
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`.
@@ -240,14 +245,14 @@ export async function getAgentRuntimeBaseCommand(
   // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
   // gpt-* models directly via ANTHROPIC_BASE_URL (no wrapper process).
   // The provider env vars are injected separately by getProviderEnvForModel.
-  if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
+  if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
-    const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
+    const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
     if (agentDefinition) {
       // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${bypassWithAgent}${agentFlag} --model ${resolvedModel}${nameFlag}`;
+      return `claude${bypassWithAgent}${agentFlag} --model ${shellQuoteModelId(resolvedModel)}${nameFlag}`;
     }
-    return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
+    return `claude ${permissionFlags} --model ${shellQuoteModelId(resolvedModel)}${nameFlag}`;
   }
 
   if (agentDefinition) {
@@ -257,9 +262,9 @@ export async function getAgentRuntimeBaseCommand(
     // launches silently fall back to the frontmatter model and ignore the
     // user's selection — observed when switching PAN-977 to Opus 4.7 left
     // the launcher running Sonnet.
-    return `claude${bypassWithAgent}${agentFlag} --model ${model}${nameFlag}`;
+    return `claude${bypassWithAgent}${agentFlag} --model ${quotedModel}${nameFlag}`;
   }
-  return `claude ${permissionFlags} --model ${model}${nameFlag}`;
+  return `claude ${permissionFlags} --model ${quotedModel}${nameFlag}`;
 }
 
 /**
@@ -296,11 +301,13 @@ export async function getRoleRuntimeBaseCommand(
   harness: 'claude-code' | 'pi' = 'claude-code',
   subRole?: string,
 ): Promise<string> {
+  const validatedModel = requireModelOverride(model);
+  const quotedModel = shellQuoteModelId(validatedModel);
   if (harness === 'pi') {
-    return `pi --mode rpc --model ${model}`;
+    return `pi --mode rpc --model ${quotedModel}`;
   }
 
-  const provider = getProviderForModel(model);
+  const provider = getProviderForModel(validatedModel);
   const definitionPath = roleAgentDefinitionPath(role, subRole);
   const agentFlag = definitionPath ? ` --agent ${definitionPath}` : '';
   const nameFlag = ` --name ${agentName}`;
@@ -313,12 +320,12 @@ export async function getRoleRuntimeBaseCommand(
 
   const printFlag = role === 'review' && subRole ? ' --print' : '';
 
-  if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
-    const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
-    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${resolvedModel}${nameFlag}`;
+  if (provider.name === 'openai' && (await getProviderAuthMode(validatedModel)) === 'subscription') {
+    const resolvedModel = CLI_PROXY_MODEL_ALIASES[validatedModel] ?? validatedModel;
+    return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${shellQuoteModelId(resolvedModel)}${nameFlag}`;
   }
 
-  return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${model}${nameFlag}`;
+  return `claude${bypassWithAgent}${printFlag}${agentFlag}${permissionFlags} --model ${quotedModel}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -540,6 +547,17 @@ export interface AgentState {
    *  resume. Read by deacon's autoResumeStoppedWorkAgents to distinguish a
    *  deliberate stop from a crash/orphan. */
   stoppedByUser?: boolean;
+  stoppedByPause?: boolean;
+  paused?: boolean;
+  pausedReason?: string;
+  pausedAt?: string;
+  troubled?: boolean;
+  troubledAt?: string;
+  consecutiveFailures?: number;
+  firstFailureInRunAt?: string;
+  lastFailureAt?: string;
+  lastFailureReason?: string;
+  lastFailureNextRetryAt?: string;
   branch?: string; // Git branch name for this agent
   costSoFar?: number;
   sessionId?: string; // For resuming sessions after handoff
@@ -582,6 +600,7 @@ export interface AgentState {
   reviewSynthesisAgentId?: string;
   reviewDeadlineAt?: string;
   reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
+  hostOverride?: boolean;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -605,6 +624,17 @@ function cleanAgentState(raw: AgentState): AgentState {
     lastActivity: raw.lastActivity,
     stoppedAt: raw.stoppedAt,
     stoppedByUser: raw.stoppedByUser,
+    stoppedByPause: raw.stoppedByPause,
+    paused: raw.paused,
+    pausedReason: raw.pausedReason,
+    pausedAt: raw.pausedAt,
+    troubled: raw.troubled,
+    troubledAt: raw.troubledAt,
+    consecutiveFailures: raw.consecutiveFailures,
+    firstFailureInRunAt: raw.firstFailureInRunAt,
+    lastFailureAt: raw.lastFailureAt,
+    lastFailureReason: raw.lastFailureReason,
+    lastFailureNextRetryAt: raw.lastFailureNextRetryAt,
     branch: raw.branch,
     costSoFar: raw.costSoFar,
     sessionId: raw.sessionId,
@@ -620,6 +650,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
     reviewDeadlineAt: raw.reviewDeadlineAt,
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
+    hostOverride: raw.hostOverride,
   };
 }
 
@@ -710,6 +741,208 @@ export async function saveAgentStateAsync(state: AgentState): Promise<void> {
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateAsync)`);
   }
+}
+
+function clearFailureTrackingFields(state: AgentState): void {
+  state.consecutiveFailures = 0;
+  delete state.firstFailureInRunAt;
+  delete state.lastFailureAt;
+  delete state.lastFailureReason;
+  delete state.lastFailureNextRetryAt;
+}
+
+/** Sets the persistent manual pause gate used before stopping or suppressing resume. */
+function applyAgentPaused(state: AgentState, reason?: string, stoppedByPause = false): void {
+  if (!state.paused) {
+    state.pausedAt = new Date().toISOString();
+  }
+  state.paused = true;
+  if (stoppedByPause) {
+    state.stoppedByPause = true;
+  }
+  if (reason === undefined) {
+    delete state.pausedReason;
+  } else {
+    state.pausedReason = reason;
+  }
+}
+
+/** Sets the persistent manual pause gate used before stopping or suppressing resume. */
+export function setAgentPaused(agentId: string, reason?: string, stoppedByPause = false): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+
+  applyAgentPaused(state, reason, stoppedByPause);
+  saveAgentState(state);
+  return true;
+}
+
+/** Sets the persistent manual pause gate using async filesystem operations. */
+export async function setAgentPausedAsync(agentId: string, reason?: string, stoppedByPause = false): Promise<AgentState | null> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return null;
+
+  applyAgentPaused(state, reason, stoppedByPause);
+  await saveAgentStateAsync(state);
+  return state;
+}
+
+function applyAgentUnpaused(state: AgentState): void {
+  if (state.stoppedByPause === true) {
+    delete state.stoppedByUser;
+  }
+  delete state.stoppedByPause;
+  delete state.paused;
+  delete state.pausedReason;
+  delete state.pausedAt;
+}
+
+function isAgentPauseClear(state: AgentState): boolean {
+  return !state.paused && state.pausedReason === undefined && state.pausedAt === undefined;
+}
+
+/** Clears the persistent manual pause gate without spawning the agent. */
+export function clearAgentPaused(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+  if (isAgentPauseClear(state)) return true;
+
+  applyAgentUnpaused(state);
+  saveAgentState(state);
+  return true;
+}
+
+/** Clears the persistent manual pause gate using async filesystem operations. */
+export async function clearAgentPausedAsync(agentId: string): Promise<AgentState | null> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return null;
+  if (isAgentPauseClear(state)) return state;
+
+  applyAgentUnpaused(state);
+  await saveAgentStateAsync(state);
+  return state;
+}
+
+/** Marks an agent as troubled after repeated resume failures. */
+export function markAgentTroubled(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+
+  if (!state.troubled) {
+    state.troubledAt = new Date().toISOString();
+  }
+  state.troubled = true;
+  saveAgentState(state);
+  return true;
+}
+
+function isAgentTroubledClear(state: AgentState): boolean {
+  return !state.troubled && state.troubledAt === undefined && (state.consecutiveFailures ?? 0) === 0 && state.firstFailureInRunAt === undefined && state.lastFailureAt === undefined && state.lastFailureReason === undefined && state.lastFailureNextRetryAt === undefined;
+}
+
+function applyAgentUntroubled(state: AgentState): void {
+  delete state.troubled;
+  delete state.troubledAt;
+  clearFailureTrackingFields(state);
+}
+
+/** Clears the troubled gate and its accumulated failure state. */
+export function clearAgentTroubled(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+  if (isAgentTroubledClear(state)) return true;
+
+  applyAgentUntroubled(state);
+  saveAgentState(state);
+  return true;
+}
+
+/** Clears the troubled gate and accumulated failure state using async filesystem operations. */
+export async function clearAgentTroubledAsync(agentId: string): Promise<AgentState | null> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return null;
+  if (isAgentTroubledClear(state)) return state;
+
+  applyAgentUntroubled(state);
+  await saveAgentStateAsync(state);
+  return state;
+}
+
+function applyAgentFailure(state: AgentState, reason: string): void {
+  const config = resolveAutoResumeConfigForIssue(state.issueId);
+  const nowMs = Date.now();
+  const now = new Date(nowMs).toISOString();
+  const firstFailureMs = Date.parse(state.firstFailureInRunAt ?? '');
+  const hasValidFirstFailure = Number.isFinite(firstFailureMs);
+  const windowElapsed = hasValidFirstFailure
+    && nowMs - firstFailureMs > config.troubledWindowMs;
+
+  if (windowElapsed || !hasValidFirstFailure) {
+    state.consecutiveFailures = 1;
+    state.firstFailureInRunAt = now;
+  } else {
+    state.consecutiveFailures = (state.consecutiveFailures ?? 0) + 1;
+  }
+
+  const backoffSeconds = config.failureBackoffSchedule[
+    Math.min(state.consecutiveFailures - 1, config.failureBackoffSchedule.length - 1)
+  ];
+  state.lastFailureAt = now;
+  state.lastFailureReason = reason;
+  state.lastFailureNextRetryAt = new Date(nowMs + backoffSeconds * 1000).toISOString();
+
+  const firstFailureInRunMs = Date.parse(state.firstFailureInRunAt ?? '');
+  const shouldMarkTroubled = state.consecutiveFailures >= config.maxConsecutiveFailures
+    && Number.isFinite(firstFailureInRunMs)
+    && nowMs - firstFailureInRunMs <= config.troubledWindowMs;
+
+  if (shouldMarkTroubled) {
+    if (!state.troubled) {
+      state.troubledAt = now;
+    }
+    state.troubled = true;
+  }
+}
+
+/** Records one failed resume/crash observation for later backoff and troubled gating. */
+export function recordAgentFailure(agentId: string, reason: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+
+  applyAgentFailure(state, reason);
+  saveAgentState(state);
+  return true;
+}
+
+/** Records one failed resume/crash observation using async filesystem operations. */
+export async function recordAgentFailureAsync(agentId: string, reason: string): Promise<AgentState | null> {
+  const state = await getAgentStateAsync(agentId);
+  if (!state) return null;
+
+  applyAgentFailure(state, reason);
+  await saveAgentStateAsync(state);
+  return state;
+}
+
+/** Resets failure tracking after an agent reaches running state. */
+export function resetAgentFailureCount(agentId: string): boolean {
+  const state = getAgentState(agentId);
+  if (!state) return false;
+  if ((state.consecutiveFailures ?? 0) === 0 && state.firstFailureInRunAt === undefined && state.lastFailureAt === undefined && state.lastFailureReason === undefined && state.lastFailureNextRetryAt === undefined) return true;
+
+  clearFailureTrackingFields(state);
+  saveAgentState(state);
+  return true;
+}
+
+/** Reports whether callers should block start, resume, auto-resume, or message delivery on the manual pause gate. */
+export function isAgentPaused(agentId: string): boolean {
+  return getAgentState(agentId)?.paused === true;
+}
+
+/** Reports whether callers should block start, resume, auto-resume, or message delivery on the troubled gate. */
+export function isAgentTroubled(agentId: string): boolean {
+  return getAgentState(agentId)?.troubled === true;
 }
 
 /** Update just the delivery method on an agent's state file. */
@@ -1149,10 +1382,32 @@ export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
   console.log(`[${agentId}] channels:dismiss:dialog-not-detected`);
 }
 
+function getAgentResumeGateBlockReason(state: Pick<AgentState, 'paused' | 'pausedReason' | 'troubled' | 'consecutiveFailures'>): string | undefined {
+  if (state.paused === true) {
+    return state.pausedReason
+      ? `agent is paused (${state.pausedReason})`
+      : 'agent is paused';
+  }
+  if (state.troubled === true) {
+    const failures = state.consecutiveFailures ?? 0;
+    return `agent is troubled (${failures} failure${failures === 1 ? '' : 's'})`;
+  }
+  return undefined;
+}
+
+function assertAgentCanTransitionToRunning(state: AgentState): void {
+  const reason = getAgentResumeGateBlockReason(state);
+  if (reason) {
+    throw new Error(`Cannot run ${state.id}: ${reason}. Clear the gate before resuming.`);
+  }
+}
+
 function markAgentRunning(state: AgentState): void {
+  assertAgentCanTransitionToRunning(state);
   const oldStatus = state.status;
   state.status = 'running';
   state.lastActivity = new Date().toISOString();
+  clearFailureTrackingFields(state);
   delete state.stoppedAt;
   // Clear user-stop intent so a later crash/orphan can be auto-resumed. Without
   // this the flag is sticky across the stop→resume→crash sequence and autoResume
@@ -1439,6 +1694,22 @@ export function getLatestSessionId(agentId: string): string | null {
   return null;
 }
 
+export async function getLatestSessionIdAsync(agentId: string): Promise<string | null> {
+  const agentDir = getAgentDir(agentId);
+  try {
+    const sessionId = (await readFile(join(agentDir, 'session.id'), 'utf8')).trim();
+    if (sessionId) return sessionId;
+  } catch { /* non-fatal */ }
+
+  try {
+    const sessions = JSON.parse(await readFile(join(agentDir, 'sessions.json'), 'utf8'));
+    if (Array.isArray(sessions) && sessions.length > 0) return sessions[sessions.length - 1];
+  } catch { /* non-fatal */ }
+
+  const runtimeState = await getAgentRuntimeStateAsync(agentId);
+  return runtimeState?.claudeSessionId ?? null;
+}
+
 export interface SpawnOptions {
   issueId: string;
   workspace: string;
@@ -1458,6 +1729,7 @@ export interface SpawnOptions {
   // and the one-agent-per-issue uniqueness check is scoped to the slot.
   slotId?: number;
   swarmItemId?: string; // vBRIEF item ID this slot is working on
+  allowHost?: boolean;
 }
 
 export interface SpawnRunOptions {
@@ -1481,6 +1753,7 @@ export interface SpawnRunOptions {
    */
   reviewSynthesisAgentId?: string;
   reviewOutputPath?: string;
+  allowHost?: boolean;
 }
 
 /**
@@ -1533,11 +1806,12 @@ export async function buildCavemanExports(
  * is a real configuration bug the user must see.
  */
 export function determineModel(options: { model?: string; role?: Role } = {}): string {
-  if (options.model) {
-    return options.model;
+  const modelOverride = normalizeModelOverride(options.model);
+  if (modelOverride) {
+    return modelOverride;
   }
 
-  return resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config);
+  return requireModelOverride(resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config));
 }
 
 /**
@@ -1658,7 +1932,7 @@ export async function buildAgentLaunchConfig(opts: {
    */
   harness?: 'claude-code' | 'pi';
 }): Promise<AgentLaunchConfig> {
-  const model = opts.model;
+  const model = requireModelOverride(opts.model);
 
   // Substrate guard: inject permission deny rules for Panopticon infrastructure
   // paths (.claude/agents/, .claude/hooks/, ~/.panopticon/, JSONL session dirs)
@@ -1801,17 +2075,56 @@ function runAgentId(issueId: string, role: Role, subRole?: string): string {
  */
 const REVIEW_SUBROLE_TIMEOUT_SECONDS = 20 * 60;
 
+export async function assertWorkspaceStackHealthyForSpawn(
+  issueId: string,
+  role: Role,
+  allowHost = false,
+  workspacePath?: string,
+): Promise<void> {
+  if (role === 'plan') return;
+
+  const health = await getWorkspaceStackHealth(issueId, { workspacePath });
+  if (health.healthy) return;
+
+  const normalizedIssue = issueId.toUpperCase();
+  const details = health.reasons.join('; ');
+  const message = `Workspace docker stack for ${normalizedIssue} is not healthy: ${details}. Run 'pan workspace rebuild ${normalizedIssue}' or retry with --host to override.`;
+
+  if (allowHost) {
+    console.warn(`[agents] ${message}`);
+    emitActivityEntry({
+      source: role,
+      level: 'warn',
+      issueId: normalizedIssue,
+      message: `agent-spawn-host-override: ${normalizedIssue}`,
+      details,
+    });
+    return;
+  }
+
+  emitActivityEntry({
+    source: role,
+    level: 'error',
+    issueId: normalizedIssue,
+    message: `agent-spawn-blocked-stack-unhealthy: ${normalizedIssue}`,
+    details,
+  });
+  throw new Error(message);
+}
+
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
+  const selectedModel = determineModel({ model: options.model, role });
 
   if (role === 'work') {
     return spawnAgent({
       issueId,
       workspace,
       harness: options.harness,
-      model: options.model,
+      model: selectedModel,
       prompt: options.prompt,
       role: 'work',
+      allowHost: options.allowHost,
     });
   }
 
@@ -1820,8 +2133,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     throw new Error(`Role run ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
+  await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost, workspace);
+
   initHook(agentId);
-  const selectedModel = determineModel({ model: options.model, role });
 
   // PAN-1048 C5: Resolve the harness for this role from config.roles[role].harness
   // before falling back to claude-code. Explicit options.harness takes precedence
@@ -1865,6 +2179,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     status: 'starting',
     startedAt: new Date().toISOString(),
     costSoFar: 0,
+    hostOverride: options.allowHost || undefined,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
@@ -1899,11 +2214,16 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     ? await getPiLauncherFields(agentId, selectedModel)
     : {};
 
-  // Create a conversation record for specialist roles so their JSONL sessions
-  // are persisted and viewable in the dashboard. The orchestrator (review
-  // without subRole) does not get a conversation — it manages sub-role
-  // reviewers and its output is visible through the work agent's panel.
-  const isSpecialistRole = (role === 'review' && options.subRole) || role === 'test' || role === 'ship';
+  // Create a conversation record for every specialist role — sub-role reviewers,
+  // the review orchestrator/synthesizer, test, and ship. The row is the index
+  // the dashboard reads to (a) locate the JSONL via claude_session_id, (b) carry
+  // pre-JSONL state (spawn_error, fork_status), and (c) let the
+  // conversation-lifecycle service compute sessionAlive from real tmux liveness
+  // instead of from the agent state machine's status field, which can lag.
+  // Excluding the orchestrator here previously forced AgentOutputPanel to
+  // synthesize a Conversation whose sessionAlive came from `agent.status`, and
+  // stale snapshots made active synthesizers render as "Starting…".
+  const isSpecialistRole = role === 'review' || role === 'test' || role === 'ship';
   let sessionId: string | undefined;
   if (isSpecialistRole) {
     sessionId = randomUUID();
@@ -2031,8 +2351,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     }
   }
 
-  state.status = 'running';
-  state.lastActivity = new Date().toISOString();
+  markAgentRunning(state);
 
   // Stamp the workspace HEAD this role run was launched against. The reactive
   // scheduler uses this to tell a still-relevant run from a zombie session
@@ -2061,16 +2380,18 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const agentId = options.slotId != null
     ? `agent-${options.issueId.toLowerCase()}-${options.slotId}`
     : `agent-${options.issueId.toLowerCase()}`;
+  const role: 'work' = options.role ?? 'work';
 
   // Check if already running (scoped to the exact session name, including slot suffix)
   if (await sessionExistsAsync(agentId)) {
     throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
+  await assertWorkspaceStackHealthyForSpawn(options.issueId, role, options.allowHost, options.workspace);
+
   // Initialize hook for this agent (FPP support)
   initHook(agentId);
 
-  const role: 'work' = options.role ?? 'work';
   await assertIssueHasBeads(options.workspace, options.issueId);
 
   // Determine model based on role configuration
@@ -2125,6 +2446,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     preSpawnStashRef: existingState?.preSpawnStashRef,
     preSpawnStashMessage: existingState?.preSpawnStashMessage,
     preSpawnBaselineHead: existingState?.preSpawnBaselineHead,
+    hostOverride: options.allowHost || undefined,
   };
 
   saveAgentState(state);
@@ -2577,8 +2899,26 @@ export async function stopAgentAsync(agentId: string): Promise<void> {
   });
 }
 
+function queueAgentMail(agentId: string, message: string): void {
+  const mailDir = join(getAgentDir(agentId), 'mail');
+  mkdirSync(mailDir, { recursive: true });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  writeFileSync(
+    join(mailDir, `${timestamp}.md`),
+    `# Message\n\n${message}\n`
+  );
+}
+
 export async function messageAgent(agentId: string, message: string): Promise<void> {
   const normalizedId = normalizeAgentId(agentId);
+  const agentState = getAgentState(normalizedId);
+  const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+  if (gateBlockReason) {
+    queueAgentMail(normalizedId, message);
+    logAgentLifecycle(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
+    console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
+    return;
+  }
 
   // Check if agent is suspended - auto-resume if so (PAN-80)
   const runtimeState = getAgentRuntimeState(normalizedId);
@@ -2608,20 +2948,13 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   // `remain-on-exit on` so the shell persists after the agent process exits, and
   // sessionExists() returns true for that dead shell. resumeAgent() kills the zombie
   // session before re-creating it.
-  const agentState = getAgentState(normalizedId);
   if (agentState && agentState.status === 'stopped') {
     console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${await sessionExistsAsync(normalizedId)})`);
 
     const resumeResult = await resumeAgent(normalizedId, message);
 
     // Save to mail queue regardless so the agent can re-read feedback if needed
-    const mailDir = join(getAgentDir(normalizedId), 'mail');
-    mkdirSync(mailDir, { recursive: true });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    writeFileSync(
-      join(mailDir, `${timestamp}.md`),
-      `# Message\n\n${message}\n`
-    );
+    queueAgentMail(normalizedId, message);
 
     if (resumeResult.success && resumeResult.messageDelivered !== false) {
       console.log(`[agents] Resumed ${normalizedId} and delivered feedback`);
@@ -2667,6 +3000,12 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     // emitted a launcher that would crash on resume for any Pi role agent.
     const resumeModel = agentState.model || 'claude-sonnet-4-6';
     const fallbackHarness = agentState.harness ?? 'claude-code';
+    await assertWorkspaceStackHealthyForSpawn(
+      agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
+      resumeRole,
+      agentState.hostOverride === true,
+      agentState.workspace,
+    );
     const fallbackPiFields = fallbackHarness === 'pi'
       ? await getPiLauncherFields(normalizedId, resumeModel)
       : {};
@@ -2719,13 +3058,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     await sendToRemoteAgent(normalizedId, remoteState.vmName, message);
 
     // Also save to mail queue for persistence
-    const mailDir = join(getAgentDir(normalizedId), 'mail');
-    mkdirSync(mailDir, { recursive: true });
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    writeFileSync(
-      join(mailDir, `${timestamp}.md`),
-      `# Message\n\n${message}\n`
-    );
+    queueAgentMail(normalizedId, message);
     return;
   }
 
@@ -2762,14 +3095,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
   await deliverAgentMessage(normalizedId, message, 'messageAgent:pan-tell', deliveryMethod);
 
   // Also save to mail queue
-  const mailDir = join(getAgentDir(normalizedId), 'mail');
-  mkdirSync(mailDir, { recursive: true });
-
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  writeFileSync(
-    join(mailDir, `${timestamp}.md`),
-    `# Message\n\n${message}\n`
-  );
+  queueAgentMail(normalizedId, message);
 }
 
 /**
@@ -2784,11 +3110,18 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
  */
 export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
+  const requestedModel = normalizeModelOverride(opts?.model);
   logAgentLifecycle(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'})`);
 
   // Check runtime state — allow both suspended (auto-suspend) and stopped/idle (manual stop, crash)
   const runtimeState = getAgentRuntimeState(normalizedId);
   const agentState = getAgentState(normalizedId);
+  const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+  if (gateBlockReason) {
+    const reason = `Cannot resume ${normalizedId}: ${gateBlockReason}. Clear the gate before resuming.`;
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+    return { success: false, error: reason };
+  }
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
   const isPlaceholder = !!agentState && agentState.status === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
   const allowedRuntimeStates = ['suspended', 'idle'];
@@ -2831,6 +3164,19 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     };
   }
 
+  try {
+    await assertWorkspaceStackHealthyForSpawn(
+      agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
+      agentState.role ?? 'work',
+      agentState.hostOverride === true,
+      agentState.workspace,
+    );
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    logAgentLifecycle(normalizedId, `resumeAgent BLOCKED: ${reason}`);
+    return { success: false, error: reason };
+  }
+
   // Kill any zombie tmux session (crashed agent left behind)
   if (await sessionExistsAsync(normalizedId)) {
     try {
@@ -2864,9 +3210,9 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
-    const model = opts?.model || agentState.model || 'claude-sonnet-4-6';
-    if (opts?.model && opts.model !== agentState.model) {
-      agentState.model = opts.model;
+    const model = requestedModel || requireModelOverride(agentState.model || 'claude-sonnet-4-6');
+    if (requestedModel && requestedModel !== agentState.model) {
+      agentState.model = requestedModel;
       saveAgentState(agentState);
     }
     const effectiveHarness = await resolveEffectiveHarness(agentState.harness, model);
@@ -2966,17 +3312,37 @@ export async function restartAgent(
   opts: RestartAgentOptions = {},
 ): Promise<{ success: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
-  const { graceful = true, model: newModel, harness: newHarness, message } = opts;
+  const { graceful = true, model: rawNewModel, harness: newHarness, message } = opts;
+  const newModel = normalizeModelOverride(rawNewModel);
 
   const agentState = getAgentState(normalizedId);
   if (!agentState) {
     return { success: false, error: `Agent ${normalizedId} not found` };
+  }
+  const gateBlockReason = getAgentResumeGateBlockReason(agentState);
+  if (gateBlockReason) {
+    const reason = `Cannot restart ${normalizedId}: ${gateBlockReason}. Clear the gate before restarting.`;
+    logAgentLifecycle(normalizedId, `restartAgent BLOCKED: ${reason}`);
+    return { success: false, error: reason };
   }
   if (!agentState.workspace || !existsSync(agentState.workspace)) {
     return { success: false, error: `Agent workspace missing: ${agentState.workspace}` };
   }
 
   logAgentLifecycle(normalizedId, `restartAgent called (graceful=${graceful}, model=${newModel || 'unchanged'}, harness=${newHarness || 'unchanged'})`);
+
+  try {
+    await assertWorkspaceStackHealthyForSpawn(
+      agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
+      agentState.role ?? 'work',
+      agentState.hostOverride === true,
+      agentState.workspace,
+    );
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    logAgentLifecycle(normalizedId, `restartAgent BLOCKED: ${reason}`);
+    return { success: false, error: reason };
+  }
 
   if (graceful && await sessionExistsAsync(normalizedId)) {
     const warning = 'Restarting in 30s. Update .pan/continue.json now with all progress, decisions, hazards, and resume point.';
@@ -2998,7 +3364,7 @@ export async function restartAgent(
 
   await stopAgentAsync(normalizedId);
 
-  const effectiveModel = newModel || agentState.model || 'claude-sonnet-4-6';
+  const effectiveModel = newModel || requireModelOverride(agentState.model || 'claude-sonnet-4-6');
   const requestedHarness = newHarness ?? agentState.harness;
   const effectiveHarness = await resolveEffectiveHarness(requestedHarness, effectiveModel);
   if (newModel && newModel !== agentState.model) {
@@ -3119,13 +3485,34 @@ export async function recoverAgent(
 
   // Runtime state files may lack required fields (PAN-150)
   if (!state.id) state.id = normalizedId;
-  if (opts.modelOverride) {
-    state.model = opts.modelOverride;
-    logAgentLifecycle(normalizedId, `recoverAgent: model overridden → ${opts.modelOverride}`);
+  const gateBlockReason = getAgentResumeGateBlockReason(state);
+  if (gateBlockReason) {
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: Cannot recover ${normalizedId}: ${gateBlockReason}. Clear the gate before recovering.`);
+    return null;
+  }
+  const modelOverride = normalizeModelOverride(opts.modelOverride);
+  if (modelOverride) {
+    state.model = modelOverride;
+    logAgentLifecycle(normalizedId, `recoverAgent: model overridden → ${modelOverride}`);
   }
   if (!state.workspace || !state.model) {
     const reason = `[agents] Cannot recover ${normalizedId}: state.json missing workspace or model`;
     console.error(reason);
+    logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: ${reason}`);
+    return null;
+  }
+
+  const recoveryRole: Role = state.role
+    ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work');
+  try {
+    await assertWorkspaceStackHealthyForSpawn(
+      state.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
+      recoveryRole,
+      state.hostOverride === true,
+      state.workspace,
+    );
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
     logAgentLifecycle(normalizedId, `recoverAgent BLOCKED: ${reason}`);
     return null;
   }
@@ -3172,8 +3559,6 @@ export async function recoverAgent(
   // the saved AgentState (or the session-id heuristic for legacy planning-* IDs)
   // and route through getRoleRuntimeBaseCommand so review/test/ship don't get
   // resurrected as work agents.
-  const recoveryRole: Role = state.role
-    ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work');
   const recoveryHarness: RuntimeName = (state.harness === 'pi' || state.harness === 'claude-code')
     ? state.harness
     : 'claude-code';

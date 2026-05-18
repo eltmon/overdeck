@@ -93,7 +93,7 @@ function loadTab(): ListTab {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-async function fetchConversations(): Promise<Conversation[]> {
+export async function fetchConversations(): Promise<Conversation[]> {
   const res = await fetch('/api/conversations');
   if (!res.ok) throw new Error('Failed to fetch conversations');
   return res.json();

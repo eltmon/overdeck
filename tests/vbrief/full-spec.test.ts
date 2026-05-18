@@ -240,7 +240,7 @@ describe('updateSubItemStatus: writes to continue.json statusOverrides', () => {
 
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
     const cont = readWorkspaceContinue(TEST_DIR);
-    expect(cont?.statusOverrides?.['update-types.update-types.ac1']).toBe('completed');
+    expect(cont?.statusOverrides?.['update-types.ac1']).toBe('completed');
   });
 
   it('merged view reflects updated subItem status', () => {
@@ -286,7 +286,7 @@ describe('updateSubItemStatus: writes to continue.json statusOverrides', () => {
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
     const cont = readWorkspaceContinue(TEST_DIR);
     expect(cont?.statusOverrides?.['update-types']).toBe('completed');
-    expect(cont?.statusOverrides?.['update-types.update-types.ac1']).toBe('completed');
+    expect(cont?.statusOverrides?.['update-types.ac1']).toBe('completed');
   });
 });
 

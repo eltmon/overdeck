@@ -587,7 +587,7 @@ export function ConversationPanel({
               agentId={agentId ?? conversation.name}
               turnDiffSummaries={diffData.summaries}
               onClose={handleCloseDiff}
-              {...(!agentId ? { diffUrlPrefix: `/api/conversations/${encodeURIComponent(conversation.name)}/diffs` } : {})}
+              diffUrlPrefix={`/api/conversations/${encodeURIComponent(conversation.name)}/diffs`}
             />
           </DiffWorkerPoolProvider>
         )}

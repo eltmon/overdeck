@@ -54,6 +54,12 @@ export interface ContainerStatus {
   lastFailureReason?: string;
 }
 
+export interface WorkspaceStackHealth {
+  healthy: boolean;
+  reasons: string[];
+  lastObserved: string;
+}
+
 export interface PendingOperation {
   type: 'approve' | 'close' | 'containerize' | 'start' | 'review' | 'merge';
   issueId: string;
@@ -80,6 +86,7 @@ export interface WorkspaceInfo {
   frontendUrl?: string;
   apiUrl?: string;
   containers?: Record<string, ContainerStatus> | null;
+  stackHealth?: WorkspaceStackHealth;
   hasDocker?: boolean;
   canContainerize?: boolean;
   pendingOperation?: PendingOperation | null;

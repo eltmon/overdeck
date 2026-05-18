@@ -273,8 +273,7 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     if (workspacePath && existsSync(workspacePath)) {
       try {
         const { stopWorkspaceDocker } = await import('./workspace-manager.js');
-        const projectName = extractPrefix(ctx.issueId)?.toLowerCase() ?? ctx.issueId.toLowerCase();
-        await stopWorkspaceDocker(workspacePath, projectName, issueLower);
+        await stopWorkspaceDocker(workspacePath, issueLower);
         cleaned = true;
       } catch { /* Docker may not be running */ }
 

@@ -22,6 +22,14 @@ export interface ContainerStats {
   status: 'running' | 'stopped' | 'unhealthy' | 'restarting';
 }
 
+export interface DockerContainerLifecycle {
+  id: string;
+  name: string;
+  status: string;
+  state?: string;
+  createdAt?: string;
+}
+
 export interface ContainerHistory {
   timestamps: number[];   // unix ms
   cpuPercent: number[];
@@ -37,7 +45,39 @@ interface DockerStatsRaw {
   NetIO: string;     // "1.23kB / 456B"
 }
 
+interface DockerPsRaw {
+  ID?: string;
+  Names?: string;
+  Name?: string;
+  Status?: string;
+  State?: string;
+  CreatedAt?: string;
+}
+
 const HISTORY_MAX = 60; // 5 min at 5s intervals
+let cachedContainerLifecycleSnapshot: DockerContainerLifecycle[] = [];
+let cachedContainerLifecycleObservedAt: string | null = null;
+
+export function getCachedDockerContainerLifecycleSnapshot(): DockerContainerLifecycle[] {
+  return cachedContainerLifecycleSnapshot.map(container => ({ ...container }));
+}
+
+export function getCachedDockerContainerLifecycleObservedAt(): string | null {
+  return cachedContainerLifecycleObservedAt;
+}
+
+export function resetCachedDockerContainerLifecycleSnapshotForTests(): void {
+  cachedContainerLifecycleSnapshot = [];
+  cachedContainerLifecycleObservedAt = null;
+}
+
+export function recordDockerContainerLifecycleSnapshot(
+  containers: DockerContainerLifecycle[],
+  observedAt = new Date().toISOString(),
+): void {
+  cachedContainerLifecycleSnapshot = containers.map(container => ({ ...container }));
+  cachedContainerLifecycleObservedAt = observedAt;
+}
 
 function parsePercent(s: string): number {
   return parseFloat(s.replace('%', '')) || 0;
@@ -107,21 +147,34 @@ export class DockerStatsCollector {
           encoding: 'utf-8',
           timeout: 10000,
         }).catch(() => ({ stdout: '', stderr: '' })),
-        execAsync(`docker ps -a --format '{{.ID}}\t{{.Names}}\t{{.Status}}' 2>/dev/null`, {
+        execAsync(`docker ps -a --format '{{json .}}' 2>/dev/null`, {
           encoding: 'utf-8',
           timeout: 5000,
         }).catch(() => ({ stdout: '', stderr: '' })),
       ]);
 
-      // Parse `docker ps -a` output for status
+      const lifecycleContainers: DockerContainerLifecycle[] = [];
       this.containerStatuses.clear();
       for (const line of psResult.stdout.trim().split('\n')) {
         if (!line.trim()) continue;
-        const [id, name, ...rest] = line.split('\t');
-        if (id && name) {
-          this.containerStatuses.set(name, rest.join('\t').toLowerCase());
+        try {
+          const raw = JSON.parse(line) as DockerPsRaw;
+          const name = raw.Names ?? raw.Name;
+          if (!raw.ID || !name) continue;
+          const container: DockerContainerLifecycle = {
+            id: raw.ID,
+            name,
+            status: raw.Status ?? '',
+            state: raw.State,
+            createdAt: raw.CreatedAt,
+          };
+          lifecycleContainers.push(container);
+          this.containerStatuses.set(name, container.status.toLowerCase());
+        } catch {
+          // Skip malformed JSON lines.
         }
       }
+      recordDockerContainerLifecycleSnapshot(lifecycleContainers);
 
       const now = Date.now();
       for (const line of statsResult.stdout.trim().split('\n')) {

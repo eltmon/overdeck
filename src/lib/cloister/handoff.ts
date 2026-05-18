@@ -13,6 +13,7 @@ import { getAgentState, saveAgentState, stopAgent, spawnAgent, spawnRun, getAgen
 import type { HandoffContext } from './handoff-context.js';
 import { captureHandoffContext, buildHandoffPrompt } from './handoff-context.js';
 import { sessionExists } from '../tmux.js';
+import { requireModelOverride } from '../model-validation.js';
 
 /**
  * Handoff method type
@@ -67,10 +68,21 @@ export async function performHandoff(
     };
   }
 
+  let targetModel: string;
+  try {
+    targetModel = requireModelOverride(options.targetModel);
+  } catch (error) {
+    return {
+      success: false,
+      method: 'kill-spawn',
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
   // Legacy specialist wake has been deleted; normalize all handoffs to role respawn.
   const method = options.method === 'specialist-wake' ? 'kill-spawn' : (options.method || detectHandoffMethod(agentId));
 
-  return await performKillAndSpawn(state, { ...options, method });
+  return await performKillAndSpawn(state, { ...options, targetModel, method });
 }
 
 /**
@@ -140,6 +152,7 @@ async function performKillAndSpawn(
       model: options.targetModel,
       role: 'work',
       prompt,
+      allowHost: state.hostOverride === true,
     });
 
     // Preserve accumulated cost without reintroducing legacy phase/complexity routing fields.

@@ -1,0 +1,94 @@
+{
+  "version": "1",
+  "issueId": "PAN-1141",
+  "created": "2026-05-17T17:34:08.282Z",
+  "updated": "2026-05-17T20:34:53.014Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T17:34Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-17T17:34:08.283Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-17T17:34:08.671Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T17:45Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T17:45:12.635Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T17:59Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T17:59:04.206Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T18:16Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T18:16:57.704Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T18:25Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T18:25:01.705Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T18:25Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-05-17T18:25:16.902Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T18:34Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T18:34:16.715Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T18:48Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T18:48:07.547Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T18:48Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-05-17T18:48:22.294Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T18:57Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T18:57:40.488Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T19:20Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T19:20:11.565Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T19:35Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T19:35:03.573Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T19:54Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T19:54:32.250Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T20:06Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T20:06:12.406Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T20:21Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T20:21:06.917Z"
+    }
+  ]
+}

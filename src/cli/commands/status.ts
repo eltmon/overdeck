@@ -1,14 +1,54 @@
 import chalk from 'chalk';
 import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
-import { listRunningAgents, getAgentDir } from '../../lib/agents.js';
+import { listRunningAgents, getAgentDir, type AgentState } from '../../lib/agents.js';
 import { isShadowed, getShadowState } from '../../lib/shadow-state.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
+import { isNoResumeValueEnabled } from '../../lib/cloister/no-resume-mode.js';
 import { getTldrMetrics, getTldrDaemonService } from '../../lib/tldr-daemon.js';
+import {
+  collectDockerContainerLifecycleSnapshot,
+  getWorkspaceStackHealth,
+  inferIssueIdFromStackContainerName,
+} from '../../lib/workspace/stack-health.js';
 
 interface StatusOptions {
   json?: boolean;
   tldr?: boolean;
   context?: boolean;
+}
+
+function issueKey(issueId: string): string {
+  return issueId.toUpperCase();
+}
+
+async function isBootNoResumeModeActive(): Promise<boolean> {
+  if (isNoResumeValueEnabled(process.env.PANOPTICON_NO_RESUME)) return true;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 250);
+  try {
+    const response = await fetch(`${getDashboardApiUrl()}/api/no-resume-mode`, { signal: controller.signal });
+    if (!response.ok) return false;
+    const payload = await response.json() as { active?: unknown };
+    return payload.active === true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function formatGatingReason(agent: AgentState & { tmuxActive: boolean }, noResumeModeActive: boolean): string {
+  if (agent.tmuxActive) return '';
+  if (agent.paused === true) return agent.pausedReason ? `Paused (${agent.pausedReason})` : 'Paused';
+  if (agent.troubled === true) {
+    const failureCount = agent.consecutiveFailures ?? 0;
+    return `Troubled (${failureCount} failure${failureCount === 1 ? '' : 's'})`;
+  }
+  if (noResumeModeActive) return 'Boot --no-resume';
+  if (agent.stoppedByUser === true) return 'Manual';
+  return '';
 }
 
 export function readContextPercent(agentId: string): number | null {
@@ -34,6 +74,28 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const agents = listRunningAgents().filter(agent =>
     agent.id && agent.issueId && agent.workspace
   );
+  const noResumeModeActive = await isBootNoResumeModeActive();
+  const dockerContainers = await collectDockerContainerLifecycleSnapshot();
+  const issueIds = new Map<string, string>();
+  for (const agent of agents) {
+    issueIds.set(issueKey(agent.issueId!), agent.issueId!);
+  }
+  for (const container of dockerContainers) {
+    const issueId = inferIssueIdFromStackContainerName(container.name);
+    if (issueId) issueIds.set(issueKey(issueId), issueId);
+  }
+
+  const stackHealthByIssue = new Map(await Promise.all(
+    Array.from(issueIds, async ([key, issueId]) => [
+      key,
+      await getWorkspaceStackHealth(issueId, { containers: dockerContainers }),
+    ] as const)
+  ));
+  const agentIssueKeys = new Set(agents.map(agent => issueKey(agent.issueId!)));
+  const brokenStacksWithoutAgent = Array.from(issueIds)
+    .filter(([key]) => !agentIssueKeys.has(key))
+    .map(([key, issueId]) => ({ issueId, stackHealth: stackHealthByIssue.get(key) }))
+    .filter((entry): entry is { issueId: string; stackHealth: NonNullable<typeof entry.stackHealth> } => Boolean(entry.stackHealth && !entry.stackHealth.healthy));
 
   if (options.json) {
     // Add shadow mode info and optional context % to JSON output
@@ -45,6 +107,8 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
         shadowMode: shadowed,
         shadowStatus: shadowState?.shadowStatus,
         trackerStatus: shadowState?.trackerStatus,
+        stackHealth: agent.issueId ? stackHealthByIssue.get(issueKey(agent.issueId)) : undefined,
+        gatingReason: formatGatingReason(agent, noResumeModeActive) || undefined,
         ...(options.context ? { contextPercent: readContextPercent(agent.id) } : {}),
       };
     }));
@@ -52,13 +116,15 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     return;
   }
 
-  if (agents.length === 0) {
+  if (agents.length === 0 && brokenStacksWithoutAgent.length === 0) {
     console.log(chalk.dim('No running agents.'));
     console.log(chalk.dim('Use "pan start <id>" to spawn one.'));
     return;
   }
 
-  console.log(chalk.bold('\nRunning Agents\n'));
+  if (agents.length > 0) {
+    console.log(chalk.bold('\nRunning Agents\n'));
+  }
 
   for (const agent of agents) {
     const statusColor = agent.tmuxActive ? chalk.green : chalk.red;
@@ -71,9 +137,14 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     const shadowed = agent.issueId ? await isShadowed(agent.issueId) : false;
     const shadowState = shadowed && agent.issueId ? await getShadowState(agent.issueId) : null;
 
+    const gatingReason = formatGatingReason(agent, noResumeModeActive);
+
     console.log(`${chalk.cyan(agent.id)}`);
     console.log(`  Issue:    ${agent.issueId}`);
     console.log(`  Status:   ${statusColor(status)}`);
+    if (gatingReason) {
+      console.log(`  Gate:     ${chalk.yellow(gatingReason)}`);
+    }
 
     if (shadowed && shadowState) {
       const statusStr = `${shadowState.shadowStatus}${shadowState.trackerStatus !== shadowState.shadowStatus ? ` (tracker: ${shadowState.trackerStatus})` : ''}`;
@@ -92,6 +163,11 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     console.log(`  Duration: ${duration} min`);
     console.log(`  Workspace: ${chalk.dim(agent.workspace)}`);
 
+    const stackHealth = agent.issueId ? stackHealthByIssue.get(issueKey(agent.issueId)) : undefined;
+    if (stackHealth && !stackHealth.healthy) {
+      console.log(`  Stack:    ${chalk.red('STACK BROKEN')} ${stackHealth.reasons.join('; ')}`);
+    }
+
     // Show TLDR session metrics if a .tldr/ dir exists in the workspace
     try {
       const tldr = getTldrMetrics(agent.workspace);
@@ -103,6 +179,15 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     } catch { /* non-fatal — workspace may not have TLDR */ }
 
     console.log('');
+  }
+
+  if (brokenStacksWithoutAgent.length > 0) {
+    console.log(chalk.bold('Broken Workspace Stacks\n'));
+    for (const { issueId, stackHealth } of brokenStacksWithoutAgent) {
+      console.log(`${chalk.cyan(issueId)}`);
+      console.log(`  Stack:    ${chalk.red('STACK BROKEN')} ${stackHealth.reasons.join('; ')}`);
+      console.log('');
+    }
   }
 
   // Show legend

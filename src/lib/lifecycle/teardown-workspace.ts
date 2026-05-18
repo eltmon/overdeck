@@ -21,7 +21,6 @@ import { killSessionAsync, sessionExists, listSessionNamesAsync } from '../tmux.
 import type { LifecycleContext, StepResult, TeardownOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js';
-import { extractPrefix } from '../issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
 
@@ -120,13 +119,12 @@ async function stopTldrDaemon(workspacePath: string): Promise<StepResult> {
  */
 async function stopDocker(
   workspacePath: string,
-  projectName: string,
   issueLower: string,
 ): Promise<StepResult> {
   const step = 'teardown:docker';
   try {
     const { stopWorkspaceDocker } = await import('../workspace-manager.js');
-    await stopWorkspaceDocker(workspacePath, projectName, issueLower);
+    await stopWorkspaceDocker(workspacePath, issueLower);
     return stepOk(step, ['Stopped Docker containers']);
   } catch {
     return stepSkipped(step, ['Docker cleanup skipped (not running or failed)']);
@@ -505,7 +503,6 @@ export async function teardownWorkspace(
   opts: TeardownOptions = {},
 ): Promise<StepResult[]> {
   const issueLower = ctx.issueId.toLowerCase();
-  const projName = opts.projectName || ctx.projectName || (extractPrefix(ctx.issueId)?.toLowerCase() ?? ctx.issueId);
   const workspacePath = findWorkspacePath(ctx.projectPath, issueLower);
   const shouldDeleteWorkspace = opts.deleteWorkspace !== false; // default true
   const results: StepResult[] = [];
@@ -528,7 +525,7 @@ export async function teardownWorkspace(
 
     // 5. Stop Docker containers (only if deleting workspace)
     if (shouldDeleteWorkspace && !opts.skipDocker) {
-      results.push(await stopDocker(workspacePath, projName, issueLower));
+      results.push(await stopDocker(workspacePath, issueLower));
     }
 
     // 5b. Kill orphaned host processes (Vite, node) that survive Docker teardown

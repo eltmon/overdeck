@@ -9,18 +9,22 @@
  * --model:   override model for work slots (default: kimi-k2.6)
  * --max-slots: max concurrent agents (default: respects guardrails)
  * --auto-advance: dispatch next wave automatically when the current wave completes
+ * --host: bypass workspace docker stack-health gate after explicit confirmation
+ * --yes: confirm --host in non-interactive contexts
  */
 
 import chalk from 'chalk';
 import ora from 'ora';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { createInterface } from 'readline/promises';
 import { getDashboardApiUrl } from '../../lib/config.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
 import { readWorkspacePlan } from '../../lib/vbrief/io.js';
 import { groupItemsByWave, getDispatchableItems, createActiveSlice, verifyActiveSlicePromptReduction, isTaskCommand, type TaskCommand, type Wave } from '../../lib/vbrief/dag.js';
 import { runTaskCommand } from '../../lib/vbrief/dag-cli.js';
 import { INTERNAL_TOKEN_HEADER, ensureInternalToken } from '../../lib/internal-token.js';
+import { normalizeModelOverride } from '../../lib/model-validation.js';
 
 const DASHBOARD_URL = getDashboardApiUrl();
 
@@ -65,15 +69,61 @@ function printWavePlan(waves: Wave[], issueId: string): void {
   console.log(chalk.dim(`  Critical depth: ${waves.length} sequential waves`));
 }
 
+interface SwarmCommandOptions {
+  dryRun?: boolean;
+  wave?: string;
+  model?: string;
+  maxSlots?: string;
+  autoAdvance?: boolean;
+  task?: string;
+  item?: string;
+  reason?: string;
+  sequence?: string;
+  host?: boolean;
+  yes?: boolean;
+}
+
+function buildHostOverrideConfirmation(issueId: string): string {
+  return `I understand this bypasses workspace isolation for ${issueId.toUpperCase()}`;
+}
+
+async function confirmHostOverride(options: SwarmCommandOptions): Promise<boolean> {
+  if (!options.host) return true;
+
+  if (!process.stdin.isTTY) {
+    if (options.yes) {
+      console.warn(chalk.yellow('--host --yes given in a non-interactive context; bypassing workspace isolation.'));
+      return true;
+    }
+    console.error(chalk.red('Error: --host requires an interactive confirmation, or pass --yes for non-interactive use.'));
+    return false;
+  }
+
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const answer = (await rl.question(chalk.bold('Are you sure? This bypasses workspace isolation. (y/N) '))).trim().toLowerCase();
+    return answer === 'y' || answer === 'yes';
+  } finally {
+    rl.close();
+  }
+}
+
 export async function swarmCommand(
   id: string,
-  options: { dryRun?: boolean; wave?: string; model?: string; maxSlots?: string; autoAdvance?: boolean; task?: string; item?: string; reason?: string; sequence?: string },
+  options: SwarmCommandOptions,
 ): Promise<void> {
   const issueId = id.toUpperCase();
 
   parseFiniteInteger(options.wave, '--wave');
   parseFiniteInteger(options.maxSlots, '--max-slots');
   parseFiniteInteger(options.sequence, '--sequence');
+  try {
+    const model = normalizeModelOverride(options.model);
+    if (model) options.model = model;
+  } catch (err) {
+    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    process.exit(1);
+  }
 
   if (options.task) {
     return taskOperation(issueId, options);
@@ -81,6 +131,10 @@ export async function swarmCommand(
 
   if (options.dryRun) {
     return dryRun(issueId);
+  }
+
+  if (!(await confirmHostOverride(options))) {
+    process.exit(1);
   }
 
   const spinner = ora(`Dispatching swarm for ${issueId}...`).start();
@@ -93,6 +147,10 @@ export async function swarmCommand(
     if (options.model) body.model = options.model;
     if (maxSlots !== undefined) body.maxSlots = maxSlots;
     if (options.autoAdvance !== undefined) body.autoAdvance = options.autoAdvance;
+    if (options.host) {
+      body.host = true;
+      body.hostOverrideConfirmation = buildHostOverrideConfirmation(issueId);
+    }
 
     // PAN-977 blocker #3: POST /api/swarm is privileged. Send the internal
     // token so the dashboard auth gate accepts the request.

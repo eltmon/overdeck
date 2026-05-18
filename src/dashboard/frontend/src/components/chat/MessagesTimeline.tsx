@@ -278,6 +278,17 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     el.scrollTop = el.scrollHeight;
   }, [rows.length, streaming]);
 
+  // Reset scroll pinning when switching conversations. The component is reused
+  // across reviewer switches (parent does not remount it), so without this the
+  // previous conversation's scrolled-up state leaks in and bails out the
+  // auto-scroll effects above.
+  useLayoutEffect(() => {
+    isPinnedToBottomRef.current = true;
+    setShowScrollToBottom(false);
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [conversationName]);
+
   const scrollToBottom = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;

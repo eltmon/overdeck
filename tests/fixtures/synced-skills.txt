@@ -45,6 +45,7 @@ pan-logs
 pan-network
 pan-new-project
 pan-oversee
+pan-pause
 pan-plan
 pan-projects
 pan-quickstart
@@ -66,6 +67,8 @@ pan-tell
 pan-test-config
 pan-tldr
 pan-tts
+pan-unpause
+pan-untroubled
 pan-up
 pan-wipe
 pan-workspace-config

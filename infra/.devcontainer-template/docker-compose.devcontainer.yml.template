@@ -19,7 +19,7 @@ services:
       - devnet
       - panopticon
 
-  # Init service: runs npm install + server build once for all workspaces
+  # Init service: runs filtered bun install + server build once for all workspaces
   # Frontend and server depend on this completing successfully
   init:
     build:
@@ -27,10 +27,14 @@ services:
       dockerfile: Dockerfile
     user: node
     working_dir: /workspaces/panopticon
+    environment:
+      - NODE_ENV=development
+      - HUSKY=0
+      - PANOPTICON_SKIP_NATIVE_POSTINSTALL=1
     command: >
       sh -c "
-        echo 'Installing dependencies...' ;
-        bun install ;
+        echo 'Installing dependencies...' &&
+        bun install --filter '@panctl/cli' --filter '@panctl/contracts' --filter '@panopticon/pi-extension' --filter 'panopticon-server' --filter 'panopticon-dashboard' &&
         echo 'Rebuilding native Node.js addons...' &&
         npm rebuild better-sqlite3 2>&1 &&
         echo 'Building contracts...' &&

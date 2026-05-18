@@ -4,6 +4,9 @@ Only one Deacon may run at a time per `~/.panopticon` state directory. Mounting
 `${HOME}/.panopticon` into a workspace devcontainer that also runs
 `dist/dashboard/server.js` creates a second Deacon racing the host's.
 
+For the broader workspace container contract, stack-health surfaces, and recovery
+commands, see `docs/WORKSPACE-CONTAINERS.md`.
+
 ### What goes wrong
 
 The container has its own tmux server. The host has its own tmux server. Both

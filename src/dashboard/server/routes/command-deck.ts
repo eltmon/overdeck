@@ -1276,10 +1276,14 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
 
     } else if (tracker === 'rally') {
       try {
-        const issueDataService = yield* Effect.tryPromise({
-          try: () => getIssueDataService(),
-          catch: () => null,
-        });
+        // getIssueDataService is sync — call it directly under JS try/catch
+        // rather than Effect.tryPromise. The old wrapper put any sync throw
+        // onto the FAILURE channel via `catch: () => null`, which `yield*`
+        // then re-raised out of this JS try/catch (Effect failures aren't
+        // JS throws) and into httpHandler's catchCause.
+        let issueDataService: IssueDataService | null;
+        try { issueDataService = getIssueDataService(); }
+        catch { issueDataService = null; }
         const allIssues = (issueDataService?.getIssues() ?? []) as Record<string, unknown>[];
         const parentFeature = allIssues.find((i) => i['source'] === 'rally' && i['identifier'] === issueId);
         const childStories = allIssues.filter((i) => i['source'] === 'rally' && i['parentRef'] === issueId);

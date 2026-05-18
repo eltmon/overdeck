@@ -25,6 +25,8 @@ pan start <issue-id>
 ```
 pan start PAN-123          # Spawn agent for issue PAN-123
 pan start MIN-456          # Works with any tracker prefix
+pan start PAN-123 --force  # Clear a paused agent gate and start anyway
+pan start PAN-123 --host   # Break-glass: bypass workspace Docker stack-health gate
 ```
 
 ## What It Does
@@ -32,6 +34,13 @@ pan start MIN-456          # Works with any tracker prefix
 Creates a git worktree at `workspaces/feature-<id>/`, installs dependencies, then spawns
 an autonomous Claude Code agent in a tmux session (`agent-<id>`). The agent loads the
 issue spec, creates a plan, and begins implementation.
+
+If an agent is paused, `pan start <id>` refuses to spawn until you run `pan unpause <id>`.
+Use `--force` only when you intentionally want to clear that pause gate and start anyway.
+
+For projects with workspace Docker configured, `pan start` checks stack health before
+spawning. Use `--host` only as an explicit break-glass override; interactive shells always
+prompt, while non-interactive callers must pass `--yes` to confirm.
 
 ## When to Use
 

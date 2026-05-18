@@ -22,6 +22,7 @@ const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
 import { loadCloisterConfig } from './config.js';
+import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatus, loadReviewStatuses, getReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
@@ -40,7 +41,7 @@ import {
   isRunning,
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
-import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent } from '../agents.js';
+import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, getAgentStateAsync, saveAgentState, saveAgentStateAsync, resumeAgent, recordAgentFailureAsync, type AgentState } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, isPaneDeadAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
@@ -2170,6 +2171,8 @@ const mergeStuckCooldowns = new Map<string, number>();
 // Callback set by the server layer to emit domain events when agents are stopped.
 // Deacon is a library module and does not own the event store directly.
 let agentStoppedNotifier: ((agentId: string) => void) | null = null;
+let agentStatusChangedNotifier: ((state: AgentState, previousStatus?: AgentState['status']) => void) | null = null;
+const orphanFailureRecordedForAutoResume = new Set<string>();
 
 /**
  * Register a callback that deacon will call when it detects an orphaned agent
@@ -2178,6 +2181,16 @@ let agentStoppedNotifier: ((agentId: string) => void) | null = null;
  */
 export function setAgentStoppedNotifier(fn: (agentId: string) => void): void {
   agentStoppedNotifier = fn;
+}
+
+/** Register a callback for Deacon-owned AgentState changes that must reach live clients. */
+export function setAgentStatusChangedNotifier(fn: (state: AgentState, previousStatus?: AgentState['status']) => void): void {
+  agentStatusChangedNotifier = fn;
+}
+
+function notifyAgentStatusChanged(state: AgentState, previousStatus?: AgentState['status']): void {
+  if (!agentStatusChangedNotifier) return;
+  try { agentStatusChangedNotifier(state, previousStatus); } catch { /* non-fatal */ }
 }
 
 // Callback set by the server layer to emit Socket.io merge:ready notifications.
@@ -2825,8 +2838,8 @@ export async function checkDeadEndAgents(): Promise<string[]> {
 
       // Circuit breaker: don't intervene if already at max requeues
       const autoRequeueCount = status.autoRequeueCount || 0;
-      if (autoRequeueCount >= 7) {
-        console.log(`[deacon] Dead-end detected for ${key} but circuit breaker active (${autoRequeueCount}/7 requeues used)`);
+      if (autoRequeueCount >= 25) {
+        console.log(`[deacon] Dead-end detected for ${key} but circuit breaker active (${autoRequeueCount}/25 requeues used)`);
         continue;
       }
 
@@ -4260,12 +4273,37 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
 /**
  * Start the deacon patrol loop
  */
+let recoverOrphanedAgentsInFlight: Promise<string[]> | null = null;
+
 /**
  * On startup, detect agents whose state.json claims 'running' or 'starting' but have
  * no live tmux session — this happens after a system crash where tmux was killed but
  * state.json was never updated. Reset them to 'stopped' so resume/re-plan works correctly.
  */
-async function recoverOrphanedAgents(context?: string): Promise<string[]> {
+export async function recoverOrphanedAgents(context?: string): Promise<string[]> {
+  if (recoverOrphanedAgentsInFlight) {
+    logDeaconEvent(`recoverOrphanedAgents coalesced${context ? ` (${context})` : ''}: scan already in flight`);
+    return recoverOrphanedAgentsInFlight;
+  }
+
+  const scan = recoverOrphanedAgentsOnce(context);
+  recoverOrphanedAgentsInFlight = scan;
+  try {
+    return await scan;
+  } finally {
+    if (recoverOrphanedAgentsInFlight === scan) {
+      recoverOrphanedAgentsInFlight = null;
+    }
+  }
+}
+
+async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
+  const noResumeMode = getNoResumeMode();
+  if (noResumeMode.active) {
+    logDeaconEvent(`PANOPTICON_NO_RESUME=1 — skipping recoverOrphanedAgents${context ? ` (${context})` : ''}`);
+    return [];
+  }
+
   if (!existsSync(AGENTS_DIR)) return [];
   let dirs: string[];
   try { dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-') || d.startsWith('planning-')); }
@@ -4331,7 +4369,14 @@ async function recoverOrphanedAgents(context?: string): Promise<string[]> {
       const oldStatus = state.status;
       state.status = 'stopped';
       state.stoppedAt = new Date().toISOString();
-      writeFileSync(stateFile, JSON.stringify(state, null, 2));
+      await saveAgentStateAsync(state);
+      if (state.stoppedByUser !== true) {
+        const failedState = await recordAgentFailureAsync(dir, `orphaned: tmux session missing (${context ?? 'patrol'})`);
+        if (failedState) {
+          notifyAgentStatusChanged(failedState, oldStatus);
+          orphanFailureRecordedForAutoResume.add(dir);
+        }
+      }
       const msg = `Recovered orphaned agent ${dir} (${oldStatus}→stopped)`;
       actions.push(msg);
       console.log(`[deacon] ${msg}`);
@@ -4770,12 +4815,25 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
  */
 export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   const resumed: string[] = [];
-  if (!existsSync(AGENTS_DIR)) return resumed;
+  const noResumeMode = getNoResumeMode();
+  if (noResumeMode.active) {
+    logDeaconEvent('PANOPTICON_NO_RESUME=1 — skipping autoResumeStoppedWorkAgents');
+    orphanFailureRecordedForAutoResume.clear();
+    return resumed;
+  }
+
+  if (!existsSync(AGENTS_DIR)) {
+    orphanFailureRecordedForAutoResume.clear();
+    return resumed;
+  }
 
   let dirs: string[];
   try {
     dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
-  } catch { return resumed; }
+  } catch {
+    orphanFailureRecordedForAutoResume.clear();
+    return resumed;
+  }
 
   logDeaconEvent(`autoResumeStoppedWorkAgents started: scanning ${dirs.length} agent directorie(s)`);
 
@@ -4792,6 +4850,32 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     if (state.role !== 'work') {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — role=${state.role} (not work)`);
       continue;
+    }
+
+    // Skip if workspace is missing
+    if (!state.workspace || !existsSync(state.workspace)) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — workspace missing (${state.workspace || 'undefined'})`);
+      continue;
+    }
+
+    if (state.paused === true) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — paused (${state.pausedReason ?? 'no reason'})`);
+      continue;
+    }
+
+    if (state.troubled === true) {
+      const failureCount = state.consecutiveFailures ?? 0;
+      const since = state.firstFailureInRunAt ?? state.troubledAt ?? 'unknown';
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — troubled (${failureCount} consecutive failures since ${since})`);
+      continue;
+    }
+
+    if (state.lastFailureNextRetryAt !== undefined) {
+      const nextRetryMs = Date.parse(state.lastFailureNextRetryAt);
+      if (Number.isFinite(nextRetryMs) && nextRetryMs > Date.now()) {
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — backoff active (next retry at ${state.lastFailureNextRetryAt})`);
+        continue;
+      }
     }
 
     // Skip if the agent has a completed marker (or processed completion) — unless
@@ -4817,12 +4901,6 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — pipeline mid-flight (review=${review?.reviewStatus ?? 'none'}, test=${review?.testStatus ?? 'none'})`);
         continue;
       }
-    }
-
-    // Skip if workspace is missing
-    if (!state.workspace || !existsSync(state.workspace)) {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — workspace missing (${state.workspace || 'undefined'})`);
-      continue;
     }
 
     // Skip if already merge-ready (review+test passed) or already merged
@@ -4887,6 +4965,10 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       const result = await resumeAgent(agentId);
       if (result.success) {
         resumed.push(agentId);
+        const resumedState = await getAgentStateAsync(agentId);
+        if (resumedState) {
+          notifyAgentStatusChanged(resumedState, state.status);
+        }
         const msg = `Auto-resumed ${agentId} (was orphaned by system event)`;
         console.log(`[deacon] ${msg}`);
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${msg}`);
@@ -4909,12 +4991,24 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
         });
       } else {
         const msg = `Failed to auto-resume ${agentId}: ${result.error}`;
+        if (!orphanFailureRecordedForAutoResume.has(agentId)) {
+          const failedState = await recordAgentFailureAsync(agentId, msg);
+          if (failedState) {
+            notifyAgentStatusChanged(failedState, state.status);
+          }
+        }
         console.warn(`[deacon] ${msg}`);
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${msg}`);
         logAgentLifecycle(agentId, `auto-resume FAILED: ${result.error}`);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (!orphanFailureRecordedForAutoResume.has(agentId)) {
+        const failedState = await recordAgentFailureAsync(agentId, `Auto-resume error for ${agentId}: ${msg}`);
+        if (failedState) {
+          notifyAgentStatusChanged(failedState, state.status);
+        }
+      }
       console.warn(`[deacon] Auto-resume error for ${agentId}: ${msg}`);
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} auto-resume threw: ${msg}`);
       logAgentLifecycle(agentId, `auto-resume threw exception: ${msg}`);
@@ -4926,6 +5020,7 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   } else {
     logDeaconEvent(`autoResumeStoppedWorkAgents completed: no agents resumed`);
   }
+  orphanFailureRecordedForAutoResume.clear();
   return resumed;
 }
 
@@ -4939,25 +5034,17 @@ export function startDeacon(): void {
   console.log(`[deacon] Starting health monitor (patrol every ${config.patrolIntervalMs / 1000}s)`);
   logDeaconEvent(`startDeacon: health monitor starting (patrol every ${config.patrolIntervalMs / 1000}s)`);
 
-  // Recover agents whose tmux sessions were killed by a system crash, THEN
-  // auto-resume the ones that were orphaned. We MUST await recovery so that
-  // state.json is updated to 'stopped' before autoResume scans it — otherwise
-  // autoResume sees 'running' and skips, leaving the agent permanently stuck.
-  recoverOrphanedAgents('Startup recovery')
-    .then(async () => {
-      await autoResumeStoppedWorkAgents();
-    })
-    .catch((err) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error('[deacon] Startup recovery/auto-resume error:', err);
-      logDeaconEvent(`startDeacon: startup recovery chain error: ${msg}`);
-    });
-
-  // Run initial patrol (includes autoResumeStoppedWorkAgents via runPatrol)
-  runPatrol().catch((err) => {
+  // Recover agents whose tmux sessions were killed by a system crash before the
+  // first patrol. The recovery mutex also coalesces any interval patrol that fires
+  // while startup recovery is still scanning.
+  void (async () => {
+    await recoverOrphanedAgents('Startup recovery');
+    await autoResumeStoppedWorkAgents();
+    await runPatrol();
+  })().catch((err) => {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[deacon] Patrol error:', err);
-    logDeaconEvent(`startDeacon: runPatrol error: ${msg}`);
+    console.error('[deacon] Startup recovery/patrol error:', err);
+    logDeaconEvent(`startDeacon: startup recovery/patrol error: ${msg}`);
   });
 
   // Schedule regular patrols

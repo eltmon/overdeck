@@ -192,6 +192,9 @@ own `node_modules` created by `bun install` — **never symlink node_modules fro
 Symlinks break local workspace package resolution (e.g., `@panctl/contracts` would
 resolve to the main repo's stale build instead of the worktree's version).
 
+See [docs/WORKSPACE-CONTAINERS.md](docs/WORKSPACE-CONTAINERS.md) for the workspace
+container contract, stack-health surfaces, spawn gate, and recovery commands.
+
 **Before running builds or tests in a workspace:**
 1. Run `bun install` from the workspace root (creates correct workspace-aware node_modules)
 2. If you modified `packages/contracts/`, rebuild: `cd packages/contracts && npm run build`
@@ -327,6 +330,25 @@ After a work agent signals completion, Cloister runs quality gates from `project
 before advancing to the review role. If typecheck/lint/test fail, feedback is sent to the
 agent's tmux session and the completion marker is NOT processed (allowing retry).
 After 3 consecutive failures, verification is bypassed to prevent permanent blocking.
+
+## Agent Auto-Resume Gates
+
+Deacon auto-resume is intentionally suppressible through three gates:
+
+- **Boot no-resume:** `PANOPTICON_NO_RESUME=1`, `pan dev --no-resume`, or
+  `pan up --no-resume` disables orphan recovery and stopped-agent auto-resume for
+  that dashboard boot only. Restart without `--no-resume` to restore patrols.
+- **Manual pause:** `pan pause <id> [--reason <text>]` persists `paused` fields in
+  `~/.panopticon/agents/<agent-id>/state.json` and stops the agent if it is running.
+  `pan unpause <id>` clears the gate without spawning. `pan start <id>` refuses
+  paused agents unless `--force` is passed; `--force` clears the pause gate first.
+- **Troubled gate:** repeated resume/crash failures mark an agent `troubled` and
+  preserve failure counters/backoff state in `state.json`. `pan untroubled <id>`
+  clears the troubled gate and failure fields after the underlying crash cause has
+  been investigated. It does not spawn the agent.
+
+These gates are orthogonal to the global Deacon freeze in SQLite
+(`deacon.globally_paused`) and the per-issue Deacon ignore flag in review status.
 
 ## Project Resolution from Issue IDs
 
