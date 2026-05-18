@@ -176,7 +176,10 @@
     .agent-sub{font-family:"SF Mono",monospace;font-size:10px;color:var(--muted-foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .agent-cell.empty .agent-name{color:var(--muted-foreground);font-style:italic;font-family:"DM Sans",sans-serif;font-size:11px}
 
-    .runtime{font-family:"SF Mono",monospace;font-size:11px;color:var(--muted-foreground);text-align:right;font-variant-numeric:tabular-nums}
+    .ledger{display:flex;flex-direction:column;gap:2px;align-items:flex-end;font-family:"SF Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .ledger .runtime{font-size:11px;color:var(--muted-foreground)}
+    .ledger .cost{font-size:10px;color:var(--signal-cost-foreground)}
+    .ledger.empty .runtime,.ledger.empty .cost{color:var(--muted-foreground);opacity:.55}
 
     .avatar{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#a855f7,#06b6d4);display:grid;place-items:center;color:#fff;font-size:9px;font-weight:600;border:1px solid var(--border)}
     .avatar.b{background:linear-gradient(135deg,#f59e0b,#ef4444)}
@@ -376,7 +379,7 @@
               <div class="agent-name">agent-pan-1052-ship</div>
               <div class="agent-sub">claude-opus-4-7 · ship</div>
             </div>
-            <div class="runtime">19 min</div>
+            <div class="ledger"><span class="runtime">19 min</span><span class="cost">$0.81</span></div>
             <div class="avatar c">EB</div>
           </div>
 
@@ -400,7 +403,7 @@
               <div class="agent-name">agent-pan-1111-ship</div>
               <div class="agent-sub">gpt-5.5 · ship · idle</div>
             </div>
-            <div class="runtime">2 min</div>
+            <div class="ledger"><span class="runtime">2 min</span><span class="cost">$0.04</span></div>
             <div class="avatar c">EB</div>
           </div>
         </div>
@@ -435,7 +438,7 @@
               <div class="agent-name">convoy-min-794-review</div>
               <div class="agent-sub">4 specialists · sonnet-4-6</div>
             </div>
-            <div class="runtime">38 min</div>
+            <div class="ledger"><span class="runtime">38 min</span><span class="cost">$1.84</span></div>
             <div class="avatar c">EB</div>
           </div>
 
@@ -459,7 +462,7 @@
               <div class="agent-name">awaiting agent restart</div>
               <div class="agent-sub mono">last: convoy-pan-1053-review</div>
             </div>
-            <div class="runtime">3h 12m</div>
+            <div class="ledger"><span class="runtime">3h 12m</span><span class="cost">$2.04</span></div>
             <div class="avatar d">EB</div>
           </div>
         </div>
@@ -494,7 +497,7 @@
               <div class="agent-name">agent-min-846</div>
               <div class="agent-sub">sonnet-4-6 · bead 7/12</div>
             </div>
-            <div class="runtime">2h 41m</div>
+            <div class="ledger"><span class="runtime">2h 41m</span><span class="cost">$1.62</span></div>
             <div class="avatar b">EB</div>
           </div>
 
@@ -518,7 +521,7 @@
               <div class="agent-name">agent-min-847</div>
               <div class="agent-sub">opus-4-7 · bead 3/8</div>
             </div>
-            <div class="runtime">1h 18m</div>
+            <div class="ledger"><span class="runtime">1h 18m</span><span class="cost">$1.94</span></div>
             <div class="avatar d">EB</div>
           </div>
 
@@ -542,7 +545,7 @@
               <div class="agent-name">agent-min-848</div>
               <div class="agent-sub">haiku-4-5 · bead 2/4</div>
             </div>
-            <div class="runtime">22 min</div>
+            <div class="ledger"><span class="runtime">22 min</span><span class="cost">$0.11</span></div>
             <div class="avatar">EB</div>
           </div>
 
@@ -566,7 +569,7 @@
               <div class="agent-name">agent-aur-4</div>
               <div class="agent-sub">sonnet-4-6 · bead 1/3</div>
             </div>
-            <div class="runtime">14 min</div>
+            <div class="ledger"><span class="runtime">14 min</span><span class="cost">$0.14</span></div>
             <div class="avatar">EB</div>
           </div>
         </div>
@@ -601,7 +604,7 @@
               <div class="agent-name">planning-min-845</div>
               <div class="agent-sub">opus-4-7 · 8 questions answered</div>
             </div>
-            <div class="runtime">12 min</div>
+            <div class="ledger"><span class="runtime">12 min</span><span class="cost">$0.18</span></div>
             <div class="avatar b">EB</div>
           </div>
 
@@ -625,7 +628,7 @@
               <div class="agent-name">no active agent</div>
               <div class="agent-sub mono">awaiting capacity</div>
             </div>
-            <div class="runtime">—</div>
+            <div class="ledger empty"><span class="runtime">—</span><span class="cost">—</span></div>
             <div class="avatar">EB</div>
           </div>
         </div>
@@ -660,7 +663,7 @@
               <div class="agent-name">no active agent</div>
               <div class="agent-sub mono">GitHub issue open</div>
             </div>
-            <div class="runtime">—</div>
+            <div class="ledger empty"><span class="runtime">—</span><span class="cost">—</span></div>
             <div class="avatar e">EB</div>
           </div>
 
@@ -683,7 +686,7 @@
               <div class="agent-name">no active agent</div>
               <div class="agent-sub mono">Linear issue open</div>
             </div>
-            <div class="runtime">—</div>
+            <div class="ledger empty"><span class="runtime">—</span><span class="cost">—</span></div>
             <div class="avatar c">EB</div>
           </div>
 
@@ -706,7 +709,7 @@
               <div class="agent-name">no active agent</div>
               <div class="agent-sub mono">GitHub #1129</div>
             </div>
-            <div class="runtime">—</div>
+            <div class="ledger empty"><span class="runtime">—</span><span class="cost">—</span></div>
             <div class="avatar d">EB</div>
           </div>
         </div>

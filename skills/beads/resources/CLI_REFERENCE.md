@@ -348,7 +348,7 @@ bd import -i issues.jsonl --orphan-handling strict     # Fail if parent is missi
 
 # Configure default orphan handling behavior
 bd config set import.orphan_handling "resurrect"
-bd sync  # Now uses resurrect mode by default
+bd import -i .beads/issues.jsonl --orphan-handling resurrect
 ```
 
 **Orphan handling modes:**
@@ -419,18 +419,14 @@ bd daemons killall --json
 bd daemons killall --force --json  # Force kill if graceful fails
 ```
 
-### Sync Operations
+### Version Control Operations
 
 ```bash
-# Manual sync (force immediate export/import/commit/push)
-bd sync
+# Commit pending local Dolt changes
+bd dolt commit -m "session update"
 
-# What it does:
-# 1. Export pending changes to JSONL
-# 2. Commit to git
-# 3. Pull from remote
-# 4. Import any updates
-# 5. Push to remote
+# Push local Dolt commits to a configured named remote
+bd dolt push --remote origin
 ```
 
 ## Issue Types
@@ -544,10 +540,10 @@ bd update bd-42 --status in_progress --json
 # ... work ...
 
 # End of session (IMPORTANT!)
-bd sync  # Force immediate sync, bypass debounce
+bd dolt commit -m "session update"
 ```
 
-**ALWAYS run `bd sync` at end of agent sessions** to ensure changes are committed/pushed immediately.
+**ALWAYS run `bd dolt commit` at end of agent sessions** to persist pending local Dolt changes.
 
 ## See Also
 

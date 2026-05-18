@@ -75,6 +75,7 @@ import {
 } from '../../../lib/review-status.js';
 import { gitPush, MainDivergedError } from '../../../lib/git/operations.js';
 import { listGitOperations } from '../../../lib/git-activity.js';
+import { restoreTrackedBeadsExport } from '../../../lib/beads-restore.js';
 import {
   computeQueuePositionFromStatus,
   findPositionInQueue,
@@ -115,6 +116,7 @@ import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
+import { restoreTrackedBeadsExport } from '../../../lib/bd-mutex.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -593,6 +595,10 @@ async function getDirtyWorkspaceErrorForReviewRequest(
   workspaceInfo: WorkspaceInfo,
 ): Promise<string | null> {
   try {
+    if (!workspaceInfo.isRemote) {
+      await restoreTrackedBeadsExport(workspacePath);
+    }
+
     const statusCmd = 'git status --porcelain -uno';
     const status = workspaceInfo.isRemote && workspaceInfo.vmName
       ? (await execAsync(
@@ -3621,6 +3627,9 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         const workspacePathRerun = wsInfoRerun.isRemote
           ? wsInfoRerun.remotePath!
           : wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
+        if (!wsInfoRerun.isRemote) {
+          yield* Effect.promise(() => restoreTrackedBeadsExport(workspacePathRerun));
+        }
         const dirtyError = yield* Effect.promise(() => getDirtyWorkspaceErrorForReviewRequest(workspacePathRerun, wsInfoRerun));
         if (dirtyError) {
           console.log(`[request-review] Rejecting ${issueId}: dirty workspace on rerun path`);
@@ -3807,6 +3816,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         { success: false, error: 'Workspace does not exist' },
         { status: 400 }
       );
+    }
+
+    if (!workspaceInfo.isRemote) {
+      yield* Effect.promise(() => restoreTrackedBeadsExport(workspacePath));
     }
 
     const dirtyWorkspaceError = yield* Effect.promise(() => getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo));

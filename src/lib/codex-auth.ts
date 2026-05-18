@@ -1,4 +1,4 @@
-import { readFile } from 'fs/promises';
+import { open, readFile } from 'fs/promises';
 import { join } from 'path';
 import { decodeJwtPayload, getCliproxyAuthDir, getCliproxyLogPath } from './cliproxy.js';
 
@@ -31,6 +31,10 @@ export interface CodexAuthUnknown {
 
 export type CodexAuthStatus = CodexAuthValid | CodexAuthExpired | CodexAuthBurned | CodexAuthMissing | CodexAuthUnknown;
 
+interface CheckCodexAuthOptions {
+  ignoreBurnBefore?: number;
+}
+
 interface CliproxyCodexCredentials {
   access_token?: string;
   email?: string;
@@ -43,7 +47,7 @@ interface CliproxyCodexCredentials {
  * Reads ~/.panopticon/cliproxy/auth/codex-primary.json, decodes the JWT
  * access_token exp claim, and compares it to the current time.
  */
-export async function checkCodexAuthStatus(): Promise<CodexAuthStatus> {
+export async function checkCodexAuthStatus(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
   const credPath = join(getCliproxyAuthDir(), 'codex-primary.json');
 
   let raw: string;
@@ -83,7 +87,7 @@ export async function checkCodexAuthStatus(): Promise<CodexAuthStatus> {
   }
 
   const jwtStatus: CodexAuthStatus = { status: 'valid', email, expiresAt };
-  return await applyBurnedTokenOverride(jwtStatus, email, expiresAt);
+  return await applyBurnedTokenOverride(jwtStatus, email, expiresAt, options);
 }
 
 /**
@@ -108,16 +112,31 @@ export async function checkCodexAuthStatus(): Promise<CodexAuthStatus> {
  * 401s (it needs real OAuth, not the local key) and would generate
  * spurious log lines on every dashboard load.
  */
+async function readLogTail(path: string): Promise<string> {
+  const TAIL_BYTES = 128 * 1024;
+  const file = await open(path, 'r');
+  try {
+    const stat = await file.stat();
+    const length = Math.min(stat.size, TAIL_BYTES);
+    const buffer = Buffer.alloc(length);
+    await file.read(buffer, 0, length, stat.size - length);
+    return buffer.toString('utf8');
+  } finally {
+    await file.close();
+  }
+}
+
 async function applyBurnedTokenOverride(
   baseStatus: CodexAuthStatus,
   email: string,
   expiresAt: string,
+  options: CheckCodexAuthOptions,
 ): Promise<CodexAuthStatus> {
   const logPath = getCliproxyLogPath();
 
   let logRaw: string;
   try {
-    logRaw = await readFile(logPath, 'utf8');
+    logRaw = await readLogTail(logPath);
   } catch {
     return baseStatus;
   }
@@ -154,11 +173,11 @@ async function applyBurnedTokenOverride(
   // A successful LLM call came AFTER the burn line → auto-retry worked.
   if (lastSuccessIdx > lastBurnIdx) return baseStatus;
 
-  // Burn is the most recent signal. But if it's older than 5 minutes with
-  // no traffic since, treat it as stale (the user hasn't actually tried
-  // anything yet; banner would be a false alarm). The JWT exp check has
-  // already covered actually-expired tokens.
-  const BURN_STALENESS_MS = 5 * 60 * 1000;
+  if (lastBurnTimestamp !== null && options.ignoreBurnBefore !== undefined && lastBurnTimestamp < options.ignoreBurnBefore) {
+    return baseStatus;
+  }
+
+  const BURN_STALENESS_MS = 60 * 60 * 1000;
   if (lastBurnTimestamp !== null && Date.now() - lastBurnTimestamp > BURN_STALENESS_MS) {
     return baseStatus;
   }
