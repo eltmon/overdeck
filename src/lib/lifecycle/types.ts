@@ -47,6 +47,8 @@ export interface LifecycleContext {
   };
   /** Issue tracker abstraction used by lifecycle operations when available */
   tracker?: IssueTracker;
+  /** True when lifecycle work was started by Deacon automation rather than an operator */
+  auto?: boolean;
 }
 
 /** Options for teardown-workspace */

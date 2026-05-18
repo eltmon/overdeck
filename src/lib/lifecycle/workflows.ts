@@ -182,7 +182,7 @@ export function closeOut(
     // 6+7. Close issue + apply label
     const closeSteps = yield* closeIssue(ctx, {
       tracker: opts.tracker,
-      comment: 'Closed via close-out ceremony',
+      comment: ctx.auto ? 'Closed via automatic close-out ceremony' : 'Closed via close-out ceremony',
       applyLabel: true,
     });
     allSteps.push(...closeSteps);

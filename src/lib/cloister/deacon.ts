@@ -130,6 +130,8 @@ import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssue, listProjects, getProject } from '../projects.js';
+import { resolveGitHubIssue } from '../tracker-utils.js';
+import { mapGitHubStateToCanonical } from '../../core/state-mapping.js';
 import { logDeaconEvent, logAgentLifecycle } from '../persistent-logger.js';
 import { emitActivityTts } from '../activity-logger.js';
 import { getShadowState } from '../shadow-state.js';
@@ -3742,6 +3744,104 @@ const firstCompletionCooldowns = new Map<string, number>();
 const FIRST_COMPLETION_IDLE_MS = 10 * 60 * 1000; // 10 minutes idle before nudging
 const FIRST_COMPLETION_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes between nudges
 
+async function getAutoCloseOutCanonicalState(issueId: string): Promise<string | null> {
+  const ghResolved = resolveGitHubIssue(issueId);
+  if (!ghResolved.isGitHub) return null;
+
+  const { stdout } = await execFileAsync('gh', [
+    'issue',
+    'view',
+    String(ghResolved.number),
+    '--repo',
+    `${ghResolved.owner}/${ghResolved.repo}`,
+    '--json',
+    'state,labels',
+  ], { encoding: 'utf-8' });
+  const parsed = JSON.parse(stdout) as { state?: string; labels?: Array<string | { name?: string }> };
+  const labels = (parsed.labels ?? [])
+    .map(label => typeof label === 'string' ? label : label.name)
+    .filter((label): label is string => typeof label === 'string');
+  return mapGitHubStateToCanonical(parsed.state ?? 'open', labels);
+}
+
+function recordAutoCloseOutFailure(issueId: string, message: string): void {
+  console.warn(`[deacon] Auto close-out failed for ${issueId}: ${message}`);
+  setReviewStatus(issueId, { mergeNotes: `Auto close-out failed: ${message}` });
+  emitActivityEntry({
+    source: 'cloister',
+    level: 'warn',
+    issueId,
+    message: `Auto close-out failed for ${issueId}: ${message}`,
+  });
+}
+
+export async function autoCloseOut(now = new Date()): Promise<string[]> {
+  const closeOutConfig = loadCloisterConfig().close_out;
+  if (closeOutConfig?.auto !== true) return [];
+
+  const delayMinutes = Math.max(0, closeOutConfig.auto_delay_minutes ?? 60);
+  const cutoff = now.getTime() - delayMinutes * 60 * 1000;
+  const actions: string[] = [];
+  const statuses = loadReviewStatuses();
+
+  for (const [key, status] of Object.entries(statuses)) {
+    const issueId = (status.issueId || key).toUpperCase();
+    if (status.mergeStatus !== 'merged') continue;
+    if (status.stuck || status.deaconIgnored) continue;
+
+    const updatedAt = Date.parse(status.updatedAt || '');
+    if (!Number.isFinite(updatedAt) || updatedAt > cutoff) continue;
+
+    let canonicalState: string | null;
+    try {
+      canonicalState = await getAutoCloseOutCanonicalState(issueId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      recordAutoCloseOutFailure(issueId, message);
+      actions.push(`Auto close-out failed for ${issueId}: ${message}`);
+      continue;
+    }
+    if (canonicalState !== 'verifying_on_main') continue;
+
+    const resolvedProject = resolveProjectFromIssue(issueId);
+    if (!resolvedProject) {
+      const message = 'no project configured';
+      recordAutoCloseOutFailure(issueId, message);
+      actions.push(`Auto close-out failed for ${issueId}: ${message}`);
+      continue;
+    }
+
+    const ghResolved = resolveGitHubIssue(issueId);
+    const ctx = {
+      issueId,
+      projectPath: resolvedProject.projectPath,
+      auto: true,
+      ...(ghResolved.isGitHub
+        ? { github: { owner: ghResolved.owner, repo: ghResolved.repo, number: ghResolved.number } }
+        : {}),
+    };
+
+    try {
+      const { closeOut } = await import('../lifecycle/workflows.js');
+      const result = await closeOut(ctx);
+      if (!result.success) {
+        const failed = result.steps.find(step => !step.success && !step.skipped);
+        throw new Error(failed?.error ?? 'closeOut workflow failed');
+      }
+      const message = `Auto close-out completed for ${issueId}`;
+      console.log(`[deacon] ${message}`);
+      emitActivityEntry({ source: 'cloister', level: 'info', issueId, message });
+      actions.push(message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      recordAutoCloseOutFailure(issueId, message);
+      actions.push(`Auto close-out failed for ${issueId}: ${message}`);
+    }
+  }
+
+  return actions;
+}
+
 /**
  * Detect work agents that finished implementation but never called `pan done`.
  *
@@ -4495,6 +4595,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   const mergedReviewingActions = await reconcileMergedButReviewing();
   actions.push(...mergedReviewingActions);
   for (const a of mergedReviewingActions) addLog('action', a, state.patrolCycle);
+
+  const autoCloseOutActions = await autoCloseOut();
+  actions.push(...autoCloseOutActions);
+  for (const a of autoCloseOutActions) addLog('action', a, state.patrolCycle);
 
   // Closed-PR readyForMerge reconciler: stops the "Awaiting Merge" view from
   // listing issues whose PR was closed without merging (PAN-1111-style stale
