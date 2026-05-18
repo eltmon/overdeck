@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T21:31:30.000Z",
+  "updated": "2026-05-18T21:34:42.474Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "165d45116",
+    "sha": "7ec1a9985",
     "dirty": false
   },
   "decisions": [
@@ -379,7 +379,26 @@
     "c1-command-deck-right-pane-reframe.c1-command-deck-right-pane-reframe.ac3": "completed",
     "c1-command-deck-right-pane-reframe.c1-command-deck-right-pane-reframe.ac4": "completed",
     "c1-command-deck-right-pane-reframe.c1-command-deck-right-pane-reframe.ac5": "completed",
-    "i1-inspector-parity-audit": "running",
-    "t1-styleguide-conformance-test": "running"
+    "i1-inspector-parity-audit": "completed",
+    "t1-styleguide-conformance-test": "running",
+    "r2-awaiting-merge-component-removal": "completed",
+    "r2-awaiting-merge-component-removal.ac1": "completed",
+    "r2-awaiting-merge-component-removal.ac2": "completed",
+    "r2-awaiting-merge-component-removal.ac3": "completed",
+    "r2-awaiting-merge-component-removal.ac4": "completed",
+    "r2-awaiting-merge-component-removal.ac5": "completed",
+    "r1-awaiting-merge-redirect": "completed",
+    "r1-awaiting-merge-redirect.ac1": "completed",
+    "r1-awaiting-merge-redirect.ac2": "completed",
+    "r1-awaiting-merge-redirect.ac3": "completed",
+    "r1-awaiting-merge-redirect.ac4": "completed",
+    "c3-command-deck-drawer-wiring": "completed",
+    "c3-command-deck-drawer-wiring.ac1": "completed",
+    "c3-command-deck-drawer-wiring.ac2": "completed",
+    "c3-command-deck-drawer-wiring.ac3": "completed",
+    "i1-inspector-parity-audit.ac1": "completed",
+    "i1-inspector-parity-audit.ac2": "completed",
+    "i1-inspector-parity-audit.ac3": "completed",
+    "i1-inspector-parity-audit.ac4": "completed"
   }
 }
