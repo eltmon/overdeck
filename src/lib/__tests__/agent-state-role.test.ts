@@ -19,6 +19,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../workspace/stack-health.js');
     vi.doUnmock('../beads-query.js');
     vi.doUnmock('../activity-logger.js');
+    vi.doUnmock('../cloister/work-agent-prompt.js');
     vi.doUnmock('../projects.js');
     delete process.env.PANOPTICON_HOME;
     rmSync(tempHome, { recursive: true, force: true });
@@ -262,6 +263,9 @@ describe('AgentState role persistence', () => {
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
       emitActivityTts: vi.fn(),
+    }));
+    vi.doMock('../cloister/work-agent-prompt.js', () => ({
+      writeStoryFeatureContext: vi.fn(async () => undefined),
     }));
 
     const { spawnAgent } = await import('../agents.js');

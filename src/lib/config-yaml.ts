@@ -106,6 +106,9 @@ export interface TtsDaemonConfig {
   dropInfoWhenFull?: boolean;
   daemonPort?: number;
   daemonHost?: string;
+  daemon?: {
+    autoStart?: boolean;
+  };
   voiceMap?: Record<string, string>;
   mutedSources?: string[];
   utteranceTemplates?: Record<string, string>;
@@ -122,6 +125,7 @@ export interface NormalizedTtsDaemonConfig {
   dropInfoWhenFull: boolean;
   daemonPort: number;
   daemonHost: string;
+  daemonAutoStart: boolean;
   voiceMap: Record<string, string>;
   mutedSources: string[];
   utteranceTemplates: Record<string, string>;
@@ -679,6 +683,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     dropInfoWhenFull: true,
     daemonPort: 8787,
     daemonHost: '127.0.0.1',
+    daemonAutoStart: false,
     voiceMap: {},
     mutedSources: [],
     utteranceTemplates: {},
@@ -852,14 +857,14 @@ async function loadProjectConfigAsync(): Promise<YamlConfig | null> {
   if (!projectRoot) return null;
 
   const newConfigPath = join(projectRoot, '.pan.yaml');
-  if (await pathExistsAsync(newConfigPath)) return loadYamlFileAsync(newConfigPath);
+  if (await pathExistsAsync(newConfigPath)) return stripProjectTtsEndpoint(await loadYamlFileAsync(newConfigPath));
 
   const legacyConfigPath = join(projectRoot, '.panopticon.yaml');
   if (await pathExistsAsync(legacyConfigPath)) {
     process.stderr.write(
       `[panopticon] Deprecation warning: .panopticon.yaml is deprecated. Rename it to .pan.yaml.\n`
     );
-    return loadYamlFileAsync(legacyConfigPath);
+    return stripProjectTtsEndpoint(await loadYamlFileAsync(legacyConfigPath));
   }
 
   return null;
@@ -952,6 +957,7 @@ function mergeTtsConfig(result: NormalizedTtsDaemonConfig, config: YamlConfig | 
   if (tts.dropInfoWhenFull !== undefined) result.dropInfoWhenFull = tts.dropInfoWhenFull;
   if (tts.daemonPort !== undefined) result.daemonPort = tts.daemonPort;
   if (tts.daemonHost !== undefined) result.daemonHost = tts.daemonHost;
+  if (tts.daemon?.autoStart !== undefined) result.daemonAutoStart = tts.daemon.autoStart;
   if (tts.voiceMap !== undefined) result.voiceMap = { ...tts.voiceMap };
   if (tts.mutedSources !== undefined) result.mutedSources = [...tts.mutedSources];
   if (tts.utteranceTemplates !== undefined) result.utteranceTemplates = { ...tts.utteranceTemplates };
@@ -969,6 +975,7 @@ export function getDefaultTtsDaemonConfig(): NormalizedTtsDaemonConfig {
     dropInfoWhenFull: DEFAULT_CONFIG.tts.dropInfoWhenFull,
     daemonPort: DEFAULT_CONFIG.tts.daemonPort,
     daemonHost: DEFAULT_CONFIG.tts.daemonHost,
+    daemonAutoStart: DEFAULT_CONFIG.tts.daemonAutoStart,
     voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
     mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
     utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },
@@ -1120,6 +1127,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       dropInfoWhenFull: DEFAULT_CONFIG.tts.dropInfoWhenFull,
       daemonPort: DEFAULT_CONFIG.tts.daemonPort,
       daemonHost: DEFAULT_CONFIG.tts.daemonHost,
+      daemonAutoStart: DEFAULT_CONFIG.tts.daemonAutoStart,
       voiceMap: { ...DEFAULT_CONFIG.tts.voiceMap },
       mutedSources: [...DEFAULT_CONFIG.tts.mutedSources],
       utteranceTemplates: { ...DEFAULT_CONFIG.tts.utteranceTemplates },

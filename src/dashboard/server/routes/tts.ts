@@ -2,7 +2,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { resolveAndSpeak, type ResolveAndSpeakOptions, type TtsSpeakMode, type TtsSpeakResult } from '../../../lib/tts-speak.js';
 import { getTtsRuntimeConfig } from '../services/tts-runtime-config.js';
-import { validateOrigin } from './origin-validation.js';
+import { getHeaderFromMap, validateOrigin, type HeaderMap } from './origin-validation.js';
 import {
   addVoice as addStoredVoice,
   clearVoices as clearStoredVoices,
@@ -11,17 +11,18 @@ import {
   type TtsVoice,
 } from '../../../lib/tts-voices.js';
 import { jsonResponse } from '../http-helpers.js';
+import { getTtsDaemonAuthHeaders, getTtsDaemonStatus, startTtsDaemon, type TtsDaemonStartResult, type TtsDaemonStatus } from '../../../lib/tts-daemon.js';
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export const EXTRACT_EMBEDDING_TIMEOUT_MS = 60_000;
+export const TTS_ROUTE_BODY_MAX_BYTES = 64 * 1024;
+export const TTS_SPEAK_TEXT_MAX_CHARS = 4_096;
+export const TTS_EXTRACT_TEXT_MAX_CHARS = 2_000;
+export const TTS_EXTRACT_DESIGN_MAX_CHARS = 2_000;
+export const QWEN_TTS_SPEAKER_EMBEDDING_MAX_DIMS = 512;
 
-export interface TtsHealthResult {
-  ok: boolean;
-  queue?: unknown;
-  model?: unknown;
-  error?: string;
-}
+export type TtsHealthResult = TtsDaemonStatus & { ttsEnabled: boolean };
 
 export interface CheckTtsHealthOptions {
   fetch?: FetchLike;
@@ -31,39 +32,42 @@ export interface CheckTtsHealthOptions {
 }
 
 export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promise<TtsHealthResult> {
-  // TTS architecture (PAN-829 + skill pan-tts):
-  // 1. The in-process subscriber (startTtsPlayback) listens for activity.tts events.
-  // 2. When an event fires, it POSTs to the Qwen3-TTS daemon at daemonHost:daemonPort/speak.
-  // 3. The daemon synthesizes audio and plays it through PipeWire.
-  //
-  // The voice-sample preview path ALSO POSTs directly to /speak — so if the
-  // daemon is down, both paths fail. Health here probes the daemon so the
-  // dashboard's TTS indicator accurately reflects whether audio will actually
-  // come out. If tts.enabled=false in settings, surface that as the reason
-  // first so users don't think the daemon is broken when they just turned it off.
-  if (options.host === undefined && options.port === undefined && !getTtsRuntimeConfig().enabled) {
-    return { ok: false, error: 'tts disabled in settings' };
+  const runtimeConfig = getTtsRuntimeConfig();
+  const config = {
+    ...runtimeConfig,
+    daemonHost: options.host ?? runtimeConfig.daemonHost,
+    daemonPort: options.port ?? runtimeConfig.daemonPort,
+  };
+
+  if (!options.fetch) {
+    const status = await getTtsDaemonStatus(config);
+    return { ...status, ttsEnabled: runtimeConfig.enabled };
   }
 
-  let host = options.host;
-  let port = options.port;
-  if (host === undefined || port === undefined) {
-    const config = getTtsRuntimeConfig();
-    host = config.daemonHost;
-    port = config.daemonPort;
-  }
-
-  const fetchImpl = options.fetch ?? fetch;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 2_000);
 
   try {
-    const response = await fetchImpl(`http://${host}:${port}/health`, { signal: controller.signal });
-    if (!response.ok) return { ok: false, error: 'daemon unreachable' };
-    const body = await response.json() as { queue?: unknown; model?: unknown };
-    return { ok: true, queue: body.queue, model: body.model };
+    const response = await options.fetch(`http://${config.daemonHost}:${config.daemonPort}/health`, { signal: controller.signal });
+    if (!response.ok) {
+      return { ok: false, running: false, pid: null, phase: 'stopped', daemonHost: config.daemonHost, daemonPort: config.daemonPort, ttsEnabled: runtimeConfig.enabled, error: 'daemon unreachable' };
+    }
+    const body = await response.json() as { queue?: unknown; model?: unknown; pid?: unknown };
+    const pid = typeof body.pid === 'number' && Number.isFinite(body.pid) && body.pid > 0 ? Math.floor(body.pid) : null;
+    return {
+      ok: true,
+      running: true,
+      pid,
+      phase: 'healthy',
+      daemonHost: config.daemonHost,
+      daemonPort: config.daemonPort,
+      ttsEnabled: runtimeConfig.enabled,
+      queue: body.queue,
+      queueDepth: typeof body.queue === 'number' ? body.queue : undefined,
+      model: body.model,
+    };
   } catch {
-    return { ok: false, error: 'daemon unreachable' };
+    return { ok: false, running: false, pid: null, phase: 'stopped', daemonHost: config.daemonHost, daemonPort: config.daemonPort, ttsEnabled: runtimeConfig.enabled, error: 'daemon unreachable' };
   } finally {
     clearTimeout(timeout);
   }
@@ -108,6 +112,60 @@ export interface ExtractEmbeddingDeps {
   timeoutMs?: number;
 }
 
+function isValidCloneEmbedding(value: unknown): value is number[] {
+  return Array.isArray(value)
+    && value.length > 0
+    && value.length <= QWEN_TTS_SPEAKER_EMBEDDING_MAX_DIMS
+    && value.every((item) => typeof item === 'number' && Number.isFinite(item));
+}
+
+function isBoundedText(value: unknown, maxChars: number): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= maxChars;
+}
+
+function ttsPayloadTooLargeResponse(request: HttpServerRequest.HttpServerRequest): Response | undefined {
+  const rawContentLength = getHeaderFromMap(request.headers as HeaderMap, 'content-length');
+  if (!rawContentLength) return undefined;
+  const contentLength = Number.parseInt(rawContentLength, 10);
+  if (Number.isFinite(contentLength) && contentLength > TTS_ROUTE_BODY_MAX_BYTES) {
+    return jsonResponse({ error: 'TTS request too large' }, { status: 413 });
+  }
+  return undefined;
+}
+
+type CappedBodyReadResult =
+  | { ok: true; text: string }
+  | { ok: false; status: 413; error: string };
+
+export async function readCappedTtsBodyText(
+  request: Pick<HttpServerRequest.HttpServerRequest, 'source'>,
+  maxBytes = TTS_ROUTE_BODY_MAX_BYTES,
+): Promise<CappedBodyReadResult> {
+  if (!request.source.body) return { ok: true, text: '' };
+
+  const reader = request.source.body.getReader();
+  const decoder = new TextDecoder();
+  let bytesRead = 0;
+  let text = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytesRead += value.byteLength;
+      if (bytesRead > maxBytes) {
+        await reader.cancel();
+        return { ok: false, status: 413, error: 'TTS request too large' };
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return { ok: true, text };
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export function toPublicVoice(voice: TtsVoice): PublicTtsVoice {
   const { embedding: _embedding, ...publicVoice } = voice;
   return publicVoice;
@@ -144,7 +202,7 @@ export function parseCreateTtsVoiceInput(body: unknown): CreateTtsVoiceInput | u
     input.instruct = record.instruct;
   }
   if (record.embedding !== undefined) {
-    if (!Array.isArray(record.embedding) || !record.embedding.every((value) => typeof value === 'number')) return undefined;
+    if (!isValidCloneEmbedding(record.embedding)) return undefined;
     input.embedding = record.embedding;
   }
 
@@ -162,7 +220,7 @@ export function parseSpeakTtsInput(body: unknown): ResolveAndSpeakOptions | unde
   if (!body || typeof body !== 'object') return undefined;
 
   const record = body as Record<string, unknown>;
-  if (typeof record.text !== 'string' || record.text.trim().length === 0) return undefined;
+  if (!isBoundedText(record.text, TTS_SPEAK_TEXT_MAX_CHARS)) return undefined;
 
   const mode = parseTtsSpeakMode(record.mode);
   if (record.mode !== undefined && !mode) return undefined;
@@ -185,7 +243,7 @@ export function parseSpeakTtsInput(body: unknown): ResolveAndSpeakOptions | unde
   }
   if (mode) input.mode = mode;
   if (record.embedding !== undefined) {
-    if (!Array.isArray(record.embedding) || !record.embedding.every((value) => typeof value === 'number')) return undefined;
+    if (!isValidCloneEmbedding(record.embedding)) return undefined;
     input.embedding = record.embedding;
   }
 
@@ -195,8 +253,8 @@ export function parseSpeakTtsInput(body: unknown): ResolveAndSpeakOptions | unde
 export function parseExtractEmbeddingInput(body: unknown): ExtractEmbeddingInput | undefined {
   if (!body || typeof body !== 'object') return undefined;
   const record = body as Record<string, unknown>;
-  if (typeof record.design !== 'string' || record.design.trim().length === 0) return undefined;
-  if (typeof record.text !== 'string' || record.text.trim().length === 0) return undefined;
+  if (!isBoundedText(record.design, TTS_EXTRACT_DESIGN_MAX_CHARS)) return undefined;
+  if (!isBoundedText(record.text, TTS_EXTRACT_TEXT_MAX_CHARS)) return undefined;
   return { design: record.design, text: record.text };
 }
 
@@ -232,6 +290,10 @@ export async function speakTts(input: ResolveAndSpeakOptions, deps: SpeakTtsDeps
   };
 }
 
+export async function startTtsDaemonFromDashboard(): Promise<TtsDaemonStartResult> {
+  return startTtsDaemon({ config: getTtsRuntimeConfig(), detach: true, timeoutMs: 120_000 });
+}
+
 export async function extractTtsEmbedding(
   input: ExtractEmbeddingInput,
   deps: ExtractEmbeddingDeps = {},
@@ -250,7 +312,7 @@ export async function extractTtsEmbedding(
   try {
     const response = await (deps.fetch ?? fetch)(`http://${host}:${port}/extract-embedding`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...await getTtsDaemonAuthHeaders() },
       body: JSON.stringify(input),
       signal: controller.signal,
     });
@@ -264,6 +326,7 @@ export async function extractTtsEmbedding(
 }
 
 function parseJsonBody(text: string): unknown | undefined {
+  if (text.length > TTS_ROUTE_BODY_MAX_BYTES) return undefined;
   try {
     return text ? JSON.parse(text) : {};
   } catch {
@@ -285,6 +348,19 @@ const getTtsHealthRoute = HttpRouter.add(
   ),
 );
 
+const postTtsStartRoute = HttpRouter.add(
+  'POST',
+  '/api/tts/start',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = originErrorResponse(request);
+    if (originError) return originError;
+
+    const result = yield* Effect.promise(() => startTtsDaemonFromDashboard());
+    return jsonResponse(result, { status: result.ok ? 200 : 503 });
+  }),
+);
+
 const getTtsVoicesRoute = HttpRouter.add(
   'GET',
   '/api/tts/voices',
@@ -300,8 +376,12 @@ const postTtsVoiceRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const originError = originErrorResponse(request);
     if (originError) return originError;
+    const payloadTooLarge = ttsPayloadTooLargeResponse(request);
+    if (payloadTooLarge) return payloadTooLarge;
 
-    const body = parseJsonBody(yield* request.text);
+    const bodyRead = yield* Effect.promise(() => readCappedTtsBodyText(request));
+    if (!bodyRead.ok) return jsonResponse({ error: bodyRead.error }, { status: bodyRead.status });
+    const body = parseJsonBody(bodyRead.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
     const input = parseCreateTtsVoiceInput(body);
@@ -347,8 +427,12 @@ const postTtsSpeakRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const originError = originErrorResponse(request);
     if (originError) return originError;
+    const payloadTooLarge = ttsPayloadTooLargeResponse(request);
+    if (payloadTooLarge) return payloadTooLarge;
 
-    const body = parseJsonBody(yield* request.text);
+    const bodyRead = yield* Effect.promise(() => readCappedTtsBodyText(request));
+    if (!bodyRead.ok) return jsonResponse({ error: bodyRead.error }, { status: bodyRead.status });
+    const body = parseJsonBody(bodyRead.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
     const input = parseSpeakTtsInput(body);
@@ -366,8 +450,12 @@ const postExtractEmbeddingRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const originError = originErrorResponse(request);
     if (originError) return originError;
+    const payloadTooLarge = ttsPayloadTooLargeResponse(request);
+    if (payloadTooLarge) return payloadTooLarge;
 
-    const body = parseJsonBody(yield* request.text);
+    const bodyRead = yield* Effect.promise(() => readCappedTtsBodyText(request));
+    if (!bodyRead.ok) return jsonResponse({ error: bodyRead.error }, { status: bodyRead.status });
+    const body = parseJsonBody(bodyRead.text);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
     const input = parseExtractEmbeddingInput(body);
@@ -380,6 +468,7 @@ const postExtractEmbeddingRoute = HttpRouter.add(
 
 export const ttsRouteLayer = Layer.mergeAll(
   getTtsHealthRoute,
+  postTtsStartRoute,
   getTtsVoicesRoute,
   postTtsVoiceRoute,
   deleteTtsVoicesRoute,

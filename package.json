@@ -28,6 +28,7 @@
     "packages": [
       "packages/contracts",
       "packages/moonshine-linux-x64",
+      "packages/qwen-tts-linux-x64",
       "packages/pi-extension",
       "src/dashboard/server",
       "src/dashboard/frontend",
@@ -98,7 +99,8 @@
     "prepare": "husky"
   },
   "optionalDependencies": {
-    "moonshine-linux-x64": "workspace:*"
+    "moonshine-linux-x64": "workspace:*",
+    "qwen-tts-linux-x64": "workspace:*"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.63",

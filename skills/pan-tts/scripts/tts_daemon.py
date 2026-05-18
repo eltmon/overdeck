@@ -15,9 +15,11 @@ GET  /health          { "ok": true, "queue": <depth>, "model": "..." }
 
 from __future__ import annotations
 
+import gc
 import http.server
 import io
 import json
+import math
 import os
 import queue
 import subprocess
@@ -48,12 +50,36 @@ DEFAULT_INSTRUCT = os.environ.get(
 )
 DEFAULT_MAX_QUEUE = 6
 MAX_QUEUE_ENV = os.environ.get("QWEN_TTS_MAX_QUEUE", str(DEFAULT_MAX_QUEUE))
+DEFAULT_MAX_REQUEST_BYTES = 64 * 1024
+MAX_REQUEST_BYTES_ENV = os.environ.get("QWEN_TTS_MAX_REQUEST_BYTES", str(DEFAULT_MAX_REQUEST_BYTES))
+DEFAULT_MAX_TEXT_CHARS = 4096
+MAX_TEXT_CHARS_ENV = os.environ.get("QWEN_TTS_MAX_TEXT_CHARS", str(DEFAULT_MAX_TEXT_CHARS))
+DEFAULT_MAX_EXTRACT_CHARS = 2000
+MAX_EXTRACT_CHARS_ENV = os.environ.get("QWEN_TTS_MAX_EXTRACT_CHARS", str(DEFAULT_MAX_EXTRACT_CHARS))
+DEFAULT_QWEN_SPEAKER_EMBEDDING_DIMS = 512
+SPEAKER_EMBEDDING_DIMS_ENV = os.environ.get(
+    "QWEN_TTS_SPEAKER_EMBEDDING_DIMS",
+    str(DEFAULT_QWEN_SPEAKER_EMBEDDING_DIMS),
+)
+AUTH_TOKEN = os.environ.get("QWEN_TTS_AUTH_TOKEN", "").strip()
+ALLOWED_ORIGINS = {
+    origin.strip()
+    for origin in os.environ.get("QWEN_TTS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+}
 SAMPLE_RATE = 24000
 PLAYER_IDLE_TIMEOUT = 10.0  # seconds to keep pw-play open after last utterance
 
 PORT = DEFAULT_PORT
 MAX_QUEUE = DEFAULT_MAX_QUEUE
+MAX_REQUEST_BYTES = DEFAULT_MAX_REQUEST_BYTES
+MAX_TEXT_CHARS = DEFAULT_MAX_TEXT_CHARS
+MAX_EXTRACT_CHARS = DEFAULT_MAX_EXTRACT_CHARS
+QWEN_SPEAKER_EMBEDDING_DIMS = DEFAULT_QWEN_SPEAKER_EMBEDDING_DIMS
 MODEL: Qwen3TTSModel | None = None
+MODEL_DESIGN: Qwen3TTSModel | None = None
+MODEL_BASE: Qwen3TTSModel | None = None
+_ACTIVE_MODEL: str | None = None
 WORK_QUEUE: "queue.Queue[dict[str, Any]]" = queue.Queue(maxsize=MAX_QUEUE)
 MODEL_LOCK = threading.Lock()
 _MODEL_INIT_LOCK = threading.Lock()
@@ -75,6 +101,49 @@ def parse_int_env(name: str, raw: str, *, minimum: int = 0, maximum: int | None 
     return value
 
 
+def validate_text_field(value: Any, max_chars: int) -> str | None:
+    text = str(value or "").strip()
+    if not text or len(text) > max_chars:
+        return None
+    return text
+
+
+def normalize_clone_embedding(embedding_data: Any) -> list[float]:
+    if not isinstance(embedding_data, list):
+        raise ValueError("invalid_embedding")
+    if not embedding_data or len(embedding_data) > QWEN_SPEAKER_EMBEDDING_DIMS:
+        raise ValueError("invalid_embedding")
+
+    embedding: list[float] = []
+    for value in embedding_data:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("invalid_embedding")
+        numeric_value = float(value)
+        if not math.isfinite(numeric_value):
+            raise ValueError("invalid_embedding")
+        embedding.append(numeric_value)
+    return embedding
+
+
+def release_models_except(active: str) -> None:
+    global MODEL, MODEL_DESIGN, MODEL_BASE, _ACTIVE_MODEL
+    released = False
+    if active != "custom" and MODEL is not None:
+        MODEL = None
+        released = True
+    if active != "design" and MODEL_DESIGN is not None:
+        MODEL_DESIGN = None
+        released = True
+    if active != "base" and MODEL_BASE is not None:
+        MODEL_BASE = None
+        released = True
+    if released:
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    _ACTIVE_MODEL = active
+
+
 def load_model() -> None:
     global MODEL
     if MODEL is not None:
@@ -82,6 +151,7 @@ def load_model() -> None:
     with _MODEL_INIT_LOCK:
         if MODEL is not None:
             return
+        release_models_except("custom")
         log(f"loading {MODEL_ID} on cuda:0 (bfloat16)…")
         t0 = time.time()
         MODEL = Qwen3TTSModel.from_pretrained(
@@ -92,9 +162,6 @@ def load_model() -> None:
         log(f"model loaded in {time.time() - t0:.1f}s")
 
 
-MODEL_DESIGN: Qwen3TTSModel | None = None
-
-
 def load_design_model() -> None:
     global MODEL_DESIGN
     if MODEL_DESIGN is not None:
@@ -102,6 +169,7 @@ def load_design_model() -> None:
     with _MODEL_INIT_LOCK:
         if MODEL_DESIGN is not None:
             return
+        release_models_except("design")
         log("loading VoiceDesign model on cuda:0 (bfloat16)…")
         t0 = time.time()
         MODEL_DESIGN = Qwen3TTSModel.from_pretrained(
@@ -112,9 +180,6 @@ def load_design_model() -> None:
         log(f"VoiceDesign model loaded in {time.time() - t0:.1f}s")
 
 
-MODEL_BASE: Qwen3TTSModel | None = None
-
-
 def load_base_model() -> None:
     global MODEL_BASE
     if MODEL_BASE is not None:
@@ -122,6 +187,7 @@ def load_base_model() -> None:
     with _MODEL_INIT_LOCK:
         if MODEL_BASE is not None:
             return
+        release_models_except("base")
         log("loading Base model on cuda:0 (bfloat16)…")
         t0 = time.time()
         MODEL_BASE = Qwen3TTSModel.from_pretrained(
@@ -148,7 +214,8 @@ def _extract_audio(result: Any) -> np.ndarray:
 
 def build_voice_clone_prompt(embedding_data: list) -> dict[str, Any]:
     assert MODEL_BASE is not None
-    spk_emb = torch.tensor(embedding_data, dtype=torch.bfloat16, device=MODEL_BASE.device)
+    embedding = normalize_clone_embedding(embedding_data)
+    spk_emb = torch.tensor(embedding, dtype=torch.bfloat16, device=MODEL_BASE.device)
     return {
         "ref_code": [None],
         "ref_spk_embedding": [spk_emb],
@@ -187,6 +254,7 @@ def synthesize(
             )
         return _extract_audio(result)
 
+    load_model()
     assert MODEL is not None
     with MODEL_LOCK:
         result = MODEL.generate_custom_voice(
@@ -196,6 +264,43 @@ def synthesize(
             instruct=instruct,
         )
     return _extract_audio(result)
+
+
+def extract_embedding(design: str, text: str) -> list:
+    tmp_path = None
+    try:
+        load_design_model()
+        assert MODEL_DESIGN is not None
+        with MODEL_LOCK:
+            result = MODEL_DESIGN.generate_voice_design(
+                text=text,
+                language="English",
+                instruct=design,
+            )
+        audio = _extract_audio(result)
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            tmp_path = f.name
+        sf.write(tmp_path, audio, samplerate=SAMPLE_RATE)
+
+        load_base_model()
+        assert MODEL_BASE is not None
+        with MODEL_LOCK:
+            prompt_items = MODEL_BASE.create_voice_clone_prompt(
+                ref_audio=tmp_path,
+                ref_text=text,
+                x_vector_only_mode=True,
+            )
+        if not prompt_items:
+            raise ValueError("voice_clone_prompt_empty")
+        spk_emb = prompt_items[0].ref_spk_embedding
+        return spk_emb.detach().cpu().tolist()
+    finally:
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 # ─── Audio playback: persistent pw-play stream ────────────────────────────────
@@ -309,6 +414,16 @@ def worker() -> None:
             _close_player()
             continue
         try:
+            if job.get("type") == "extract-embedding":
+                result_queue = job["result_queue"]
+                try:
+                    embedding = extract_embedding(job["design"], job["text"])
+                    result_queue.put({"ok": True, "embedding": embedding})
+                except Exception as exc:  # noqa: BLE001
+                    log(f"extract-embedding failed: {exc}")
+                    result_queue.put({"ok": False, "error": str(exc)})
+                continue
+
             t0 = time.time()
             audio = synthesize(
                 job["text"],
@@ -321,7 +436,7 @@ def worker() -> None:
             dur = len(audio) / SAMPLE_RATE
             log(
                 f"spoke {dur:.1f}s in {gen_secs:.1f}s "
-                f"(rtf={gen_secs / max(dur, 0.001):.2f}): {job['text'][:60]!r}"
+                f"(rtf={gen_secs / max(dur, 0.001):.2f})"
             )
             play_audio(audio, job.get("volume", 1.0))
         except Exception as exc:  # noqa: BLE001
@@ -330,11 +445,27 @@ def worker() -> None:
             WORK_QUEUE.task_done()
 
 
+BODY_TOO_LARGE = object()
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
+    def _origin_allowed(self) -> bool:
+        origin = self.headers.get("Origin")
+        return not origin or origin in ALLOWED_ORIGINS
+
+    def _authorized(self) -> bool:
+        header_token = self.headers.get("X-Panopticon-TTS-Token", "").strip()
+        auth_header = self.headers.get("Authorization", "").strip()
+        bearer_token = auth_header.removeprefix("Bearer ").strip() if auth_header.startswith("Bearer ") else ""
+        return bool(AUTH_TOKEN) and (header_token == AUTH_TOKEN or bearer_token == AUTH_TOKEN)
+
     def _cors(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin")
+        if origin and origin in ALLOWED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Panopticon-TTS-Token, Authorization")
 
     def _json(self, status: int, body: dict[str, Any]) -> None:
         payload = json.dumps(body).encode("utf-8")
@@ -346,13 +477,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_OPTIONS(self) -> None:  # noqa: N802
+        if not self._origin_allowed():
+            self._json(403, {"error": "origin_not_allowed"})
+            return
         self.send_response(204)
         self._cors()
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/health":
-            self._json(200, {"ok": True, "queue": WORK_QUEUE.qsize(), "model": MODEL_ID})
+            self._json(200, {"ok": True, "queue": WORK_QUEUE.qsize(), "model": MODEL_ID, "pid": os.getpid()})
             return
         self._json(404, {"error": "not_found"})
 
@@ -362,6 +496,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             length = max(0, int(raw_len))
         except ValueError:
             length = 0
+        if length > MAX_REQUEST_BYTES:
+            return BODY_TOO_LARGE
         raw = self.rfile.read(length) if length > 0 else b""
         try:
             return json.loads(raw or b"{}")
@@ -369,16 +505,33 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return {}
 
     def do_POST(self) -> None:  # noqa: N802
+        if not self._origin_allowed():
+            self._json(403, {"error": "origin_not_allowed"})
+            return
+        if not self._authorized():
+            self._json(401, {"error": "unauthorized"})
+            return
+
         body = self._read_body()
+        if body is BODY_TOO_LARGE:
+            self._json(413, {"error": "request_too_large"})
+            return
         if not isinstance(body, dict):
             self._json(400, {"error": "expected_object"})
             return
 
         if self.path == "/speak":
-            text = str(body.get("text") or "").strip()
+            text = validate_text_field(body.get("text"), MAX_TEXT_CHARS)
             if not text:
-                self._json(400, {"error": "empty_text"})
+                self._json(400, {"error": "invalid_text"})
                 return
+            embedding = body.get("embedding")
+            if embedding is not None:
+                try:
+                    embedding = normalize_clone_embedding(embedding)
+                except ValueError:
+                    self._json(400, {"error": "invalid_embedding"})
+                    return
             raw_volume = body.get("volume", 1.0)
             try:
                 volume = float(raw_volume)
@@ -393,7 +546,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         "instruct": str(body.get("instruct") or DEFAULT_INSTRUCT),
                         "volume": volume,
                         "mode": str(body.get("mode") or "custom"),
-                        "embedding": body.get("embedding"),
+                        "embedding": embedding,
                     }
                 )
             except queue.Full:
@@ -403,54 +556,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if self.path == "/extract-embedding":
-            design = str(body.get("design") or "").strip()
-            text = str(body.get("text") or "").strip()
+            design = validate_text_field(body.get("design"), MAX_EXTRACT_CHARS)
+            text = validate_text_field(body.get("text"), MAX_EXTRACT_CHARS)
             if not design or not text:
                 self._json(400, {"error": "missing_design_or_text"})
                 return
 
-            tmp_path = None
+            result_queue: "queue.Queue[dict[str, Any]]" = queue.Queue(maxsize=1)
             try:
-                # 1. Generate audio with VoiceDesign
-                load_design_model()
-                assert MODEL_DESIGN is not None
-                with MODEL_LOCK:
-                    result = MODEL_DESIGN.generate_voice_design(
-                        text=text,
-                        language="English",
-                        instruct=design,
-                    )
-                audio = _extract_audio(result)
+                WORK_QUEUE.put_nowait(
+                    {
+                        "type": "extract-embedding",
+                        "design": design,
+                        "text": text,
+                        "result_queue": result_queue,
+                    }
+                )
+            except queue.Full:
+                self._json(429, {"error": "queue_full", "depth": WORK_QUEUE.qsize()})
+                return
 
-                # 2. Save to temp file
-                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                    tmp_path = f.name
-                sf.write(tmp_path, audio, samplerate=SAMPLE_RATE)
+            try:
+                result = result_queue.get(timeout=180)
+            except queue.Empty:
+                self._json(503, {"error": "extract_embedding_timeout"})
+                return
 
-                # 3. Extract speaker embedding with Base model
-                load_base_model()
-                assert MODEL_BASE is not None
-                with MODEL_LOCK:
-                    prompt_items = MODEL_BASE.create_voice_clone_prompt(
-                        ref_audio=tmp_path,
-                        ref_text=text,
-                        x_vector_only_mode=True,
-                    )
-                if not prompt_items:
-                    self._json(422, {"error": "voice_clone_prompt_empty"})
-                    return
-                spk_emb = prompt_items[0].ref_spk_embedding
-                embedding_list = spk_emb.detach().cpu().tolist()
-                self._json(200, {"embedding": embedding_list})
-            except Exception as exc:  # noqa: BLE001
-                log(f"extract-embedding failed: {exc}")
-                self._json(500, {"error": str(exc)})
-            finally:
-                if tmp_path is not None:
-                    try:
-                        os.unlink(tmp_path)
-                    except OSError:
-                        pass
+            if result.get("ok"):
+                self._json(200, {"embedding": result["embedding"]})
+                return
+            if result.get("error") == "voice_clone_prompt_empty":
+                self._json(422, {"error": "voice_clone_prompt_empty"})
+                return
+            self._json(500, {"error": "extract_embedding_failed"})
             return
 
         self._json(404, {"error": "not_found"})
@@ -460,11 +598,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 def main() -> int:
-    global PORT, MAX_QUEUE, WORK_QUEUE
+    global PORT, MAX_QUEUE, MAX_REQUEST_BYTES, MAX_TEXT_CHARS, MAX_EXTRACT_CHARS, QWEN_SPEAKER_EMBEDDING_DIMS, WORK_QUEUE
+
+    if not AUTH_TOKEN:
+        log("QWEN_TTS_AUTH_TOKEN is required")
+        return 1
 
     try:
         PORT = parse_int_env("QWEN_TTS_PORT", PORT_ENV, minimum=1, maximum=65535)
         MAX_QUEUE = parse_int_env("QWEN_TTS_MAX_QUEUE", MAX_QUEUE_ENV, minimum=1)
+        MAX_REQUEST_BYTES = parse_int_env("QWEN_TTS_MAX_REQUEST_BYTES", MAX_REQUEST_BYTES_ENV, minimum=1)
+        MAX_TEXT_CHARS = parse_int_env("QWEN_TTS_MAX_TEXT_CHARS", MAX_TEXT_CHARS_ENV, minimum=1)
+        MAX_EXTRACT_CHARS = parse_int_env("QWEN_TTS_MAX_EXTRACT_CHARS", MAX_EXTRACT_CHARS_ENV, minimum=1)
+        QWEN_SPEAKER_EMBEDDING_DIMS = parse_int_env(
+            "QWEN_TTS_SPEAKER_EMBEDDING_DIMS",
+            SPEAKER_EMBEDDING_DIMS_ENV,
+            minimum=1,
+        )
     except ValueError as exc:
         log(f"invalid env var: {exc}")
         return 1

@@ -10,6 +10,7 @@ const baseTtsConfig = (): NormalizedTtsDaemonConfig => ({
   dropInfoWhenFull: true,
   daemonHost: '127.0.0.1',
   daemonPort: 8787,
+  daemonAutoStart: false,
   voiceMap: {},
   mutedSources: [],
   utteranceTemplates: {},

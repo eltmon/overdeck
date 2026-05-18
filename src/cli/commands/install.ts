@@ -23,6 +23,7 @@ import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../l
 import { generatePanopticonTraefikConfig, cleanupTemplateFiles, ensureProjectCerts, generateTlsConfig } from '../../lib/traefik.js';
 import { refreshCache } from '../../lib/sync.js';
 import { setupHooksCommand } from './setup/hooks.js';
+import { installTtsDaemonDependencies } from '../../lib/tts-daemon.js';
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -34,6 +35,7 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-docker', 'Skip Docker network setup')
     .option('--skip-beads', 'Skip beads CLI installation')
     .option('--skip-moonshine', 'Skip Moonshine voice sidecar build (AutoPreso + Voice STT will not work without it)')
+    .option('--skip-tts-daemon', 'Skip Qwen TTS daemon venv install (CUDA torch download is large)')
     .action(installCommand);
 }
 
@@ -44,6 +46,7 @@ interface InstallOptions {
   skipDocker?: boolean;
   skipBeads?: boolean;
   skipMoonshine?: boolean;
+  skipTtsDaemon?: boolean;
 }
 
 interface PrereqResult {
@@ -494,6 +497,20 @@ async function installCommand(options: InstallOptions): Promise<void> {
     }
   } else {
     spinner.info(`Skipping Moonshine sidecar build (platform=${process.platform}/${process.arch}, only linux/x64 supported)`);
+  }
+
+  if (options.skipTtsDaemon) {
+    spinner.info('Skipping Qwen TTS daemon install (--skip-tts-daemon)');
+  } else {
+    spinner.start('Installing Qwen TTS daemon dependencies (creates venv, CUDA torch download is large)...');
+    const result = await installTtsDaemonDependencies();
+    if (result.status === 'installed') {
+      spinner.succeed(result.message);
+    } else if (result.status === 'skipped') {
+      spinner.info(result.reason);
+    } else {
+      spinner.warn(`Qwen TTS daemon install failed: ${result.reason}`);
+    }
   }
 
   // Step 6: Setup Traefik configuration

@@ -1,4 +1,5 @@
 import type { NormalizedTtsDaemonConfig } from './config-yaml.js';
+import { getTtsDaemonAuthHeaders } from './tts-daemon.js';
 import { findVoiceById, type TtsVoice } from './tts-voices.js';
 
 export type TtsSpeakMode = 'custom' | 'design' | 'clone';
@@ -129,7 +130,7 @@ async function postSpeakPayload(
   try {
     const response = await (deps.fetch ?? fetch)(`http://${config.daemonHost}:${config.daemonPort}/speak`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...await getTtsDaemonAuthHeaders() },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });

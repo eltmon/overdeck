@@ -795,6 +795,23 @@ program
         console.log(chalk.dim('  TLDR will be unavailable but dashboard will work normally'));
       }
 
+      try {
+        const { loadConfig } = await import('../lib/config-yaml.js');
+        const { startTtsDaemon } = await import('../lib/tts-daemon.js');
+        const ttsConfig = loadConfig().config.tts;
+        if (ttsConfig.daemonAutoStart) {
+          console.log(chalk.dim('\nStarting Qwen TTS daemon...'));
+          const result = await startTtsDaemon({ config: ttsConfig, detach: true, timeoutMs: 30_000 });
+          if (result.ok) {
+            console.log(chalk.green(`✓ Qwen TTS daemon listening on http://${ttsConfig.daemonHost}:${ttsConfig.daemonPort}`));
+          } else {
+            console.log(chalk.yellow('⚠ Failed to start Qwen TTS daemon:'), result.error ?? result.status?.error ?? 'unknown error');
+          }
+        }
+      } catch (error: any) {
+        console.log(chalk.yellow('⚠ Failed to evaluate Qwen TTS daemon auto-start:'), error?.message || String(error));
+      }
+
       // Start the supervisor sidecar — exposes POST /restart-dashboard on a
       // separate port so the dashboard's Force Restart button still works
       // when the dashboard process itself has crashed.

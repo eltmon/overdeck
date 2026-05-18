@@ -7,9 +7,11 @@ import {
   extractTtsEmbedding,
   listTtsVoices,
   originErrorResponse,
+  QWEN_TTS_SPEAKER_EMBEDDING_MAX_DIMS,
   parseCreateTtsVoiceInput,
   parseExtractEmbeddingInput,
   parseSpeakTtsInput,
+  readCappedTtsBodyText,
   removeTtsVoice,
   speakTts,
 } from '../tts.js';
@@ -31,7 +33,14 @@ describe('checkTtsHealth', () => {
 
     await expect(checkTtsHealth({ fetch: fetchImpl, host: '127.0.0.1', port: 8787 })).resolves.toEqual({
       ok: true,
+      running: true,
+      pid: null,
+      phase: 'healthy',
+      daemonHost: '127.0.0.1',
+      daemonPort: 8787,
+      ttsEnabled: false,
       queue: 2,
+      queueDepth: 2,
       model: 'qwen3-tts',
     });
     expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:8787/health', expect.objectContaining({ signal: expect.any(AbortSignal) }));
@@ -44,6 +53,12 @@ describe('checkTtsHealth', () => {
 
     await expect(checkTtsHealth({ fetch: fetchImpl, host: '127.0.0.1', port: 8787 })).resolves.toEqual({
       ok: false,
+      running: false,
+      pid: null,
+      phase: 'stopped',
+      daemonHost: '127.0.0.1',
+      daemonPort: 8787,
+      ttsEnabled: false,
       error: 'daemon unreachable',
     });
   });
@@ -53,7 +68,35 @@ describe('checkTtsHealth', () => {
 
     await expect(checkTtsHealth({ fetch: fetchImpl, host: '127.0.0.1', port: 8787 })).resolves.toEqual({
       ok: false,
+      running: false,
+      pid: null,
+      phase: 'stopped',
+      daemonHost: '127.0.0.1',
+      daemonPort: 8787,
+      ttsEnabled: false,
       error: 'daemon unreachable',
+    });
+  });
+});
+
+describe('TTS request body limits', () => {
+  it('rejects chunked request streams before buffering beyond the route cap', async () => {
+    const request = new Request('http://localhost/api/tts/speak', {
+      method: 'POST',
+      body: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array(32));
+          controller.enqueue(new Uint8Array(33));
+          controller.close();
+        },
+      }),
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' });
+
+    await expect(readCappedTtsBodyText({ source: request }, 64)).resolves.toEqual({
+      ok: false,
+      status: 413,
+      error: 'TTS request too large',
     });
   });
 });
@@ -156,6 +199,12 @@ describe('TTS voice routes helpers', () => {
     expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'clone' })).toBeUndefined();
     expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'clone', embedding: [] })).toBeUndefined();
     expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'clone', embedding: ['x'] })).toBeUndefined();
+    expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'clone', embedding: [Number.POSITIVE_INFINITY] })).toBeUndefined();
+    expect(parseCreateTtsVoiceInput({
+      name: 'Bad',
+      kind: 'clone',
+      embedding: Array.from({ length: QWEN_TTS_SPEAKER_EMBEDDING_MAX_DIMS + 1 }, () => 0),
+    })).toBeUndefined();
   });
 
   it('deletes voices and reports unknown ids', async () => {
@@ -216,10 +265,16 @@ describe('TTS speak route helpers', () => {
 
   it('rejects invalid speak payloads', () => {
     expect(parseSpeakTtsInput({ text: '' })).toBeUndefined();
+    expect(parseSpeakTtsInput({ text: 'x'.repeat(4_097) })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', mode: 'robot' })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', preview: 'yes' })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', volume: 2 })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', embedding: ['x'] })).toBeUndefined();
+    expect(parseSpeakTtsInput({ text: 'bad', embedding: [Number.NaN] })).toBeUndefined();
+    expect(parseSpeakTtsInput({
+      text: 'bad',
+      embedding: Array.from({ length: QWEN_TTS_SPEAKER_EMBEDDING_MAX_DIMS + 1 }, () => 0),
+    })).toBeUndefined();
   });
 
   it('returns 200 with spoken true when the resolver speaks', async () => {
@@ -264,6 +319,8 @@ describe('TTS embedding extraction route helpers', () => {
     expect(parseExtractEmbeddingInput({ design: '', text: 'sample text' })).toBeUndefined();
     expect(parseExtractEmbeddingInput({ design: 'warm narrator', text: '' })).toBeUndefined();
     expect(parseExtractEmbeddingInput({ design: 1, text: 'sample text' })).toBeUndefined();
+    expect(parseExtractEmbeddingInput({ design: 'x'.repeat(2_001), text: 'sample text' })).toBeUndefined();
+    expect(parseExtractEmbeddingInput({ design: 'warm narrator', text: 'x'.repeat(2_001) })).toBeUndefined();
   });
 
   it('proxies extraction requests to the daemon with a 60-second timeout', async () => {
@@ -278,7 +335,7 @@ describe('TTS embedding extraction route helpers', () => {
     expect(EXTRACT_EMBEDDING_TIMEOUT_MS).toBe(60_000);
     expect(fetchImpl).toHaveBeenCalledWith('http://127.0.0.1:8787/extract-embedding', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-Panopticon-TTS-Token': expect.any(String) }),
       body: JSON.stringify({ design: 'warm narrator', text: 'sample text' }),
       signal: expect.any(AbortSignal),
     });

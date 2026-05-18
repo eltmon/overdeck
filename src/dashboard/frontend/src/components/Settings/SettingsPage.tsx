@@ -95,6 +95,17 @@ async function fetchSettings(): Promise<SettingsConfig> {
 
 interface TtsHealthResponse {
   ok: boolean;
+  running: boolean;
+  pid: number | null;
+  daemonHost: string;
+  daemonPort: number;
+  phase?: 'stopped' | 'starting' | 'healthy' | 'unhealthy';
+  initializing?: boolean;
+  queueDepth?: number;
+  model?: unknown;
+  uptimeSeconds?: number;
+  gpuMemoryUsedMb?: number;
+  error?: string;
 }
 
 interface TtsVoiceListItem {
@@ -110,6 +121,27 @@ async function fetchTtsHealth(): Promise<TtsHealthResponse> {
   const res = await fetch('/api/tts/health');
   if (!res.ok) throw new Error('Failed to fetch TTS health');
   return res.json();
+}
+
+async function startTtsDaemonRequest(): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch('/api/tts/start', { method: 'POST' });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || body.ok !== true) throw new Error(body.error ?? body.status?.error ?? 'Failed to start TTS daemon');
+  return body;
+}
+
+function formatTtsUptime(seconds: number | undefined): string | undefined {
+  if (seconds === undefined) return undefined;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m ${remainingSeconds}s`;
+  return `${remainingSeconds}s`;
+}
+
+function formatTtsGpuMemory(mb: number | undefined): string | undefined {
+  if (mb === undefined) return undefined;
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)}GB VRAM` : `${mb}MB VRAM`;
 }
 
 async function fetchTtsVoices(): Promise<TtsVoiceListItem[]> {
@@ -623,6 +655,18 @@ export function SettingsPage() {
     },
   });
 
+  const ttsStartMutation = useMutation({
+    mutationFn: startTtsDaemonRequest,
+    onSuccess: () => {
+      toast.success('TTS daemon started');
+      queryClient.invalidateQueries({ queryKey: ['tts-health'] });
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to start TTS daemon: ${error.message}`);
+      queryClient.invalidateQueries({ queryKey: ['tts-health'] });
+    },
+  });
+
   const queueTtsSave = useCallback((next: TtsConfig) => {
     pendingTtsSaveRef.current = next;
     if (ttsSaveInFlightRef.current) return;
@@ -1001,6 +1045,18 @@ export function SettingsPage() {
   const ttsRate = ttsConfig.rate ?? 1;
   const ttsMaxChars = ttsConfig.maxChars ?? 140;
   const ttsDaemonOnline = ttsHealth?.ok === true;
+  const ttsDaemonStarting = ttsHealth?.phase === 'starting' || ttsHealth?.initializing === true;
+  const ttsDaemonStatus = ttsHealth === undefined ? 'checking' : ttsDaemonOnline ? 'online' : ttsDaemonStarting ? 'starting' : ttsHealth.running ? 'unhealthy' : 'offline';
+  const ttsDaemonModel = typeof ttsHealth?.model === 'string' ? ttsHealth.model : undefined;
+  const ttsDaemonUptime = formatTtsUptime(ttsHealth?.uptimeSeconds);
+  const ttsDaemonGpuMemory = formatTtsGpuMemory(ttsHealth?.gpuMemoryUsedMb);
+  const ttsDaemonDetails = [
+    ttsHealth ? `${ttsHealth.daemonHost}:${ttsHealth.daemonPort}` : undefined,
+    ttsHealth?.pid ? `pid ${ttsHealth.pid}` : undefined,
+    ttsHealth?.queueDepth !== undefined ? `queue ${ttsHealth.queueDepth}` : undefined,
+    ttsDaemonGpuMemory,
+    ttsDaemonUptime ? `uptime ${ttsDaemonUptime}` : undefined,
+  ].filter(Boolean).join(' | ');
   const ttsTemplateEntries = Object.entries(ttsConfig.utteranceTemplates ?? {});
   const canAddTtsTemplate = ttsTemplateEntries.length < TTS_EVENT_KEYS.length;
 
@@ -1920,10 +1976,12 @@ export function SettingsPage() {
               ? 'bg-muted/50 text-muted-foreground'
               : ttsDaemonOnline
                 ? 'bg-success/10 text-success'
-                : 'bg-destructive/10 text-destructive'
+                : ttsDaemonStarting
+                  ? 'bg-warning/10 text-warning'
+                  : 'bg-destructive/10 text-destructive'
           }`}>
             <span className={`h-1.5 w-1.5 rounded-full ${ttsDaemonOnline ? 'bg-success' : 'bg-current'}`} />
-            Daemon status: {ttsHealth === undefined ? 'checking' : ttsDaemonOnline ? 'online' : 'offline'}
+            Daemon status: {ttsDaemonStatus}
           </span>
         }
       >
@@ -1946,6 +2004,30 @@ export function SettingsPage() {
               ttsConfig.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]'
             }`} />
           </button>
+        </SettingsRow>
+
+        <SettingsRow
+          label="Daemon"
+          description={ttsDaemonDetails || ttsHealth?.error || 'Live Qwen TTS daemon status'}
+        >
+          <div className="flex flex-col items-end gap-1.5 text-right">
+            <span className={`text-sm font-medium ${ttsDaemonOnline ? 'text-success' : ttsDaemonStarting ? 'text-warning' : 'text-muted-foreground'}`}>
+              {ttsDaemonOnline ? 'running' : ttsDaemonStatus}
+            </span>
+            {ttsDaemonModel && (
+              <span className="max-w-xs truncate text-xs text-muted-foreground">{ttsDaemonModel}</span>
+            )}
+            {!ttsDaemonOnline && !ttsDaemonStarting && (
+              <button
+                type="button"
+                onClick={() => ttsStartMutation.mutate()}
+                disabled={ttsStartMutation.isPending}
+                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-50"
+              >
+                {ttsStartMutation.isPending ? 'Starting…' : 'Start daemon'}
+              </button>
+            )}
+          </div>
         </SettingsRow>
 
         <SettingsRow
