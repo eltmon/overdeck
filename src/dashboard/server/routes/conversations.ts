@@ -78,6 +78,7 @@ import {
 } from '../../../lib/tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog } from '../../../lib/agents.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
+import { markRespawnPending } from '../services/pending-respawn.js';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
@@ -1530,16 +1531,25 @@ const postConversationResumeRoute = HttpRouter.add(
           }
         }
 
-        await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
-        await waitForTmuxSession(conv.tmuxSession);
-        if (harness === 'pi') {
-          await waitForPiTuiReady(conv.tmuxSession);
-        } else {
-          await waitForClaudePrompt(conv.tmuxSession, 30000).catch(() => false);
-        }
+        // Mark the session as mid-respawn so terminal WS reconnects landing
+        // in the tmux-down window don't get a fatal 4404. The tmux session
+        // is already dead here (sessionAlive was false) — this guards the
+        // window between now and `waitForTmuxSession` returning.
+        const respawn = markRespawnPending(conv.tmuxSession);
+        try {
+          await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
+          await waitForTmuxSession(conv.tmuxSession);
+          if (harness === 'pi') {
+            await waitForPiTuiReady(conv.tmuxSession);
+          } else {
+            await waitForClaudePrompt(conv.tmuxSession, 30000).catch(() => false);
+          }
 
-        markConversationActive(name);
-        return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
+          markConversationActive(name);
+          return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
+        } finally {
+          respawn.done();
+        }
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] resume conversation failed:', msg);
@@ -1604,89 +1614,98 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         }
         const harnessChanged = harness !== currentHarness;
 
-        // Always kill the existing session first (if alive) so the model change takes effect
-        await killSessionAsync(conv.tmuxSession).catch(() => {});
+        // Mark the session as mid-respawn BEFORE killing it so terminal
+        // WS reconnects landing in the kill→spawn gap don't get a fatal
+        // 4404. The marker is cleared in the `finally` below regardless
+        // of which branch returns or throws.
+        const respawn = markRespawnPending(conv.tmuxSession);
+        try {
+          // Always kill the existing session first (if alive) so the model change takes effect
+          await killSessionAsync(conv.tmuxSession).catch(() => {});
 
-        if (!(await validateCwdContainment(conv.cwd))) {
-          return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
-        }
+          if (!(await validateCwdContainment(conv.cwd))) {
+            return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
+          }
 
-        // Validate model before persisting so invalid values never reach the DB.
-        if (model && !SAFE_MODEL_PATTERN.test(model)) {
-          return jsonResponse({ error: 'Invalid model' }, { status: 400 });
-        }
+          // Validate model before persisting so invalid values never reach the DB.
+          if (model && !SAFE_MODEL_PATTERN.test(model)) {
+            return jsonResponse({ error: 'Invalid model' }, { status: 400 });
+          }
 
-        // Persist the new model and harness
-        if (model) setConversationModel(name, model);
-        if (harnessChanged) setConversationHarness(name, harness);
+          // Persist the new model and harness
+          if (model) setConversationModel(name, model);
+          if (harnessChanged) setConversationHarness(name, harness);
 
-        // Extract the session UUID from the existing session file path
-        const oldSessionId = conv.claudeSessionId;
+          // Extract the session UUID from the existing session file path
+          const oldSessionId = conv.claudeSessionId;
 
-        // Compact (if needed) then respawn with the new model before reporting success.
-        const sessionFile = await resolveSessionFile(conv);
-        const cwd = conv.cwd;
-        const tmuxSession = conv.tmuxSession;
-        const effort = conv.effort ?? undefined;
-        const issueId = conv.issueId ?? undefined;
+          // Compact (if needed) then respawn with the new model before reporting success.
+          const sessionFile = await resolveSessionFile(conv);
+          const cwd = conv.cwd;
+          const tmuxSession = conv.tmuxSession;
+          const effort = conv.effort ?? undefined;
+          const issueId = conv.issueId ?? undefined;
 
-        // Only resume if the session JSONL actually exists — Claude Code's --resume
-        // fails with "No conversation found" if the file is missing (e.g., first
-        // model switch on a fresh conversation or cross-provider switch).
-        let resumeSessionId = oldSessionId ?? randomUUID();
-        let canResume = !!oldSessionId && !!sessionFile && existsSync(sessionFile);
-        if (oldSessionId && !canResume) {
-          console.error(
-            `[conversations] SESSION-LOST ${name} harness=${currentHarness} ` +
-            `claudeSessionId=${oldSessionId} resolved=${sessionFile ?? 'null'} — ` +
-            `switch-model will start a fresh session`,
-          );
-        }
+          // Only resume if the session JSONL actually exists — Claude Code's --resume
+          // fails with "No conversation found" if the file is missing (e.g., first
+          // model switch on a fresh conversation or cross-provider switch).
+          let resumeSessionId = oldSessionId ?? randomUUID();
+          let canResume = !!oldSessionId && !!sessionFile && existsSync(sessionFile);
+          if (oldSessionId && !canResume) {
+            console.error(
+              `[conversations] SESSION-LOST ${name} harness=${currentHarness} ` +
+              `claudeSessionId=${oldSessionId} resolved=${sessionFile ?? 'null'} — ` +
+              `switch-model will start a fresh session`,
+            );
+          }
 
-        if (harnessChanged) {
-          // Runtime change: convert the existing transcript into the target
-          // harness's format so history carries over. Native (Claude-format)
-          // compaction must NOT run here — it would write Claude records into a
-          // Pi JSONL (or vice versa). The converter produces a fresh session in
-          // the target format and returns its session id.
-          if (canResume && sessionFile) {
-            try {
-              const result = await convertConversationTranscript({
-                fromHarness: currentHarness,
-                toHarness: harness,
-                sourceSessionFile: sessionFile,
-                cwd,
-                tmuxSession,
-              });
-              resumeSessionId = result.sessionId;
-              canResume = true;
-              if (harness === 'claude-code') setConversationClaudeSessionId(name, result.sessionId);
-            } catch (convErr) {
-              const cm = convErr instanceof Error ? convErr.message : String(convErr);
-              console.error(`[conversations] SESSION-CONVERT-FAILED ${name} ${currentHarness}->${harness}: ${cm}`);
+          if (harnessChanged) {
+            // Runtime change: convert the existing transcript into the target
+            // harness's format so history carries over. Native (Claude-format)
+            // compaction must NOT run here — it would write Claude records into a
+            // Pi JSONL (or vice versa). The converter produces a fresh session in
+            // the target format and returns its session id.
+            if (canResume && sessionFile) {
+              try {
+                const result = await convertConversationTranscript({
+                  fromHarness: currentHarness,
+                  toHarness: harness,
+                  sourceSessionFile: sessionFile,
+                  cwd,
+                  tmuxSession,
+                });
+                resumeSessionId = result.sessionId;
+                canResume = true;
+                if (harness === 'claude-code') setConversationClaudeSessionId(name, result.sessionId);
+              } catch (convErr) {
+                const cm = convErr instanceof Error ? convErr.message : String(convErr);
+                console.error(`[conversations] SESSION-CONVERT-FAILED ${name} ${currentHarness}->${harness}: ${cm}`);
+                canResume = false;
+              }
+            } else {
+              // No source transcript to convert — start the new harness fresh.
               canResume = false;
             }
-          } else {
-            // No source transcript to convert — start the new harness fresh.
-            canResume = false;
+          } else if (harness === 'claude-code') {
+            // Same harness, Claude Code: native (Claude-format) compaction is correct.
+            await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
           }
-        } else if (harness === 'claude-code') {
-          // Same harness, Claude Code: native (Claude-format) compaction is correct.
-          await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
-        }
-        // Pi staying on Pi: skip native compaction — it is Claude-format only and
-        // would corrupt the Pi JSONL. Pi manages its own context.
+          // Pi staying on Pi: skip native compaction — it is Claude-format only and
+          // would corrupt the Pi JSONL. Pi manages its own context.
 
-        await spawnConversationSession(tmuxSession, cwd, resumeSessionId, model, effort, issueId, canResume, harness);
-        await waitForTmuxSession(tmuxSession);
-        if (harness === 'pi') {
-          await waitForPiTuiReady(tmuxSession);
-        } else {
-          await waitForClaudePrompt(tmuxSession, 30000).catch(() => false);
-        }
+          await spawnConversationSession(tmuxSession, cwd, resumeSessionId, model, effort, issueId, canResume, harness);
+          await waitForTmuxSession(tmuxSession);
+          if (harness === 'pi') {
+            await waitForPiTuiReady(tmuxSession);
+          } else {
+            await waitForClaudePrompt(tmuxSession, 30000).catch(() => false);
+          }
 
-        markConversationActive(name);
-        return jsonResponse({ ...conv, status: 'active', model, harness, reattached: false, sessionAlive: true });
+          markConversationActive(name);
+          return jsonResponse({ ...conv, status: 'active', model, harness, reattached: false, sessionAlive: true });
+        } finally {
+          respawn.done();
+        }
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] switch model failed:', msg);
@@ -2159,6 +2178,9 @@ const postConversationRestartAllRoute = HttpRouter.add(
         const results: { name: string; model: string | null; status: string }[] = [];
 
         for (const conv of convs) {
+          // Mark mid-respawn so terminal WS reconnects don't 4404 in the
+          // kill→spawn gap. Cleared in finally so failures still release it.
+          const respawn = markRespawnPending(conv.tmuxSession);
           try {
             // Kill existing tmux session
             await killSessionAsync(conv.tmuxSession).catch(() => {});
@@ -2185,6 +2207,8 @@ const postConversationRestartAllRoute = HttpRouter.add(
             const msg = err instanceof Error ? err.message : String(err);
             console.error(`[conversations] Failed to restart ${conv.name}:`, msg);
             results.push({ name: conv.name, model: conv.model, status: 'failed' });
+          } finally {
+            respawn.done();
           }
         }
 

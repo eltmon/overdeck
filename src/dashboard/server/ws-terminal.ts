@@ -20,12 +20,18 @@ import { homedir } from 'node:os';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
-import { buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
-import { getReauthSessionToken, invalidateReauthToken } from './routes/codex-auth.js';
+import { buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
+import { consumeReauthTerminalToken } from './routes/codex-auth.js';
 import { hasDashboardAuthHeaders } from './routes/dashboard-auth.js';
 import { validateOriginHeaders } from './routes/origin-validation.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 import { getInternalToken } from '../../lib/internal-token.js';
+import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
+
+// Worst-case respawn window for switch-model / resume / restart-all is
+// dominated by `waitForClaudePrompt`'s 30s ceiling. 35s gives a comfortable
+// margin for the surrounding kill + spawn + tmux-up overhead.
+const RESPAWN_WAIT_MS = 35_000;
 
 type ClientControlMessage =
   | { type: 'attach'; cols: number; rows: number }
@@ -238,8 +244,22 @@ export function setupTerminalWebSocket(server: http.Server): void {
       try {
         const sessions = await listSessionNamesAsync();
         if (!sessions.includes(sessionName)) {
-          ws.close(4404, 'session-not-found');
-          return;
+          // The session may legitimately be gone, OR it may be in the
+          // middle of a switch-model / resume / restart-all kill→spawn
+          // cycle. The frontend treats 4404 as fatal (no retry), so
+          // emitting it during a respawn gap leaves the terminal panel
+          // stuck on "Could not reconnect" even after the new session
+          // is up. Wait for the respawn to land before deciding.
+          if (isRespawnPending(sessionName)) {
+            const cameBack = await waitForSessionRespawn(sessionName, RESPAWN_WAIT_MS);
+            if (!cameBack) {
+              ws.close(4404, 'session-not-found');
+              return;
+            }
+          } else {
+            ws.close(4404, 'session-not-found');
+            return;
+          }
         }
       } catch (err) {
         ws.close(1008, `Failed to list tmux sessions: ${err}`);
@@ -428,7 +448,13 @@ export function setupTerminalWebSocket(server: http.Server): void {
       const startLocalPty = async () => {
         if (ptyStarted) return;
         try {
-          const exists = await sessionExistsAsync(sessionName);
+          let exists = await sessionExistsAsync(sessionName);
+          // Mirror the upfront 4404 guard: tolerate the kill→spawn gap of
+          // an in-progress respawn rather than emitting fatal 4404 the
+          // client won't retry.
+          if (!exists && isRespawnPending(sessionName)) {
+            exists = await waitForSessionRespawn(sessionName, RESPAWN_WAIT_MS);
+          }
           if (!exists) {
             console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
             // Use 4404 (private-use range) so the client can distinguish
