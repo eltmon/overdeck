@@ -32,6 +32,8 @@ export interface TtsDaemonState {
   port: number;
   phase?: TtsDaemonStatePhase;
   startupDeadlineAt?: string;
+  scriptPath?: string;
+  processStartTimeTicks?: string;
   model?: string;
 }
 
@@ -150,6 +152,8 @@ async function readState(): Promise<TtsDaemonState | null> {
       port: parsed.port,
       phase: parsed.phase === 'starting' || parsed.phase === 'running' ? parsed.phase : undefined,
       startupDeadlineAt: typeof parsed.startupDeadlineAt === 'string' ? parsed.startupDeadlineAt : undefined,
+      scriptPath: typeof parsed.scriptPath === 'string' ? parsed.scriptPath : undefined,
+      processStartTimeTicks: typeof parsed.processStartTimeTicks === 'string' ? parsed.processStartTimeTicks : undefined,
       model: typeof parsed.model === 'string' ? parsed.model : undefined,
     };
   } catch {
@@ -320,26 +324,62 @@ export function isProcessAlive(pid: number): boolean {
   }
 }
 
-async function terminateProcess(pid: number, timeoutMs: number): Promise<void> {
-  if (!isProcessAlive(pid)) return;
+async function readProcessIdentity(pid: number): Promise<{ cmdline: string; startTimeTicks: string } | null> {
+  try {
+    const [cmdlineRaw, statRaw] = await Promise.all([
+      readFile(`/proc/${pid}/cmdline`, 'utf8'),
+      readFile(`/proc/${pid}/stat`, 'utf8'),
+    ]);
+    const closeParen = statRaw.lastIndexOf(')');
+    if (closeParen === -1) return null;
+    const fields = statRaw.slice(closeParen + 2).trim().split(/\s+/);
+    const startTimeTicks = fields[19];
+    if (!startTimeTicks) return null;
+    return { cmdline: cmdlineRaw.replace(/\0/g, ' ').trim(), startTimeTicks };
+  } catch {
+    return null;
+  }
+}
+
+async function buildManagedProcessIdentity(pid: number, scriptPath: string): Promise<Pick<TtsDaemonState, 'scriptPath' | 'processStartTimeTicks'>> {
+  const identity = await readProcessIdentity(pid);
+  return {
+    scriptPath,
+    processStartTimeTicks: identity?.startTimeTicks,
+  };
+}
+
+async function isManagedProcessAlive(state: TtsDaemonState | null): Promise<boolean> {
+  if (!state || !isProcessAlive(state.pid)) return false;
+  if (!state.scriptPath || !state.processStartTimeTicks) return false;
+  const identity = await readProcessIdentity(state.pid);
+  return identity !== null
+    && identity.startTimeTicks === state.processStartTimeTicks
+    && identity.cmdline.includes(state.scriptPath);
+}
+
+async function terminateManagedProcess(state: TtsDaemonState, timeoutMs: number): Promise<boolean> {
+  if (!await isManagedProcessAlive(state)) return false;
+  const pid = state.pid;
   try {
     process.kill(pid, 'SIGTERM');
   } catch {
-    return;
+    return false;
   }
 
   const deadline = Date.now() + timeoutMs;
-  while (isProcessAlive(pid) && Date.now() < deadline) {
+  while (await isManagedProcessAlive(state) && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
-  if (isProcessAlive(pid)) {
+  if (await isManagedProcessAlive(state)) {
     try {
       process.kill(pid, 'SIGKILL');
     } catch {
       // already gone
     }
   }
+  return true;
 }
 
 async function sampleGpuMemoryUsedMb(pid: number): Promise<number | undefined> {
@@ -388,7 +428,7 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
   try {
     const response = await fetch(`http://${config.daemonHost}:${config.daemonPort}/health`, { signal: controller.signal });
     if (!response.ok) return { ok: false, error: 'daemon unreachable' };
-      const body = await response.json() as { queue?: unknown; model?: unknown; pid?: unknown };
+    const body = await response.json() as { queue?: unknown; model?: unknown; pid?: unknown };
     return {
       ok: true,
       pid: parseHealthPid(body.pid),
@@ -404,16 +444,16 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
 }
 
 export async function getTtsDaemonStatus(config: NormalizedTtsDaemonConfig): Promise<TtsDaemonStatus> {
-  const managedPid = await readPid();
-  const managedRunning = managedPid !== null && isProcessAlive(managedPid);
   const [state, health] = await Promise.all([
     readState(),
     fetchDaemonHealth(config),
   ]);
+  const managedRunning = await isManagedProcessAlive(state);
+  const managedPid = managedRunning ? state!.pid : null;
   const healthPid = health.ok === true ? health.pid ?? null : null;
   const pid = managedRunning ? managedPid : healthPid;
   const running = managedRunning || health.ok === true;
-  const initializing = managedRunning && health.ok !== true && state?.pid === managedPid && isWithinStartupGrace(state);
+  const initializing = managedRunning && health.ok !== true && isWithinStartupGrace(state);
   const phase: TtsDaemonStatusPhase = health.ok === true
     ? 'healthy'
     : initializing
@@ -422,13 +462,15 @@ export async function getTtsDaemonStatus(config: NormalizedTtsDaemonConfig): Pro
         ? 'unhealthy'
         : 'stopped';
 
-  if (health.ok === true && managedRunning && state?.pid === managedPid && state.phase === 'starting') {
+  if (health.ok === true && managedRunning && state?.phase === 'starting') {
     await writeState({
       pid: state.pid,
       startedAt: state.startedAt,
       host: state.host,
       port: state.port,
       phase: 'running',
+      scriptPath: state.scriptPath,
+      processStartTimeTicks: state.processStartTimeTicks,
       model: typeof health.model === 'string' ? health.model : state.model,
     });
   }
@@ -485,8 +527,11 @@ export async function startTtsDaemon(options: TtsDaemonStartOptions): Promise<Tt
       alreadyRunning = true;
       spawnedPid = existing.pid;
     } else {
-      if (existing.managed && existing.pid !== null) {
-        await terminateProcess(existing.pid, 5_000);
+      const state = await readState();
+      if (existing.managed && state) {
+        await terminateManagedProcess(state, 5_000);
+        await clearState();
+      } else if (state && !await isManagedProcessAlive(state)) {
         await clearState();
       }
       const python = await getTtsDaemonPython();
@@ -520,6 +565,7 @@ export async function startTtsDaemon(options: TtsDaemonStartOptions): Promise<Tt
         port: config.daemonPort,
         phase: 'starting',
         startupDeadlineAt: startupDeadlineIso(),
+        ...await buildManagedProcessIdentity(child.pid, script),
       });
 
       if (detach) child.unref();
@@ -534,8 +580,7 @@ export async function startTtsDaemon(options: TtsDaemonStartOptions): Promise<Tt
   }
 
   const status = await waitForTtsDaemonHealth(config, options.timeoutMs);
-  const accepted = status.ok || status.initializing === true;
-  return { ok: accepted, pid: status.pid ?? spawnedPid, alreadyRunning, status, error: accepted ? undefined : status.error };
+  return { ok: status.ok, pid: status.pid ?? spawnedPid, alreadyRunning, status, error: status.ok ? undefined : status.error };
 }
 
 export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig): Promise<TtsDaemonForegroundResult> {
@@ -557,13 +602,7 @@ export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig):
     child = spawn(python, [script], {
       detached: false,
       stdio: 'inherit',
-      env: {
-        ...process.env,
-        QWEN_TTS_HOST: config.daemonHost,
-        QWEN_TTS_PORT: String(config.daemonPort),
-        QWEN_TTS_AUTH_TOKEN: authToken,
-        QWEN_TTS_ALLOWED_ORIGINS: process.env.QWEN_TTS_ALLOWED_ORIGINS ?? defaultAllowedOrigins(),
-      },
+      env: buildTtsDaemonEnv(config, authToken),
     });
 
     if (!child.pid) return { pid: null, exitCode: 1, signal: null };
@@ -574,6 +613,7 @@ export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig):
       port: config.daemonPort,
       phase: 'starting',
       startupDeadlineAt: startupDeadlineIso(),
+      ...await buildManagedProcessIdentity(child.pid, script),
     });
   } finally {
     await releaseStartLock();
@@ -591,19 +631,27 @@ export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig):
 
 export async function stopTtsDaemon(timeoutMs = 5_000): Promise<TtsDaemonStopResult> {
   await setTtsDaemonManualStopGate();
-  const statePid = await readPid();
-  if (statePid !== null && !isProcessAlive(statePid)) {
+  const state = await readState();
+  if (state) {
+    if (!await isManagedProcessAlive(state)) {
+      await clearState();
+      return { stopped: false, pid: state.pid, error: 'TTS daemon pid file was stale' };
+    }
+    await terminateManagedProcess(state, timeoutMs);
     await clearState();
-    return { stopped: false, pid: statePid, error: 'TTS daemon pid file was stale' };
+    return { stopped: true, pid: state.pid };
   }
 
   const config = loadConfig().config.tts;
-  const status = statePid === null ? await getTtsDaemonStatus(config) : null;
-  const pid = statePid ?? status?.pid ?? null;
+  const status = await getTtsDaemonStatus(config);
+  const pid = status.pid ?? null;
   if (pid === null) return { stopped: false, pid: null, error: 'TTS daemon is not running' };
 
-  await terminateProcess(pid, timeoutMs);
-  await clearState();
+  try {
+    process.kill(pid, 'SIGTERM');
+  } catch {
+    return { stopped: false, pid, error: 'TTS daemon is not running' };
+  }
   return { stopped: true, pid };
 }
 

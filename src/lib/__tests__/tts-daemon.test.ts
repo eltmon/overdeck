@@ -23,6 +23,31 @@ const CONFIG: NormalizedTtsDaemonConfig = {
 const originalPanopticonHome = process.env.PANOPTICON_HOME;
 let testHome: string;
 
+function mockProcIdentities(identities: Record<number, { cmdline: string; startTimeTicks: string }>): void {
+  vi.doMock('node:fs/promises', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('node:fs/promises')>();
+    return {
+      ...actual,
+      readFile: vi.fn(async (path: Parameters<typeof actual.readFile>[0], ...args: unknown[]) => {
+        const pathString = String(path);
+        const cmdlineMatch = pathString.match(/^\/proc\/(\d+)\/cmdline$/);
+        if (cmdlineMatch) {
+          const identity = identities[Number(cmdlineMatch[1])];
+          if (!identity) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+          return `${identity.cmdline.replaceAll(' ', '\0')}\0`;
+        }
+        const statMatch = pathString.match(/^\/proc\/(\d+)\/stat$/);
+        if (statMatch) {
+          const identity = identities[Number(statMatch[1])];
+          if (!identity) throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+          return `${statMatch[1]} (python) S 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${identity.startTimeTicks}`;
+        }
+        return actual.readFile(path, ...(args as [Parameters<typeof actual.readFile>[1]]));
+      }),
+    };
+  });
+}
+
 describe('tts daemon lifecycle state', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -35,6 +60,7 @@ describe('tts daemon lifecycle state', () => {
 
   afterEach(() => {
     vi.doUnmock('node:child_process');
+    vi.doUnmock('node:fs/promises');
     vi.unstubAllGlobals();
     if (originalPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
     else process.env.PANOPTICON_HOME = originalPanopticonHome;
@@ -79,6 +105,7 @@ describe('tts daemon lifecycle state', () => {
       ...((await importOriginal()) as typeof import('node:child_process')),
       spawn,
     }));
+    mockProcIdentities({ 4242: { cmdline: `python ${join(process.cwd(), 'skills', 'pan-tts', 'scripts', 'tts_daemon.py')}`, startTimeTicks: '12345' } });
     const killSpy = vi.spyOn(process, 'kill');
     killSpy.mockImplementation(((pid: number) => {
       if (pid === 4242) return true;
@@ -94,6 +121,8 @@ describe('tts daemon lifecycle state', () => {
       port: 8787,
       phase: 'starting',
       startupDeadlineAt: new Date(Date.now() + 60_000).toISOString(),
+      scriptPath: join(process.cwd(), 'skills', 'pan-tts', 'scripts', 'tts_daemon.py'),
+      processStartTimeTicks: '12345',
     }), 'utf8');
 
     try {
@@ -101,11 +130,61 @@ describe('tts daemon lifecycle state', () => {
       const result = await startTtsDaemon({ config: CONFIG, timeoutMs: 0 });
 
       expect(status).toMatchObject({ ok: false, running: true, managed: true, phase: 'starting', initializing: true, pid: 4242 });
-      expect(result).toMatchObject({ ok: true, pid: 4242, alreadyRunning: true, status: { phase: 'starting', initializing: true } });
+      expect(result).toMatchObject({ ok: false, pid: 4242, alreadyRunning: true, status: { phase: 'starting', initializing: true } });
       expect(killSpy).not.toHaveBeenCalledWith(4242, 'SIGTERM');
       expect(spawn).not.toHaveBeenCalled();
     } finally {
       killSpy.mockRestore();
+    }
+  });
+
+  it('does not signal a stale pid that fails process identity validation', async () => {
+    const spawn = vi.fn(() => ({ pid: 7777, unref: vi.fn() }));
+    vi.doMock('node:child_process', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('node:child_process')),
+      spawn,
+    }));
+    const scriptPath = join(process.cwd(), 'skills', 'pan-tts', 'scripts', 'tts_daemon.py');
+    mockProcIdentities({ 7777: { cmdline: `python ${scriptPath}`, startTimeTicks: '67890' } });
+    const killSpy = vi.spyOn(process, 'kill');
+    killSpy.mockImplementation(((pid: number, signal?: NodeJS.Signals | number) => {
+      if (pid === 4242 && signal === 0) return true;
+      if (pid === 7777 && signal === 0) return true;
+      return true;
+    }) as typeof process.kill);
+    const { QWEN_TTS_PID_PATH, QWEN_TTS_STATE_PATH, getTtsDaemonVenvDir, startTtsDaemon } = await import('../tts-daemon.js');
+    mkdirSync(join(testHome, 'pids'), { recursive: true });
+    writeFileSync(QWEN_TTS_PID_PATH, '4242\n', 'utf8');
+    writeFileSync(QWEN_TTS_STATE_PATH, JSON.stringify({
+      pid: 4242,
+      startedAt: '2026-05-18T00:00:00.000Z',
+      host: '127.0.0.1',
+      port: 8787,
+      scriptPath,
+      processStartTimeTicks: '12345',
+    }), 'utf8');
+    const venvDir = await getTtsDaemonVenvDir();
+    const packageDir = join(venvDir, '..');
+    const hadPackageDir = existsSync(packageDir);
+    const hadVenvDir = existsSync(venvDir);
+    const python = join(venvDir, 'bin', 'python');
+    const hadPython = existsSync(python);
+    if (!hadPython) {
+      mkdirSync(join(python, '..'), { recursive: true });
+      writeFileSync(python, '#!/usr/bin/env python3\n', 'utf8');
+    }
+
+    try {
+      const result = await startTtsDaemon({ config: CONFIG, waitForHealth: false });
+
+      expect(result).toMatchObject({ ok: true, pid: 7777, alreadyRunning: false });
+      expect(killSpy).not.toHaveBeenCalledWith(4242, 'SIGTERM');
+      expect(spawn).toHaveBeenCalled();
+    } finally {
+      killSpy.mockRestore();
+      if (!hadPython) rmSync(python, { force: true });
+      if (!hadVenvDir) rmSync(venvDir, { recursive: true, force: true });
+      if (!hadPackageDir) rmSync(packageDir, { recursive: true, force: true });
     }
   });
 
@@ -115,6 +194,11 @@ describe('tts daemon lifecycle state', () => {
       ...((await importOriginal()) as typeof import('node:child_process')),
       spawn,
     }));
+    const scriptPath = join(process.cwd(), 'skills', 'pan-tts', 'scripts', 'tts_daemon.py');
+    mockProcIdentities({
+      4242: { cmdline: `python ${scriptPath}`, startTimeTicks: '12345' },
+      7777: { cmdline: `python ${scriptPath}`, startTimeTicks: '67890' },
+    });
     const killSpy = vi.spyOn(process, 'kill');
     let oldPidAlive = true;
     killSpy.mockImplementation(((pid: number, signal?: NodeJS.Signals | number) => {
@@ -134,6 +218,8 @@ describe('tts daemon lifecycle state', () => {
       startedAt: '2026-05-18T00:00:00.000Z',
       host: '127.0.0.1',
       port: 8787,
+      scriptPath,
+      processStartTimeTicks: '12345',
     }), 'utf8');
     const venvDir = await getTtsDaemonVenvDir();
     const packageDir = join(venvDir, '..');

@@ -15,6 +15,7 @@ GET  /health          { "ok": true, "queue": <depth>, "model": "..." }
 
 from __future__ import annotations
 
+import gc
 import http.server
 import io
 import json
@@ -76,6 +77,9 @@ MAX_TEXT_CHARS = DEFAULT_MAX_TEXT_CHARS
 MAX_EXTRACT_CHARS = DEFAULT_MAX_EXTRACT_CHARS
 QWEN_SPEAKER_EMBEDDING_DIMS = DEFAULT_QWEN_SPEAKER_EMBEDDING_DIMS
 MODEL: Qwen3TTSModel | None = None
+MODEL_DESIGN: Qwen3TTSModel | None = None
+MODEL_BASE: Qwen3TTSModel | None = None
+_ACTIVE_MODEL: str | None = None
 WORK_QUEUE: "queue.Queue[dict[str, Any]]" = queue.Queue(maxsize=MAX_QUEUE)
 MODEL_LOCK = threading.Lock()
 _MODEL_INIT_LOCK = threading.Lock()
@@ -121,6 +125,25 @@ def normalize_clone_embedding(embedding_data: Any) -> list[float]:
     return embedding
 
 
+def release_models_except(active: str) -> None:
+    global MODEL, MODEL_DESIGN, MODEL_BASE, _ACTIVE_MODEL
+    released = False
+    if active != "custom" and MODEL is not None:
+        MODEL = None
+        released = True
+    if active != "design" and MODEL_DESIGN is not None:
+        MODEL_DESIGN = None
+        released = True
+    if active != "base" and MODEL_BASE is not None:
+        MODEL_BASE = None
+        released = True
+    if released:
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    _ACTIVE_MODEL = active
+
+
 def load_model() -> None:
     global MODEL
     if MODEL is not None:
@@ -128,6 +151,7 @@ def load_model() -> None:
     with _MODEL_INIT_LOCK:
         if MODEL is not None:
             return
+        release_models_except("custom")
         log(f"loading {MODEL_ID} on cuda:0 (bfloat16)…")
         t0 = time.time()
         MODEL = Qwen3TTSModel.from_pretrained(
@@ -138,9 +162,6 @@ def load_model() -> None:
         log(f"model loaded in {time.time() - t0:.1f}s")
 
 
-MODEL_DESIGN: Qwen3TTSModel | None = None
-
-
 def load_design_model() -> None:
     global MODEL_DESIGN
     if MODEL_DESIGN is not None:
@@ -148,6 +169,7 @@ def load_design_model() -> None:
     with _MODEL_INIT_LOCK:
         if MODEL_DESIGN is not None:
             return
+        release_models_except("design")
         log("loading VoiceDesign model on cuda:0 (bfloat16)…")
         t0 = time.time()
         MODEL_DESIGN = Qwen3TTSModel.from_pretrained(
@@ -158,9 +180,6 @@ def load_design_model() -> None:
         log(f"VoiceDesign model loaded in {time.time() - t0:.1f}s")
 
 
-MODEL_BASE: Qwen3TTSModel | None = None
-
-
 def load_base_model() -> None:
     global MODEL_BASE
     if MODEL_BASE is not None:
@@ -168,6 +187,7 @@ def load_base_model() -> None:
     with _MODEL_INIT_LOCK:
         if MODEL_BASE is not None:
             return
+        release_models_except("base")
         log("loading Base model on cuda:0 (bfloat16)…")
         t0 = time.time()
         MODEL_BASE = Qwen3TTSModel.from_pretrained(
@@ -234,6 +254,7 @@ def synthesize(
             )
         return _extract_audio(result)
 
+    load_model()
     assert MODEL is not None
     with MODEL_LOCK:
         result = MODEL.generate_custom_voice(
