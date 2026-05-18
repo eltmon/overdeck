@@ -229,6 +229,41 @@ describe('auto-resume gates', () => {
     expect(resumeAgentMock).not.toHaveBeenCalled();
   });
 
+  it('logs verify-paused instead of manually-paused for merged paused agents', async () => {
+    const agentId = 'agent-pan-1141-verify-paused';
+    resumeAgentMock.mockResolvedValue({ success: true });
+    const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
+    const reviewStatus = await import('../../../src/lib/review-status.js');
+    const logger = await import('../../../src/lib/persistent-logger.js');
+    vi.mocked(reviewStatus.getReviewStatus).mockReturnValue({
+      issueId: 'PAN-1141',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'merged',
+      readyForMerge: false,
+      updatedAt: BASE_TIME.toISOString(),
+    });
+    agents.saveAgentState({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: workspaceFor(agentId),
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: BASE_TIME.toISOString(),
+      paused: true,
+      pausedReason: 'awaiting close-out (verify on main)',
+      pausedAt: BASE_TIME.toISOString(),
+    });
+
+    const resumed = await autoResumeStoppedWorkAgents();
+
+    expect(resumed).toEqual([]);
+    expect(resumeAgentMock).not.toHaveBeenCalled();
+    expect(vi.mocked(logger.logDeaconEvent)).toHaveBeenCalledWith(expect.stringContaining('verify-paused'));
+  });
+
   it('pan pause stops stale-running agents without live tmux sessions', async () => {
     const agentId = 'agent-pan-1141';
     const { agents } = await loadDeaconWithResumeMock();
@@ -276,6 +311,42 @@ describe('auto-resume gates', () => {
     const state = agents.getAgentState(agentId);
     expect(state?.status).toBe('stopped');
     expect(state?.consecutiveFailures).toBe(1);
+  });
+
+  it('does not orphan-recover verify-paused running agents with killed tmux sessions', async () => {
+    const agentId = 'agent-pan-1141-verify-orphan';
+    const { agents, recoverOrphanedAgents } = await loadDeaconWithResumeMock();
+    const reviewStatus = await import('../../../src/lib/review-status.js');
+    const logger = await import('../../../src/lib/persistent-logger.js');
+    vi.mocked(reviewStatus.getReviewStatus).mockReturnValue({
+      issueId: 'PAN-1141',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'merged',
+      readyForMerge: false,
+      updatedAt: BASE_TIME.toISOString(),
+    });
+    agents.saveAgentState({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace: workspaceFor(agentId),
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: BASE_TIME.toISOString(),
+      paused: true,
+      pausedReason: 'awaiting close-out (verify on main)',
+      pausedAt: BASE_TIME.toISOString(),
+    });
+
+    const actions = await recoverOrphanedAgents('patrol');
+
+    const state = agents.getAgentState(agentId);
+    expect(actions).toEqual([]);
+    expect(state?.status).toBe('running');
+    expect(state?.consecutiveFailures).toBeUndefined();
+    expect(vi.mocked(logger.logDeaconEvent)).toHaveBeenCalledWith(expect.stringContaining('verify-paused'));
   });
 
   it('queues feedback without resuming paused agents', async () => {

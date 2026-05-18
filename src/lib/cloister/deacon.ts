@@ -2757,7 +2757,7 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
         const msg = `Reconciled stale mergeStatus for ${issueId} — branch ${branch} is merged to main`;
         actions.push(msg);
         console.log(`[deacon] ${msg}`);
-        // PAN-1027: also run the post-merge cleanup so labels get cleaned, work agent
+        // PAN-1027: also run the post-merge handoff so labels get cleaned, work agent
         // tmux session is killed, beads compacted, etc. Without this the dashboard knows
         // the issue is merged but the GitHub labels stay stale ("in-progress"/"in-review")
         // and orphaned tmux sessions leak memory. skipDeploy avoids respawning the server
@@ -3537,7 +3537,7 @@ async function reconcileAndCheckIfMerged(
           const prState = await getPullRequestState(prRef[1], prRef[2], Number.parseInt(prRef[3], 10));
           if (prState.merged) {
             setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
-            // PAN-1027: also run the post-merge cleanup so labels get cleaned and the
+            // PAN-1027: also run the post-merge handoff so labels get cleaned and the
             // work-agent tmux session is killed. Without this, GitHub-detected merges
             // leave stale "in-progress" / "in-review" labels and leaked tmux sessions.
             try {
@@ -3550,7 +3550,7 @@ async function reconcileAndCheckIfMerged(
                 );
               }
             } catch (err) {
-              console.warn(`[deacon] Could not run post-merge cleanup for ${issueId}: ${err}`);
+              console.warn(`[deacon] Could not run post-merge handoff for ${issueId}: ${err}`);
             }
             return remember(true);
           }
@@ -3743,6 +3743,11 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
 const firstCompletionCooldowns = new Map<string, number>();
 const FIRST_COMPLETION_IDLE_MS = 10 * 60 * 1000; // 10 minutes idle before nudging
 const FIRST_COMPLETION_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes between nudges
+
+function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>): boolean {
+  if (state.paused !== true || !state.issueId) return false;
+  return getReviewStatus(state.issueId)?.mergeStatus === 'merged';
+}
 
 async function getAutoCloseOutCanonicalState(issueId: string): Promise<string | null> {
   const ghResolved = resolveGitHubIssue(issueId);
@@ -4975,6 +4980,10 @@ async function recoverOrphanedAgentsOnce(context?: string): Promise<string[]> {
     try {
       const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
       if (state.status !== 'running' && state.status !== 'starting') continue;
+      if (isVerifyPausedAgentState(state)) {
+        logDeaconEvent(`recoverOrphanedAgents: ${dir} skipped — verify-paused (mergeStatus=merged, tmux session intentionally absent)`);
+        continue;
+      }
 
       // PAN-977: headless review sub-role agents run via `claude --print` in a
       // detached, HUP-immune launcher with NO tmux session. "No tmux session"
@@ -5532,7 +5541,8 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     }
 
     if (state.paused === true) {
-      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — paused (${state.pausedReason ?? 'no reason'})`);
+      const pauseKind = isVerifyPausedAgentState(state) ? 'verify-paused' : 'manually-paused';
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — ${pauseKind} (${state.pausedReason ?? 'no reason'})`);
       continue;
     }
 
