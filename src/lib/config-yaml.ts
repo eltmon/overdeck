@@ -9,6 +9,7 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 'fs';
+import { readFile as readFileAsync, writeFile as writeFileAsync, stat as statAsync } from 'fs/promises';
 import { dirname, join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
