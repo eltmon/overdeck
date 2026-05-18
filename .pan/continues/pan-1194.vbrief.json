@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1194",
   "created": "2026-05-18T22:07:39.007Z",
-  "updated": "2026-05-18T22:43:40.583Z",
+  "updated": "2026-05-18T23:00:14.442Z",
   "gitState": {
     "branch": "feature/pan-1194",
-    "sha": "7124b658c",
-    "dirty": false
+    "sha": "fa2cd33e6",
+    "dirty": true
   },
   "decisions": [
     {
@@ -108,13 +108,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Type-additions bead workspace-0pbz is committed at 7124b658c. Close the bead, run its required deep inspection, then start the next unblocked foundational bead after INSPECTION PASSED.",
-    "beadId": "workspace-0pbz",
+    "description": "mergeability-detector bead workspace-pqxu implemented: refreshSwarmSlotMergeability is covered by targeted tests, typecheck, lint, and graphify update. Commit this bead, close it, then run required deep inspection before proceeding.",
+    "beadId": "workspace-pqxu",
     "filesToRead": [
       "src/dashboard/server/routes/swarm.ts",
-      "src/lib/vbrief/continue-state.ts",
       "src/dashboard/server/routes/__tests__/swarm.test.ts",
-      ".pan/spec.vbrief.json"
+      ".pan/specs/2026-05-18-PAN-1194-swarm-no-recovery-when-a-slot-s-pr-becomes-unmergeable-auto-advance-halts-forever.vbrief.json"
     ]
   },
   "beadsMapping": {},
@@ -130,6 +129,18 @@
       "timestamp": "2026-05-18T22:43:40.583Z",
       "reason": "end",
       "note": "Implemented type-additions: widened swarm slot/runtime status to failed-merge, preserved consecutiveConflictCount and prUrl through runtime mapping, added round-trip regression test, ran swarm test and typecheck, updated graph and vBRIEF status, committed 7124b658c.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T22:47:09.421Z",
+      "reason": "feedback",
+      "note": "Addressed inspection blocker by untracking workspace-local .pan/continue.json and .pan/spec.vbrief.json, moving their contents to canonical .pan/continues and .pan/specs paths, and committing fa2cd33e6.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:00:14.442Z",
+      "reason": "end",
+      "note": "Implemented mergeability-detector: added refreshSwarmSlotMergeability with GitHub PR-state checks, failed-merge debounce/metadata handling, transient gh error handling, latest-slot-history targeting, and regression tests. Ran targeted swarm tests, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],

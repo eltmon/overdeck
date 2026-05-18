@@ -11,6 +11,9 @@ import * as projects from '../../../../lib/projects.js';
 import * as vbriefIo from '../../../../lib/vbrief/io.js';
 import * as agents from '../../../../lib/agents.js';
 import * as tmux from '../../../../lib/tmux.js';
+import * as trackerUtils from '../../../../lib/tracker-utils.js';
+
+const ghExecFileMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../agents.js', () => ({
   evaluateSpawnGuardrails: vi.fn(),
@@ -28,6 +31,10 @@ vi.mock('../../../../lib/projects.js', () => ({
   listProjects: vi.fn(() => []),
 }));
 
+vi.mock('../../../../lib/tracker-utils.js', () => ({
+  resolveGitHubIssue: vi.fn(),
+}));
+
 // PAN-977: createSlotWorktree shells out to `git fetch`/`git worktree add`. The
 // test temp directories are not git repos, so stub child_process.execFile to
 // resolve successfully — the alternative (running real git) was never the
@@ -38,7 +45,16 @@ vi.mock('node:child_process', async () => {
     ...actual,
     execFile: ((...args: any[]) => {
       const commandArgs = Array.isArray(args[1]) ? args[1] : [];
-      const cb = args[args.length - 1] as (err: null, out: { stdout: string; stderr: string }) => void;
+      const cb = args[args.length - 1] as (err: Error | null, out: { stdout: string; stderr: string }) => void;
+      if (args[0] === 'gh') {
+        if (ghExecFileMock.getMockImplementation()) {
+          return ghExecFileMock(...args);
+        }
+        if (typeof cb === 'function') {
+          cb(null, { stdout: '[]', stderr: '' });
+        }
+        return undefined;
+      }
       let stdout = '';
       if (args[0] === 'git' && commandArgs[0] === 'branch' && commandArgs[1] === '--show-current') {
         stdout = 'feature/971\n';
@@ -133,6 +149,7 @@ describe('swarm route helpers', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    ghExecFileMock.mockReset();
     vi.useFakeTimers();
 
     testHome = mkdtempSync(join(tmpdir(), 'pan-971-swarm-test-'));
@@ -150,6 +167,13 @@ describe('swarm route helpers', () => {
       key: 'panopticon',
       tracker: 'github',
     } as any);
+    vi.mocked(trackerUtils.resolveGitHubIssue).mockReturnValue({
+      isGitHub: true,
+      owner: 'owner',
+      repo: 'repo',
+      prefix: 'PAN',
+      number: 971,
+    });
     vi.mocked(vbriefIo.readWorkspacePlan).mockReturnValue(PLAN_DOC);
     vi.mocked(vbriefIo.readPlanAsync).mockResolvedValue(PLAN_DOC);
     vi.mocked(vbriefIo.findPlan).mockReturnValue(join(projectPath, 'workspaces', 'feature-pan-971', '.pan', 'spec.vbrief.json'));
@@ -177,6 +201,40 @@ describe('swarm route helpers', () => {
     delete process.env.USERPROFILE;
     rmSync(testHome, { recursive: true, force: true });
   });
+
+  function mockGhPrList(prs: unknown[]): void {
+    ghExecFileMock.mockImplementation((...args: any[]) => {
+      const cb = args[args.length - 1] as (err: Error | null, out: { stdout: string; stderr: string }) => void;
+      cb(null, { stdout: JSON.stringify(prs), stderr: '' });
+      return undefined;
+    });
+  }
+
+  function baseSwarmState(overrides: Record<string, unknown> = {}) {
+    return {
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-0-item',
+          itemTitle: 'Prepare slot input',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'completed' as const,
+          phase: 'implementation' as const,
+          startedAt: '2026-05-07T00:00:00Z',
+          completedAt: '2026-05-07T00:05:00Z',
+          ...overrides,
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    };
+  }
 
   // PAN-977 review-round-18 regression: `continueDirForWorkspace` must return
   // the workspace root, not `${workspacePath}/.pan`. Internally
@@ -286,6 +344,153 @@ describe('swarm route helpers', () => {
     });
     expect('consecutiveConflictCount' in loaded.slots[1]!).toBe(false);
     expect('prUrl' in loaded.slots[1]!).toBe(false);
+  });
+
+  it('skips mergeability refresh for completed synthesis slots', async () => {
+    mockGhPrList([{ number: 1 }]);
+    const { __testInternals } = await import('../swarm.js');
+
+    const refreshed = await __testInternals.refreshSwarmSlotMergeability(baseSwarmState({ phase: 'synthesis' }) as any, projectPath);
+
+    expect(refreshed.changed).toBe(false);
+    expect(ghExecFileMock).not.toHaveBeenCalled();
+  });
+
+  it('skips mergeability refresh for non-GitHub projects', async () => {
+    vi.mocked(trackerUtils.resolveGitHubIssue).mockReturnValue({ isGitHub: false });
+    mockGhPrList([{ number: 1 }]);
+    const { __testInternals } = await import('../swarm.js');
+
+    const refreshed = await __testInternals.refreshSwarmSlotMergeability(baseSwarmState() as any, projectPath);
+
+    expect(refreshed.changed).toBe(false);
+    expect(ghExecFileMock).not.toHaveBeenCalled();
+  });
+
+  it('debounces conflicting PRs before marking a slot failed-merge', async () => {
+    mockGhPrList([{ number: 1188, mergeable: false, mergeableState: 'CONFLICTING', state: 'OPEN', url: 'https://github.com/owner/repo/pull/1188' }]);
+    const { __testInternals } = await import('../swarm.js');
+
+    const first = await __testInternals.refreshSwarmSlotMergeability(baseSwarmState() as any, projectPath);
+    expect(first.changed).toBe(true);
+    expect(first.state.slots[0]).toMatchObject({
+      status: 'completed',
+      consecutiveConflictCount: 1,
+      prUrl: 'https://github.com/owner/repo/pull/1188',
+    });
+
+    const second = await __testInternals.refreshSwarmSlotMergeability(first.state as any, projectPath);
+    expect(second.changed).toBe(true);
+    expect(second.state.slots[0]).toMatchObject({
+      status: 'failed-merge',
+      failureReason: 'PR #1188 not mergeable: CONFLICTING',
+      consecutiveConflictCount: 2,
+      prUrl: 'https://github.com/owner/repo/pull/1188',
+    });
+  });
+
+  it('marks a completed slot failed-merge when no PR is found but leaves running slots alone', async () => {
+    mockGhPrList([]);
+    const { __testInternals } = await import('../swarm.js');
+
+    const completed = await __testInternals.refreshSwarmSlotMergeability(baseSwarmState() as any, projectPath);
+    expect(completed.changed).toBe(true);
+    expect(completed.state.slots[0]).toMatchObject({
+      status: 'failed-merge',
+      failureReason: 'No open PR found for feature/pan-971-slot-1',
+    });
+
+    const running = await __testInternals.refreshSwarmSlotMergeability(baseSwarmState({ status: 'running' }) as any, projectPath);
+    expect(running.changed).toBe(false);
+    expect(running.state.slots[0]?.status).toBe('running');
+  });
+
+  it('marks a closed unmerged PR as failed-merge', async () => {
+    mockGhPrList([{ number: 1188, mergeable: null, mergeableState: null, state: 'CLOSED', url: 'https://github.com/owner/repo/pull/1188', mergedAt: null }]);
+    const { __testInternals } = await import('../swarm.js');
+
+    const refreshed = await __testInternals.refreshSwarmSlotMergeability(baseSwarmState() as any, projectPath);
+
+    expect(refreshed.changed).toBe(true);
+    expect(refreshed.state.slots[0]).toMatchObject({
+      status: 'failed-merge',
+      failureReason: 'PR #1188 closed without merge',
+      prUrl: 'https://github.com/owner/repo/pull/1188',
+    });
+  });
+
+  it('resets conflict debounce state when the PR becomes mergeable', async () => {
+    mockGhPrList([{ number: 1188, mergeable: true, mergeableState: 'CLEAN', state: 'OPEN', url: 'https://github.com/owner/repo/pull/1188' }]);
+    const { __testInternals } = await import('../swarm.js');
+
+    const refreshed = await __testInternals.refreshSwarmSlotMergeability(baseSwarmState({ consecutiveConflictCount: 1 }) as any, projectPath);
+
+    expect(refreshed.changed).toBe(true);
+    expect(refreshed.state.slots[0]).toMatchObject({
+      status: 'completed',
+      consecutiveConflictCount: 0,
+      prUrl: 'https://github.com/owner/repo/pull/1188',
+    });
+  });
+
+  it('treats gh failures as transient for mergeability refresh', async () => {
+    ghExecFileMock.mockImplementation((...args: any[]) => {
+      const cb = args[args.length - 1] as (err: Error) => void;
+      cb(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      return undefined;
+    });
+    const { __testInternals } = await import('../swarm.js');
+
+    const state = baseSwarmState({ consecutiveConflictCount: 1 });
+    const refreshed = await __testInternals.refreshSwarmSlotMergeability(state as any, projectPath);
+
+    expect(refreshed.changed).toBe(false);
+    expect(refreshed.state).toBe(state);
+  });
+
+  it('mutates only the latest implementation slot record for mergeability refresh', async () => {
+    mockGhPrList([{ number: 1188, mergeable: false, mergeableState: 'CONFLICTING', state: 'OPEN', url: 'https://github.com/owner/repo/pull/1188' }]);
+    const { __testInternals } = await import('../swarm.js');
+    const state = {
+      ...baseSwarmState(),
+      slots: [
+        {
+          slot: 1,
+          itemId: 'old-item',
+          itemTitle: 'Old item',
+          sessionName: 'agent-pan-971-1-old',
+          workspace: '/tmp/old',
+          status: 'merged' as const,
+          phase: 'implementation' as const,
+          startedAt: '2026-05-07T00:00:00Z',
+          completedAt: '2026-05-07T00:05:00Z',
+        },
+        {
+          slot: 1,
+          itemId: 'wave-0-item',
+          itemTitle: 'Prepare slot input',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'running' as const,
+          phase: 'implementation' as const,
+          startedAt: '2026-05-07T00:10:00Z',
+        },
+      ],
+    };
+
+    const refreshed = await __testInternals.refreshSwarmSlotMergeability(state as any, projectPath);
+
+    expect(refreshed.changed).toBe(true);
+    expect(refreshed.state.slots[0]).toEqual(state.slots[0]);
+    expect(refreshed.state.slots[1]).toMatchObject({
+      status: 'running',
+      consecutiveConflictCount: 1,
+    });
+  });
+
+  it('does not use blocking filesystem or process APIs in the swarm route', () => {
+    const source = readFileSync(join(process.cwd(), 'src/dashboard/server/routes/swarm.ts'), 'utf-8');
+    expect(source).not.toMatch(/\bexecSync\b|\breadFileSync\b|\breaddirSync\b/);
   });
 
   it('builds structured AgentTaskInput with dependencies and acceptance criteria', async () => {

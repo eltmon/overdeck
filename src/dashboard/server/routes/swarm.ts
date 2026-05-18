@@ -23,6 +23,7 @@ import { getSystemHealthSnapshot, getResourceConfig } from '../services/system-h
 import { evaluateSpawnGuardrails } from './agents.js';
 import { validateOrigin } from './origin-validation.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
+import { resolveGitHubIssue } from '../../../lib/tracker-utils.js';
 import { findPlanAsync, readPlanAsync, applyStatusOverrides, VBriefMergeConflictError } from '../../../lib/vbrief/io.js';
 import { readWorkspaceContinueAsync } from '../../../lib/pan-dir/continue.js';
 import { readContinueStateAsync, writeContinueStateAsync, type ContinueState, type SwarmRuntime } from '../../../lib/vbrief/continue-state.js';
@@ -171,6 +172,8 @@ const SWARM_AUTO_ADVANCE_BACKOFF_MS = 60_000;
 const SWARM_AUTO_ADVANCE_BACKOFF_THRESHOLD = 3;
 const SWARM_PANE_CHECK_CONCURRENCY = 10;
 const SWARM_SLOT_SPAWN_CONCURRENCY = 3;
+const SWARM_PR_CHECK_TIMEOUT_MS = 5000;
+const KNOWN_NON_BLOCKING_MERGE_STATES = new Set(['CLEAN', 'UNSTABLE', 'BEHIND', 'HAS_HOOKS']);
 const autoAdvanceInFlight = new Set<string>();
 // PAN-977 blocker #2: bounded active-swarm registry. Only swarms in this set
 // are polled by the auto-advance loop; the loop self-suspends when the set is
@@ -573,6 +576,157 @@ async function refreshSwarmSlotStatuses(
       ...state,
       slots,
       updatedAt: completedAt,
+    },
+    changed: true,
+  };
+}
+
+interface SwarmSlotPullRequest {
+  number: number;
+  mergeable?: boolean | null;
+  mergeableState?: string | null;
+  state?: string | null;
+  closed?: boolean | null;
+  url?: string | null;
+  mergedAt?: string | null;
+}
+
+interface MergeabilityRefreshResult {
+  index: number;
+  slot: SlotAssignment;
+}
+
+function latestImplementationSlotsBySlotNumber(slots: SlotAssignment[]): MergeabilityRefreshResult[] {
+  const targets = new Map<number, MergeabilityRefreshResult>();
+  for (let i = slots.length - 1; i >= 0; i--) {
+    const slot = slots[i]!;
+    if (slot.phase !== 'implementation' || (slot.status !== 'running' && slot.status !== 'completed')) continue;
+    const existing = targets.get(slot.slot);
+    if (slot.status === 'running') {
+      if (!existing || existing.slot.status !== 'running') {
+        targets.set(slot.slot, { index: i, slot });
+      }
+      continue;
+    }
+    if (!existing) {
+      targets.set(slot.slot, { index: i, slot });
+    }
+  }
+  return [...targets.values()];
+}
+
+function isNonBlockingMergeState(mergeableState: string | null | undefined): boolean {
+  return Boolean(mergeableState && KNOWN_NON_BLOCKING_MERGE_STATES.has(mergeableState.toUpperCase()));
+}
+
+function isConflictingMergeState(pr: SwarmSlotPullRequest): boolean {
+  const state = pr.mergeableState?.toUpperCase();
+  return state === 'CONFLICTING' || (pr.mergeable === false && !state);
+}
+
+function selectRelevantPullRequest(prs: SwarmSlotPullRequest[]): SwarmSlotPullRequest | undefined {
+  return prs.find(pr => pr.state?.toUpperCase() !== 'CLOSED') ?? prs[0];
+}
+
+function updateSlotFromPullRequest(slot: SlotAssignment, branch: string, pr: SwarmSlotPullRequest | undefined): SlotAssignment {
+  if (!pr) {
+    if (slot.status !== 'completed') return slot;
+    return {
+      ...slot,
+      status: 'failed-merge',
+      failureReason: `No open PR found for ${branch}`,
+      consecutiveConflictCount: undefined,
+      prUrl: undefined,
+    };
+  }
+
+  if (pr.state?.toUpperCase() === 'CLOSED' && !pr.mergedAt) {
+    return {
+      ...slot,
+      status: 'failed-merge',
+      failureReason: `PR #${pr.number} closed without merge`,
+      consecutiveConflictCount: undefined,
+      prUrl: pr.url ?? undefined,
+    };
+  }
+
+  if (isConflictingMergeState(pr)) {
+    const nextCount = (slot.consecutiveConflictCount ?? 0) + 1;
+    if (nextCount >= 2) {
+      const reason = pr.mergeableState ?? 'mergeable=false';
+      return {
+        ...slot,
+        status: 'failed-merge',
+        failureReason: `PR #${pr.number} not mergeable: ${reason}`,
+        consecutiveConflictCount: nextCount,
+        prUrl: pr.url ?? undefined,
+      };
+    }
+    return {
+      ...slot,
+      consecutiveConflictCount: nextCount,
+      prUrl: pr.url ?? slot.prUrl,
+    };
+  }
+
+  if (pr.mergeable === true || isNonBlockingMergeState(pr.mergeableState)) {
+    if ((slot.consecutiveConflictCount ?? 0) === 0) return slot;
+    return {
+      ...slot,
+      consecutiveConflictCount: 0,
+      prUrl: pr.url ?? slot.prUrl,
+    };
+  }
+
+  return slot;
+}
+
+async function refreshSwarmSlotMergeability(
+  state: SwarmState,
+  projectPath?: string,
+): Promise<{ state: SwarmState; changed: boolean }> {
+  const resolution = resolveGitHubIssue(state.issueId);
+  if (!resolution.isGitHub) return { state, changed: false };
+
+  const targets = latestImplementationSlotsBySlotNumber(state.slots);
+  if (targets.length === 0) return { state, changed: false };
+
+  const repo = `${resolution.owner}/${resolution.repo}`;
+  const issueLower = state.issueId.toLowerCase();
+  const updates = await runWithConcurrencyLimit(
+    targets,
+    SWARM_PANE_CHECK_CONCURRENCY,
+    async ({ index, slot }) => {
+      const branch = `feature/${issueLower}-slot-${slot.slot}`;
+      try {
+        const { stdout } = await execFileAsync(
+          'gh',
+          ['pr', 'list', '--repo', repo, '--head', branch, '--state', 'all', '--json', 'number,mergeable,mergeableState,state,closed,url,mergedAt', '--limit', '5'],
+          { encoding: 'utf-8', signal: AbortSignal.timeout(SWARM_PR_CHECK_TIMEOUT_MS), cwd: projectPath },
+        );
+        const prs = JSON.parse(stdout) as SwarmSlotPullRequest[];
+        return { index, slot: updateSlotFromPullRequest(slot, branch, selectRelevantPullRequest(prs)) };
+      } catch {
+        return { index, slot };
+      }
+    },
+  );
+
+  const slots = [...state.slots];
+  let changed = false;
+  for (const update of updates) {
+    if (update.slot !== state.slots[update.index]) {
+      changed = true;
+      slots[update.index] = update.slot;
+    }
+  }
+
+  if (!changed) return { state, changed: false };
+  return {
+    state: {
+      ...state,
+      slots,
+      updatedAt: new Date().toISOString(),
     },
     changed: true,
   };
@@ -2089,6 +2243,7 @@ const getSwarmRoute = HttpRouter.add(
 
 export const __testInternals = {
   refreshSwarmSlotStatuses,
+  refreshSwarmSlotMergeability,
   dispatchSwarmWave,
   pollSwarmAutoAdvance,
   ensureSwarmAutoAdvanceLoop,

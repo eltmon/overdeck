@@ -4340,8 +4340,8 @@
     "hash": "dd13fbeadece3a88305c8f7acb15c250"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/swarm.ts": {
-    "mtime": 1779144061.7885468,
-    "hash": "c4d5be660e107d462cb20c613e46ae4d"
+    "mtime": 1779145118.177465,
+    "hash": "4f2ff888776c99b67947a01cea891fa1"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/origin-validation.ts": {
     "mtime": 1779142045.650325,
@@ -4456,8 +4456,8 @@
     "hash": "46bdee8405d46f2035d36739b8981e6d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/__tests__/swarm.test.ts": {
-    "mtime": 1779144085.4463596,
-    "hash": "ef0f504751b81f51bf752150593a6cc2"
+    "mtime": 1779145098.5858026,
+    "hash": "d11c0a542c9b796d70715e82fb644755"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/__tests__/costs-experiments.test.ts": {
     "mtime": 1779142045.6494794,

@@ -4,7 +4,7 @@
     "created": "2026-05-18T22:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1194: Swarm: no recovery when a slot's PR becomes unmergeable — auto-advance halts forever",
-    "updated": "2026-05-18T22:42:31.430Z"
+    "updated": "2026-05-18T23:00:14.442Z"
   },
   "plan": {
     "id": "pan-1194",
@@ -145,7 +145,7 @@
       {
         "id": "mergeability-detector",
         "title": "Implement `refreshSwarmSlotMergeability` helper with PR-state-driven `failed-merge` detection",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T22:40:00.000Z",
         "metadata": {
@@ -161,7 +161,7 @@
           {
             "id": "mergeability-detector.ac1",
             "title": "Function signature exactly: `async function refreshSwarmSlotMergeability(state: SwarmState, projectPath?: string): Promise<{ state: SwarmState; changed: boolean }>` exported via `__testInternals` for tests.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -169,7 +169,7 @@
           {
             "id": "mergeability-detector.ac2",
             "title": "Synthesis slots (`phase === 'synthesis'`) are never inspected (no PR exists). Unit test asserts the helper returns `changed: false` when the only slot is a completed synthesis slot.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -177,7 +177,7 @@
           {
             "id": "mergeability-detector.ac3",
             "title": "Non-GitHub project (resolveGitHubIssue returns isGitHub=false) is a no-op. Unit test stubs the helper to non-GitHub and asserts no gh process is spawned and changed=false.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -185,7 +185,7 @@
           {
             "id": "mergeability-detector.ac4",
             "title": "PR CONFLICTING observed once: slot stays at its current status with `consecutiveConflictCount` incremented to 1. Observed twice consecutively: slot transitions to `failed-merge` with failureReason naming the PR number and prUrl populated. Unit test covers both ticks.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -193,7 +193,7 @@
           {
             "id": "mergeability-detector.ac5",
             "title": "PR list empty AND slot was `completed`: slot transitions to `failed-merge` with failureReason 'No open PR found for <branch>'. PR list empty AND slot was `running`: no transition (PR may not have been opened yet).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -201,7 +201,7 @@
           {
             "id": "mergeability-detector.ac6",
             "title": "PR closed without merge (`state === 'CLOSED' && !mergedAt`): slot transitions to `failed-merge` with failureReason 'PR #<n> closed without merge'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -209,7 +209,7 @@
           {
             "id": "mergeability-detector.ac7",
             "title": "PR mergeable (`mergeable === true` OR `mergeableState ∈ {'CLEAN','UNSTABLE','BEHIND','HAS_HOOKS'}` per existing KNOWN_NON_BLOCKING_STATES): consecutiveConflictCount is reset to 0 if previously > 0. No status transition.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -217,7 +217,7 @@
           {
             "id": "mergeability-detector.ac8",
             "title": "gh shell-out timeout (AbortSignal fires) OR non-zero exit: slot is skipped for the tick, no transition, no exception bubbles out of the helper. Unit test uses execAsync mock that throws AbortError.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -225,7 +225,7 @@
           {
             "id": "mergeability-detector.ac9",
             "title": "Cumulative slot history: when state.slots has multiple records sharing a slot number, only the latest running/completed implementation record is inspected and mutated. Historical merged/failed records are untouched. Unit test seeds two records for slot 1 (one merged, one running) and asserts only the running one is mutated.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -233,7 +233,7 @@
           {
             "id": "mergeability-detector.ac10",
             "title": "No blocking I/O: helper uses execAsync (or execFileAsync), readFile from 'fs/promises', and never imports execSync/readFileSync/readdirSync. Verified by grep in the unit test file or in CI lint.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
