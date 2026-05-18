@@ -2,7 +2,6 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { resolveAndSpeak, type ResolveAndSpeakOptions, type TtsSpeakMode, type TtsSpeakResult } from '../../../lib/tts-speak.js';
 import { getTtsRuntimeConfig } from '../services/tts-runtime-config.js';
-import { isTtsPlaybackRunning } from '../services/tts-playback.js';
 import { validateOrigin } from './origin-validation.js';
 import {
   addVoice as addStoredVoice,
@@ -32,18 +31,18 @@ export interface CheckTtsHealthOptions {
 }
 
 export async function checkTtsHealth(options: CheckTtsHealthOptions = {}): Promise<TtsHealthResult> {
-  // PAN-829 shipped TTS as an in-process service (startTtsPlayback). The legacy
-  // external daemon at config.daemonHost:config.daemonPort is now optional —
-  // most installs don't run it. Report the in-process state first so the
-  // dashboard's TTS status indicator stops yelling "daemon unreachable" at users
-  // who never had a daemon. The external probe is only consulted when caller
-  // pins host/port explicitly (settings panel "test connection" flow) or when
-  // the in-process service isn't running.
-  if (options.host === undefined && options.port === undefined) {
-    if (isTtsPlaybackRunning()) return { ok: true };
-    // In-process is off — still report disabled rather than probing the legacy
-    // daemon endpoint, because "tts.enabled=false" is the actual disabled state.
-    if (!getTtsRuntimeConfig().enabled) return { ok: false, error: 'tts disabled in settings' };
+  // TTS architecture (PAN-829 + skill pan-tts):
+  // 1. The in-process subscriber (startTtsPlayback) listens for activity.tts events.
+  // 2. When an event fires, it POSTs to the Qwen3-TTS daemon at daemonHost:daemonPort/speak.
+  // 3. The daemon synthesizes audio and plays it through PipeWire.
+  //
+  // The voice-sample preview path ALSO POSTs directly to /speak — so if the
+  // daemon is down, both paths fail. Health here probes the daemon so the
+  // dashboard's TTS indicator accurately reflects whether audio will actually
+  // come out. If tts.enabled=false in settings, surface that as the reason
+  // first so users don't think the daemon is broken when they just turned it off.
+  if (options.host === undefined && options.port === undefined && !getTtsRuntimeConfig().enabled) {
+    return { ok: false, error: 'tts disabled in settings' };
   }
 
   let host = options.host;
