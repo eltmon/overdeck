@@ -177,6 +177,15 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     fix: 'brew install ttyd / Download from https://github.com/tsl0922/ttyd/releases',
   });
 
+  // ast-grep (AST-based code search)
+  const hasAstGrep = checkCommand('sg');
+  results.push({
+    name: 'ast-grep',
+    passed: hasAstGrep,
+    message: hasAstGrep ? 'installed' : 'not found (will auto-install)',
+    fix: 'npm install -g @ast-grep/cli',
+  });
+
   return {
     results,
     // mkcert, ttyd, and beads are optional (will be auto-installed or skipped)
@@ -357,6 +366,31 @@ async function installCommand(options: InstallOptions): Promise<void> {
     }
   } else {
     spinner.info('ttyd already installed');
+  }
+
+  // Step 5c: Install ast-grep (AST-based code search)
+  const hasAstGrepNow = checkCommand('sg');
+  if (!hasAstGrepNow) {
+    spinner.start('Installing ast-grep...');
+    try {
+      const plat = detectPlatform();
+      if (plat === 'darwin') {
+        try {
+          execSync('brew install ast-grep', { stdio: 'pipe', timeout: 120000 });
+          spinner.succeed('ast-grep installed via Homebrew');
+        } catch {
+          execSync('npm install -g @ast-grep/cli', { stdio: 'pipe', timeout: 120000 });
+          spinner.succeed('ast-grep installed via npm');
+        }
+      } else {
+        execSync('npm install -g @ast-grep/cli', { stdio: 'pipe', timeout: 120000 });
+        spinner.succeed('ast-grep installed via npm');
+      }
+    } catch (error) {
+      spinner.warn('ast-grep installation failed — install manually: npm install -g @ast-grep/cli');
+    }
+  } else {
+    spinner.info('ast-grep already installed');
   }
 
   // Step 5b: Install beads CLI (git-backed issue tracker)
