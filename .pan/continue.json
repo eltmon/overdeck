@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T05:46:41.560Z",
+  "updated": "2026-05-18T05:47:40.299Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "c056ee719",
-    "dirty": true
+    "sha": "fa0b4e927",
+    "dirty": false
   },
   "decisions": [
     {
@@ -192,11 +192,9 @@
     }
   ],
   "resumePoint": {
-    "description": "PhaseGlyph bead workspace-9lm0 is implemented and ready to commit/close. After commit, close workspace-9lm0 and skip inspection because requiresInspection=false.",
-    "beadId": "workspace-9lm0",
+    "description": "workspace-9lm0 is closed and inspection was skipped because requiresInspection=false. Run bd ready -l pan-1148 and claim the next unblocked PAN-1148 bead in vBRIEF sequence.",
+    "beadId": null,
     "filesToRead": [
-      "src/dashboard/frontend/src/components/primitives/PhaseGlyph.tsx",
-      "src/dashboard/frontend/src/components/primitives/PhaseGlyph.test.tsx",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -230,6 +228,12 @@
       "timestamp": "2026-05-18T05:46:41.560Z",
       "reason": "bead",
       "note": "Implemented workspace-9lm0 / f2-phase-glyph: added typed PhaseGlyph primitive, token-backed phase colors, SVG shapes for lifecycle phases, tests, and completed vBRIEF statuses.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:47:40.299Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-9lm0. bd required --force because downstream dependents were reported as blockers, matching the dependency-direction issue recorded in H13.",
       "agentModel": "gpt-5.5"
     }
   ],
