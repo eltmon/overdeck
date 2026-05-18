@@ -183,6 +183,41 @@ describe('getZoneAActions', () => {
     expect(layout.primary).toContain('reviewTest');
   });
 
+  it('verifying issues do not surface ready-to-merge actions', () => {
+    const layout = getZoneAActions({
+      ...baseZoneA,
+      issueCanonicalState: 'verifying_on_main',
+      reviewStatus: {
+        issueId: 'PAN-830',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'merged',
+        readyForMerge: true,
+        updatedAt: '2026-04-26T00:00:00Z',
+      },
+    });
+    expect(layout.primary).not.toContain('merge');
+    expect(layout.primary).not.toContain('startAgent');
+    expect(layout.overflow).not.toContain('resetIssue');
+  });
+
+  it('verifying display labels normalize to the verifying state', () => {
+    const layout = getZoneAActions({
+      ...baseZoneA,
+      issueCanonicalState: 'Verifying On Main',
+      reviewStatus: {
+        issueId: 'PAN-830',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'pending',
+        readyForMerge: true,
+        updatedAt: '2026-04-26T00:00:00Z',
+      },
+    });
+    expect(layout.primary).not.toContain('merge');
+    expect(layout.overflow).not.toContain('resetIssue');
+  });
+
   it('failed pipeline surfaces recover + reviewTest', () => {
     const layout = getZoneAActions({
       ...baseZoneA,

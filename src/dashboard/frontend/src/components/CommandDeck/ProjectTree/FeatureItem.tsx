@@ -453,7 +453,7 @@ function getFeatureStateTone(stateLabel: string): 'done' | 'progress' | 'review'
   const normalized = stateLabel.trim().toLowerCase();
   if (normalized === 'done') return 'done';
   if (normalized === 'in progress' || normalized === 'active') return 'progress';
-  if (normalized === 'in review' || normalized === 'review') return 'review';
+  if (normalized === 'in review' || normalized === 'review' || normalized === 'verifying' || normalized === 'verifying on main') return 'review';
   if (normalized === 'has context') return 'context';
   if (normalized === 'planning') return 'planning';
   return 'todo';
@@ -537,6 +537,9 @@ function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readon
   if (normalized === 'has context') {
     return `Planning artifacts exist for this issue, but active implementation or review has not started yet.${contextSuffix}`;
   }
+  if (normalized === 'verifying' || normalized === 'verifying on main') {
+    return 'The merge has landed and this issue is awaiting main-branch verification and close-out.';
+  }
   if (normalized === 'in review' || normalized === 'review') {
     return feature.readyForMerge
       ? 'Implementation has moved into review/test/merge flow and is ready for human merge approval.'
@@ -615,7 +618,7 @@ function writeExpanded(issueId: string, expanded: boolean): void {
  *  to keep the tree scannable. Users can override; that choice is persisted. */
 function defaultExpandedFromState(stateLabel: string): boolean {
   const s = stateLabel.toLowerCase();
-  return s.includes('progress') || s.includes('review') || s.includes('testing');
+  return s.includes('progress') || s.includes('review') || s.includes('testing') || s.includes('verifying');
 }
 
 /** Compute the dominant session presence for the feature row StatusDot.

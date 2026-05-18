@@ -100,7 +100,7 @@ export function ZoneActionStrip({
       hasInference: false,
       hasTranscripts: false,
       hasDiscussions: false,
-      issueCanonicalState: issue?.status?.toLowerCase() ?? null,
+      issueCanonicalState: issue?.state ?? issue?.status ?? null,
       isMerged: reviewStatus?.mergeStatus === 'merged',
     });
   }, [reviewStatus, reviewStatusLoading, agent, lifecycle, workspace, planningState, issue, reviewStatus?.mergeStatus]);
