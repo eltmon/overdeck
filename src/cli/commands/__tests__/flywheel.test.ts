@@ -8,9 +8,39 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
+
+const flywheelLifecycleMocks = vi.hoisted(() => ({
+  paused: false,
+  activeRunId: null as string | null,
+  sessionExists: false,
+  pauseFlywheel: vi.fn(async () => {
+    flywheelLifecycleMocks.paused = true;
+  }),
+  resumeFlywheel: vi.fn(async () => {
+    flywheelLifecycleMocks.paused = false;
+  }),
+}));
+
+vi.mock('../../../lib/cloister/flywheel.js', () => ({
+  FLYWHEEL_ORCHESTRATOR_AGENT_ID: 'flywheel-orchestrator',
+  pauseFlywheel: flywheelLifecycleMocks.pauseFlywheel,
+  resumeFlywheel: flywheelLifecycleMocks.resumeFlywheel,
+}));
+
+vi.mock('../../../lib/database/app-settings.js', () => ({
+  getFlywheelActiveRunId: () => flywheelLifecycleMocks.activeRunId,
+  isFlywheelGloballyPaused: () => flywheelLifecycleMocks.paused,
+}));
+
+vi.mock('../../../lib/tmux.js', () => ({
+  sessionExistsAsync: vi.fn(async () => flywheelLifecycleMocks.sessionExists),
+}));
+
 import {
   emitStatusCommand,
+  flywheelPauseCommand,
   flywheelReportCommand,
+  flywheelResumeCommand,
   flywheelStatusCommand,
   parseFlywheelStatusJson,
   readFlywheelStatusJson,
@@ -83,6 +113,11 @@ describe('flywheel CLI commands', () => {
     vi.stubEnv('GIT_AUTHOR_EMAIL', 'test@example.com');
     vi.stubEnv('GIT_COMMITTER_NAME', 'Panopticon Test');
     vi.stubEnv('GIT_COMMITTER_EMAIL', 'test@example.com');
+    flywheelLifecycleMocks.paused = false;
+    flywheelLifecycleMocks.activeRunId = null;
+    flywheelLifecycleMocks.sessionExists = false;
+    flywheelLifecycleMocks.pauseFlywheel.mockClear();
+    flywheelLifecycleMocks.resumeFlywheel.mockClear();
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -168,6 +203,50 @@ describe('flywheel CLI commands', () => {
     expect(errorSpy).toHaveBeenCalledWith('no active flywheel run');
   });
 
+  it('pauses the flywheel and prints before/after gate state', async () => {
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+
+    await flywheelPauseCommand();
+
+    expect(flywheelLifecycleMocks.pauseFlywheel).toHaveBeenCalledTimes(1);
+    expect(logSpy).toHaveBeenCalledWith('Flywheel paused: before paused=false active_run_id=RUN-1; after paused=true active_run_id=RUN-1');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('treats pause while already paused as an idempotent notice', async () => {
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+    flywheelLifecycleMocks.paused = true;
+
+    await flywheelPauseCommand();
+
+    expect(flywheelLifecycleMocks.pauseFlywheel).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith('Flywheel already paused (paused=true active_run_id=RUN-1)');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('resumes the flywheel and prints before/after gate state', async () => {
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+    flywheelLifecycleMocks.paused = true;
+
+    await flywheelResumeCommand();
+
+    expect(flywheelLifecycleMocks.resumeFlywheel).toHaveBeenCalledTimes(1);
+    expect(logSpy).toHaveBeenCalledWith('Flywheel resumed: before paused=true active_run_id=RUN-1; after paused=false active_run_id=RUN-1');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('treats resume while already running as an idempotent notice', async () => {
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+    flywheelLifecycleMocks.paused = false;
+    flywheelLifecycleMocks.sessionExists = true;
+
+    await flywheelResumeCommand();
+
+    expect(flywheelLifecycleMocks.resumeFlywheel).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith('Flywheel already running (paused=false active_run_id=RUN-1)');
+    expect(process.exitCode).toBeUndefined();
+  });
+
   it('writes and commits a deterministic run report', async () => {
     const repoDir = await createReportRepo(tempDir);
     await writeLatestFlywheelStatus({
@@ -228,9 +307,13 @@ describe('flywheel CLI commands', () => {
     const flywheel = program.commands.find(command => command.name() === 'flywheel');
     const emitStatus = flywheel?.commands.find(command => command.name() === 'emit-status');
     const status = flywheel?.commands.find(command => command.name() === 'status');
+    const pause = flywheel?.commands.find(command => command.name() === 'pause');
+    const resume = flywheel?.commands.find(command => command.name() === 'resume');
     const report = flywheel?.commands.find(command => command.name() === 'report');
     expect(emitStatus?.options.map(option => option.long)).toContain('--file');
     expect(status?.options.map(option => option.long)).toContain('--json');
+    expect(pause).toBeDefined();
+    expect(resume).toBeDefined();
     expect(report).toBeDefined();
   });
 });

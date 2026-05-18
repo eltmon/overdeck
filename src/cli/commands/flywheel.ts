@@ -6,6 +6,9 @@ import { Schema } from 'effect';
 import { Command } from 'commander';
 import { FlywheelStatus } from '@panctl/contracts';
 import { getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns } from '../../dashboard/server/services/flywheel-run-state.js';
+import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel } from '../../lib/cloister/flywheel.js';
+import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
+import { sessionExistsAsync } from '../../lib/tmux.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
 
@@ -19,6 +22,11 @@ interface StatusOptions {
 
 interface ReportOptions {
   cwd?: string;
+}
+
+interface FlywheelGateSnapshot {
+  paused: boolean;
+  activeRunId: string | null;
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
@@ -288,6 +296,51 @@ async function commitFlywheelReport(cwd: string, runNumber: number, requireAmend
   return mode;
 }
 
+function readFlywheelGateSnapshot(): FlywheelGateSnapshot {
+  return {
+    paused: isFlywheelGloballyPaused(),
+    activeRunId: getFlywheelActiveRunId(),
+  };
+}
+
+function formatGateSnapshot(snapshot: FlywheelGateSnapshot): string {
+  return `paused=${snapshot.paused ? 'true' : 'false'} active_run_id=${snapshot.activeRunId ?? 'none'}`;
+}
+
+export async function flywheelPauseCommand(): Promise<void> {
+  try {
+    const before = readFlywheelGateSnapshot();
+    if (before.paused) {
+      console.log(`Flywheel already paused (${formatGateSnapshot(before)})`);
+      return;
+    }
+
+    await pauseFlywheel();
+    const after = readFlywheelGateSnapshot();
+    console.log(`Flywheel paused: before ${formatGateSnapshot(before)}; after ${formatGateSnapshot(after)}`);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
+export async function flywheelResumeCommand(): Promise<void> {
+  try {
+    const before = readFlywheelGateSnapshot();
+    if (!before.paused && await sessionExistsAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID)) {
+      console.log(`Flywheel already running (${formatGateSnapshot(before)})`);
+      return;
+    }
+
+    await resumeFlywheel();
+    const after = readFlywheelGateSnapshot();
+    console.log(`Flywheel resumed: before ${formatGateSnapshot(before)}; after ${formatGateSnapshot(after)}`);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
 export async function flywheelReportCommand(options: ReportOptions = {}): Promise<void> {
   try {
     const cwd = options.cwd ?? process.cwd();
@@ -342,6 +395,16 @@ export function registerFlywheelCommands(program: Command): void {
     .description('Show the active Flywheel run status')
     .option('--json', 'Emit the raw FlywheelStatus JSON')
     .action(flywheelStatusCommand);
+
+  flywheel
+    .command('pause')
+    .description('Pause the active Flywheel orchestrator run')
+    .action(flywheelPauseCommand);
+
+  flywheel
+    .command('resume')
+    .description('Resume the paused Flywheel orchestrator run')
+    .action(flywheelResumeCommand);
 
   flywheel
     .command('report')
