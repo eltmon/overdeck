@@ -244,6 +244,30 @@ describe('updateSubItemStatus', () => {
     expect(other?.status).toBe('pending');
   });
 
+  it('applies compact subItem status overrides whose keys equal dotted subItem IDs', () => {
+    const doc = makePlanWithSubItems();
+    writePlanDoc(doc);
+    const panDir = join(WORKSPACE_PATH, '.pan');
+    mkdirSync(panDir, { recursive: true });
+    writeFileSync(join(panDir, 'continue.json'), JSON.stringify({
+      version: '1',
+      issueId: ISSUE_ID,
+      created: '2026-01-01T00:00:00Z',
+      updated: '2026-01-01T00:00:00Z',
+      gitState: {},
+      decisions: [],
+      hazards: [],
+      resumePoint: null,
+      beadsMapping: {},
+      sessionHistory: [],
+      statusOverrides: { 'item-1.ac1': 'completed' },
+    }));
+
+    const updated = readWorkspacePlan(WORKSPACE_PATH)!;
+    const sub = updated.plan.items[0].subItems!.find(s => s.id === 'item-1.ac1');
+    expect(sub?.status).toBe('completed');
+  });
+
   it('no-ops when item ID does not exist', () => {
     const doc = makePlanWithSubItems();
     writePlanDoc(doc);

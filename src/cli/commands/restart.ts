@@ -22,6 +22,9 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
 
+import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../../lib/restart-lock.js';
+import { writeRestartStatus } from '../../lib/restart-status.js';
+
 import {
   openDashboardLogStdio,
   readPlatformConfig,
@@ -66,22 +69,55 @@ function resolveNode22(): string {
   return 'node';
 }
 
-function resolveBundledServerPath(): string {
-  // After tsdown bundles the CLI, this code runs inside `dist/cli/index.js`,
-  // so `__dirname` is `dist/cli` and the sibling dashboard bundle sits at
-  // `dist/dashboard/server.js` — one `..` up, not two. The old two-up form
-  // was written assuming the unbundled `dist/cli/commands/restart.js` layout
-  // and resolved to `<project>/dashboard/server.js`, which never exists.
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  return join(__dirname, '..', 'dashboard', 'server.js');
+type DashboardBundleCandidate = {
+  path: string;
+  preferred: boolean;
+};
+
+function dashboardBundleCandidates(): DashboardBundleCandidate[] {
+  const currentDir = dirname(fileURLToPath(import.meta.url));
+  return [
+    {
+      path: join(currentDir, '..', 'dashboard', 'server.js'),
+      preferred: currentDir.endsWith(join('dist', 'cli')),
+    },
+    {
+      path: join(currentDir, '..', '..', '..', 'dist', 'dashboard', 'server.js'),
+      preferred: currentDir.endsWith(join('src', 'cli', 'commands')),
+    },
+    {
+      path: join(currentDir, '..', '..', 'dashboard', 'server.js'),
+      preferred: currentDir.endsWith(join('dist', 'cli', 'commands')),
+    },
+  ];
 }
 
-function spawnDashboardDetached(config: PlatformConfig, opts?: { disableDeacon?: boolean }): void {
+function uniqueBundleCandidates(): DashboardBundleCandidate[] {
+  const seen = new Set<string>();
+  return dashboardBundleCandidates().filter((candidate) => {
+    if (seen.has(candidate.path)) return false;
+    seen.add(candidate.path);
+    return true;
+  });
+}
+
+export function resolveBundledServerPath(): string {
+  const candidates = uniqueBundleCandidates();
+  return candidates.find(candidate => existsSync(candidate.path))?.path
+    ?? candidates.find(candidate => candidate.preferred)?.path
+    ?? candidates[0].path;
+}
+
+function searchedBundlePaths(): string[] {
+  return uniqueBundleCandidates().map(candidate => candidate.path);
+}
+
+export function spawnDashboardDetached(config: PlatformConfig, opts?: { disableDeacon?: boolean }): void {
   const serverPath = resolveBundledServerPath();
   if (!existsSync(serverPath)) {
     throw new StageError({
       stage: 'dashboard',
-      reason: `Dashboard bundle not found at ${serverPath}. Run \`npm run build\`.`,
+      reason: `Dashboard bundle not found. Run \`npm run build\`. Searched: ${searchedBundlePaths().join(', ')}`,
     });
   }
   const child = spawn(resolveNode22(), [serverPath], {
@@ -90,6 +126,8 @@ function spawnDashboardDetached(config: PlatformConfig, opts?: { disableDeacon?:
     env: {
       ...process.env,
       DASHBOARD_PORT: String(config.dashboardPort),
+      API_PORT: String(config.dashboardApiPort),
+      PORT: String(config.dashboardApiPort),
       PANOPTICON_MODE: 'production',
       ...(opts?.disableDeacon ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
     },
@@ -97,7 +135,28 @@ function spawnDashboardDetached(config: PlatformConfig, opts?: { disableDeacon?:
   child.unref();
 }
 
+async function recordRestartStatus(startedAt: number, success: boolean, error?: string): Promise<void> {
+  await writeRestartStatus({
+    ts: new Date().toISOString(),
+    trigger: 'pan restart',
+    success,
+    error,
+    durationMs: Date.now() - startedAt,
+    attempts: 1,
+  });
+}
+
+async function reportHeldRestartLock(startedAt: number): Promise<void> {
+  const holder = await readRestartLockHolder();
+  const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
+  const error = `restart in progress (${heldBy})`;
+  console.error(chalk.yellow(error));
+  await recordRestartStatus(startedAt, false, error);
+  process.exitCode = 2;
+}
+
 export async function restartCommand(options: RestartOptions): Promise<void> {
+  const startedAt = Date.now();
   const scope = resolveScope(options);
   const config = readPlatformConfig();
   const healthTimeoutMs = options.healthTimeout
@@ -111,19 +170,32 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
   console.log(chalk.bold(`Restarting Panopticon (${scope})...\n`));
 
+  const lockInherited = process.env.PANOPTICON_RESTART_LOCK_HELD === '1';
+  const needsRestartLock = (scope === 'dashboard' || scope === 'full') && !lockInherited;
+  let restartLock: RestartLockHandle | null = null;
+  if (needsRestartLock) {
+    restartLock = await acquireRestartLock('pan restart');
+    if (!restartLock) {
+      await reportHeldRestartLock(startedAt);
+      return;
+    }
+  }
+
   try {
     switch (scope) {
       case 'dashboard': {
-        // Cycle the supervisor so it picks up the latest bundle.
-        try {
-          const { stopSupervisorProcess, startSupervisorProcess } = await import('../../lib/supervisor.js');
-          stopSupervisorProcess();
-          startSupervisorProcess();
-        } catch { /* non-fatal */ }
+        if (process.env.PANOPTICON_SKIP_SUPERVISOR_CYCLE !== '1') {
+          try {
+            const { stopSupervisorProcess, startSupervisorProcess } = await import('../../lib/supervisor.js');
+            stopSupervisorProcess();
+            startSupervisorProcess();
+          } catch { /* non-fatal */ }
+        }
 
         await restartDashboard(config, () => spawnDashboardDetached(config, { disableDeacon }), {
           healthTimeoutMs,
         });
+        await recordRestartStatus(startedAt, true);
         console.log(chalk.green('✓ Dashboard restarted and healthy'));
         console.log(chalk.dim('  CLIProxy, Traefik, and TLDR were left running.'));
         break;
@@ -151,8 +223,14 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       }
     }
   } catch (err) {
+    const message = err instanceof StageError
+      ? `[${err.failure.stage}] ${err.failure.reason}`
+      : (err as Error)?.message || String(err);
+    if (scope === 'dashboard') {
+      await recordRestartStatus(startedAt, false, message);
+    }
     if (err instanceof StageError) {
-      console.error(chalk.red(`✗ [${err.failure.stage}] ${err.failure.reason}`));
+      console.error(chalk.red(`✗ ${message}`));
       console.error(
         chalk.dim(
           '  Other components were left in their prior state. ' +
@@ -160,9 +238,11 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
         ),
       );
     } else {
-      console.error(chalk.red('✗ Restart failed:'), (err as Error)?.message || err);
+      console.error(chalk.red('✗ Restart failed:'), message);
     }
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    await restartLock?.release();
   }
 }
 

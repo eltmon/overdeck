@@ -76,6 +76,7 @@ import { doctorCommand } from './commands/doctor.js';
 import { systemHealthCommand } from './commands/system-health.js';
 import { updateCommand } from './commands/update.js';
 import { restartCommand } from './commands/restart.js';
+import { reloadCommand } from './commands/reload.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { planCommand } from './commands/plan.js';
@@ -838,33 +839,15 @@ program
       }
     }
 
-    // Kill any existing dashboard processes before starting a new one.
-    // This prevents EADDRINUSE when pan up is run while a dashboard is already running.
-    // Uses fuser instead of lsof | xargs kill — busybox lsof on Alpine ignores -t/-i
-    // and lists ALL processes, which xargs then tries to kill (including PID 1).
-    try {
-      execSync(`fuser -k -TERM ${dashboardPort}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
-      execSync(`fuser -k -TERM ${dashboardApiPort}/tcp 2>/dev/null || true`, { stdio: 'pipe' });
-    } catch {
-      // No existing processes — that's fine
-    }
-
-    const waitForPortToFree = async (port: number, timeoutMs = 5000): Promise<void> => {
-      const start = Date.now();
-      while (Date.now() - start < timeoutMs) {
-        try {
-          execSync(`bash -c 'echo >/dev/tcp/127.0.0.1/${port}'`, { encoding: 'utf8', stdio: 'pipe', timeout: 1000 });
-        } catch {
-          return;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    };
-
-    await Promise.all([
-      waitForPortToFree(dashboardPort),
-      waitForPortToFree(dashboardApiPort),
-    ]);
+    const { stopDashboard, readPlatformConfig } = await import('../lib/platform-lifecycle.js');
+    const platformConfig = readPlatformConfig();
+    await stopDashboard({
+      ...platformConfig,
+      dashboardPort,
+      dashboardApiPort,
+      traefikEnabled,
+      traefikDomain,
+    });
 
     // Start dashboard
     if (isProduction) {
@@ -896,6 +879,8 @@ program
             env: {
               ...process.env,
               DASHBOARD_PORT: String(dashboardPort),
+              API_PORT: String(dashboardApiPort),
+              PORT: String(dashboardApiPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
               ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
@@ -952,6 +937,8 @@ program
             env: {
               ...process.env,
               DASHBOARD_PORT: String(dashboardPort),
+              API_PORT: String(dashboardApiPort),
+              PORT: String(dashboardApiPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
               ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
@@ -1104,6 +1091,14 @@ program
 
     console.log('');
   });
+
+program
+  .command('reload')
+  .description('Build Panopticon, then restart the dashboard only after the build succeeds')
+  .option('--skip-build', 'Skip npm run build and restart the existing bundle')
+  .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 30000)')
+  .option('--no-deacon', 'Skip Cloister/Deacon auto-start after reload')
+  .action(reloadCommand);
 
 // Scoped restart: `pan restart` defaults to the dashboard only and never
 // touches CLIProxy / Traefik / TLDR. Use `--full` for the nuclear option.
