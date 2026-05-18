@@ -46,7 +46,13 @@ export function PipelineView() {
   }, [agents]);
 
   const groupedIssues = useMemo(() => {
-    const groups = Object.fromEntries(PHASES.map((phase) => [phase, []])) as Record<PipelineIssuePhase, Issue[]>;
+    const groups: Record<PipelineIssuePhase, Issue[]> = {
+      ship: [],
+      review: [],
+      work: [],
+      plan: [],
+      todo: [],
+    };
 
     for (const issue of issues) {
       const agent = agentByIssueId.get(issue.identifier) ?? null;
