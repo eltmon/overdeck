@@ -4,7 +4,7 @@
     "created": "2026-05-18T22:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1194: Swarm: no recovery when a slot's PR becomes unmergeable — auto-advance halts forever",
-    "updated": "2026-05-18T23:11:53.562Z"
+    "updated": "2026-05-18T23:22:16.395Z"
   },
   "plan": {
     "id": "pan-1194",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T22:40:00.000Z",
-    "updated": "2026-05-18T22:42:31.430Z",
+    "updated": "2026-05-18T23:22:16.395Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1194",
@@ -309,7 +309,7 @@
       {
         "id": "recovery-endpoint",
         "title": "Add `POST /api/swarm/:issueId/slot/:slotId/recover` recovery endpoint with retry/drop/handoff actions",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T22:40:00.000Z",
         "metadata": {
@@ -325,68 +325,77 @@
           {
             "id": "recovery-endpoint.ac1",
             "title": "Route registered at exact path `POST /api/swarm/:issueId/slot/:slotId/recover` with internal-token auth. Returns 403 without the token, 400 for invalid issueId/slotId, 409 if no failed-merge slot exists, 400 for invalid action.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
           },
           {
             "id": "recovery-endpoint.ac2",
             "title": "`action: 'retry'` clears the matched failed-merge slot (reverts to pending/recovering state) AND clears top-level autoAdvanceFailureCount, autoAdvanceRetryAfter, lastAutoAdvanceError. Next pollSwarmAutoAdvance tick is free to dispatch. Unit test verifies the next pollSwarmAutoAdvance call dispatches a fresh slot for the same itemId.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
           },
           {
             "id": "recovery-endpoint.ac3",
             "title": "`action: 'drop'` calls applyTaskOperationToPlanFileAsync({ type: 'done', itemId: <slot.itemId>, reason: 'Operator dropped slot via failed-merge recovery', writerId: 'swarm-recover-drop-<pid>' }) AND clears top-level failure counters. The slot record stays at `failed-merge` but advance is no longer blocked. Subsequent poll dispatches the next DAG-ready item.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
           },
           {
             "id": "recovery-endpoint.ac4",
             "title": "`action: 'handoff'` flips state.autoAdvance to false and emits `source: 'ship', level: 'warn', message: 'Swarm autoAdvance disabled for <ISSUE> after operator handoff of slot <N>. Take it from here.'`. The auto-advance poll loop drops the issue from activeSwarmIssueIds on its next tick (existing cleanup branch).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
           },
           {
             "id": "recovery-endpoint.ac5",
             "title": "Every successful action emits a `source: 'ship', level: 'info'` activity entry recording the operator decision and naming slot, item, action.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
           },
           {
             "id": "recovery-endpoint.ac6",
             "title": "Persistence ordering: ALL three actions write SwarmState via the existing saveSwarmState path. drop additionally writes the vBRIEF via applyTaskOperationToPlanFileAsync; if the vBRIEF write fails, saveSwarmState is NOT called and the route returns 500 with the underlying error (no half-applied state).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
           },
           {
             "id": "recovery-endpoint.ac7",
             "title": "Idempotency: replaying the same recover request on a slot that has already been recovered (no failed-merge entry exists) returns 409 with a clear message rather than 500 or silently re-applying.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
           },
           {
             "id": "recovery-endpoint.ac8",
             "title": "Unit tests for all three actions use vi.useFakeTimers() where the poll loop is exercised post-recovery.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T23:22:16.395Z"
           }
-        ]
+        ],
+        "completed": "2026-05-18T23:22:16.395Z"
       },
       {
         "id": "cli-recover",

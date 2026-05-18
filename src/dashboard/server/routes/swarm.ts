@@ -42,6 +42,8 @@ function uniqueTmpPath(path: string): string {
 
 // ─── Swarm state persistence ────────────────────────────────────────────────
 
+type SwarmRecoveryAction = 'retry' | 'drop' | 'handoff';
+
 interface SlotAssignment {
   slot: number;
   itemId: string;
@@ -61,6 +63,8 @@ interface SlotAssignment {
   failureReason?: string;
   consecutiveConflictCount?: number;
   prUrl?: string;
+  recoveryAction?: SwarmRecoveryAction;
+  recoveredAt?: string;
 }
 
 // Cap synthesis output that we persist into the continue vBRIEF and forward into
@@ -235,7 +239,7 @@ function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
   const slots: SlotAssignment[] = runtime.slots.map(slot => {
     // Preserve passthrough fields (phase, failureReason, completed status)
     // that the runtime persists alongside the canonical SwarmSlotRuntime shape.
-    const extra = slot as unknown as { phase?: 'synthesis' | 'implementation'; failureReason?: string; completedStatus?: 'completed' | 'merged' };
+    const extra = slot as unknown as { phase?: 'synthesis' | 'implementation'; failureReason?: string; completedStatus?: 'completed' | 'merged'; recoveryAction?: SwarmRecoveryAction; recoveredAt?: string };
     const status = slot.status === 'failed'
       ? 'failed'
       : slot.status === 'failed-merge'
@@ -256,6 +260,8 @@ function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
       failureReason: extra.failureReason,
       ...(slot.consecutiveConflictCount === undefined ? {} : { consecutiveConflictCount: slot.consecutiveConflictCount }),
       ...(slot.prUrl === undefined ? {} : { prUrl: slot.prUrl }),
+      ...(extra.recoveryAction === undefined ? {} : { recoveryAction: extra.recoveryAction }),
+      ...(extra.recoveredAt === undefined ? {} : { recoveredAt: extra.recoveredAt }),
       startedAt: slot.dispatchedAt,
       completedAt: slot.mergedAt,
     };
@@ -301,6 +307,8 @@ function runtimeFromState(state: SwarmState, existing?: SwarmRuntime): SwarmRunt
       failureReason: slot.failureReason,
       ...(slot.consecutiveConflictCount === undefined ? {} : { consecutiveConflictCount: slot.consecutiveConflictCount }),
       ...(slot.prUrl === undefined ? {} : { prUrl: slot.prUrl }),
+      ...(slot.recoveryAction === undefined ? {} : { recoveryAction: slot.recoveryAction }),
+      ...(slot.recoveredAt === undefined ? {} : { recoveredAt: slot.recoveredAt }),
       dispatchedAt: slot.startedAt,
       mergedAt: slot.completedAt,
     } as unknown as SwarmRuntime['slots'][number])),
@@ -511,8 +519,18 @@ function failedMergeMessage(state: SwarmState, slot: SlotAssignment): string {
   return `Swarm slot ${slot.slot} (${slot.itemTitle}) branch ${branch}${pr} unmergeable: ${reason}. Recover with: pan swarm recover ${state.issueId} ${slot.slot} --action <retry|drop|handoff>`;
 }
 
+function isRecoveredFailedMergeSlot(slot: SlotAssignment): boolean {
+  return slot.status === 'failed-merge' && Boolean(slot.recoveryAction);
+}
+
 function firstFailedSlot(state: SwarmState): SlotAssignment | undefined {
-  return state.slots.find((slot) => slot.status === 'failed' || slot.status === 'failed-merge');
+  return state.slots.find((slot) => slot.status === 'failed' || (slot.status === 'failed-merge' && !isRecoveredFailedMergeSlot(slot)));
+}
+
+function slotReadyToAdvance(slot: SlotAssignment): boolean {
+  return slot.status === 'merged'
+    || (slot.status === 'completed' && slot.phase === 'synthesis')
+    || (slot.status === 'failed-merge' && (slot.recoveryAction === 'retry' || slot.recoveryAction === 'drop'));
 }
 
 function newlyFailedMergeSlots(before: SwarmState, after: SwarmState): SlotAssignment[] {
@@ -1563,6 +1581,107 @@ async function onSlotMergeComplete(issueId: string, itemId: string, slotId: numb
   return { ok: true };
 }
 
+interface SwarmRecoveryResultBody {
+  ok?: boolean;
+  action?: SwarmRecoveryAction;
+  slotId?: number;
+  issueId?: string;
+  error?: string;
+}
+
+function clearAutoAdvanceFailureFields(state: SwarmState): SwarmState {
+  return {
+    ...state,
+    autoAdvanceFailureCount: 0,
+    autoAdvanceRetryAfter: undefined,
+    lastAutoAdvanceError: undefined,
+  };
+}
+
+function latestFailedMergeSlotIndex(state: SwarmState, slotId: number): number {
+  for (let i = state.slots.length - 1; i >= 0; i--) {
+    const slot = state.slots[i]!;
+    if (slot.slot === slotId && slot.status === 'failed-merge' && !slot.recoveryAction) return i;
+  }
+  return -1;
+}
+
+async function recoverSwarmSlot(
+  issueId: string,
+  slotId: number,
+  action: SwarmRecoveryAction,
+): Promise<{ status: number; body: SwarmRecoveryResultBody }> {
+  const issueUpper = canonicalIssueId(issueId);
+  if (!issueUpper) return { status: 400, body: { error: 'issueId must be a tracker key like PAN-977.' } };
+  if (!Number.isInteger(slotId) || slotId <= 0) return { status: 400, body: { error: 'slotId must be a positive integer.' } };
+
+  const state = await loadSwarmState(issueUpper);
+  const matchedIndex = state ? latestFailedMergeSlotIndex(state, slotId) : -1;
+  if (!state || matchedIndex < 0) {
+    return { status: 409, body: { error: `No failed-merge slot ${slotId} exists for ${issueUpper}.` } };
+  }
+
+  const slot = state.slots[matchedIndex]!;
+  const project = resolveProjectFromIssue(issueUpper);
+  if (!project) return { status: 404, body: { error: `Could not resolve project for ${issueUpper}` } };
+  const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueUpper.toLowerCase()}`);
+  const canonicalPlanPath = await findPlanAsync(mainWorkspace);
+  const writerId = `swarm-recover-${action}-${process.pid}`;
+
+  if (action === 'retry' || action === 'drop') {
+    if (!canonicalPlanPath) return { status: 422, body: { error: `No canonical vBRIEF plan found for ${issueUpper}` } };
+    try {
+      await applyTaskOperationToPlanFileAsync(canonicalPlanPath, {
+        type: action === 'drop' ? 'done' : 'unblock',
+        itemId: slot.itemId,
+        reason: action === 'drop'
+          ? 'Operator dropped slot via failed-merge recovery'
+          : 'Operator retried slot via failed-merge recovery',
+        writerId,
+      }, mainWorkspace);
+    } catch (err: any) {
+      return { status: 500, body: { error: err?.message ?? String(err) } };
+    }
+  }
+
+  const recoveredAt = new Date().toISOString();
+  const recoveredSlots = state.slots.map((candidate, index) => index === matchedIndex
+    ? { ...candidate, recoveryAction: action, recoveredAt }
+    : candidate);
+  const nextState = clearAutoAdvanceFailureFields({
+    ...state,
+    slots: recoveredSlots,
+    autoAdvance: action === 'handoff' ? false : state.autoAdvance,
+    updatedAt: recoveredAt,
+  });
+
+  try {
+    await saveSwarmState(nextState);
+  } catch (err: any) {
+    return { status: 500, body: { error: err?.message ?? String(err) } };
+  }
+
+  emitActivityEntry({
+    source: 'ship',
+    level: 'info',
+    issueId: issueUpper,
+    message: `Operator recovered slot ${slotId} via ${action} (${slot.itemId})`,
+  });
+  if (action === 'handoff') {
+    emitActivityEntry({
+      source: 'ship',
+      level: 'warn',
+      issueId: issueUpper,
+      message: `Swarm autoAdvance disabled for ${issueUpper} after operator handoff of slot ${slotId}. Take it from here.`,
+    });
+  }
+
+  activeSwarmIssueIds.add(issueUpper);
+  ensureSwarmAutoAdvanceLoop();
+
+  return { status: 200, body: { ok: true, action, slotId, issueId: issueUpper } };
+}
+
 /**
  * Discover active swarms by scanning every registered project's `workspaces/feature-*`
  * directory for a continue vBRIEF carrying a `swarmRuntime`. The legacy sidecar
@@ -1719,10 +1838,7 @@ async function pollSwarmAutoAdvance(): Promise<void> {
     // otherwise downstream slots get dispatched against stale parent-branch
     // files. Synthesis slots end at 'completed' by design (they only
     // produce context, never merge), so allow them as ready-to-advance.
-    const allSlotsReadyToAdvance = state.slots.length > 0 && state.slots.every(
-      (slot) => slot.status === 'merged'
-        || (slot.status === 'completed' && slot.phase === 'synthesis'),
-    );
+    const allSlotsReadyToAdvance = state.slots.length > 0 && state.slots.every(slotReadyToAdvance);
     if (!allSlotsReadyToAdvance) continue;
 
     autoAdvanceInFlight.add(state.issueId);
@@ -2260,6 +2376,48 @@ const postSwarmSlotMergedRoute = HttpRouter.add(
   })),
 );
 
+/**
+ * Failed-merge recovery matrix:
+ * - retry: release the vBRIEF item back to pending, mark the slot recovered, clear auto-advance failure fields, and let polling dispatch the item again.
+ * - drop: mark the vBRIEF item done, keep the failed-merge slot visible as recovered, clear auto-advance failure fields, and let polling advance downstream DAG work.
+ * - handoff: disable autoAdvance, keep the failed-merge slot visible as recovered, and log that an operator is taking manual control.
+ */
+const postSwarmSlotRecoverRoute = HttpRouter.add(
+  'POST',
+  '/api/swarm/:issueId/slot/:slotId/recover',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
+      import('../../../lib/internal-token.js'),
+    );
+    const expected = getInternalToken();
+    if (!expected) {
+      return jsonResponse({ error: 'internal token not configured' }, { status: 503 });
+    }
+    const headers = request.headers as Record<string, string | string[] | undefined>;
+    const rawHeader = headers[INTERNAL_TOKEN_HEADER];
+    const provided = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    if (!constantTimeTokenEqual(provided, expected)) {
+      return jsonResponse({ error: 'forbidden' }, { status: 403 });
+    }
+
+    const params = yield* HttpRouter.params;
+    const issueId = canonicalIssueId(params['issueId'] ?? '');
+    const rawSlotId = params['slotId'] ?? '';
+    if (!issueId) return jsonResponse({ error: 'issueId must be a tracker key like PAN-977.' }, { status: 400 });
+    if (!/^[1-9]\d*$/.test(rawSlotId)) return jsonResponse({ error: 'slotId must be a positive integer.' }, { status: 400 });
+
+    const body = yield* readJsonBody;
+    const action = (body as Record<string, unknown>)['action'];
+    if (action !== 'retry' && action !== 'drop' && action !== 'handoff') {
+      return jsonResponse({ error: "action must be one of 'retry', 'drop', or 'handoff'." }, { status: 400 });
+    }
+
+    const result = yield* Effect.promise(() => recoverSwarmSlot(issueId, Number.parseInt(rawSlotId, 10), action));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
 // ─── GET /api/swarm/:issueId ────────────────────────────────────────────────
 
 const getSwarmRoute = HttpRouter.add(
@@ -2302,6 +2460,7 @@ export const __testInternals = {
   ensureSwarmAutoAdvanceLoop,
   resumeSwarmAutoAdvanceLoopOnStartup,
   onSlotMergeComplete,
+  recoverSwarmSlot,
   buildStructuredSlotTaskInput,
   buildSlotPrompt,
   // PAN-977 round-10 blocker #4: tests read durable runtime state via the
@@ -2327,5 +2486,6 @@ export { resumeSwarmAutoAdvanceLoopOnStartup };
 export const swarmRouteLayer = Layer.mergeAll(
   postSwarmRoute,
   postSwarmSlotMergedRoute,
+  postSwarmSlotRecoverRoute,
   getSwarmRoute,
 );

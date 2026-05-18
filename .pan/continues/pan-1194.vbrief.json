@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1194",
   "created": "2026-05-18T22:07:39.007Z",
-  "updated": "2026-05-18T23:11:53.562Z",
+  "updated": "2026-05-18T23:22:16.395Z",
   "gitState": {
     "branch": "feature/pan-1194",
     "dirty": true
@@ -107,11 +107,12 @@
     }
   ],
   "resumePoint": {
-    "description": "frontend-visual bead workspace-zu3p implemented: InspectorPanel renders failed-merge swarm runtime state, PR link, failure reason, and auto-advance failure banner. Commit and close the bead; inspection is not required.",
-    "beadId": "workspace-zu3p",
+    "description": "recovery-endpoint bead workspace-bjtb implemented: POST /api/swarm/:issueId/slot/:slotId/recover handles retry/drop/handoff, persists recovery state, updates vBRIEF for retry/drop before runtime state, and resumes or disables auto-advance as appropriate. Commit, close bead, then run required fast inspection.",
+    "beadId": "workspace-bjtb",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
-      "src/dashboard/frontend/src/components/__tests__/InspectorPanel.swarm.test.tsx",
+      "src/dashboard/server/routes/swarm.ts",
+      "src/dashboard/server/routes/__tests__/swarm.test.ts",
+      "src/lib/vbrief/continue-state.ts",
       ".pan/specs/2026-05-18-PAN-1194-swarm-no-recovery-when-a-slot-s-pr-becomes-unmergeable-auto-advance-halts-forever.vbrief.json"
     ]
   },
@@ -152,6 +153,12 @@
       "timestamp": "2026-05-18T23:11:53.562Z",
       "reason": "end",
       "note": "Implemented frontend-visual: InspectorPanel now fetches swarm runtime state and renders failed-merge slots with a distinct pill, failure reason, optional PR link, and visible auto-advance failure banner. Added React Testing Library snapshot coverage. Ran frontend focused test, swarm server test, typecheck, lint, frontend build, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:22:16.395Z",
+      "reason": "end",
+      "note": "Implemented recovery-endpoint: added internal-token-protected POST /api/swarm/:issueId/slot/:slotId/recover with retry/drop/handoff actions, recovery metadata persistence, auto-advance failure clearing, handoff warning activity, and tests for successful actions, idempotency, and vBRIEF failure ordering. Ran focused swarm route tests, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],

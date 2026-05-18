@@ -2156,8 +2156,8 @@
     "hash": "3f5fcfcbb2b4a2468e7e36cbdd26efc2"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/lib/vbrief/continue-state.ts": {
-    "mtime": 1779144040.3298087,
-    "hash": "a682742b50d62f7a6d28d1ee69e32681"
+    "mtime": 1779146231.879829,
+    "hash": "d36c753e397031ee46a3ea0955f2d60f"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/lib/vbrief/beads.ts": {
     "mtime": 1779142045.6844282,
@@ -4344,8 +4344,8 @@
     "hash": "dd13fbeadece3a88305c8f7acb15c250"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/swarm.ts": {
-    "mtime": 1779145472.6644418,
-    "hash": "7f847f1a0bf7bb1427551ca87fa9e95b"
+    "mtime": 1779146560.9348736,
+    "hash": "df8d40510d2d14ce4fd6362526e515b7"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/origin-validation.ts": {
     "mtime": 1779142045.650325,
@@ -4460,8 +4460,8 @@
     "hash": "46bdee8405d46f2035d36739b8981e6d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/__tests__/swarm.test.ts": {
-    "mtime": 1779145544.133855,
-    "hash": "c314f41375d02f0148916576e3ba35e7"
+    "mtime": 1779146570.1101818,
+    "hash": "4c4158a63b2fae37e2e6301a127b49e3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1194/src/dashboard/server/routes/__tests__/costs-experiments.test.ts": {
     "mtime": 1779142045.6494794,

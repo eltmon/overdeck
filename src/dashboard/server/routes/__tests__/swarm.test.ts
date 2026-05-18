@@ -852,6 +852,144 @@ describe('swarm route helpers', () => {
     expect(agents.spawnAgent).not.toHaveBeenCalled();
   });
 
+  it('recovers a failed-merge slot via retry and dispatches the item on the next poll', async () => {
+    const { __testInternals } = await import('../swarm.js');
+    const featureWorkspace = join(projectPath, 'workspaces', 'feature-pan-971');
+    const runningDoc = {
+      ...PLAN_DOC,
+      plan: {
+        ...PLAN_DOC.plan,
+        items: PLAN_DOC.plan.items.map(item => item.id === 'wave-0-item' ? { ...item, status: 'running' as const } : item),
+      },
+    };
+    writeFileSync(join(featureWorkspace, '.pan', 'spec.vbrief.json'), JSON.stringify(runningDoc, null, 2));
+    await __testInternals.persistSwarmRuntime(featureWorkspace, {
+      ...baseSwarmState({ status: 'failed-merge', failureReason: 'PR #1188 not mergeable: CONFLICTING', prUrl: 'https://github.com/owner/repo/pull/1188' }),
+      autoAdvanceFailureCount: 2,
+      autoAdvanceRetryAfter: '2026-05-07T00:10:00Z',
+      lastAutoAdvanceError: 'slot failed',
+    } as any);
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue([]);
+
+    const recovered = await __testInternals.recoverSwarmSlot('PAN-971', 1, 'retry');
+
+    expect(recovered).toMatchObject({ status: 200, body: { ok: true, action: 'retry', slotId: 1, issueId: 'PAN-971' } });
+    const recoveredState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(recoveredState.autoAdvanceFailureCount).toBe(0);
+    expect(recoveredState.autoAdvanceRetryAfter).toBeUndefined();
+    expect(recoveredState.lastAutoAdvanceError).toBeUndefined();
+    expect(recoveredState.slots[0]).toMatchObject({ status: 'failed-merge', recoveryAction: 'retry' });
+
+    await __testInternals.pollSwarmAutoAdvance();
+
+    const dispatchedState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(dispatchedState.slots.find(s => s.itemId === 'wave-0-item')?.status).toBe('running');
+    expect(agents.spawnAgent).toHaveBeenCalledTimes(1);
+    expect(activityLogger.emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'ship',
+      level: 'info',
+      issueId: 'PAN-971',
+      message: 'Operator recovered slot 1 via retry (wave-0-item)',
+    }));
+  });
+
+  it('recovers a failed-merge slot via drop and dispatches downstream DAG work', async () => {
+    const { __testInternals } = await import('../swarm.js');
+    const featureWorkspace = join(projectPath, 'workspaces', 'feature-pan-971');
+    const runningDoc = {
+      ...PLAN_DOC,
+      plan: {
+        ...PLAN_DOC.plan,
+        items: PLAN_DOC.plan.items.map(item => item.id === 'wave-0-item' ? { ...item, status: 'running' as const } : item),
+      },
+    };
+    writeFileSync(join(featureWorkspace, '.pan', 'spec.vbrief.json'), JSON.stringify(runningDoc, null, 2));
+    await __testInternals.persistSwarmRuntime(featureWorkspace, {
+      ...baseSwarmState({ status: 'failed-merge', failureReason: 'PR #1188 not mergeable: CONFLICTING' }),
+      lastAutoAdvanceError: 'slot failed',
+      autoAdvanceFailureCount: 1,
+    } as any);
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue([]);
+
+    const recovered = await __testInternals.recoverSwarmSlot('PAN-971', 1, 'drop');
+
+    expect(recovered.status).toBe(200);
+    const plan = JSON.parse(readFileSync(join(featureWorkspace, '.pan', 'spec.vbrief.json'), 'utf-8')) as VBriefDocument;
+    expect(plan.plan.items.find(item => item.id === 'wave-0-item')?.status).toBe('completed');
+    expect(plan.plan.items.find(item => item.id === 'wave-0-item')?.metadata?.statusReason).toBe('Operator dropped slot via failed-merge recovery');
+    const recoveredState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(recoveredState.slots[0]).toMatchObject({ status: 'failed-merge', recoveryAction: 'drop' });
+    expect(recoveredState.lastAutoAdvanceError).toBeUndefined();
+
+    await __testInternals.pollSwarmAutoAdvance();
+
+    const dispatchedState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(dispatchedState.slots.find(s => s.itemId === 'wave-1-item')?.status).toBe('running');
+    expect(agents.spawnAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers a failed-merge slot via handoff and lets the next poll drop the active swarm', async () => {
+    const { __testInternals } = await import('../swarm.js');
+    const featureWorkspace = join(projectPath, 'workspaces', 'feature-pan-971');
+    await __testInternals.persistSwarmRuntime(featureWorkspace, {
+      ...baseSwarmState({ status: 'failed-merge', failureReason: 'PR #1188 not mergeable: CONFLICTING' }),
+      lastAutoAdvanceError: 'slot failed',
+      autoAdvanceFailureCount: 1,
+    } as any);
+
+    const recovered = await __testInternals.recoverSwarmSlot('PAN-971', 1, 'handoff');
+
+    expect(recovered.status).toBe(200);
+    const recoveredState = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(recoveredState.autoAdvance).toBe(false);
+    expect(recoveredState.slots[0]).toMatchObject({ status: 'failed-merge', recoveryAction: 'handoff' });
+    expect(activityLogger.emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'ship',
+      level: 'warn',
+      issueId: 'PAN-971',
+      message: 'Swarm autoAdvance disabled for PAN-971 after operator handoff of slot 1. Take it from here.',
+    }));
+
+    await __testInternals.pollSwarmAutoAdvance();
+
+    expect(__testInternals.getActiveSwarmIssueIds().has('PAN-971')).toBe(false);
+  });
+
+  it('returns 409 when replaying recovery for an already recovered slot', async () => {
+    const { __testInternals } = await import('../swarm.js');
+    const featureWorkspace = join(projectPath, 'workspaces', 'feature-pan-971');
+    await __testInternals.persistSwarmRuntime(featureWorkspace, baseSwarmState({
+      status: 'failed-merge',
+      recoveryAction: 'drop',
+      recoveredAt: '2026-05-07T00:06:00Z',
+    }) as any);
+
+    const replay = await __testInternals.recoverSwarmSlot('PAN-971', 1, 'drop');
+
+    expect(replay.status).toBe(409);
+    expect(replay.body.error).toContain('No failed-merge slot 1 exists for PAN-971');
+  });
+
+  it('does not persist drop recovery state when the vBRIEF mutation fails', async () => {
+    const { __testInternals } = await import('../swarm.js');
+    const featureWorkspace = join(projectPath, 'workspaces', 'feature-pan-971');
+    await __testInternals.persistSwarmRuntime(featureWorkspace, baseSwarmState({
+      itemId: 'missing-item',
+      status: 'failed-merge',
+      failureReason: 'PR #1188 not mergeable: CONFLICTING',
+    }) as any);
+
+    const failed = await __testInternals.recoverSwarmSlot('PAN-971', 1, 'drop');
+
+    expect(failed.status).toBe(500);
+    expect(failed.body.error).toContain('Plan item not found: missing-item');
+    const state = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(state.slots[0]?.recoveryAction).toBeUndefined();
+    expect(activityLogger.emitActivityEntry).not.toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Operator recovered slot 1 via drop (missing-item)',
+    }));
+  });
+
   // PAN-977 round-15 blocker: when a synthesis slot for itemX has completed
   // but its tmux session is still alive (pane teardown lagging), a dispatch
   // for itemX as an implementation slot MUST NOT silently alias the

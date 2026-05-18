@@ -173,6 +173,8 @@ export interface SwarmSlotRuntime {
   mergedAt?: string;
   consecutiveConflictCount?: number;
   prUrl?: string;
+  recoveryAction?: 'retry' | 'drop' | 'handoff';
+  recoveredAt?: string;
 }
 
 /** Context update written by a synthesis agent before a convergence-point item is dispatched. */
