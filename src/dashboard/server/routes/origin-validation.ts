@@ -101,3 +101,27 @@ export function validateOrigin(
 export function _resetTrustedOriginsForTests(): void {
   cachedTrustedOrigins = undefined;
 }
+
+/**
+ * Origin trust check used by raw WebSocket upgrade paths (autopreso, voice).
+ * Accepts a parsed Origin string and the Host header; returns true if the
+ * origin is in the trusted set OR matches the request's own host (loopback
+ * dev case where the origin is the same as the host being served from).
+ */
+export function isTrustedOriginForHost(
+  origin: string | undefined,
+  host: string | string[] | undefined,
+): boolean {
+  if (!origin) return false;
+  const normalized = normalizeOrigin(origin);
+  if (!normalized) return false;
+  if (getTrustedOrigins().includes(normalized)) return true;
+  const hostStr = Array.isArray(host) ? host[0] : host;
+  if (!hostStr) return false;
+  try {
+    const url = new URL(origin);
+    return url.host === hostStr;
+  } catch {
+    return false;
+  }
+}
