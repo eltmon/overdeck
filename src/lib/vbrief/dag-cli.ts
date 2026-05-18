@@ -5,14 +5,15 @@
  * Dashboard routes use the async variants in dag.ts.
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
-import { dirname } from 'path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
+import { dirname, join as pathJoin } from 'path';
 
 import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
 import {
   activePlanWriters,
   applyTaskOperation,
   getDispatchableItems,
+  isPidDead,
   isTaskCommand,
   lockOwnerPath,
   lockPathForPlan,
@@ -33,30 +34,55 @@ function assertSingleWriter(planPath: string, writerId: string): void {
     throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${owner} already owns the worktree`);
   }
   const lockPath = lockPathForPlan(planPath);
-  try {
-    mkdirSync(lockPath, { mode: 0o700 });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      writeFileSync(
-        lockOwnerPath(planPath),
-        JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2),
-        'utf-8',
-      );
-    } catch (writeErr) {
-      try { rmSync(lockPath, { recursive: true, force: true }); } catch { /* best effort */ }
-      throw writeErr;
+      mkdirSync(lockPath, { mode: 0o700 });
+      try {
+        writeFileSync(
+          lockOwnerPath(planPath),
+          JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2),
+          'utf-8',
+        );
+      } catch (writeErr) {
+        try { rmSync(lockPath, { recursive: true, force: true }); } catch { /* best effort */ }
+        throw writeErr;
+      }
+      activePlanWriters.set(planPath, writerId);
+      return;
+    } catch (err: any) {
+      if (err?.code !== 'EEXIST') throw err;
+      let lockOwner = 'unknown writer';
+      let ownerPid: number | undefined;
+      try {
+        const ownerData = JSON.parse(readFileSync(lockOwnerPath(planPath), 'utf-8')) as {
+          writerId?: string; pid?: number; acquiredAt?: string;
+        };
+        ownerPid = ownerData.pid;
+        lockOwner = `${ownerData.writerId ?? 'unknown writer'} pid=${ownerData.pid ?? 'unknown'} acquiredAt=${ownerData.acquiredAt ?? 'unknown'}`;
+      } catch { /* ignore malformed owner file */ }
+      // Reclaim orphan locks left behind by crashed writers (dead PID).
+      if (attempt === 0 && isPidDead(ownerPid)) {
+        console.warn(`[vbrief] Reclaiming orphan writer lock for ${planPath} (dead ${lockOwner})`);
+        removeStaleLockSync(planPath);
+        continue;
+      }
+      throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lockOwner} already owns the worktree`);
     }
-  } catch (err: any) {
-    if (err?.code !== 'EEXIST') throw err;
-    let lockOwner = 'unknown writer';
-    try {
-      const ownerData = JSON.parse(readFileSync(lockOwnerPath(planPath), 'utf-8')) as {
-        writerId?: string; pid?: number; acquiredAt?: string;
-      };
-      lockOwner = `${ownerData.writerId ?? 'unknown writer'} pid=${ownerData.pid ?? 'unknown'} acquiredAt=${ownerData.acquiredAt ?? 'unknown'}`;
-    } catch { /* ignore malformed owner file */ }
-    throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lockOwner} already owns the worktree`);
   }
-  activePlanWriters.set(planPath, writerId);
+}
+
+function removeStaleLockSync(planPath: string): void {
+  rmSync(lockPathForPlan(planPath), { recursive: true, force: true });
+  try {
+    const dir = dirname(planPath);
+    const base = planPath.slice(dir.length + 1);
+    const entries = readdirSync(dir);
+    for (const entry of entries) {
+      if (entry.startsWith(`${base}.`) && entry.endsWith('.tmp')) {
+        try { rmSync(pathJoin(dir, entry), { force: true }); } catch { /* best effort */ }
+      }
+    }
+  } catch { /* best effort */ }
 }
 
 function releasePlanWriter(planPath: string, writerId: string): void {

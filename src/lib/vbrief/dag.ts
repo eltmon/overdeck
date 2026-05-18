@@ -3,7 +3,7 @@
  */
 
 import { existsSync } from 'fs';
-import { mkdir, readFile, rename, rm, writeFile } from 'fs/promises';
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
 import { readWorkspaceContinueAsync, writeWorkspaceContinueAsync } from '../pan-dir/continue.js';
@@ -696,6 +696,44 @@ export function lockOwnerPath(planPath: string): string {
   return join(lockPathForPlan(planPath), 'owner.json');
 }
 
+/**
+ * Returns true if `pid` is *certainly* dead — i.e., `process.kill(pid, 0)`
+ * throws ESRCH. Any other error (EPERM, EINVAL) means the process might
+ * still be running and we should NOT reclaim the lock. Returns false for
+ * `pid <= 0` or undefined to be conservative.
+ *
+ * Used to detect orphaned writer locks left behind by crashed writers.
+ */
+export function isPidDead(pid: number | undefined | null): boolean {
+  if (!pid || pid <= 0) return false;
+  if (pid === process.pid) return false;
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (err: any) {
+    return err?.code === 'ESRCH';
+  }
+}
+
+/**
+ * Remove a stale writer lock directory and any sibling `.tmp` transaction
+ * files for the same plan path. Idempotent and best-effort.
+ */
+export async function removeStaleLockAsync(planPath: string): Promise<void> {
+  await rm(lockPathForPlan(planPath), { recursive: true, force: true });
+  // Sweep .tmp transaction files that share the plan-path prefix
+  try {
+    const dir = dirname(planPath);
+    const base = planPath.slice(dir.length + 1);
+    const entries = await readdir(dir);
+    for (const entry of entries) {
+      if (entry.startsWith(`${base}.`) && entry.endsWith('.tmp')) {
+        try { await rm(join(dir, entry), { force: true }); } catch { /* best effort */ }
+      }
+    }
+  } catch { /* best effort */ }
+}
+
 // PAN-977 round-16 blocker #2: bounded retry/wait around the writer lock so
 // concurrent same-cycle dispatch claims (parallel slot spawns mutating the
 // same .pan/spec.vbrief.json) wait for the previous atomic write rather than
@@ -735,11 +773,19 @@ async function assertSingleWriterAsync(planPath: string, writerId: string): Prom
       } catch (err: any) {
         if (err?.code !== 'EEXIST') throw err;
         // On-disk lock exists but in-memory map says owner-or-empty — record
-        // the on-disk owner for diagnostics, then fall through to retry.
+        // the on-disk owner for diagnostics. If the owner PID is dead, the
+        // lock is orphaned (writer crashed); reclaim it on the next attempt.
+        let ownerPid: number | undefined;
         try {
           const ownerData = JSON.parse(await readFile(lockOwnerPath(planPath), 'utf-8')) as { writerId?: string; pid?: number; acquiredAt?: string };
+          ownerPid = ownerData.pid;
           lastOwnerDescription = `${ownerData.writerId ?? 'unknown writer'} pid=${ownerData.pid ?? 'unknown'} acquiredAt=${ownerData.acquiredAt ?? 'unknown'}`;
         } catch { /* ignore malformed owner file */ }
+        if (isPidDead(ownerPid)) {
+          console.warn(`[vbrief] Reclaiming orphan writer lock for ${planPath} (dead ${lastOwnerDescription})`);
+          await removeStaleLockAsync(planPath);
+          continue;
+        }
       }
     } else {
       lastOwnerDescription = owner;
