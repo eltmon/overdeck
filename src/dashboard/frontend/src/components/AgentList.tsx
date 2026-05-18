@@ -1,24 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSharedTick } from '../lib/useSharedTick';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
-import { useDashboardStore, selectAgentList } from '../lib/store';
-import { Brain, Play, Square, Clock, AlertCircle, CheckCircle2, Activity, XCircle, Radio } from 'lucide-react';
-
-interface CloisterStatus {
-  running: boolean;
-  lastCheck: string | null;
-  config: {
-    startup: { auto_start: boolean };
-    specialists: Record<string, { enabled: boolean; auto_wake: boolean }>;
-  };
-  summary: {
-    active: number;
-    stale: number;
-    warning: number;
-    stuck: number;
-    total: number;
-  };
-}
+import { Brain, Clock, Activity, XCircle, Radio } from 'lucide-react';
 
 interface ActivityEntry {
   id: string;
@@ -62,40 +45,10 @@ async function fetchProjectSpecialists(): Promise<ProjectSpecialistStatus[]> {
   return (data.projects ?? []).filter((p: ProjectSpecialistStatus) => p.isRunning || p.metadata?.currentRun || p.metadata?.lastRunAt);
 }
 
-async function fetchCloisterStatus(): Promise<CloisterStatus> {
-  const res = await fetch('/api/cloister/status');
-  if (!res.ok) throw new Error('Failed to fetch Cloister status');
-  return res.json();
-}
-
 async function fetchActivity(): Promise<ActivityEntry[]> {
   const res = await fetch('/api/activity');
   if (!res.ok) return [];
   return res.json();
-}
-
-
-async function startCloister(): Promise<void> {
-  const res = await fetch('/api/cloister/start', { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to start Cloister');
-}
-
-async function stopCloister(): Promise<void> {
-  const res = await fetch('/api/cloister/stop', { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to stop Cloister');
-}
-
-function formatTimeAgo(timestamp: string | null): string {
-  if (!timestamp) return 'Never';
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-
-  if (diffSecs < 60) return `${diffSecs}s ago`;
-  if (diffMins < 60) return `${diffMins}m ago`;
-  return `${Math.floor(diffMins / 60)}h ago`;
 }
 
 function stalenessClass(timestamp: string | null): string {
@@ -125,19 +78,9 @@ function LiveLastHeard({ timestamp, label }: { timestamp: string | null; label?:
 export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
   const queryClient = useQueryClient();
 
-  // PAN-1048 — derive specialist liveness from role-tagged agents
-  // (review / test / ship), not the retired specialistsByName projection.
-  const allAgents = useDashboardStore(selectAgentList);
-
   const { data: runningProjectSpecialists } = useQuery({
     queryKey: ['project-specialists-running'],
     queryFn: fetchProjectSpecialists,
-    refetchInterval: 5000,
-  });
-
-  const { data: cloisterStatus } = useQuery({
-    queryKey: ['cloister-status'],
-    queryFn: fetchCloisterStatus,
     refetchInterval: 5000,
   });
 
@@ -147,107 +90,11 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
     refetchInterval: 5000,
   });
 
-  const startCloisterMutation = useMutation({
-    mutationFn: startCloister,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cloister-status'] });
-    },
-  });
-
-  const stopCloisterMutation = useMutation({
-    mutationFn: stopCloister,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cloister-status'] });
-    },
-  });
-
-  // Check if any specialist role is actually active (running tmux session).
-  // A "specialist" in the new role-primitive model is any agent with role
-  // review / test / ship that is not stopped.
-  const anySpecialistActive = allAgents.some(
-    (a) => (a.role === 'review' || a.role === 'test' || a.role === 'ship') && a.status !== 'stopped',
-  );
-  const patrolRunning = cloisterStatus?.running || false;
-
   // Get recent activity (last 5)
   const recentActivity = (activity || []).slice(-5).reverse();
 
   return (
     <div className="space-y-4">
-      {/* Cloister Deacon Section */}
-      <div className="bg-card rounded-lg">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <h2 className="font-semibold text-foreground flex items-center gap-2">
-            <Clock className="w-5 h-5 text-primary" />
-            Cloister Deacon
-          </h2>
-          <div className="flex items-center gap-2">
-            <span className={`text-xs px-2 py-1 rounded ${
-              anySpecialistActive
-                ? 'badge-bg-success text-success'
-                : 'bg-popover text-muted-foreground'
-            }`}>
-              {anySpecialistActive ? '● Specialists Active' : '○ Specialists Idle'}
-            </span>
-            {patrolRunning ? (
-              <button
-                onClick={() => stopCloisterMutation.mutate()}
-                disabled={stopCloisterMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-destructive hover:bg-popover rounded transition-colors disabled:opacity-50"
-                title="Stop patrol loop"
-              >
-                <Square className="w-3 h-3" />
-                Stop Patrol
-              </button>
-            ) : (
-              <button
-                onClick={() => startCloisterMutation.mutate()}
-                disabled={startCloisterMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-success hover:bg-popover rounded transition-colors disabled:opacity-50"
-                title="Start patrol loop (health monitoring)"
-              >
-                <Play className="w-3 h-3" />
-                Start Patrol
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="p-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground">Patrol Status:</span>{' '}
-              <span className={patrolRunning ? 'text-success' : 'text-muted-foreground'}>
-                {patrolRunning ? '● Running' : '○ Stopped'}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Last Check:</span>{' '}
-              <span className="text-foreground">
-                {formatTimeAgo(cloisterStatus?.lastCheck || null)}
-              </span>
-            </div>
-            {cloisterStatus?.summary && (
-              <>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-success" />
-                  <span className="text-foreground">{cloisterStatus.summary.active} active</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {cloisterStatus.summary.stuck > 0 ? (
-                    <AlertCircle className="w-4 h-4 text-destructive" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-muted-foreground" />
-                  )}
-                  <span className={cloisterStatus.summary.stuck > 0 ? 'text-destructive' : 'text-muted-foreground'}>
-                    {cloisterStatus.summary.stuck} stuck
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Recent Activity Section */}
       {recentActivity.length > 0 && (
         <div className="bg-card rounded-lg">
