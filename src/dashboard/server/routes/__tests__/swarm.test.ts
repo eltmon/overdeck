@@ -225,6 +225,69 @@ describe('swarm route helpers', () => {
     expect(persisted?.swarmRuntime?.slots?.[0]?.itemId).toBe('wave-0-item');
   });
 
+  it('round-trips failed-merge slot state through the canonical swarm runtime', async () => {
+    const cont = await import('../../../../lib/vbrief/continue-state.js');
+    const { __testInternals } = await import('../swarm.js');
+    const featureWorkspace = join(projectPath, 'workspaces', 'feature-pan-971');
+    const runtimeState = {
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 1,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-0-item',
+          itemTitle: 'First',
+          sessionName: 'agent-pan-971-1',
+          workspace: join(featureWorkspace, 'slot-1'),
+          status: 'failed-merge' as const,
+          phase: 'implementation' as const,
+          failureReason: 'PR #1188 is conflicting',
+          consecutiveConflictCount: 2,
+          prUrl: 'https://github.com/owner/repo/pull/1188',
+          startedAt: '2026-05-12T00:00:00Z',
+          completedAt: '2026-05-12T00:05:00Z',
+        },
+        {
+          slot: 2,
+          itemId: 'wave-1-item',
+          itemTitle: 'Second',
+          sessionName: 'agent-pan-971-2',
+          workspace: join(featureWorkspace, 'slot-2'),
+          status: 'running' as const,
+          phase: 'implementation' as const,
+          startedAt: '2026-05-12T00:01:00Z',
+        },
+      ],
+      createdAt: '2026-05-12T00:00:00Z',
+      updatedAt: '2026-05-12T00:05:00Z',
+    };
+
+    await __testInternals.persistSwarmRuntime(featureWorkspace, runtimeState as any);
+
+    const persisted = (await cont.readContinueStateAsync(featureWorkspace, 'PAN-971'))!.swarmRuntime!;
+    expect(persisted.slots[0]).toMatchObject({
+      status: 'failed-merge',
+      failureReason: 'PR #1188 is conflicting',
+      consecutiveConflictCount: 2,
+      prUrl: 'https://github.com/owner/repo/pull/1188',
+    });
+    expect('consecutiveConflictCount' in persisted.slots[1]!).toBe(false);
+    expect('prUrl' in persisted.slots[1]!).toBe(false);
+
+    const loaded = (await __testInternals.loadSwarmState('PAN-971'))!;
+    expect(loaded.slots[0]).toMatchObject({
+      status: 'failed-merge',
+      failureReason: 'PR #1188 is conflicting',
+      consecutiveConflictCount: 2,
+      prUrl: 'https://github.com/owner/repo/pull/1188',
+    });
+    expect('consecutiveConflictCount' in loaded.slots[1]!).toBe(false);
+    expect('prUrl' in loaded.slots[1]!).toBe(false);
+  });
+
   it('builds structured AgentTaskInput with dependencies and acceptance criteria', async () => {
     const { __testInternals } = await import('../swarm.js');
 

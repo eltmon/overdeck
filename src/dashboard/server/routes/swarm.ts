@@ -46,7 +46,7 @@ interface SlotAssignment {
   itemTitle: string;
   sessionName: string;
   workspace: string;
-  status: 'pending' | 'running' | 'completed' | 'merged' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'merged' | 'failed' | 'failed-merge';
   /**
    * Distinguishes a synthesis dispatch (the slot only produces a synthesis context
    * for downstream consumers) from a normal implementation dispatch. Recorded so
@@ -57,6 +57,8 @@ interface SlotAssignment {
   startedAt?: string;
   completedAt?: string;
   failureReason?: string;
+  consecutiveConflictCount?: number;
+  prUrl?: string;
 }
 
 // Cap synthesis output that we persist into the continue vBRIEF and forward into
@@ -232,11 +234,13 @@ function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
     const extra = slot as unknown as { phase?: 'synthesis' | 'implementation'; failureReason?: string; completedStatus?: 'completed' | 'merged' };
     const status = slot.status === 'failed'
       ? 'failed'
-      : extra.completedStatus === 'completed'
-        ? 'completed'
-        : slot.status === 'merged'
-          ? 'merged'
-          : 'running';
+      : slot.status === 'failed-merge'
+        ? 'failed-merge'
+        : extra.completedStatus === 'completed'
+          ? 'completed'
+          : slot.status === 'merged'
+            ? 'merged'
+            : 'running';
     return {
       slot: slot.slotId,
       itemId: slot.itemId,
@@ -246,6 +250,8 @@ function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
       status,
       phase: extra.phase,
       failureReason: extra.failureReason,
+      ...(slot.consecutiveConflictCount === undefined ? {} : { consecutiveConflictCount: slot.consecutiveConflictCount }),
+      ...(slot.prUrl === undefined ? {} : { prUrl: slot.prUrl }),
       startedAt: slot.dispatchedAt,
       completedAt: slot.mergedAt,
     };
@@ -277,13 +283,20 @@ function runtimeFromState(state: SwarmState, existing?: SwarmRuntime): SwarmRunt
       itemTitle: slot.itemTitle,
       sessionName: slot.sessionName,
       workspace: slot.workspace,
-      // SwarmSlotRuntime status is narrower than SwarmState — fold 'completed'
-      // into 'running' on the runtime side and round-trip the original via
-      // `completedStatus` so `stateFromRuntime` can recover it.
-      status: slot.status === 'merged' ? 'merged' : slot.status === 'failed' ? 'failed' : 'running',
+      // `completed` round-trips through completedStatus because SwarmSlotRuntime
+      // records active terminal states separately from completed-but-unmerged work.
+      status: slot.status === 'merged'
+        ? 'merged'
+        : slot.status === 'failed'
+          ? 'failed'
+          : slot.status === 'failed-merge'
+            ? 'failed-merge'
+            : 'running',
       completedStatus: slot.status === 'completed' ? 'completed' : undefined,
       phase: slot.phase,
       failureReason: slot.failureReason,
+      ...(slot.consecutiveConflictCount === undefined ? {} : { consecutiveConflictCount: slot.consecutiveConflictCount }),
+      ...(slot.prUrl === undefined ? {} : { prUrl: slot.prUrl }),
       dispatchedAt: slot.startedAt,
       mergedAt: slot.completedAt,
     } as unknown as SwarmRuntime['slots'][number])),

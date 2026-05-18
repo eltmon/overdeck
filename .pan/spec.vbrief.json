@@ -4,7 +4,7 @@
     "created": "2026-05-18T22:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1194: Swarm: no recovery when a slot's PR becomes unmergeable — auto-advance halts forever",
-    "updated": "2026-05-18T22:15:03.649Z"
+    "updated": "2026-05-18T22:42:31.430Z"
   },
   "plan": {
     "id": "pan-1194",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T22:40:00.000Z",
-    "updated": "2026-05-18T22:15:03.649Z",
+    "updated": "2026-05-18T22:42:31.430Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1194",
@@ -87,7 +87,7 @@
       {
         "id": "type-additions",
         "title": "Add `failed-merge` to slot status types and runtime ↔ state mappers",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T22:40:00.000Z",
         "metadata": {
@@ -103,7 +103,7 @@
           {
             "id": "type-additions.ac1",
             "title": "`SlotAssignment.status` includes `'failed-merge'` and `SwarmState`/`SwarmDispatchResponseBody` type checks pass against the widened union.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -111,7 +111,7 @@
           {
             "id": "type-additions.ac2",
             "title": "`SwarmSlotRuntime.status` includes `'failed-merge'` in src/lib/vbrief/continue-state.ts. Existing readers of SwarmSlotRuntime (e.g. continue-state-swarm.test.ts) continue to typecheck without changes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -119,7 +119,7 @@
           {
             "id": "type-additions.ac3",
             "title": "`runtimeFromState` and `stateFromRuntime` round-trip a `failed-merge` slot without changing its status. New unit test asserts the round-trip preserves status, failureReason, consecutiveConflictCount, and prUrl.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -127,7 +127,7 @@
           {
             "id": "type-additions.ac4",
             "title": "`SlotAssignment` and `SwarmSlotRuntime` gain optional `consecutiveConflictCount?: number` and `prUrl?: string` fields. The mappers preserve both fields when present and omit them when absent.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -135,7 +135,7 @@
           {
             "id": "type-additions.ac5",
             "title": "`npm run typecheck` passes with zero new errors after the union widening.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
