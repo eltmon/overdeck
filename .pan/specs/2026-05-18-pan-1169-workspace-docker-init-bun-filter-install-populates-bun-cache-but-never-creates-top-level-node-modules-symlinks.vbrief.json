@@ -184,7 +184,7 @@
           },
           {
             "id": "fail-init-on-unresolved-import.ac5",
-            "title": "Manual injection test: when the init container is run with the Bead 1 fix REVERTED (i.e. --filter restored, top-level node_modules empty), the init container exits non-zero with a diagnostic message that references PAN-1169 and the UNRESOLVED_IMPORT warnings, instead of exiting 0 silently. Document the test method (e.g. local revert of the docker-compose change, rerun of init service) in the bead's completion notes.",
+            "title": "Manual injection test: run the init container with the Bead 1 fix reverted (`--filter` restored) and a fresh empty top-level node_modules volume, then document the exact observed result. If that exact restored-filter scenario no longer emits UNRESOLVED_IMPORT in the current Bun/build environment, document that result and run an equivalent missing-top-level-dependency injection that removes representative externalized imports (`yaml`, `@iarna`, `effect`); the equivalent injection must make init exit non-zero with a diagnostic referencing PAN-1169 and UNRESOLVED_IMPORT.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
