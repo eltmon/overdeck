@@ -129,7 +129,7 @@ type PipelineState =
 
 function normalizeCanonicalState(state?: string | null): string | null {
   if (!state) return null;
-  return state.trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+  return state.trim().toLowerCase().replace(/[-\s]+/g, '_');
 }
 
 function derivePipelineState(input: ZoneAInput): PipelineState {

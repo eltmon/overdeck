@@ -16,7 +16,7 @@ import {
   MoreHorizontal, FileText, ListTodo, Brain, MessageSquare,
   Upload, Send, XCircle, GitMerge, ChevronDown,
 } from 'lucide-react';
-import type { Agent, Issue } from '../../types';
+import { STATUS_LABELS, type Agent, type Issue } from '../../types';
 import { getZoneAActions, type ActionKey } from '../../lib/commandDeckActions';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { useZoneAActions } from './useZoneAActions';
@@ -142,6 +142,7 @@ export function ZoneActionStrip({
             issueId={issueId}
             reviewStatus={reviewStatus}
             variant="inspector"
+            issueState={issue?.state ?? (issue?.status ? STATUS_LABELS[issue.status] : undefined)}
           />
         );
 

@@ -7,10 +7,11 @@ interface MergeButtonProps {
   issueId: string;
   reviewStatus?: { readyForMerge?: boolean; mergeStatus?: string };
   variant: 'card' | 'inspector';
+  issueState?: string;
   onClick?: (e: React.MouseEvent) => void;
 }
 
-export function MergeButton({ issueId, reviewStatus, variant, onClick }: MergeButtonProps) {
+export function MergeButton({ issueId, reviewStatus, variant, issueState, onClick }: MergeButtonProps) {
   const showAlert = useAlert();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -54,7 +55,7 @@ export function MergeButton({ issueId, reviewStatus, variant, onClick }: MergeBu
     : 0;
   const isMergeStuck = mergingElapsed > STUCK_MERGE_MS;
 
-  if (!reviewStatus?.readyForMerge || reviewStatus?.mergeStatus === 'merged') {
+  if (issueState === 'verifying_on_main' || !reviewStatus?.readyForMerge || reviewStatus?.mergeStatus === 'merged') {
     return null;
   }
 

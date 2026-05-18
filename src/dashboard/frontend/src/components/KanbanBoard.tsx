@@ -39,6 +39,7 @@ import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry
 import { useWorkspaceStackHealthQuery, type WorkspaceData } from './CommandDeck/ZoneCOverviewTabs/queries';
 import IssueCardPrimitive from './primitives/IssueCard';
 import VerbBadge from './primitives/VerbBadge';
+import { VerifyingOnMainBadge } from './VerifyingOnMainBadge';
 
 
 // Parity registry anchor — keeps the card action surface tied to the
@@ -162,6 +163,17 @@ export function applyReviewStateToIssue(
   labels.delete('Review Ready');
   labels.add('merged');
 
+  // PAN-1190: keep verifying_on_main visible after merge until close-out completes.
+  const currentCanonical = STATUS_LABELS[issue.status] || 'backlog';
+  if (currentCanonical === 'verifying_on_main' || issue.targetCanonicalState === 'verifying_on_main') {
+    return {
+      ...issue,
+      mergeStatus: 'merged',
+      labels: Array.from(labels),
+      targetCanonicalState: 'verifying_on_main',
+    };
+  }
+
   return {
     ...issue,
     status: 'Done',
@@ -252,6 +264,7 @@ export function groupByStatus(issues: Issue[], showClosedOut: boolean = false): 
     todo: [],
     in_progress: [],
     in_review: [],
+    verifying_on_main: [],
     done: [],
     canceled: [],
   };
@@ -1057,6 +1070,7 @@ const COLUMN_COLORS: Record<string, string> = {
   todo: 'border-border',
   in_progress: 'border-primary',
   in_review: 'border-warning',
+  verifying_on_main: 'border-info',
   done: 'border-success',
 };
 
@@ -1065,6 +1079,7 @@ const COLUMN_TITLES: Record<string, string> = {
   todo: 'To Do',
   in_progress: 'In Progress',
   in_review: 'In Review',
+  verifying_on_main: 'Verifying',
   done: 'Done',
 };
 
@@ -2729,6 +2744,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
   const isPipelineStuck = !isTerminal && canonical === 'in_review' && isReviewPipelineStuck(reviewStatus);
   const cardVerbBadge =
+    canonical === 'verifying_on_main' ? <VerifyingOnMainBadge compact /> :
     isTerminal ? <VerbBadge variant="MERGED" /> :
     isReadyToMerge ? <VerbBadge variant="READY TO MERGE" /> :
     isPipelineStuck ? <VerbBadge variant="CHANGES REQUESTED" /> :

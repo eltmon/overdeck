@@ -54,7 +54,7 @@ async function forgeApprove(issueId: string): Promise<unknown> {
 }
 
 function isVerifyingIssue(issue?: Issue): boolean {
-  const state = (issue?.state ?? issue?.status ?? '').trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+  const state = (issue?.state ?? issue?.status ?? '').trim().toLowerCase().replace(/[-\s]+/g, '_');
   return state === 'verifying' || state === 'verifying_on_main';
 }
 
@@ -98,7 +98,7 @@ export function AwaitingMergePage() {
       .filter((rs) => {
         const issue = issuesById.get(rs.issueId.toLowerCase());
         // Filter out issues the tracker has marked as cancelled/wontfix.
-        if (issue?.state === 'canceled' || issue?.state === 'cancelled') return false;
+        if (issue?.state === 'canceled') return false;
         if (isVerifyingIssue(issue)) return false;
         // Filter out issues that are 'done' with a failed merge OR a 'merged' tracker label —
         // they were completed outside Panopticon (PR merged manually on GitHub).
