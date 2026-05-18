@@ -5,6 +5,11 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { validateOrigin } from './origin-validation.js';
+import {
+  getFlywheelRunDetail,
+  listFlywheelRuns,
+  type FlywheelRunStateOptions,
+} from '../services/flywheel-run-state.js';
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 
@@ -59,6 +64,34 @@ const readJsonBody = Effect.gen(function* () {
     return { ok: false as const, error: 'Request body must be valid JSON' };
   }
 });
+
+export async function getFlywheelRunsPayload(options: FlywheelRunStateOptions = {}) {
+  return listFlywheelRuns(options);
+}
+
+export async function getFlywheelRunPayload(runId: string, options: FlywheelRunStateOptions = {}) {
+  return getFlywheelRunDetail(runId, options);
+}
+
+const getFlywheelRunsRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/runs',
+  httpHandler(Effect.gen(function* () {
+    return yield* Effect.promise(async () => jsonResponse(await getFlywheelRunsPayload()));
+  })),
+);
+
+const getFlywheelRunRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/runs/:id',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const runId = params['id'] ?? '';
+    const run = yield* Effect.promise(() => getFlywheelRunPayload(runId));
+    if (!run) return jsonResponse({ error: 'Flywheel run not found', runId }, { status: 404 });
+    return jsonResponse(run);
+  })),
+);
 
 const getFlywheelBriefRoute = HttpRouter.add(
   'GET',
@@ -117,6 +150,8 @@ const postFlywheelBriefRoute = HttpRouter.add(
 );
 
 export const flywheelRouteLayer = Layer.mergeAll(
+  getFlywheelRunsRoute,
+  getFlywheelRunRoute,
   getFlywheelBriefRoute,
   postFlywheelBriefRoute,
 );
