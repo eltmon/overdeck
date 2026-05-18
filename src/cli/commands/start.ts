@@ -9,7 +9,7 @@ import { exec, execFile, execFileSync } from 'child_process';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-import { spawnAgent } from '../../lib/agents.js';
+import { clearAgentPaused, getAgentState, spawnAgent } from '../../lib/agents.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
@@ -92,6 +92,7 @@ interface IssueOptions {
   auto?: boolean;
   host?: boolean;
   yes?: boolean;
+  force?: boolean;
 }
 
 /**
@@ -276,7 +277,8 @@ async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIs
 async function handleRemoteWorkspace(
   issueId: string,
   options: IssueOptions,
-  spinner: Ora
+  spinner: Ora,
+  clearPauseBeforeSpawn: boolean
 ): Promise<void> {
   const config = loadConfig();
 
@@ -368,6 +370,10 @@ async function handleRemoteWorkspace(
   spinner.text = 'Spawning remote agent...';
 
   try {
+    if (clearPauseBeforeSpawn) {
+      clearAgentPaused(agentId);
+    }
+
     const remoteAgent = await spawnRemoteAgent({
       issueId,
       workspace: remoteMetadata,
@@ -702,11 +708,32 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
   }
 
+  // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
+  const normalizedId = id.toLowerCase();
+  const agentId = `agent-${normalizedId}`;
+  const existingAgentState = getAgentState(agentId);
+  const shouldClearPauseBeforeSpawn = existingAgentState?.paused === true && options.force === true;
+  if (existingAgentState?.paused === true && !options.force) {
+    process.stderr.write(chalk.red(`Agent ${agentId} is paused and will not be started.\n`));
+    if (existingAgentState.pausedReason) {
+      process.stderr.write(chalk.red(`Pause reason: ${existingAgentState.pausedReason}\n`));
+    }
+    process.stderr.write(chalk.red(`Run pan unpause ${id} to clear the pause, or pan start ${id} --force to override.\n`));
+    process.exit(1);
+  }
+  if (existingAgentState?.troubled === true) {
+    const failures = existingAgentState.consecutiveFailures ?? 0;
+    process.stderr.write(chalk.red(`Agent ${agentId} is troubled (${failures} failure${failures === 1 ? '' : 's'}) and will not be started.\n`));
+    if (existingAgentState.lastFailureReason) {
+      process.stderr.write(chalk.red(`Last failure: ${existingAgentState.lastFailureReason}\n`));
+    }
+    process.stderr.write(chalk.red(`Investigate the crash cause, then run pan untroubled ${id} before starting.\n`));
+    process.exit(1);
+  }
+
   const spinner = ora(`Preparing workspace for ${id}...`).start();
 
   try {
-    // Normalize issue ID (MIN-648 -> min-648 for tmux session name)
-    const normalizedId = id.toLowerCase();
 
     // Determine workspace location preference
     const locationPreference = determineWorkspaceLocation(options);
@@ -723,7 +750,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // Refuse fresh start when a resumable session already exists.
     // Users must choose resume or reset-session explicitly.
     try {
-      assertCanStartFresh(id);
+      assertCanStartFresh(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
     } catch (error) {
       if (workspacePath || isRemote) {
         throw error;
@@ -732,7 +759,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Handle remote workspace
     if (isRemote || (locationPreference === 'remote' && !workspacePath)) {
-      await handleRemoteWorkspace(id, options, spinner);
+      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn);
       return;
     }
 
@@ -1007,6 +1034,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     const prompt = await buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
 
     spinner.text = 'Spawning agent...';
+
+    if (shouldClearPauseBeforeSpawn) {
+      clearAgentPaused(agentId);
+    }
 
     const agent = await spawnAgent({
       issueId: id,

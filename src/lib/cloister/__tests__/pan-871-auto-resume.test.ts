@@ -7,8 +7,10 @@ vi.mock('../../../lib/agents.js', () => ({
   listRunningAgents: vi.fn(() => []),
   getAgentDir: vi.fn((agentId: string) => `/tmp/test-agents/${agentId}`),
   getAgentState: vi.fn(),
+  getAgentStateAsync: vi.fn(),
   saveAgentState: vi.fn(),
   resumeAgent: vi.fn(async () => ({ success: true })),
+  recordAgentFailureAsync: vi.fn(async () => null),
 }));
 
 vi.mock('../../../lib/review-status.js', () => ({
@@ -90,11 +92,12 @@ vi.mock('fs', () => ({
 }));
 
 import { autoResumeStoppedWorkAgents } from '../deacon.js';
-import { getAgentState, resumeAgent } from '../../../lib/agents.js';
+import { getAgentState, getAgentStateAsync, resumeAgent } from '../../../lib/agents.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
 import { getShadowState } from '../../../lib/shadow-state.js';
 
 const mockGetAgentState = getAgentState as any;
+const mockGetAgentStateAsync = getAgentStateAsync as any;
 const mockResumeAgent = resumeAgent as any;
 const mockGetReviewStatus = getReviewStatus as any;
 const mockGetShadowState = getShadowState as any;
@@ -102,7 +105,7 @@ const mockGetShadowState = getShadowState as any;
 describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAgentState.mockReturnValue({
+    const agentState = {
       id: 'agent-pan-871',
       issueId: 'PAN-871',
       workspace: '/tmp/workspace',
@@ -111,7 +114,9 @@ describe('autoResumeStoppedWorkAgents (PAN-871)', () => {
       model: 'claude-sonnet-4-6',
       status: 'stopped',
       startedAt: new Date().toISOString(),
-    });
+    };
+    mockGetAgentState.mockReturnValue(agentState);
+    mockGetAgentStateAsync.mockResolvedValue({ ...agentState, status: 'running' });
     mockGetReviewStatus.mockReturnValue({
       issueId: 'PAN-871',
       reviewStatus: 'blocked',

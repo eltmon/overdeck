@@ -93,6 +93,16 @@ You can drive any stage from the dashboard, the CLI, or a webhook. Engage as muc
 
 ---
 
+## Agent Auto-Resume Controls
+
+Panopticon auto-recovers stopped work agents, but operators can deliberately gate that behavior:
+
+- `pan dev --no-resume` and `pan up --no-resume` start the dashboard with boot-scoped no-resume mode. Orphan recovery and stopped-agent auto-resume stay disabled until the dashboard is restarted without `--no-resume`.
+- `pan pause <id> [--reason <text>]` persists a per-agent pause gate and stops the agent if it is running. `pan unpause <id>` clears the gate without spawning; `pan start <id> --force` clears it and starts immediately.
+- If an agent repeatedly crashes or fails to resume, Deacon marks it `troubled` and backs off instead of looping forever. Investigate the root cause, then run `pan untroubled <id>` to clear the troubled gate and failure counters. Run `pan start <id>` only after the issue is safe to retry.
+
+These controls are visible in the dashboard through top-level no-resume warnings and per-agent paused/troubled badges.
+
 ## Key Features
 
 | Feature | Description |

@@ -31,6 +31,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
 
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({}) })))
     ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([])
     ;(getWorkspaceStackHealth as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       healthy: true,
@@ -42,6 +43,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
   afterEach(() => {
     logSpy.mockRestore()
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('AC: prints a "Harness:" line for each running agent (pi value when configured)', async () => {
@@ -127,5 +129,92 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
     expect(out).toContain('Broken Workspace Stacks')
     expect(out).toContain('PAN-1140')
     expect(out).toContain('STACK BROKEN')
+  })
+
+  it('prints gating reasons only for non-running gated agents', async () => {
+    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'agent-paused',
+        issueId: 'PAN-1141',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        workspace: '/tmp/paused',
+        startedAt: new Date().toISOString(),
+        tmuxActive: false,
+        paused: true,
+        pausedReason: 'manual inspection',
+      },
+      {
+        id: 'agent-troubled',
+        issueId: 'PAN-1142',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        workspace: '/tmp/troubled',
+        startedAt: new Date().toISOString(),
+        tmuxActive: false,
+        troubled: true,
+        consecutiveFailures: 3,
+      },
+      {
+        id: 'agent-manual',
+        issueId: 'PAN-1143',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        workspace: '/tmp/manual',
+        startedAt: new Date().toISOString(),
+        tmuxActive: false,
+        stoppedByUser: true,
+      },
+      {
+        id: 'agent-waiting',
+        issueId: 'PAN-1144',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        workspace: '/tmp/waiting',
+        startedAt: new Date().toISOString(),
+        tmuxActive: false,
+      },
+      {
+        id: 'agent-running',
+        issueId: 'PAN-1145',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        workspace: '/tmp/running',
+        startedAt: new Date().toISOString(),
+        tmuxActive: true,
+      },
+    ])
+
+    await statusCommand({} as any)
+
+    const out = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(out).toContain('Gate:     Paused (manual inspection)')
+    expect(out).toContain('Gate:     Troubled (3 failures)')
+    expect(out).toContain('Gate:     Manual')
+    expect(out).not.toMatch(/agent-waiting[\s\S]*?Gate:/)
+    expect(out).not.toMatch(/agent-running[\s\S]*?Gate:/)
+  })
+
+  it('uses dashboard no-resume state as a boot gating reason', async () => {
+    ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ active: true, since: '2026-05-17T17:00:00.000Z' }),
+    })
+    ;(listRunningAgents as unknown as ReturnType<typeof vi.fn>).mockReturnValue([
+      {
+        id: 'agent-no-resume',
+        issueId: 'PAN-1141',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        workspace: '/tmp/no-resume',
+        startedAt: new Date().toISOString(),
+        tmuxActive: false,
+      },
+    ])
+
+    await statusCommand({} as any)
+
+    const out = logSpy.mock.calls.map(c => String(c[0])).join('\n')
+    expect(out).toContain('Gate:     Boot --no-resume')
   })
 })
