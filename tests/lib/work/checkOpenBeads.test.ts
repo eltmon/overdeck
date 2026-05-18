@@ -6,6 +6,9 @@
  * execFile (not exec) for the bd call so the issueId never goes through a shell.
  */
 
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockExecFn = vi.fn();
@@ -71,6 +74,34 @@ describe('checkOpenBeads', () => {
     expect(result[1]).toContain('bead-abc');
     expect(result[1]).toContain('Implement feature X');
     expect(result[2]).toContain('bead-def');
+  });
+
+  it('honors a workspace beads redirect before reading stale local JSONL', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'pan-beads-redirect-'));
+    try {
+      const projectDir = join(tempDir, 'project');
+      const workspaceDir = join(projectDir, 'workspaces', 'feature-pan-1');
+      const canonicalBeadsDir = join(projectDir, '.beads');
+      const staleBeadsDir = join(workspaceDir, '.beads');
+      mkdirSync(canonicalBeadsDir, { recursive: true });
+      mkdirSync(staleBeadsDir, { recursive: true });
+      writeFileSync(join(staleBeadsDir, 'redirect'), '../../.beads');
+      writeFileSync(
+        join(staleBeadsDir, 'issues.jsonl'),
+        `${JSON.stringify({ id: 'stale-open', title: 'Stale open', status: 'open', labels: ['pan-1'] })}\n`,
+      );
+      writeFileSync(
+        join(canonicalBeadsDir, 'issues.jsonl'),
+        `${JSON.stringify({ id: 'closed-real', title: 'Closed real', status: 'closed', labels: ['pan-1'] })}\n`,
+      );
+
+      const { checkOpenBeads } = await import('../../../src/lib/work/done-preflight.js');
+      const result = await checkOpenBeads(workspaceDir, 'PAN-1');
+      expect(result).toEqual([]);
+      expect(mockExecFileFn).not.toHaveBeenCalled();
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('uses the title field when task/subject are absent', async () => {
