@@ -7,7 +7,6 @@ import { AgentOutputPanel } from './components/AgentOutputPanel';
 import { HealthDashboard } from './components/HealthDashboard';
 import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
-import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
 import { EventRouter } from './components/EventRouter';
@@ -64,7 +63,6 @@ const TAB_PATHS: Record<Tab, string> = {
   'command-deck': '/command-deck',
   agents: '/agents',
   resources: '/resources',
-  'awaiting-merge': '/awaiting-merge',
   autopreso: '/autopreso',
   activity: '/activity',
   metrics: '/metrics',
@@ -947,11 +945,6 @@ export default function App() {
         {activeTab === 'costs' && (
           <div className="w-full overflow-auto">
             <CostsPage />
-          </div>
-        )}
-        {activeTab === 'awaiting-merge' && (
-          <div className="w-full overflow-auto">
-            <AwaitingMergePage />
           </div>
         )}
         {activeTab === 'autopreso' && (

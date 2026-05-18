@@ -40,7 +40,6 @@ vi.mock('./components/AgentOutputPanel', () => ({ AgentOutputPanel: () => null }
 vi.mock('./components/HealthDashboard', () => ({ HealthDashboard: () => null }));
 vi.mock('./components/SkillsList', () => ({ SkillsList: () => null }));
 vi.mock('./components/ActivityPanel', () => ({ ActivityPanel: () => null }));
-vi.mock('./components/AwaitingMergePage', () => ({ AwaitingMergePage: () => null }));
 vi.mock('./components/ConfirmationDialog', () => ({
   ConfirmationDialog: () => null,
 }));
