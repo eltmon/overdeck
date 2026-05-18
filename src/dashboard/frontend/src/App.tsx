@@ -31,6 +31,7 @@ import { DetailPanelLayout } from './components/DetailPanelLayout';
 
 import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseBanner } from './components/DeaconPauseToggle';
+import { NoResumeBanner } from './components/NoResumeBanner';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
 import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
@@ -731,6 +732,8 @@ export default function App() {
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <NoResumeBanner />
+
         {/* Deacon Frozen Banner — shown whenever the global patrol pause flag is set */}
         <DeaconPauseBanner />
 

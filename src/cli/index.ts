@@ -40,6 +40,9 @@ import { statusCommand } from './commands/status.js';
 import { issueCommand as startCommand } from './commands/start.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
+import { pauseCommand } from './commands/pause.js';
+import { unpauseCommand } from './commands/unpause.js';
+import { untroubledCommand } from './commands/untroubled.js';
 import { forkCommand } from './commands/fork.js';
 import { unarchiveConversationCommand } from './commands/unarchive-conversation.js';
 import { resumeCommand } from './commands/resume.js';
@@ -329,6 +332,22 @@ program
   .action(killCommand);
 
 program
+  .command('pause <id>')
+  .description('Persistently pause an agent and stop it if running')
+  .option('--reason <reason>', 'Reason to store with the pause gate')
+  .action(pauseCommand);
+
+program
+  .command('unpause <id>')
+  .description('Clear an agent pause gate without spawning it')
+  .action(unpauseCommand);
+
+program
+  .command('untroubled <id>')
+  .description('Clear an agent troubled gate without spawning it')
+  .action(untroubledCommand);
+
+program
   .command('fork <conv>')
   .description('Summary Fork a conversation — creates new session from a summary of previous work')
   .option('--model <model>', 'Model for the summary-forked session')
@@ -411,6 +430,7 @@ program
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
   .option('--auto', 'Skip planning agent by synthesizing a minimal vBRIEF and beads from the issue title/body')
+  .option('--force', 'Clear a paused agent gate and start anyway')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
   .option('--yes', 'Confirm --host in non-interactive contexts')
   .action(startCommand);
@@ -472,6 +492,7 @@ program
   .description('Start dashboard in development mode with Vite HMR')
   .option('--skip-traefik', 'Skip Traefik startup')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
+  .option('--no-resume', 'Start dashboard with agent auto-resume disabled for this boot')
   .action(devCommand);
 
 program
@@ -480,6 +501,7 @@ program
   .option('--detach', 'Run in background')
   .option('--skip-traefik', 'Skip Traefik startup')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
+  .option('--no-resume', 'Start dashboard with agent auto-resume disabled for this boot')
   .action(async (options) => {
     const { spawn, execSync } = await import('child_process');
     const { join, dirname } = await import('path');
@@ -514,6 +536,9 @@ program
     }
 
     console.log(chalk.bold('Starting Panopticon...\n'));
+    if (options.noResume) {
+      console.log(chalk.yellow('  [no-resume mode active] Agent auto-resume is disabled for this dashboard boot'));
+    }
 
     // Auto-sync skills, hooks, and MCP config on every startup
     {
@@ -786,7 +811,10 @@ program
       const child = spawn(electronAppPath, [], {
         detached: true,
         stdio: 'ignore',
-        env: process.env,
+        env: {
+          ...process.env,
+          ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
+        },
       });
 
       const launchSucceeded = await new Promise<boolean>((resolve) => {
@@ -884,6 +912,7 @@ program
               DASHBOARD_PORT: String(dashboardPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
+              ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
             },
           });
 
@@ -940,6 +969,7 @@ program
               DASHBOARD_PORT: String(dashboardPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
               ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
+              ...(options.noResume ? { PANOPTICON_NO_RESUME: '1' } : {}),
             },
           });
 

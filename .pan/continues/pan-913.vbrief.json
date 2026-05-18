@@ -2,13 +2,21 @@
   "version": "1",
   "issueId": "PAN-913",
   "created": "2026-05-09T23:35:53.171Z",
-  "updated": "2026-05-12T22:54:29.123Z",
+  "updated": "2026-05-17T20:27:07.514Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": "rebase-on-main-and-resubmit",
   "beadsMapping": {},
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-17T20:27:07Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-913\n\n# Review Synthesis — PAN-913 — 2026-05-17\n\n## Verdict: BLOCKED\n\nOne correctness blocker must be resolved before this branch can advance to review.\n\n---\n\n## Blocker\n\n### `pan done` passes the open-bead gate on `bd list` timeout — `src/lib/work/done-preflight.ts:86`\n\n**Reviewer:** correctness\n**Evidence tier:** Tier 1\n\n`checkOpenBeads()` catches timeout-like failures from `listBeadsByStatus()` and returns `[]` after logging `continuing without the bead gate`. A timeout is not proof that no open beads exist. Returning an empty failure list causes `runPreflightChecks()` to treat the open-bead check as passed, permitting `pan done` to mark work complete even when the live bead source of truth was unavailable.\n\n**Runtime impact:** Under realistic lock contention or a slow bead store, `bd list --status open` can time out. The completion gate is then silently bypassed. Open beads remain unverified and incomplete work can be advanced into review, violating the core work-completion invariant.\n\n**Fix required:** Do not pass the gate on timeout. Either (a) make the `bd` query reliable at the root cause, or (b) return a blocking failure on timeout so the agent/operator must resolve the bead query before completion. A fallback is acceptable only for ENOENT/127 (bd not installed), not for timeouts from an installed but temporarily unhealthy bead store.\n\n---\n\n## Advisory (non-blocking)\n\n### Failed auto-retry leaves stale `reauthSessionName` — `src/dashboard/frontend/src/hooks/useCodexAutoRetry.ts:118`\n\nAfter a successful re-auth but a failed spawn retry, `pending.reauthSessionName` is not cleared. The polling path completes and the fallback valid-auth retry path returns early because `reauthSessionName` is still present. The retry lifecycle is stuck for that pending spawn in the current tab.\n\n**Fix:** Clear re-auth session fields once status endpoint reports re-auth complete, or clear them on retry failure while preserving `requestBody` for a later manual retry.\n\n---\n\n## Clean Areas\n\n| Reviewer | Status | Notes |\n|---|---|---|\n| Security | PASS | No injection, credential disclosure, XSS, CSRF, or unauthorized terminal access paths found |\n| Performance | PASS | No blocking regressions; one advisory on terminal WebSocket memory budget (chunk-cap but no byte-cap) |\n| Requirements | PASS | All 31 acceptance criteria implemented and evidenced |\n\n---\n\n## Files in Scope of Blocker\n\n- `src/lib/work/done-preflight.ts` — `checkOpenBeads()` timeout handling at line 86\n- `src/lib/bd-mutex.ts` — supporting mutex; confirm timeout propagation is correct here too\n\n---\n\n## Signal\n\nReviewer: blocked\nBlocker: `pan done` open-bead gate silently passes when `bd list` times out, can advance incomplete work to review\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-913/.pan/review/agent-pan-913-review-8a7c36f5/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-913 -m \"Fixed review issues\"`"
+    }
+  ],
   "sessionHistory": [
     {
       "reason": "feedback",
@@ -454,6 +462,91 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-05-12T22:54:29.123Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T15:34Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T15:34:33.216Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-17T15:34:33.245Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T15:43Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-17T15:43:24.377Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-17T15:43:24.413Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T15:43Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-17T15:43:37.393Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-17T17:42:20.978Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T17:52Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T17:52:47.187Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-17T17:52:47.208Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T18:07Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-17T18:07:51.678Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T18:37Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T18:37:04.673Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T18:57Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T18:57:53.410Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T19:08Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T19:08:32.546Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T19:16Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T19:16:04.783Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T19:24Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T19:24:08.178Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T19:34Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T19:34:20.619Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T19:44Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T19:44:15.698Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-17T20:27Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-17T20:27:07.514Z"
     }
   ]
 }

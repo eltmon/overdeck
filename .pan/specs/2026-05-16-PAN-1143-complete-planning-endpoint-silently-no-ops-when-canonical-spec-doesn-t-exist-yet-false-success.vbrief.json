@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-16T22:47:31.251Z",
-    "updated": "2026-05-17T00:04:05.755Z",
+    "updated": "2026-05-17T20:23:03.577Z",
     "author": "panopticon-cli/auto-start",
     "description": "Auto-synthesized minimal plan for PAN-1143: complete-planning endpoint silently no-ops when canonical spec doesn't exist yet (false success)",
     "inspectionPolicy": "never"
@@ -10,12 +10,12 @@
   "plan": {
     "id": "pan-1143",
     "title": "complete-planning endpoint silently no-ops when canonical spec doesn't exist yet (false success)",
-    "status": "proposed",
+    "status": "completed",
     "uid": "5f0f8562-ee1a-4d62-9751-d1e89f862fb4",
     "author": "panopticon-cli/auto-start",
-    "sequence": 74,
+    "sequence": 79,
     "created": "2026-05-16T22:47:31.251Z",
-    "updated": "2026-05-17T00:04:05.755Z",
+    "updated": "2026-05-17T20:23:03.577Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1143",
@@ -32,61 +32,52 @@
         "phase": "done",
         "issueId": "PAN-1143",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-17T00:04:05.754Z",
+        "updatedAt": "2026-05-17T20:23:01.768Z",
         "work": {
-          "updatedAt": "2026-05-17T00:04:05.754Z",
+          "updatedAt": "2026-05-17T20:23:01.768Z",
           "history": []
         },
         "verification": {
-          "status": "passed",
-          "updatedAt": "2026-05-17T00:04:05.754Z",
-          "history": [
-            {
-              "status": "passed",
-              "at": "2026-05-17T00:04:05.754Z"
-            }
-          ]
+          "updatedAt": "2026-05-17T20:23:01.768Z",
+          "history": []
         },
         "review": {
           "status": "passed",
-          "updatedAt": "2026-05-17T00:04:05.754Z",
-          "notes": "All 4 reviewers passed; all 6 ACs implemented, no findings",
+          "updatedAt": "2026-05-17T20:23:01.768Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-17T00:04:05.754Z",
-              "notes": "All 4 reviewers passed; all 6 ACs implemented, no findings"
+              "at": "2026-05-17T20:23:01.768Z"
             }
           ],
           "approval": "approved"
         },
         "test": {
           "status": "passed",
-          "updatedAt": "2026-05-17T00:04:05.754Z",
-          "notes": "Skipped: no code changed since pre-review verification gate",
+          "updatedAt": "2026-05-17T20:23:01.768Z",
+          "notes": "Skipped: issue is already merged",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-17T00:04:05.754Z",
-              "notes": "Skipped: no code changed since pre-review verification gate"
+              "at": "2026-05-17T20:23:01.768Z",
+              "notes": "Skipped: issue is already merged"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-17T00:04:05.754Z",
+          "updatedAt": "2026-05-17T20:23:01.768Z",
           "history": []
         },
         "merge": {
           "status": "merged",
-          "updatedAt": "2026-05-17T00:04:05.754Z",
+          "updatedAt": "2026-05-17T20:23:01.768Z",
           "history": [
             {
               "status": "merged",
-              "at": "2026-05-17T00:04:05.754Z"
+              "at": "2026-05-17T20:23:01.768Z"
             }
           ],
-          "readyForMerge": false,
-          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1144"
+          "readyForMerge": false
         }
       }
     },
@@ -169,5 +160,6 @@
       }
     ],
     "edges": []
-  }
+  },
+  "status": "completed"
 }

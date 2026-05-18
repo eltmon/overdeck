@@ -382,12 +382,47 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       const nextTurnDiffSummariesByAgentId = isTerminalTurnDiffSummaryStatus(event.payload.status)
         ? omitTurnDiffSummariesForAgent(state.turnDiffSummariesByAgentId, event.payload.agentId)
         : state.turnDiffSummariesByAgentId
+      const nextAgent: AgentSnapshot = { ...agent, status: event.payload.status }
+
+      if ('stoppedByUser' in event.payload) nextAgent.stoppedByUser = event.payload.stoppedByUser
+      if ('paused' in event.payload) nextAgent.paused = event.payload.paused
+      if ('pausedReason' in event.payload) {
+        if (event.payload.pausedReason === null || event.payload.pausedReason === undefined) delete nextAgent.pausedReason
+        else nextAgent.pausedReason = event.payload.pausedReason
+      }
+      if ('pausedAt' in event.payload) {
+        if (event.payload.pausedAt === null || event.payload.pausedAt === undefined) delete nextAgent.pausedAt
+        else nextAgent.pausedAt = event.payload.pausedAt
+      }
+      if ('troubled' in event.payload) nextAgent.troubled = event.payload.troubled
+      if ('troubledAt' in event.payload) {
+        if (event.payload.troubledAt === null || event.payload.troubledAt === undefined) delete nextAgent.troubledAt
+        else nextAgent.troubledAt = event.payload.troubledAt
+      }
+      if ('consecutiveFailures' in event.payload) nextAgent.consecutiveFailures = event.payload.consecutiveFailures
+      if ('firstFailureInRunAt' in event.payload) {
+        if (event.payload.firstFailureInRunAt === null || event.payload.firstFailureInRunAt === undefined) delete nextAgent.firstFailureInRunAt
+        else nextAgent.firstFailureInRunAt = event.payload.firstFailureInRunAt
+      }
+      if ('lastFailureAt' in event.payload) {
+        if (event.payload.lastFailureAt === null || event.payload.lastFailureAt === undefined) delete nextAgent.lastFailureAt
+        else nextAgent.lastFailureAt = event.payload.lastFailureAt
+      }
+      if ('lastFailureReason' in event.payload) {
+        if (event.payload.lastFailureReason === null || event.payload.lastFailureReason === undefined) delete nextAgent.lastFailureReason
+        else nextAgent.lastFailureReason = event.payload.lastFailureReason
+      }
+      if ('lastFailureNextRetryAt' in event.payload) {
+        if (event.payload.lastFailureNextRetryAt === null || event.payload.lastFailureNextRetryAt === undefined) delete nextAgent.lastFailureNextRetryAt
+        else nextAgent.lastFailureNextRetryAt = event.payload.lastFailureNextRetryAt
+      }
+
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: {
           ...state.agentsById,
-          [event.payload.agentId]: { ...agent, status: event.payload.status },
+          [event.payload.agentId]: nextAgent,
         },
         turnDiffSummariesByAgentId: nextTurnDiffSummariesByAgentId,
       }

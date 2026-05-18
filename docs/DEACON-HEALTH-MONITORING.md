@@ -114,6 +114,17 @@ cloister:
     interval: 60    # seconds between patrol cycles
 ```
 
+Work-agent auto-resume backoff can be overridden per project in `projects.yaml`:
+
+```yaml
+autoResume:
+  maxConsecutiveFailures: 3
+  troubledWindowMs: 600000
+  failureBackoffSchedule: [5, 30, 120]
+```
+
+Defaults are 3 failures within 10 minutes, with 5s / 30s / 120s retry backoff.
+
 ## Parallel Review Recovery & Circuit Breaker (PAN-794)
 
 When parallel-review dispatch leaves an issue in `reviewing`/`testing` without a
@@ -156,6 +167,30 @@ status to `pending`, so PAN-794 added a scoped cycle with a hard cap.
 - `src/lib/database/review-status-db.ts` — `review_retry_count`, `recovery_started_at`
 - `src/lib/database/schema.ts` — migration v24 → v25
 - `packages/contracts/src/types.ts` — `ReviewStatusSnapshot` fields
+
+## Auto-Resume Gates
+
+Deacon can auto-resume stopped work agents, but three gates suppress that path:
+
+- **Boot no-resume:** `PANOPTICON_NO_RESUME=1` is set for the dashboard process by
+  `pan dev --no-resume` or `pan up --no-resume`. It is boot-scoped only and
+  short-circuits both `autoResumeStoppedWorkAgents()` and `recoverOrphanedAgents()`.
+  The dashboard shows a top banner while active; restart without `--no-resume` to
+  restore auto-resume.
+- **Manual pause:** `pan pause <id> [--reason <text>]` stores `paused`,
+  `pausedReason`, and `pausedAt` on `~/.panopticon/agents/<agent-id>/state.json`
+  and stops the live agent if it is running. Deacon skips paused agents. Use
+  `pan unpause <id>` to clear the gate without spawning; `pan start <id> --force`
+  clears the pause gate and starts immediately.
+- **Troubled gate:** repeated resume/crash failures update `consecutiveFailures`,
+  `firstFailureInRunAt`, `lastFailureAt`, `lastFailureReason`, and
+  `lastFailureNextRetryAt`. Crossing the configured threshold marks the agent
+  `troubled`; Deacon skips it until `pan untroubled <id>` clears the troubled gate
+  and failure fields.
+
+These gates are per-agent and live in the agent JSON state file. They are separate
+from global Deacon freeze and per-issue Deacon ignore, which are operator controls
+for broader patrol behavior.
 
 ## Operator Freeze: Global Deacon Pause
 

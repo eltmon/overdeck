@@ -341,7 +341,7 @@ export async function isBranchAlreadyRebased(
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PORT = parseInt(process.env.API_PORT || process.env.PORT || '3011', 10);
-const MAX_AUTO_REQUEUE = 7;
+const MAX_AUTO_REQUEUE = 25;
 
 // Track server-managed merges — imported from specialists.ts (single source of truth).
 // Previously this was a local Set that was never in sync with specialists.ts's export (PAN-632).

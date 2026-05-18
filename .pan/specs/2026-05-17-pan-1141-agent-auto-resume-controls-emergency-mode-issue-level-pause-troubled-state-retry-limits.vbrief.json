@@ -4,7 +4,7 @@
     "created": "2026-05-16T22:05:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1141: Agent auto-resume controls — emergency mode, issue-level pause, troubled-state retry limits",
-    "updated": "2026-05-17T17:22:00.000Z"
+    "updated": "2026-05-17T20:34:53.384Z"
   },
   "plan": {
     "id": "pan-1141",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "a3f7c2d9-1b4e-4a8f-9c2d-7f5b8e1c3d4a",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 80,
     "created": "2026-05-16T22:05:00.000Z",
-    "updated": "2026-05-17T17:22:00.000Z",
+    "updated": "2026-05-17T20:34:53.384Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1141",
@@ -85,7 +85,7 @@
       {
         "id": "agent-state-fields",
         "title": "Extend AgentState with pause/troubled/failure-tracking fields and helper functions",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -101,7 +101,7 @@
           {
             "id": "agent-state-fields.ac1",
             "title": "All ten new fields are present on `AgentState` and round-trip through `cleanAgentState()` without loss",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -109,7 +109,7 @@
           {
             "id": "agent-state-fields.ac2",
             "title": "All eight new helpers exist, are exported from `src/lib/agents.ts`, and have JSDoc explaining when each is called",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -117,7 +117,7 @@
           {
             "id": "agent-state-fields.ac3",
             "title": "Helpers are idempotent: calling `setAgentPaused` twice does not change `pausedAt`; calling `clearAgentPaused` on an unpaused agent is a no-op",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -125,7 +125,7 @@
           {
             "id": "agent-state-fields.ac4",
             "title": "Helpers handle the missing-state.json case gracefully (return false / no-op) without throwing",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -133,7 +133,7 @@
           {
             "id": "agent-state-fields.ac5",
             "title": "`npm run typecheck` and `npm run lint` pass",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -143,7 +143,7 @@
       {
         "id": "cloister-skip-paused-troubled",
         "title": "Gate autoResumeStoppedWorkAgents() on paused and troubled flags",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -159,7 +159,7 @@
           {
             "id": "cloister-skip-paused-troubled.ac1",
             "title": "Paused agents are skipped with log line `autoResumeStoppedWorkAgents: <id> skipped — paused (<reason>)`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -167,7 +167,7 @@
           {
             "id": "cloister-skip-paused-troubled.ac2",
             "title": "Troubled agents are skipped with log line `autoResumeStoppedWorkAgents: <id> skipped — troubled (<N> consecutive failures since <timestamp>)`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -175,7 +175,7 @@
           {
             "id": "cloister-skip-paused-troubled.ac3",
             "title": "Both gates take precedence over the review-feedback short-circuit — a paused/troubled agent with pending review feedback is still NOT resumed",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -185,7 +185,7 @@
       {
         "id": "cloister-no-resume-env",
         "title": "Honor PANOPTICON_NO_RESUME=1 in deacon startup paths",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -201,7 +201,7 @@
           {
             "id": "cloister-no-resume-env.ac1",
             "title": "`PANOPTICON_NO_RESUME=1` causes `autoResumeStoppedWorkAgents()` to return an empty array without scanning agent dirs",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -209,7 +209,7 @@
           {
             "id": "cloister-no-resume-env.ac2",
             "title": "`PANOPTICON_NO_RESUME=1` causes `recoverOrphanedAgents()` to return without touching any state.json",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -217,7 +217,7 @@
           {
             "id": "cloister-no-resume-env.ac3",
             "title": "Dashboard exposes `GET /api/no-resume-mode` returning the active state and boot timestamp",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -225,7 +225,7 @@
           {
             "id": "cloister-no-resume-env.ac4",
             "title": "Truthy values `1`, `true`, `yes` are all honored; falsy values `0`, `false`, empty string disable",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -235,7 +235,7 @@
       {
         "id": "failure-counter",
         "title": "Increment and reset the consecutive-failure counter at cloister failure sites",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -251,7 +251,7 @@
           {
             "id": "failure-counter.ac1",
             "title": "Failed auto-resume increments `consecutiveFailures` by 1 and stamps `lastFailureAt` / `lastFailureReason`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -259,7 +259,7 @@
           {
             "id": "failure-counter.ac2",
             "title": "Orphan-crash detection increments `consecutiveFailures` exactly once per detected crash (no double-count when orphan-recovery and auto-resume run in the same patrol cycle)",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -267,7 +267,7 @@
           {
             "id": "failure-counter.ac3",
             "title": "Successful spawn (agent reaches `running`) resets `consecutiveFailures` to 0 and clears `firstFailureInRunAt`/`lastFailureAt`/`lastFailureReason`/`lastFailureNextRetryAt`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -277,7 +277,7 @@
       {
         "id": "backoff-and-troubled-flip",
         "title": "Exponential backoff and threshold-based troubled flip",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -293,7 +293,7 @@
           {
             "id": "backoff-and-troubled-flip.ac1",
             "title": "After 1st failure, agent is skipped during the next 5 seconds and resumable after; after 2nd, 30s; after 3rd, 120s",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -301,7 +301,7 @@
           {
             "id": "backoff-and-troubled-flip.ac2",
             "title": "3 consecutive failures within 10 minutes (default config) flip `troubled = true` and stamp `troubledAt`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -309,7 +309,7 @@
           {
             "id": "backoff-and-troubled-flip.ac3",
             "title": "If failures span > 10 minutes (e.g. 1 failure now, 2 more 11 minutes later), no troubled-flip happens — `firstFailureInRunAt` slides to the failure that resets the window",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -317,7 +317,7 @@
           {
             "id": "backoff-and-troubled-flip.ac4",
             "title": "`AutoResumeConfig` interface and defaults exported from `src/lib/cloister/auto-resume-config.ts`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -325,7 +325,7 @@
           {
             "id": "backoff-and-troubled-flip.ac5",
             "title": "Skipping during backoff logs `autoResumeStoppedWorkAgents: <id> skipped — backoff active (next retry at <iso>)`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -335,7 +335,7 @@
       {
         "id": "cli-pause",
         "title": "Add `pan pause <id> [--reason \"<text>\"]` command",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -351,46 +351,41 @@
           {
             "id": "cli-pause.ac1",
             "title": "`pan pause <id>` succeeds when the agent is running (kills it) AND when it is already stopped (just sets the flag)",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:32:40.229Z"
+            }
           },
           {
             "id": "cli-pause.ac2",
             "title": "`--reason \"text\"` writes the reason to `pausedReason`; absence omits the field",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:32:40.229Z"
+            }
           },
           {
             "id": "cli-pause.ac3",
             "title": "Re-pausing an already-paused agent updates the reason but does NOT overwrite `pausedAt`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:32:40.229Z"
+            }
           },
           {
             "id": "cli-pause.ac4",
             "title": "Unknown agent ID prints a clear error and exits non-zero",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:32:40.229Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T15:32:40.229Z"
+        ]
       },
       {
         "id": "cli-unpause",
         "title": "Add `pan unpause <id>` command",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -406,37 +401,33 @@
           {
             "id": "cli-unpause.ac1",
             "title": "`pan unpause <id>` clears `paused`, `pausedReason`, `pausedAt` from state.json",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:05:59.072Z"
+            }
           },
           {
             "id": "cli-unpause.ac2",
             "title": "Unpausing a non-paused agent is a successful no-op with a dim 'already unpaused' message",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:05:59.072Z"
+            }
           },
           {
             "id": "cli-unpause.ac3",
             "title": "Does NOT spawn or resume the agent; output includes the hint to run `pan start` if desired",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:05:59.072Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T16:05:59.072Z"
+        ]
       },
       {
         "id": "cli-untroubled",
         "title": "Add `pan untroubled <id>` command",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -452,37 +443,33 @@
           {
             "id": "cli-untroubled.ac1",
             "title": "`pan untroubled <id>` clears `troubled`, `troubledAt`, `consecutiveFailures`, `firstFailureInRunAt`, `lastFailureAt`, `lastFailureReason`, `lastFailureNextRetryAt`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:11:38.569Z"
+            }
           },
           {
             "id": "cli-untroubled.ac2",
             "title": "Untroubling a non-troubled agent is a successful no-op with a dim message",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:11:38.569Z"
+            }
           },
           {
             "id": "cli-untroubled.ac3",
             "title": "Does NOT spawn or resume the agent",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:11:38.569Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T16:11:38.569Z"
+        ]
       },
       {
         "id": "cli-dev-no-resume",
         "title": "Add `--no-resume` flag to `pan dev`",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -498,46 +485,41 @@
           {
             "id": "cli-dev-no-resume.ac1",
             "title": "`pan dev --no-resume` starts dashboard + traefik + cliproxy normally",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:58:13.099Z"
+            }
           },
           {
             "id": "cli-dev-no-resume.ac2",
             "title": "Child dashboard process sees `PANOPTICON_NO_RESUME=1` in its environment",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:58:13.099Z"
+            }
           },
           {
             "id": "cli-dev-no-resume.ac3",
             "title": "No agents are auto-spawned; deacon logs the skip; dashboard shows the no-resume banner",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:58:13.099Z"
+            }
           },
           {
             "id": "cli-dev-no-resume.ac4",
             "title": "Startup terminal output shows a clear `[no-resume mode active]` line",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:58:13.099Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T16:58:13.099Z"
+        ]
       },
       {
         "id": "cli-up-no-resume",
         "title": "Add `--no-resume` flag to `pan up`",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -553,37 +535,33 @@
           {
             "id": "cli-up-no-resume.ac1",
             "title": "`pan up --no-resume` boots the dashboard without spawning agents",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T17:22:00.000Z"
+            }
           },
           {
             "id": "cli-up-no-resume.ac2",
             "title": "Startup terminal output includes a `[no-resume mode active]` line",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T17:22:00.000Z"
+            }
           },
           {
             "id": "cli-up-no-resume.ac3",
             "title": "`pan up` without the flag continues to auto-resume agents (no regression)",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T17:22:00.000Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T17:22:00.000Z"
+        ]
       },
       {
         "id": "cli-status-gating-reason",
         "title": "Surface gating reason in `pan status`",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -599,28 +577,25 @@
           {
             "id": "cli-status-gating-reason.ac1",
             "title": "Each non-running in-flight agent shows one of the four gating reasons (or no gating reason if it is mid-pipeline waiting on review feedback)",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T17:18:30.000Z"
+            }
           },
           {
             "id": "cli-status-gating-reason.ac2",
             "title": "Running agents do not show a gating reason column",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T17:18:30.000Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T17:18:30.000Z"
+        ]
       },
       {
         "id": "cli-start-refuse-paused",
         "title": "`pan start <id>` refuses paused issues unless `--force`",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -636,37 +611,33 @@
           {
             "id": "cli-start-refuse-paused.ac1",
             "title": "`pan start <id>` on a paused agent prints a clear error referencing `pan unpause` and the pause reason, then exits non-zero",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:03:35.590Z"
+            }
           },
           {
             "id": "cli-start-refuse-paused.ac2",
             "title": "`pan start <id> --force` on a paused agent clears the paused flag and spawns normally",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:03:35.590Z"
+            }
           },
           {
             "id": "cli-start-refuse-paused.ac3",
             "title": "`pan start <id>` on an unpaused agent is unchanged (no regression)",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:03:35.590Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T16:03:35.590Z"
+        ]
       },
       {
         "id": "dashboard-api",
         "title": "Dashboard backend: pause/unpause/untroubled endpoints and snapshot fields",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -682,73 +653,65 @@
           {
             "id": "dashboard-api.ac1",
             "title": "POST /api/agents/:id/pause sets the flag, kills running agent, returns 200 with updated state",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:27:45.794Z"
+            }
           },
           {
             "id": "dashboard-api.ac2",
             "title": "POST /api/agents/:id/unpause clears the flag and returns 200 (does not spawn)",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:27:45.794Z"
+            }
           },
           {
             "id": "dashboard-api.ac3",
             "title": "POST /api/agents/:id/untroubled clears troubled + failure counters, returns 200",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:27:45.794Z"
+            }
           },
           {
             "id": "dashboard-api.ac4",
             "title": "GET /api/no-resume-mode returns `{ active: boolean, since: string|null }`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:27:45.794Z"
+            }
           },
           {
             "id": "dashboard-api.ac5",
             "title": "Agent snapshot shape includes the ten new fields; contracts package updated and rebuilt",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:27:45.794Z"
+            }
           },
           {
             "id": "dashboard-api.ac6",
             "title": "Each mutating endpoint emits a domain event so the frontend updates without polling",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:27:45.794Z"
+            }
           },
           {
             "id": "dashboard-api.ac7",
             "title": "All four endpoints use `execAsync` / `fs/promises` — no `execSync` or sync FS calls (CLAUDE.md rule)",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:27:45.794Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T15:27:45.794Z"
+        ]
       },
       {
         "id": "frontend-badges",
         "title": "IssueAgentCard: Paused/Troubled badges and gating-reason pill",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -764,46 +727,41 @@
           {
             "id": "frontend-badges.ac1",
             "title": "Paused badge appears on cards whose agent has `paused: true`, with the reason in a tooltip",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:55:12.498Z"
+            }
           },
           {
             "id": "frontend-badges.ac2",
             "title": "Troubled badge appears on cards whose agent has `troubled: true`, with failure count and timestamp in a tooltip",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:55:12.498Z"
+            }
           },
           {
             "id": "frontend-badges.ac3",
             "title": "Gating-reason pill displays one of the four labels for non-running in-flight agents",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:55:12.498Z"
+            }
           },
           {
             "id": "frontend-badges.ac4",
             "title": "Pill is hidden for running agents and for agents that completed normally",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:55:12.498Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T15:55:12.498Z"
+        ]
       },
       {
         "id": "frontend-pause-controls",
         "title": "IssueAgentCard: pause/unpause buttons with reason input",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -819,46 +777,41 @@
           {
             "id": "frontend-pause-controls.ac1",
             "title": "Pause button appears for non-paused agents; clicking it shows reason input and submits",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:51:18.903Z"
+            }
           },
           {
             "id": "frontend-pause-controls.ac2",
             "title": "Unpause button appears for paused agents; clicking it sends the request and updates the badge immediately on response",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:51:18.903Z"
+            }
           },
           {
             "id": "frontend-pause-controls.ac3",
             "title": "Empty reason is allowed (sends no `reason` field)",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:51:18.903Z"
+            }
           },
           {
             "id": "frontend-pause-controls.ac4",
             "title": "Error responses surface as a toast or inline error; button re-enables on failure",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:51:18.903Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T15:51:18.903Z"
+        ]
       },
       {
         "id": "frontend-untroubled-control",
         "title": "IssueAgentCard: Clear-troubled-state action",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -874,28 +827,25 @@
           {
             "id": "frontend-untroubled-control.ac1",
             "title": "Button visible only on troubled agents",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:46:30.478Z"
+            }
           },
           {
             "id": "frontend-untroubled-control.ac2",
             "title": "Click clears the badge and zeroes the failure-count tooltip",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T15:46:30.478Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T15:46:30.478Z"
+        ]
       },
       {
         "id": "frontend-no-resume-banner",
         "title": "Top-level NoResumeBanner component",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -911,37 +861,33 @@
           {
             "id": "frontend-no-resume-banner.ac1",
             "title": "Banner renders when `active: true` and is hidden when false",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:09:38.459Z"
+            }
           },
           {
             "id": "frontend-no-resume-banner.ac2",
             "title": "Banner copy includes the boot timestamp and the override instruction",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:09:38.459Z"
+            }
           },
           {
             "id": "frontend-no-resume-banner.ac3",
             "title": "Banner sits above DeaconPauseBanner / StoppedAgentsBanner / CodexAuthBanner in the App.tsx render order",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:09:38.459Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T16:09:38.459Z"
+        ]
       },
       {
         "id": "wrapper-skills",
         "title": "Wrapper skills for pan-pause, pan-unpause, pan-untroubled",
-        "status": "completed",
+        "status": "pending",
         "priority": "medium",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -957,37 +903,33 @@
           {
             "id": "wrapper-skills.ac1",
             "title": "Three SKILL.md files exist with correct frontmatter and CLI-wrapper shape",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:13:47.531Z"
+            }
           },
           {
             "id": "wrapper-skills.ac2",
             "title": "Each skill body documents the verb's persistence semantics and interaction with `pan start`/`pan kill`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:13:47.531Z"
+            }
           },
           {
             "id": "wrapper-skills.ac3",
             "title": "`scripts/lint-skills.sh` (via `npm run lint`) passes — every flag and arg the skills mention is present on the CLI",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:13:47.531Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T16:13:47.531Z"
+        ]
       },
       {
         "id": "config-overrides",
         "title": "Per-project autoResume overrides in projects.yaml",
-        "status": "completed",
+        "status": "pending",
         "priority": "low",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -1003,7 +945,7 @@
           {
             "id": "config-overrides.ac1",
             "title": "projects.yaml accepts an optional `autoResume` block per project; absent block uses defaults",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1011,7 +953,7 @@
           {
             "id": "config-overrides.ac2",
             "title": "Failure tracking honors the project's threshold and backoff schedule when present",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1019,7 +961,7 @@
           {
             "id": "config-overrides.ac3",
             "title": "Invalid config values (negative numbers, non-array schedule) fall back to defaults with a logged warning",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1029,7 +971,7 @@
       {
         "id": "tests-cloister-gating",
         "title": "Tests: cloister gating (paused, troubled, no-resume)",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -1045,28 +987,25 @@
           {
             "id": "tests-cloister-gating.ac1",
             "title": "All five test cases exist and pass under `npm test`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T17:12:44.000Z"
+            }
           },
           {
             "id": "tests-cloister-gating.ac2",
             "title": "Tests use real temp directories for agent state (not mocked fs) to avoid the kind of mock/prod divergence CLAUDE.md warns about",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T17:12:44.000Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T17:12:44.000Z"
+        ]
       },
       {
         "id": "tests-failure-tracking",
         "title": "Tests: failure counter, backoff windows, troubled-flip threshold",
-        "status": "completed",
+        "status": "pending",
         "priority": "high",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -1082,28 +1021,25 @@
           {
             "id": "tests-failure-tracking.ac1",
             "title": "All eight test cases exist and pass under `npm test`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T17:03:24.831Z"
+            }
           },
           {
             "id": "tests-failure-tracking.ac2",
             "title": "Time-dependent tests use fake timers (vitest's `vi.useFakeTimers()`) to keep them deterministic and fast",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T17:03:24.831Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T17:03:24.831Z"
+        ]
       },
       {
         "id": "docs-updates",
         "title": "Documentation updates",
-        "status": "completed",
+        "status": "pending",
         "priority": "low",
         "created": "2026-05-16T22:05:00.000Z",
         "metadata": {
@@ -1119,32 +1055,28 @@
           {
             "id": "docs-updates.ac1",
             "title": "CLAUDE.md and any relevant docs/* references describe the three new gates",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:52:31.418Z"
+            }
           },
           {
             "id": "docs-updates.ac2",
             "title": "README or docs include a 'troubleshooting an agent that keeps crashing' note that mentions `pan untroubled`",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:52:31.418Z"
+            }
           },
           {
             "id": "docs-updates.ac3",
             "title": "`docs/SKILLS-CONVENTION.md` exclusion list is unchanged or explicitly notes that pan-pause/unpause/untroubled have wrapper skills",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
-            },
-            "completed": "2026-05-17T16:52:31.418Z"
+            }
           }
-        ],
-        "completed": "2026-05-17T16:52:31.418Z"
+        ]
       }
     ],
     "edges": [
@@ -1285,7 +1217,67 @@
       }
     ],
     "metadata": {
-      "canonicalFilename": "2026-05-17-PAN-1141-agent-auto-resume-controls-emergency-mode-issue-level-pause-troubled-state-retry-limits.vbrief.json"
+      "canonicalFilename": "2026-05-17-PAN-1141-agent-auto-resume-controls-emergency-mode-issue-level-pause-troubled-state-retry-limits.vbrief.json",
+      "pipeline": {
+        "phase": "review",
+        "issueId": "PAN-1141",
+        "sqliteAuthoritative": true,
+        "updatedAt": "2026-05-17T20:34:53.381Z",
+        "work": {
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "history": []
+        },
+        "verification": {
+          "status": "passed",
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "history": [
+            {
+              "status": "passed",
+              "at": "2026-05-17T20:34:53.381Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "reviewing",
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "notes": "pan start bypasses troubled gate; dashboard Start buttons shown for paused/troubled agents; dashboard routes use sync I/O; npm test timeout",
+          "history": [
+            {
+              "status": "reviewing",
+              "at": "2026-05-17T20:34:53.381Z",
+              "notes": "pan start bypasses troubled gate; dashboard Start buttons shown for paused/troubled agents; dashboard routes use sync I/O; npm test timeout"
+            }
+          ],
+          "approval": "pending"
+        },
+        "test": {
+          "status": "pending",
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-17T20:34:53.381Z"
+            }
+          ]
+        },
+        "uat": {
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "history": []
+        },
+        "merge": {
+          "status": "pending",
+          "updatedAt": "2026-05-17T20:34:53.381Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-17T20:34:53.381Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1157"
+        }
+      }
     }
-  }
+  },
+  "status": "proposed"
 }
