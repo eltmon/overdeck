@@ -114,10 +114,10 @@ vi.mock('./ConversationList', () => ({
   ),
 }));
 
-vi.mock('./ProjectOverview', () => ({
-  ProjectOverview: (props: any) => (
+vi.mock('./ProjectLens', () => ({
+  ProjectLens: (props: any) => (
     <div
-      data-testid="project-overview"
+      data-testid="project-lens"
       data-project={props.projectName}
       data-features={props.features.map((feature: any) => feature.issueId).join(',')}
       data-cost={props.issueCosts['PAN-821']}
@@ -443,12 +443,12 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     await screen.findAllByTestId('project-node');
     fireEvent.click(screen.getByTestId('project-test-project'));
 
-    const overview = screen.getByTestId('project-overview');
-    expect(overview).toHaveAttribute('data-project', 'test-project');
-    expect(overview).toHaveAttribute('data-features', 'PAN-821');
-    expect(overview).toHaveAttribute('data-cost', '12.34');
-    expect(overview).toHaveAttribute('data-model-cost', '7.89');
-    expect(overview).toHaveAttribute('data-stage-cost', '4.45');
+    const lens = screen.getByTestId('project-lens');
+    expect(lens).toHaveAttribute('data-project', 'test-project');
+    expect(lens).toHaveAttribute('data-features', 'PAN-821');
+    expect(lens).toHaveAttribute('data-cost', '12.34');
+    expect(lens).toHaveAttribute('data-model-cost', '7.89');
+    expect(lens).toHaveAttribute('data-stage-cost', '4.45');
     expect(screen.queryByTestId('conversation-panel')).not.toBeInTheDocument();
     expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
   });

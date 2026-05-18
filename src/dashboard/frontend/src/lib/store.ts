@@ -37,6 +37,11 @@ export interface DashboardStore extends DashboardState {
   syncSnapshot(snapshot: DashboardSnapshot): void
   applyEvent(event: DomainEvent): void
   applyEvents(events: DomainEvent[]): void
+  /** Drawer issue detail overlay (PAN-1148) */
+  drawerIssueId: string | null
+  drawerTab: string
+  openDrawerIssue(issueId: string, tab?: string): void
+  closeDrawerIssue(): void
 }
 
 // ─── Initial state ────────────────────────────────────────────────────────────
@@ -45,6 +50,11 @@ const initialState: DashboardState = {
   ...INITIAL_READ_MODEL_STATE,
   bootstrapComplete: false,
   snapshotTimestamp: null,
+}
+
+const initialDrawerState = {
+  drawerIssueId: null as string | null,
+  drawerTab: 'overview' as string,
 }
 
 // ─── Thin wrappers over shared reducers (add bootstrapComplete flag) ─────────
@@ -65,6 +75,7 @@ function applyEvents(state: DashboardState, events: DomainEvent[]): DashboardSta
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
   ...initialState,
+  ...initialDrawerState,
 
   syncSnapshot: (snapshot) => {
     saveSnapshotToCache(snapshot)
@@ -76,6 +87,12 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
 
   applyEvents: (events) =>
     set((state) => applyEvents(state, events)),
+
+  openDrawerIssue: (issueId, tab) =>
+    set({ drawerIssueId: issueId, drawerTab: tab ?? 'overview' }),
+
+  closeDrawerIssue: () =>
+    set({ drawerIssueId: null, drawerTab: 'overview' }),
 }))
 
 // ─── Selector memoization helpers ─────────────────────────────────────────────

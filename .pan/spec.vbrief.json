@@ -4,7 +4,7 @@
     "created": "2026-05-18T05:10:55.134Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
-    "updated": "2026-05-18T06:00:10.000Z"
+    "updated": "2026-05-18T08:39:44.723Z"
   },
   "plan": {
     "id": "pan-1148",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "4506a8e9-5388-424a-8301-87772aa05925",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 14,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T06:00:10.000Z",
+    "updated": "2026-05-18T08:39:44.723Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -142,7 +142,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:04:59.925Z"
           },
           {
             "id": "f1-verb-badge.ac2",
@@ -150,7 +151,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:04:59.925Z"
           },
           {
             "id": "f1-verb-badge.ac3",
@@ -158,7 +160,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:04:59.925Z"
           },
           {
             "id": "f1-verb-badge.ac4",
@@ -166,7 +169,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:04:59.925Z"
           },
           {
             "id": "f1-verb-badge.ac5",
@@ -174,7 +178,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:04:59.925Z"
           },
           {
             "id": "f1-verb-badge.ac6",
@@ -182,9 +187,11 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:04:59.925Z"
           }
-        ]
+        ],
+        "completed": "2026-05-18T06:04:59.925Z"
       },
       {
         "id": "f2-phase-glyph",
@@ -208,7 +215,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:05:00.149Z"
           },
           {
             "id": "f2-phase-glyph.ac2",
@@ -216,7 +224,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:05:00.149Z"
           },
           {
             "id": "f2-phase-glyph.ac3",
@@ -224,9 +233,11 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:05:00.149Z"
           }
-        ]
+        ],
+        "completed": "2026-05-18T06:05:00.149Z"
       },
       {
         "id": "f3-phase-header",
@@ -250,7 +261,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:05:00.427Z"
           },
           {
             "id": "f3-phase-header.ac2",
@@ -258,7 +270,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:05:00.427Z"
           },
           {
             "id": "f3-phase-header.ac3",
@@ -266,9 +279,11 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:05:00.427Z"
           }
-        ]
+        ],
+        "completed": "2026-05-18T06:05:00.427Z"
       },
       {
         "id": "f4-metric-tile",
@@ -292,7 +307,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:05:00.657Z"
           },
           {
             "id": "f4-metric-tile.ac2",
@@ -300,7 +316,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:05:00.657Z"
           },
           {
             "id": "f4-metric-tile.ac3",
@@ -308,7 +325,8 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:05:00.657Z"
           },
           {
             "id": "f4-metric-tile.ac4",
@@ -316,14 +334,16 @@
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:05:00.657Z"
           }
-        ]
+        ],
+        "completed": "2026-05-18T06:05:00.657Z"
       },
       {
         "id": "f5-issue-row",
         "title": "Add IssueRow primitive (Pipeline / Command Deck row, composes VerbBadge + PhaseGlyph)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -339,80 +359,91 @@
           {
             "id": "f5-issue-row.ac1",
             "title": "IssueRow grid layout matches PRD §4.7.5 exactly for both pipeline and command-deck variants",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:06:50.877Z"
           },
           {
             "id": "f5-issue-row.ac2",
             "title": "Priority left border uses ::before pseudo with the correct color per priority level; no inline color hacks",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:06:50.877Z"
           },
           {
             "id": "f5-issue-row.ac3",
             "title": "Composes VerbBadge for the one colored badge slot; composes PhaseGlyph for the phase column",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:06:50.877Z"
           },
           {
             "id": "f5-issue-row.ac4",
             "title": "Ledger cell renders runtime in muted, cost in --signal-cost-foreground; empty state renders `—` at 55% opacity",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:06:50.877Z"
           },
           {
             "id": "f5-issue-row.ac5",
             "title": "Label chips use bg-muted + muted-foreground; never status-colored (PRD §4.5 'labels are taxonomy, never status')",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:06:50.877Z"
           },
           {
             "id": "f5-issue-row.ac6",
             "title": "Avatar gradient renders one of 5 deterministic tones based on assignee name hash",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:06:50.877Z"
           },
           {
             "id": "f5-issue-row.ac7",
             "title": "Root element carries `data-component=\"issue-row\"` for styleguide-conformance test",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:06:50.877Z"
           },
           {
             "id": "f5-issue-row.ac8",
             "title": "Click handler accepts an issueId-based onOpen callback; component itself does not own routing",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T06:06:50.877Z"
           }
-        ]
+        ],
+        "completed": "2026-05-18T06:06:50.877Z"
       },
       {
         "id": "f6-issue-card",
         "title": "Add IssueCard primitive (Board card, composes VerbBadge)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 1 merged into feature branch",
+          "statusUpdatedAt": "2026-05-18T08:39:11.958Z"
         },
         "narrative": {
           "Action": "Create src/dashboard/frontend/src/components/primitives/IssueCard.tsx implementing PRD §4.7.6 exactly: 14px radius, padding 12px 12px 10px, lighter card surface (color-mix background 92% + white), priority left border identical to IssueRow, stuck/merge-ready border color overrides, project mark + ID + verb badge in row 1, 2-line clamped title, label chips, bead progress bar with phase-colored fill, footer with agent meta + runtime + 18px avatar. Tag root with `data-component=\"issue-card\"`."
@@ -421,56 +452,64 @@
           {
             "id": "f6-issue-card.ac1",
             "title": "IssueCard implements all PRD §4.7.6 spec values (radius, padding, surface, hover, priority bar inset 12px)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:11.958Z"
           },
           {
             "id": "f6-issue-card.ac2",
             "title": "Stuck card and merge-ready card border colors swap correctly when corresponding props are true",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:11.958Z"
           },
           {
             "id": "f6-issue-card.ac3",
             "title": "Bead progress bar renders the correct fill width and phase-colored fill",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:11.958Z"
           },
           {
             "id": "f6-issue-card.ac4",
             "title": "Composes VerbBadge; never renders status colors on labels",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:11.958Z"
           },
           {
             "id": "f6-issue-card.ac5",
             "title": "Root element carries `data-component=\"issue-card\"`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:11.958Z"
           }
-        ]
+        ],
+        "completed": "2026-05-18T08:39:11.958Z"
       },
       {
         "id": "f7-agent-card",
         "title": "Add AgentCard primitive (Agents fleet card, composes VerbBadge)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 2 merged into feature branch",
+          "statusUpdatedAt": "2026-05-18T08:39:40.186Z"
         },
         "narrative": {
           "Action": "Create src/dashboard/frontend/src/components/primitives/AgentCard.tsx implementing PRD §4.7.9 exactly: card surface with 18px radius, 3px ::before left accent per phase, stuck border override, name + verb badge + menu button row, issue panel with project mark + ID/title (2-line clamp), tri-column meta (lbl/val pairs), stream excerpt with fade-out gradient and 84px max-height, optional stuck banner, footer with primary/danger action links. Tag root with `data-component=\"agent-card\"`."
@@ -479,56 +518,64 @@
           {
             "id": "f7-agent-card.ac1",
             "title": "AgentCard implements PRD §4.7.9 spec (grid container, accent rail, stuck override)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:40.186Z"
           },
           {
             "id": "f7-agent-card.ac2",
             "title": "Stream excerpt has the fade-out gradient via ::after at 24px tall",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:40.186Z"
           },
           {
             "id": "f7-agent-card.ac3",
             "title": "Stuck banner renders inline when `stuck` prop is true; never shown otherwise",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:40.186Z"
           },
           {
             "id": "f7-agent-card.ac4",
             "title": "Footer action links: primary uses --info-foreground, danger uses --destructive-foreground (right-aligned)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:40.186Z"
           },
           {
             "id": "f7-agent-card.ac5",
             "title": "Root element carries `data-component=\"agent-card\"`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-18T08:39:40.186Z"
           }
-        ]
+        ],
+        "completed": "2026-05-18T08:39:40.186Z"
       },
       {
         "id": "f8-universal-chrome",
         "title": "Add fractal-noise body overlay + shared top-bar styles for new chrome",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 3 dispatched",
+          "statusUpdatedAt": "2026-05-18T08:39:16.665Z"
         },
         "narrative": {
           "Action": "PRD §4.7 'Universal rules' calls for a 3.5%-opacity fractal-noise body overlay (fixed-position SVG turbulence at 256px tile) on every page. Add it as a global element rendered once in App.tsx (or main shell). Also extract the shared top-bar style helpers per PRD §4.7.2 (52px/48px height, 13px breadcrumb, 32px search/buttons, segmented control) into src/dashboard/frontend/src/components/primitives/TopBar.tsx for reuse by Pipeline, Board, Agents."
@@ -1087,14 +1134,16 @@
       {
         "id": "p1-pipeline-page-shell",
         "title": "Add Pipeline page shell + route (greenfield)",
-        "status": "pending",
+        "status": "running",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 6 dispatched",
+          "statusUpdatedAt": "2026-05-18T08:39:17.588Z"
         },
         "narrative": {
           "Action": "Create src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx as the new Pipeline route content. Composes TopBar (52px), MetricStrip (5 tiles — wired in p2), grouped IssueRow lists under PhaseHeader (wired in p3), and a footer-empty zone. Imports the Issue Row primitive from f5. Reads issues from selectIssues + reviewStatusByIssueId from the existing dashboard store and classifies by lifecycle phase using src/dashboard/frontend/src/lib/pipeline-state.ts. Add `pipeline` to Tab type in Header.tsx; add `TAB_PATHS['pipeline'] = '/pipeline'` in App.tsx. (Default-route flip ships in n2.)"
@@ -1797,14 +1846,16 @@
       {
         "id": "a4-agents-move-deacon-to-health",
         "title": "Move Deacon status UI from Agents to Health page",
-        "status": "pending",
+        "status": "running",
         "priority": "medium",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-1148",
           "requiresInspection": false,
-          "inspectionDepth": "fast"
+          "inspectionDepth": "fast",
+          "statusReason": "Swarm slot 7 dispatched",
+          "statusUpdatedAt": "2026-05-18T08:39:44.723Z"
         },
         "narrative": {
           "Action": "Relocate the DeaconStatus component (currently under CommandDeck/DeaconStatus.tsx) usage into HealthDashboard.tsx. Remove any Deacon-specific section that was rendered inside AgentList. CloisterStatusBar (sidebar) and the global DeaconPauseToggle (footer) are unrelated and remain unchanged."
@@ -1923,7 +1974,7 @@
       {
         "id": "r2-awaiting-merge-component-removal",
         "title": "Delete AwaitingMergePage.tsx + Tab type entry + all inbound references",
-        "status": "completed",
+        "status": "pending",
         "priority": "low",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -1939,7 +1990,7 @@
           {
             "id": "r2-awaiting-merge-component-removal.ac1",
             "title": "AwaitingMergePage.tsx file is deleted",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1947,7 +1998,7 @@
           {
             "id": "r2-awaiting-merge-component-removal.ac2",
             "title": "'awaiting-merge' is removed from Tab union in Header.tsx; TS typecheck still passes",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1955,7 +2006,7 @@
           {
             "id": "r2-awaiting-merge-component-removal.ac3",
             "title": "TAB_PATHS and PATH_TO_TAB no longer contain awaiting-merge entries",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1963,7 +2014,7 @@
           {
             "id": "r2-awaiting-merge-component-removal.ac4",
             "title": "grep -r AwaitingMergePage src/ returns zero results",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1971,7 +2022,7 @@
           {
             "id": "r2-awaiting-merge-component-removal.ac5",
             "title": "selectAwaitingMerge / selectBlockedFromMerge / selectOpenMergeRequests selectors remain in store.ts (used by Pipeline filters)",
-            "status": "completed",
+            "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -2640,5 +2691,6 @@
     "metadata": {
       "canonicalFilename": "2026-05-18-PAN-1148-unified-dashboard-redesign-pipeline-board-command-deck-agents-and-shared-issue-detail-drawer.vbrief.json"
     }
-  }
+  },
+  "status": "proposed"
 }
