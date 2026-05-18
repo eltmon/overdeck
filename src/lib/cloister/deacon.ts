@@ -2834,8 +2834,8 @@ export async function checkDeadEndAgents(): Promise<string[]> {
 
       // Circuit breaker: don't intervene if already at max requeues
       const autoRequeueCount = status.autoRequeueCount || 0;
-      if (autoRequeueCount >= 7) {
-        console.log(`[deacon] Dead-end detected for ${key} but circuit breaker active (${autoRequeueCount}/7 requeues used)`);
+      if (autoRequeueCount >= 25) {
+        console.log(`[deacon] Dead-end detected for ${key} but circuit breaker active (${autoRequeueCount}/25 requeues used)`);
         continue;
       }
 

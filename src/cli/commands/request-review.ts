@@ -23,7 +23,7 @@ interface RequestReviewResponse {
   remainingRequeues?: number;
 }
 
-const MAX_AUTO_REQUEUES = 7;
+const MAX_AUTO_REQUEUES = 25;
 
 export async function requestReviewCommand(
   id: string,
