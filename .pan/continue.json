@@ -1,0 +1,129 @@
+{
+  "version": "1",
+  "issueId": "PAN-1189",
+  "created": "2026-05-18T12:44:37.358Z",
+  "updated": "2026-05-18T13:05:00.000Z",
+  "gitState": { "branch": "feature/pan-1189", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Block hard on PAN-1148 — consume VerbBadge, PhaseGlyph, IssueRow, MetricTile, MetricStrip primitives rather than reinventing them. If a primitive is missing when work starts, file a follow-up against PAN-1148 instead of duplicating it.",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Flywheel is a new sixth lifecycle role (alongside plan/work/review/test/ship) but is NOT issue-scoped. It runs as a singleton Cloister-managed agent named `flywheel-orchestrator`. Role prompt lives at roles/flywheel.md; config under roles.flywheel in ~/.panopticon/config.yaml.",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Enforce singleton via a Cloister gate row (`flywheel.globally_paused`) plus a SQLite-tracked `flywheel.active_run_id`. Spawn refuses if a run is already active; pause flips the gate and stops the tmux session without killing the run state.",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Status delivery contract: orchestrator POSTs FlywheelStatus JSON to `POST /api/flywheel/status` on the local dashboard each tick. Dashboard validates against the contract, updates in-memory state, persists ONLY the latest snapshot to `~/.panopticon/flywheel/runs/<runId>/latest.json`, and broadcasts via Effect RPC stream `subscribeFlywheelStatus` over `/ws/rpc`. No per-tick SQLite churn.",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Orchestrator-side helper command `pan flywheel emit-status --file <json>` wraps the POST so the role prompt never deals with raw HTTP. Schema-validates client-side before sending; bad payloads fail loud.",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Default brief committed to `docs/flywheel-brief.md` (cleaned-up port of `~/Projects/ALL-UP-WITH-TWIST.md`). `pan flywheel start --brief <path>` overrides. No inline-in-config storage — briefs are markdown the team can diff and review.",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Sidebar reshuffle (adding Pipeline, retiring Awaiting Merge) belongs to PAN-1148 and is NOT in scope here. This issue adds ONLY the Flywheel nav item under the existing Operations group, appended after Agents.",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "CLI surface: `pan flywheel start|pause|resume|status|report|emit-status`. Wrapper skill at `skills/pan-flywheel/SKILL.md` matching SKILLS-CONVENTION (lint-skills.sh enforces drift). Umbrella `pan` learns `flywheel` as a verb under the Operations bucket.",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Conversation pane reuses the existing Claude Code conversation surface (the same one used for agent terminals/transcripts) scoped to the singleton `flywheel-orchestrator` session. No new transcript storage is introduced — the existing conversation/JSONL machinery already covers it.",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "Settings → Roles gains a Flywheel row mirroring the existing five role rows (harness, model, effort) plus two flywheel-specific knobs: maxAgents (concurrency cap) and scope (PAN-only | all-tracked-projects). Persisted under roles.flywheel in config.yaml; changes apply on the next tick without restart.",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    },
+    {
+      "id": "D11",
+      "summary": "`pan flywheel report` writes `docs/FLYWHEEL-STATE.md` (replace) and appends a run-N section to `docs/OPERATION-FIX-ALL.md`, then creates a single `docs(flywheel): run N` commit. Toast in dashboard links to both files. Idempotent — running twice on the same run produces a no-op (or amend if uncommitted).",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    },
+    {
+      "id": "D12",
+      "summary": "Auto-mode default for the orchestrator role config: harness=claude-code, model=opus-4.7, effort=high, maxAgents=8, scope=PAN-only. Mirrors tonight's proven run shape. Users edit via Settings → Roles → Flywheel.",
+      "recordedAt": "2026-05-18T13:05:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "PAN-1148 primitives may not land before this issue's work agent starts. Work agent must verify VerbBadge/PhaseGlyph/IssueRow/MetricTile/MetricStrip exist as importable components before building the status pane.",
+      "mitigation": "Block on PAN-1148 in plan edges. If pipeline tries to start work and PAN-1148 isn't merged, work agent must STOP and surface a blocker rather than reimplement the primitives."
+    },
+    {
+      "id": "H2",
+      "summary": "Orchestrator-spawned-by-orchestrator infinite loop. If the flywheel role gains the ability to start nested flywheel runs, recursion blows up Cloister.",
+      "mitigation": "Cloister lifecycle bead (cloister-flywheel-lifecycle) MUST refuse to spawn a second flywheel-orchestrator while one is active. Add a unit test asserting the gate."
+    },
+    {
+      "id": "H3",
+      "summary": "Per-tick snapshot churn. A 5h run can emit hundreds of FlywheelStatus payloads. If stored in SQLite, it bloats the DB; if broadcast naïvely, it floods every connected client.",
+      "mitigation": "Persist only `latest.json` to disk. Broadcast via Effect RPC stream, which already handles backpressure. End-of-run commits the report exactly once."
+    },
+    {
+      "id": "H4",
+      "summary": "Conversation pane and orchestrator role read from two different surfaces — the dashboard might show stale transcript while the tmux session is alive.",
+      "mitigation": "Reuse the same conversation surface plumbing the agents page uses. Don't introduce a parallel transcript store."
+    },
+    {
+      "id": "H5",
+      "summary": "Brief discoverability. Operators may not know where briefs live; running `pan flywheel start` with no `--brief` should not surprise them.",
+      "mitigation": "Default brief lives at `docs/flywheel-brief.md` and is read if no `--brief` is passed. Surface the resolved brief path in `pan flywheel status` and on the dashboard top-bar."
+    },
+    {
+      "id": "H6",
+      "summary": "Orchestrator host-vs-container assumption. The orchestrator needs host git/gh/tmux sockets; spawning it inside a workspace devcontainer breaks the single-Deacon invariant and the `~/.panopticon` host mount.",
+      "mitigation": "Lifecycle bead MUST refuse to spawn flywheel-orchestrator when running inside a devcontainer (detect via PANOPTICON_DISABLE_DEACON or hostname pattern). Document in roles/flywheel.md."
+    },
+    {
+      "id": "H7",
+      "summary": "Status contract drift between orchestrator emitter and dashboard reader. If the contract evolves and one side updates first, the dashboard crashes on bad payloads.",
+      "mitigation": "FlywheelStatus contract lives in `@panctl/contracts` and is imported by BOTH the emit-status CLI helper (client-side validation) and the POST route (server-side validation). Schema is the single source of truth."
+    },
+    {
+      "id": "H8",
+      "summary": "Stop / pause semantics. Pausing a long-running orchestrator mid-tick may interrupt a spawn or merge it just initiated.",
+      "mitigation": "Pause sets the gate so the orchestrator self-checks at tick boundaries and idles; it does NOT kill the tmux session. Resume clears the gate. Stop (kill) is a separate, explicit verb if ever needed."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-18T12:44:37.358Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1189: Bake the Fix-All Flywheel into Panopticon — sidebar tab, configurable orchestrator, standardized status, conversation pane",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-18T13:05:00.000Z",
+      "reason": "planning",
+      "note": "Planning complete: 12 auto-decisions recorded, 8 hazards identified, 23 beads decomposed across contract / role / lifecycle / server / CLI / UI / docs.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
