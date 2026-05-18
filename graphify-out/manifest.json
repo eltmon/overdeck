@@ -3899,9 +3899,21 @@
     "mtime": 1779082772.2871552,
     "hash": "29d17589c30df4b3fd80431d56217c59"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/primitives/MetricTile.tsx": {
+    "mtime": 1779083658.767179,
+    "hash": "c7a33afaed09503f654e7438d397723d"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/primitives/PhaseHeader.test.tsx": {
     "mtime": 1779083344.190468,
     "hash": "6fd9ad48ddb31c3061fc3a5a27f03675"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/primitives/MetricStrip.tsx": {
+    "mtime": 1779083668.113446,
+    "hash": "a76c698df2b5d90c9899f90c88f41903"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/primitives/MetricTile.test.tsx": {
+    "mtime": 1779083703.1774414,
+    "hash": "17fc46a4a31bcc1b7ccdc498345f7e27"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/primitives/PhaseHeader.tsx": {
     "mtime": 1779083327.819903,

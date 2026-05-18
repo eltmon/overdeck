@@ -4,7 +4,7 @@
     "created": "2026-05-18T05:10:55.134Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
-    "updated": "2026-05-18T05:49:44.241Z"
+    "updated": "2026-05-18T05:56:18.000Z"
   },
   "plan": {
     "id": "pan-1148",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T05:49:44.241Z",
+    "updated": "2026-05-18T05:56:18.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -273,7 +273,7 @@
       {
         "id": "f4-metric-tile",
         "title": "Add MetricTile + MetricStrip primitive (uniform tile for Pipeline / Agents / Command Deck strips)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -289,7 +289,7 @@
           {
             "id": "f4-metric-tile.ac1",
             "title": "MetricTile accepts {eyebrow, value, sub?, delta?, icon, signal} props and renders per PRD §4.7.3 spec",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -297,7 +297,7 @@
           {
             "id": "f4-metric-tile.ac2",
             "title": "Number value stays --foreground in all signal variants (rule: only icon carries signal color)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -305,7 +305,7 @@
           {
             "id": "f4-metric-tile.ac3",
             "title": "MetricStrip composes N tiles in CSS grid; column count is a prop (5 for Pipeline, 6 for Agents)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -313,7 +313,7 @@
           {
             "id": "f4-metric-tile.ac4",
             "title": "Delta variant renders positive (cost down) as success-foreground green, negative as destructive-foreground red",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
