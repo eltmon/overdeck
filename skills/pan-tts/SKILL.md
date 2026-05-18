@@ -147,7 +147,7 @@ pan tts voices set-default "Vivian Voice"
 pan tts voices map reviewStatus.passed "Vivian Voice"
 ```
 
-`pan tts test` reads `tts.voice` from `~/.panopticon/config.yaml`, resolves it in `~/.panopticon/tts-voices.json`, and POSTs directly to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (or the configured `tts.daemonHost`/`tts.daemonPort`). If no system voice is configured, set one with `pan tts voices set-default <name>` before running the smoke test.
+`pan tts test` reads `tts.voice` from `~/.panopticon/config.yaml`, resolves it in `~/.panopticon/tts-voices.json`, and POSTs directly to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (or the configured `tts.daemonHost`/`tts.daemonPort`). On a fresh install with no saved system voice, the smoke test uses the daemon's default preset (`Vivian`, override via `QWEN_TTS_VOICE`) so the audio path can be verified before creating a voice library.
 
 The skill also bundles `scripts/say.sh` for one-off utterances that bypass Panopticon voice settings:
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildTtsSpeakPayload,
   DEFAULT_TTS_TEST_TEXT,
@@ -40,6 +40,10 @@ const PAYLOAD_CONTROLS = {
   maxChars: CONFIG.maxChars,
   dropInfoWhenFull: CONFIG.dropInfoWhenFull,
 };
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 const PRESET_VOICE: TtsVoice = {
   id: 'voice-1',
@@ -308,18 +312,26 @@ describe('pan tts test', () => {
     });
   });
 
-  it('prints an actionable error when no system voice is configured', async () => {
-    const stderr = { error: vi.fn() };
+  it('posts through the daemon default preset when no system voice is configured', async () => {
+    vi.stubEnv('QWEN_TTS_VOICE', 'Vivian');
+    vi.stubEnv('QWEN_TTS_INSTRUCT', '');
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"queued":true}', { status: 202 }));
+    const findVoiceByIdMock = vi.fn();
     const result = await runTtsTest(undefined, {
       config: { ...CONFIG, voice: '' },
-      findVoiceById: vi.fn(),
-      fetch: vi.fn(),
+      findVoiceById: findVoiceByIdMock,
+      fetch: fetchMock,
       stdout: { log: vi.fn() },
-      stderr,
+      stderr: { error: vi.fn() },
     });
 
-    expect(result).toMatchObject({ ok: false, reason: 'no-voice' });
-    expect(stderr.error).toHaveBeenCalledWith(expect.stringContaining('No system voice set'));
+    expect(result).toEqual({ ok: true, url: 'http://127.0.0.1:8787/speak' });
+    expect(findVoiceByIdMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8787/speak', {
+      method: 'POST',
+      headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-Panopticon-TTS-Token': expect.any(String) }),
+      body: JSON.stringify({ text: DEFAULT_TTS_TEST_TEXT, voice: 'Vivian', instruct: '', volume: 0.8, ...PAYLOAD_CONTROLS, mode: 'custom' }),
+    });
   });
 
   it('prints an actionable error when the daemon is down', async () => {

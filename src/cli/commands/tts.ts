@@ -19,6 +19,7 @@ import {
 } from '../../lib/tts-daemon.js';
 
 export const DEFAULT_TTS_TEST_TEXT = 'The quick brown fox jumps over the lazy dog. Panopticon dashboard is now online.';
+export const DEFAULT_TTS_TEST_VOICE = 'Vivian';
 
 export interface RunTtsTestDeps {
   config?: NormalizedTtsDaemonConfig;
@@ -146,6 +147,18 @@ export function buildTtsSpeakPayload(voice: TtsVoice, text: string, config: Norm
   return buildRuntimeTtsSpeakPayload(voice, text, config);
 }
 
+function buildDefaultTtsTestVoice(): TtsVoice {
+  const presetName = process.env.QWEN_TTS_VOICE?.trim() || DEFAULT_TTS_TEST_VOICE;
+  return {
+    id: 'daemon-default-preset',
+    name: presetName,
+    kind: 'preset',
+    createdAt: new Date(0).toISOString(),
+    presetName,
+    instruct: process.env.QWEN_TTS_INSTRUCT?.trim() || '',
+  };
+}
+
 async function postTtsSpeakPayload(
   voice: TtsVoice,
   text: string | undefined,
@@ -187,9 +200,7 @@ export async function runTtsTest(text: string | undefined, deps: RunTtsTestDeps 
   const stderr = deps.stderr ?? console;
 
   if (!voiceId) {
-    const message = 'No system voice set — use pan tts voices set-default <name>';
-    stderr.error(chalk.yellow(message));
-    return { ok: false, reason: 'no-voice', message };
+    return postTtsSpeakPayload(buildDefaultTtsTestVoice(), text, config, { fetch: deps.fetch, stdout, stderr });
   }
 
   const voice = await (deps.findVoiceById ?? findVoiceById)(voiceId);
