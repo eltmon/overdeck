@@ -3899,6 +3899,14 @@
     "mtime": 1779082772.2871552,
     "hash": "29d17589c30df4b3fd80431d56217c59"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/primitives/PhaseHeader.test.tsx": {
+    "mtime": 1779083344.190468,
+    "hash": "6fd9ad48ddb31c3061fc3a5a27f03675"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/primitives/PhaseHeader.tsx": {
+    "mtime": 1779083327.819903,
+    "hash": "082d934f3531cae90b213d43f76a4d9b"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/primitives/PhaseGlyph.test.tsx": {
     "mtime": 1779083131.7262442,
     "hash": "6c52633846c42443aacd6834865287e0"
