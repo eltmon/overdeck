@@ -5069,8 +5069,31 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     }
 
     setReviewStatus(issueId, { mergeStep: 'stripping-planning' });
-    // Planning-state stripping is gone: workspace state lives in `.pan/` and
-    // merges to main naturally with the code.
+    // Strip .planning/ artifacts before merge — these are workspace-local
+    // scratch files (STATE.md, feedback/) that must never land on main (#888).
+    try {
+      const { stdout: hasPlanning } = await execAsync(
+        'git ls-files -- .planning/ 2>/dev/null || true',
+        { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+      );
+      if (hasPlanning.trim()) {
+        console.log(`[merge] Stripping .planning/ artifacts from ${branchName} before merge...`);
+        await execAsync('git rm -r --cached .planning/', { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 });
+        await execAsync(
+          `git commit -m "chore: strip .planning/ before merge"`,
+          { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+        );
+        await execAsync(
+          `git push --force-with-lease origin HEAD:${branchName}`,
+          { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 }
+        );
+        console.log(`[merge] Stripped .planning/ from ${branchName}`);
+      }
+    } catch (stripErr: any) {
+      console.warn(`[merge] Failed to strip .planning/ from ${branchName}: ${stripErr.message}`);
+      // Non-fatal: proceed to verification. The no-planning-on-main guardrail
+      // will catch any .planning/ files that slip through.
+    }
 
     // Step 3: Post-rebase verification gate (typecheck, lint, test)
     // Ensures the rebase didn't introduce issues before merging.
