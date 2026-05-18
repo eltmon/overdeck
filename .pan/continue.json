@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T05:44:04.606Z",
+  "updated": "2026-05-18T05:46:41.560Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "010a65efc",
+    "sha": "c056ee719",
     "dirty": true
   },
   "decisions": [
@@ -116,6 +116,12 @@
       "summary": "VerbBadge variants use the PRD literal verb strings as the TypeScript discriminant, including STUCK · Nh for the hours-bearing stuck badge.",
       "recordedAt": "2026-05-18T05:42:56.951Z",
       "rationale": "The styleguide-conformance test needs data-variant to match the variant prop exactly, and literal PRD labels make unknown variants fail at compile time."
+    },
+    {
+      "id": "D19",
+      "summary": "PhaseGlyph supports plan as a typed phase in addition to todo/work/review/ship/done, reusing the signal-review token.",
+      "recordedAt": "2026-05-18T05:46:41.560Z",
+      "rationale": "The bead title lists five glyph phases, but its action text explicitly maps ship/plan to --signal-review-foreground and PhaseHeader uses Plan as a lifecycle group."
     }
   ],
   "hazards": [
@@ -186,9 +192,11 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-hu0c is closed and inspection was skipped because requiresInspection=false. Run bd ready -l pan-1148 and claim the next unblocked PAN-1148 bead.",
-    "beadId": null,
+    "description": "PhaseGlyph bead workspace-9lm0 is implemented and ready to commit/close. After commit, close workspace-9lm0 and skip inspection because requiresInspection=false.",
+    "beadId": "workspace-9lm0",
     "filesToRead": [
+      "src/dashboard/frontend/src/components/primitives/PhaseGlyph.tsx",
+      "src/dashboard/frontend/src/components/primitives/PhaseGlyph.test.tsx",
       ".pan/spec.vbrief.json"
     ]
   },
@@ -216,6 +224,12 @@
       "timestamp": "2026-05-18T05:44:04.606Z",
       "reason": "bead-close",
       "note": "Closed workspace-hu0c. bd required --force because downstream dependents were reported as blockers despite dep tree showing workspace-hu0c as their upstream [blocks] dependency.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:46:41.560Z",
+      "reason": "bead",
+      "note": "Implemented workspace-9lm0 / f2-phase-glyph: added typed PhaseGlyph primitive, token-backed phase colors, SVG shapes for lifecycle phases, tests, and completed vBRIEF statuses.",
       "agentModel": "gpt-5.5"
     }
   ],
