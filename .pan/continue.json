@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1169",
   "created": "2026-05-18T08:34:50.104Z",
-  "updated": "2026-05-18T09:36:30.947Z",
+  "updated": "2026-05-18T09:51:46.695Z",
   "gitState": {
     "branch": "feature/pan-1169",
     "sha": "eb39b987e",
@@ -130,6 +130,11 @@
       "reason": "handoff-fix",
       "note": "Corrected stale beadsMapping from planning IDs workspace-0bdf/workspace-ya3b to actual closed bead IDs workspace-68ho/workspace-8lfs so pan done checks the completed bead records.",
       "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T09:51:46.695Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
