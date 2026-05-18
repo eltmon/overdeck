@@ -93,4 +93,49 @@ describe('FleetAgentsView', () => {
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
     expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
   });
+
+  it('filters the fleet grid with multi-select phase pills and syncs the URL', () => {
+    render(<FleetAgentsView />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'work' }));
+    expect(window.location.search).toBe('?phase=work');
+    expect(screen.getByText('agent-running')).toBeInTheDocument();
+    expect(screen.queryByText('agent-idle')).not.toBeInTheDocument();
+    expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'ship' }));
+    expect(new URLSearchParams(window.location.search).get('phase')).toBe('work,ship');
+    expect(screen.getByText('agent-running')).toBeInTheDocument();
+    expect(screen.getByText('agent-idle')).toBeInTheDocument();
+    expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
+  });
+
+  it('filters additively by project and model dropdowns and syncs the URL', () => {
+    useDashboardStore.setState({
+      issuesRaw: [
+        issue({ identifier: 'PAN-1', title: 'Fleet drawer issue', project: { id: 'pan', name: 'Panopticon', color: '#333' } }),
+        issue({ identifier: 'PAN-2', title: 'Stuck issue', project: { id: 'ops', name: 'Ops', color: '#444' } }),
+        issue({ identifier: 'PAN-3', title: 'Ship issue', project: { id: 'pan', name: 'Panopticon', color: '#333' } }),
+      ],
+      agentsById: {
+        'agent-running': agent({ id: 'agent-running', issueId: 'PAN-1', status: 'running', role: 'work', model: 'claude-opus-4-7' }),
+        'agent-stuck': agent({ id: 'agent-stuck', issueId: 'PAN-2', status: 'stuck', role: 'review', model: 'claude-sonnet-4-6' }),
+        'agent-idle': agent({ id: 'agent-idle', issueId: 'PAN-3', status: 'stopped', role: 'ship', model: 'claude-haiku-4-5-20251001' }),
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    render(<FleetAgentsView />);
+
+    fireEvent.click(screen.getByLabelText('Panopticon'));
+    expect(window.location.search).toBe('?projects=pan');
+    expect(screen.getByText('agent-running')).toBeInTheDocument();
+    expect(screen.getByText('agent-idle')).toBeInTheDocument();
+    expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('haiku-4-5'));
+    expect(window.location.search).toBe('?projects=pan&models=claude-haiku-4-5-20251001');
+    expect(screen.queryByText('agent-running')).not.toBeInTheDocument();
+    expect(screen.getByText('agent-idle')).toBeInTheDocument();
+    expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
+  });
 });

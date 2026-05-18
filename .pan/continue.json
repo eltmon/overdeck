@@ -203,11 +203,11 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-quqw Board card launch controls removal is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
+    "description": "workspace-wfgv Agents filter row is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
     "beadId": "pending",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/KanbanBoard.tsx",
-      "src/dashboard/frontend/src/components/KanbanBoard.test.tsx"
+      "src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx",
+      "src/dashboard/frontend/src/components/Agents/FleetAgentsView.test.tsx"
     ]
   },
   "beadsMapping": {},
@@ -453,6 +453,10 @@
     "b2-board-strip-config-controls": "completed",
     "b2-board-strip-config-controls.ac1": "completed",
     "b2-board-strip-config-controls.ac2": "completed",
-    "b2-board-strip-config-controls.ac3": "completed"
+    "b2-board-strip-config-controls.ac3": "completed",
+    "a3-agents-filter-row": "completed",
+    "a3-agents-filter-row.ac1": "completed",
+    "a3-agents-filter-row.ac2": "completed",
+    "a3-agents-filter-row.ac3": "completed"
   }
 }
