@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T22:04:30.000Z",
+  "updated": "2026-05-18T22:08:00.000Z"
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "809a3f29b",
+    "sha": "fa25b957d"
     "dirty": false
   },
   "decisions": [
@@ -429,6 +429,11 @@
     "p4-pipeline-cross-project-filter.ac1": "completed",
     "p4-pipeline-cross-project-filter.ac2": "completed",
     "p4-pipeline-cross-project-filter.ac3": "completed",
-    "p4-pipeline-cross-project-filter.ac4": "completed"
+    "p4-pipeline-cross-project-filter.ac4": "completed",
+    "p3-pipeline-phase-grouping": "completed",
+    "p3-pipeline-phase-grouping.ac1": "completed",
+    "p3-pipeline-phase-grouping.ac2": "completed",
+    "p3-pipeline-phase-grouping.ac3": "completed",
+    "p3-pipeline-phase-grouping.ac4": "completed"
   }
 }

@@ -27,7 +27,9 @@ describe('PipelineView', () => {
       drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [
         issue({ identifier: 'PAN-1', title: 'Ready to ship', priority: 1, labels: ['ship'], project: { id: 'pan', name: 'Panopticon', color: '#fff' } }),
-        issue({ identifier: 'PAN-2', title: 'Active work', priority: 2, status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' } }),
+        issue({ identifier: 'PAN-2', title: 'Active work', priority: 2, status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' }, updatedAt: '2026-05-18T02:00:00.000Z' }),
+        issue({ identifier: 'PAN-6', title: 'Urgent active work', priority: 1, status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' }, updatedAt: '2026-05-18T00:30:00.000Z' }),
+        issue({ identifier: 'PAN-7', title: 'Newer active work', priority: 2, status: 'In Progress', state: 'in_progress', project: { id: 'ops', name: 'Operations', color: '#fff' }, updatedAt: '2026-05-18T03:00:00.000Z' }),
         issue({ identifier: 'PAN-3', title: 'Planned work', priority: 3, hasPlan: true, project: { id: 'pan', name: 'Panopticon', color: '#fff' } }),
         issue({ identifier: 'PAN-4', title: 'Blocked merge', priority: 2, project: { id: 'ops', name: 'Operations', color: '#fff' } }),
         issue({ identifier: 'PAN-5', title: 'Open PR', priority: 2, project: { id: 'ops', name: 'Operations', color: '#fff' } }),
@@ -84,7 +86,20 @@ describe('PipelineView', () => {
     expect(within(workPhase).getByText('Active work')).toBeInTheDocument();
     expect(within(workPhase).getByText('agent-pan-2')).toBeInTheDocument();
     expect(within(planPhase).getByText('Planned work')).toBeInTheDocument();
+    expect(container.querySelector('[data-component="phase-header"]')).toHaveClass('sticky', 'top-0');
     expect(container.querySelectorAll('[data-component="phase-header"]')).toHaveLength(5);
+  });
+
+  it('sorts rows within each phase by priority rank then updatedAt descending', () => {
+    const { container } = render(<PipelineView />);
+    const workPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="work"]') as HTMLElement;
+
+    expect(
+      within(workPhase)
+        .getAllByRole('button')
+        .filter((row) => row.getAttribute('data-component') === 'issue-row')
+        .map((row) => row.getAttribute('data-issue-id')),
+    ).toEqual(['PAN-6', 'PAN-7', 'PAN-2']);
   });
 
   it('opens the issue drawer from a Pipeline row without disturbing scroll position', () => {
@@ -116,6 +131,9 @@ describe('PipelineView', () => {
     expect(screen.getByText('Ready to ship')).toBeInTheDocument();
     expect(screen.getByText('Planned work')).toBeInTheDocument();
     expect(screen.queryByText('Active work')).toBeNull();
+    const reviewPhase = document.querySelector('[data-component="pipeline-phase"][data-phase="review"]') as HTMLElement;
+    expect(within(reviewPhase).getByText('0')).toBeInTheDocument();
+    expect(within(reviewPhase).queryByRole('button')).toBeNull();
   });
 
   it('maps ship modifiers to the legacy merge subviews', () => {

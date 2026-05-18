@@ -44,6 +44,16 @@ function agentSub(agent: Agent) {
   return [agent.model, agent.status].filter(Boolean).join(' · ');
 }
 
+function priorityRank(priority: number) {
+  return 5 - priority;
+}
+
+function comparePipelineIssues(a: Issue, b: Issue) {
+  const priorityDelta = priorityRank(b.priority) - priorityRank(a.priority);
+  if (priorityDelta !== 0) return priorityDelta;
+  return b.updatedAt.localeCompare(a.updatedAt);
+}
+
 function readFilterState(): PipelineFilterState {
   if (typeof window === 'undefined') {
     return { phase: 'all', projects: [], blocked: false, noPr: false };
@@ -186,6 +196,10 @@ export function PipelineView() {
       }
 
       groups[phase].push(issue);
+    }
+
+    for (const phase of PHASES) {
+      groups[phase].sort(comparePipelineIssues);
     }
 
     return groups;
