@@ -2728,12 +2728,12 @@
     "hash": "6d499b1268901cadfd71b78db0056f2a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/App.tsx": {
-    "mtime": 1779080823.251229,
-    "hash": "d3c182831cb55c37f1c8f124d13fcfa8"
+    "mtime": 1779083926.5986066,
+    "hash": "c59b6b83210fa2c1ebfb10977eb4ddb4"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/App.test.tsx": {
-    "mtime": 1779080823.2506394,
-    "hash": "fbc106969f0b8f19f75cd1da9783ec9a"
+    "mtime": 1779083926.9736168,
+    "hash": "1de414123b53cb82c5e897feb2c0ab4e"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/vite-env.d.ts": {
     "mtime": 1779080823.2675197,
@@ -2971,10 +2971,6 @@
     "mtime": 1779080823.256518,
     "hash": "bbdbe82f7e6fc0807c7b06dba42da5e2"
   },
-  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/AwaitingMergePage.tsx": {
-    "mtime": 1779080823.251643,
-    "hash": "9878353b52b539c4d5adc07d2e333704"
-  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/SkillsList.tsx": {
     "mtime": 1779080823.26073,
     "hash": "bd629104b4c6b925dea6148f64fbf428"
@@ -2996,8 +2992,8 @@
     "hash": "92e80fc9453f4b382953abc646690ebc"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/Header.tsx": {
-    "mtime": 1779080823.256518,
-    "hash": "32c4088cecfe3074d0757aae9ba4292d"
+    "mtime": 1779083926.8286128,
+    "hash": "abfca340722815abd8978ef2ff10bc4b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/FreshnessIndicator.tsx": {
     "mtime": 1779080823.2550251,
@@ -3016,8 +3012,8 @@
     "hash": "3b345e510999705cab512db22053d54c"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/Sidebar.tsx": {
-    "mtime": 1779080823.26073,
-    "hash": "ae60fb2d55262f8f29fa87724e55017b"
+    "mtime": 1779083937.6179051,
+    "hash": "7a9e23f0afcf7962cf3d7b77f743c9ec"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1148/src/dashboard/frontend/src/components/PlanDialog.tsx": {
     "mtime": 1779080823.2580254,
