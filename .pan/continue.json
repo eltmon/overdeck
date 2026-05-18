@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T05:57:09.000Z",
+  "updated": "2026-05-18T06:00:59.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "3d937ef87",
+    "sha": "59d0ce7c3",
     "dirty": false
   },
   "decisions": [
@@ -198,8 +198,8 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-5tj2 is closed and inspection was skipped because requiresInspection=false. User idle-nudge selected workspace-tjhs as the next ready PAN-1148 bead to claim.",
-    "beadId": "workspace-tjhs",
+    "description": "workspace-tjhs is closed and inspection was skipped because requiresInspection=false. Run bd ready -l pan-1148 and claim the next unblocked PAN-1148 bead.",
+    "beadId": null,
     "filesToRead": [
       ".pan/spec.vbrief.json"
     ]
@@ -264,6 +264,18 @@
       "timestamp": "2026-05-18T05:57:09.000Z",
       "reason": "bead-close",
       "note": "Closed workspace-5tj2. Inspection skipped because requiresInspection=false; bd required --force because downstream dependents were reported as blockers, matching H13.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T06:00:10.000Z",
+      "reason": "bead",
+      "note": "Implemented workspace-tjhs / r2-awaiting-merge-component-removal: deleted AwaitingMergePage, removed Tab/TAB_PATHS/render/sidebar/test references, preserved store merge selectors, and completed vBRIEF statuses.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T06:00:59.000Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-tjhs. Inspection skipped because requiresInspection=false; verified App test, typecheck, lint, grep, and graph update.",
       "agentModel": "gpt-5.5"
     }
   ],
