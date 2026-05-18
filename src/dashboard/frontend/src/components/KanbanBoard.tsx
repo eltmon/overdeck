@@ -1194,6 +1194,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   // Event-sourced state from Zustand store (PAN-433 read model)
   const issues = useDashboardStore(selectIssuesByCycle(cycleFilter, includeCompleted)) as unknown as Issue[];
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const openIssue = useDashboardStore((state) => state.openIssue);
   // PAN-1048 — derive specialist-role agents (review / test / ship) from the
   // unified agent list. Replaces the retired specialistsByName projection.
   const specialists = useMemo(
@@ -1935,6 +1936,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
                     onSelectIssue={onSelectIssue}
+                    onOpenIssue={openIssue}
                     onPlan={openPlanDialog}
                     onViewBeads={setBeadsDialogIssue}
                     onViewVBrief={setVbriefDialogIssue}
@@ -2047,6 +2049,7 @@ function ColumnContent({
   costsLoading,
   selectedIssue,
   onSelectIssue,
+  onOpenIssue,
   onPlan,
   onViewBeads,
   onViewVBrief,
@@ -2066,6 +2069,7 @@ function ColumnContent({
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
   onSelectIssue: (id: string | null) => void;
+  onOpenIssue: (id: string) => void;
   onPlan: (issue: Issue, autoStart?: boolean) => void;
   onViewBeads: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
@@ -2102,9 +2106,7 @@ function ColumnContent({
         cost={issueCosts[issue.identifier.toLowerCase()]}
         costsLoading={costsLoading}
         isSelected={selectedIssue === issue.identifier}
-        onSelect={() => onSelectIssue(
-          selectedIssue === issue.identifier ? null : issue.identifier
-        )}
+        onSelect={() => onOpenIssue(issue.identifier)}
         onPlan={(autoStart) => onPlan(issue, autoStart)}
         onViewBeads={(i) => onViewBeads(i)}
         onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}

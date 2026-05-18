@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T22:24:00.000Z",
+  "updated": "2026-05-18T22:34:00.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "b8f596f2b",
+    "sha": "71aab7899",
     "dirty": true
   },
   "decisions": [
@@ -442,6 +442,10 @@
     "i3-command-palette-drawer-integration": "completed",
     "i3-command-palette-drawer-integration.ac1": "completed",
     "i3-command-palette-drawer-integration.ac2": "completed",
-    "i3-command-palette-drawer-integration.ac3": "completed"
+    "i3-command-palette-drawer-integration.ac3": "completed",
+    "b4-board-drawer-wiring": "completed",
+    "b4-board-drawer-wiring.ac1": "completed",
+    "b4-board-drawer-wiring.ac2": "completed",
+    "b4-board-drawer-wiring.ac3": "completed"
   }
 }

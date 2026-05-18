@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Issue, Agent } from '../types';
 // PAN-1048 — SpecialistAgent retired; specialist-style indicators now come
 // from role-tagged AgentSnapshots passed through the `specialists` prop.
-import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard } from './KanbanBoard';
+import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, KanbanBoard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard } from './KanbanBoard';
 import { useDashboardStore } from '../lib/store';
 import { DialogProvider } from './DialogProvider';
 
@@ -498,6 +498,88 @@ describe('ListIssueRow', () => {
     const trackerLink = links.find(l => l.getAttribute('href') === 'https://github.com/test/repo/issues/123');
     expect(trackerLink).toBeDefined();
     expect(trackerLink!.getAttribute('target')).toBe('_blank');
+  });
+});
+
+describe('KanbanBoard drawer wiring', () => {
+  function createBoardIssue(overrides: Partial<Issue> = {}): Issue {
+    return {
+      id: overrides.identifier ?? 'PAN-1',
+      identifier: overrides.identifier ?? 'PAN-1',
+      title: overrides.title ?? 'Board drawer issue',
+      status: overrides.status ?? 'Todo',
+      state: overrides.state ?? 'todo',
+      priority: overrides.priority ?? 3,
+      labels: overrides.labels ?? [],
+      url: `https://example.com/${overrides.identifier ?? 'PAN-1'}`,
+      createdAt: '2026-05-18T00:00:00.000Z',
+      updatedAt: '2026-05-18T00:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  function renderBoard(props: Partial<ComponentProps<typeof KanbanBoard>> = {}) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <DialogProvider>
+          <KanbanBoard {...props} />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/board');
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = input.toString();
+      if (url === '/api/registered-projects') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve('{}'),
+        json: () => Promise.resolve({ issues: [], workspaces: [] }),
+      } as Response);
+    }));
+    useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
+      issuesRaw: [createBoardIssue()],
+      agentsById: {},
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('opens the issue drawer from a single Board card click without changing selection', async () => {
+    const onSelectIssue = vi.fn();
+    renderBoard({ selectedIssue: null, onSelectIssue });
+
+    fireEvent.click(await screen.findByTestId('issue-card-PAN-1'));
+
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
+    expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
+    expect(onSelectIssue).not.toHaveBeenCalled();
+
+    useDashboardStore.getState().closeIssue();
+
+    expect(onSelectIssue).not.toHaveBeenCalled();
+  });
+
+  it('keeps bulk selection on the checkbox affordance without opening the drawer', async () => {
+    renderBoard();
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Select PAN-1' }) as HTMLInputElement;
+    fireEvent.click(checkbox);
+
+    await waitFor(() => expect(checkbox.checked).toBe(true));
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: null, tab: 'overview' });
   });
 });
 
