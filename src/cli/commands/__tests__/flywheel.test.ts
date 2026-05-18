@@ -19,12 +19,22 @@ const flywheelLifecycleMocks = vi.hoisted(() => ({
   resumeFlywheel: vi.fn(async () => {
     flywheelLifecycleMocks.paused = false;
   }),
+  spawnFlywheel: vi.fn(async ({ runId }: { runId: string }) => ({
+    id: 'flywheel-orchestrator',
+    issueId: runId,
+    workspace: '/repo',
+    role: 'plan',
+    model: 'claude-opus-4-7',
+    status: 'running',
+    startedAt: '2026-05-18T12:00:00.000Z',
+  })),
 }));
 
 vi.mock('../../../lib/cloister/flywheel.js', () => ({
   FLYWHEEL_ORCHESTRATOR_AGENT_ID: 'flywheel-orchestrator',
   pauseFlywheel: flywheelLifecycleMocks.pauseFlywheel,
   resumeFlywheel: flywheelLifecycleMocks.resumeFlywheel,
+  spawnFlywheel: flywheelLifecycleMocks.spawnFlywheel,
 }));
 
 vi.mock('../../../lib/database/app-settings.js', () => ({
@@ -41,6 +51,7 @@ import {
   flywheelPauseCommand,
   flywheelReportCommand,
   flywheelResumeCommand,
+  flywheelStartCommand,
   flywheelStatusCommand,
   parseFlywheelStatusJson,
   readFlywheelStatusJson,
@@ -118,6 +129,7 @@ describe('flywheel CLI commands', () => {
     flywheelLifecycleMocks.sessionExists = false;
     flywheelLifecycleMocks.pauseFlywheel.mockClear();
     flywheelLifecycleMocks.resumeFlywheel.mockClear();
+    flywheelLifecycleMocks.spawnFlywheel.mockClear();
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -201,6 +213,59 @@ describe('flywheel CLI commands', () => {
 
     expect(process.exitCode).toBe(1);
     expect(errorSpy).toHaveBeenCalledWith('no active flywheel run');
+  });
+
+  it('starts a flywheel run with the default brief and writes initial state', async () => {
+    await mkdir(join(tempDir, 'docs'), { recursive: true });
+    await writeFile(join(tempDir, 'docs', 'flywheel-brief.md'), '# Flywheel Brief\n', 'utf8');
+
+    await flywheelStartCommand({ cwd: tempDir });
+
+    expect(flywheelLifecycleMocks.spawnFlywheel).toHaveBeenCalledWith(expect.objectContaining({
+      runId: 'RUN-1',
+      briefPath: join(tempDir, 'docs', 'flywheel-brief.md'),
+      workspace: tempDir,
+    }));
+    const latest = JSON.parse(await readFile(join(tempDir, 'flywheel', 'runs', 'RUN-1', 'latest.json'), 'utf8')) as FlywheelStatus;
+    expect(latest.runId).toBe('RUN-1');
+    expect(latest.agents[0]?.id).toBe('flywheel-orchestrator');
+    expect(logSpy).toHaveBeenCalledWith('Flywheel started: RUN-1');
+    expect(logSpy).toHaveBeenCalledWith('Brief: docs/flywheel-brief.md');
+    expect(logSpy).toHaveBeenCalledWith('Run URL: http://dashboard.test/flywheel');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('starts a flywheel run with a brief override', async () => {
+    await writeFile(join(tempDir, 'some-brief.md'), '# Custom Brief\n', 'utf8');
+
+    await flywheelStartCommand({ cwd: tempDir, brief: './some-brief.md' });
+
+    expect(flywheelLifecycleMocks.spawnFlywheel).toHaveBeenCalledWith(expect.objectContaining({
+      runId: 'RUN-1',
+      briefPath: join(tempDir, 'some-brief.md'),
+      workspace: tempDir,
+    }));
+    expect(logSpy).toHaveBeenCalledWith('Brief: some-brief.md');
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('reports a missing flywheel brief clearly', async () => {
+    await flywheelStartCommand({ cwd: tempDir, brief: './missing.md' });
+
+    expect(flywheelLifecycleMocks.spawnFlywheel).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith('Flywheel brief not found: missing.md');
+  });
+
+  it('surfaces the active run gate when start is refused', async () => {
+    await mkdir(join(tempDir, 'docs'), { recursive: true });
+    await writeFile(join(tempDir, 'docs', 'flywheel-brief.md'), '# Flywheel Brief\n', 'utf8');
+    flywheelLifecycleMocks.spawnFlywheel.mockRejectedValueOnce(new Error('Flywheel run RUN-7 is already active; pause, resume, or report it before starting another run'));
+
+    await flywheelStartCommand({ cwd: tempDir });
+
+    expect(process.exitCode).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith('Flywheel run RUN-7 is already active; pause, resume, or report it before starting another run');
   });
 
   it('pauses the flywheel and prints before/after gate state', async () => {
@@ -305,11 +370,13 @@ describe('flywheel CLI commands', () => {
     registerFlywheelCommands(program);
 
     const flywheel = program.commands.find(command => command.name() === 'flywheel');
+    const start = flywheel?.commands.find(command => command.name() === 'start');
     const emitStatus = flywheel?.commands.find(command => command.name() === 'emit-status');
     const status = flywheel?.commands.find(command => command.name() === 'status');
     const pause = flywheel?.commands.find(command => command.name() === 'pause');
     const resume = flywheel?.commands.find(command => command.name() === 'resume');
     const report = flywheel?.commands.find(command => command.name() === 'report');
+    expect(start?.options.map(option => option.long)).toContain('--brief');
     expect(emitStatus?.options.map(option => option.long)).toContain('--file');
     expect(status?.options.map(option => option.long)).toContain('--json');
     expect(pause).toBeDefined();

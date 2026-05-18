@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import type { AgentState } from '../agents.js';
 import { spawnRun, stopAgentAsync } from '../agents.js';
 import {
@@ -11,6 +12,7 @@ export const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';
 export interface FlywheelLifecycleOptions {
   runId?: string;
   workspace?: string;
+  briefPath?: string;
   prompt?: string;
   model?: string;
   harness?: 'claude-code' | 'pi';
@@ -30,10 +32,13 @@ function defaultFlywheelRunId(): string {
   return `RUN-${Date.now()}`;
 }
 
-function defaultFlywheelPrompt(runId: string): string {
+function defaultFlywheelPrompt(runId: string, briefPath?: string, briefContent?: string): string {
+  const briefSection = briefPath
+    ? `\n\nBrief path: ${briefPath}\n\n${briefContent ?? ''}`
+    : '';
   return `FLYWHEEL ORCHESTRATOR TASK for ${runId}:
 
-Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Panopticon roles through the normal pipeline surfaces, and wait for explicit lifecycle instructions when the run is paused or complete.`;
+Run the Fix-All Flywheel loop. Keep status snapshots current, coordinate Panopticon roles through the normal pipeline surfaces, and wait for explicit lifecycle instructions when the run is paused or complete.${briefSection}`;
 }
 
 export function isFlywheelDevcontainerRuntime(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -45,10 +50,11 @@ export function isFlywheelDevcontainerRuntime(env: NodeJS.ProcessEnv = process.e
 }
 
 async function spawnFlywheelAgent(runId: string, options: FlywheelLifecycleOptions = {}): Promise<AgentState> {
+  const briefContent = options.briefPath ? await readFile(options.briefPath, 'utf8') : undefined;
   return spawnRun(runId, 'plan', {
     agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
     workspace: options.workspace ?? process.cwd(),
-    prompt: options.prompt ?? defaultFlywheelPrompt(runId),
+    prompt: options.prompt ?? defaultFlywheelPrompt(runId, options.briefPath, briefContent),
     model: options.model,
     harness: options.harness,
     allowHost: true,

@@ -1,12 +1,13 @@
 import { exec } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { freemem, totalmem } from 'node:os';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { Schema } from 'effect';
 import { Command } from 'commander';
 import { FlywheelStatus } from '@panctl/contracts';
-import { getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns } from '../../dashboard/server/services/flywheel-run-state.js';
-import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel } from '../../lib/cloister/flywheel.js';
+import { getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
+import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
 import { sessionExistsAsync } from '../../lib/tmux.js';
 
@@ -18,6 +19,11 @@ interface EmitStatusOptions {
 
 interface StatusOptions {
   json?: boolean;
+}
+
+interface StartOptions {
+  brief?: string;
+  cwd?: string;
 }
 
 interface ReportOptions {
@@ -64,6 +70,86 @@ export function validateFlywheelStatusPayload(payload: unknown): FlywheelStatus 
   }
 }
 
+const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
+
+function isInsideRoot(projectRoot: string, candidate: string): boolean {
+  const relativePath = relative(projectRoot, candidate);
+  return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
+}
+
+function resolveFlywheelStartBriefPath(cwd: string, requestedPath?: string): { absolutePath: string; displayPath: string } {
+  const rawPath = requestedPath?.trim() || DEFAULT_BRIEF_PATH;
+  if (rawPath.includes('\0')) throw new Error('Brief path is invalid');
+
+  const root = resolve(cwd);
+  const absolutePath = isAbsolute(rawPath) ? resolve(rawPath) : resolve(root, rawPath);
+  if (!isInsideRoot(root, absolutePath)) throw new Error('Brief path must stay inside the project root');
+
+  const normalizedRoot = root.endsWith(sep) ? root : `${root}${sep}`;
+  const displayPath = absolutePath === root ? '.' : relative(root, absolutePath);
+  return { absolutePath, displayPath: absolutePath.startsWith(normalizedRoot) ? displayPath : absolutePath };
+}
+
+async function requireFlywheelBrief(cwd: string, requestedPath?: string): Promise<{ absolutePath: string; displayPath: string }> {
+  const resolved = resolveFlywheelStartBriefPath(cwd, requestedPath);
+  try {
+    await readFile(resolved.absolutePath, 'utf8');
+    return resolved;
+  } catch (error) {
+    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+    if (code === 'ENOENT') throw new Error(`Flywheel brief not found: ${resolved.displayPath}`);
+    throw error;
+  }
+}
+
+function mb(bytes: number): number {
+  return Math.round(bytes / 1024 / 1024);
+}
+
+async function createInitialFlywheelStatus(runId: string, startedAt: string, cwd: string, agentModel: string | undefined): Promise<FlywheelStatus> {
+  const ramTotalMb = mb(totalmem());
+  return {
+    runId,
+    startedAt,
+    elapsedMs: 0,
+    orchestrator: {
+      harness: 'claude-code',
+      model: agentModel ?? 'default',
+      effort: 'high',
+      ctxPercent: 0,
+    },
+    headline: {
+      bugsFixed: 0,
+      swarmItemsMerged: 0,
+      swarmItemsTotal: 0,
+      prsMerged: 0,
+      awaitingUat: 0,
+    },
+    activePipeline: [],
+    substrateBugs: [],
+    agents: [{
+      id: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
+      label: 'flywheel-orchestrator',
+      status: 'running',
+      role: 'flywheel',
+      model: agentModel,
+    }],
+    parked: [],
+    system: {
+      mainHead: await gitOutput('git rev-parse --short HEAD', cwd).catch(() => 'unknown'),
+      ramUsedMb: Math.max(0, ramTotalMb - mb(freemem())),
+      ramTotalMb,
+      swapUsedMb: 0,
+      swapTotalMb: 0,
+      agentsActive: 1,
+      agentsCap: 8,
+    },
+    openQuestions: [],
+    ticks: 0,
+    lastTickAt: startedAt,
+  };
+}
+
 export async function postFlywheelStatus(status: FlywheelStatus, fetchImpl: typeof fetch = fetch): Promise<void> {
   const res = await fetchImpl(`${dashboardBaseUrl()}/api/flywheel/status`, {
     method: 'POST',
@@ -84,6 +170,24 @@ export async function emitStatusCommand(options: EmitStatusOptions): Promise<voi
     const status = validateFlywheelStatusPayload(payload);
     await postFlywheelStatus(status);
     console.log(`Flywheel status emitted for ${status.runId}`);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
+export async function flywheelStartCommand(options: StartOptions = {}): Promise<void> {
+  try {
+    const cwd = options.cwd ?? process.cwd();
+    const brief = await requireFlywheelBrief(cwd, options.brief);
+    const runId = await nextFlywheelRunId();
+    const startedAt = new Date().toISOString();
+    const agent = await spawnFlywheel({ runId, briefPath: brief.absolutePath, workspace: cwd });
+    await writeLatestFlywheelStatus(await createInitialFlywheelStatus(runId, startedAt, cwd, agent.model));
+
+    console.log(`Flywheel started: ${runId}`);
+    console.log(`Brief: ${brief.displayPath}`);
+    console.log(`Run URL: ${dashboardBaseUrl()}/flywheel`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
@@ -383,6 +487,12 @@ export function registerFlywheelCommands(program: Command): void {
   const flywheel = program
     .command('flywheel')
     .description('Flywheel orchestrator lifecycle and status helpers');
+
+  flywheel
+    .command('start')
+    .description('Start the Flywheel orchestrator')
+    .option('--brief <path>', 'Path to the Flywheel brief', DEFAULT_BRIEF_PATH)
+    .action(flywheelStartCommand);
 
   flywheel
     .command('emit-status')
