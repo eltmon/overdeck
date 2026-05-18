@@ -1,0 +1,129 @@
+{
+  "version": "1",
+  "issueId": "PAN-1190",
+  "created": "2026-05-18T13:06:45.462Z",
+  "updated": "2026-05-18T13:25:00.000Z",
+  "gitState": { "branch": "feature/pan-1190", "sha": "49b94dd76", "dirty": false },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Canonical state is named 'verifying_on_main' (snake_case) to match in_progress / in_review; the GitHub label is 'verifying-on-main' (kebab-case); the UI badge text is 'VERIFYING'.",
+      "recordedAt": "2026-05-18T13:25:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "postMergeLifecycle becomes a non-destructive merge handoff. It still runs verification, mergeStatus update, stash drop, server deploy, Docker shutdown, reviewer/synthesis session kill, beads compaction, and TLDR reindex — but it stops closing the issue, deleting agent state dirs, tearing down the workspace, deleting branches, moving the PRD, and transitioning the vBRIEF. Those steps move into closeOut.",
+      "recordedAt": "2026-05-18T13:25:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Work agent + planning agent are paused at merge using the existing setAgentPaused() primitive in src/lib/agents.ts: paused=true with reason 'awaiting close-out (verify on main)' and stoppedByPause=true. tmux sessions are killed to free RAM, but ~/.panopticon/agents/<id>/state.json survives so the operator can `pan unpause <id>` if a regression surfaces.",
+      "recordedAt": "2026-05-18T13:25:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Reviewer/synthesis sessions are killed at MERGE (not at close-out). They have no context-recovery value once the merge has landed, but a non-trivial RSS cost. Today's behavior already kills them at merge; preserve it.",
+      "recordedAt": "2026-05-18T13:25:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "vBRIEF active→completed transition moves from merge time to close-out time. During verify phase the vBRIEF stays at 'running' / 'active', so a regression reopen does not require re-promoting the spec.",
+      "recordedAt": "2026-05-18T13:25:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "close_out config defaults: remove_workspace=false, delete_feature_branch=false, auto=false, auto_delay_minutes=60. Operators opt in to destruction explicitly; manual close-out is the default.",
+      "recordedAt": "2026-05-18T13:25:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "The new HTTP route is POST /api/issues/:id/close-out, registered in src/dashboard/server/routes/issues.ts via the Effect HttpRouter pattern. It calls closeOut(ctx) from src/lib/lifecycle/index.ts and returns the WorkflowResult.",
+      "recordedAt": "2026-05-18T13:25:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "mapGitHubStateToCanonical recognizes the legacy 'needs-close-out' label as equivalent to 'verifying-on-main' for backward compat. This lets mid-flight already-merged issues with the old label stay visible on the dashboard during rollout without a data migration.",
+      "recordedAt": "2026-05-18T13:25:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Auto close-out (when enabled) runs inside the existing Deacon patrol loop, NOT as a separate daemon. This complies with .claude/rules/single-deacon-invariant.md and reuses the existing patrol cadence.",
+      "recordedAt": "2026-05-18T13:25:00.000Z"
+    },
+    {
+      "id": "D10",
+      "summary": "KanbanBoard adds a new 'Verifying' column between Review and Done (rather than folding verifying_on_main into Done with only a badge), so operators can visually scan the verify backlog the same way they scan in_progress/in_review.",
+      "recordedAt": "2026-05-18T13:25:00.000Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "postMergeLifecycle spawns a detached deploy script (post-merge-deploy.sh) that rebuilds dist/ and restarts the server. After restart, the fresh server reads pending-post-merge.json and re-runs postMergeLifecycle with skipDeploy=true. The refactored non-destructive postMergeLifecycle must remain safe under this re-entry pattern.",
+      "mitigation": "Keep the _completedPostMerge Set guard. Ensure every step in the refactored function is idempotent: setReviewStatus is idempotent, label edits are idempotent (gh accepts --add-label even if already applied), setAgentPaused is idempotent, dropLingeringPreMergeStashes is idempotent. Add a test that runs postMergeLifecycle twice and asserts no double-cleanup symptoms."
+    },
+    {
+      "id": "H2",
+      "summary": "closeIssueWithCircuitBreaker in merge-agent.ts has retry-failure counters keyed by issueId. After the refactor it should be removed entirely (closeOut handles tracker close). Leaving dead code paths invites future agents to wire them back in.",
+      "mitigation": "Delete closeIssueWithCircuitBreaker, _closeIssueFailures, MAX_CLOSE_RETRIES, and the `closeIssue` import in merge-agent.ts as part of the split bead. Grep for any external callers of these before deletion."
+    },
+    {
+      "id": "H3",
+      "summary": "Issues currently in flight with the legacy 'needs-close-out' label (applied by the pre-PAN-1190 postMergeLifecycle) must not fall off the dashboard during rollout. They currently map to 'done' canonical state.",
+      "mitigation": "mapGitHubStateToCanonical (D8) treats 'needs-close-out' as equivalent to 'verifying-on-main' when the issue is OPEN. Closed issues with 'needs-close-out' continue to map to 'done' (terminal). Tested in add-canonical-state.ac8 and reopen-tolerance.ac4."
+    },
+    {
+      "id": "H4",
+      "summary": "Deacon orphan recovery (recoverOrphanedAgents) and autoResumeStoppedWorkAgents may incorrectly auto-resume paused-for-verify work agents, putting them back into 'running' state with no work to do (the PR is already merged).",
+      "mitigation": "deacon-recognize-verifying.ac1: explicit skip rule for state.paused=true && mergeStatus='merged'. PAN-489 already added a 'merged: true' stamp guard for the destroyed-state case; the new path uses paused=true + mergeStatus='merged' instead. Test by simulating Deacon patrol against a paused-for-verify fixture."
+    },
+    {
+      "id": "H5",
+      "summary": "Deep-wipe (POST /api/agents/:id/deep-wipe with deleteWorkspace=true) is irreversible and explicitly out of scope for close-out. Operators reading the 'Close Out' button might assume it's just as destructive.",
+      "mitigation": "Dashboard-verifying-ui.ac4: the Close Out confirmation modal explicitly lists the destructive steps that will run AND lists what is preserved (PRD, beads history, branch by default). Wording: 'Close Out finalizes the issue. This is not a deep-wipe.'"
+    },
+    {
+      "id": "H6",
+      "summary": "Auto close-out failing in a tight loop could burn API rate limits on the tracker (mirrors the PAN-328 incident: 24,626 Linear API calls before idempotency guards were added).",
+      "mitigation": "auto-closeout-poller.ac6 explicitly bans tight-loop retries. Failures back off by close_out.auto_delay_minutes and surface via emitActivityEntry so operators see them. Reuse the _completedPostMerge-style guard pattern."
+    },
+    {
+      "id": "H7",
+      "summary": "Polyrepo merges go through specialists.ts firePostMergeLifecycle and _serverManagedMerges, with separate guards (line 116-145 in routes/specialists.ts). The refactored postMergeLifecycle must remain compatible with the polyrepo path.",
+      "mitigation": "split-postmerge-nondestructive.ac5: idempotency guards still work after the refactor. Smoke-test the polyrepo path end-to-end before declaring the bead done."
+    },
+    {
+      "id": "H8",
+      "summary": "PAN-1148 (VerbBadge) may or may not be merged when PAN-1190 lands. If we import VerbBadge from a path that does not yet exist on main, the dashboard build breaks.",
+      "mitigation": "dashboard-verifying-ui.ac6: gracefully fall back to an inline badge with a TODO comment if VerbBadge isn't importable. If both PRs are in flight simultaneously, PAN-1190 ships the inline badge first; PAN-1148 consolidates after both land."
+    },
+    {
+      "id": "H9",
+      "summary": "Configuration drift: projects.yaml may not document the new close_out section, leaving operators unaware of the new knobs.",
+      "mitigation": "add-closeout-config-flags.ac5: update projects.yaml comments. docs-verifying-phase.ac3: update pan-close SKILL.md. Lint check in lint-skills.sh catches drift between CLI flags and skill docs."
+    },
+    {
+      "id": "H10",
+      "summary": "The vBRIEF transition moving from merge to close-out (D5) means an issue can sit in verify phase indefinitely with vBRIEF status='running' / 'active'. The dashboard's vBRIEF viewer needs to render this state sensibly (not as 'still running').",
+      "mitigation": "If the vBRIEF viewer renders 'active' or 'running' specially, add a small banner reading 'Merged — awaiting close-out' when issue canonical state is verifying_on_main. Optional polish; not blocking."
+    }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-18T13:06:45.462Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1190: Add post-merge UAT phase: merge ≠ done, close-out is a deliberate operator step",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-18T13:25:00.000Z",
+      "reason": "planning",
+      "note": "Auto-planning complete. 14 beads written to .pan/spec.vbrief.json with 2 deep-inspection foundation beads (add-canonical-state, split-postmerge-nondestructive). 10 autoDecisions recorded, 10 hazards mapped with mitigations. Forward-only change: already-merged-and-closed issues are not migrated; legacy 'needs-close-out' label remains recognized for back-compat.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
+}
