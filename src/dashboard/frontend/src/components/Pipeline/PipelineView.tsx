@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 
 import { useDashboardStore, selectAgentList, selectIssues } from '../../lib/store';
@@ -31,6 +32,22 @@ type ProjectOption = {
   id: string;
   name: string;
 };
+
+type IssueCost = {
+  issueId: string;
+  totalCost: number;
+};
+
+async function fetchIssueCosts(): Promise<Record<string, IssueCost>> {
+  const res = await fetch('/api/costs/by-issue');
+  if (!res.ok) return {};
+  const data = await res.json();
+  const costMap: Record<string, IssueCost> = {};
+  for (const issue of data.issues ?? []) {
+    costMap[String(issue.issueId).toLowerCase()] = issue;
+  }
+  return costMap;
+}
 
 function reviewStatusForIssue(reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>, issue: Issue) {
   return reviewStatusByIssueId[issue.identifier] ?? reviewStatusByIssueId[issue.identifier.toUpperCase()];
@@ -129,11 +146,37 @@ function filterMatchesShipModifier(filter: PipelineFilterState, reviewStatus?: R
   return true;
 }
 
+function isClosedIssue(issue: Issue) {
+  const state = issue.state ?? issue.status;
+  return issue.stateType === 'completed' || issue.stateType === 'canceled' || state === 'done' || state === 'canceled' || state === 'Closed' || state === 'Completed';
+}
+
+function isRunningAgent(agent: Agent) {
+  return agent.status !== 'stopped' && agent.status !== 'dead' && agent.status !== 'failed';
+}
+
+function formatCost(value: number) {
+  if (value >= 100) return `$${value.toFixed(0)}`;
+  if (value >= 10) return `$${value.toFixed(1)}`;
+  if (value >= 1) return `$${value.toFixed(2)}`;
+  if (value > 0) return `$${value.toFixed(3)}`;
+  return '$0';
+}
+
+function MetricIcon({ label }: { label: string }) {
+  return <span aria-hidden="true">{label}</span>;
+}
+
 export function PipelineView() {
   const issues = useDashboardStore(selectIssues) as Issue[];
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
   const openIssue = useDashboardStore((state) => state.openIssue);
+  const { data: issueCosts = {} } = useQuery({
+    queryKey: ['issueCosts'],
+    queryFn: fetchIssueCosts,
+    staleTime: 10000,
+  });
   const [filter, setFilter] = useState(readFilterState);
   const phaseRefs = useRef<Record<PipelineIssuePhase, HTMLElement | null>>({
     ship: null,
@@ -205,6 +248,42 @@ export function PipelineView() {
     return groups;
   }, [agentByIssueId, filter, issues, reviewStatusByIssueId]);
 
+  const metricTiles = useMemo(() => {
+    const activeIssues = issues.filter((issue) => !isClosedIssue(issue)).length;
+    const workRunning = agents.filter((agent) => agent.role === 'work' && isRunningAgent(agent)).length;
+    const reviewIssueIds = new Set<string>();
+
+    for (const agent of agents) {
+      if ((agent.role === 'review' || agent.role === 'test') && isRunningAgent(agent) && agent.issueId) {
+        reviewIssueIds.add(agent.issueId);
+      }
+    }
+
+    for (const status of Object.values(reviewStatusByIssueId)) {
+      if (
+        status.reviewStatus === 'reviewing' ||
+        status.testStatus === 'testing' ||
+        status.verificationStatus === 'running' ||
+        status.inspectStatus === 'inspecting'
+      ) {
+        reviewIssueIds.add(status.issueId);
+      }
+    }
+
+    const readyToShip = Object.values(reviewStatusByIssueId).filter(
+      (status) => status.readyForMerge === true && status.mergeStatus !== 'merged',
+    ).length;
+    const spend = Object.values(issueCosts).reduce((total, cost) => total + (cost.totalCost || 0), 0);
+
+    return [
+      { id: 'active', eyebrow: 'Active issues', value: activeIssues, sub: 'open pipeline', icon: <MetricIcon label="●" />, signal: 'info' as const },
+      { id: 'work', eyebrow: 'Work running', value: workRunning, sub: 'work agents', icon: <MetricIcon label="▶" />, signal: 'warning' as const },
+      { id: 'review', eyebrow: 'Review running', value: reviewIssueIds.size, sub: 'review gates', icon: <MetricIcon label="◆" />, signal: 'review' as const },
+      { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ready to merge', icon: <MetricIcon label="↑" />, signal: 'success' as const },
+      { id: 'spend', eyebrow: 'Spend', value: formatCost(spend), sub: '24h spend', icon: <MetricIcon label="$" />, signal: 'cost' as const },
+    ];
+  }, [agents, issueCosts, issues, reviewStatusByIssueId]);
+
   const visiblePhases = filter.phase === 'all' ? PHASES : [filter.phase];
 
   function updateFilter(next: PipelineFilterState, scrollToPhase?: PipelineIssuePhase) {
@@ -234,7 +313,7 @@ export function PipelineView() {
   return (
     <section className="flex h-full w-full flex-col overflow-hidden bg-background" data-component="pipeline-view">
       <TopBar title="Pipeline" eyebrow="Unified operations" />
-      <MetricStrip columns={5} tiles={[]} />
+      <MetricStrip columns={5} tiles={metricTiles} />
       <div className="flex shrink-0 flex-wrap items-center gap-[8px] border-b border-border bg-background px-[22px] py-[10px]" data-component="pipeline-filter-row">
         <div className="flex items-center gap-[4px] rounded-[var(--radius-sm)] border border-border bg-card p-[2px]" aria-label="Pipeline phase filter">
           {PHASE_FILTERS.map((phase) => (

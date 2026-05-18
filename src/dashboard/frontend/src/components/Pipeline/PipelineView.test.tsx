@@ -1,9 +1,24 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../../lib/store';
 import type { Issue } from '../../types';
 import { PipelineView } from './PipelineView';
+
+function renderPipelineView() {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: Infinity },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={client}>
+      <PipelineView />
+    </QueryClientProvider>,
+  );
+}
 
 function issue(overrides: Partial<Issue>): Issue {
   return {
@@ -23,6 +38,17 @@ function issue(overrides: Partial<Issue>): Issue {
 describe('PipelineView', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/costs/by-issue') {
+        return new Response(JSON.stringify({
+          issues: [
+            { issueId: 'PAN-1', totalCost: 1.25 },
+            { issueId: 'PAN-2', totalCost: 0.5 },
+          ],
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    }));
     useDashboardStore.setState({
       drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [
@@ -65,12 +91,23 @@ describe('PipelineView', () => {
           consecutiveFailures: 0,
           killCount: 0,
         },
+        'review-pan-4': {
+          id: 'review-pan-4',
+          issueId: 'PAN-4',
+          role: 'review',
+          status: 'running',
+          model: 'opus',
+          runtime: 'claude-code',
+          startedAt: '2026-05-18T01:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+        },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
   });
 
   it('renders the Pipeline shell from existing store state and groups issues by pipeline-state helpers', () => {
-    const { container } = render(<PipelineView />);
+    const { container } = renderPipelineView();
 
     const topBar = container.querySelector('[data-component="top-bar"]');
     const strip = container.querySelector('[data-component="metric-strip"]');
@@ -91,7 +128,7 @@ describe('PipelineView', () => {
   });
 
   it('sorts rows within each phase by priority rank then updatedAt descending', () => {
-    const { container } = render(<PipelineView />);
+    const { container } = renderPipelineView();
     const workPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="work"]') as HTMLElement;
 
     expect(
@@ -102,8 +139,32 @@ describe('PipelineView', () => {
     ).toEqual(['PAN-6', 'PAN-7', 'PAN-2']);
   });
 
+  it('renders reactive metric tiles from store state and the Board cost rollup query', async () => {
+    renderPipelineView();
+
+    const strip = screen.getByText('Active issues').closest('[data-component="metric-strip"]') as HTMLElement;
+
+    expect(within(strip).getByText('Active issues')).toBeInTheDocument();
+    expect(within(strip).getByText('Work running')).toBeInTheDocument();
+    expect(within(strip).getByText('Review running')).toBeInTheDocument();
+    expect(within(strip).getByText('Ship')).toBeInTheDocument();
+    expect(within(strip).getByText('Spend')).toBeInTheDocument();
+    expect(await within(strip).findByText('$1.75')).toBeInTheDocument();
+
+    const tiles = Array.from(strip.querySelectorAll('[data-component="metric-tile"]'));
+    expect(tiles.map((tile) => tile.getAttribute('data-signal'))).toEqual(['info', 'warning', 'review', 'success', 'cost']);
+    expect(tiles.map((tile) => tile.querySelector('[data-component="metric-tile-value"]')?.textContent)).toEqual([
+      '7',
+      '1',
+      '1',
+      '1',
+      '$1.75',
+    ]);
+    expect(fetch).toHaveBeenCalledWith('/api/costs/by-issue');
+  });
+
   it('opens the issue drawer from a Pipeline row without disturbing scroll position', () => {
-    const { container } = render(<PipelineView />);
+    const { container } = renderPipelineView();
     const scroller = container.querySelector('[data-component="pipeline-view"] > .flex-1') as HTMLElement;
     scroller.scrollTop = 160;
 
@@ -118,7 +179,7 @@ describe('PipelineView', () => {
   });
 
   it('syncs phase and project filters to the URL', () => {
-    render(<PipelineView />);
+    renderPipelineView();
 
     fireEvent.click(screen.getByRole('button', { name: 'work' }));
     expect(window.location.search).toBe('?phase=work');
@@ -137,7 +198,7 @@ describe('PipelineView', () => {
   });
 
   it('maps ship modifiers to the legacy merge subviews', () => {
-    const { unmount } = render(<PipelineView />);
+    const { unmount } = renderPipelineView();
 
     fireEvent.click(screen.getByRole('button', { name: 'Blocked' }));
     expect(new URLSearchParams(window.location.search).get('phase')).toBe('ship');
@@ -147,7 +208,7 @@ describe('PipelineView', () => {
 
     unmount();
     window.history.replaceState(null, '', '/');
-    render(<PipelineView />);
+    renderPipelineView();
 
     fireEvent.click(screen.getByRole('button', { name: 'No PR' }));
     expect(new URLSearchParams(window.location.search).get('phase')).toBe('ship');

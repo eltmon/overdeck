@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-18T22:08:00.000Z"
+  "updated": "2026-05-18T22:13:00.000Z",
   "gitState": {
     "branch": "feature/pan-1148",
-    "sha": "fa25b957d"
+    "sha": "81e2464b7",
     "dirty": false
   },
   "decisions": [
@@ -434,6 +434,10 @@
     "p3-pipeline-phase-grouping.ac1": "completed",
     "p3-pipeline-phase-grouping.ac2": "completed",
     "p3-pipeline-phase-grouping.ac3": "completed",
-    "p3-pipeline-phase-grouping.ac4": "completed"
+    "p3-pipeline-phase-grouping.ac4": "completed",
+    "p2-pipeline-metric-strip": "completed",
+    "p2-pipeline-metric-strip.ac1": "completed",
+    "p2-pipeline-metric-strip.ac2": "completed",
+    "p2-pipeline-metric-strip.ac3": "completed"
   }
 }
