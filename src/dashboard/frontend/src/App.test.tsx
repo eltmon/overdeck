@@ -67,6 +67,7 @@ vi.mock('./components/search/SearchModal', () => ({ SearchModal: () => null }));
 vi.mock('./components/CommandPalette', () => ({ CommandPalette: () => null }));
 vi.mock('./components/ResourcesPanel', () => ({ ResourcesPanel: () => null }));
 vi.mock('./components/GodView', () => ({ GodViewPage: () => null }));
+vi.mock('./components/flywheel/FlywheelConversationPane', () => ({ FlywheelConversationPane: () => <div data-testid="flywheel-page" /> }));
 vi.mock('./components/Sidebar', () => ({ Sidebar: () => null }));
 vi.mock('./components/BootstrapGate', () => ({ BootstrapGate: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('./components/skeletons/KanbanSkeleton', () => ({ KanbanSkeleton: () => null }));
@@ -185,6 +186,15 @@ describe('conversation route helpers', () => {
         '55': 'terminal',
         '161': 'terminal',
       },
+    });
+  });
+
+  it('maps the Flywheel URL to the flywheel tab', () => {
+    window.history.replaceState(null, '', '/flywheel');
+
+    expect(getConversationRouteState()).toMatchObject({
+      tab: 'flywheel',
+      convId: null,
     });
   });
 });
