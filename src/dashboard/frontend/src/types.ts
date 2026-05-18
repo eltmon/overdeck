@@ -27,7 +27,7 @@ export interface Issue {
   project?: LinearProject;
   source?: IssueSource;
   sourceRepo?: string;
-  state?: string;  // Canonical issue state (e.g. 'canceled', 'done', 'in_review')
+  state?: CanonicalState;  // Canonical issue state (e.g. 'canceled', 'done', 'verifying_on_main')
   shadowStatus?: 'open' | 'in_progress' | 'closed';  // Shadow mode status tracking
   targetCanonicalState?: CanonicalState;  // Explicit column placement from drag-drop
   shadowedAt?: string;  // When shadow state was created
@@ -154,6 +154,7 @@ export type CanonicalState =
   | 'todo'
   | 'in_progress'
   | 'in_review'
+  | 'verifying_on_main'
   | 'done'
   | 'canceled';
 
@@ -165,6 +166,7 @@ export const STATUS_ORDER: CanonicalState[] = [
   'todo',
   'in_progress',
   'in_review',
+  'verifying_on_main',
   'done'
 ];
 
@@ -194,6 +196,11 @@ export const STATUS_LABELS: Record<string, CanonicalState> = {
   'QA': 'in_review',
   'Testing': 'in_review',
 
+  // Verifying states
+  'Verifying': 'verifying_on_main',
+  'Verifying On Main': 'verifying_on_main',
+  'verifying-on-main': 'verifying_on_main',
+
   // Done states
   'Done': 'done',
   'Completed': 'done',
@@ -215,6 +222,7 @@ export const STATE_TYPE_MAP: Record<CanonicalState, StateType> = {
   todo: 'unstarted',
   in_progress: 'started',
   in_review: 'started',
+  verifying_on_main: 'started',
   done: 'completed',
   canceled: 'canceled',
 };
