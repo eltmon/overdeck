@@ -1649,7 +1649,11 @@ async function createSlotWorktree(
     const localList = localBranches.split('\n').map(b => b.replace(/^[*+\s]+/, '').trim()).filter(Boolean);
     const remoteList = remoteBranches.split('\n').map(b => b.trim()).filter(Boolean);
     parentBranch = await resolveParentFeatureBranch(projectPath, issueUpper, localList, remoteList);
-    slotBranch = `${parentBranch}/slot-${slotNum}`;
+    // PAN-1176: slot branches are siblings (`feature/<parent>-slot-N`), not
+    // children (`feature/<parent>/slot-N`). Git refuses to create a sub-tree
+    // ref under a leaf ref — the parent `feature/<parent>` blocks any
+    // `feature/<parent>/...` creation. Sibling naming sidesteps the collision.
+    slotBranch = `${parentBranch}-slot-${slotNum}`;
 
     if (existsSync(workspacePath)) {
       return { success: true, workspacePath, branch: slotBranch, parentBranch };
@@ -1852,7 +1856,7 @@ function buildSynthesisPrompt(
       deliverableLines.push(
         `- **${parent.id}: ${parent.title}**`,
         `  - slot ${slot.slotId}, status \`${slot.status}\``,
-        `  - branch: \`${parentBranch}/slot-${slot.slotId}\``,
+        `  - branch: \`${parentBranch}-slot-${slot.slotId}\``,
         `  - merge target: \`${parentBranch}\``,
         `  - slot workspace: \`${slot.workspace || '(not yet created)'}\``,
         `  - tmux session: \`${slot.sessionName}\``,
@@ -1876,9 +1880,9 @@ function buildSynthesisPrompt(
     `cd <your synthesis workspace>`,
     `# changed files merged into the parent feature branch by each upstream slot:`,
     `git fetch origin`,
-    `git diff --stat origin/${parentBranch}...origin/${parentBranch}/slot-<N>`,
+    `git diff --stat origin/${parentBranch}...origin/${parentBranch}-slot-<N>`,
     `# full diff for review:`,
-    `git log --stat origin/${parentBranch}/slot-<N> ^origin/main`,
+    `git log --stat origin/${parentBranch}-slot-<N> ^origin/main`,
     '```',
     '',
     'Upstream parent items and their delivery records:',

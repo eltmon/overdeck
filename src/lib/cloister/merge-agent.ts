@@ -243,20 +243,25 @@ async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string,
 }
 
 /**
- * Detect a swarm slot branch like `feature/977/slot-3` or `feature/pan-977/slot-3`.
+ * Detect a swarm slot branch like `feature/977-slot-3` or `feature/pan-977-slot-3`.
  * Slot branches merge into their parent feature branch, NOT into main, so we must NOT
  * run the full per-issue post-merge lifecycle for them. Instead we drive
  * `onSlotMergeComplete()` so the swarm runtime advances per-item.
+ *
+ * PAN-1176: the slot branch suffix uses `-slot-N` (hyphen), not `/slot-N`
+ * (slash). Git refuses to create `feature/<parent>/slot-N` when
+ * `feature/<parent>` already exists as a leaf ref — refs cannot have both a
+ * leaf and a sub-tree at the same path. Sibling names (`feature/<parent>` and
+ * `feature/<parent>-slot-N`) avoid the collision.
  */
-const SLOT_BRANCH_PATTERN = /^feature\/[^/]+\/slot-(\d+)$/;
+const SLOT_BRANCH_PATTERN = /^feature\/(.+)-slot-(\d+)$/;
 function parseSlotBranch(branch: string | undefined | null): { itemSlot: number; issueLower: string } | null {
   if (!branch) return null;
   const match = SLOT_BRANCH_PATTERN.exec(branch);
   if (!match) return null;
-  const slot = Number.parseInt(match[1], 10);
+  const slot = Number.parseInt(match[2], 10);
   if (!Number.isInteger(slot) || slot <= 0) return null;
-  const issueLower = branch.split('/')[1];
-  return { itemSlot: slot, issueLower };
+  return { itemSlot: slot, issueLower: match[1] };
 }
 
 export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string, options?: { skipDeploy?: boolean }): Promise<void> {

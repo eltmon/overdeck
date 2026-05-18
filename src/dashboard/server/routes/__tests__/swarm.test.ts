@@ -238,7 +238,7 @@ describe('swarm route helpers', () => {
       },
       1,
       2,
-      'feature/971/slot-2',
+      'feature/971-slot-2',
       'feature/971',
     );
 
@@ -251,7 +251,7 @@ describe('swarm route helpers', () => {
       title: 'Dispatch next wave',
       wave_index: 1,
       slot: 2,
-      branch: 'feature/971/slot-2',
+      branch: 'feature/971-slot-2',
       pr_target: 'feature/971',
       workspace_plan_path: '.pan/spec.vbrief.json',
       dependencies: [
@@ -277,7 +277,7 @@ describe('swarm route helpers', () => {
       },
       1,
       2,
-      'feature/971/slot-2',
+      'feature/971-slot-2',
       'feature/971',
     );
 
@@ -292,7 +292,7 @@ describe('swarm route helpers', () => {
     };
 
     expect(parsed.schema).toBe('AgentTaskInput');
-    expect(parsed.branch).toBe('feature/971/slot-2');
+    expect(parsed.branch).toBe('feature/971-slot-2');
     expect(parsed.pr_target).toBe('feature/971');
     expect(parsed.dependencies).toEqual([{ item_id: 'wave-0-item', title: 'Prepare slot input' }]);
     expect(prompt).toContain('The plan is in .pan/spec.vbrief.json');
