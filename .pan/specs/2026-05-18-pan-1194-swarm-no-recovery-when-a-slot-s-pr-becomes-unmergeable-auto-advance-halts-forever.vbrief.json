@@ -4,7 +4,7 @@
     "created": "2026-05-18T22:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1194: Swarm: no recovery when a slot's PR becomes unmergeable — auto-advance halts forever",
-    "updated": "2026-05-18T23:48:43.465Z"
+    "updated": "2026-05-18T23:49:31.687Z"
   },
   "plan": {
     "id": "pan-1194",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8452620e-f664-41c0-b8b4-4fb39fe2205f",
     "author": "agent:claude-opus-4-7",
-    "sequence": 16,
+    "sequence": 22,
     "created": "2026-05-18T22:40:00.000Z",
-    "updated": "2026-05-18T23:48:43.465Z",
+    "updated": "2026-05-18T23:49:31.687Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1194",
@@ -623,44 +623,57 @@
         "phase": "work",
         "issueId": "PAN-1194",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-18T23:27:35.026Z",
+        "updatedAt": "2026-05-18T23:49:31.681Z",
         "work": {
-          "updatedAt": "2026-05-18T23:27:35.026Z",
+          "updatedAt": "2026-05-18T23:49:31.681Z",
           "history": []
         },
         "verification": {
-          "updatedAt": "2026-05-18T23:27:35.026Z",
-          "history": []
-        },
-        "review": {
           "status": "pending",
-          "updatedAt": "2026-05-18T23:27:35.026Z",
+          "updatedAt": "2026-05-18T23:49:31.681Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-18T23:27:35.026Z"
+              "at": "2026-05-18T23:49:31.681Z"
+            }
+          ]
+        },
+        "review": {
+          "status": "pending",
+          "updatedAt": "2026-05-18T23:49:31.681Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-18T23:49:31.681Z"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-18T23:27:35.026Z",
+          "updatedAt": "2026-05-18T23:49:31.681Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-18T23:27:35.026Z"
+              "at": "2026-05-18T23:49:31.681Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-18T23:27:35.026Z",
+          "updatedAt": "2026-05-18T23:49:31.681Z",
           "history": []
         },
         "merge": {
-          "updatedAt": "2026-05-18T23:27:35.026Z",
-          "history": [],
-          "readyForMerge": false
+          "status": "pending",
+          "updatedAt": "2026-05-18T23:49:31.681Z",
+          "history": [
+            {
+              "status": "pending",
+              "at": "2026-05-18T23:49:31.681Z"
+            }
+          ],
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1206"
         }
       }
     }
