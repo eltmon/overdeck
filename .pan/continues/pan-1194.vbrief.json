@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1194",
   "created": "2026-05-18T22:07:39.007Z",
-  "updated": "2026-05-18T22:40:00.000Z",
+  "updated": "2026-05-18T22:43:40.583Z",
   "gitState": {
     "branch": "feature/pan-1194",
-    "sha": "09f233573",
+    "sha": "7124b658c",
     "dirty": false
   },
   "decisions": [
@@ -58,6 +58,11 @@
       "id": "D10",
       "summary": "Tests for retry/backoff paths MUST use `vi.useFakeTimers()` per `.claude/rules/fake-timers-for-retry-tests.md`. The auto-advance poll loop, mergeability gh-call timeout, and recovery action backoff clears must all be exercised under fake timers.",
       "recordedAt": "2026-05-18T22:40:00.000Z"
+    },
+    {
+      "id": "D11",
+      "summary": "Repaired the bead dependency direction for type-additions before implementation: the tracker had type-additions depending on its downstream beads, while the vBRIEF makes type-additions the blocker for mergeability-detector, recovery-endpoint, and frontend-visual. The beads graph now matches the canonical vBRIEF for PAN-1194.",
+      "recordedAt": "2026-05-18T22:43:40.583Z"
     }
   ],
   "hazards": [
@@ -102,7 +107,16 @@
       "mitigation": "Pass the post-first-pass `state` into `refreshSwarmSlotMergeability` and have it return `{ state, changed }` with the same contract as `refreshSwarmSlotStatuses`. Call them sequentially and combine `changed` flags before the single `saveSwarmState` write."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "Type-additions bead workspace-0pbz is committed at 7124b658c. Close the bead, run its required deep inspection, then start the next unblocked foundational bead after INSPECTION PASSED.",
+    "beadId": "workspace-0pbz",
+    "filesToRead": [
+      "src/dashboard/server/routes/swarm.ts",
+      "src/lib/vbrief/continue-state.ts",
+      "src/dashboard/server/routes/__tests__/swarm.test.ts",
+      ".pan/spec.vbrief.json"
+    ]
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
   "sessionHistory": [
@@ -111,6 +125,12 @@
       "reason": "planning",
       "note": "Initial planning session (auto mode)",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-18T22:43:40.583Z",
+      "reason": "end",
+      "note": "Implemented type-additions: widened swarm slot/runtime status to failed-merge, preserved consecutiveConflictCount and prUrl through runtime mapping, added round-trip regression test, ran swarm test and typecheck, updated graph and vBRIEF status, committed 7124b658c.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []
