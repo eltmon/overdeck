@@ -533,7 +533,6 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       generateLauncherScript({
         role: 'plan',
         workingDir: workspacePath,
-        setCi: true,
         setTerminalEnv: true,
         panopticonEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
         providerExports,

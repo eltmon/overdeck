@@ -1998,7 +1998,7 @@ export async function buildAgentLaunchConfig(opts: {
       spawnMode: 'resume',
       workingDir: opts.workspace,
       changeDir: false,
-      setCi: true,
+      setTerminalEnv: true,
       providerExports,
       // PAN-1048 + PAN-1055: claude-code resumes load the role-specific
       // frontmatter (roleAgentDefinitionPath); pi resumes route through
@@ -2032,7 +2032,6 @@ export async function buildAgentLaunchConfig(opts: {
     role: launchRole,
     workingDir: opts.workspace,
     changeDir: false,
-    setCi: true,
     setTerminalEnv: true,
     providerExports,
     cavemanExports,
@@ -2294,7 +2293,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     role,
     workingDir: workspace,
     changeDir: false,
-    setCi: true,
     setTerminalEnv: true,
     providerExports,
     promptFile: shouldDeliverPromptViaTmux ? undefined : promptFile,
@@ -3035,7 +3033,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       role: resumeRole,
       workingDir: agentState.workspace,
       changeDir: false,
-      setCi: true,
+      setTerminalEnv: true,
       providerExports,
       baseCommand: await getRoleRuntimeBaseCommand(
         resumeModel,

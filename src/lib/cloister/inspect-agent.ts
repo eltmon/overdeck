@@ -230,7 +230,6 @@ export async function spawnInspectAgent(
       generateLauncherScript({
         role: 'work',
         workingDir: context.workspace,
-        setCi: true,
         setTerminalEnv: true,
         unsetProviderEnv: true,
         providerExports: Object.entries(providerEnv)

@@ -85,7 +85,6 @@ export interface LauncherConfig {
   extraArgs?: string;
 
   // Env shaping
-  setCi?: boolean;
   setTerminalEnv?: boolean;
   providerExports?: string;
   unsetProviderEnv?: boolean;
@@ -180,11 +179,6 @@ export function generateLauncherScript(config: LauncherConfig): string {
   // Pipefail
   if (config.setPipefail) {
     lines.push('set -o pipefail');
-  }
-
-  // CI
-  if (config.setCi) {
-    lines.push('export CI=1');
   }
 
   // Trust mkcert CA so agent CLI commands can reach https://pan.localhost

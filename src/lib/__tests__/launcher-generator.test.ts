@@ -11,13 +11,11 @@ describe('generateLauncherScript', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
-      setCi: true,
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
-      export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6
@@ -29,7 +27,6 @@ describe('generateLauncherScript', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
-      setCi: true,
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"\nexport ANTHROPIC_AUTH_TOKEN="tok"',
       cavemanExports: 'export CAVEMAN_DEFAULT_MODE="active"\n',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.4',
@@ -37,7 +34,6 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
-      export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
@@ -53,7 +49,6 @@ describe('generateLauncherScript', () => {
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'resume',
-      setCi: true,
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
       baseCommand: 'claude --agent pan-work-agent',
       resumeSessionId: 'sess-123',
@@ -62,7 +57,6 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
-      export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
@@ -76,7 +70,6 @@ describe('generateLauncherScript', () => {
       ...DEFAULT_CONFIG,
       role: 'plan',
       workingDir: '/workspace/project',
-      setCi: true,
       setTerminalEnv: true,
       panopticonEnv: { agentId: 'plan-abc', issueId: 'PAN-824', sessionType: 'planning' },
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
@@ -89,7 +82,6 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
-      export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export TERM=xterm-256color
       export COLORTERM=truecolor
@@ -123,7 +115,6 @@ describe('generateLauncherScript', () => {
       setPipefail: true,
       unsetProviderEnv: true,
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
-      setCi: true,
       panopticonEnv: { agentId: 'spec-123', issueId: 'PAN-824', sessionType: 'correctness-review' },
       cavemanExports: 'export CAVEMAN_DEFAULT_MODE="active"\n',
       promptFile: '/tmp/prompt.md',
@@ -136,7 +127,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
       set -o pipefail
-      export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export PANOPTICON_AGENT_ID='spec-123'
       export PANOPTICON_ISSUE_ID='PAN-824'
@@ -412,14 +402,12 @@ describe('generateLauncherScript', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
-      setCi: true,
       changeDir: false,
       baseCommand: 'claude --model claude-sonnet-4-6',
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       unset TMUX TMUX_PANE STY
-      export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       exec claude --model claude-sonnet-4-6
       "
@@ -434,7 +422,6 @@ describe('generateLauncherScript', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
-      setCi: true,
       baseCommand: 'claude --agent pan-work-agent',
     });
     expect(script).toContain('exec claude --agent pan-work-agent');
@@ -447,7 +434,6 @@ describe('generateLauncherScript', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
-      setCi: true,
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
       baseCommand: 'claude --agent pan-work-agent --model gpt-5.4',
     });
@@ -460,7 +446,6 @@ describe('generateLauncherScript', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'plan',
-      setCi: true,
       promptFile: '/tmp/init-prompt.txt',
       baseCommand: 'claude --agent pan-planning-agent',
       keepAlive: true,
@@ -474,7 +459,6 @@ describe('generateLauncherScript', () => {
       ...DEFAULT_CONFIG,
       role: 'work',
       spawnMode: 'resume',
-      setCi: true,
       baseCommand: 'claude --agent pan-work-agent',
       resumeSessionId: 'sess-123',
     });
@@ -501,7 +485,6 @@ describe('generateLauncherScript', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
-      setCi: true,
       baseCommand: 'claude --agent pan-work-agent --name agent-pan-982',
     });
     expect(script).toContain('--agent pan-work-agent');
@@ -557,7 +540,6 @@ describe('generateLauncherWrapper', () => {
     const FIXTURE_CONFIG: LauncherConfig = {
       ...DEFAULT_CONFIG,
       role: 'work',
-      setCi: true,
       baseCommand:
         'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
       sessionId: 'sess-abc',
@@ -569,7 +551,6 @@ describe('generateLauncherWrapper', () => {
         [
           '#!/bin/bash',
           'unset TMUX TMUX_PANE STY',
-          'export CI=1',
           'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',
           "cd -- '/workspace/project'",
           "exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc'",
@@ -747,13 +728,11 @@ describe('generateLauncherScript — Pi harness (PAN-636)', () => {
     const a = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
-      setCi: true,
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
     const b = generateLauncherScript({
       ...DEFAULT_CONFIG,
       role: 'work',
-      setCi: true,
       harness: 'claude-code',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
