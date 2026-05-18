@@ -490,7 +490,6 @@ export function ComposerPromptEditor({
     if (slashIdx < 0) return null;
 
     const afterSlash = text.slice(slashIdx + 1);
-    if (/\s/.test(afterSlash)) return null;
 
     return {
       slashIdx,
