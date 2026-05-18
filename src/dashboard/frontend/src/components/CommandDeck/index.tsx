@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Compass, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
-import { ProjectOverview, type IssueCostBreakdown } from './ProjectOverview';
+import { ProjectLens } from './ProjectLens';
+import type { IssueCostBreakdown } from './ProjectOverview';
 import { DeaconStatus } from './DeaconStatus';
 import { IssueWorkbench } from './IssueWorkbench';
 import { BeadsDialog } from '../BeadsDialog';
@@ -1200,12 +1201,14 @@ export function CommandDeck({
               issue={selectedIssue ?? undefined}
             />
           ) : selectedProject ? (
-            <ProjectOverview
+            <ProjectLens
               projectName={selectedProject}
               features={selectedProjectData?.features ?? []}
               issueCosts={issueCosts}
               issueCostDetails={issueCostDetails}
               onSelectFeature={(feature) => handleSelectFeature(feature.issueId)}
+              issues={issues}
+              agents={agents}
             />
           ) : (
             <div className={styles.contentEmpty}>
