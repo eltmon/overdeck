@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
@@ -6,6 +7,7 @@ import { useDashboardStore, selectAgentList, selectIssues } from '../../lib/stor
 import { cn } from '../../lib/utils';
 import type { Agent, Issue } from '../../types';
 import AgentCard, { type AgentCardRole } from '../primitives/AgentCard';
+import MetricStrip from '../primitives/MetricStrip';
 import type { VerbBadgeProps } from '../primitives/VerbBadge';
 
 const ROLE_ORDER = {
@@ -30,6 +32,21 @@ type FilterOption = {
   id: string;
   name: string;
 };
+
+type CostTrend = {
+  totalCost?: number;
+  totalTokens?: number;
+};
+
+type CostTrendsResponse = {
+  trends?: CostTrend[];
+};
+
+async function fetchCostTrends(): Promise<CostTrendsResponse> {
+  const res = await fetch('/api/costs/trends?days=1');
+  if (!res.ok) return { trends: [] };
+  return res.json();
+}
 
 function agentRole(agent: Agent): AgentCardRole {
   return agent.role ?? 'work';
@@ -58,6 +75,28 @@ function formatDuration(ms: number) {
   const minutes = Math.floor((safeMs % 3_600_000) / 60_000);
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
+}
+
+function formatCost(value: number) {
+  if (value >= 100) return `$${value.toFixed(0)}`;
+  if (value >= 10) return `$${value.toFixed(1)}`;
+  if (value >= 1) return `$${value.toFixed(2)}`;
+  if (value > 0) return `$${value.toFixed(3)}`;
+  return '$0';
+}
+
+function formatTokens(tokens: number) {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(0)}K`;
+  return String(tokens);
+}
+
+function isRunningAgent(agent: Agent) {
+  return agent.status !== 'stopped' && agent.status !== 'dead' && agent.status !== 'failed' && agent.status !== 'stuck';
+}
+
+function MetricIcon({ label }: { label: string }) {
+  return <span aria-hidden="true">{label}</span>;
 }
 
 function stuckHours(agent: Agent, now: Date) {
@@ -187,6 +226,11 @@ export function FleetAgentsView() {
   const agentOutputById = useDashboardStore((state) => state.agentOutputById);
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [filter, setFilter] = useState(readFilterState);
+  const { data: costTrends = { trends: [] } } = useQuery({
+    queryKey: ['agents-cost-trends'],
+    queryFn: fetchCostTrends,
+    staleTime: 10_000,
+  });
 
   const issuesById = useMemo(() => {
     const map = new Map<string, Issue>();
@@ -235,6 +279,34 @@ export function FleetAgentsView() {
     return true;
   }), [filter, fleetAgents, issuesById]);
 
+  const metricTiles = useMemo(() => {
+    const runningAgents = fleetAgents.filter(isRunningAgent);
+    const stuckAgents = fleetAgents.filter((agent) => agent.status === 'stuck' || agent.troubled || agent.status === 'failed');
+    const queuedAgents = fleetAgents.filter((agent) => agent.status === 'starting');
+    const avgRuntime = runningAgents.length === 0
+      ? 0
+      : runningAgents.reduce((total, agent) => total + Math.max(0, now.getTime() - new Date(agent.startedAt).getTime()), 0) / runningAgents.length;
+    const cost24h = costTrends.trends?.reduce((total, trend) => total + (trend.totalCost ?? 0), 0) ?? 0;
+    const tokens24h = costTrends.trends?.reduce((total, trend) => total + (trend.totalTokens ?? 0), 0) ?? 0;
+
+    return [
+      { id: 'running', eyebrow: 'Running', value: runningAgents.length, sub: 'live agents', icon: <MetricIcon label="▶" />, signal: 'info' as const },
+      { id: 'stuck', eyebrow: 'Stuck', value: stuckAgents.length, sub: 'needs attention', icon: <MetricIcon label="!" />, signal: 'destructive' as const },
+      {
+        id: 'cost',
+        eyebrow: 'Cost 24h',
+        value: formatCost(cost24h),
+        sub: 'canonical /costs',
+        icon: <MetricIcon label="$" />,
+        signal: 'cost' as const,
+        title: 'Open /costs for canonical 24h spend numbers',
+      },
+      { id: 'tokens', eyebrow: 'Tokens 24h', value: formatTokens(tokens24h), sub: 'cost events', icon: <MetricIcon label="#" />, signal: 'muted' as const },
+      { id: 'runtime', eyebrow: 'Avg runtime', value: formatDuration(avgRuntime), sub: 'running agents', icon: <MetricIcon label="⏱" />, signal: 'review' as const },
+      { id: 'queue', eyebrow: 'Queue', value: queuedAgents.length, sub: 'starting agents', icon: <MetricIcon label="…" />, signal: 'warning' as const },
+    ];
+  }, [costTrends.trends, fleetAgents, now]);
+
   function updateFilter(next: AgentsFilterState) {
     setFilter(next);
     replaceFilterUrl(next);
@@ -268,6 +340,7 @@ export function FleetAgentsView() {
 
   return (
     <section data-component="fleet-agents-view" className="p-6">
+      <MetricStrip tiles={metricTiles} columns={6} variant="agents" className="mb-[14px]" />
       <div className="mb-[14px] flex flex-wrap items-center gap-[8px] rounded-[18px] border border-border bg-background/80 px-[12px] py-[10px]" data-component="agents-filter-row">
         <div className="flex items-center gap-[4px] rounded-[var(--radius-sm)] border border-border bg-card p-[2px]" aria-label="Agents phase filter">
           <button

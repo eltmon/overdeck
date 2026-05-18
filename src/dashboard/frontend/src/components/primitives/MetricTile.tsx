@@ -20,6 +20,7 @@ export type MetricTileProps = {
   signal: MetricSignal;
   variant?: MetricTileVariant;
   className?: string;
+  title?: string;
 };
 
 const SIGNAL_ICON_CLASSES = {
@@ -61,12 +62,14 @@ export default function MetricTile({
   signal,
   variant = 'pipeline',
   className,
+  title,
 }: MetricTileProps) {
   return (
     <div
       data-component="metric-tile"
       data-signal={signal}
       data-variant={variant}
+      title={title}
       className={cn(
         'rounded-[18px] border border-border bg-card',
         TILE_PADDING_CLASSES[variant],

@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../../lib/store';
@@ -35,6 +36,22 @@ function issue(overrides: Partial<Issue>): Issue {
   };
 }
 
+function renderFleetView() {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: Infinity },
+      mutations: { retry: false },
+    },
+  });
+  client.setQueryData(['agents-cost-trends'], { trends: [{ totalCost: 12.34, totalTokens: 456_000 }] });
+
+  return render(
+    <QueryClientProvider client={client}>
+      <FleetAgentsView />
+    </QueryClientProvider>,
+  );
+}
+
 describe('FleetAgentsView', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -61,6 +78,13 @@ describe('FleetAgentsView', () => {
         'agent-stuck': ['review started', 'waiting for output'],
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/costs/trends?days=1') {
+        return new Response(JSON.stringify({ trends: [{ totalCost: 12.34, totalTokens: 456_000 }] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    }));
   });
 
   afterEach(() => {
@@ -68,7 +92,7 @@ describe('FleetAgentsView', () => {
   });
 
   it('renders running, stuck, and idle AgentCard primitives in the fleet grid', () => {
-    render(<FleetAgentsView />);
+    renderFleetView();
 
     expect(screen.getByText('agent-running')).toBeInTheDocument();
     expect(screen.getByText('agent-stuck')).toBeInTheDocument();
@@ -77,8 +101,31 @@ describe('FleetAgentsView', () => {
     expect(screen.getByText('working on PAN-1')).toBeInTheDocument();
   });
 
+  it('renders the six Agents metric tiles in order with live cost totals', () => {
+    renderFleetView();
+
+    const tiles = Array.from(document.querySelectorAll('[data-component="metric-tile"]'));
+
+    expect(tiles).toHaveLength(6);
+    expect(tiles.map((tile) => within(tile as HTMLElement).getByText(/Running|Stuck|Cost 24h|Tokens 24h|Avg runtime|Queue/).textContent)).toEqual([
+      'Running',
+      'Stuck',
+      'Cost 24h',
+      'Tokens 24h',
+      'Avg runtime',
+      'Queue',
+    ]);
+    expect(tiles.map((tile) => tile.getAttribute('data-signal'))).toEqual(['info', 'destructive', 'cost', 'muted', 'review', 'warning']);
+    expect(within(tiles[0] as HTMLElement).getByText('1')).toBeInTheDocument();
+    expect(within(tiles[1] as HTMLElement).getByText('1')).toBeInTheDocument();
+    expect(within(tiles[2] as HTMLElement).getByText('$12.3')).toBeInTheDocument();
+    expect(within(tiles[3] as HTMLElement).getByText('456K')).toBeInTheDocument();
+    expect(within(tiles[4] as HTMLElement).getByText('3h 0m')).toBeInTheDocument();
+    expect(tiles[2]).toHaveAttribute('title', 'Open /costs for canonical 24h spend numbers');
+  });
+
   it('renders stuck agents with the destructive override and stuck verb badge', () => {
-    render(<FleetAgentsView />);
+    renderFleetView();
 
     expect(screen.getByText('STUCK · 2h')).toBeInTheDocument();
     expect(screen.getByText('No response from agent')).toBeInTheDocument();
@@ -86,7 +133,7 @@ describe('FleetAgentsView', () => {
   });
 
   it('opens the drawer from a fleet card issue action', () => {
-    render(<FleetAgentsView />);
+    renderFleetView();
 
     fireEvent.click(screen.getAllByText('Open issue')[0]);
 
@@ -95,7 +142,7 @@ describe('FleetAgentsView', () => {
   });
 
   it('filters the fleet grid with multi-select phase pills and syncs the URL', () => {
-    render(<FleetAgentsView />);
+    renderFleetView();
 
     fireEvent.click(screen.getByRole('button', { name: 'work' }));
     expect(window.location.search).toBe('?phase=work');
@@ -124,7 +171,7 @@ describe('FleetAgentsView', () => {
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
-    render(<FleetAgentsView />);
+    renderFleetView();
 
     fireEvent.click(screen.getByLabelText('Panopticon'));
     expect(window.location.search).toBe('?projects=pan');

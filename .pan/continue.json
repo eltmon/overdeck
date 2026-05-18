@@ -203,11 +203,12 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-wfgv Agents filter row is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
+    "description": "workspace-7qta Agents metric strip is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
     "beadId": "pending",
     "filesToRead": [
       "src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx",
-      "src/dashboard/frontend/src/components/Agents/FleetAgentsView.test.tsx"
+      "src/dashboard/frontend/src/components/Agents/FleetAgentsView.test.tsx",
+      "src/dashboard/frontend/src/components/primitives/MetricTile.tsx"
     ]
   },
   "beadsMapping": {},
@@ -457,6 +458,10 @@
     "a3-agents-filter-row": "completed",
     "a3-agents-filter-row.ac1": "completed",
     "a3-agents-filter-row.ac2": "completed",
-    "a3-agents-filter-row.ac3": "completed"
+    "a3-agents-filter-row.ac3": "completed",
+    "a2-agents-metric-strip": "completed",
+    "a2-agents-metric-strip.ac1": "completed",
+    "a2-agents-metric-strip.ac2": "completed",
+    "a2-agents-metric-strip.ac3": "completed"
   }
 }
