@@ -4,7 +4,7 @@
     "created": "2026-05-18T13:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1190: Add post-merge UAT phase — merge ≠ done, close-out is a deliberate operator step",
-    "updated": "2026-05-18T13:15:45.046Z"
+    "updated": "2026-05-18T16:30:33.257Z"
   },
   "plan": {
     "id": "pan-1190",
@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T13:25:00.000Z",
-    "updated": "2026-05-18T13:15:45.046Z",
+    "updated": "2026-05-18T16:30:33.257Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1190",
@@ -95,7 +95,7 @@
       {
         "id": "add-canonical-state",
         "title": "Add 'verifying_on_main' canonical state and GitHub label mapping",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T13:25:00.000Z",
         "metadata": {
@@ -111,7 +111,7 @@
           {
             "id": "add-canonical-state.ac1",
             "title": "CanonicalState union in src/core/state-mapping.ts includes 'verifying_on_main' (snake_case).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -119,7 +119,7 @@
           {
             "id": "add-canonical-state.ac2",
             "title": "CANONICAL_STATES array includes verifying_on_main with type='started' and a distinct color (suggest amber/yellow #f59e0b).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -127,7 +127,7 @@
           {
             "id": "add-canonical-state.ac3",
             "title": "STATE_TYPE_MAP maps verifying_on_main → 'started'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -135,7 +135,7 @@
           {
             "id": "add-canonical-state.ac4",
             "title": "GitHub trackers stateMap: verifying_on_main → { status: 'open', label: 'verifying-on-main' }. Linear/GitLab/Jira/Trello fall back to existing in_progress/in_review semantics with auto_create when supported.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -143,7 +143,7 @@
           {
             "id": "add-canonical-state.ac5",
             "title": "WORKFLOW_LABELS array includes 'verifying-on-main' (and keeps 'needs-close-out' for back-compat).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -151,7 +151,7 @@
           {
             "id": "add-canonical-state.ac6",
             "title": "getStateLabel(verifying_on_main) returns 'verifying-on-main'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -159,7 +159,7 @@
           {
             "id": "add-canonical-state.ac7",
             "title": "mapGitHubStateToCanonical: an OPEN issue with the 'verifying-on-main' label OR the legacy 'needs-close-out' label maps to verifying_on_main (NOT done). Precedence: verifying-on-main beats merged-without-close-out semantics — issue stays in verifying column until close-out applies 'closed-out' and closes the issue.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -167,7 +167,7 @@
           {
             "id": "add-canonical-state.ac8",
             "title": "CLOSED GitHub issues with 'closed-out' label still map to 'done' (close-out terminal). CLOSED issues without 'closed-out' but with 'merged' or 'verifying-on-main' also map to 'done' (treat closed-without-ceremony as terminal).",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -175,7 +175,7 @@
           {
             "id": "add-canonical-state.ac9",
             "title": "Unit tests in src/core/__tests__ (or co-located test file) cover the new state, the new label precedence, the legacy 'needs-close-out' back-compat path, and the closed-issue terminal path.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

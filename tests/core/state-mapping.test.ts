@@ -8,9 +8,31 @@ import {
   WORKFLOW_LABELS,
   trackerStateToCanonical,
   canonicalToTrackerState,
+  CANONICAL_STATES,
+  STATE_TYPE_MAP,
+  DEFAULT_STATE_MAPPINGS,
 } from '../../src/core/state-mapping.js';
 
 describe('state-mapping', () => {
+  describe('canonical states', () => {
+    it('defines verifying_on_main as a started state with a distinct color', () => {
+      expect(CANONICAL_STATES).toContainEqual({
+        name: 'verifying_on_main',
+        type: 'started',
+        description: 'Merged and awaiting verification on main',
+        color: '#f59e0b',
+      });
+      expect(STATE_TYPE_MAP.verifying_on_main).toBe('started');
+    });
+
+    it('maps verifying_on_main to the GitHub verifying-on-main label', () => {
+      expect(DEFAULT_STATE_MAPPINGS.trackers.github.stateMap.verifying_on_main).toEqual({
+        status: 'open',
+        label: 'verifying-on-main',
+      });
+    });
+  });
+
   describe('getStateLabel', () => {
     it('should return in-progress for in_progress state', () => {
       expect(getStateLabel('in_progress')).toBe('in-progress');
@@ -18,6 +40,10 @@ describe('state-mapping', () => {
 
     it('should return in-review for in_review state', () => {
       expect(getStateLabel('in_review')).toBe('in-review');
+    });
+
+    it('should return verifying-on-main for verifying_on_main state', () => {
+      expect(getStateLabel('verifying_on_main')).toBe('verifying-on-main');
     });
 
     it('should return done for done state', () => {
@@ -53,6 +79,22 @@ describe('state-mapping', () => {
     it('should return canceled for open issues with cancel labels', () => {
       expect(mapGitHubStateToCanonical('open', ['wontfix'])).toBe('canceled');
       expect(mapGitHubStateToCanonical('open', ['duplicate'])).toBe('canceled');
+    });
+
+    it('should return verifying_on_main for open issues with verifying labels', () => {
+      expect(mapGitHubStateToCanonical('open', ['verifying-on-main'])).toBe('verifying_on_main');
+      expect(mapGitHubStateToCanonical('open', ['needs-close-out'])).toBe('verifying_on_main');
+    });
+
+    it('should prefer verifying_on_main over the legacy merged label on open issues', () => {
+      expect(mapGitHubStateToCanonical('open', ['merged', 'verifying-on-main'])).toBe('verifying_on_main');
+      expect(mapGitHubStateToCanonical('open', ['merged', 'needs-close-out'])).toBe('verifying_on_main');
+    });
+
+    it('should return done for closed issues with merged or verifying labels', () => {
+      expect(mapGitHubStateToCanonical('closed', ['closed-out'])).toBe('done');
+      expect(mapGitHubStateToCanonical('closed', ['merged'])).toBe('done');
+      expect(mapGitHubStateToCanonical('closed', ['verifying-on-main'])).toBe('done');
     });
 
     it('should return in_review for done label on open issue', () => {
@@ -101,6 +143,7 @@ describe('state-mapping', () => {
       expect(getLinearStateName('todo')).toBe('Todo');
       expect(getLinearStateName('in_progress')).toBe('In Progress');
       expect(getLinearStateName('in_review')).toBe('In Review');
+      expect(getLinearStateName('verifying_on_main')).toBe('In Review');
       expect(getLinearStateName('done')).toBe('Done');
       expect(getLinearStateName('canceled')).toBe('Canceled');
     });
@@ -156,6 +199,13 @@ describe('state-mapping', () => {
       expect(result).toContain('bug');
     });
 
+    it('should add target state label for verifying_on_main', () => {
+      const result = cleanupWorkflowLabels(['bug', 'needs-close-out'], 'verifying_on_main');
+      expect(result).toContain('verifying-on-main');
+      expect(result).toContain('bug');
+      expect(result).not.toContain('needs-close-out');
+    });
+
     it('should add target state label for done', () => {
       const result = cleanupWorkflowLabels(['bug'], 'done');
       expect(result).toContain('done');
@@ -185,6 +235,8 @@ describe('state-mapping', () => {
       expect(WORKFLOW_LABELS).toContain('in progress');
       expect(WORKFLOW_LABELS).toContain('in-review');
       expect(WORKFLOW_LABELS).toContain('in review');
+      expect(WORKFLOW_LABELS).toContain('verifying-on-main');
+      expect(WORKFLOW_LABELS).toContain('needs-close-out');
       expect(WORKFLOW_LABELS).toContain('planned');
       expect(WORKFLOW_LABELS).toContain('planning');
     });
@@ -198,6 +250,10 @@ describe('state-mapping', () => {
       expect(trackerStateToCanonical('In Review', 'linear')).toBe('in_review');
       expect(trackerStateToCanonical('Done', 'linear')).toBe('done');
       expect(trackerStateToCanonical('Canceled', 'linear')).toBe('canceled');
+    });
+
+    it('should map the GitHub verifying label to verifying_on_main', () => {
+      expect(trackerStateToCanonical('verifying-on-main', 'github')).toBe('verifying_on_main');
     });
 
     it('should use fallback heuristics for unknown states', () => {
@@ -220,6 +276,7 @@ describe('state-mapping', () => {
       expect(canonicalToTrackerState('todo', 'linear')).toBe('Todo');
       expect(canonicalToTrackerState('in_progress', 'linear')).toBe('In Progress');
       expect(canonicalToTrackerState('in_review', 'linear')).toBe('In Review');
+      expect(canonicalToTrackerState('verifying_on_main', 'linear')).toBe('In Review');
       expect(canonicalToTrackerState('done', 'linear')).toBe('Done');
       expect(canonicalToTrackerState('canceled', 'linear')).toBe('Canceled');
     });

@@ -2,8 +2,12 @@
   "version": "1",
   "issueId": "PAN-1190",
   "created": "2026-05-18T13:06:45.462Z",
-  "updated": "2026-05-18T13:25:00.000Z",
-  "gitState": { "branch": "feature/pan-1190", "sha": "49b94dd76", "dirty": false },
+  "updated": "2026-05-18T16:30:33.257Z",
+  "gitState": {
+    "branch": "feature/pan-1190",
+    "sha": "2a2b4fe8f",
+    "dirty": true
+  },
   "decisions": [
     {
       "id": "D1",
@@ -54,6 +58,11 @@
       "id": "D10",
       "summary": "KanbanBoard adds a new 'Verifying' column between Review and Done (rather than folding verifying_on_main into Done with only a badge), so operators can visually scan the verify backlog the same way they scan in_progress/in_review.",
       "recordedAt": "2026-05-18T13:25:00.000Z"
+    },
+    {
+      "id": "D11",
+      "summary": "The Beads dependency mirror for PAN-1190 had the add-canonical-state foundation bead depending on its downstream beads; corrected those edges so the Beads graph matches the vBRIEF where add-canonical-state blocks downstream work.",
+      "recordedAt": "2026-05-18T16:30:33.257Z"
     }
   ],
   "hazards": [
@@ -108,7 +117,15 @@
       "mitigation": "If the vBRIEF viewer renders 'active' or 'running' specially, add a small banner reading 'Merged — awaiting close-out' when issue canonical state is verifying_on_main. Optional polish; not blocking."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "add-canonical-state is implemented and focused tests/typecheck pass. Commit the bead, close workspace-lg9r, then run deep inspection because metadata.requiresInspection=true and inspectionDepth='deep'.",
+    "beadId": "workspace-lg9r",
+    "filesToRead": [
+      "src/core/state-mapping.ts",
+      "tests/core/state-mapping.test.ts",
+      ".pan/spec.vbrief.json"
+    ]
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
   "sessionHistory": [
@@ -123,6 +140,12 @@
       "reason": "planning",
       "note": "Auto-planning complete. 14 beads written to .pan/spec.vbrief.json with 2 deep-inspection foundation beads (add-canonical-state, split-postmerge-nondestructive). 10 autoDecisions recorded, 10 hazards mapped with mitigations. Forward-only change: already-merged-and-closed issues are not migrated; legacy 'needs-close-out' label remains recognized for back-compat.",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-18T16:30:33.257Z",
+      "reason": "bead-progress",
+      "note": "Implemented add-canonical-state: added verifying_on_main canonical state, GitHub verifying-on-main label mapping, legacy needs-close-out open-issue mapping, and state-mapping tests. npm test -- tests/core/state-mapping.test.ts and npm run typecheck passed.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []
