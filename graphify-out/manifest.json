@@ -896,8 +896,8 @@
     "hash": "dcdedb4823ddd234a2985584358094de"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/skills/pan-tts/scripts/tts_daemon.py": {
-    "mtime": 1779085535.5188053,
-    "hash": "adf1f58471db6b816b5d5b5f4bc0192b"
+    "mtime": 1779087055.0590384,
+    "hash": "c4dd6d8e3cb139397e868005ebbe6784"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/skills/stitch-react-components/scripts/validate.js": {
     "mtime": 1779079561.4478323,
@@ -956,7 +956,7 @@
     "hash": "dd52649bc1aacbe76d12527406c1922b"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/scripts/record-cost-event.d.ts": {
-    "mtime": 1779085825.6081839,
+    "mtime": 1779086339.1406162,
     "hash": "f05b2a12c7e7c8dffbbcc073e1431bcb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/scripts/notify-complete": {
@@ -1300,8 +1300,8 @@
     "hash": "cfcfcec2ce7b0f2baedc8c2c1b186192"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/tts-daemon.ts": {
-    "mtime": 1779085475.4870543,
-    "hash": "45c43b0969984a92b351d5150a22d931"
+    "mtime": 1779087076.9758334,
+    "hash": "ac8a8f942a41ffbc0362667c575b4899"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/traefik.ts": {
     "mtime": 1779079561.5147128,
@@ -1872,7 +1872,7 @@
     "hash": "f22ef8fd59f55cffb12b60ee2ebbc300"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/cloister/merge-agent.ts": {
-    "mtime": 1779085789.222139,
+    "mtime": 1779086302.405809,
     "hash": "53dd91969e6ab792d22fc1d768448e94"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/cloister/config.ts": {
@@ -2332,7 +2332,7 @@
     "hash": "b483e56dd26e06dee628945f27eb91be"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/__tests__/agent-state-role.test.ts": {
-    "mtime": 1779085936.6003628,
+    "mtime": 1779086302.4318104,
     "hash": "7f13a33e73fc87c29129226d2b547032"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/lib/__tests__/tts-daemon.test.ts": {
@@ -4264,8 +4264,8 @@
     "hash": "6e1b0483b32593e0f0ed25d009a5f9a5"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/tts.ts": {
-    "mtime": 1779083031.8901677,
-    "hash": "68ef8a320c4c8d0719e24f01ab36d74b"
+    "mtime": 1779086886.5237858,
+    "hash": "18029a01eb96110fdef215d03182a852"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/agents.ts": {
     "mtime": 1779079561.4764404,
@@ -4340,7 +4340,7 @@
     "hash": "dd13fbeadece3a88305c8f7acb15c250"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/swarm.ts": {
-    "mtime": 1779085789.222139,
+    "mtime": 1779086302.405809,
     "hash": "3b5a7f98f46d4a22d1da0839b08f29eb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/origin-validation.ts": {
@@ -4444,8 +4444,8 @@
     "hash": "f1fe165dec85b1719b899baccd983efc"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/__tests__/tts.test.ts": {
-    "mtime": 1779082963.1424448,
-    "hash": "efe71f27827f49c1be6ec4694ee68b92"
+    "mtime": 1779086929.664412,
+    "hash": "96badb691483e0cd158905af4542ac0d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/__tests__/buildRichPRBody.test.ts": {
     "mtime": 1779079561.476357,
@@ -4456,7 +4456,7 @@
     "hash": "46bdee8405d46f2035d36739b8981e6d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/__tests__/swarm.test.ts": {
-    "mtime": 1779085789.221139,
+    "mtime": 1779086302.405809,
     "hash": "fded9c6c1d751c5495ebf9809853ad98"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1170/src/dashboard/server/routes/__tests__/costs-experiments.test.ts": {

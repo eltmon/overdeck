@@ -18,6 +18,7 @@ from __future__ import annotations
 import http.server
 import io
 import json
+import math
 import os
 import queue
 import subprocess
@@ -48,6 +49,17 @@ DEFAULT_INSTRUCT = os.environ.get(
 )
 DEFAULT_MAX_QUEUE = 6
 MAX_QUEUE_ENV = os.environ.get("QWEN_TTS_MAX_QUEUE", str(DEFAULT_MAX_QUEUE))
+DEFAULT_MAX_REQUEST_BYTES = 64 * 1024
+MAX_REQUEST_BYTES_ENV = os.environ.get("QWEN_TTS_MAX_REQUEST_BYTES", str(DEFAULT_MAX_REQUEST_BYTES))
+DEFAULT_MAX_TEXT_CHARS = 4096
+MAX_TEXT_CHARS_ENV = os.environ.get("QWEN_TTS_MAX_TEXT_CHARS", str(DEFAULT_MAX_TEXT_CHARS))
+DEFAULT_MAX_EXTRACT_CHARS = 2000
+MAX_EXTRACT_CHARS_ENV = os.environ.get("QWEN_TTS_MAX_EXTRACT_CHARS", str(DEFAULT_MAX_EXTRACT_CHARS))
+DEFAULT_QWEN_SPEAKER_EMBEDDING_DIMS = 512
+SPEAKER_EMBEDDING_DIMS_ENV = os.environ.get(
+    "QWEN_TTS_SPEAKER_EMBEDDING_DIMS",
+    str(DEFAULT_QWEN_SPEAKER_EMBEDDING_DIMS),
+)
 AUTH_TOKEN = os.environ.get("QWEN_TTS_AUTH_TOKEN", "").strip()
 ALLOWED_ORIGINS = {
     origin.strip()
@@ -59,6 +71,10 @@ PLAYER_IDLE_TIMEOUT = 10.0  # seconds to keep pw-play open after last utterance
 
 PORT = DEFAULT_PORT
 MAX_QUEUE = DEFAULT_MAX_QUEUE
+MAX_REQUEST_BYTES = DEFAULT_MAX_REQUEST_BYTES
+MAX_TEXT_CHARS = DEFAULT_MAX_TEXT_CHARS
+MAX_EXTRACT_CHARS = DEFAULT_MAX_EXTRACT_CHARS
+QWEN_SPEAKER_EMBEDDING_DIMS = DEFAULT_QWEN_SPEAKER_EMBEDDING_DIMS
 MODEL: Qwen3TTSModel | None = None
 WORK_QUEUE: "queue.Queue[dict[str, Any]]" = queue.Queue(maxsize=MAX_QUEUE)
 MODEL_LOCK = threading.Lock()
@@ -79,6 +95,30 @@ def parse_int_env(name: str, raw: str, *, minimum: int = 0, maximum: int | None 
     if maximum is not None and value > maximum:
         raise ValueError(f"{name} must be <= {maximum}, got {value}")
     return value
+
+
+def validate_text_field(value: Any, max_chars: int) -> str | None:
+    text = str(value or "").strip()
+    if not text or len(text) > max_chars:
+        return None
+    return text
+
+
+def normalize_clone_embedding(embedding_data: Any) -> list[float]:
+    if not isinstance(embedding_data, list):
+        raise ValueError("invalid_embedding")
+    if not embedding_data or len(embedding_data) > QWEN_SPEAKER_EMBEDDING_DIMS:
+        raise ValueError("invalid_embedding")
+
+    embedding: list[float] = []
+    for value in embedding_data:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("invalid_embedding")
+        numeric_value = float(value)
+        if not math.isfinite(numeric_value):
+            raise ValueError("invalid_embedding")
+        embedding.append(numeric_value)
+    return embedding
 
 
 def load_model() -> None:
@@ -154,7 +194,8 @@ def _extract_audio(result: Any) -> np.ndarray:
 
 def build_voice_clone_prompt(embedding_data: list) -> dict[str, Any]:
     assert MODEL_BASE is not None
-    spk_emb = torch.tensor(embedding_data, dtype=torch.bfloat16, device=MODEL_BASE.device)
+    embedding = normalize_clone_embedding(embedding_data)
+    spk_emb = torch.tensor(embedding, dtype=torch.bfloat16, device=MODEL_BASE.device)
     return {
         "ref_code": [None],
         "ref_spk_embedding": [spk_emb],
@@ -383,6 +424,9 @@ def worker() -> None:
             WORK_QUEUE.task_done()
 
 
+BODY_TOO_LARGE = object()
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     def _origin_allowed(self) -> bool:
         origin = self.headers.get("Origin")
@@ -431,6 +475,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             length = max(0, int(raw_len))
         except ValueError:
             length = 0
+        if length > MAX_REQUEST_BYTES:
+            return BODY_TOO_LARGE
         raw = self.rfile.read(length) if length > 0 else b""
         try:
             return json.loads(raw or b"{}")
@@ -446,15 +492,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
 
         body = self._read_body()
+        if body is BODY_TOO_LARGE:
+            self._json(413, {"error": "request_too_large"})
+            return
         if not isinstance(body, dict):
             self._json(400, {"error": "expected_object"})
             return
 
         if self.path == "/speak":
-            text = str(body.get("text") or "").strip()
+            text = validate_text_field(body.get("text"), MAX_TEXT_CHARS)
             if not text:
-                self._json(400, {"error": "empty_text"})
+                self._json(400, {"error": "invalid_text"})
                 return
+            embedding = body.get("embedding")
+            if embedding is not None:
+                try:
+                    embedding = normalize_clone_embedding(embedding)
+                except ValueError:
+                    self._json(400, {"error": "invalid_embedding"})
+                    return
             raw_volume = body.get("volume", 1.0)
             try:
                 volume = float(raw_volume)
@@ -469,7 +525,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         "instruct": str(body.get("instruct") or DEFAULT_INSTRUCT),
                         "volume": volume,
                         "mode": str(body.get("mode") or "custom"),
-                        "embedding": body.get("embedding"),
+                        "embedding": embedding,
                     }
                 )
             except queue.Full:
@@ -479,8 +535,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if self.path == "/extract-embedding":
-            design = str(body.get("design") or "").strip()
-            text = str(body.get("text") or "").strip()
+            design = validate_text_field(body.get("design"), MAX_EXTRACT_CHARS)
+            text = validate_text_field(body.get("text"), MAX_EXTRACT_CHARS)
             if not design or not text:
                 self._json(400, {"error": "missing_design_or_text"})
                 return
@@ -511,7 +567,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if result.get("error") == "voice_clone_prompt_empty":
                 self._json(422, {"error": "voice_clone_prompt_empty"})
                 return
-            self._json(500, {"error": str(result.get("error") or "extract_embedding_failed")})
+            self._json(500, {"error": "extract_embedding_failed"})
             return
 
         self._json(404, {"error": "not_found"})
@@ -521,7 +577,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 def main() -> int:
-    global PORT, MAX_QUEUE, WORK_QUEUE
+    global PORT, MAX_QUEUE, MAX_REQUEST_BYTES, MAX_TEXT_CHARS, MAX_EXTRACT_CHARS, QWEN_SPEAKER_EMBEDDING_DIMS, WORK_QUEUE
 
     if not AUTH_TOKEN:
         log("QWEN_TTS_AUTH_TOKEN is required")
@@ -530,6 +586,14 @@ def main() -> int:
     try:
         PORT = parse_int_env("QWEN_TTS_PORT", PORT_ENV, minimum=1, maximum=65535)
         MAX_QUEUE = parse_int_env("QWEN_TTS_MAX_QUEUE", MAX_QUEUE_ENV, minimum=1)
+        MAX_REQUEST_BYTES = parse_int_env("QWEN_TTS_MAX_REQUEST_BYTES", MAX_REQUEST_BYTES_ENV, minimum=1)
+        MAX_TEXT_CHARS = parse_int_env("QWEN_TTS_MAX_TEXT_CHARS", MAX_TEXT_CHARS_ENV, minimum=1)
+        MAX_EXTRACT_CHARS = parse_int_env("QWEN_TTS_MAX_EXTRACT_CHARS", MAX_EXTRACT_CHARS_ENV, minimum=1)
+        QWEN_SPEAKER_EMBEDDING_DIMS = parse_int_env(
+            "QWEN_TTS_SPEAKER_EMBEDDING_DIMS",
+            SPEAKER_EMBEDDING_DIMS_ENV,
+            minimum=1,
+        )
     except ValueError as exc:
         log(f"invalid env var: {exc}")
         return 1

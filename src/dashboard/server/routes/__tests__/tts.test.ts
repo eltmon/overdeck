@@ -7,6 +7,7 @@ import {
   extractTtsEmbedding,
   listTtsVoices,
   originErrorResponse,
+  QWEN_TTS_SPEAKER_EMBEDDING_MAX_DIMS,
   parseCreateTtsVoiceInput,
   parseExtractEmbeddingInput,
   parseSpeakTtsInput,
@@ -172,6 +173,12 @@ describe('TTS voice routes helpers', () => {
     expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'clone' })).toBeUndefined();
     expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'clone', embedding: [] })).toBeUndefined();
     expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'clone', embedding: ['x'] })).toBeUndefined();
+    expect(parseCreateTtsVoiceInput({ name: 'Bad', kind: 'clone', embedding: [Number.POSITIVE_INFINITY] })).toBeUndefined();
+    expect(parseCreateTtsVoiceInput({
+      name: 'Bad',
+      kind: 'clone',
+      embedding: Array.from({ length: QWEN_TTS_SPEAKER_EMBEDDING_MAX_DIMS + 1 }, () => 0),
+    })).toBeUndefined();
   });
 
   it('deletes voices and reports unknown ids', async () => {
@@ -232,10 +239,16 @@ describe('TTS speak route helpers', () => {
 
   it('rejects invalid speak payloads', () => {
     expect(parseSpeakTtsInput({ text: '' })).toBeUndefined();
+    expect(parseSpeakTtsInput({ text: 'x'.repeat(4_097) })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', mode: 'robot' })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', preview: 'yes' })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', volume: 2 })).toBeUndefined();
     expect(parseSpeakTtsInput({ text: 'bad', embedding: ['x'] })).toBeUndefined();
+    expect(parseSpeakTtsInput({ text: 'bad', embedding: [Number.NaN] })).toBeUndefined();
+    expect(parseSpeakTtsInput({
+      text: 'bad',
+      embedding: Array.from({ length: QWEN_TTS_SPEAKER_EMBEDDING_MAX_DIMS + 1 }, () => 0),
+    })).toBeUndefined();
   });
 
   it('returns 200 with spoken true when the resolver speaks', async () => {
@@ -280,6 +293,8 @@ describe('TTS embedding extraction route helpers', () => {
     expect(parseExtractEmbeddingInput({ design: '', text: 'sample text' })).toBeUndefined();
     expect(parseExtractEmbeddingInput({ design: 'warm narrator', text: '' })).toBeUndefined();
     expect(parseExtractEmbeddingInput({ design: 1, text: 'sample text' })).toBeUndefined();
+    expect(parseExtractEmbeddingInput({ design: 'x'.repeat(2_001), text: 'sample text' })).toBeUndefined();
+    expect(parseExtractEmbeddingInput({ design: 'warm narrator', text: 'x'.repeat(2_001) })).toBeUndefined();
   });
 
   it('proxies extraction requests to the daemon with a 60-second timeout', async () => {

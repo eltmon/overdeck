@@ -2,7 +2,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { resolveAndSpeak, type ResolveAndSpeakOptions, type TtsSpeakMode, type TtsSpeakResult } from '../../../lib/tts-speak.js';
 import { getTtsRuntimeConfig } from '../services/tts-runtime-config.js';
-import { validateOrigin } from './origin-validation.js';
+import { getHeaderFromMap, validateOrigin, type HeaderMap } from './origin-validation.js';
 import {
   addVoice as addStoredVoice,
   clearVoices as clearStoredVoices,
@@ -16,6 +16,11 @@ import { getTtsDaemonAuthHeaders, getTtsDaemonStatus, startTtsDaemon, type TtsDa
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export const EXTRACT_EMBEDDING_TIMEOUT_MS = 60_000;
+export const TTS_ROUTE_BODY_MAX_BYTES = 64 * 1024;
+export const TTS_SPEAK_TEXT_MAX_CHARS = 4_096;
+export const TTS_EXTRACT_TEXT_MAX_CHARS = 2_000;
+export const TTS_EXTRACT_DESIGN_MAX_CHARS = 2_000;
+export const QWEN_TTS_SPEAKER_EMBEDDING_MAX_DIMS = 512;
 
 export type TtsHealthResult = TtsDaemonStatus & { ttsEnabled: boolean };
 
@@ -105,6 +110,27 @@ export interface ExtractEmbeddingDeps {
   timeoutMs?: number;
 }
 
+function isValidCloneEmbedding(value: unknown): value is number[] {
+  return Array.isArray(value)
+    && value.length > 0
+    && value.length <= QWEN_TTS_SPEAKER_EMBEDDING_MAX_DIMS
+    && value.every((item) => typeof item === 'number' && Number.isFinite(item));
+}
+
+function isBoundedText(value: unknown, maxChars: number): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= maxChars;
+}
+
+function ttsPayloadTooLargeResponse(request: HttpServerRequest.HttpServerRequest): Response | undefined {
+  const rawContentLength = getHeaderFromMap(request.headers as HeaderMap, 'content-length');
+  if (!rawContentLength) return undefined;
+  const contentLength = Number.parseInt(rawContentLength, 10);
+  if (Number.isFinite(contentLength) && contentLength > TTS_ROUTE_BODY_MAX_BYTES) {
+    return jsonResponse({ error: 'TTS request too large' }, { status: 413 });
+  }
+  return undefined;
+}
+
 export function toPublicVoice(voice: TtsVoice): PublicTtsVoice {
   const { embedding: _embedding, ...publicVoice } = voice;
   return publicVoice;
@@ -141,7 +167,7 @@ export function parseCreateTtsVoiceInput(body: unknown): CreateTtsVoiceInput | u
     input.instruct = record.instruct;
   }
   if (record.embedding !== undefined) {
-    if (!Array.isArray(record.embedding) || !record.embedding.every((value) => typeof value === 'number')) return undefined;
+    if (!isValidCloneEmbedding(record.embedding)) return undefined;
     input.embedding = record.embedding;
   }
 
@@ -159,7 +185,7 @@ export function parseSpeakTtsInput(body: unknown): ResolveAndSpeakOptions | unde
   if (!body || typeof body !== 'object') return undefined;
 
   const record = body as Record<string, unknown>;
-  if (typeof record.text !== 'string' || record.text.trim().length === 0) return undefined;
+  if (!isBoundedText(record.text, TTS_SPEAK_TEXT_MAX_CHARS)) return undefined;
 
   const mode = parseTtsSpeakMode(record.mode);
   if (record.mode !== undefined && !mode) return undefined;
@@ -182,7 +208,7 @@ export function parseSpeakTtsInput(body: unknown): ResolveAndSpeakOptions | unde
   }
   if (mode) input.mode = mode;
   if (record.embedding !== undefined) {
-    if (!Array.isArray(record.embedding) || !record.embedding.every((value) => typeof value === 'number')) return undefined;
+    if (!isValidCloneEmbedding(record.embedding)) return undefined;
     input.embedding = record.embedding;
   }
 
@@ -192,8 +218,8 @@ export function parseSpeakTtsInput(body: unknown): ResolveAndSpeakOptions | unde
 export function parseExtractEmbeddingInput(body: unknown): ExtractEmbeddingInput | undefined {
   if (!body || typeof body !== 'object') return undefined;
   const record = body as Record<string, unknown>;
-  if (typeof record.design !== 'string' || record.design.trim().length === 0) return undefined;
-  if (typeof record.text !== 'string' || record.text.trim().length === 0) return undefined;
+  if (!isBoundedText(record.design, TTS_EXTRACT_DESIGN_MAX_CHARS)) return undefined;
+  if (!isBoundedText(record.text, TTS_EXTRACT_TEXT_MAX_CHARS)) return undefined;
   return { design: record.design, text: record.text };
 }
 
@@ -265,6 +291,7 @@ export async function extractTtsEmbedding(
 }
 
 function parseJsonBody(text: string): unknown | undefined {
+  if (text.length > TTS_ROUTE_BODY_MAX_BYTES) return undefined;
   try {
     return text ? JSON.parse(text) : {};
   } catch {
@@ -314,8 +341,12 @@ const postTtsVoiceRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const originError = originErrorResponse(request);
     if (originError) return originError;
+    const payloadTooLarge = ttsPayloadTooLargeResponse(request);
+    if (payloadTooLarge) return payloadTooLarge;
 
-    const body = parseJsonBody(yield* request.text);
+    const bodyText = yield* request.text;
+    if (bodyText.length > TTS_ROUTE_BODY_MAX_BYTES) return jsonResponse({ error: 'TTS request too large' }, { status: 413 });
+    const body = parseJsonBody(bodyText);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
     const input = parseCreateTtsVoiceInput(body);
@@ -361,8 +392,12 @@ const postTtsSpeakRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const originError = originErrorResponse(request);
     if (originError) return originError;
+    const payloadTooLarge = ttsPayloadTooLargeResponse(request);
+    if (payloadTooLarge) return payloadTooLarge;
 
-    const body = parseJsonBody(yield* request.text);
+    const bodyText = yield* request.text;
+    if (bodyText.length > TTS_ROUTE_BODY_MAX_BYTES) return jsonResponse({ error: 'TTS request too large' }, { status: 413 });
+    const body = parseJsonBody(bodyText);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
     const input = parseSpeakTtsInput(body);
@@ -380,8 +415,12 @@ const postExtractEmbeddingRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const originError = originErrorResponse(request);
     if (originError) return originError;
+    const payloadTooLarge = ttsPayloadTooLargeResponse(request);
+    if (payloadTooLarge) return payloadTooLarge;
 
-    const body = parseJsonBody(yield* request.text);
+    const bodyText = yield* request.text;
+    if (bodyText.length > TTS_ROUTE_BODY_MAX_BYTES) return jsonResponse({ error: 'TTS request too large' }, { status: 413 });
+    const body = parseJsonBody(bodyText);
     if (body === undefined) return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
 
     const input = parseExtractEmbeddingInput(body);
