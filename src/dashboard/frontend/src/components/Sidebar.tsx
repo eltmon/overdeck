@@ -167,9 +167,9 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
         <div className="flex items-center justify-between h-12 px-3 shrink-0 border-b border-border">
           {!collapsed && (
             <button
-              onClick={() => onTabChange('kanban')}
+              onClick={() => onTabChange('pipeline')}
               className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0"
-              title="Go to Board"
+              title="Go to Pipeline"
             >
               <Eye className="w-5 h-5 text-primary shrink-0" />
               {/* PAN-698: Space Grotesk is reserved for the sidebar wordmark only */}
@@ -183,9 +183,9 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
           )}
           {collapsed && (
             <button
-              onClick={() => onTabChange('kanban')}
+              onClick={() => onTabChange('pipeline')}
               className="flex items-center justify-center w-full hover:opacity-80 transition-opacity"
-              title="Go to Board"
+              title="Go to Pipeline"
             >
               <Eye className="w-5 h-5 text-primary" />
             </button>

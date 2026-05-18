@@ -58,9 +58,21 @@ describe('Sidebar navigation', () => {
     expect(onTabChange).toHaveBeenCalledWith('pipeline');
   });
 
+  it('routes the expanded logo to Pipeline', () => {
+    const { onTabChange } = renderSidebar('kanban');
+
+    const logo = screen.getByTitle('Go to Pipeline');
+    fireEvent.click(logo);
+    expect(onTabChange).toHaveBeenCalledWith('pipeline');
+  });
+
   it('keeps collapsed-mode icons clickable', () => {
     localStorage.setItem('panopticon.ui.sidebarCollapsed', 'true');
     const { onTabChange } = renderSidebar('kanban');
+
+    const logo = screen.getByTitle('Go to Pipeline');
+    fireEvent.click(logo);
+    expect(onTabChange).toHaveBeenCalledWith('pipeline');
 
     const pipelineButton = screen.getByTestId('sidebar-pipeline');
     expect(pipelineButton).toHaveAttribute('title', 'Awaiting Merge → filter on Pipeline');

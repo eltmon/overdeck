@@ -61,8 +61,8 @@ interface TrackerStatus {
 }
 
 const TAB_PATHS: Record<Tab, string> = {
-  pipeline: '/pipeline',
-  kanban: '/',
+  pipeline: '/',
+  kanban: '/board',
   'command-deck': '/command-deck',
   agents: '/agents',
   flywheel: '/flywheel',
@@ -78,14 +78,17 @@ const TAB_PATHS: Record<Tab, string> = {
   sessions: '/sessions',
 };
 
-const PATH_TO_TAB: Record<string, Tab> = Object.fromEntries(
-  Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab])
-) as Record<string, Tab>;
+const PATH_TO_TAB: Record<string, Tab> = {
+  ...Object.fromEntries(
+    Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab])
+  ) as Record<string, Tab>,
+  '/pipeline': 'pipeline',
+};
 
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
   if (path.startsWith('/conv/')) return 'command-deck';
-  return PATH_TO_TAB[path] || 'command-deck';
+  return PATH_TO_TAB[path] || 'pipeline';
 }
 
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {

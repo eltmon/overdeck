@@ -14,7 +14,7 @@
     "author": "agent:claude-opus-4-7",
     "sequence": 2,
     "created": "2026-05-18T05:10:55.134Z",
-    "updated": "2026-05-18T21:27:15.000Z",
+    "updated": "2026-05-18T21:39:30.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1148",
@@ -2052,7 +2052,7 @@
       {
         "id": "n2-default-route-flip",
         "title": "Flip default route: / → Pipeline, /board → Board, sidebar logo click → Pipeline",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-18T05:10:55.134Z",
         "metadata": {
@@ -2068,44 +2068,50 @@
           {
             "id": "n2-default-route-flip.ac1",
             "title": "Visiting / renders Pipeline (not Board)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:39:30.000Z"
           },
           {
             "id": "n2-default-route-flip.ac2",
             "title": "Visiting /board renders Board",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:39:30.000Z"
           },
           {
             "id": "n2-default-route-flip.ac3",
             "title": "Sidebar logo click navigates to Pipeline (both collapsed and expanded modes)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:39:30.000Z"
           },
           {
             "id": "n2-default-route-flip.ac4",
             "title": "getTabFromPath() returns 'pipeline' as default for unknown paths (was 'command-deck')",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:39:30.000Z"
           },
           {
             "id": "n2-default-route-flip.ac5",
             "title": "App.test.tsx covers path → tab resolution for /, /pipeline, /board",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "updated": "2026-05-18T21:39:30.000Z"
           }
-        ]
+        ],
+        "updated": "2026-05-18T21:39:30.000Z"
       },
       {
         "id": "i1-inspector-parity-audit",

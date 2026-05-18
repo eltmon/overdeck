@@ -200,8 +200,16 @@ describe('conversation route helpers', () => {
     });
   });
 
-  it('resolves the Pipeline route to the pipeline tab', () => {
+  it('resolves Pipeline as the default route and Board as /board', () => {
+    window.history.replaceState(null, '', '/');
+    expect(getConversationRouteState().tab).toBe('pipeline');
     window.history.replaceState(null, '', '/pipeline');
+    expect(getConversationRouteState().tab).toBe('pipeline');
+
+    window.history.replaceState(null, '', '/board');
+    expect(getConversationRouteState().tab).toBe('kanban');
+
+    window.history.replaceState(null, '', '/unknown');
     expect(getConversationRouteState().tab).toBe('pipeline');
   });
 });
@@ -265,7 +273,6 @@ describe('App conversation view routing', () => {
 
 describe('App Pipeline routing', () => {
   beforeEach(() => {
-    window.history.replaceState(null, '', '/pipeline');
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === '/api/version') {
@@ -281,15 +288,28 @@ describe('App Pipeline routing', () => {
     }));
   });
 
-  it('renders PipelineView at /pipeline', () => {
+  it('renders PipelineView at /', () => {
+    window.history.replaceState(null, '', '/');
     renderApp();
     expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
+  });
+
+  it('renders PipelineView at /pipeline', () => {
+    window.history.replaceState(null, '', '/pipeline');
+    renderApp();
+    expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
+  });
+
+  it('renders Board at /board', () => {
+    window.history.replaceState(null, '', '/board');
+    renderApp();
+    expect(screen.getByText('Open issue')).toBeInTheDocument();
   });
 });
 
 describe('App kanban issue details', () => {
   beforeEach(() => {
-    window.history.replaceState(null, '', '/');
+    window.history.replaceState(null, '', '/board');
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === '/api/version') {
