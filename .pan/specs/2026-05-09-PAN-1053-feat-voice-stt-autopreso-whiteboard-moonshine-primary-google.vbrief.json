@@ -4,17 +4,17 @@
     "created": "2026-05-09T17:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1053: feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "updated": "2026-05-16T21:29:36.605Z"
+    "updated": "2026-05-18T01:05:35.572Z"
   },
   "plan": {
     "id": "pan-1053",
     "title": "feat: Voice STT + AutoPreso whiteboard — Moonshine primary, Google Cloud STT fallback",
-    "status": "proposed",
+    "status": "completed",
     "uid": "a4f2c8d1-7b3e-4a90-b5f6-2e1d9c0a8374",
     "author": "agent:claude-opus-4-7",
-    "sequence": 358,
+    "sequence": 366,
     "created": "2026-05-09T17:00:00.000Z",
-    "updated": "2026-05-16T21:29:36.605Z",
+    "updated": "2026-05-18T01:05:35.572Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1053",
@@ -1460,60 +1460,60 @@
     "metadata": {
       "canonicalFilename": "2026-05-09-PAN-1053-feat-voice-stt-autopreso-whiteboard-moonshine-primary-google-cloud-stt-fallback.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "done",
         "issueId": "PAN-1053",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-16T21:29:36.600Z",
+        "updatedAt": "2026-05-18T01:05:31.184Z",
         "work": {
-          "updatedAt": "2026-05-16T21:29:36.600Z",
+          "updatedAt": "2026-05-18T01:05:31.184Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-16T21:29:36.600Z",
+          "updatedAt": "2026-05-18T01:05:31.184Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-16T21:29:36.600Z"
+              "at": "2026-05-18T01:05:31.184Z"
             }
           ]
         },
         "review": {
-          "status": "blocked",
-          "updatedAt": "2026-05-16T21:29:36.600Z",
-          "notes": "Voice stop drops final transcript; voice settings body unbounded",
+          "status": "passed",
+          "updatedAt": "2026-05-18T01:05:31.184Z",
+          "notes": "Agent re-review request (3/25): Fixed review issues",
           "history": [
             {
-              "status": "blocked",
-              "at": "2026-05-16T21:29:36.600Z",
-              "notes": "Voice stop drops final transcript; voice settings body unbounded"
+              "status": "passed",
+              "at": "2026-05-18T01:05:31.184Z",
+              "notes": "Agent re-review request (3/25): Fixed review issues"
             }
           ],
-          "approval": "changes_requested"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-05-16T21:29:36.600Z",
-          "notes": "Skipped: no code changed since pre-review verification gate",
+          "status": "passed",
+          "updatedAt": "2026-05-18T01:05:31.184Z",
+          "notes": "Skipped: issue is already merged",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-16T21:29:36.600Z",
-              "notes": "Skipped: no code changed since pre-review verification gate"
+              "status": "passed",
+              "at": "2026-05-18T01:05:31.184Z",
+              "notes": "Skipped: issue is already merged"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-16T21:29:36.600Z",
+          "updatedAt": "2026-05-18T01:05:31.184Z",
           "history": []
         },
         "merge": {
-          "status": "pending",
-          "updatedAt": "2026-05-16T21:29:36.600Z",
+          "status": "merged",
+          "updatedAt": "2026-05-18T01:05:31.184Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-16T21:29:36.600Z"
+              "status": "merged",
+              "at": "2026-05-18T01:05:31.184Z"
             }
           ],
           "readyForMerge": false,
@@ -1522,5 +1522,5 @@
       }
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
