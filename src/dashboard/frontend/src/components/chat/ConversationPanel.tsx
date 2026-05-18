@@ -555,7 +555,7 @@ export function ConversationPanel({
           {(viewMode === 'conversation' || !showTerminal) && (
             <ConversationView
               conversation={conversation}
-              onResume={!embedded && !showTerminal ? handleResume : undefined}
+              onResume={!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined}
               onArchive={!embedded ? handleArchive : undefined}
               resumePending={resumeMutation.isPending}
               roundMarkers={roundMarkers}
