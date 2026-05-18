@@ -1,4 +1,4 @@
-import { loadConfig } from '../lib/config-yaml.js';
+import { loadConfigAsyncNoMigration } from '../lib/config-yaml.js';
 import { getTtsDaemonStatus, hasTtsDaemonState, isTtsDaemonManuallyStopped, startTtsDaemon } from '../lib/tts-daemon.js';
 import { parsePositiveIntEnv } from './watchdog.js';
 
@@ -101,7 +101,7 @@ export class TtsWatchdog {
     if (this.ticking) return;
     this.ticking = true;
     try {
-      const ttsConfig = loadConfig().config.tts;
+      const ttsConfig = (await loadConfigAsyncNoMigration()).config.tts;
       const manuallyStopped = await isTtsDaemonManuallyStopped();
       this.active = !manuallyStopped && (ttsConfig.daemonAutoStart || await hasTtsDaemonState());
       if (!this.active) {

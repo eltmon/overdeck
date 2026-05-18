@@ -98,10 +98,10 @@ describe('tts daemon lifecycle state', () => {
 
     try {
       const status = await getTtsDaemonStatus(CONFIG);
-      const result = await startTtsDaemon({ config: CONFIG, waitForHealth: false });
+      const result = await startTtsDaemon({ config: CONFIG, timeoutMs: 0 });
 
       expect(status).toMatchObject({ ok: false, running: true, managed: true, phase: 'starting', initializing: true, pid: 4242 });
-      expect(result).toMatchObject({ ok: true, pid: 4242, alreadyRunning: true });
+      expect(result).toMatchObject({ ok: true, pid: 4242, alreadyRunning: true, status: { phase: 'starting', initializing: true } });
       expect(killSpy).not.toHaveBeenCalledWith(4242, 'SIGTERM');
       expect(spawn).not.toHaveBeenCalled();
     } finally {

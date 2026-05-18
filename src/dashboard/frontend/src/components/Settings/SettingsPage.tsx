@@ -99,6 +99,8 @@ interface TtsHealthResponse {
   pid: number | null;
   daemonHost: string;
   daemonPort: number;
+  phase?: 'stopped' | 'starting' | 'healthy' | 'unhealthy';
+  initializing?: boolean;
   queueDepth?: number;
   model?: unknown;
   uptimeSeconds?: number;
@@ -1043,7 +1045,8 @@ export function SettingsPage() {
   const ttsRate = ttsConfig.rate ?? 1;
   const ttsMaxChars = ttsConfig.maxChars ?? 140;
   const ttsDaemonOnline = ttsHealth?.ok === true;
-  const ttsDaemonStatus = ttsHealth === undefined ? 'checking' : ttsDaemonOnline ? 'online' : ttsHealth.running ? 'unhealthy' : 'offline';
+  const ttsDaemonStarting = ttsHealth?.phase === 'starting' || ttsHealth?.initializing === true;
+  const ttsDaemonStatus = ttsHealth === undefined ? 'checking' : ttsDaemonOnline ? 'online' : ttsDaemonStarting ? 'starting' : ttsHealth.running ? 'unhealthy' : 'offline';
   const ttsDaemonModel = typeof ttsHealth?.model === 'string' ? ttsHealth.model : undefined;
   const ttsDaemonUptime = formatTtsUptime(ttsHealth?.uptimeSeconds);
   const ttsDaemonGpuMemory = formatTtsGpuMemory(ttsHealth?.gpuMemoryUsedMb);
@@ -1973,7 +1976,9 @@ export function SettingsPage() {
               ? 'bg-muted/50 text-muted-foreground'
               : ttsDaemonOnline
                 ? 'bg-success/10 text-success'
-                : 'bg-destructive/10 text-destructive'
+                : ttsDaemonStarting
+                  ? 'bg-warning/10 text-warning'
+                  : 'bg-destructive/10 text-destructive'
           }`}>
             <span className={`h-1.5 w-1.5 rounded-full ${ttsDaemonOnline ? 'bg-success' : 'bg-current'}`} />
             Daemon status: {ttsDaemonStatus}
@@ -2006,13 +2011,13 @@ export function SettingsPage() {
           description={ttsDaemonDetails || ttsHealth?.error || 'Live Qwen TTS daemon status'}
         >
           <div className="flex flex-col items-end gap-1.5 text-right">
-            <span className={`text-sm font-medium ${ttsDaemonOnline ? 'text-success' : 'text-muted-foreground'}`}>
+            <span className={`text-sm font-medium ${ttsDaemonOnline ? 'text-success' : ttsDaemonStarting ? 'text-warning' : 'text-muted-foreground'}`}>
               {ttsDaemonOnline ? 'running' : ttsDaemonStatus}
             </span>
             {ttsDaemonModel && (
               <span className="max-w-xs truncate text-xs text-muted-foreground">{ttsDaemonModel}</span>
             )}
-            {!ttsDaemonOnline && (
+            {!ttsDaemonOnline && !ttsDaemonStarting && (
               <button
                 type="button"
                 onClick={() => ttsStartMutation.mutate()}

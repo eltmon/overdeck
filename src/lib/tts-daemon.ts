@@ -226,6 +226,37 @@ function defaultAllowedOrigins(): string {
   return Array.from(origins).join(',');
 }
 
+function buildTtsDaemonEnv(config: NormalizedTtsDaemonConfig, authToken: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const key of [
+    'PATH',
+    'HOME',
+    'USER',
+    'LANG',
+    'LANGUAGE',
+    'XDG_RUNTIME_DIR',
+    'PULSE_SERVER',
+    'PIPEWIRE_RUNTIME_DIR',
+    'ALSA_CONFIG_PATH',
+    'CUDA_VISIBLE_DEVICES',
+    'NVIDIA_VISIBLE_DEVICES',
+    'NVIDIA_DRIVER_CAPABILITIES',
+    'LD_LIBRARY_PATH',
+    'SSL_CERT_FILE',
+    'REQUESTS_CA_BUNDLE',
+  ]) {
+    if (process.env[key] !== undefined) env[key] = process.env[key];
+  }
+  for (const [key, value] of Object.entries(process.env)) {
+    if ((key.startsWith('LC_') || key.startsWith('QWEN_TTS_')) && value !== undefined) env[key] = value;
+  }
+  env.QWEN_TTS_HOST = config.daemonHost;
+  env.QWEN_TTS_PORT = String(config.daemonPort);
+  env.QWEN_TTS_AUTH_TOKEN = authToken;
+  env.QWEN_TTS_ALLOWED_ORIGINS = process.env.QWEN_TTS_ALLOWED_ORIGINS ?? defaultAllowedOrigins();
+  return env;
+}
+
 async function acquireStartLock(): Promise<void> {
   await mkdir(dirname(QWEN_TTS_START_LOCK_PATH), { recursive: true });
   while (true) {
@@ -473,13 +504,7 @@ export async function startTtsDaemon(options: TtsDaemonStartOptions): Promise<Tt
       const child = spawn(python, [script], {
         detached: detach,
         stdio: detach ? ['ignore', logFile!.fd, logFile!.fd] : 'inherit',
-        env: {
-          ...process.env,
-          QWEN_TTS_HOST: config.daemonHost,
-          QWEN_TTS_PORT: String(config.daemonPort),
-          QWEN_TTS_AUTH_TOKEN: authToken,
-          QWEN_TTS_ALLOWED_ORIGINS: process.env.QWEN_TTS_ALLOWED_ORIGINS ?? defaultAllowedOrigins(),
-        },
+        env: buildTtsDaemonEnv(config, authToken),
       });
 
       if (!child.pid) {
@@ -509,7 +534,8 @@ export async function startTtsDaemon(options: TtsDaemonStartOptions): Promise<Tt
   }
 
   const status = await waitForTtsDaemonHealth(config, options.timeoutMs);
-  return { ok: status.ok, pid: status.pid ?? spawnedPid, alreadyRunning, status, error: status.ok ? undefined : status.error };
+  const accepted = status.ok || status.initializing === true;
+  return { ok: accepted, pid: status.pid ?? spawnedPid, alreadyRunning, status, error: accepted ? undefined : status.error };
 }
 
 export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig): Promise<TtsDaemonForegroundResult> {

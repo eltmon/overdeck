@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../lib/config-yaml.js', () => ({
-  loadConfig: () => ({ config: { tts: mocks.ttsConfig } }),
+  loadConfigAsyncNoMigration: async () => ({ config: { tts: mocks.ttsConfig } }),
 }));
 
 vi.mock('../../lib/tts-daemon.js', () => ({
