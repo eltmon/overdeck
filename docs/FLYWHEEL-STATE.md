@@ -18,7 +18,11 @@
 - PAN-1139 (#1156) merged 01:04Z — dashboard restart watchdog (1,493 lines)
 - PAN-1053 (#1119) merged 01:05Z — voice STT + autopreso + Moonshine (16,781 lines)
 
-**In flight at end of run:** PR #717 (PAN-457, 19k lines), PR #1138 (PAN-829, 5.4k lines) — both rebased onto main, CI re-running after I hand-resolved merge conflicts.
+**Also merged in extended push:**
+- PAN-457  (#717)  merged 01:19Z — Conversation discovery + indexing (19,265 lines, 205 files) — open since 2026-04-15.
+- PAN-829  (#1138) merged 01:23Z — TTS lifecycle + coverage (5,392 lines, 60 files).
+
+**Final tally: 12 PRs shipped tonight.** Zero PRs left in queue.
 
 **Substrate fixes shipped to main alongside (root-cause work, not part of any PR):**
 - `MAX_AUTO_REQUEUE` raised 7 → 25 (literal value in three call-sites) — per user direction; was tripping otherwise-progressing PRs.
