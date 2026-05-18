@@ -34,6 +34,7 @@ describe('tts daemon lifecycle state', () => {
   });
 
   afterEach(() => {
+    vi.doUnmock('node:child_process');
     vi.unstubAllGlobals();
     if (originalPanopticonHome === undefined) delete process.env.PANOPTICON_HOME;
     else process.env.PANOPTICON_HOME = originalPanopticonHome;
@@ -56,5 +57,70 @@ describe('tts daemon lifecycle state', () => {
     expect(status).toMatchObject({ ok: false, running: false, pid: null });
     expect(existsSync(QWEN_TTS_PID_PATH)).toBe(true);
     expect(existsSync(QWEN_TTS_STATE_PATH)).toBe(true);
+  });
+
+  it('reports healthy unmanaged daemons from the health endpoint pid', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      ok: true,
+      queue: 0,
+      model: 'qwen3-tts',
+      pid: 4321,
+    }), { status: 200 })));
+    const { getTtsDaemonStatus } = await import('../tts-daemon.js');
+
+    const status = await getTtsDaemonStatus(CONFIG);
+
+    expect(status).toMatchObject({ ok: true, running: true, managed: false, pid: 4321 });
+  });
+
+  it('replaces an unhealthy live managed daemon on start', async () => {
+    const spawn = vi.fn(() => ({ pid: 7777, unref: vi.fn() }));
+    vi.doMock('node:child_process', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('node:child_process')),
+      spawn,
+    }));
+    const killSpy = vi.spyOn(process, 'kill');
+    let oldPidAlive = true;
+    killSpy.mockImplementation(((pid: number, signal?: NodeJS.Signals | number) => {
+      if (pid === 4242) {
+        if (signal === 'SIGTERM') oldPidAlive = false;
+        if (oldPidAlive || signal === 'SIGTERM') return true;
+        throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' });
+      }
+      if (pid === 7777 && signal === 0) return true;
+      return true;
+    }) as typeof process.kill);
+    const { QWEN_TTS_PID_PATH, QWEN_TTS_STATE_PATH, getTtsDaemonVenvDir, startTtsDaemon } = await import('../tts-daemon.js');
+    mkdirSync(join(testHome, 'pids'), { recursive: true });
+    writeFileSync(QWEN_TTS_PID_PATH, '4242\n', 'utf8');
+    writeFileSync(QWEN_TTS_STATE_PATH, JSON.stringify({
+      pid: 4242,
+      startedAt: '2026-05-18T00:00:00.000Z',
+      host: '127.0.0.1',
+      port: 8787,
+    }), 'utf8');
+    const venvDir = await getTtsDaemonVenvDir();
+    const packageDir = join(venvDir, '..');
+    const hadPackageDir = existsSync(packageDir);
+    const hadVenvDir = existsSync(venvDir);
+    const python = join(venvDir, 'bin', 'python');
+    const hadPython = existsSync(python);
+    if (!hadPython) {
+      mkdirSync(join(python, '..'), { recursive: true });
+      writeFileSync(python, '#!/usr/bin/env python3\n', 'utf8');
+    }
+
+    try {
+      const result = await startTtsDaemon({ config: CONFIG, waitForHealth: false });
+
+      expect(result).toMatchObject({ ok: true, pid: 7777, alreadyRunning: false });
+      expect(killSpy).toHaveBeenCalledWith(4242, 'SIGTERM');
+      expect(spawn).toHaveBeenCalled();
+    } finally {
+      killSpy.mockRestore();
+      if (!hadPython) rmSync(python, { force: true });
+      if (!hadVenvDir) rmSync(venvDir, { recursive: true, force: true });
+      if (!hadPackageDir) rmSync(packageDir, { recursive: true, force: true });
+    }
   });
 });

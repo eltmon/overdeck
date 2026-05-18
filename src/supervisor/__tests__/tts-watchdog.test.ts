@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TtsWatchdog } from '../tts-watchdog.js';
+import { readTtsWatchdogConfig, TtsWatchdog } from '../tts-watchdog.js';
 import type { NormalizedTtsDaemonConfig } from '../../lib/config-yaml.js';
 
 const mocks = vi.hoisted(() => ({
@@ -38,6 +38,25 @@ vi.mock('../../lib/tts-daemon.js', () => ({
 async function tick(watchdog: TtsWatchdog): Promise<void> {
   await (watchdog as unknown as { tick: () => Promise<void> }).tick();
 }
+
+describe('readTtsWatchdogConfig', () => {
+  it('falls back from invalid timing env vars and clamps unsafe minimums', () => {
+    expect(readTtsWatchdogConfig({
+      PANOPTICON_TTS_WATCHDOG_POLL_MS: '0',
+      PANOPTICON_TTS_WATCHDOG_FAIL_THRESHOLD: 'abc',
+      PANOPTICON_TTS_WATCHDOG_MAX_RESTARTS: 'NaN',
+      PANOPTICON_TTS_WATCHDOG_WINDOW_MS: '-1',
+      PANOPTICON_TTS_WATCHDOG_START_TIMEOUT_MS: '1',
+    })).toEqual({
+      enabled: true,
+      pollMs: 5_000,
+      failThreshold: 1,
+      maxRestarts: 3,
+      windowMs: 10 * 60_000,
+      startTimeoutMs: 1_000,
+    });
+  });
+});
 
 describe('TtsWatchdog', () => {
   beforeEach(() => {

@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { LOGS_DIR, PANOPTICON_HOME } from './paths.js';
-import type { NormalizedTtsDaemonConfig } from './config-yaml.js';
+import { loadConfig, type NormalizedTtsDaemonConfig } from './config-yaml.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -33,6 +33,7 @@ export interface TtsDaemonStatus {
   ok: boolean;
   running: boolean;
   pid: number | null;
+  managed?: boolean;
   daemonHost: string;
   daemonPort: number;
   queue?: unknown;
@@ -258,6 +259,28 @@ export function isProcessAlive(pid: number): boolean {
   }
 }
 
+async function terminateProcess(pid: number, timeoutMs: number): Promise<void> {
+  if (!isProcessAlive(pid)) return;
+  try {
+    process.kill(pid, 'SIGTERM');
+  } catch {
+    return;
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  while (isProcessAlive(pid) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  if (isProcessAlive(pid)) {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // already gone
+    }
+  }
+}
+
 async function sampleGpuMemoryUsedMb(pid: number): Promise<number | undefined> {
   try {
     const { stdout } = await execFileAsync('nvidia-smi', [
@@ -277,12 +300,12 @@ async function sampleGpuMemoryUsedMb(pid: number): Promise<number | undefined> {
   return undefined;
 }
 
-async function getGpuMemoryUsedMb(pid: number | null): Promise<number | undefined> {
+function getGpuMemoryUsedMb(pid: number | null): number | undefined {
   if (!pid) return undefined;
   if (gpuMemoryCache?.pid === pid && Date.now() - gpuMemoryCache.sampledAt < GPU_MEMORY_CACHE_TTL_MS) {
     return gpuMemoryCache.value;
   }
-  if (gpuMemoryInFlight?.pid === pid) return gpuMemoryInFlight.promise;
+  if (gpuMemoryInFlight?.pid === pid) return undefined;
 
   const promise = sampleGpuMemoryUsedMb(pid).then((value) => {
     gpuMemoryCache = { pid, sampledAt: Date.now(), value };
@@ -291,7 +314,11 @@ async function getGpuMemoryUsedMb(pid: number | null): Promise<number | undefine
     if (gpuMemoryInFlight?.pid === pid) gpuMemoryInFlight = null;
   });
   gpuMemoryInFlight = { pid, promise };
-  return promise;
+  return undefined;
+}
+
+function parseHealthPid(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
 }
 
 async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 2_000): Promise<Partial<TtsDaemonStatus>> {
@@ -300,9 +327,10 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
   try {
     const response = await fetch(`http://${config.daemonHost}:${config.daemonPort}/health`, { signal: controller.signal });
     if (!response.ok) return { ok: false, error: 'daemon unreachable' };
-    const body = await response.json() as { queue?: unknown; model?: unknown };
+    const body = await response.json() as { queue?: unknown; model?: unknown; pid?: unknown };
     return {
       ok: true,
+      pid: parseHealthPid(body.pid),
       queue: body.queue,
       queueDepth: typeof body.queue === 'number' ? body.queue : undefined,
       model: body.model,
@@ -315,22 +343,26 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
 }
 
 export async function getTtsDaemonStatus(config: NormalizedTtsDaemonConfig): Promise<TtsDaemonStatus> {
-  const pid = await readPid();
-  const running = pid !== null && isProcessAlive(pid);
-  const [state, health, gpuMemoryUsedMb] = await Promise.all([
+  const managedPid = await readPid();
+  const managedRunning = managedPid !== null && isProcessAlive(managedPid);
+  const [state, health] = await Promise.all([
     readState(),
     fetchDaemonHealth(config),
-    getGpuMemoryUsedMb(pid),
   ]);
+  const healthPid = health.ok === true ? health.pid ?? null : null;
+  const pid = managedRunning ? managedPid : healthPid;
+  const running = managedRunning || health.ok === true;
 
-  const uptimeSeconds = state?.startedAt && running
+  const uptimeSeconds = state?.startedAt && managedRunning
     ? Math.max(0, Math.floor((Date.now() - Date.parse(state.startedAt)) / 1000))
     : undefined;
+  const gpuMemoryUsedMb = managedRunning ? getGpuMemoryUsedMb(managedPid) : undefined;
 
   return {
     ok: health.ok === true,
     running,
-    pid: running ? pid : null,
+    pid,
+    managed: managedRunning,
     daemonHost: config.daemonHost,
     daemonPort: config.daemonPort,
     queue: health.queue,
@@ -338,7 +370,7 @@ export async function getTtsDaemonStatus(config: NormalizedTtsDaemonConfig): Pro
     model: health.model ?? state?.model,
     uptimeSeconds,
     gpuMemoryUsedMb,
-    error: health.ok === true ? undefined : health.error ?? (running ? 'daemon unhealthy' : 'daemon not running'),
+    error: health.ok === true ? undefined : health.error ?? (managedRunning ? 'daemon unhealthy' : 'daemon not running'),
   };
 }
 
@@ -367,10 +399,14 @@ export async function startTtsDaemon(options: TtsDaemonStartOptions): Promise<Tt
   try {
     await clearTtsDaemonManualStopGate();
     const existing = await getTtsDaemonStatus(config);
-    if (existing.running) {
+    if (existing.ok) {
       alreadyRunning = true;
       spawnedPid = existing.pid;
     } else {
+      if (existing.managed && existing.pid !== null) {
+        await terminateProcess(existing.pid, 5_000);
+        await clearState();
+      }
       const python = await getTtsDaemonPython();
       const script = await resolveTtsDaemonScript();
       if (!(await pathExists(python))) {
@@ -474,33 +510,18 @@ export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig):
 
 export async function stopTtsDaemon(timeoutMs = 5_000): Promise<TtsDaemonStopResult> {
   await setTtsDaemonManualStopGate();
-  const pid = await readPid();
+  const statePid = await readPid();
+  if (statePid !== null && !isProcessAlive(statePid)) {
+    await clearState();
+    return { stopped: false, pid: statePid, error: 'TTS daemon pid file was stale' };
+  }
+
+  const config = loadConfig().config.tts;
+  const status = statePid === null ? await getTtsDaemonStatus(config) : null;
+  const pid = statePid ?? status?.pid ?? null;
   if (pid === null) return { stopped: false, pid: null, error: 'TTS daemon is not running' };
-  if (!isProcessAlive(pid)) {
-    await clearState();
-    return { stopped: false, pid, error: 'TTS daemon pid file was stale' };
-  }
 
-  try {
-    process.kill(pid, 'SIGTERM');
-  } catch (error) {
-    await clearState();
-    return { stopped: false, pid, error: error instanceof Error ? error.message : String(error) };
-  }
-
-  const deadline = Date.now() + timeoutMs;
-  while (isProcessAlive(pid) && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-
-  if (isProcessAlive(pid)) {
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      // already gone
-    }
-  }
-
+  await terminateProcess(pid, timeoutMs);
   await clearState();
   return { stopped: true, pid };
 }

@@ -1,5 +1,6 @@
 import { loadConfig } from '../lib/config-yaml.js';
 import { getTtsDaemonStatus, hasTtsDaemonState, isTtsDaemonManuallyStopped, startTtsDaemon } from '../lib/tts-daemon.js';
+import { parsePositiveIntEnv } from './watchdog.js';
 
 export interface TtsWatchdogConfig {
   enabled: boolean;
@@ -21,14 +22,18 @@ export interface TtsWatchdogStatus {
   nextPollAt: string | null;
 }
 
+function parseTtsWatchdogIntEnv(value: string | undefined, fallback: number, minimum: number): number {
+  return Math.max(minimum, parsePositiveIntEnv(value, fallback));
+}
+
 export function readTtsWatchdogConfig(env: NodeJS.ProcessEnv = process.env): TtsWatchdogConfig {
   return {
     enabled: env.PANOPTICON_TTS_WATCHDOG !== '0',
-    pollMs: Number(env.PANOPTICON_TTS_WATCHDOG_POLL_MS ?? 5_000),
-    failThreshold: Number(env.PANOPTICON_TTS_WATCHDOG_FAIL_THRESHOLD ?? 1),
-    maxRestarts: Number(env.PANOPTICON_TTS_WATCHDOG_MAX_RESTARTS ?? 3),
-    windowMs: Number(env.PANOPTICON_TTS_WATCHDOG_WINDOW_MS ?? 10 * 60_000),
-    startTimeoutMs: Number(env.PANOPTICON_TTS_WATCHDOG_START_TIMEOUT_MS ?? 25_000),
+    pollMs: parseTtsWatchdogIntEnv(env.PANOPTICON_TTS_WATCHDOG_POLL_MS, 5_000, 1_000),
+    failThreshold: parseTtsWatchdogIntEnv(env.PANOPTICON_TTS_WATCHDOG_FAIL_THRESHOLD, 1, 1),
+    maxRestarts: parseTtsWatchdogIntEnv(env.PANOPTICON_TTS_WATCHDOG_MAX_RESTARTS, 3, 1),
+    windowMs: parseTtsWatchdogIntEnv(env.PANOPTICON_TTS_WATCHDOG_WINDOW_MS, 10 * 60_000, 1_000),
+    startTimeoutMs: parseTtsWatchdogIntEnv(env.PANOPTICON_TTS_WATCHDOG_START_TIMEOUT_MS, 25_000, 1_000),
   };
 }
 

@@ -415,7 +415,7 @@ def worker() -> None:
             dur = len(audio) / SAMPLE_RATE
             log(
                 f"spoke {dur:.1f}s in {gen_secs:.1f}s "
-                f"(rtf={gen_secs / max(dur, 0.001):.2f}): {job['text'][:60]!r}"
+                f"(rtf={gen_secs / max(dur, 0.001):.2f})"
             )
             play_audio(audio, job.get("volume", 1.0))
         except Exception as exc:  # noqa: BLE001
@@ -465,7 +465,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/health":
-            self._json(200, {"ok": True, "queue": WORK_QUEUE.qsize(), "model": MODEL_ID})
+            self._json(200, {"ok": True, "queue": WORK_QUEUE.qsize(), "model": MODEL_ID, "pid": os.getpid()})
             return
         self._json(404, {"error": "not_found"})
 
