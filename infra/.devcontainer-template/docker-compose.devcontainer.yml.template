@@ -19,7 +19,7 @@ services:
       - devnet
       - panopticon
 
-  # Init service: runs filtered bun install + server build once for all workspaces
+  # Init service: runs bun install + server build once for all workspaces
   # Frontend and server depend on this completing successfully
   init:
     build:
@@ -34,13 +34,15 @@ services:
     command: >
       sh -c "
         echo 'Installing dependencies...' &&
-        bun install --filter '@panctl/cli' --filter '@panctl/contracts' --filter '@panopticon/pi-extension' --filter 'panopticon-server' --filter 'panopticon-dashboard' &&
+        # PAN-1169: --filter leaves top-level node_modules un-hoisted on this named volume.
+        bun install &&
         echo 'Rebuilding native Node.js addons...' &&
         npm rebuild better-sqlite3 2>&1 &&
         echo 'Building contracts...' &&
         cd packages/contracts && bun run build 2>&1 && cd ../.. &&
         echo 'Building dashboard server...' &&
-        npm run build:dashboard:server &&
+        # PAN-1169: fail init if externalized imports stay unresolved; this grep guard is intentional and must not be removed as noisy build output.
+        npm run build:dashboard:server > /tmp/dashboard-build.log 2>&1; build_status=$$?; cat /tmp/dashboard-build.log; if [ "$$build_status" -ne 0 ]; then exit "$$build_status"; fi; if grep -q 'UNRESOLVED_IMPORT' /tmp/dashboard-build.log; then echo 'ERROR: dashboard build emitted UNRESOLVED_IMPORT warnings — top-level node_modules is incomplete (see PAN-1169).' >&2; exit 1; fi &&
         echo 'Init complete'
       "
     volumes:
