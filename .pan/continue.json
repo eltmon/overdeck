@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1169",
   "created": "2026-05-18T08:34:50.104Z",
-  "updated": "2026-05-18T09:10:00.000Z",
+  "updated": "2026-05-18T09:03:37.004Z",
   "gitState": {
     "branch": "feature/pan-1169",
-    "sha": "81cf7398d",
+    "sha": "19373e1c0",
     "dirty": false
   },
   "decisions": [
@@ -87,7 +87,14 @@
       "mitigation": "Bead-2's acceptance criterion ac3 requires a comment in the template explaining the contract (token pattern, references PAN-1169) so a future bundler swap updates the detection rather than removing it as 'noise'."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "Implementation complete for PAN-1169; run quality gates, push, and call pan done.",
+    "beadId": null,
+    "filesToRead": [
+      ".pan/spec.vbrief.json",
+      "infra/.devcontainer-template/docker-compose.devcontainer.yml.template"
+    ]
+  },
   "beadsMapping": {
     "drop-filter-from-init": "workspace-0bdf",
     "fail-init-on-unresolved-import": "workspace-ya3b"
@@ -105,6 +112,18 @@
       "reason": "planning",
       "note": "Reconciled with prior auto-planning artifact at .pan/spec.vbrief.json (status: proposed, sequence: 2). Verified the existing plan is consistent with the current template state (both docker-compose.devcontainer.yml.template and devcontainer.json.template still use --filter on bun install) and with the issue body's recommended Fix #1. Beads are already materialized in beads tracker (workspace-0bdf: drop-filter, workspace-ya3b: fail-on-UNRESOLVED_IMPORT). No re-finalize needed; planning is complete and ready for the work role to pick up.",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-18T08:53:38.224Z",
+      "reason": "bead-complete",
+      "note": "Completed workspace-68ho: removed Bun --filter flags from devcontainer templates, verified fresh Docker init created top-level effect/yaml/@iarna packages, server stayed running, and stack health was healthy.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T09:03:37.004Z",
+      "reason": "bead-complete",
+      "note": "Completed workspace-8lfs: added an init guard that captures dashboard server build output, preserves build exit status under busybox sh, and fails init when UNRESOLVED_IMPORT appears. Clean guarded init passed; synthetic missing top-level dependency injection produced UNRESOLVED_IMPORT and init exit 1; busybox sh non-zero status handling was verified with alpine.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []

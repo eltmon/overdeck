@@ -137,7 +137,7 @@
       {
         "id": "fail-init-on-unresolved-import",
         "title": "Fail init container loudly on UNRESOLVED_IMPORT warnings during dashboard build",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-18T04:30:00.000Z",
         "metadata": {
@@ -153,7 +153,7 @@
           {
             "id": "fail-init-on-unresolved-import.ac1",
             "title": "The init service's `command:` in `infra/.devcontainer-template/docker-compose.devcontainer.yml.template` captures the dashboard server build's stdout+stderr, scans it for the literal token `UNRESOLVED_IMPORT`, and exits the init container with non-zero status if any match is found.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -161,7 +161,7 @@
           {
             "id": "fail-init-on-unresolved-import.ac2",
             "title": "The exit-status handling is correct under busybox `sh -c`: a non-zero exit from `npm run build:dashboard:server` itself (not just the grep) must also fail init. This means either `set -o pipefail` is used (and works under the container's sh) or `${PIPESTATUS[0]}` is explicitly checked.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -169,7 +169,7 @@
           {
             "id": "fail-init-on-unresolved-import.ac3",
             "title": "A comment above the new guard in the template explains why it exists, references PAN-1169, and warns against removing it as 'noise'.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -177,7 +177,7 @@
           {
             "id": "fail-init-on-unresolved-import.ac4",
             "title": "On a freshly-rebuilt PAN-1169 workspace with the Bead 1 fix in place, the init container exits 0 (no UNRESOLVED_IMPORT warnings, build completes cleanly) — i.e. the guard does not produce a false positive when the system is working.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -185,7 +185,7 @@
           {
             "id": "fail-init-on-unresolved-import.ac5",
             "title": "Manual injection test: when the init container is run with the Bead 1 fix REVERTED (i.e. --filter restored, top-level node_modules empty), the init container exits non-zero with a diagnostic message that references PAN-1169 and the UNRESOLVED_IMPORT warnings, instead of exiting 0 silently. Document the test method (e.g. local revert of the docker-compose change, rerun of init service) in the bead's completion notes.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -193,7 +193,7 @@
           {
             "id": "fail-init-on-unresolved-import.ac6",
             "title": "No new files are added (no separate shell script). The change is entirely inside `infra/.devcontainer-template/docker-compose.devcontainer.yml.template`'s `init.command` block.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
