@@ -32,6 +32,22 @@ describe('restoreTrackedBeadsExport', () => {
     expect(existsSync(join(workspace, '.beads', 'issues.jsonl'))).toBe(true);
   });
 
+  it('restores the tracked export when the deletion has already been staged', async () => {
+    // `git rm` removes the file from both worktree AND index. `git restore --` alone
+    // is a no-op in this state because the index has no entry to restore from — we
+    // need `git restore --source=HEAD --staged --worktree` to recover from HEAD.
+    execSync('git rm -q .beads/issues.jsonl', { cwd: workspace });
+    const before = execSync('git status --porcelain', { cwd: workspace, encoding: 'utf-8' });
+    expect(before).toMatch(/^D\s+\.beads\/issues\.jsonl/m);
+    expect(existsSync(join(workspace, '.beads', 'issues.jsonl'))).toBe(false);
+
+    await restoreTrackedBeadsExport(workspace);
+
+    expect(existsSync(join(workspace, '.beads', 'issues.jsonl'))).toBe(true);
+    const after = execSync('git status --porcelain', { cwd: workspace, encoding: 'utf-8' });
+    expect(after).toBe('');
+  });
+
   it('is a no-op when the export is present and clean', async () => {
     const before = execSync('git status --porcelain', { cwd: workspace, encoding: 'utf-8' });
     expect(before).toBe('');

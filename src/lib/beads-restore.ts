@@ -33,8 +33,18 @@ export async function restoreTrackedBeadsExport(workspacePath: string): Promise<
       cwd: workspacePath,
       encoding: 'utf-8',
     });
-    if (stdout.split('\n').some((line) => line.slice(0, 2).includes('D'))) {
-      await execAsync('git restore -- .beads/issues.jsonl', { cwd: workspacePath });
+    // git status --porcelain shows the index column (col 0) and worktree column (col 1).
+    // - "_D" = working tree deleted (file removed but still in index)
+    // - "D_" = staged deletion (already removed from index — `git restore --` alone
+    //          is a no-op here because the index has nothing to restore from)
+    // - "DD" = staged + worktree deletion
+    // For any of these, restoring from HEAD into both the index AND worktree recovers
+    // the tracked file in every case.
+    const xy = stdout.split('\n').find((line) => line.endsWith(' .beads/issues.jsonl'));
+    if (xy && (xy[0] === 'D' || xy[1] === 'D')) {
+      await execAsync('git restore --source=HEAD --staged --worktree -- .beads/issues.jsonl', {
+        cwd: workspacePath,
+      });
     }
   } catch {
     // Best effort — never throw from the safety net.
