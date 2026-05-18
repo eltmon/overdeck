@@ -91,12 +91,12 @@ describe('ServerConfig', () => {
   });
 
   describe('host', () => {
-    it('defaults to 127.0.0.1', async () => {
+    it('defaults to 0.0.0.0 so panopticon-traefik (docker) can reach the host process', async () => {
       const cfg = await getConfig();
-      expect(cfg.host).toBe('127.0.0.1');
+      expect(cfg.host).toBe('0.0.0.0');
     });
 
-    it('reads HOST env var', async () => {
+    it('reads HOST env var (lockdown to loopback)', async () => {
       process.env['HOST'] = '127.0.0.1';
       const cfg = await getConfig();
       expect(cfg.host).toBe('127.0.0.1');
