@@ -2,8 +2,15 @@ import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { execSync } from 'node:child_process';
-import { EDITORS, type EditorId } from '@panctl/contracts';
+import type { EditorId } from '@panctl/contracts';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
+
+type Editor = (typeof import('@panctl/contracts'))['EDITORS'][number];
+
+async function loadEditors(): Promise<readonly Editor[]> {
+  const { EDITORS } = await import('@panctl/contracts');
+  return EDITORS;
+}
 
 function getFileManagerCommand(): string | null {
   switch (process.platform) {
@@ -24,8 +31,8 @@ function isCommandAvailable(command: string): boolean {
   }
 }
 
-function detectFirstAvailableEditor(): { id: EditorId; command: string } | null {
-  for (const editor of EDITORS) {
+function detectFirstAvailableEditor(editors: readonly Editor[]): { id: EditorId; command: string } | null {
+  for (const editor of editors) {
     if (editor.id === 'file-manager') continue;
     if (editor.command && isCommandAvailable(editor.command)) {
       return { id: editor.id, command: editor.command };
@@ -35,6 +42,7 @@ function detectFirstAvailableEditor(): { id: EditorId; command: string } | null 
 }
 
 export async function openCommand(issueId: string, options: { editor?: string }) {
+  const editors = await loadEditors();
   const issueLower = issueId.toLowerCase();
   const resolved = resolveProjectFromIssue(issueId);
   if (!resolved) {
@@ -52,10 +60,10 @@ export async function openCommand(issueId: string, options: { editor?: string })
   let editorLabel: string;
 
   if (options.editor) {
-    const entry = EDITORS.find((e) => e.id === options.editor);
+    const entry = editors.find((e) => e.id === options.editor);
     if (!entry) {
       console.error(`Unknown editor: ${options.editor}`);
-      console.error(`Available: ${EDITORS.map((e) => e.id).join(', ')}`);
+      console.error(`Available: ${editors.map((e) => e.id).join(', ')}`);
       process.exit(1);
     }
     if (entry.id === 'file-manager') {
@@ -71,14 +79,14 @@ export async function openCommand(issueId: string, options: { editor?: string })
       editorLabel = entry.label;
     }
   } else {
-    const detected = detectFirstAvailableEditor();
+    const detected = detectFirstAvailableEditor(editors);
     if (!detected) {
       console.error('No supported editor found in PATH');
-      console.error(`Supported: ${EDITORS.filter((e) => e.command).map((e) => `${e.label} (${e.command})`).join(', ')}`);
+      console.error(`Supported: ${editors.filter((e) => e.command).map((e) => `${e.label} (${e.command})`).join(', ')}`);
       process.exit(1);
     }
     editorCommand = detected.command;
-    editorLabel = EDITORS.find((e) => e.id === detected.id)!.label;
+    editorLabel = editors.find((e) => e.id === detected.id)!.label;
   }
 
   console.log(`Opening ${workspacePath} in ${editorLabel}...`);

@@ -38,12 +38,16 @@ function getHeader(
   return value;
 }
 
+export function isTrustedOriginForHost(origin: string, _host: string | undefined): boolean {
+  const normalized = normalizeOrigin(origin);
+  return normalized !== null && getTrustedOrigins().includes(normalized);
+}
+
 export function validateOrigin(
   request: HttpServerRequest.HttpServerRequest,
 ): { ok: true } | { ok: false; error: string } {
   const origin = getHeader(request, 'origin');
   const referer = getHeader(request, 'referer');
-  const trusted = getTrustedOrigins();
 
   if (!origin && !referer) {
     const method = request.method.toUpperCase();
@@ -54,15 +58,13 @@ export function validateOrigin(
   }
 
   if (origin) {
-    const normalized = normalizeOrigin(origin);
-    if (normalized && trusted.includes(normalized)) {
+    if (isTrustedOriginForHost(origin, getHeader(request, 'host'))) {
       return { ok: true };
     }
     return { ok: false, error: 'Invalid origin' };
   }
 
-  const normalized = normalizeOrigin(referer);
-  if (normalized && trusted.includes(normalized)) {
+  if (isTrustedOriginForHost(referer, getHeader(request, 'host'))) {
     return { ok: true };
   }
   return { ok: false, error: 'Invalid referer' };

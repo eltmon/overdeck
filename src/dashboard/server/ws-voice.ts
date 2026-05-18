@@ -1,0 +1,182 @@
+import http from 'node:http';
+import { Buffer } from 'node:buffer';
+import { WebSocket, WebSocketServer } from 'ws';
+import { autoPresoSession } from '../../autopreso/session.js';
+import type { ITurnEmitter } from '../../voice/transcription.js';
+import { createTranscriptionManager, type TranscriptionManager } from '../../voice/transcription-manager.js';
+import { createTurnQueue, type TurnQueue } from '../../voice/turn-queue.js';
+import { loadVoiceSettings, subscribeVoiceSettings } from './routes/voice.js';
+import { isTrustedOriginForHost } from './routes/origin-validation.js';
+
+function sendJson(ws: WebSocket, payload: unknown): void {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
+  }
+}
+
+function rawDataToBuffer(data: WebSocket.RawData): Buffer {
+  if (Buffer.isBuffer(data)) return data;
+  if (data instanceof ArrayBuffer) return Buffer.from(data);
+  if (Array.isArray(data)) return Buffer.concat(data);
+  return Buffer.from(data);
+}
+
+const MAX_AUDIO_FRAME_BYTES = 64_000;
+const VOICE_STOP_FINALIZE_TIMEOUT_MS = 5_000;
+
+function isTrustedWebSocketOrigin(request: http.IncomingMessage): boolean {
+  const origin = request.headers.origin;
+  if (typeof origin !== 'string') return false;
+  return isTrustedOriginForHost(origin, request.headers.host);
+}
+
+export function setupVoiceWebSocket(server: http.Server): void {
+  const wss = new WebSocketServer({ noServer: true });
+  const originalOn = server.on.bind(server);
+  let activeVoiceSocket: WebSocket | null = null;
+
+  server.on = function(event: string, listener: (...args: unknown[]) => void) {
+    if (event === 'upgrade') {
+      const wrapped = (request: http.IncomingMessage, socket: import('net').Socket, head: Buffer) => {
+        const url = new URL(request.url || '', `http://${request.headers.host}`);
+        if (url.pathname === '/ws/voice') return;
+        (listener as (req: http.IncomingMessage, socket: import('net').Socket, head: Buffer) => void)(request, socket, head);
+      };
+      return originalOn(event, wrapped as never);
+    }
+    return originalOn(event, listener as never);
+  } as typeof server.on;
+
+  originalOn('upgrade', (request: http.IncomingMessage, socket: import('net').Socket, head: Buffer) => {
+    const url = new URL(request.url || '', `http://${request.headers.host}`);
+    if (url.pathname !== '/ws/voice') return;
+    if (!isTrustedWebSocketOrigin(request)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit('connection', ws, request);
+    });
+  });
+
+  wss.on('connection', (ws: WebSocket) => {
+    if (activeVoiceSocket?.readyState === WebSocket.OPEN || activeVoiceSocket?.readyState === WebSocket.CONNECTING) {
+      sendJson(ws, { type: 'error', error: 'Another voice transcription session is already active' });
+      ws.close(1013, 'Voice transcription session already active');
+      return;
+    }
+    activeVoiceSocket = ws;
+
+    let manager: TranscriptionManager | null = null;
+    let turnQueue: TurnQueue | null = null;
+    let finalizeTimer: NodeJS.Timeout | null = null;
+
+    const finishStop = () => {
+      if (finalizeTimer) clearTimeout(finalizeTimer);
+      finalizeTimer = null;
+      turnQueue?.flush();
+      sendJson(ws, { type: 'transcript:finalized' });
+    };
+
+    const stopWithTimeout = async (transcription: ITurnEmitter): Promise<boolean> => {
+      try {
+        await Promise.race([
+          transcription.stop(),
+          new Promise<never>((_, reject) => {
+            finalizeTimer = setTimeout(() => reject(new Error('Voice transcription finalization timed out')), VOICE_STOP_FINALIZE_TIMEOUT_MS);
+          }),
+        ]);
+        return true;
+      } catch (error) {
+        sendJson(ws, { type: 'error', error: error instanceof Error ? error.message : String(error) });
+        return false;
+      } finally {
+        if (finalizeTimer) clearTimeout(finalizeTimer);
+        finalizeTimer = null;
+      }
+    };
+
+    const configureTranscription = async (nextSettings?: Awaited<ReturnType<typeof loadVoiceSettings>>) => {
+      const settings = nextSettings ?? await loadVoiceSettings();
+      if (ws.readyState !== WebSocket.OPEN) return;
+      turnQueue?.close();
+      manager?.close();
+      manager = createTranscriptionManager(settings);
+      manager.applyCurrent();
+      const transcription = manager.getActive();
+      if (!transcription) throw new Error('Voice transcription unavailable');
+      transcription.onPartial((text) => sendJson(ws, { type: 'transcript:partial', text }));
+      turnQueue = createTurnQueue(transcription, (text) => {
+        sendJson(ws, { type: 'transcript:committed', text });
+        const result = autoPresoSession.processTranscript(text, settings);
+        if (!result.accepted) {
+          sendJson(ws, { type: 'error', error: 'AutoPreso transcript processing is not live' });
+        } else if (result.coalesced) {
+          sendJson(ws, { type: 'error', error: 'AutoPreso transcript processing is backpressured' });
+        }
+      });
+      transcription.onError((error) => sendJson(ws, { type: 'error', error: error.message }));
+    };
+
+    const unsubscribeSettings = subscribeVoiceSettings((settings) => {
+      void configureTranscription(settings).catch((error) => {
+        sendJson(ws, { type: 'error', error: error instanceof Error ? error.message : String(error) });
+      });
+    });
+
+    void configureTranscription()
+      .catch((error) => {
+        sendJson(ws, { type: 'error', error: error instanceof Error ? error.message : String(error) });
+        ws.close(1011, 'Voice transcription unavailable');
+      });
+
+    ws.on('message', (data, isBinary) => {
+      const transcription = manager?.getActive();
+      if (!transcription) {
+        sendJson(ws, { type: 'error', error: 'Voice transcription is not ready' });
+        return;
+      }
+      if (isBinary) {
+        const audio = rawDataToBuffer(data);
+        if (audio.byteLength > MAX_AUDIO_FRAME_BYTES) {
+          sendJson(ws, { type: 'error', error: 'Voice audio frame is too large' });
+          ws.close(1009, 'Voice audio frame is too large');
+          return;
+        }
+        if (!transcription.sendAudio(audio)) {
+          sendJson(ws, { type: 'error', error: 'Voice transcription is backpressured' });
+        }
+        return;
+      }
+
+      let message: unknown;
+      try {
+        message = JSON.parse(data.toString());
+      } catch {
+        sendJson(ws, { type: 'error', error: 'Invalid voice control message' });
+        return;
+      }
+
+      if (message && typeof message === 'object' && 'type' in message && message.type === 'stop') {
+        void stopWithTimeout(transcription).then((completed) => {
+          if (completed) finishStop();
+        });
+      }
+    });
+
+    const closeTranscription = () => {
+      if (activeVoiceSocket === ws) activeVoiceSocket = null;
+      unsubscribeSettings();
+      if (finalizeTimer) clearTimeout(finalizeTimer);
+      finalizeTimer = null;
+      turnQueue?.close();
+      turnQueue = null;
+      manager?.close();
+      manager = null;
+    };
+
+    ws.on('close', closeTranscription);
+    ws.on('error', closeTranscription);
+  });
+}

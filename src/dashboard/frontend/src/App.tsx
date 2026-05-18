@@ -20,6 +20,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { CommandDeck } from './components/CommandDeck';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
+import { AutoPresoView } from './components/autopreso/AutoPresoView';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { BootstrapGate } from './components/BootstrapGate';
@@ -63,6 +64,7 @@ const TAB_PATHS: Record<Tab, string> = {
   agents: '/agents',
   resources: '/resources',
   'awaiting-merge': '/awaiting-merge',
+  autopreso: '/autopreso',
   activity: '/activity',
   metrics: '/metrics',
   costs: '/costs',
@@ -948,6 +950,11 @@ export default function App() {
         {activeTab === 'awaiting-merge' && (
           <div className="w-full overflow-auto">
             <AwaitingMergePage />
+          </div>
+        )}
+        {activeTab === 'autopreso' && (
+          <div className="w-full h-full overflow-hidden">
+            <AutoPresoView />
           </div>
         )}
         {activeTab === 'settings' && (

@@ -133,5 +133,6 @@ describe('removeLegacySkills070', () => {
 
     const secondRun = removeLegacySkills070();
     expect(secondRun).toEqual([]);
+    expect(existsSync(join(mockClaudeSkills, 'pan-tldr'))).toBe(true);
   });
 });
