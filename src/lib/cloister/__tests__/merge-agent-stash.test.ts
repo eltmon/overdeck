@@ -38,7 +38,7 @@ vi.mock('../../tmux.js', () => ({
   listSessionNamesAsync: tmuxMocks.listSessionNamesAsync,
   sendKeysAsync: vi.fn(async () => {}),
   sessionExists: tmuxMocks.sessionExists,
-  sessionExistsAsync: vi.fn(async () => false),
+  sessionExistsAsync: vi.fn(async (name: string) => tmuxMocks.sessionExists(name)),
   killSession: tmuxMocks.killSession,
   killSessionAsync: tmuxMocks.killSessionAsync,
 }));
@@ -47,6 +47,7 @@ vi.mock('../../agents.js', () => ({
   spawnRun: vi.fn(async () => ({ id: 'agent-pan-1-ship' })),
   getAgentState: vi.fn(() => null),
   setAgentPaused: setAgentPausedMock,
+  setAgentPausedAsync: vi.fn(async (...args: unknown[]) => setAgentPausedMock(...args)),
 }));
 vi.mock('../validation.js', () => ({
   runMergeValidation: vi.fn(async () => ({ valid: true, skipped: true })),
@@ -262,8 +263,10 @@ describe('merge-agent ship role and stash lifecycle', () => {
       expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-1', { mergeStatus: 'merged', readyForMerge: false });
       expect(setAgentPausedMock).toHaveBeenCalledWith('agent-pan-1', 'awaiting close-out (verify on main)', true);
       expect(setAgentPausedMock).toHaveBeenCalledWith('planning-pan-1', 'awaiting close-out (verify on main)', true);
-      expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-pan-1');
-      expect(tmuxMocks.killSession).toHaveBeenCalledWith('planning-pan-1');
+      expect(tmuxMocks.sessionExists).toHaveBeenCalledWith('agent-pan-1');
+      expect(tmuxMocks.sessionExists).toHaveBeenCalledWith('planning-pan-1');
+      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1');
+      expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('planning-pan-1');
       expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-test');
       expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-ship');
       expect(tmuxMocks.killSessionAsync).toHaveBeenCalledWith('agent-pan-1-review-synthesis');

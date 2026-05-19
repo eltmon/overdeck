@@ -2331,7 +2331,7 @@ async function hasActiveAgentForIssue(issueId: string, allowPausedMerged = false
 function isValidIssueId(id: string): boolean {
   if (typeof id !== 'string') return false;
   // Linear-style: PREFIX-123
-  if (/^[A-Z][A-Z0-9]*-\d+$/.test(id)) return true;
+  if (/^[A-Za-z][A-Za-z0-9]*-\d+$/.test(id)) return true;
   // GitHub-style: owner/repo#number (alphanumeric, hyphens, underscores, periods only)
   if (/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+#\d+$/.test(id)) return true;
   return false;
