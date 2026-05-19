@@ -158,6 +158,7 @@ describe('merge-agent ship role and stash lifecycle', () => {
   });
 
   it('drops lingering pre-merge stashes during post-merge lifecycle', async () => {
+    resolveGitHubIssueMock.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1 });
     execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
       const callback = (typeof _opts === 'function' ? _opts : cb)!;
       if (cmd.includes('git rev-parse --verify')) return callback(null, { stdout: 'branch-sha\n', stderr: '' });
@@ -188,6 +189,31 @@ describe('merge-agent ship role and stash lifecycle', () => {
 
     expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'def456abc123def456abc123def456abc123def4');
     expect(dropStash).not.toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
+  });
+
+  it('blocks post-merge completion when verifying_on_main transition fails', async () => {
+    resolveGitHubIssueMock.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1 });
+    tmuxMocks.sessionExists.mockReturnValue(true);
+    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
+      const callback = (typeof _opts === 'function' ? _opts : cb)!;
+      if (cmd.includes('git rev-parse --verify')) return callback(null, { stdout: 'branch-sha\n', stderr: '' });
+      if (cmd.includes('git merge-base --is-ancestor')) return callback(null, { stdout: '', stderr: '' });
+      if (cmd.includes('gh issue edit') && cmd.includes('--add-label') && cmd.includes('verifying-on-main')) {
+        return callback(new Error('label update failed'), { stdout: '', stderr: 'label update failed' });
+      }
+      callback(null, { stdout: '', stderr: '' });
+    });
+
+    await expect(postMergeLifecycle('PAN-1', '/tmp/workspace', 'feature/pan-1', { skipDeploy: true })).rejects.toThrow('label update failed');
+
+    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-1', {
+      mergeStatus: 'failed',
+      readyForMerge: false,
+      mergeNotes: expect.stringContaining('Post-merge verifying_on_main transition failed'),
+    });
+    expect(setAgentPausedMock).not.toHaveBeenCalled();
+    expect(tmuxMocks.killSession).not.toHaveBeenCalled();
+    expect(tmuxMocks.killSessionAsync).not.toHaveBeenCalled();
   });
 
   it('performs a non-destructive verify-on-main handoff after merge', async () => {

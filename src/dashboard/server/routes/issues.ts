@@ -2176,6 +2176,27 @@ function sanitizeCloseOutError(error: unknown): string {
   return 'Internal server error';
 }
 
+function getCachedIssueForCloseOut(issueDataService: IssueDataService, issueId: string): any | undefined {
+  return issueDataService.getIssues().find(
+    (issue: any) => String(issue.identifier ?? issue.id ?? '').toUpperCase() === issueId.toUpperCase(),
+  );
+}
+
+function isCachedIssueClosedOut(issue: any | undefined): boolean {
+  return Array.isArray(issue?.labels)
+    && issue.labels.some((label: unknown) => String(label).toLowerCase() === 'closed-out');
+}
+
+function closeOutAlreadyCompletedResult(issueId: string): WorkflowResult {
+  return {
+    workflow: 'close-out',
+    issueId,
+    success: true,
+    steps: [{ step: 'close-out:idempotent', success: true, skipped: true, details: ['Issue already closed out'] }],
+    duration: 0,
+  };
+}
+
 // ─── Route: POST /api/issues/:id/close-out ───────────────────────────────────
 
 const postIssueCloseOutRoute = HttpRouter.add(
@@ -2199,6 +2220,9 @@ const postIssueCloseOutRoute = HttpRouter.add(
 
     const eventStore = yield* EventStoreService;
     const issueDataService = getIssueDataService();
+    if (isCachedIssueClosedOut(getCachedIssueForCloseOut(issueDataService, id))) {
+      return jsonResponse(closeOutAlreadyCompletedResult(id));
+    }
     const issueSource = issueDataService.getIssueSource(id);
 
     if (issueSource === 'rally') {

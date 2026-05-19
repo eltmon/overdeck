@@ -85,6 +85,7 @@ vi.mock('../../../src/lib/paths.js', () => ({
 
 vi.mock('../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn().mockReturnValue({ isGitHub: false }),
+  resolveTrackerType: vi.fn().mockReturnValue('github'),
 }));
 
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({

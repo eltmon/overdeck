@@ -195,6 +195,34 @@ describe('POST /api/issues/:id/close-out', () => {
     ]);
   });
 
+  it('returns a successful no-op when close-out is repeated', async () => {
+    const cachedIssue = {
+      identifier: 'PAN-1190',
+      status: 'Verifying on Main',
+      state: 'verifying_on_main',
+      canonicalStatus: 'verifying_on_main',
+      mergeStatus: 'merged',
+      labels: ['bug', 'verifying-on-main', 'needs-close-out'],
+    };
+    issueDataServiceMock.getIssues.mockReturnValue([cachedIssue]);
+    issueDataServiceMock.patchIssue.mockImplementation((_id: string, patch: Record<string, unknown>) => {
+      Object.assign(cachedIssue, patch);
+    });
+
+    const first = await postCloseOut('PAN-1190');
+    const second = await postCloseOut('PAN-1190');
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(second.body).toMatchObject({
+      workflow: 'close-out',
+      issueId: 'PAN-1190',
+      success: true,
+      steps: [{ step: 'close-out:idempotent', success: true, skipped: true }],
+    });
+    expect(closeOutMock).toHaveBeenCalledOnce();
+  });
+
   it('allows cookie-authenticated dashboard requests with exact trusted origin and CSRF token', async () => {
     const result = await postCloseOut('PAN-1190', {
       [INTERNAL_TOKEN_HEADER]: '',

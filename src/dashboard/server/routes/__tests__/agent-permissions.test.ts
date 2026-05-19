@@ -6,7 +6,7 @@ import {
   normalizePermissionRequestBody,
   processPermissionResponse,
 } from '../agent-permissions.js';
-import { validateOrigin, _resetTrustedOriginsForTests } from '../origin-validation.js';
+import { isTrustedOriginForHost, validateOrigin, _resetTrustedOriginsForTests } from '../origin-validation.js';
 
 const PENDING_REQUEST: ChannelPermissionRequestSnapshot = {
   requestId: 'perm-1',
@@ -63,6 +63,14 @@ describe('agent permission helpers', () => {
 
     expect(validateOrigin({ method: 'POST', headers: { origin: 'https://pan.localhost' } } as any)).toEqual({ ok: true });
     expect(validateOrigin({ method: 'POST', headers: { origin: 'https://admin.pan.localhost' } } as any)).toEqual({ ok: true });
+  });
+
+  it('rejects WebSocket origins that only match the request Host header', () => {
+    process.env.PORT = '3011';
+    _resetTrustedOriginsForTests();
+
+    expect(isTrustedOriginForHost('http://attacker.example:3011', 'attacker.example:3011')).toBe(false);
+    expect(isTrustedOriginForHost('http://localhost:3011', 'attacker.example:3011')).toBe(true);
   });
 
   it('normalizes null inputPreview and rejects oversized permission payloads', () => {

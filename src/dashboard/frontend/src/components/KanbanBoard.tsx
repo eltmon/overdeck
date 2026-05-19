@@ -29,7 +29,9 @@ import { CostBreakdownModal } from './CostBreakdownModal';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
-import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../lib/swarmSlots';
+import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
+import { formatRelativeTime } from '../lib/formatRelativeTime';
+import { getIssueWorkAgentMap, getWorkSessionLabel, isAgentSessionAttachable } from '../lib/swarmSlots';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { BulkActionBar } from './BulkActionBar';
@@ -1195,7 +1197,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     mutationFn: async (issueIds: string[]) => {
       const res = await fetch('/api/issues/bulk-close-out', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify({ issueIds }),
       });
       if (!res.ok) {
