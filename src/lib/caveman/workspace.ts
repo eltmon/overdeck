@@ -12,7 +12,8 @@
  */
 
 import { existsSync } from 'fs';
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { chmod, mkdir, readFile, writeFile } from 'fs/promises';
+import { homedir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
 import type { NormalizedCavemanConfig } from '../config-yaml.js';
@@ -55,11 +56,9 @@ export function determineCavemanVariant(config: NormalizedCavemanConfig): Cavema
  */
 export async function injectMemoryHookSettings(workspacePath: string): Promise<void> {
   const claudeDir = join(workspacePath, '.claude');
-  const hooksDir = join(claudeDir, 'hooks');
-  await mkdir(hooksDir, { recursive: true });
+  await mkdir(claudeDir, { recursive: true });
 
-  const scriptPath = join(hooksDir, MEMORY_HOOK_SCRIPT);
-  await writeFile(scriptPath, memoryHookScript(), 'utf-8');
+  const scriptPath = await installTrustedMemoryHookScript();
 
   const settingsPath = join(claudeDir, 'settings.json');
   const settings = await readWorkspaceSettings(settingsPath);
@@ -132,6 +131,16 @@ async function readWorkspaceSettings(settingsPath: string): Promise<Record<strin
   } catch {
     return {};
   }
+}
+
+async function installTrustedMemoryHookScript(): Promise<string> {
+  const hooksDir = join(process.env.PANOPTICON_HOME || join(homedir(), '.panopticon'), 'hooks', 'memory');
+  await mkdir(hooksDir, { recursive: true, mode: 0o700 });
+  await chmod(hooksDir, 0o700);
+  const scriptPath = join(hooksDir, MEMORY_HOOK_SCRIPT);
+  await writeFile(scriptPath, memoryHookScript(), { encoding: 'utf-8', mode: 0o600 });
+  await chmod(scriptPath, 0o600);
+  return scriptPath;
 }
 
 function upsertHook(hooks: Record<string, HookEntry[]>, hookType: string, command: string, timeout: number): void {

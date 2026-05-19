@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { appendFile, readFile } from 'fs/promises';
 import type { MemoryIdentity, MemoryStatus, RagDecision, RagDecisionSource } from '@panctl/contracts';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from './paths.js';
-import { expandMemoryQuery, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
+import { expandMemoryQuery, getCachedMemoryQueryExpansion, type QueryExpansionCall, type QueryExpansionResult } from './query-expansion.js';
 import { searchMemory, type MemorySearchHit } from './search.js';
 import { isMemoryPromptTimeInjectionEnabled } from './settings.js';
 
@@ -82,23 +82,32 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
   }
 
   let expansion: QueryExpansionResult;
-  try {
-    expansion = await expandMemoryQuery({
+  if (surface === 'user-prompt') {
+    expansion = getCachedMemoryQueryExpansion({
       prompt: input.prompt,
       identity: input.identity,
       previousObservations: input.previousObservations,
       now,
-      id: input.id,
-      expand: input.expansion,
     });
-  } catch {
-    expansion = {
-      query: input.prompt,
-      expandedTerms: [],
-      cacheKey: '',
-      status: 'fallback',
-      reason: 'extraction-failed',
-    };
+  } else {
+    try {
+      expansion = await expandMemoryQuery({
+        prompt: input.prompt,
+        identity: input.identity,
+        previousObservations: input.previousObservations,
+        now,
+        id: input.id,
+        expand: input.expansion,
+      });
+    } catch {
+      expansion = {
+        query: input.prompt,
+        expandedTerms: [],
+        cacheKey: '',
+        status: 'fallback',
+        reason: 'extraction-failed',
+      };
+    }
   }
 
   const search = input.search ?? searchMemory;

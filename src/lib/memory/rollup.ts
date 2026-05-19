@@ -221,7 +221,7 @@ export async function readArchivedStatuses(projectId: string, issueId: string, l
 async function archiveStatus(projectId: string, issueId: string, status: MemoryStatus, now: Date): Promise<string> {
   const archiveDir = resolveArchiveDir(projectId, issueId);
   await ensureDir(archiveDir);
-  const path = `${archiveDir}/${now.toISOString().slice(0, 10)}_${slugify(status.name)}.json`;
+  const path = `${archiveDir}/${now.toISOString().replace(/[:.]/g, '-')}_${slugify(status.name)}_${randomUUID()}.json`;
   await writeJsonAtomically(path, status);
   return path;
 }

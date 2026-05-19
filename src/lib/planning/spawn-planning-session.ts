@@ -594,6 +594,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       status: 'running',
       startedAt: new Date().toISOString(),
       role: 'plan',
+      harness: effectiveHarness,
       location: workspaceLocation,
     }, null, 2));
 

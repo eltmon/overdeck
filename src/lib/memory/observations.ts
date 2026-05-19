@@ -3,7 +3,7 @@ import { open, readFile, rename, writeFile } from 'fs/promises';
 import { dirname } from 'path';
 import type { MemoryObservation } from '@panctl/contracts';
 import { ensureParentDir, resolveObservationsFile } from './paths.js';
-import { withMemoryFtsDatabase } from './fts-db.js';
+import { runMemoryFtsTransaction } from './fts-db.js';
 import { updateMemoryHealth } from './health.js';
 
 const appendLocks = new Map<string, Promise<void>>();
@@ -80,53 +80,61 @@ async function withAppendLock<T>(jsonlPath: string, task: () => Promise<T>): Pro
 
 async function indexObservation(observation: MemoryObservation, jsonlPath: string, byteOffset: number): Promise<void> {
   const content = [observation.narrative, observation.summary].filter(Boolean).join('\n\n');
-  await withMemoryFtsDatabase(observation.projectId, (db) => {
-    db.prepare(`
-      INSERT INTO memory_fts (
+  await runMemoryFtsTransaction(observation.projectId, [
+    {
+      method: 'run',
+      sql: `
+        INSERT INTO memory_fts (
+          content,
+          display_content,
+          source,
+          branch,
+          entry_date,
+          entry_time,
+          entry_type,
+          files,
+          tags,
+          doc_type,
+          scope,
+          project_id,
+          workspace_id,
+          issue_id,
+          run_id,
+          session_id,
+          agent_role,
+          agent_harness
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      params: [
         content,
-        display_content,
-        source,
-        branch,
-        entry_date,
-        entry_time,
-        entry_type,
-        files,
-        tags,
-        doc_type,
-        scope,
-        project_id,
-        workspace_id,
-        issue_id,
-        run_id,
-        session_id,
-        agent_role,
-        agent_harness
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      content,
-      observation.summary,
-      observation.id,
-      observation.gitBranch,
-      observation.timestamp.slice(0, 10),
-      observation.timestamp.slice(11),
-      'memory',
-      observation.files.join(','),
-      observation.tags.join(','),
-      'observation',
-      'workspace',
-      observation.projectId,
-      observation.workspaceId,
-      observation.issueId,
-      observation.runId,
-      observation.sessionId,
-      observation.agentRole,
-      observation.agentHarness,
-    );
-    db.prepare(`
-      INSERT OR REPLACE INTO observation_index (id, observation_path_jsonl, byte_offset)
-      VALUES (?, ?, ?)
-    `).run(observation.id, jsonlPath, byteOffset);
-  });
+        observation.summary,
+        observation.id,
+        observation.gitBranch,
+        observation.timestamp.slice(0, 10),
+        observation.timestamp.slice(11),
+        'memory',
+        observation.files.join(','),
+        observation.tags.join(','),
+        'observation',
+        'workspace',
+        observation.projectId,
+        observation.workspaceId,
+        observation.issueId,
+        observation.runId,
+        observation.sessionId,
+        observation.agentRole,
+        observation.agentHarness,
+      ],
+    },
+    {
+      method: 'run',
+      sql: `
+        INSERT OR REPLACE INTO observation_index (id, observation_path_jsonl, byte_offset)
+        VALUES (?, ?, ?)
+      `,
+      params: [observation.id, jsonlPath, byteOffset],
+    },
+  ]);
 }
 
 async function upsertObservationMarkdown(markdownPath: string, observation: MemoryObservation): Promise<void> {

@@ -1,4 +1,4 @@
-import { withMemoryFtsDatabase } from './fts-db.js';
+import { runMemoryFtsStatement } from './fts-db.js';
 
 const DEFAULT_LIMIT = 20;
 const OVERFETCH_RATIO = 3;
@@ -90,49 +90,53 @@ export async function searchMemory(input: SearchMemoryInput): Promise<MemorySear
   const identityPredicate = buildIdentityPredicate(input);
   if (!identityPredicate) return [];
 
-  const rows = await withMemoryFtsDatabase(input.projectId, (db) => db.prepare(`
-    SELECT
-      rowid,
-      content,
-      display_content,
-      source,
-      branch,
-      entry_date,
-      entry_time,
-      entry_type,
-      files,
-      tags,
-      doc_type,
-      scope,
-      project_id,
-      workspace_id,
-      issue_id,
-      run_id,
-      session_id,
-      agent_role,
-      agent_harness,
-      bm25(memory_fts) AS bm25
-    FROM memory_fts
-    WHERE memory_fts MATCH ?
-      AND project_id = ?
-      ${identityPredicate.sql}
-      AND (? = 1 OR (entry_date || 'T' || entry_time) > COALESCE((
-        SELECT MAX(from_timestamp)
-        FROM reset_markers
-        WHERE (scope = 'project' AND scope_id = memory_fts.project_id)
-           OR (scope = 'workspace' AND scope_id = memory_fts.workspace_id)
-           OR (scope = 'issue' AND scope_id = memory_fts.issue_id)
-           OR (scope = 'session' AND scope_id = memory_fts.session_id)
-      ), ''))
-    ORDER BY bm25(memory_fts) ASC
-    LIMIT ?
-  `).all(
-    matchQuery,
-    input.projectId,
-    ...identityPredicate.params,
-    input.includeArchived ? 1 : 0,
-    limit * OVERFETCH_RATIO,
-  ) as MemorySearchRow[]);
+  const rows = await runMemoryFtsStatement<MemorySearchRow[]>(input.projectId, {
+    method: 'all',
+    sql: `
+      SELECT
+        rowid,
+        content,
+        display_content,
+        source,
+        branch,
+        entry_date,
+        entry_time,
+        entry_type,
+        files,
+        tags,
+        doc_type,
+        scope,
+        project_id,
+        workspace_id,
+        issue_id,
+        run_id,
+        session_id,
+        agent_role,
+        agent_harness,
+        bm25(memory_fts) AS bm25
+      FROM memory_fts
+      WHERE memory_fts MATCH ?
+        AND project_id = ?
+        ${identityPredicate.sql}
+        AND (? = 1 OR (entry_date || 'T' || entry_time) > COALESCE((
+          SELECT MAX(from_timestamp)
+          FROM reset_markers
+          WHERE (scope = 'project' AND scope_id = memory_fts.project_id)
+             OR (scope = 'workspace' AND scope_id = memory_fts.workspace_id)
+             OR (scope = 'issue' AND scope_id = memory_fts.issue_id)
+             OR (scope = 'session' AND scope_id = memory_fts.session_id)
+        ), ''))
+      ORDER BY bm25(memory_fts) ASC
+      LIMIT ?
+    `,
+    params: [
+      matchQuery,
+      input.projectId,
+      ...identityPredicate.params,
+      input.includeArchived ? 1 : 0,
+      limit * OVERFETCH_RATIO,
+    ],
+  });
 
   const tokenBudget = input.sibling ? normalizeSiblingTokenBudget(input.siblingTokenBudget) : null;
   const queryTerms = extractQueryTerms(input.query);

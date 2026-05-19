@@ -109,7 +109,7 @@ describe('TranscriptPoller', () => {
     const readTranscriptSlice = vi.fn()
       .mockResolvedValueOnce('{"type":"user"}\n')
       .mockResolvedValueOnce('{"type":"assistant"}\n');
-    const enqueue = vi.fn(async () => undefined);
+    const enqueue = vi.fn(async () => ({ status: 'written' as const, observation: {} as never, reason: null } as never));
     const poller = new TranscriptPoller({
       activityLineThreshold: 2,
       statTranscript,
@@ -190,7 +190,7 @@ describe('TranscriptPoller', () => {
 
   it('samples transcript growth with a bounded read and treats over-cap growth as extraction-worthy', async () => {
     const readTranscriptSlice = vi.fn(async () => 'partial sample without newline');
-    const enqueue = vi.fn(async () => undefined);
+    const enqueue = vi.fn(async () => ({ status: 'written' as const, observation: {} as never, reason: null } as never));
     const poller = new TranscriptPoller({
       activityLineThreshold: 20,
       statTranscript: async () => ({ size: MAX_MEMORY_POLLER_SAMPLE_BYTES + 500, mtimeMs: 1 }),

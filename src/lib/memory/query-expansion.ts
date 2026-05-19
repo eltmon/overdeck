@@ -72,6 +72,19 @@ export interface QueryExpansionLogEntry {
   reason: string | null;
 }
 
+export function getCachedMemoryQueryExpansion(input: Pick<QueryExpansionInput, 'prompt' | 'identity' | 'previousObservations' | 'now'>): QueryExpansionResult {
+  const cacheKey = buildQueryExpansionCacheKey(input);
+  const cached = getCachedExpansion(cacheKey, input.now ?? new Date());
+  if (cached) return { ...cached, status: 'cache-hit' };
+  return {
+    query: input.prompt,
+    expandedTerms: [],
+    cacheKey,
+    status: 'fallback',
+    reason: null,
+  };
+}
+
 export async function expandMemoryQuery(input: QueryExpansionInput): Promise<QueryExpansionResult> {
   const cacheKey = buildQueryExpansionCacheKey(input);
   const cached = getCachedExpansion(cacheKey, input.now ?? new Date());

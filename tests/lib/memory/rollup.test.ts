@@ -278,10 +278,12 @@ describe('memory status rollup synthesis', () => {
       emitStatusUpdated: () => undefined,
     });
 
-    expect(await readdir(archiveDir)).toEqual([
+    const files = await readdir(archiveDir);
+    expect(files).toHaveLength(3);
+    expect(files).toEqual(expect.arrayContaining([
       '2026-05-14_one.json',
       '2026-05-15_two.json',
-      '2026-05-16_three.json',
-    ]);
+    ]));
+    expect(files.some((file) => file.startsWith('2026-05-16T22-00-00-000Z_three_') && file.endsWith('.json'))).toBe(true);
   });
 });

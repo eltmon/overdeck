@@ -138,8 +138,8 @@ export class TranscriptPoller {
       fired: 0,
       removed: 0,
     };
-    if (!await this.areObservationsEnabled()) return result;
     if (this.ticking || this.entries.size === 0) return result;
+    if (!await this.areObservationsEnabled()) return result;
 
     this.ticking = true;
     try {
@@ -187,17 +187,20 @@ export class TranscriptPoller {
     if (pendingLineCount < this.activityLineThreshold) return 'belowThreshold';
     if (this.isRateLimited(entry.sessionId)) return 'rateLimited';
 
-    await this.enqueueDelta({
+    const checkpoint = this.getCheckpoint(entry.sessionId);
+    const fromOffset = checkpoint?.lastOffset ?? entry.lastExtractionOffset;
+    const extractionResult = await this.enqueueDelta({
       sessionId: entry.sessionId,
       transcriptPath: entry.transcriptPath,
-      fromOffset: entry.lastExtractionOffset,
+      fromOffset,
       toOffset: fileStat.size,
       identity: entry.identity,
       trigger: 'poller',
     });
+    const durableOffset = isSuccessfulExtractionResult(extractionResult) ? fileStat.size : fromOffset;
     this.entries.set(entry.sessionId, {
       ...nextEntry,
-      lastExtractionOffset: fileStat.size,
+      lastExtractionOffset: durableOffset,
       pendingLineCount: 0,
     });
     return 'fired';
@@ -210,6 +213,10 @@ export class TranscriptPoller {
     if (!checkpoint.lastMidTurnAt) return false;
     return this.now().getTime() - new Date(checkpoint.lastMidTurnAt).getTime() < this.minIntervalMs;
   }
+}
+
+function isSuccessfulExtractionResult(result: unknown): boolean {
+  return typeof result === 'object' && result !== null && 'status' in result && result.status === 'written';
 }
 
 const defaultTranscriptPoller = new TranscriptPoller();

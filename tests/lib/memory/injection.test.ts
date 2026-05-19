@@ -139,26 +139,28 @@ describe('prompt-time memory injection', () => {
     });
 
     const started = performance.now();
+    const expansion = vi.fn(async () => ({
+      status: 'extracted' as const,
+      provider: 'stub',
+      result: {
+        data: { terms: ['prompt injection', 'memory retrieval', 'summary'] },
+        usage: { input: 1, output: 1 },
+        cost: { usd: 0 },
+        model: 'stub-model',
+        provider: 'stub',
+      },
+    }));
     const result = await injectPromptTimeMemory({
-      prompt: 'Need prompt injection retrieval context',
+      prompt: 'prompt injection memory retrieval summary',
       identity,
       now: new Date('2026-05-16T22:30:00.000Z'),
       id: 'inject-1',
-      expansion: async () => ({
-        status: 'extracted',
-        provider: 'stub',
-        result: {
-          data: { terms: ['prompt injection', 'memory retrieval', 'summary'] },
-          usage: { input: 1, output: 1 },
-          cost: { usd: 0 },
-          model: 'stub-model',
-          provider: 'stub',
-        },
-      }),
+      expansion,
     });
     const elapsed = performance.now() - started;
 
     expect(elapsed).toBeLessThan(1000);
+    expect(expansion).not.toHaveBeenCalled();
     expect(result.status).toBe('injected');
     expect(result.context).toContain('<panopticon-memory-context>');
     expect(result.context).toContain('Untrusted historical context from prior Panopticon memory retrieval.');
@@ -178,7 +180,7 @@ describe('prompt-time memory injection', () => {
       type: 'rag-decision',
       surface: 'user-prompt',
       outcome: 'injected',
-      expandedTerms: ['prompt injection', 'memory retrieval', 'summary'],
+      expandedTerms: [],
       hitCounts: { status: 1, observations: 1, summaries: 1, sibling: 1 },
       budgets: PROMPT_TIME_MEMORY_BUDGETS,
     });
@@ -239,20 +241,22 @@ describe('prompt-time memory injection', () => {
     });
   });
 
-  it('logs expansion-failed and returns safely when expansion fails with no hits', async () => {
+  it('logs no-memory-hits without calling expansion in the prompt-time hot path', async () => {
+    const expansion = vi.fn(async () => ({ status: 'dropped' as const, reason: 'extraction-failed' as const, error: new Error('provider unavailable') }));
     const result = await injectPromptTimeMemory({
       prompt: 'raw fallback prompt',
       identity,
       now: new Date('2026-05-16T22:30:00.000Z'),
       id: 'expansion-failed-1',
-      expansion: async () => ({ status: 'dropped', reason: 'extraction-failed', error: new Error('provider unavailable') }),
+      expansion,
     });
 
-    expect(result).toMatchObject({ status: 'expansion-failed', reason: 'extraction-failed', context: '' });
+    expect(expansion).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ status: 'expansion-failed', reason: 'no-memory-hits', context: '' });
     expect((await readRagEntries()).at(-1)).toMatchObject({
       id: 'expansion-failed-1',
       outcome: 'expansion-failed',
-      expansion: { status: 'fallback', reason: 'extraction-failed' },
+      expansion: { status: 'fallback', reason: null },
     });
   });
 
