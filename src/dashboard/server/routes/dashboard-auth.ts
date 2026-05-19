@@ -1,4 +1,4 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
@@ -36,10 +36,9 @@ function getHeader(
 
 function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
   if (!provided) return false;
-  const providedBuffer = Buffer.from(provided, 'utf8');
-  const expectedBuffer = Buffer.from(expected, 'utf8');
-  if (providedBuffer.length !== expectedBuffer.length) return false;
-  return timingSafeEqual(providedBuffer, expectedBuffer);
+  const providedHash = createHash('sha256').update(provided).digest();
+  const expectedHash = createHash('sha256').update(expected).digest();
+  return timingSafeEqual(providedHash, expectedHash);
 }
 
 function cookieValue(cookieHeader: string | undefined, name: string): string | undefined {

@@ -3770,24 +3770,32 @@ async function getAutoCloseOutCanonicalState(issueId: string): Promise<string | 
   }
 
   const ghResolved = resolveGitHubIssue(issueId);
-  if (!ghResolved.isGitHub) return null;
+  if (!ghResolved.isGitHub) {
+    autoCloseOutCache.set(issueId, { state: null, timestamp: Date.now() });
+    return null;
+  }
 
-  const { stdout } = await execFileAsync('gh', [
-    'issue',
-    'view',
-    String(ghResolved.number),
-    '--repo',
-    `${ghResolved.owner}/${ghResolved.repo}`,
-    '--json',
-    'state,labels',
-  ], { encoding: 'utf-8' });
-  const parsed = JSON.parse(stdout) as { state?: string; labels?: Array<string | { name?: string }> };
-  const labels = (parsed.labels ?? [])
-    .map(label => typeof label === 'string' ? label : label.name)
-    .filter((label): label is string => typeof label === 'string');
-  const result = mapGitHubStateToCanonical(parsed.state ?? 'open', labels);
-  autoCloseOutCache.set(issueId, { state: result, timestamp: Date.now() });
-  return result;
+  try {
+    const { stdout } = await execFileAsync('gh', [
+      'issue',
+      'view',
+      String(ghResolved.number),
+      '--repo',
+      `${ghResolved.owner}/${ghResolved.repo}`,
+      '--json',
+      'state,labels',
+    ], { encoding: 'utf-8' });
+    const parsed = JSON.parse(stdout) as { state?: string; labels?: Array<string | { name?: string }> };
+    const labels = (parsed.labels ?? [])
+      .map(label => typeof label === 'string' ? label : label.name)
+      .filter((label): label is string => typeof label === 'string');
+    const result = mapGitHubStateToCanonical(parsed.state ?? 'open', labels);
+    autoCloseOutCache.set(issueId, { state: result, timestamp: Date.now() });
+    return result;
+  } catch {
+    autoCloseOutCache.set(issueId, { state: null, timestamp: Date.now() });
+    return null;
+  }
 }
 
 function recordAutoCloseOutFailure(issueId: string, message: string): void {
