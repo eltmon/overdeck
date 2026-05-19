@@ -307,6 +307,7 @@ describe('swarm route helpers', () => {
           itemTitle: 'First',
           sessionName: 'agent-pan-971-1',
           workspace: join(featureWorkspace, 'slot-1'),
+          branch: 'feature/971-slot-1',
           status: 'failed-merge' as const,
           phase: 'implementation' as const,
           failureReason: 'PR #1188 is conflicting',
@@ -334,6 +335,7 @@ describe('swarm route helpers', () => {
 
     const persisted = (await cont.readContinueStateAsync(featureWorkspace, 'PAN-971'))!.swarmRuntime!;
     expect(persisted.slots[0]).toMatchObject({
+      branch: 'feature/971-slot-1',
       status: 'failed-merge',
       failureReason: 'PR #1188 is conflicting',
       consecutiveConflictCount: 2,
@@ -344,6 +346,7 @@ describe('swarm route helpers', () => {
 
     const loaded = (await __testInternals.loadSwarmState('PAN-971'))!;
     expect(loaded.slots[0]).toMatchObject({
+      branch: 'feature/971-slot-1',
       status: 'failed-merge',
       failureReason: 'PR #1188 is conflicting',
       consecutiveConflictCount: 2,
@@ -375,6 +378,23 @@ describe('swarm route helpers', () => {
     expect(refreshed.state.slots[0]).toMatchObject({
       status: 'completed',
       consecutiveConflictCount: 1,
+      prUrl: 'https://github.com/owner/repo/pull/1188',
+    });
+  });
+
+  it('uses the persisted slot branch when refreshing mergeability for numeric parent branches', async () => {
+    mockGhPrList([{ number: 1188, mergeable: true, mergeableState: 'CLEAN', state: 'OPEN', url: 'https://github.com/owner/repo/pull/1188' }]);
+    const { __testInternals } = await import('../swarm.js');
+    const state = baseSwarmState({ branch: 'feature/971-slot-1', consecutiveConflictCount: 1 });
+
+    const refreshed = await __testInternals.refreshSwarmSlotMergeability(state as any, projectPath);
+
+    expect(refreshed.changed).toBe(true);
+    const ghArgs = ghExecFileMock.mock.calls[0]?.[1] as string[];
+    expect(ghArgs.slice(ghArgs.indexOf('--head'), ghArgs.indexOf('--head') + 2)).toEqual(['--head', 'feature/971-slot-1']);
+    expect(refreshed.state.slots[0]).toMatchObject({
+      status: 'completed',
+      consecutiveConflictCount: 0,
       prUrl: 'https://github.com/owner/repo/pull/1188',
     });
   });

@@ -51,6 +51,7 @@ interface SlotAssignment {
   itemTitle: string;
   sessionName: string;
   workspace: string;
+  branch?: string;
   status: 'pending' | 'running' | 'completed' | 'merged' | 'failed' | 'failed-merge';
   /**
    * Distinguishes a synthesis dispatch (the slot only produces a synthesis context
@@ -240,7 +241,7 @@ function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
   const slots: SlotAssignment[] = runtime.slots.map(slot => {
     // Preserve passthrough fields (phase, failureReason, completed status)
     // that the runtime persists alongside the canonical SwarmSlotRuntime shape.
-    const extra = slot as unknown as { phase?: 'synthesis' | 'implementation'; failureReason?: string; completedStatus?: 'completed' | 'merged'; recoveryAction?: SwarmRecoveryAction; recoveredAt?: string };
+    const extra = slot as unknown as { branch?: string; phase?: 'synthesis' | 'implementation'; failureReason?: string; completedStatus?: 'completed' | 'merged'; recoveryAction?: SwarmRecoveryAction; recoveredAt?: string };
     const status = slot.status === 'failed'
       ? 'failed'
       : slot.status === 'failed-merge'
@@ -258,6 +259,7 @@ function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
       itemTitle: slot.itemTitle,
       sessionName: slot.sessionName,
       workspace: slot.workspace,
+      branch: extra.branch,
       status,
       phase: extra.phase,
       failureReason: extra.failureReason,
@@ -296,6 +298,7 @@ function runtimeFromState(state: SwarmState, existing?: SwarmRuntime): SwarmRunt
       itemTitle: slot.itemTitle,
       sessionName: slot.sessionName,
       workspace: slot.workspace,
+      branch: slot.branch,
       // `completed` round-trips through completedStatus because SwarmSlotRuntime
       // records active terminal states separately from completed-but-unmerged work.
       status: slot.status === 'merged'
@@ -513,8 +516,12 @@ function recordAutoAdvanceFailure(state: SwarmState, error: string, now = Date.n
   };
 }
 
-function slotBranch(issueId: string, slotId: number): string {
+function fallbackSlotBranch(issueId: string, slotId: number): string {
   return `feature/${issueId.toLowerCase()}-slot-${slotId}`;
+}
+
+function slotPullRequestHead(state: SwarmState, slot: SlotAssignment): string {
+  return slot.branch ?? fallbackSlotBranch(state.issueId, slot.slot);
 }
 
 function failedMergeMessage(state: SwarmState, slot: SlotAssignment): string {
@@ -569,28 +576,32 @@ function newlyFailedMergeSlots(before: SwarmState, after: SwarmState): SlotAssig
   return after.slots.filter((slot, index) => slot.status === 'failed-merge' && before.slots[index]?.status !== 'failed-merge');
 }
 
-function emitFailedMergeTransitions(before: SwarmState, after: SwarmState): void {
-  for (const slot of newlyFailedMergeSlots(before, after)) {
+function emitFailedMergeTransitionActivities(state: SwarmState, slots: SlotAssignment[]): void {
+  for (const slot of slots) {
     emitActivityEntry({
       source: 'ship',
       level: 'error',
-      issueId: after.issueId,
-      message: failedMergeMessage(after, slot),
+      issueId: state.issueId,
+      message: failedMergeMessage(state, slot),
     });
   }
+}
+
+function emitFailedMergeTransitions(before: SwarmState, after: SwarmState): void {
+  emitFailedMergeTransitionActivities(after, newlyFailedMergeSlots(before, after));
 }
 
 async function refreshSwarmRuntimeState(
   state: SwarmState,
   sessions?: string[],
   projectPath?: string,
-): Promise<{ state: SwarmState; changed: boolean }> {
+): Promise<{ state: SwarmState; changed: boolean; failedMergeTransitions: SlotAssignment[] }> {
   const statusRefresh = await refreshSwarmSlotStatuses(state, sessions);
   const mergeabilityRefresh = await refreshSwarmSlotMergeability(statusRefresh.state, projectPath);
-  emitFailedMergeTransitions(state, mergeabilityRefresh.state);
   return {
     state: mergeabilityRefresh.state,
     changed: statusRefresh.changed || mergeabilityRefresh.changed,
+    failedMergeTransitions: newlyFailedMergeSlots(state, mergeabilityRefresh.state),
   };
 }
 
@@ -605,6 +616,7 @@ async function refreshSwarmIssue(issueId: string): Promise<{ status: number; bod
   const project = resolveProjectFromIssue(issueUpper);
   const refreshed = await refreshSwarmRuntimeState(state, sessions, project?.projectPath);
   if (refreshed.changed) await saveSwarmState(refreshed.state);
+  emitFailedMergeTransitionActivities(refreshed.state, refreshed.failedMergeTransitions);
   return { status: 200, body: { success: true, issueId: issueUpper, changed: refreshed.changed, state: refreshed.state } };
 }
 
@@ -801,12 +813,11 @@ async function refreshSwarmSlotMergeability(
   if (targets.length === 0) return { state, changed: false };
 
   const repo = `${resolution.owner}/${resolution.repo}`;
-  const issueLower = state.issueId.toLowerCase();
   const updates = await runWithConcurrencyLimit(
     targets,
     SWARM_PANE_CHECK_CONCURRENCY,
     async ({ index, slot }) => {
-      const branch = slotBranch(state.issueId, slot.slot);
+      const branch = slotPullRequestHead(state, slot);
       try {
         const { stdout } = await execFileAsync(
           'gh',
@@ -1195,6 +1206,7 @@ async function dispatchSwarmWave(
             itemTitle: item.title,
             sessionName,
             workspace: existingSlot.workspace ?? '',
+            branch: existingSlot.branch,
             status: 'running' as const,
             phase: existingSlot.phase,
             startedAt: existingSlot.startedAt,
@@ -1300,6 +1312,7 @@ async function dispatchSwarmWave(
           itemTitle: item.title,
           sessionName,
           workspace: worktreeResult.workspacePath,
+          branch: worktreeResult.branch,
           status: 'running' as const,
           phase: dispatchSynthesisFirst ? ('synthesis' as const) : ('implementation' as const),
           startedAt: new Date().toISOString(),
@@ -1835,7 +1848,7 @@ async function pollSwarmAutoAdvance(): Promise<void> {
     if (isAutoAdvanceCoolingDown(loadedState)) continue;
 
     const project = resolveProjectFromIssue(loadedState.issueId);
-    const { state, changed } = await refreshSwarmRuntimeState(loadedState, sessions, project?.projectPath);
+    const { state, changed, failedMergeTransitions } = await refreshSwarmRuntimeState(loadedState, sessions, project?.projectPath);
     // PAN-977 round-13 blocker #1: persistence MUST run before any final-wave
     // cleanup so a freshly-observed completed/failed slot status survives a
     // dashboard restart, even on the very last polling tick. Previously the
@@ -1852,6 +1865,7 @@ async function pollSwarmAutoAdvance(): Promise<void> {
         await saveSwarmState(recordAutoAdvanceFailure(state, `Runtime persist failed: ${persistErr?.message ?? persistErr}`)).catch(() => undefined);
         continue;
       }
+      emitFailedMergeTransitionActivities(state, failedMergeTransitions);
     }
 
     const failedSlot = firstFailedSlot(state);
