@@ -1,11 +1,21 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { WS_METHODS } from '@panctl/contracts';
+
+const wsTransportMock = vi.hoisted(() => ({
+  subscribe: vi.fn(() => vi.fn()),
+}));
+
+vi.mock('../../lib/wsTransport', () => ({
+  getTransport: () => wsTransportMock,
+}));
 
 import { useDashboardStore } from '../../lib/store';
 import type { Issue } from '../../types';
 import { DialogProvider } from '../DialogProvider';
 import { IssueDrawer } from './IssueDrawer';
+import { resetDrawerIssueSubscriptionForTest } from './useDrawerData';
 
 const issue: Issue = {
   id: 'PAN-1',
@@ -51,7 +61,11 @@ function renderDrawer(beads: TestBead[] = []) {
 
 describe('IssueDrawer', () => {
   beforeEach(() => {
+    vi.useRealTimers();
+    resetDrawerIssueSubscriptionForTest();
     vi.restoreAllMocks();
+    wsTransportMock.subscribe.mockReset();
+    wsTransportMock.subscribe.mockReturnValue(vi.fn());
     window.history.replaceState(null, '', '/');
     useDashboardStore.setState({
       drawer: { issueId: null, tab: 'overview' },
@@ -96,6 +110,41 @@ describe('IssueDrawer', () => {
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'files' });
     expect(window.location.search).toBe('?issue=PAN-1&tab=files');
     expect(screen.getByTestId('drawer-tab-panel-files')).toBeInTheDocument();
+  });
+
+  it('subscribes once to issue-filtered drawer events for all drawer sections', () => {
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    expect(wsTransportMock.subscribe).toHaveBeenCalledTimes(1);
+    const [connect] = wsTransportMock.subscribe.mock.calls[0]!;
+    const subscribeIssueEvents = vi.fn(() => ({}));
+
+    connect({ [WS_METHODS.subscribeIssueEvents]: subscribeIssueEvents });
+
+    expect(subscribeIssueEvents).toHaveBeenCalledWith({ issueId: 'PAN-1' });
+  });
+
+  it('tears down the drawer issue subscription on close and reuses quick same-issue reopens', async () => {
+    vi.useFakeTimers();
+    const unsubscribe = vi.fn();
+    wsTransportMock.subscribe.mockReturnValue(unsubscribe);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    const first = renderDrawer();
+
+    first.unmount();
+    await vi.advanceTimersByTimeAsync(999);
+    expect(unsubscribe).not.toHaveBeenCalled();
+
+    const second = renderDrawer();
+
+    expect(wsTransportMock.subscribe).toHaveBeenCalledTimes(1);
+    second.unmount();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 
   it('scrolls to active agent section when URL hash targets it', async () => {

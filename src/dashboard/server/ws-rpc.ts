@@ -43,6 +43,41 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
   } as DomainEvent;
 }
 
+function normalizedIssueId(value: unknown) {
+  return typeof value === 'string' ? value.toLowerCase() : null;
+}
+
+function recordMatchesIssue(record: unknown, issueId: string) {
+  if (!record || typeof record !== 'object') return false;
+  const data = record as Record<string, unknown>;
+  const target = issueId.toLowerCase();
+  const directIssueId = normalizedIssueId(data['issueId'] ?? data['identifier'] ?? data['id']);
+  if (directIssueId === target) return true;
+  const agentIssueId = normalizedIssueId((data['agent'] as Record<string, unknown> | undefined)?.['issueId']);
+  if (agentIssueId === target) return true;
+  const currentIssue = normalizedIssueId(data['currentIssue']);
+  if (currentIssue === target) return true;
+  const agentId = normalizedIssueId(data['agentId']);
+  return agentId === `agent-${target}`;
+}
+
+export function filterDomainEventForIssue(event: DomainEvent, issueId: string): DomainEvent | null {
+  const payload = event.payload as Record<string, unknown>;
+  if (recordMatchesIssue(payload, issueId)) return event;
+
+  if (event.type === 'issues.snapshot' && Array.isArray(payload['issues'])) {
+    const issues = payload['issues'].filter((issue) => recordMatchesIssue(issue, issueId));
+    return issues.length > 0 ? { ...event, payload: { ...payload, issues } } as DomainEvent : null;
+  }
+
+  if (event.type === 'activity.updated' && Array.isArray(payload['events'])) {
+    const events = payload['events'].filter((entry) => recordMatchesIssue(entry, issueId));
+    return events.length > 0 ? { ...event, payload: { ...payload, events } } as DomainEvent : null;
+  }
+
+  return null;
+}
+
 function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
   return {
     id: session.id,
@@ -421,6 +456,16 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             (unsubscribe) => Effect.sync(() => unsubscribe()),
           ),
         ),
+
+      // ── subscribeIssueEvents ──────────────────────────────────────────────────
+      [WS_METHODS.subscribeIssueEvents]: (input) => {
+        console.log(`[ws-rpc] subscribeIssueEvents invoked issueId=${input.issueId}`);
+        return eventStore.streamEvents.pipe(
+          Stream.map(storedToDomainEvent),
+          Stream.map((event) => filterDomainEventForIssue(event, input.issueId)),
+          Stream.filter((event): event is DomainEvent => event !== null),
+        );
+      },
 
       // ── subscribeTerminal — live PTY stream (B20) ────────────────────────────
       [WS_METHODS.subscribeTerminal]: (input) =>

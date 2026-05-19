@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-19T00:34:31.552Z",
+  "updated": "2026-05-19T00:45:36.323Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "dirty": true,
-    "sha": "89f1f09f6"
+    "sha": "67edec355"
   },
   "decisions": [
     {
@@ -203,15 +203,14 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-bffv InspectorPanel parity checklist is implemented and verified; continue the next ready PAN-1148 bead from bd ready.",
-    "beadId": "pending",
+    "description": "workspace-epub drawer subscription contract is implemented and verified; run required inspection, then continue the next ready PAN-1148 bead from bd ready.",
+    "beadId": "workspace-epub",
     "filesToRead": [
-      "docs/design/inspector-parity-checklist.md",
-      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
-      "src/dashboard/frontend/src/components/inspector/ActionsSection.tsx",
-      "src/dashboard/frontend/src/components/inspector/AgentInfoSection.tsx",
-      "src/dashboard/frontend/src/components/inspector/ContainerSection.tsx",
-      "src/dashboard/frontend/src/components/inspector/ReviewPipelineSection.tsx"
+      "packages/contracts/src/rpc.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "src/dashboard/frontend/src/components/drawer/useDrawerData.ts",
+      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+      "src/dashboard/server/__tests__/ws-rpc.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -381,6 +380,12 @@
       "timestamp": "2026-05-19T00:34:31.552Z",
       "reason": "bead-close",
       "note": "Implemented workspace-bffv InspectorPanel parity checklist at docs/design/inspector-parity-checklist.md, enumerating legacy InspectorPanel features, inspector/* sub-files, AgentList, and GodView/AgentGrid deletion gates with destination or confirmation status. Verified conflict-marker check, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T00:45:36.323Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-epub drawer subscription contract with subscribeIssueEvents(issueId), server-side event filtering, shared useDrawerData-managed subscription teardown/reuse, focused WS-RPC and drawer tests, full npm test, typecheck, lint, and graphify update.",
       "agentModel": "gpt-5.5"
     }
   ],
@@ -577,6 +582,13 @@
     "d4-drawer-tabs.ac1": "completed",
     "d4-drawer-tabs.ac2": "completed",
     "d4-drawer-tabs.ac3": "completed",
-    "d4-drawer-tabs.ac4": "completed"
+    "d4-drawer-tabs.ac4": "completed",
+    "d2-drawer-subscription-contract": "completed",
+    "d2-drawer-subscription-contract.ac1": "completed",
+    "d2-drawer-subscription-contract.ac2": "completed",
+    "d2-drawer-subscription-contract.ac3": "completed",
+    "d2-drawer-subscription-contract.ac4": "completed",
+    "d2-drawer-subscription-contract.ac5": "completed",
+    "d2-drawer-subscription-contract.ac6": "completed"
   }
 }

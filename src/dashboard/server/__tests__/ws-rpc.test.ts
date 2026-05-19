@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildEnrichSessionsJobPayload } from '../ws-rpc.js';
+import { buildEnrichSessionsJobPayload, filterDomainEventForIssue } from '../ws-rpc.js';
+import type { DomainEvent } from '@panctl/contracts';
 import type { RuntimeConversationsConfig } from '../../../lib/config-yaml.js';
 
 describe('ws-rpc enrichSessions payload', () => {
@@ -44,5 +45,51 @@ describe('ws-rpc enrichSessions payload', () => {
       skipAlreadyEnriched: true,
       force: true,
     });
+  });
+});
+
+describe('filterDomainEventForIssue', () => {
+  it('keeps direct issue events for the requested issue only', () => {
+    const event: DomainEvent = {
+      type: 'review.status_changed',
+      sequence: 1,
+      timestamp: '2026-05-19T00:00:00.000Z',
+      payload: { issueId: 'PAN-1', status: { issueId: 'PAN-1' } },
+    } as DomainEvent;
+
+    expect(filterDomainEventForIssue(event, 'PAN-1')).toBe(event);
+    expect(filterDomainEventForIssue(event, 'PAN-2')).toBeNull();
+  });
+
+  it('filters snapshot and activity payloads before streaming them to the drawer', () => {
+    const issuesSnapshot: DomainEvent = {
+      type: 'issues.snapshot',
+      sequence: 2,
+      timestamp: '2026-05-19T00:00:00.000Z',
+      payload: {
+        issues: [
+          { id: 'PAN-1', identifier: 'PAN-1' },
+          { id: 'PAN-2', identifier: 'PAN-2' },
+        ],
+      },
+    } as DomainEvent;
+    const activity: DomainEvent = {
+      type: 'activity.updated',
+      sequence: 3,
+      timestamp: '2026-05-19T00:00:00.000Z',
+      payload: {
+        events: [
+          { id: 'a', issueId: 'PAN-1' },
+          { id: 'b', issueId: 'PAN-2' },
+        ],
+      },
+    } as DomainEvent;
+
+    expect((filterDomainEventForIssue(issuesSnapshot, 'PAN-1')?.payload as { issues: unknown[] }).issues).toEqual([
+      { id: 'PAN-1', identifier: 'PAN-1' },
+    ]);
+    expect((filterDomainEventForIssue(activity, 'PAN-1')?.payload as { events: unknown[] }).events).toEqual([
+      { id: 'a', issueId: 'PAN-1' },
+    ]);
   });
 });
