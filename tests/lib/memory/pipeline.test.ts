@@ -62,8 +62,8 @@ describe('extractFromTranscriptDelta', () => {
           workspaceId: claimInput.identity.workspaceId,
           issueId: claimInput.identity.issueId,
           transcriptPath: claimInput.transcriptPath,
-          lastOffset: claimInput.toOffset,
-          lastObservationAt: '2026-05-16T23:00:00.000Z',
+          lastOffset: claimInput.expectedFromOffset,
+          lastObservationAt: null,
           lastMidTurnAt: null,
           midTurnCountInCurrentTurn: 0,
           updatedAt: '2026-05-16T23:00:00.000Z',
@@ -93,6 +93,24 @@ describe('extractFromTranscriptDelta', () => {
       calls.push('rollup');
       return { status: 'below-threshold' as const, pendingCount: 1, threshold: 4 };
     });
+    const commitRange = vi.fn(() => {
+      calls.push('commit');
+      return {
+        status: 'committed' as const,
+        checkpoint: {
+          sessionId: 'session-1',
+          projectId: 'panopticon-cli',
+          workspaceId: 'feature-pan-1052',
+          issueId: 'PAN-1052',
+          transcriptPath: '/tmp/session.jsonl',
+          lastOffset: 100,
+          lastObservationAt: '2026-05-16T23:00:00.000Z',
+          lastMidTurnAt: null,
+          midTurnCountInCurrentTurn: 0,
+          updatedAt: '2026-05-16T23:00:00.000Z',
+        },
+      };
+    });
     const updateHealth = vi.fn(async () => {
       calls.push('health');
     });
@@ -105,6 +123,7 @@ describe('extractFromTranscriptDelta', () => {
       writePendingTurn,
       emitObservationCreated,
       maybeTriggerRollup,
+      commitRange,
       updateHealth,
     }));
 
@@ -118,6 +137,7 @@ describe('extractFromTranscriptDelta', () => {
       'writePending',
       'emit',
       'rollup',
+      'commit',
       'health',
     ]);
     expect(writePendingTurn).toHaveBeenCalledWith(expect.objectContaining({
@@ -128,6 +148,11 @@ describe('extractFromTranscriptDelta', () => {
       eventsConsumed: 2,
       compressedText: 'U: implement pipeline\nA: done',
     }), expect.objectContaining({ triggerRollup: false }));
+    expect(commitRange).toHaveBeenCalledWith(expect.objectContaining({
+      expectedFromOffset: 0,
+      toOffset: 100,
+      consumedOffset: 100,
+    }));
     expect(updateHealth).toHaveBeenCalledWith(identity, { status: 'healthy', success: true });
   });
 
@@ -159,23 +184,7 @@ describe('extractFromTranscriptDelta', () => {
     const updateHealth = vi.fn(async () => undefined);
 
     const result = await extractFromTranscriptDelta(input({
-      claimRange: () => ({
-        status: 'claimed',
-        fromOffset: 0,
-        toOffset: 100,
-        checkpoint: {
-          sessionId: 'session-1',
-          projectId: 'panopticon-cli',
-          workspaceId: 'feature-pan-1052',
-          issueId: 'PAN-1052',
-          transcriptPath: '/tmp/session.jsonl',
-          lastOffset: 100,
-          lastObservationAt: '2026-05-16T23:00:00.000Z',
-          lastMidTurnAt: null,
-          midTurnCountInCurrentTurn: 0,
-          updatedAt: '2026-05-16T23:00:00.000Z',
-        },
-      }),
+      claimRange: () => claimedRange(0, 100),
       compress: async () => {
         throw new Error('disk unavailable');
       },
@@ -189,4 +198,65 @@ describe('extractFromTranscriptDelta', () => {
       success: false,
     });
   });
+
+  it('commits checkpoints only to the last fully consumed JSONL line', async () => {
+    const commitRange = vi.fn(() => ({ status: 'committed' as const, checkpoint: claimedRange(0, 100).checkpoint }));
+
+    await extractFromTranscriptDelta(input({
+      claimRange: () => claimedRange(0, 100),
+      compress: async () => ({ text: 'U: one complete event', eventsConsumed: 1, lastFullLineOffset: 72 }),
+      extract: async () => extractedPayload(),
+      writeObservation: async () => ({ jsonlPath: '/tmp/observations.jsonl', markdownPath: '/tmp/observations.md' }),
+      writePendingTurn: async () => ({ path: '/tmp/pending.json', fileName: 'pending.json' }),
+      emitObservationCreated: async () => undefined,
+      maybeTriggerRollup: async () => ({ status: 'below-threshold' as const, pendingCount: 1, threshold: 4 }),
+      commitRange,
+    }));
+
+    expect(commitRange).toHaveBeenCalledWith(expect.objectContaining({
+      expectedFromOffset: 0,
+      toOffset: 100,
+      consumedOffset: 72,
+    }));
+  });
+
+  it('releases claimed ranges without committing when post-claim durable stages fail', async () => {
+    const commitRange = vi.fn();
+    const releaseRange = vi.fn();
+
+    const result = await extractFromTranscriptDelta(input({
+      claimRange: () => claimedRange(0, 100),
+      compress: async () => ({ text: 'U: one complete event', eventsConsumed: 1, lastFullLineOffset: 100 }),
+      extract: async () => extractedPayload(),
+      writeObservation: async () => {
+        throw new Error('disk full');
+      },
+      commitRange,
+      releaseRange,
+    }));
+
+    expect(result).toEqual({ status: 'failed', observation: null, reason: 'write-failed' });
+    expect(commitRange).not.toHaveBeenCalled();
+    expect(releaseRange).toHaveBeenCalledWith('session-1', 0, 100);
+  });
 });
+
+function claimedRange(fromOffset: number, toOffset: number) {
+  return {
+    status: 'claimed' as const,
+    fromOffset,
+    toOffset,
+    checkpoint: {
+      sessionId: 'session-1',
+      projectId: 'panopticon-cli',
+      workspaceId: 'feature-pan-1052',
+      issueId: 'PAN-1052',
+      transcriptPath: '/tmp/session.jsonl',
+      lastOffset: fromOffset,
+      lastObservationAt: null,
+      lastMidTurnAt: null,
+      midTurnCountInCurrentTurn: 0,
+      updatedAt: '2026-05-16T23:00:00.000Z',
+    },
+  };
+}

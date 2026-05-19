@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { MemoryIdentity } from '@panctl/contracts';
-import { TranscriptPoller } from '../../../src/lib/memory/poller.js';
+import { MAX_MEMORY_POLLER_SAMPLE_BYTES, TranscriptPoller } from '../../../src/lib/memory/poller.js';
 import type { TranscriptEntry } from '../../../src/lib/memory/transcript-source.js';
 
 const identity = {
@@ -186,6 +186,32 @@ describe('TranscriptPoller', () => {
 
     await expect(poller.tick()).resolves.toMatchObject({ rateLimited: 1, fired: 0 });
     expect(extract).not.toHaveBeenCalled();
+  });
+
+  it('samples transcript growth with a bounded read and treats over-cap growth as extraction-worthy', async () => {
+    const readTranscriptSlice = vi.fn(async () => 'partial sample without newline');
+    const enqueue = vi.fn(async () => undefined);
+    const poller = new TranscriptPoller({
+      activityLineThreshold: 20,
+      statTranscript: async () => ({ size: MAX_MEMORY_POLLER_SAMPLE_BYTES + 500, mtimeMs: 1 }),
+      readTranscriptSlice,
+      getTranscriptCheckpoint: () => null,
+      enqueueTranscriptDelta: enqueue,
+    });
+    poller.register(entry());
+
+    await expect(poller.tick()).resolves.toMatchObject({ fired: 1 });
+
+    expect(readTranscriptSlice).toHaveBeenCalledWith('/tmp/session-1.jsonl', 0, MAX_MEMORY_POLLER_SAMPLE_BYTES);
+    expect(enqueue).toHaveBeenCalledWith(expect.objectContaining({
+      fromOffset: 0,
+      toOffset: MAX_MEMORY_POLLER_SAMPLE_BYTES + 500,
+    }));
+    expect(poller.snapshot()[0]).toMatchObject({
+      lastObservedOffset: MAX_MEMORY_POLLER_SAMPLE_BYTES,
+      lastExtractionOffset: MAX_MEMORY_POLLER_SAMPLE_BYTES + 500,
+      pendingLineCount: 0,
+    });
   });
 
   it('syncs the in-memory registry from lifecycle-gated transcript sources', async () => {

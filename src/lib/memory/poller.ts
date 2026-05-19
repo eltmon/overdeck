@@ -10,6 +10,7 @@ export const DEFAULT_MEMORY_POLLER_INTERVAL_MS = 2_000;
 export const DEFAULT_MEMORY_POLLER_ACTIVITY_LINE_THRESHOLD = 20;
 export const DEFAULT_MEMORY_POLLER_MIN_INTERVAL_MS = 60_000;
 export const DEFAULT_MEMORY_POLLER_MAX_MID_TURN_EXTRACTIONS = 3;
+export const MAX_MEMORY_POLLER_SAMPLE_BYTES = 64 * 1024;
 
 export interface RegisteredTranscript {
   sessionId: string;
@@ -168,13 +169,17 @@ export class TranscriptPoller {
       return 'unchanged';
     }
 
-    const delta = await this.readTranscriptSlice(entry.transcriptPath, entry.lastObservedOffset, fileStat.size);
-    const pendingLineCount = entry.pendingLineCount + countCompleteLines(delta);
+    const inspectedOffset = Math.min(fileStat.size, entry.lastObservedOffset + MAX_MEMORY_POLLER_SAMPLE_BYTES);
+    const exceededSample = inspectedOffset < fileStat.size;
+    const delta = await this.readTranscriptSlice(entry.transcriptPath, entry.lastObservedOffset, inspectedOffset);
+    const pendingLineCount = exceededSample
+      ? this.activityLineThreshold
+      : entry.pendingLineCount + countCompleteLines(delta);
     const nextEntry = {
       ...entry,
       lastSize: fileStat.size,
       lastMtimeMs: fileStat.mtimeMs,
-      lastObservedOffset: fileStat.size,
+      lastObservedOffset: inspectedOffset,
       pendingLineCount,
     };
     this.entries.set(entry.sessionId, nextEntry);
@@ -234,11 +239,11 @@ export function unregisterTranscriptForPolling(sessionId: string): void {
 }
 
 async function readTranscriptSlice(path: string, fromOffset: number, toOffset: number): Promise<string> {
-  const length = Math.max(0, toOffset - fromOffset);
+  const length = Math.min(Math.max(0, toOffset - fromOffset), MAX_MEMORY_POLLER_SAMPLE_BYTES);
   if (length === 0) return '';
   const file = await open(path, 'r');
   try {
-    const buffer = Buffer.alloc(length);
+    const buffer = Buffer.allocUnsafe(length);
     const { bytesRead } = await file.read(buffer, 0, length, fromOffset);
     return buffer.subarray(0, bytesRead).toString('utf8');
   } finally {

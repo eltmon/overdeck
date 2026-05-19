@@ -1,6 +1,13 @@
 import { randomUUID } from 'crypto';
 import type { MemoryIdentity, MemoryObservation, PendingTurn } from '@panctl/contracts';
-import { claimTranscriptRange, type ClaimTranscriptRangeResult, type TranscriptClaimTrigger } from './checkpoints.js';
+import {
+  claimTranscriptRange,
+  commitTranscriptRange,
+  releaseTranscriptRange,
+  type ClaimTranscriptRangeResult,
+  type CommitTranscriptRangeResult,
+  type TranscriptClaimTrigger,
+} from './checkpoints.js';
 import { compressTranscriptDelta, type CompressedTranscriptDelta } from './compress.js';
 import {
   extractObservationFromTurn,
@@ -33,6 +40,8 @@ export interface ExtractFromTranscriptDeltaInput {
   now?: Date;
   id?: string;
   claimRange?: PipelineClaimRange;
+  commitRange?: PipelineCommitRange;
+  releaseRange?: PipelineReleaseRange;
   compress?: PipelineCompress;
   extract?: ExtractObservationInput['extract'];
   writeObservation?: PipelineWriteObservation;
@@ -56,7 +65,7 @@ export type ExtractFromTranscriptDeltaResult =
   | { status: 'noop'; observation: null; reason: 'subagent' | 'invalid-range' | 'offset-mismatch' | 'empty-delta' }
   | { status: 'skipped'; observation: null; reason: Extract<ExtractObservationResult, { status: 'skipped' }>['reason'] }
   | { status: 'dropped'; observation: null; reason: Extract<ExtractObservationResult, { status: 'dropped' }>['reason'] }
-  | { status: 'failed'; observation: null; reason: 'claim-failed' | 'compress-failed' | 'write-failed' | 'pending-write-failed' | 'event-emit-failed' | 'rollup-failed' | 'pipeline-error' };
+  | { status: 'failed'; observation: null; reason: 'claim-failed' | 'compress-failed' | 'write-failed' | 'pending-write-failed' | 'event-emit-failed' | 'rollup-failed' | 'checkpoint-commit-failed' | 'pipeline-error' };
 
 export type PipelineClaimRange = (input: {
   sessionId: string;
@@ -67,6 +76,17 @@ export type PipelineClaimRange = (input: {
   trigger: TranscriptClaimTrigger;
   now?: Date;
 }) => ClaimTranscriptRangeResult;
+export type PipelineCommitRange = (input: {
+  sessionId: string;
+  expectedFromOffset: number;
+  toOffset: number;
+  consumedOffset: number;
+  transcriptPath: string;
+  identity: Pick<MemoryIdentity, 'projectId' | 'workspaceId' | 'issueId'>;
+  trigger: TranscriptClaimTrigger;
+  now?: Date;
+}) => CommitTranscriptRangeResult;
+export type PipelineReleaseRange = (sessionId: string, expectedFromOffset: number, toOffset: number) => void;
 export type PipelineCompress = (input: { transcriptPath: string; fromOffset: number; toOffset: number }) => Promise<CompressedTranscriptDelta>;
 export type PipelineWriteObservation = (observation: MemoryObservation) => Promise<WriteObservationResult>;
 export type PipelineWritePendingTurn = (turn: PendingTurn, options?: StatusRollupTriggerOptions) => Promise<WritePendingTurnResult>;
@@ -86,6 +106,9 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
     }
   };
 
+  let claimedRange: Extract<ClaimTranscriptRangeResult, { status: 'claimed' }> | null = null;
+  let checkpointCommitted = false;
+
   try {
     const claimed = await safeClaim(input);
     if (claimed.status === 'failed') {
@@ -93,6 +116,7 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
       return { status: 'failed', observation: null, reason: claimed.reason };
     }
     if (claimed.result.status === 'empty') return { status: 'noop', observation: null, reason: claimed.result.reason };
+    claimedRange = claimed.result;
 
     const compressed = await safeCompress(input, claimed.result.fromOffset, claimed.result.toOffset);
     if (compressed.status === 'failed') {
@@ -161,6 +185,13 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
       return { status: 'failed', observation: null, reason: 'rollup-failed' };
     }
 
+    const committed = await safeCommit(input, claimed.result, compressed.result.lastFullLineOffset);
+    if (committed.status === 'failed') {
+      await recordHealth({ status: 'failing', reason: 'checkpoint-commit-failed', success: false });
+      return { status: 'failed', observation: null, reason: 'checkpoint-commit-failed' };
+    }
+    checkpointCommitted = true;
+
     await recordHealth({ status: 'healthy', success: true });
     return {
       status: 'written',
@@ -174,6 +205,11 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
   } catch {
     await recordHealth({ status: 'failing', reason: 'pipeline-error', success: false });
     return { status: 'failed', observation: null, reason: 'pipeline-error' };
+  } finally {
+    if (claimedRange && !checkpointCommitted) {
+      const release = input.releaseRange ?? releaseTranscriptRange;
+      release(input.sessionId, claimedRange.fromOffset, claimedRange.toOffset);
+    }
   }
 }
 
@@ -207,6 +243,29 @@ async function safeCompress(input: ExtractFromTranscriptDeltaInput, fromOffset: 
   try {
     const compress = input.compress ?? compressTranscriptDelta;
     return { status: 'compressed', result: await compress({ transcriptPath: input.transcriptPath, fromOffset, toOffset }) };
+  } catch {
+    return { status: 'failed' };
+  }
+}
+
+async function safeCommit(
+  input: ExtractFromTranscriptDeltaInput,
+  claimed: Extract<ClaimTranscriptRangeResult, { status: 'claimed' }>,
+  consumedOffset: number,
+): Promise<{ status: 'committed'; result: CommitTranscriptRangeResult } | { status: 'failed' }> {
+  try {
+    const commit = input.commitRange ?? commitTranscriptRange;
+    const result = commit({
+      sessionId: input.sessionId,
+      expectedFromOffset: claimed.fromOffset,
+      toOffset: claimed.toOffset,
+      consumedOffset,
+      transcriptPath: input.transcriptPath,
+      identity: input.identity,
+      trigger: input.trigger,
+      now: input.now,
+    });
+    return result.status === 'committed' ? { status: 'committed', result } : { status: 'failed' };
   } catch {
     return { status: 'failed' };
   }

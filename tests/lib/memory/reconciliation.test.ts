@@ -3,7 +3,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { closeDatabase, resetDatabase } from '../../../src/lib/database/index.js';
-import { claimTranscriptRange, getTranscriptCheckpoint } from '../../../src/lib/memory/checkpoints.js';
+import { claimTranscriptRange, commitTranscriptRange, getTranscriptCheckpoint } from '../../../src/lib/memory/checkpoints.js';
 import { reconcileAgentMemory, reconcileStaleTranscriptCheckpoints } from '../../../src/lib/memory/reconciliation.js';
 import type { ExtractFromTranscriptDeltaInput } from '../../../src/lib/memory/pipeline.js';
 
@@ -44,6 +44,16 @@ async function checkpoint(sessionId: string, lastOffset: number, content: string
     trigger: 'stop-hook',
     now: new Date('2026-05-16T22:00:00.000Z'),
   });
+  commitTranscriptRange({
+    sessionId,
+    expectedFromOffset: 0,
+    toOffset: lastOffset,
+    consumedOffset: lastOffset,
+    transcriptPath,
+    identity,
+    trigger: 'stop-hook',
+    now: new Date('2026-05-16T22:00:00.000Z'),
+  });
   return transcriptPath;
 }
 
@@ -59,6 +69,16 @@ function claimingExtractor() {
       now: new Date('2026-05-16T22:01:00.000Z'),
     });
     if (claim.status === 'empty') return { status: 'noop' as const, observation: null, reason: claim.reason };
+    commitTranscriptRange({
+      sessionId: input.sessionId,
+      expectedFromOffset: input.fromOffset,
+      toOffset: input.toOffset,
+      consumedOffset: input.toOffset,
+      transcriptPath: input.transcriptPath,
+      identity: input.identity,
+      trigger: input.trigger,
+      now: new Date('2026-05-16T22:01:00.000Z'),
+    });
     return { status: 'written' as const, observation: {} as never, reason: null } as never;
   });
 }
@@ -95,7 +115,7 @@ describe('memory reconciliation', () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining('scanned=2'));
   });
 
-  it('is idempotent because claimRange advances the checkpoint once', async () => {
+  it('is idempotent because the extractor commits the checkpoint once', async () => {
     await checkpoint('session-stale', 10, '01234567890123456789');
     const extract = claimingExtractor();
     const options = {
