@@ -131,6 +131,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Install Playwright browsers (root) for vitest e2e
+        if: steps.panopticon-test.outputs.skip_vitest != 'true'
+        run: npx playwright install --with-deps chromium
+
       - name: Test
         if: steps.panopticon-test.outputs.skip_vitest != 'true'
         # GitHub Actions runners have limited memory. Vitest config automatically uses 1 fork
