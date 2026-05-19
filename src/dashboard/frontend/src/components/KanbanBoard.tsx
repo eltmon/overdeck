@@ -1389,45 +1389,10 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }, [issues]);
 
   // Handle drag end
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event;
+  const handleDragEnd = useCallback((_event: DragEndEvent) => {
     setActiveDragIssue(null);
     setActiveDragStatus(null);
-
-    if (!over) return;
-
-    const issueId = active.id as string;
-    const targetStatus = over.id as CanonicalState;
-
-    const issue = issues?.find(i => i.id === issueId);
-    if (!issue) return;
-
-    const currentStatus = STATUS_LABELS[issue.status] as CanonicalState;
-
-    // No change
-    if (currentStatus === targetStatus) return;
-
-    // Check for active agents
-    const issueIdLower = issue.identifier.toLowerCase();
-    const hasActiveAgent = agents.some(
-      a => a.issueId?.toLowerCase() === issueIdLower && a.status !== 'dead'
-    );
-
-    if (hasActiveAgent) {
-      setAgentWarningDialog({ open: true, issue, targetStatus });
-      return;
-    }
-
-    // Check if moving to done
-    if (targetStatus === 'done') {
-      setSyncPromptDialog({ open: true, issue });
-      return;
-    }
-
-    // Proceed with move
-    showUndoNotification(issue.identifier, currentStatus, targetStatus);
-    moveStatusMutation.mutate({ issueId: issue.identifier, targetStatus });
-  }, [issues, agents, moveStatusMutation, showUndoNotification]);
+  }, []);
 
   // Confirm agent warning
   const confirmAgentMove = useCallback(() => {

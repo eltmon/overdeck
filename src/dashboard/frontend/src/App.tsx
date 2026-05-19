@@ -121,6 +121,31 @@ export function serializeConversationViewModes(viewModes: ConversationViewModeMa
     .join(',');
 }
 
+export function normalizeLegacyAwaitingMergeRoute(path = window.location.pathname, search = window.location.search): string | null {
+  if (path !== '/awaiting-merge') return null;
+
+  const params = new URLSearchParams(search);
+  const subview = params.get('subview');
+  params.delete('subview');
+  params.set('phase', 'ship');
+
+  if (subview === 'blocked') {
+    params.set('blocked', '1');
+    params.delete('noPr');
+  } else if (subview === 'no-pr' || subview === 'noPr') {
+    params.set('noPr', '1');
+    params.delete('blocked');
+  }
+
+  const query = params.toString();
+  return query ? `/pipeline?${query}` : '/pipeline?phase=ship';
+}
+
+function normalizeCurrentRoute() {
+  const next = normalizeLegacyAwaitingMergeRoute();
+  if (next) window.history.replaceState(null, '', `${next}${window.location.hash}`);
+}
+
 /** Extract conversation ID from /conv/:id path, or null if not matching. */
 export function getConvIdFromPath(path = window.location.pathname): string | null {
   const match = path.match(/^\/conv\/(\d+)$/);
@@ -256,6 +281,7 @@ function StandaloneTerminalRoute({ sessionName, token }: { sessionName: string; 
 }
 
 export default function App() {
+  normalizeCurrentRoute();
   const terminalPath = window.location.pathname;
   const terminalSession = new URLSearchParams(window.location.search).get('terminal');
   if (terminalPath.startsWith('/terminal/') || terminalSession) {
@@ -469,6 +495,7 @@ export default function App() {
   // Handle browser back/forward
   useEffect(() => {
     const onPopState = () => {
+      normalizeCurrentRoute();
       const routeState = getConversationRouteState();
       setActiveTabState(routeState.tab);
       setSelectedConvIdState(routeState.convId);

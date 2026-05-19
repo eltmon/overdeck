@@ -61,7 +61,7 @@ describe('filterDomainEventForIssue', () => {
     expect(filterDomainEventForIssue(event, 'PAN-2')).toBeNull();
   });
 
-  it('filters snapshot and activity payloads before streaming them to the drawer', () => {
+  it('omits replacement-style snapshot events from issue-scoped drawer streams', () => {
     const issuesSnapshot: DomainEvent = {
       type: 'issues.snapshot',
       sequence: 2,
@@ -85,11 +85,7 @@ describe('filterDomainEventForIssue', () => {
       },
     } as DomainEvent;
 
-    expect((filterDomainEventForIssue(issuesSnapshot, 'PAN-1')?.payload as { issues: unknown[] }).issues).toEqual([
-      { id: 'PAN-1', identifier: 'PAN-1' },
-    ]);
-    expect((filterDomainEventForIssue(activity, 'PAN-1')?.payload as { events: unknown[] }).events).toEqual([
-      { id: 'a', issueId: 'PAN-1' },
-    ]);
+    expect(filterDomainEventForIssue(issuesSnapshot, 'PAN-1')).toBeNull();
+    expect(filterDomainEventForIssue(activity, 'PAN-1')).toBeNull();
   });
 });

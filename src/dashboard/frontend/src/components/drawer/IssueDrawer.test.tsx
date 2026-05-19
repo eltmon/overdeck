@@ -147,6 +147,28 @@ describe('IssueDrawer', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps one issue-filtered listener through 50 rapid open-close-open bursts', async () => {
+    vi.useFakeTimers();
+    const unsubscribe = vi.fn();
+    wsTransportMock.subscribe.mockReturnValue(unsubscribe);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    let current: ReturnType<typeof renderDrawer> | null = null;
+    for (let index = 0; index < 50; index += 1) {
+      current = renderDrawer();
+      current.unmount();
+      await vi.advanceTimersByTimeAsync(999);
+      expect(unsubscribe).not.toHaveBeenCalled();
+    }
+
+    current = renderDrawer();
+    expect(wsTransportMock.subscribe).toHaveBeenCalledTimes(1);
+
+    current.unmount();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
   it('scrolls to active agent section when URL hash targets it', async () => {
     const originalScrollIntoView = Element.prototype.scrollIntoView;
     const scrollIntoView = vi.fn();

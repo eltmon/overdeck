@@ -69,22 +69,22 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
       data-testid={testId}
       onClick={onClick}
       className={cn(
-        'group relative overflow-hidden rounded-2xl border cursor-pointer transition-all shadow-[0_6px_22px_rgba(0,0,0,0.08)] bg-[linear-gradient(145deg,var(--color-surface)_0%,rgba(255,255,255,0.03)_100%)]',
+        'group relative overflow-hidden rounded-2xl border cursor-pointer bg-card shadow-sm transition-all',
         sessionLostCard && 'border-warning/50',
         selected
-          ? 'ring-2 ring-warning/70 shadow-[0_12px_30px_rgba(245,158,11,0.18)]'
+          ? 'ring-2 ring-warning/70 shadow-lg'
           : unhealthyCard || stuckCard
-            ? 'border-destructive/60 bg-destructive/[0.03] shadow-[0_10px_26px_rgba(239,68,68,0.14)]'
+            ? 'border-destructive/60 bg-destructive/10 shadow-md'
             : mergeReadyCard
-              ? 'border-warning/60 bg-warning/[0.03] shadow-[0_10px_26px_rgba(245,158,11,0.14)]'
+              ? 'border-warning/60 bg-warning/10 shadow-md'
               : bulkSelected
-                ? 'border-primary/50 bg-primary/[0.03] shadow-[0_6px_22px_rgba(0,0,0,0.08)]'
-                : 'hover:-translate-y-0.5 border-border/70 hover:border-border hover:shadow-[0_12px_28px_rgba(0,0,0,0.12)]',
+                ? 'border-primary/50 bg-primary/10 shadow-sm'
+                : 'hover:-translate-y-0.5 border-border/70 hover:border-border hover:shadow-md',
         className,
       )}
     >
       <div className={cn('pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br', tone)} />
-      <div className={cn('absolute inset-y-0 left-0 w-1.5', accent)} />
+      <div className={cn('absolute bottom-[12px] left-0 top-[12px] w-1.5 rounded-r-[2px]', accent)} />
       {children}
     </div>
   );

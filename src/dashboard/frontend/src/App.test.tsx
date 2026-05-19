@@ -7,6 +7,7 @@ import App, {
   getConversationRouteState,
   getConversationViewModeFromSearch,
   getConvIdFromPath,
+  normalizeLegacyAwaitingMergeRoute,
   parseConversationViewModes,
   serializeConversationViewModes,
 } from './App';
@@ -221,6 +222,23 @@ describe('conversation route helpers', () => {
 
     window.history.replaceState(null, '', '/unknown');
     expect(getConversationRouteState().tab).toBe('pipeline');
+  });
+
+  it('normalizes legacy awaiting-merge routes to Pipeline ship filters', () => {
+    expect(normalizeLegacyAwaitingMergeRoute('/awaiting-merge', '')).toBe('/pipeline?phase=ship');
+    expect(normalizeLegacyAwaitingMergeRoute('/awaiting-merge', '?subview=blocked')).toBe('/pipeline?phase=ship&blocked=1');
+    expect(normalizeLegacyAwaitingMergeRoute('/awaiting-merge', '?subview=no-pr')).toBe('/pipeline?phase=ship&noPr=1');
+    expect(normalizeLegacyAwaitingMergeRoute('/board', '')).toBeNull();
+  });
+
+  it('rewrites /awaiting-merge before rendering Pipeline', () => {
+    window.history.replaceState(null, '', '/awaiting-merge?subview=blocked');
+
+    renderApp();
+
+    expect(window.location.pathname).toBe('/pipeline');
+    expect(window.location.search).toBe('?phase=ship&blocked=1');
+    expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
   });
 });
 

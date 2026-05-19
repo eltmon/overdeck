@@ -54,16 +54,16 @@ const ROW_CLASSES = {
 const PRIORITY_BORDER_CLASSES = {
   urgent: 'before:bg-destructive',
   high: 'before:bg-warning',
-  medium: 'before:bg-[rgb(255_255_255_/_22%)]',
+  medium: 'before:bg-muted-foreground/30',
   low: 'before:bg-transparent',
 } satisfies Record<IssueRowPriority, string>;
 
-const AVATAR_GRADIENT_CLASSES = [
-  'bg-[linear-gradient(135deg,#8b5cf6,#06b6d4)]',
-  'bg-[linear-gradient(135deg,#f59e0b,#ef4444)]',
-  'bg-[linear-gradient(135deg,#10b981,#06b6d4)]',
-  'bg-[linear-gradient(135deg,#3b82f6,#8b5cf6)]',
-  'bg-[linear-gradient(135deg,#ef4444,#f59e0b)]',
+const AVATAR_TONE_CLASSES = [
+  'bg-primary text-primary-foreground',
+  'bg-warning text-warning-foreground',
+  'bg-success text-success-foreground',
+  'bg-info text-info-foreground',
+  'bg-destructive text-destructive-foreground',
 ] as const;
 
 function hashString(value: string) {
@@ -96,7 +96,7 @@ export default function IssueRow({
   className,
 }: IssueRowProps) {
   const avatarName = assignee?.name ?? issueId;
-  const avatarGradient = AVATAR_GRADIENT_CLASSES[hashString(avatarName) % AVATAR_GRADIENT_CLASSES.length];
+  const avatarTone = AVATAR_TONE_CLASSES[hashString(avatarName) % AVATAR_TONE_CLASSES.length];
   const hasLedger = Boolean(ledger?.runtime || ledger?.cost);
   const hasAgent = Boolean(agent?.name);
 
@@ -174,8 +174,8 @@ export default function IssueRow({
       <span
         data-component="issue-row-avatar"
         className={cn(
-          'flex h-[22px] w-[22px] items-center justify-center rounded-full border border-border text-[9px] font-semibold leading-none text-white',
-          avatarGradient,
+          'flex h-[22px] w-[22px] items-center justify-center rounded-full border border-border text-[9px] font-semibold leading-none',
+          avatarTone,
         )}
       >
         {avatarInitials(avatarName)}

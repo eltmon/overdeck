@@ -65,14 +65,8 @@ export function filterDomainEventForIssue(event: DomainEvent, issueId: string): 
   const payload = event.payload as Record<string, unknown>;
   if (recordMatchesIssue(payload, issueId)) return event;
 
-  if (event.type === 'issues.snapshot' && Array.isArray(payload['issues'])) {
-    const issues = payload['issues'].filter((issue) => recordMatchesIssue(issue, issueId));
-    return issues.length > 0 ? { ...event, payload: { ...payload, issues } } as DomainEvent : null;
-  }
-
-  if (event.type === 'activity.updated' && Array.isArray(payload['events'])) {
-    const events = payload['events'].filter((entry) => recordMatchesIssue(entry, issueId));
-    return events.length > 0 ? { ...event, payload: { ...payload, events } } as DomainEvent : null;
+  if (event.type === 'issues.snapshot' || event.type === 'activity.updated') {
+    return null;
   }
 
   return null;

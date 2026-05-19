@@ -321,7 +321,7 @@ export function PipelineView() {
 
   return (
     <section className="flex h-full w-full flex-col overflow-hidden bg-background" data-component="pipeline-view">
-      <TopBar title="Pipeline" eyebrow="Unified operations" />
+      <TopBar title="Pipeline" breadcrumb="Unified operations" />
       <MetricStrip columns={5} tiles={metricTiles} />
       <div className="flex shrink-0 flex-wrap items-center gap-[8px] border-b border-border bg-background px-[22px] py-[10px]" data-component="pipeline-filter-row">
         <div className="flex items-center gap-[4px] rounded-[var(--radius-sm)] border border-border bg-card p-[2px]" aria-label="Pipeline phase filter">

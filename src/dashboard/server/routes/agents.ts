@@ -1040,6 +1040,12 @@ function agentStopRoute(method: 'DELETE' | 'POST', path: string) {
     method,
     path,
     httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const originCheck = validateOrigin(request);
+      if (!originCheck.ok) {
+        return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
+      }
+
       const params = yield* HttpRouter.params;
       const id = params['id'] ?? '';
       const eventStore = yield* EventStoreService;

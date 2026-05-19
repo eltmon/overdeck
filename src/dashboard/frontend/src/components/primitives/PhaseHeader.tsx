@@ -19,7 +19,7 @@ const PHASE_BORDER_CLASSES = {
   review: 'border-t-warning',
   work: 'border-t-info',
   plan: 'border-t-signal-review',
-  todo: 'border-t-[rgb(255_255_255_/_15%)]',
+  todo: 'border-t-border',
 } satisfies Record<PhaseHeaderPhase, string>;
 
 const PHASE_DOT_CLASSES = {
@@ -27,7 +27,7 @@ const PHASE_DOT_CLASSES = {
   review: 'bg-warning',
   work: 'bg-info',
   plan: 'bg-signal-review',
-  todo: 'bg-[rgb(255_255_255_/_15%)]',
+  todo: 'bg-muted-foreground/30',
 } satisfies Record<PhaseHeaderPhase, string>;
 
 const VARIANT_PADDING_CLASSES = {
@@ -64,7 +64,7 @@ export default function PhaseHeader({
       data-phase={phase}
       data-variant={variant}
       className={cn(
-        'sticky top-0 z-[2] flex items-center gap-[12px] border-b border-t-2 border-b-border bg-[color:color-mix(in_srgb,var(--background)_92%,white)] backdrop-blur-[6px]',
+        'sticky top-0 z-[2] flex items-center gap-[12px] border-b border-t-2 border-b-border bg-background/95 backdrop-blur-[6px]',
         PHASE_BORDER_CLASSES[phase],
         VARIANT_PADDING_CLASSES[variant],
         className,

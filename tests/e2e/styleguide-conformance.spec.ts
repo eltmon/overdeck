@@ -1,60 +1,236 @@
-import { describe, expect, it } from 'vitest';
-import { readFile } from 'node:fs/promises';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import type { AddressInfo } from 'node:net';
 
-const root = process.cwd();
+type ViteDevServer = {
+  listen: () => Promise<void> | void;
+  close: () => Promise<void> | void;
+  httpServer?: { address: () => AddressInfo | string | null };
+};
 
-async function readSource(path: string) {
-  return readFile(join(root, path), 'utf8');
+const require = createRequire(import.meta.url);
+let vite: ViteDevServer;
+let browser: Browser;
+let baseUrl: string;
+
+const now = '2026-05-18T00:00:00.000Z';
+
+const issue = {
+  id: 'PAN-1148',
+  identifier: 'PAN-1148',
+  title: 'Styleguide conformance issue',
+  status: 'In Progress',
+  state: 'in_progress',
+  priority: 2,
+  labels: ['styleguide'],
+  url: 'https://example.com/PAN-1148',
+  createdAt: now,
+  updatedAt: now,
+  project: { id: 'pan', name: 'Panopticon', color: 'var(--primary)' },
+};
+
+const agent = {
+  id: 'agent-pan-1148',
+  issueId: 'PAN-1148',
+  role: 'work',
+  status: 'running',
+  runtime: 'claude-code',
+  harness: 'claude-code',
+  model: 'claude-opus-4-7',
+  startedAt: now,
+  lastActivity: now,
+  consecutiveFailures: 0,
+  killCount: 0,
+};
+
+const feature = {
+  issueId: 'PAN-1148',
+  title: 'Styleguide conformance issue',
+  projectName: 'Panopticon',
+  branch: 'feature/pan-1148',
+  status: 'In Progress',
+  stateLabel: 'In Progress',
+  agentStatus: 'running',
+  hasPlanning: true,
+  hasPrd: true,
+  hasState: true,
+  isShadow: false,
+  cost: 1.25,
+  readyForMerge: false,
+  sessions: [{ sessionId: 'agent-pan-1148', type: 'work', role: 'work', presence: 'active' }],
+  resourceSources: ['workspace', 'branch'],
+  resourceDetails: {
+    hasWorkspace: true,
+    localBranchCount: 1,
+    remoteBranchCount: 1,
+    tmuxSessionCount: 1,
+    prs: [],
+    hasVbrief: true,
+    hasBeads: true,
+    dockerContainerCount: 0,
+  },
+};
+
+const snapshot = {
+  sequence: 1,
+  timestamp: now,
+  agents: [agent],
+  agentRuntimeById: {},
+  reviewStatuses: [],
+  resources: null,
+  issues: [issue],
+  channelPermissionRequests: [],
+  scanProgress: null,
+  enrichStats: null,
+  enrichProgressBySessionId: {},
+  embedProgressBySessionId: {},
+};
+
+async function newContext(): Promise<BrowserContext> {
+  const context = await browser.newContext();
+  await context.addInitScript(({ snapshotFixture, featureFixture }) => {
+    localStorage.setItem('pan-snapshot-cache-v1', JSON.stringify({ data: snapshotFixture, timestamp: new Date().toISOString() }));
+    window.fetch = async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname + input.search : input.url;
+      const path = new URL(url, window.location.origin).pathname;
+      const search = new URL(url, window.location.origin).search;
+      const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (path === '/api/dashboard/session') return json({ ok: true });
+      if (path === '/api/version') return json({ version: 'test', supervisorUrl: null });
+      if (path === '/api/tracker-status') return json({ primary: 'github', configured: [] });
+      if (path === '/api/confirmations') return json([]);
+      if (path === '/api/cloister/status') return json({
+        running: true,
+        lastCheck: new Date().toISOString(),
+        summary: { active: 1, stale: 0, warning: 0, stuck: 0, total: 1 },
+        agentsNeedingAttention: [],
+      });
+      if (path === '/api/settings') return json({ tts: { enabled: false } });
+      if (path === '/api/tts/health') return json({ ok: true, queue: 0, model: 'test-tts' });
+      if (path === '/api/deacon/status') return json({
+        isRunning: true,
+        config: { patrolIntervalMs: 15_000 },
+        state: { specialists: {}, lastPatrol: new Date().toISOString(), patrolCycle: 1 },
+        lastPatrol: { cycle: 1, timestamp: new Date().toISOString(), actions: [], massDeathDetected: false },
+      });
+      if (path === '/api/system/health') return json({
+        severity: 'normal',
+        updatedAt: new Date().toISOString(),
+        summary: {
+          cpuPercent: 1,
+          loadAverage1m: 0.1,
+          loadPerCore1m: 0.01,
+          totalMemoryBytes: 16_000_000_000,
+          usedMemoryBytes: 4_000_000_000,
+          availableMemoryBytes: 12_000_000_000,
+          memoryUsedPercent: 25,
+          swapTotalBytes: 0,
+          swapUsedBytes: 0,
+          swapUsedPercent: 0,
+          overcommitPercent: 0,
+          agentCount: 1,
+          workAgentCount: 1,
+          planningAgentCount: 0,
+          specialistSessionCount: 0,
+          leakedSpecialistCount: 0,
+          containerCount: 0,
+          containerMemoryBytes: 0,
+          panopticonMemoryBytes: 128_000_000,
+          panopticonMemoryPercent: 1,
+        },
+        thresholds: {
+          memoryAvailableWarningBytes: 4_000_000_000,
+          memoryAvailableCriticalBytes: 2_000_000_000,
+          swapUsedWarningPercent: 20,
+          swapUsedCriticalPercent: 50,
+          cpuLoadWarningPerCore: 1,
+          cpuLoadCriticalPerCore: 2,
+          overcommitWarningPercent: 150,
+          overcommitCriticalPercent: 200,
+        },
+        reasons: [],
+        agents: [],
+        leakedSpecialists: [],
+        topConsumers: [],
+      });
+      if (path === '/api/specialists') return json({ projects: [] });
+      if (path === '/api/cliproxy/status') return json({ running: true, pid: null, checkedAt: new Date().toISOString() });
+      if (path === '/api/costs/by-issue') return json({ issues: [{ issueId: 'PAN-1148', totalCost: 1.25 }] });
+      if (path === '/api/costs/trends') return json({ trends: [{ totalCost: 1.25, totalTokens: 4200 }] });
+      if (path === '/api/metrics/summary') return json({
+        today: { totalCost: 1.25, agentCount: 1, activeCount: 1, stuckCount: 0, warningCount: 0 },
+        topSpenders: { agents: [{ agentId: 'agent-pan-1148', cost: 1.25 }], issues: [{ issueId: 'PAN-1148', cost: 1.25 }] },
+      });
+      if (path === '/api/issues/resource-allocated') return json([featureFixture]);
+      if (path === '/api/registered-projects') return json([{ key: 'pan', name: 'Panopticon', path: '/tmp/panopticon' }]);
+      if (path === '/api/session-trees') return json({ trees: [] });
+      if (path === '/api/conversations') return json([]);
+      if (path === '/api/conversations/cost' || path === '/api/conversations/cost/by-workspace') return json({ totalCost: 0, entries: [] });
+      return json(search ? { search } : {});
+    };
+  }, { snapshotFixture: snapshot, featureFixture: feature });
+  return context;
 }
 
-describe('styleguide conformance', () => {
-  it('asserts shared primitive signatures across canonical surfaces', async () => {
-    const surfaces = [
-      {
-        route: '/pipeline',
-        file: 'src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx',
-        primaryPrimitive: 'IssueRow',
-        primaryComponent: 'issue-row',
-      },
-      {
-        route: '/board',
-        file: 'src/dashboard/frontend/src/components/KanbanBoard.tsx',
-        primaryPrimitive: 'IssueCardPrimitive',
-        primaryComponent: 'issue-card',
-      },
-      {
-        route: '/command-deck',
-        file: 'src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx',
-        primaryPrimitive: 'IssueRow',
-        primaryComponent: 'issue-row',
-      },
-      {
-        route: '/agents',
-        file: 'src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx',
-        primaryPrimitive: 'AgentCard',
-        primaryComponent: 'agent-card',
-      },
-    ] as const;
+async function openRoute(path: string): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await newContext();
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}${path}`);
+  return { context, page };
+}
 
-    const primitiveSources = {
-      'issue-row': await readSource('src/dashboard/frontend/src/components/primitives/IssueRow.tsx'),
-      'issue-card': await readSource('src/dashboard/frontend/src/components/primitives/IssueCard.tsx'),
-      'agent-card': await readSource('src/dashboard/frontend/src/components/primitives/AgentCard.tsx'),
-      'verb-badge': await readSource('src/dashboard/frontend/src/components/primitives/VerbBadge.tsx'),
-    };
-
-    expect(primitiveSources['verb-badge']).toContain('data-component="verb-badge"');
-
-    for (const surface of surfaces) {
-      const source = await readSource(surface.file);
-      expect(source, `${surface.route} uses ${surface.primaryPrimitive}`).toContain(surface.primaryPrimitive);
-      expect(source, `${surface.route} renders VerbBadge`).toContain('VerbBadge');
-      expect(primitiveSources[surface.primaryComponent]).toContain(`data-component="${surface.primaryComponent}"`);
-    }
+beforeAll(async () => {
+  const frontendRoot = join(process.cwd(), 'src/dashboard/frontend');
+  const vitePath = require.resolve('vite', { paths: [frontendRoot] });
+  const { createServer } = await import(vitePath) as { createServer: (options: Record<string, unknown>) => Promise<ViteDevServer> };
+  vite = await createServer({
+    root: frontendRoot,
+    plugins: [{
+      name: 'styleguide-empty-index-css',
+      enforce: 'pre',
+      transform(_code: string, id: string) {
+        return id.endsWith('/src/index.css') ? { code: '', map: null } : null;
+      },
+    }],
+    server: { host: '127.0.0.1', port: 0 },
+    logLevel: 'error',
   });
+  await vite.listen();
+  const address = vite.httpServer?.address() as AddressInfo;
+  baseUrl = `http://127.0.0.1:${address.port}`;
+  browser = await chromium.launch();
+}, 30_000);
 
-  it.skip('skips /god-view because it is outside the PAN-1148 styleguide surface set', () => {
-    expect('/god-view').toBe('/god-view');
-  });
+afterAll(async () => {
+  await browser?.close();
+  await vite?.close();
+});
+
+describe('styleguide rendered surface conformance', () => {
+  it('renders shared primitives on Pipeline, Board, Command Deck, and Agents routes', async () => {
+    const pipeline = await openRoute('/pipeline');
+    await expect.poll(() => pipeline.page.locator('[data-component="top-bar"]').count()).toBeGreaterThan(0);
+    await expect.poll(() => pipeline.page.locator('[data-component="phase-header"]').count()).toBeGreaterThan(0);
+    await expect.poll(() => pipeline.page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"]').count()).toBe(1);
+    await pipeline.context.close();
+
+    const board = await openRoute('/board');
+    await expect.poll(() => board.page.locator('[data-component="issue-card"][data-issue-id="PAN-1148"]').count()).toBe(1);
+    await board.context.close();
+
+    const commandDeck = await openRoute('/command-deck');
+    await commandDeck.page.getByText('Panopticon', { exact: true }).nth(1).click();
+    await expect.poll(() => commandDeck.page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"][data-variant="command-deck"]').count()).toBe(1);
+    await commandDeck.context.close();
+
+    const agents = await openRoute('/agents');
+    await expect.poll(() => agents.page.locator('[data-component="agent-card"][data-agent-id="agent-pan-1148"]').count()).toBe(1);
+    await agents.context.close();
+  }, 45_000);
 });
