@@ -71,6 +71,23 @@ describe('IssueDrawer', () => {
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'activity' });
   });
 
+  it('scrolls to active agent section when URL hash targets it', async () => {
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    window.history.replaceState(null, '', '/?issue=PAN-1&tab=overview#active-agent');
+
+    try {
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+      });
+    } finally {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
+
   it('closes from the X button and removes drawer URL params', async () => {
     useDashboardStore.getState().openIssue('PAN-1', 'plan');
 

@@ -28,6 +28,15 @@ export function IssueDrawer() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [closeIssue, drawer.issueId]);
 
+  useEffect(() => {
+    if (!drawer.issueId || window.location.hash !== '#active-agent') return;
+
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('active-agent')?.scrollIntoView({ block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [drawer.issueId]);
+
   if (!drawer.issueId) return null;
 
   return (

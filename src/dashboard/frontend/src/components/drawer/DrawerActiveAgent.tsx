@@ -26,7 +26,7 @@ export default function DrawerActiveAgent() {
 
   if (!activeAgent) {
     return (
-      <section data-component="drawer-active-agent" data-testid="drawer-active-agent" className="rounded-[var(--radius)] border border-border bg-card p-[14px]">
+      <section id="active-agent" data-component="drawer-active-agent" data-testid="drawer-active-agent" className="rounded-[var(--radius)] border border-border bg-card p-[14px]">
         <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Active Agent</div>
         <div className="rounded-[10px] border border-border bg-background/45 px-[12px] py-[14px] text-[12px] text-muted-foreground">
           No active agent.
@@ -54,7 +54,7 @@ export default function DrawerActiveAgent() {
   };
 
   return (
-    <section data-component="drawer-active-agent" data-testid="drawer-active-agent" className="rounded-[var(--radius)] border border-border border-l-[3px] border-l-signal-review bg-card p-[14px]">
+    <section id="active-agent" data-component="drawer-active-agent" data-testid="drawer-active-agent" className="rounded-[var(--radius)] border border-border border-l-[3px] border-l-signal-review bg-card p-[14px]">
       <div className="flex items-start justify-between gap-[12px]">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-[8px]">

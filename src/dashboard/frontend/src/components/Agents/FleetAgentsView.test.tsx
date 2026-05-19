@@ -132,13 +132,14 @@ describe('FleetAgentsView', () => {
     expect(screen.getByText('agent-stuck').closest('[data-component="agent-card"]')).toHaveAttribute('data-stuck', 'true');
   });
 
-  it('opens the drawer from a fleet card issue action', () => {
+  it('opens the drawer from a fleet card issue action at the active-agent anchor', () => {
     renderFleetView();
 
     fireEvent.click(screen.getAllByText('Open issue')[0]);
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
     expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
+    expect(window.location.hash).toBe('#active-agent');
   });
 
   it('filters the fleet grid with multi-select phase pills and syncs the URL', () => {

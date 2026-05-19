@@ -328,6 +328,13 @@ export function FleetAgentsView() {
     updateFilter({ ...filter, models: toggleValue(filter.models, model) });
   }
 
+  function openAgentIssue(issueId: string) {
+    openIssue(issueId, 'overview');
+    const url = new URL(window.location.href);
+    url.hash = 'active-agent';
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+
   if (fleetAgents.length === 0) {
     return (
       <section data-component="fleet-agents-view" className="p-6">
@@ -407,7 +414,7 @@ export function FleetAgentsView() {
                 verbBadge={verbBadgeForAgent(agent, now)}
                 stuck={stuck}
                 stuckMessage={agent.lastFailureReason ?? agent.error ?? 'Agent requires attention.'}
-                onOpenIssue={agent.issueId ? () => openIssue(agent.issueId!, 'overview') : undefined}
+                onOpenIssue={agent.issueId ? () => openAgentIssue(agent.issueId!) : undefined}
               />
             );
           })}
