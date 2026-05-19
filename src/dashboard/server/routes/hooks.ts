@@ -23,6 +23,7 @@ import { getAgentRuntimeStateAsync, getAgentStateAsync, listRunningAgentsAsync, 
 import { sessionFilePath } from '../../../lib/paths.js';
 import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
 import { hasDashboardInternalToken } from './dashboard-auth.js';
+import { ReadModelService } from '../read-model.js';
 import { getConversationByClaudeSessionId } from '../../../lib/database/conversations-db.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
 import type { ExtractFromTranscriptDeltaInput } from '../../../lib/memory/pipeline.js';
@@ -63,6 +64,7 @@ export interface HandleMemoryTurnBodyOptions {
   enqueuePipeline?: (input: ExtractFromTranscriptDeltaInput) => void;
   areObservationsEnabled?: () => boolean | Promise<boolean>;
   resolveTranscriptPath?: (body: Record<string, unknown>, sessionId: string) => Promise<string | null>;
+  resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
 }
 
 export interface HandleMemorySessionStartBodyOptions {
@@ -71,6 +73,7 @@ export interface HandleMemorySessionStartBodyOptions {
   registerTranscript?: typeof registerTranscriptForPolling;
   areObservationsEnabled?: () => boolean | Promise<boolean>;
   resolveTranscriptPath?: (body: Record<string, unknown>, sessionId: string) => Promise<string | null>;
+  resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
 }
 
 export type HandleMemoryTurnBodyResult =
@@ -113,13 +116,13 @@ export async function handleMemoryTurnBody(
   let agentState: AgentState | null = null;
   const trustedTranscriptPath = options.resolveTranscriptPath
     ? await options.resolveTranscriptPath(body, sessionId)
-    : resolveTrustedTranscriptPathFromState(agentState = await resolveAgentState(body, sessionId), sessionId);
+    : resolveTrustedTranscriptPathFromState(agentState = await resolveAgentState(body, sessionId, options.resolveAgentIdBySessionId), sessionId);
   if (!trustedTranscriptPath || resolve(transcriptPath) !== trustedTranscriptPath) {
     return { status: 'error', statusCode: 422, error: 'transcript path could not be verified' };
   }
 
   if (!payloadIdentity && !options.resolveIdentity && !agentState) {
-    agentState = await resolveAgentState(body, sessionId);
+    agentState = await resolveAgentState(body, sessionId, options.resolveAgentIdBySessionId);
   }
   const identity = payloadIdentity
     ?? (options.resolveIdentity
@@ -167,13 +170,17 @@ export async function handleMemorySessionStartBody(
     return { status: 'error', statusCode: 400, error: 'session_id and transcript_path are required' };
   }
 
-  const trustedTranscriptPath = await (options.resolveTranscriptPath ?? resolveTrustedTranscriptPath)(body, sessionId);
+  const trustedTranscriptPath = options.resolveTranscriptPath
+    ? await options.resolveTranscriptPath(body, sessionId)
+    : await resolveTrustedTranscriptPath(body, sessionId, options.resolveAgentIdBySessionId);
   if (!trustedTranscriptPath || resolve(transcriptPath) !== trustedTranscriptPath) {
     return { status: 'error', statusCode: 422, error: 'transcript path could not be verified' };
   }
 
   const identity = parseMemoryIdentity(payload.identity, sessionId)
-    ?? await (options.resolveIdentity ?? resolveMemoryIdentity)(body, sessionId);
+    ?? (options.resolveIdentity
+      ? await options.resolveIdentity(body, sessionId)
+      : await resolveMemoryIdentity(body, sessionId, options.resolveAgentIdBySessionId));
   if (!identity) {
     return { status: 'error', statusCode: 422, error: 'memory identity could not be resolved' };
   }
@@ -194,6 +201,7 @@ export async function handleMemorySessionStartBody(
 
 export interface HandleMemoryInjectBodyOptions {
   injectMemory?: typeof injectPromptTimeMemory;
+  resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
 }
 
 export async function handleMemoryInjectBody(
@@ -216,7 +224,7 @@ export async function handleMemoryInjectBody(
   }
 
   const identity = parseMemoryIdentity(body.identity, sessionId)
-    ?? await resolveMemoryIdentity(body, sessionId);
+    ?? await resolveMemoryIdentity(body, sessionId, options.resolveAgentIdBySessionId);
   if (!identity) {
     return { error: 'memory identity could not be resolved', status: 202 } as const;
   }
@@ -239,7 +247,10 @@ const postMemoryInjectRoute = HttpRouter.add(
       return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
     }
 
-    const result = yield* Effect.promise(() => handleMemoryInjectBody(body));
+    const readModel = yield* ReadModelService;
+    const result = yield* Effect.promise(() => handleMemoryInjectBody(body, {
+      resolveAgentIdBySessionId: async (sessionId) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId)),
+    }));
     if ('error' in result) return jsonResponse({ ok: false, error: result.error }, { status: result.status });
     return jsonResponse({ ok: true, ...result });
   })),
@@ -260,7 +271,10 @@ const postMemorySessionStartRoute = HttpRouter.add(
       return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
     }
 
-    const result = yield* Effect.promise(() => handleMemorySessionStartBody(body));
+    const readModel = yield* ReadModelService;
+    const result = yield* Effect.promise(() => handleMemorySessionStartBody(body, {
+      resolveAgentIdBySessionId: async (sessionId) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId)),
+    }));
     if (result.status === 'subagent' || result.status === 'disabled') return HttpServerResponse.text('', { status: 204 });
     if (result.status === 'error') return jsonResponse({ ok: false, error: result.error }, { status: result.statusCode });
 
@@ -283,7 +297,10 @@ const postMemoryTurnRoute = HttpRouter.add(
       return jsonResponse({ error: 'invalid JSON' }, { status: 400 });
     }
 
-    const result = yield* Effect.promise(() => handleMemoryTurnBody(body));
+    const readModel = yield* ReadModelService;
+    const result = yield* Effect.promise(() => handleMemoryTurnBody(body, {
+      resolveAgentIdBySessionId: async (sessionId) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId)),
+    }));
     if (result.status === 'subagent' || result.status === 'disabled') return HttpServerResponse.text('', { status: 204 });
     if (result.status === 'error') return jsonResponse({ ok: false, error: result.error }, { status: result.statusCode });
 
@@ -358,8 +375,12 @@ function parseMemoryIdentity(value: unknown, sessionId: string): MemoryIdentity 
   return { projectId, workspaceId, issueId, runId, sessionId, agentRole, agentHarness };
 }
 
-async function resolveMemoryIdentity(body: Record<string, unknown>, sessionId: string): Promise<MemoryIdentity | null> {
-  return resolveMemoryIdentityFromState(await resolveAgentState(body, sessionId), sessionId);
+async function resolveMemoryIdentity(
+  body: Record<string, unknown>,
+  sessionId: string,
+  resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>,
+): Promise<MemoryIdentity | null> {
+  return resolveMemoryIdentityFromState(await resolveAgentState(body, sessionId, resolveAgentIdBySessionId), sessionId);
 }
 
 function resolveMemoryIdentityFromState(state: AgentState | null, sessionId: string): MemoryIdentity | null {
@@ -375,20 +396,36 @@ function resolveMemoryIdentityFromState(state: AgentState | null, sessionId: str
   };
 }
 
-async function resolveTrustedTranscriptPath(body: Record<string, unknown>, sessionId: string): Promise<string | null> {
-  return resolveTrustedTranscriptPathFromState(await resolveAgentState(body, sessionId), sessionId);
+async function resolveTrustedTranscriptPath(
+  body: Record<string, unknown>,
+  sessionId: string,
+  resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>,
+): Promise<string | null> {
+  return resolveTrustedTranscriptPathFromState(await resolveAgentState(body, sessionId, resolveAgentIdBySessionId), sessionId);
 }
 
 function resolveTrustedTranscriptPathFromState(state: AgentState | null, sessionId: string): string | null {
   return state ? resolve(sessionFilePath(state.workspace, sessionId)) : null;
 }
 
-async function resolveAgentState(body: Record<string, unknown>, sessionId: string): Promise<AgentState | null> {
+async function resolveAgentState(
+  body: Record<string, unknown>,
+  sessionId: string,
+  resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>,
+): Promise<AgentState | null> {
   const agentId = stringField(body.agentId) ?? stringField(body.agent_id);
-  return agentId ? await getAgentStateAsync(agentId) : await findAgentStateBySessionId(sessionId);
+  return agentId ? await getAgentStateAsync(agentId) : await findAgentStateBySessionId(sessionId, resolveAgentIdBySessionId);
 }
 
-async function findAgentStateBySessionId(sessionId: string): Promise<AgentState | null> {
+async function findAgentStateBySessionId(
+  sessionId: string,
+  resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>,
+): Promise<AgentState | null> {
+  if (resolveAgentIdBySessionId) {
+    const agentId = await resolveAgentIdBySessionId(sessionId);
+    return agentId ? await getAgentStateAsync(agentId) : null;
+  }
+
   const agents = await listRunningAgentsAsync();
   for (const agent of agents) {
     if (agent.sessionId === sessionId) return agent;

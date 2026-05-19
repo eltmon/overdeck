@@ -6,7 +6,7 @@ import type { MemoryIdentity, MemoryStatus } from '@panctl/contracts';
 import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from '../../../src/lib/memory/paths.js';
 import { handleMemoryInjectBody } from '../../../src/dashboard/server/routes/hooks.js';
-import { injectPromptTimeMemory, PROMPT_TIME_MEMORY_BUDGETS } from '../../../src/lib/memory/injection.js';
+import { injectPromptTimeMemory, PROMPT_TIME_MEMORY_BUDGETS, type PromptTimeRagDecisionLogEntry } from '../../../src/lib/memory/injection.js';
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
@@ -100,6 +100,17 @@ async function insertRow(overrides: Partial<Record<string, string>> = {}) {
   ));
 }
 
+async function injectWithLog(
+  input: Omit<Parameters<typeof injectPromptTimeMemory>[0], 'logDecision'>,
+): Promise<{ result: Awaited<ReturnType<typeof injectPromptTimeMemory>>; decision: PromptTimeRagDecisionLogEntry }> {
+  let decision!: PromptTimeRagDecisionLogEntry;
+  const result = await injectPromptTimeMemory({
+    ...input,
+    logDecision: async (entry) => { decision = entry; },
+  });
+  return { result, decision };
+}
+
 async function readRagEntries() {
   const raw = await readFile(resolveRagRunsFile(identity.projectId, identity.issueId, '2026-05-16'), 'utf8');
   return raw.trim().split('\n').map((line) => JSON.parse(line));
@@ -150,7 +161,7 @@ describe('prompt-time memory injection', () => {
         provider: 'stub',
       },
     }));
-    const result = await injectPromptTimeMemory({
+    const { result, decision } = await injectWithLog({
       prompt: 'prompt injection memory retrieval summary',
       identity,
       now: new Date('2026-05-16T22:30:00.000Z'),
@@ -174,8 +185,7 @@ describe('prompt-time memory injection', () => {
     expect(result.decision.allocations.summaries).toBeLessThanOrEqual(PROMPT_TIME_MEMORY_BUDGETS.summaries);
     expect(result.decision.allocations.sibling).toBeLessThanOrEqual(PROMPT_TIME_MEMORY_BUDGETS.sibling);
 
-    const entries = await readRagEntries();
-    expect(entries.at(-1)).toMatchObject({
+    expect(decision).toMatchObject({
       id: 'inject-1',
       type: 'rag-decision',
       surface: 'user-prompt',
@@ -184,8 +194,8 @@ describe('prompt-time memory injection', () => {
       hitCounts: { status: 1, observations: 1, summaries: 1, sibling: 1 },
       budgets: PROMPT_TIME_MEMORY_BUDGETS,
     });
-    expect(entries.at(-1).allocationBytes.observations).toBeGreaterThan(0);
-    expect(entries.at(-1).sources.map((source: { docType: string }) => source.docType)).toContain('sibling');
+    expect(decision.allocationBytes.observations).toBeGreaterThan(0);
+    expect(decision.sources.map((source: { docType: string }) => source.docType)).toContain('sibling');
   });
 
   it('escapes retrieved memory text so stored content cannot close prompt delimiters', async () => {
@@ -255,7 +265,7 @@ describe('prompt-time memory injection', () => {
   it('keeps spawn-time injection enabled when the prompt-time settings toggle is disabled', async () => {
     await writeStatus();
 
-    const result = await injectPromptTimeMemory({
+    const { result, decision } = await injectWithLog({
       prompt: 'spawn status context',
       identity,
       surface: 'spawn',
@@ -277,7 +287,7 @@ describe('prompt-time memory injection', () => {
 
     expect(result.status).toBe('injected');
     expect(result.context).toContain('<panopticon-memory-context format="json">');
-    expect((await readRagEntries()).at(-1)).toMatchObject({
+    expect(decision).toMatchObject({
       id: 'spawn-1',
       surface: 'spawn',
       outcome: 'injected',
@@ -285,7 +295,7 @@ describe('prompt-time memory injection', () => {
   });
 
   it('skips prompt-time injection when the settings toggle is disabled', async () => {
-    const result = await injectPromptTimeMemory({
+    const { result, decision } = await injectWithLog({
       prompt: 'disabled memory injection',
       identity,
       now: new Date('2026-05-16T22:30:00.000Z'),
@@ -297,7 +307,7 @@ describe('prompt-time memory injection', () => {
     });
 
     expect(result).toMatchObject({ status: 'skipped', reason: 'prompt-time-injection-disabled', context: '' });
-    expect((await readRagEntries()).at(-1)).toMatchObject({
+    expect(decision).toMatchObject({
       id: 'disabled-1',
       outcome: 'skipped',
       reason: 'prompt-time-injection-disabled',
@@ -317,7 +327,7 @@ describe('prompt-time memory injection', () => {
         provider: 'stub',
       },
     }));
-    const result = await injectPromptTimeMemory({
+    const { result, decision } = await injectWithLog({
       prompt: 'raw fallback prompt',
       identity,
       now: new Date('2026-05-16T22:30:00.000Z'),
@@ -327,7 +337,7 @@ describe('prompt-time memory injection', () => {
 
     expect(expansion).toHaveBeenCalledOnce();
     expect(result).toMatchObject({ status: 'no-hits', reason: 'no-memory-hits', context: '' });
-    expect((await readRagEntries()).at(-1)).toMatchObject({
+    expect(decision).toMatchObject({
       id: 'no-hits-1',
       outcome: 'no-hits',
       expansion: { status: 'expanded', reason: null },
@@ -336,7 +346,7 @@ describe('prompt-time memory injection', () => {
 
   it('logs expansion-failed only when prompt-time expansion fails', async () => {
     const expansion = vi.fn(async () => ({ status: 'dropped' as const, reason: 'extraction-failed' as const, error: new Error('provider unavailable') }));
-    const result = await injectPromptTimeMemory({
+    const { result, decision } = await injectWithLog({
       prompt: 'provider unavailable prompt',
       identity,
       now: new Date('2026-05-16T22:30:00.000Z'),
@@ -346,7 +356,7 @@ describe('prompt-time memory injection', () => {
 
     expect(expansion).toHaveBeenCalledOnce();
     expect(result).toMatchObject({ status: 'expansion-failed', reason: 'extraction-failed', context: '' });
-    expect((await readRagEntries()).at(-1)).toMatchObject({
+    expect(decision).toMatchObject({
       id: 'expansion-failed-1',
       outcome: 'expansion-failed',
       expansion: { status: 'fallback', reason: 'extraction-failed' },
@@ -356,7 +366,7 @@ describe('prompt-time memory injection', () => {
   it('logs context-too-large when hits exist but no budget can include them', async () => {
     await writeStatus();
 
-    const result = await injectPromptTimeMemory({
+    const { result, decision } = await injectWithLog({
       prompt: 'status context',
       identity,
       now: new Date('2026-05-16T22:30:00.000Z'),
@@ -376,7 +386,7 @@ describe('prompt-time memory injection', () => {
     });
 
     expect(result).toMatchObject({ status: 'context-too-large', reason: 'memory-context-exceeds-token-budget', context: '' });
-    expect((await readRagEntries()).at(-1)).toMatchObject({
+    expect(decision).toMatchObject({
       id: 'too-large-1',
       outcome: 'context-too-large',
       allocations: { status: 0, observations: 0, summaries: 0, sibling: 0 },
@@ -387,7 +397,7 @@ describe('prompt-time memory injection', () => {
   it('truncates oversized memory chunks to their per-bucket token budgets', async () => {
     await insertRow({ content: `oversized observation memory rag ${'x'.repeat(200)}` });
 
-    const result = await injectPromptTimeMemory({
+    const { result, decision } = await injectWithLog({
       prompt: 'oversized observation',
       identity,
       now: new Date('2026-05-16T22:30:00.000Z'),
@@ -408,7 +418,7 @@ describe('prompt-time memory injection', () => {
 
     expect(result.status).toBe('budget-truncated');
     expect(result.decision.allocations.observations).toBeLessThanOrEqual(5);
-    expect((await readRagEntries()).at(-1)).toMatchObject({
+    expect(decision).toMatchObject({
       id: 'truncated-1',
       outcome: 'budget-truncated',
       reason: 'memory-context-truncated-to-budget',

@@ -180,6 +180,8 @@ export interface ReadModelServiceShape {
   ) => Effect.Effect<import('@panctl/contracts').ResolvedChannelPermissionDecision | null>;
   /** Return in-memory turn diff summaries for a single agent. */
   readonly getTurnDiffSummaries: (agentId: string) => Effect.Effect<TurnDiffSummary[]>;
+  /** Return the agentId for a given sessionId (from agent snapshot or runtime claudeSessionId). */
+  readonly getAgentIdBySessionId: (sessionId: string) => Effect.Effect<string | null>;
   /** Apply a domain event to the read model (called by event store on append). */
   readonly applyEvent: (event: DomainEvent) => void;
   /** Bootstrap the read model from existing lib module state. */
@@ -287,6 +289,9 @@ export const ReadModelServiceLive = Layer.effect(
 
     const getTurnDiffSummaries = (agentId: string): Effect.Effect<TurnDiffSummary[]> =>
       Effect.sync(() => cloneTurnDiffSummaries(state.turnDiffSummariesByAgentId[agentId]));
+
+    const getAgentIdBySessionId = (sessionId: string): Effect.Effect<string | null> =>
+      Effect.sync(() => state.agentIdBySessionId[sessionId] ?? null);
 
     // ── Bootstrap inline during layer construction ───────────────────────────
     yield* Effect.gen(function* () {
@@ -722,6 +727,7 @@ export const ReadModelServiceLive = Layer.effect(
       getChannelPermissionRequest,
       getResolvedChannelPermissionDecision,
       getTurnDiffSummaries,
+      getAgentIdBySessionId,
       applyEvent,
       bootstrap: Effect.void,
     };

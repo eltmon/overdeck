@@ -104,6 +104,8 @@ export interface ReadModelState {
   enrichProgressBySessionId: Record<number, EnrichProgressSnapshot>
   /** PAN-457 — latest per-session embedding progress */
   embedProgressBySessionId: Record<number, EmbedProgressSnapshot>
+  /** sessionId (from agent snapshot or runtime claudeSessionId) → agentId index */
+  agentIdBySessionId: Record<string, string>
 }
 
 export interface ScanProgressSnapshot {
@@ -186,6 +188,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   enrichStats: null,
   enrichProgressBySessionId: {},
   embedProgressBySessionId: {},
+  agentIdBySessionId: {},
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -259,6 +262,18 @@ export function omitTurnDiffSummariesForAgent(
   return rest
 }
 
+/** Remove all entries in agentIdBySessionId that point to the given agentId. */
+function removeAgentFromSessionIndex(
+  agentIdBySessionId: ReadModelState['agentIdBySessionId'],
+  agentId: string,
+): ReadModelState['agentIdBySessionId'] {
+  const next: Record<string, string> = {}
+  for (const [sessionId, id] of Object.entries(agentIdBySessionId)) {
+    if (id !== agentId) next[sessionId] = id
+  }
+  return next
+}
+
 // ─── PAN-800 runtime helpers ─────────────────────────────────────────────────
 
 function defaultRuntimeSnapshot(agentId: string, timestamp: string, sequence: number): AgentRuntimeSnapshot {
@@ -309,6 +324,15 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
 
   const memory = snapshot.memory as Partial<MemoryReadModelState> | undefined
 
+  // Rebuild sessionId → agentId index from snapshot
+  const agentIdBySessionId: Record<string, string> = {}
+  for (const agent of snapshot.agents) {
+    if (agent.sessionId) agentIdBySessionId[agent.sessionId] = agent.id
+  }
+  for (const [agentId, runtime] of Object.entries(snapshot.agentRuntimeById ?? {})) {
+    if (runtime.claudeSessionId) agentIdBySessionId[runtime.claudeSessionId] = agentId
+  }
+
   return {
     ...state,
     sequence: snapshot.sequence,
@@ -330,6 +354,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     enrichStats: snapshot.enrichStats ?? null,
     enrichProgressBySessionId: snapshot.enrichProgressBySessionId ?? {},
     embedProgressBySessionId: snapshot.embedProgressBySessionId ?? {},
+    agentIdBySessionId,
   }
 }
 
@@ -339,27 +364,38 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
   switch (event.type) {
     case 'agent.created': {
       const existing = state.agentsById[event.payload.agentId]
+      const agent = event.payload.agent
+      const nextAgentIdBySessionId = agent.sessionId
+        ? { ...state.agentIdBySessionId, [agent.sessionId]: agent.id }
+        : state.agentIdBySessionId
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: {
           ...state.agentsById,
           [event.payload.agentId]: existing
-            ? { ...existing, ...event.payload.agent }
-            : event.payload.agent,
+            ? { ...existing, ...agent }
+            : agent,
         },
+        agentIdBySessionId: nextAgentIdBySessionId,
       }
     }
 
-    case 'agent.started':
+    case 'agent.started': {
+      const agent = event.payload.agent
+      const nextAgentIdBySessionId = agent.sessionId
+        ? { ...state.agentIdBySessionId, [agent.sessionId]: agent.id }
+        : state.agentIdBySessionId
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: {
           ...state.agentsById,
-          [event.payload.agentId]: event.payload.agent,
+          [event.payload.agentId]: agent,
         },
+        agentIdBySessionId: nextAgentIdBySessionId,
       }
+    }
 
     case 'agent.enrichment_changed': {
       const agent = state.agentsById[event.payload.agentId]
@@ -434,6 +470,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         resolvedChannelPermissionDecisionsById: nextResolvedDecisionsById,
         resolvedChannelPermissionDecisionIdsByAgentId: restResolvedIds,
         turnDiffSummariesByAgentId: omitTurnDiffSummariesForAgent(state.turnDiffSummariesByAgentId, event.payload.agentId),
+        agentIdBySessionId: removeAgentFromSessionIndex(state.agentIdBySessionId, event.payload.agentId),
       }
     }
 
@@ -694,8 +731,10 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         Object.entries(state.agentsById).filter(([, agent]) => agent.issueId !== issueId)
       )
       let nextTurnDiffSummariesByAgentId = state.turnDiffSummariesByAgentId
+      let nextAgentIdBySessionId = state.agentIdBySessionId
       for (const agentId of removedAgentIds) {
         nextTurnDiffSummariesByAgentId = omitTurnDiffSummariesForAgent(nextTurnDiffSummariesByAgentId, agentId)
+        nextAgentIdBySessionId = removeAgentFromSessionIndex(nextAgentIdBySessionId, agentId)
       }
       const updatedIssues = (state.issuesRaw as Array<Record<string, unknown>>).map(issue => {
         if (issue['identifier'] === issueId || issue['id'] === issueId) {
@@ -708,6 +747,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: updatedAgents,
         turnDiffSummariesByAgentId: nextTurnDiffSummariesByAgentId,
+        agentIdBySessionId: nextAgentIdBySessionId,
         issuesRaw: updatedIssues,
       }
     }
@@ -716,10 +756,12 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       const { issueId, sessionName } = event.payload
       let updatedAgents: typeof state.agentsById
       let nextTurnDiffSummariesByAgentId = state.turnDiffSummariesByAgentId
+      let nextAgentIdBySessionId = state.agentIdBySessionId
       if (sessionName) {
         const { [sessionName]: _removed, ...rest } = state.agentsById
         updatedAgents = rest
         nextTurnDiffSummariesByAgentId = omitTurnDiffSummariesForAgent(nextTurnDiffSummariesByAgentId, sessionName)
+        nextAgentIdBySessionId = removeAgentFromSessionIndex(nextAgentIdBySessionId, sessionName)
       } else {
         const removedAgentIds = Object.entries(state.agentsById)
           .filter(([, agent]) => agent.issueId === issueId)
@@ -729,6 +771,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         )
         for (const agentId of removedAgentIds) {
           nextTurnDiffSummariesByAgentId = omitTurnDiffSummariesForAgent(nextTurnDiffSummariesByAgentId, agentId)
+          nextAgentIdBySessionId = removeAgentFromSessionIndex(nextAgentIdBySessionId, agentId)
         }
       }
       return {
@@ -736,6 +779,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: updatedAgents,
         turnDiffSummariesByAgentId: nextTurnDiffSummariesByAgentId,
+        agentIdBySessionId: nextAgentIdBySessionId,
       }
     }
 
@@ -1078,11 +1122,20 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         lastActivity: event.timestamp,
         updatedAtSequence: event.sequence,
       }
+      let nextAgentIdBySessionId = state.agentIdBySessionId
+      if (claudeSessionId && claudeSessionId !== prev.claudeSessionId) {
+        nextAgentIdBySessionId = { ...state.agentIdBySessionId, [claudeSessionId]: agentId }
+        if (prev.claudeSessionId && state.agentIdBySessionId[prev.claudeSessionId] === agentId) {
+          const { [prev.claudeSessionId]: _removed, ...rest } = state.agentIdBySessionId
+          nextAgentIdBySessionId = { ...rest, [claudeSessionId]: agentId }
+        }
+      }
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
         agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+        agentIdBySessionId: nextAgentIdBySessionId,
       }
     }
 

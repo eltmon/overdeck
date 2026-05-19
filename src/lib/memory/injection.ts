@@ -390,13 +390,13 @@ function escapeJsonForPrompt(value: string): string {
 
 async function writeDecision(input: PromptTimeMemoryInjectionInput, decision: PromptTimeRagDecisionLogEntry): Promise<void> {
   if (input.logDecision) {
-    await input.logDecision(decision);
+    void input.logDecision(decision).catch(() => {});
     return;
   }
 
   const filePath = resolveRagRunsFile(input.identity.projectId, input.identity.issueId, decision.timestamp);
   await ensureParentDir(filePath);
-  await appendFile(filePath, `${JSON.stringify(decision)}\n`, 'utf8');
+  void appendFile(filePath, `${JSON.stringify(decision)}\n`, 'utf8').catch(() => {});
 }
 
 async function readStatus(projectId: string, issueId: string): Promise<MemoryStatus | null> {

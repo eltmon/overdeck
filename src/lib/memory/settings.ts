@@ -3,6 +3,9 @@ import yaml from 'js-yaml';
 import { getGlobalConfigPath } from '../config-yaml.js';
 import type { ExtractionProviderTarget, MemoryProviderSettings } from './providers/types.js';
 
+const CACHE_TTL_MS = 5_000;
+let cachedSettings: { path: string; settings: MemorySettings; expiresAt: number } | null = null;
+
 export const DEFAULT_MEMORY_ROLLUP_PENDING_THRESHOLD = 4;
 export const DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS = 10_000;
 export const DEFAULT_MEMORY_WORKER_CONCURRENCY = 4;
@@ -17,6 +20,11 @@ export interface MemorySettings {
 }
 
 export async function loadMemorySettings(configPath = getGlobalConfigPath()): Promise<MemorySettings> {
+  const now = Date.now();
+  if (cachedSettings && cachedSettings.path === configPath && cachedSettings.expiresAt > now) {
+    return cachedSettings.settings;
+  }
+
   let parsed: unknown;
   try {
     parsed = yaml.load(await readFile(configPath, 'utf8'));
@@ -33,7 +41,7 @@ export async function loadMemorySettings(configPath = getGlobalConfigPath()): Pr
   const features = isRecord(memory.features) ? memory.features : {};
   const fallbackChain = parseFallbackChain(extraction.fallback_chain);
 
-  return {
+  const settings: MemorySettings = {
     extraction: {
       provider: stringOrUndefined(extraction.provider),
       model: stringOrUndefined(extraction.model),
@@ -46,6 +54,9 @@ export async function loadMemorySettings(configPath = getGlobalConfigPath()): Pr
     sidebarRefreshIntervalMs: positiveIntegerOrDefault(memory.sidebar_refresh_interval_ms, DEFAULT_MEMORY_SIDEBAR_REFRESH_INTERVAL_MS),
     workerConcurrency: positiveIntegerOrDefault(memory.worker_concurrency, DEFAULT_MEMORY_WORKER_CONCURRENCY),
   };
+
+  cachedSettings = { path: configPath, settings, expiresAt: now + CACHE_TTL_MS };
+  return settings;
 }
 
 export async function getMemoryRollupPendingThreshold(): Promise<number> {
@@ -62,6 +73,11 @@ export async function areMemoryObservationsEnabled(): Promise<boolean> {
 
 export async function isMemoryPromptTimeInjectionEnabled(): Promise<boolean> {
   return (await loadMemorySettings()).promptTimeInjectionEnabled;
+}
+
+/** Clear the in-memory settings cache. Used by tests that mutate config files. */
+export function clearMemorySettingsCache(): void {
+  cachedSettings = null;
 }
 
 function defaultMemorySettings(): MemorySettings {

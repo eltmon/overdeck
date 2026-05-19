@@ -12,7 +12,7 @@ import {
   writePendingTurn,
   type StatusRollupJob,
 } from '../../../src/lib/memory/pending.js';
-import { loadMemorySettings } from '../../../src/lib/memory/settings.js';
+import { clearMemorySettingsCache, loadMemorySettings } from '../../../src/lib/memory/settings.js';
 
 let tempDir: string | null = null;
 let originalHome: string | undefined;
@@ -191,6 +191,7 @@ describe('pending turn writer', () => {
     expect((await loadMemorySettings(configPath)).rollupPendingThreshold).toBe(6);
 
     await writeFile(configPath, 'memory:\n  rollup_pending_threshold: 2\n', 'utf8');
+    clearMemorySettingsCache();
     expect((await loadMemorySettings(configPath)).rollupPendingThreshold).toBe(2);
   });
 
