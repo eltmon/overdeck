@@ -65,7 +65,10 @@ vi.mock('../../stashes.js', () => ({
   popStash: vi.fn(async () => {}),
   listStashes: vi.fn(async () => []),
 }));
-vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssue: resolveGitHubIssueMock }));
+vi.mock('../../tracker-utils.js', () => ({
+  resolveGitHubIssue: resolveGitHubIssueMock,
+  resolveTrackerType: vi.fn((issueId: string) => resolveGitHubIssueMock(issueId).isGitHub ? 'github' : 'linear'),
+}));
 vi.mock('../../lifecycle/close-issue.js', () => ({ closeIssue: closeIssueMock }));
 vi.mock('../../vbrief/lifecycle-io.js', () => ({ transitionVBriefOnMain: transitionVBriefOnMainMock }));
 vi.mock('../../lifecycle/teardown-workspace.js', () => ({ teardownWorkspace: teardownWorkspaceMock }));
@@ -242,11 +245,11 @@ describe('merge-agent ship role and stash lifecycle', () => {
       expect(tmuxMocks.killSessionAsync).not.toHaveBeenCalledWith('unrelated-session');
 
       const commands = execMock.mock.calls.map(([cmd]) => String(cmd));
-      expect(commands.some(command => command.includes('--add-label "verifying-on-main"'))).toBe(true);
-      expect(commands.some(command => command.includes('--remove-label "in-review"'))).toBe(true);
-      expect(commands.some(command => command.includes('--remove-label "in-progress"'))).toBe(true);
+      expect(commands.some(command => command.includes('--add-label') && command.includes('verifying-on-main'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label') && command.includes('in-review'))).toBe(true);
+      expect(commands.some(command => command.includes('--remove-label') && command.includes('in-progress'))).toBe(true);
       expect(commands.some(command => command.includes('gh issue close'))).toBe(false);
-      expect(commands.some(command => command.includes('--add-label "needs-close-out"'))).toBe(false);
+      expect(commands.some(command => command.includes('--add-label') && command.includes('needs-close-out'))).toBe(false);
       expect(existsSync(workspacePath)).toBe(true);
       expect(existsSync(agentStateDir)).toBe(true);
       expect(findSpecByIssue(projectPath, 'PAN-1')?.status).toBe('active');

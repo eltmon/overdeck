@@ -43,7 +43,7 @@ import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from
 import type { CreateBeadsResult } from '../../../lib/vbrief/beads.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
-import { clearReviewStatus } from '../review-status.js';
+import { clearReviewStatus, getReviewStatus } from '../review-status.js';
 import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
@@ -2269,7 +2269,15 @@ function normalizePlanningId(issueId: string): string {
   return `planning-${issueId.toLowerCase()}`;
 }
 
-async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
+function isInactiveAgentStatus(status: string | undefined): boolean {
+  return status === 'dead' || status === 'stopped' || status === 'failed';
+}
+
+function isPausedMergedAgentSafe(agentState: { paused?: boolean } | null | undefined, allowPausedMerged: boolean): boolean {
+  return allowPausedMerged && agentState?.paused === true;
+}
+
+async function hasActiveAgentForIssue(issueId: string, allowPausedMerged = false): Promise<boolean> {
   const agentId = normalizeAgentId(issueId);
   const planningId = normalizePlanningId(issueId);
 
@@ -2278,10 +2286,10 @@ async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
   if (VALID_TMUX_NAME_RE.test(planningId) && await sessionExistsAsync(planningId)) return true;
 
   const agentState = await getAgentStateAsync(agentId);
-  if (agentState && agentState.status !== 'stopped' && agentState.status !== 'error') return true;
+  if (agentState && !isInactiveAgentStatus(agentState.status) && !isPausedMergedAgentSafe(agentState, allowPausedMerged)) return true;
 
   const planningState = await getAgentStateAsync(planningId);
-  if (planningState && planningState.status !== 'stopped' && planningState.status !== 'error') return true;
+  if (planningState && !isInactiveAgentStatus(planningState.status) && !isPausedMergedAgentSafe(planningState, allowPausedMerged)) return true;
 
   return false;
 }
@@ -2303,6 +2311,8 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
   '/api/issues/bulk-close-out',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
 
     // Content-Type enforcement — exact match, no substring trickery
     const contentType = (request.headers as Record<string, string | string[] | undefined>)['content-type'];
@@ -2363,7 +2373,12 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     const results: Array<{ issueId: string; success: boolean; error?: string; skipped: boolean }> = [];
     for (const id of issueIds) {
       // Server-side active-agent guardrail
-      const hasActiveAgent = yield* Effect.promise(() => hasActiveAgentForIssue(id));
+      const cachedIssue = issueDataService.getIssues().find(
+        (issue: any) => (issue.identifier || '').toUpperCase() === id.toUpperCase(),
+      );
+      const reviewStatus = getReviewStatus(id.toUpperCase());
+      const allowPausedMerged = reviewStatus?.mergeStatus === 'merged' || cachedIssue?.mergeStatus === 'merged';
+      const hasActiveAgent = yield* Effect.promise(() => hasActiveAgentForIssue(id, allowPausedMerged));
       if (hasActiveAgent) {
         results.push({ issueId: id, success: false, error: 'Skipped: active agent running', skipped: true });
         continue;

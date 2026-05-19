@@ -7,8 +7,8 @@
  * deepWipe() — Destructive: teardown(deleteBranches) + delete agent state + reset issue
  */
 
-import { existsSync, readFileSync } from 'fs';
-import { copyFile } from 'fs/promises';
+import { existsSync } from 'fs';
+import { copyFile, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -585,12 +585,11 @@ async function clearReviewStatusStepImpl(issueId: string): Promise<StepResult> {
     try {
       const statusFile = join(PANOPTICON_HOME, 'review-status.json');
       if (existsSync(statusFile)) {
-        const data = JSON.parse(readFileSync(statusFile, 'utf-8'));
+        const data = JSON.parse(await readFile(statusFile, 'utf-8'));
         const upperKey = issueId.toUpperCase();
         if (data[upperKey]) {
           delete data[upperKey];
-          const { writeFileSync } = await import('fs');
-          writeFileSync(statusFile, JSON.stringify(data, null, 2));
+          await writeFile(statusFile, JSON.stringify(data, null, 2));
         }
       }
       return stepOk(step, ['Review status cleared (direct)']);

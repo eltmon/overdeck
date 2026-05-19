@@ -42,9 +42,8 @@ import { issuesRouteLayer } from '../issues.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
 
-async function postCloseOut(issueId: string) {
-  const appendedEvents: Record<string, unknown>[] = [];
-  const eventStoreLayer = Layer.succeed(EventStoreService, {
+function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
+  return Layer.succeed(EventStoreService, {
     append: (event: Record<string, unknown>) => Effect.sync(() => {
       appendedEvents.push(event);
       return appendedEvents.length;
@@ -58,10 +57,36 @@ async function postCloseOut(issueId: string) {
     getLatestSequence: Effect.succeed(0),
     streamEvents: Stream.empty,
   });
+}
+
+async function postCloseOut(issueId: string) {
+  const appendedEvents: Record<string, unknown>[] = [];
+  const eventStoreLayer = eventStoreLayerFor(appendedEvents);
 
   const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/issues/${issueId}/close-out`, {
     method: 'POST',
     headers: { [INTERNAL_TOKEN_HEADER]: 'test-token' },
+  }));
+
+  const response = await Effect.runPromise(
+    Effect.scoped(
+      Effect.flatMap(HttpRouter.toHttpEffect(issuesRouteLayer), (app) =>
+        Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
+      ).pipe(Effect.provide(eventStoreLayer)),
+    ),
+  );
+  const responseBody = response.body as { body?: Uint8Array } | null;
+  const text = responseBody?.body ? new TextDecoder().decode(responseBody.body) : '{}';
+  return { status: response.status, body: JSON.parse(text), appendedEvents };
+}
+
+async function postBulkCloseOut(headers: Record<string, string> = {}) {
+  const appendedEvents: Record<string, unknown>[] = [];
+  const eventStoreLayer = eventStoreLayerFor(appendedEvents);
+  const request = HttpServerRequest.fromWeb(new Request('http://localhost/api/issues/bulk-close-out', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ issueIds: ['PAN-1190'] }),
   }));
 
   const response = await Effect.runPromise(
@@ -151,5 +176,21 @@ describe('POST /api/issues/:id/close-out', () => {
         },
       }),
     ]);
+  });
+});
+
+describe('POST /api/issues/bulk-close-out', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+    _resetInternalTokenCacheForTests();
+  });
+
+  it('rejects requests without dashboard authorization', async () => {
+    const result = await postBulkCloseOut();
+
+    expect(result.status).toBe(401);
+    expect(result.body).toEqual({ error: 'unauthorized' });
+    expect(closeOutMock).not.toHaveBeenCalled();
   });
 });

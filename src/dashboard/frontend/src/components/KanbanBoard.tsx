@@ -1239,11 +1239,13 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   );
   const issuesWithAgents = useMemo(() => {
     // Build a Set of issueIds that have at least one active agent
+    const selectedIssueById = new Map(selectedIssues.map(issue => [issue.identifier.toLowerCase(), issue]));
     const activeAgentIssueIds = new Set<string>();
     for (const agent of agents) {
-      if (agent.issueId && agent.status !== 'dead' && agent.status !== 'stopped' && agent.status !== 'failed') {
-        activeAgentIssueIds.add(agent.issueId.toLowerCase());
-      }
+      if (!agent.issueId || agent.status === 'dead' || agent.status === 'stopped' || agent.status === 'failed') continue;
+      const issue = selectedIssueById.get(agent.issueId.toLowerCase());
+      if (agent.paused && issue?.mergeStatus === 'merged') continue;
+      activeAgentIssueIds.add(agent.issueId.toLowerCase());
     }
     return selectedIssues.filter(issue => activeAgentIssueIds.has(issue.identifier.toLowerCase()));
   }, [selectedIssues, agents]);

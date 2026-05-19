@@ -156,6 +156,27 @@ describe('IssueLifecycle Effect service', () => {
       expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-inreview');
     });
 
+    it('prefers a verifying state by name', async () => {
+      mockLinearGetTeamStates.mockReturnValue(
+        ok([
+          { id: 'state-open', name: 'Todo', type: 'unstarted' },
+          { id: 'state-inprogress', name: 'In Progress', type: 'started' },
+          { id: 'state-verifying', name: 'Verifying On Main', type: 'started' },
+          { id: 'state-inreview', name: 'In Review', type: 'started' },
+        ]),
+      );
+      const { IssueLifecycle } = await import('../issue-lifecycle.js');
+      const layer = await makeTestLayer();
+
+      const program = Effect.gen(function* () {
+        const lifecycle = yield* IssueLifecycle;
+        yield* lifecycle.transitionTo('MIN-1', 'verifying_on_main');
+      }).pipe(Effect.provide(layer));
+
+      await runEffect(program);
+      expect(mockLinearUpdateState).toHaveBeenCalledWith('uuid-linear', 'state-verifying');
+    });
+
     it('transitions to "closed" using completed type', async () => {
       const { IssueLifecycle } = await import('../issue-lifecycle.js');
       const layer = await makeTestLayer();
@@ -208,6 +229,22 @@ describe('IssueLifecycle Effect service', () => {
       await runEffect(program);
       expect(mockGitHubAddLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-review');
       expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-progress');
+    });
+
+    it('transitions to verifying_on_main without closing the GitHub issue', async () => {
+      const { IssueLifecycle } = await import('../issue-lifecycle.js');
+      const layer = await makeTestLayer();
+
+      const program = Effect.gen(function* () {
+        const lifecycle = yield* IssueLifecycle;
+        yield* lifecycle.transitionTo('APP-42', 'verifying_on_main');
+      }).pipe(Effect.provide(layer));
+
+      await runEffect(program);
+      expect(mockGitHubAddLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'verifying-on-main');
+      expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-progress');
+      expect(mockGitHubRemoveLabel).toHaveBeenCalledWith('acme', 'myapp', 42, 'in-review');
+      expect(mockGitHubCloseIssue).not.toHaveBeenCalled();
     });
 
     it('closes GitHub issue on closed state', async () => {
