@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-19T01:38:59.875Z",
+  "updated": "2026-05-19T07:04:44.783Z",
   "gitState": {
     "branch": "feature/pan-1052",
     "sha": "ba1999366",
@@ -375,6 +375,11 @@
       "timestamp": "2026-05-19T01:32:10.267Z",
       "reason": "end",
       "note": "Completed PAN-1052 memory substrate bead verification. Local bd reports all PAN-1052 beads closed and 0 open/ready; branch pushed at 417aaee78. pan done preflight still sees stale open beads, filed as substrate bug https://github.com/eltmon/panopticon-cli/issues/1209."
+    },
+    {
+      "timestamp": "2026-05-19T07:04:44.783Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
