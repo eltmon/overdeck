@@ -16,7 +16,8 @@ import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getEventStore } from '../event-store.js'
 import type { AgentOutputReceivedEvent } from '@panctl/contracts'
 import { readFile } from 'node:fs/promises'
-import { join, homedir } from 'node:path'
+import { join } from 'node:path'
+import { homedir } from 'node:os'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
