@@ -43,8 +43,12 @@ function renderFleetView() {
       mutations: { retry: false },
     },
   });
-  client.setQueryData(['issue-costs-by-issue'], {
-    'pan-1': { issueId: 'PAN-1', totalCost: 12.34, tokenCount: 456_000 },
+  client.setQueryData(['cost-stream', undefined, 500], {
+    events: [],
+    byIssue: {
+      'pan-1': [{ ts: '2026-05-18T00:00:00.000Z', model: 'opus', provider: 'anthropic', cost: 12.34, tokens: 456_000 }],
+    },
+    count: 1,
   });
 
   return render(
@@ -82,8 +86,14 @@ describe('FleetAgentsView', () => {
     } as Parameters<typeof useDashboardStore.setState>[0]);
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url === '/api/costs/by-issue') {
-        return new Response(JSON.stringify({ issues: [{ issueId: 'PAN-1', totalCost: 12.34, tokenCount: 456_000 }] }), { status: 200 });
+      if (url.startsWith('/api/costs/stream')) {
+        return new Response(JSON.stringify({
+          events: [],
+          byIssue: {
+            'pan-1': [{ ts: '2026-05-18T00:00:00.000Z', model: 'opus', provider: 'anthropic', cost: 12.34, tokens: 456_000 }],
+          },
+          count: 1,
+        }), { status: 200 });
       }
       return new Response(JSON.stringify({}), { status: 200 });
     }));
@@ -132,6 +142,25 @@ describe('FleetAgentsView', () => {
     expect(screen.getByText('STUCK · 2h')).toBeInTheDocument();
     expect(screen.getByText('No response from agent')).toBeInTheDocument();
     expect(screen.getByText('agent-stuck').closest('[data-component="agent-card"]')).toHaveAttribute('data-stuck', 'true');
+  });
+
+  it('treats error and unknown contract statuses as non-running stuck fleet agents', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-error': agent({ id: 'agent-error', issueId: 'PAN-1', status: 'error', role: 'work', lastFailureReason: 'Process exited' }),
+        'agent-unknown': agent({ id: 'agent-unknown', issueId: 'PAN-2', status: 'unknown', role: 'review' }),
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderFleetView();
+
+    expect(screen.getByText('agent-error')).toBeInTheDocument();
+    expect(screen.getByText('agent-unknown')).toBeInTheDocument();
+    expect(screen.getAllByText(/STUCK ·/)).toHaveLength(2);
+    expect(screen.queryByText('WORK RUNNING')).not.toBeInTheDocument();
+    expect(screen.queryByText('REVIEW RUNNING')).not.toBeInTheDocument();
+    expect(within(screen.getByText('Running').closest('[data-component="metric-tile"]') as HTMLElement).getByText('0')).toBeInTheDocument();
+    expect(within(screen.getByText('Stuck').closest('[data-component="metric-tile"]') as HTMLElement).getByText('2')).toBeInTheDocument();
   });
 
   it('opens the drawer from a fleet card issue action at the active-agent anchor', () => {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 
+import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
+import { isAgentProblemStatus, isAgentRunningStatus } from '../../lib/pipeline-state';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
@@ -18,7 +19,7 @@ const ROLE_ORDER = {
   ship: 4,
 } satisfies Record<AgentCardRole, number>;
 
-const ACTIVE_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'starting', 'running', 'failed']);
+const FLEET_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'starting', 'running', 'failed', 'error', 'unknown']);
 const PHASE_FILTERS = ['work', 'review', 'ship', 'plan', 'stuck'] as const;
 type AgentPhaseFilter = typeof PHASE_FILTERS[number];
 
@@ -33,21 +34,11 @@ type FilterOption = {
   name: string;
 };
 
-type IssueCostRollup = {
-  issueId: string;
-  totalCost?: number;
-  tokenCount?: number;
-};
-
-async function fetchIssueCosts(): Promise<Record<string, IssueCostRollup>> {
-  const res = await fetch('/api/costs/by-issue');
-  if (!res.ok) return {};
-  const data = await res.json() as { issues?: IssueCostRollup[] };
-  const costs: Record<string, IssueCostRollup> = {};
-  for (const issue of data.issues ?? []) {
-    costs[issue.issueId.toLowerCase()] = issue;
-  }
-  return costs;
+function sumIssueCostEvents(events: CostEvent[] | undefined) {
+  return (events ?? []).reduce(
+    (totals, event) => ({ cost: totals.cost + event.cost, tokens: totals.tokens + event.tokens }),
+    { cost: 0, tokens: 0 },
+  );
 }
 
 function agentRole(agent: Agent): AgentCardRole {
@@ -94,7 +85,7 @@ function formatTokens(tokens: number) {
 }
 
 function isRunningAgent(agent: Agent) {
-  return agent.status !== 'stopped' && agent.status !== 'dead' && agent.status !== 'failed' && agent.status !== 'stuck';
+  return isAgentRunningStatus(agent.status);
 }
 
 function MetricIcon({ label }: { label: string }) {
@@ -107,7 +98,7 @@ function stuckHours(agent: Agent, now: Date) {
 }
 
 function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {
-  if (agent.status === 'stuck' || agent.troubled || agent.status === 'failed') {
+  if (isAgentProblemStatus(agent.status) || agent.troubled) {
     return { variant: 'STUCK · Nh', hours: stuckHours(agent, now) };
   }
   if (agent.hasPendingQuestion) return { variant: 'INPUT' };
@@ -127,13 +118,13 @@ function verbBadgeForAgent(agent: Agent, now: Date): VerbBadgeProps {
 }
 
 function agentPhase(agent: Agent): AgentPhaseFilter {
-  if (agent.status === 'stuck' || agent.troubled || agent.status === 'failed') return 'stuck';
+  if (isAgentProblemStatus(agent.status) || agent.troubled) return 'stuck';
   const role = agentRole(agent);
   return role === 'test' ? 'review' : role;
 }
 
 function isFleetAgent(agent: Agent) {
-  return agent.status !== 'dead' && agent.status !== 'stopped' && (Boolean(agent.role) || ACTIVE_STATUSES.has(agent.status));
+  return agent.status !== 'dead' && agent.status !== 'stopped' && (Boolean(agent.role) || FLEET_STATUSES.has(agent.status));
 }
 
 function parseList(value: string | null) {
@@ -228,11 +219,7 @@ export function FleetAgentsView() {
   const agentOutputById = useDashboardStore((state) => state.agentOutputById);
   const openIssue = useDashboardStore((state) => state.openIssue);
   const [filter, setFilter] = useState(readFilterState);
-  const { data: issueCosts = {} } = useQuery({
-    queryKey: ['issue-costs-by-issue'],
-    queryFn: fetchIssueCosts,
-    staleTime: 15_000,
-  });
+  const { eventsByIssue } = useCostStream({ limit: 500 });
 
   useEffect(() => {
     const handlePopState = () => setFilter(readFilterState());
@@ -253,7 +240,7 @@ export function FleetAgentsView() {
     agents
       .filter(isFleetAgent)
       .sort((a, b) => {
-        const stuckDelta = Number(b.status === 'stuck' || b.troubled) - Number(a.status === 'stuck' || a.troubled);
+        const stuckDelta = Number(isAgentProblemStatus(b.status) || b.troubled) - Number(isAgentProblemStatus(a.status) || a.troubled);
         if (stuckDelta !== 0) return stuckDelta;
         const roleDelta = ROLE_ORDER[agentRole(a)] - ROLE_ORDER[agentRole(b)];
         if (roleDelta !== 0) return roleDelta;
@@ -289,7 +276,7 @@ export function FleetAgentsView() {
 
   const metricTiles = useMemo(() => {
     const runningAgents = fleetAgents.filter(isRunningAgent);
-    const stuckAgents = fleetAgents.filter((agent) => agent.status === 'stuck' || agent.troubled || agent.status === 'failed');
+    const stuckAgents = fleetAgents.filter((agent) => isAgentProblemStatus(agent.status) || agent.troubled);
     const queuedAgents = fleetAgents.filter((agent) => agent.status === 'starting');
     const avgRuntime = runningAgents.length === 0
       ? 0
@@ -297,10 +284,10 @@ export function FleetAgentsView() {
     const costIssueIds = new Set(fleetAgents.map((agent) => issueKey(agent.issueId)).filter(Boolean));
     const { cost24h, tokens24h } = Array.from(costIssueIds).reduce(
       (totals, issueId) => {
-        const cost = issueCosts[issueId];
+        const issueTotals = sumIssueCostEvents(eventsByIssue[issueId] ?? eventsByIssue[issueId.toUpperCase()]);
         return {
-          cost24h: totals.cost24h + (cost?.totalCost ?? 0),
-          tokens24h: totals.tokens24h + (cost?.tokenCount ?? 0),
+          cost24h: totals.cost24h + issueTotals.cost,
+          tokens24h: totals.tokens24h + issueTotals.tokens,
         };
       },
       { cost24h: 0, tokens24h: 0 },
@@ -322,7 +309,7 @@ export function FleetAgentsView() {
       { id: 'runtime', eyebrow: 'Avg runtime', value: formatDuration(avgRuntime), sub: 'running agents', icon: <MetricIcon label="⏱" />, signal: 'review' as const },
       { id: 'queue', eyebrow: 'Queue', value: queuedAgents.length, sub: 'starting agents', icon: <MetricIcon label="…" />, signal: 'warning' as const },
     ];
-  }, [fleetAgents, issueCosts, now]);
+  }, [eventsByIssue, fleetAgents, now]);
 
   function updateFilter(next: AgentsFilterState) {
     setFilter(next);
@@ -407,7 +394,7 @@ export function FleetAgentsView() {
             const issue = issuesById.get(issueKey(agent.issueId));
             const role = agentRole(agent);
             const output = agentOutputById[agent.id] ?? [];
-            const stuck = agent.status === 'stuck' || agent.troubled || agent.status === 'failed';
+            const stuck = isAgentProblemStatus(agent.status) || agent.troubled;
             const lastHeard = agent.lastActivity ? formatRelativeTime(agent.lastActivity, now) : '—';
             const runtime = formatDuration(now.getTime() - new Date(agent.startedAt).getTime());
 

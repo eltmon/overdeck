@@ -7,7 +7,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 
-interface CostEvent {
+export interface CostEvent {
   ts: string;
   model: string;
   provider: string;

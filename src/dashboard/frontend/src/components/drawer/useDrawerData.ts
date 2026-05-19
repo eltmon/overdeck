@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo } from 'react';
+import { Stream } from 'effect';
 
-import { type ReviewStatusSnapshot } from '@panctl/contracts';
+import { WS_METHODS, type DomainEvent, type ReviewStatusSnapshot } from '@panctl/contracts';
 
 import { useDashboardStore, selectIssues, selectAgents, selectReviewStatus } from '../../lib/store';
+import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import type { Agent, Issue } from '../../types';
 
 export type DrawerActivityPhase = 'work' | 'review' | 'ship' | 'done' | 'info';
@@ -76,11 +77,70 @@ type BeadTask = {
   closedAt?: string;
 };
 
-type BeadsResponse = {
+type IssueWithBeads = Issue & {
+  beads?: BeadTask[];
   tasks?: BeadTask[];
 };
 
-export function resetDrawerIssueSubscriptionForTest() {}
+type DrawerIssueSubscription = {
+  issueId: string;
+  refCount: number;
+  unsubscribe: () => void;
+  releaseTimer: number | null;
+};
+
+let drawerIssueSubscription: DrawerIssueSubscription | null = null;
+
+function subscribeToIssueEvents(issueId: string, applyEvent: (event: DomainEvent) => void) {
+  return getTransport().subscribe(
+    (client) =>
+      (client as PanRpcProtocolClient)[WS_METHODS.subscribeIssueEvents]({ issueId }) as unknown as Stream.Stream<DomainEvent, Error>,
+    applyEvent,
+  );
+}
+
+function stopDrawerIssueSubscription() {
+  if (drawerIssueSubscription?.releaseTimer) {
+    window.clearTimeout(drawerIssueSubscription.releaseTimer);
+  }
+  drawerIssueSubscription?.unsubscribe();
+  drawerIssueSubscription = null;
+}
+
+function acquireDrawerIssueSubscription(issueId: string, applyEvent: (event: DomainEvent) => void) {
+  if (drawerIssueSubscription?.issueId !== issueId) {
+    stopDrawerIssueSubscription();
+    drawerIssueSubscription = {
+      issueId,
+      refCount: 0,
+      unsubscribe: subscribeToIssueEvents(issueId, applyEvent),
+      releaseTimer: null,
+    };
+  }
+
+  if (drawerIssueSubscription.releaseTimer) {
+    window.clearTimeout(drawerIssueSubscription.releaseTimer);
+    drawerIssueSubscription.releaseTimer = null;
+  }
+
+  drawerIssueSubscription.refCount += 1;
+
+  return () => {
+    if (!drawerIssueSubscription || drawerIssueSubscription.issueId !== issueId) return;
+    drawerIssueSubscription.refCount -= 1;
+    if (drawerIssueSubscription.refCount > 0) return;
+
+    drawerIssueSubscription.releaseTimer = window.setTimeout(() => {
+      if (drawerIssueSubscription?.issueId === issueId && drawerIssueSubscription.refCount === 0) {
+        stopDrawerIssueSubscription();
+      }
+    }, 1_000);
+  };
+}
+
+export function resetDrawerIssueSubscriptionForTest() {
+  stopDrawerIssueSubscription();
+}
 
 export type DrawerData = {
   issue: Issue | null;
@@ -199,6 +259,12 @@ function beadTitle(bead: BeadTask, issueId: string) {
   return title.replace(new RegExp(`^${issueId}:\\s*`, 'i'), '');
 }
 
+function issueBeads(issue: Issue | null): BeadTask[] | undefined {
+  if (!issue) return undefined;
+  const issueWithBeads = issue as IssueWithBeads;
+  return issueWithBeads.beads ?? issueWithBeads.tasks;
+}
+
 function normalizeBeads(tasks: BeadTask[] | undefined, issueId: string): DrawerBeadItem[] {
   return (tasks ?? []).map((bead) => {
     const status = beadStatus(bead.status);
@@ -291,22 +357,17 @@ function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot |
 
 export function useDrawerData(): DrawerData {
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
+  const applyEvent = useDashboardStore((state) => state.applyEvent);
   const issues = useDashboardStore(selectIssues) as Issue[];
   const agents = useDashboardStore(selectAgents) as Agent[];
   const recentActivity = useDashboardStore((state) => state.recentActivity) as ActivityEntry[];
   const detailedActivity = useDashboardStore((state) => state.detailedActivity) as ActivityEntry[];
   const reviewStatus = useDashboardStore(selectReviewStatus(drawerIssueId ?? ''));
 
-  const { data: beadsData } = useQuery<BeadsResponse>({
-    queryKey: ['drawer-beads', drawerIssueId],
-    queryFn: async () => {
-      const response = await fetch(`/api/issues/${drawerIssueId}/beads`);
-      if (!response.ok) throw new Error('Failed to fetch drawer beads');
-      return response.json();
-    },
-    enabled: drawerIssueId !== null,
-    staleTime: 10_000,
-  });
+  useEffect(() => {
+    if (!drawerIssueId) return;
+    return acquireDrawerIssueSubscription(drawerIssueId, applyEvent);
+  }, [applyEvent, drawerIssueId]);
 
   return useMemo(() => {
     if (!drawerIssueId) {
@@ -333,11 +394,11 @@ export function useDrawerData(): DrawerData {
       issue,
       agents: issueAgents,
       reviewStatus,
-      beads: normalizeBeads(beadsData?.tasks, drawerIssueId),
+      beads: normalizeBeads(issueBeads(issue), drawerIssueId),
       reviewSpecialists: reviewSpecialists(reviewStatus),
       verificationGates: verificationGates(reviewStatus),
       phaseTimeline: phaseTimeline(issue, reviewStatus),
       activityRail,
     };
-  }, [agents, beadsData, detailedActivity, drawerIssueId, issues, recentActivity, reviewStatus]);
+  }, [agents, detailedActivity, drawerIssueId, issues, recentActivity, reviewStatus]);
 }

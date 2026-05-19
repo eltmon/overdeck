@@ -25,6 +25,7 @@ import {
   Bot,
   RefreshCw,
 } from 'lucide-react';
+import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
 import type { Issue, Agent } from '../types';
 
@@ -192,7 +193,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
 
   // ─── Dynamic: issues ────────────────────────────────────────────────────────
 
-  const activeAgents = agents.filter((a) => a.status !== 'dead');
+  const activeAgents = agents.filter((agent) => isAgentRunningStatus(agent.status));
   const activeIssueIds = new Set(activeAgents.map((a) => a.issueId?.toLowerCase()).filter(Boolean));
   const branchByIssueId = new Map(
     activeAgents

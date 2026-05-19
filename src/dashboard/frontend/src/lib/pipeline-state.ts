@@ -74,6 +74,14 @@ export function isReviewInfraStuck(status?: PipelineStateLike | null): boolean {
   return status?.stuck === true && status.stuckReason === 'review_infrastructure_failure';
 }
 
+export function isAgentRunningStatus(status?: Agent['status'] | null): boolean {
+  return status === 'running' || status === 'starting' || status === 'healthy' || status === 'warning';
+}
+
+export function isAgentProblemStatus(status?: Agent['status'] | null): boolean {
+  return status === 'stuck' || status === 'failed' || status === 'error' || status === 'unknown';
+}
+
 /**
  * PAN-1034: a pending review with no active queue/specialist for more than 2x
  * the longest specialist timeout is stranded. This is distinct from a fresh
@@ -141,12 +149,7 @@ export function getPipelineIssuePhase(
     return 'review';
   }
 
-  if (
-    agent?.role === 'work' &&
-    agent.status !== 'stopped' &&
-    agent.status !== 'dead' &&
-    agent.status !== 'failed'
-  ) {
+  if (agent?.role === 'work' && isAgentRunningStatus(agent.status)) {
     return 'work';
   }
 

@@ -49,6 +49,8 @@ const AGENT_STATUS_DOT: Record<Agent['status'], string> = {
   starting: 'bg-signal-review',
   running: 'bg-primary',
   failed: 'bg-destructive',
+  error: 'bg-destructive',
+  unknown: 'bg-warning',
 };
 
 export function ContainerCard({ container, history, onClick }: ContainerCardProps) {

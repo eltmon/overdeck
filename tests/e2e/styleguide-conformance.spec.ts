@@ -162,6 +162,11 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/specialists') return json({ projects: [] });
       if (path === '/api/cliproxy/status') return json({ running: true, pid: null, checkedAt: new Date().toISOString() });
       if (path === '/api/costs/by-issue') return json({ issues: [{ issueId: 'PAN-1148', totalCost: 1.25 }] });
+      if (path === '/api/costs/stream') return json({
+        events: [],
+        byIssue: { 'PAN-1148': [{ ts: new Date().toISOString(), model: 'opus', provider: 'anthropic', cost: 1.25, tokens: 4200 }] },
+        count: 1,
+      });
       if (path === '/api/costs/trends') return json({ trends: [{ totalCost: 1.25, totalTokens: 4200 }] });
       if (path === '/api/metrics/summary') return json({
         today: { totalCost: 1.25, agentCount: 1, activeCount: 1, stuckCount: 0, warningCount: 0 },
@@ -236,5 +241,15 @@ describe('styleguide rendered surface conformance', () => {
     await expect.poll(() => agents.page.locator('[data-component="agent-card"][data-agent-id="agent-pan-1148"]').count()).toBe(1);
     await expect.poll(() => agents.page.locator('[data-component="verb-badge"]').count()).toBeGreaterThan(0);
     await agents.context.close();
+
+    const drawer = await openRoute('/pipeline?issue=PAN-1148&tab=overview');
+    await expect.poll(() => drawer.page.locator('[data-component="drawer-action-bar"]').count()).toBe(1);
+    await expect.poll(() => drawer.page.locator('[data-component="shared-button"][data-variant="ghost"]').count()).toBeGreaterThan(0);
+    await expect.poll(() => drawer.page.locator('[data-component="shared-button"][data-variant="primary"]').count()).toBeGreaterThan(0);
+    const ghostBorder = await drawer.page.locator('[data-testid="drawer-action-reset"]').evaluate((node) => getComputedStyle(node).borderColor);
+    const primaryShadow = await drawer.page.locator('[data-testid="drawer-action-merge"]').evaluate((node) => getComputedStyle(node).boxShadow);
+    expect(ghostBorder).not.toBe('rgba(0, 0, 0, 0)');
+    expect(primaryShadow).toContain('rgba(255, 255, 255, 0.06)');
+    await drawer.context.close();
   }, 45_000);
 });

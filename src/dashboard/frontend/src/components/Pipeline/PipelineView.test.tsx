@@ -39,12 +39,14 @@ describe('PipelineView', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/');
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      if (String(input) === '/api/costs/by-issue') {
+      if (String(input).startsWith('/api/costs/stream')) {
         return new Response(JSON.stringify({
-          issues: [
-            { issueId: 'PAN-1', totalCost: 1.25 },
-            { issueId: 'PAN-2', totalCost: 0.5 },
-          ],
+          events: [],
+          byIssue: {
+            'PAN-1': [{ ts: '2026-05-18T00:00:00.000Z', model: 'opus', provider: 'anthropic', cost: 1.25, tokens: 1000 }],
+            'PAN-2': [{ ts: '2026-05-18T00:00:00.000Z', model: 'opus', provider: 'anthropic', cost: 0.5, tokens: 500 }],
+          },
+          count: 2,
         }), { status: 200 });
       }
       return new Response(JSON.stringify({}), { status: 200 });
@@ -139,7 +141,7 @@ describe('PipelineView', () => {
     ).toEqual(['PAN-6', 'PAN-7', 'PAN-2']);
   });
 
-  it('renders reactive metric tiles from store state and the Board cost rollup query', async () => {
+  it('renders reactive metric tiles from store state and the cost event stream', async () => {
     renderPipelineView();
 
     const strip = screen.getByText('Active issues').closest('[data-component="metric-strip"]') as HTMLElement;
@@ -160,7 +162,50 @@ describe('PipelineView', () => {
       '1',
       '$1.75',
     ]);
-    expect(fetch).toHaveBeenCalledWith('/api/costs/by-issue');
+    expect(fetch).toHaveBeenCalledWith('/api/costs/stream?limit=500');
+  });
+
+  it('does not classify error or unknown work agents as running work', () => {
+    useDashboardStore.setState({
+      issuesRaw: [
+        issue({ identifier: 'PAN-8', title: 'Errored agent work', hasPlan: true }),
+        issue({ identifier: 'PAN-9', title: 'Unknown agent work', hasPlan: true }),
+      ],
+      agentsById: {
+        'agent-pan-8': {
+          id: 'agent-pan-8',
+          issueId: 'PAN-8',
+          role: 'work',
+          status: 'error',
+          model: 'opus',
+          runtime: 'claude-code',
+          startedAt: '2026-05-18T01:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+        },
+        'agent-pan-9': {
+          id: 'agent-pan-9',
+          issueId: 'PAN-9',
+          role: 'work',
+          status: 'unknown',
+          model: 'opus',
+          runtime: 'claude-code',
+          startedAt: '2026-05-18T01:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+        },
+      },
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const workPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="work"]') as HTMLElement;
+    const planPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="plan"]') as HTMLElement;
+
+    expect(within(workPhase).queryByText('Errored agent work')).toBeNull();
+    expect(within(workPhase).queryByText('Unknown agent work')).toBeNull();
+    expect(within(planPhase).getByText('Errored agent work')).toBeInTheDocument();
+    expect(within(planPhase).getByText('Unknown agent work')).toBeInTheDocument();
   });
 
   it('opens the issue drawer from a Pipeline row without disturbing scroll position', () => {

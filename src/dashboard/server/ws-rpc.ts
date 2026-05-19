@@ -61,12 +61,22 @@ function recordMatchesIssue(record: unknown, issueId: string) {
   return agentId === `agent-${target}`;
 }
 
+function filterRecordsForIssue(records: unknown, issueId: string) {
+  return Array.isArray(records) ? records.filter((record) => recordMatchesIssue(record, issueId)) : [];
+}
+
 export function filterDomainEventForIssue(event: DomainEvent, issueId: string): DomainEvent | null {
   const payload = event.payload as Record<string, unknown>;
   if (recordMatchesIssue(payload, issueId)) return event;
 
-  if (event.type === 'issues.snapshot' || event.type === 'activity.updated') {
-    return null;
+  if (event.type === 'issues.snapshot') {
+    const issues = filterRecordsForIssue(payload['issues'], issueId);
+    return issues.length > 0 ? { ...event, payload: { ...payload, issues } } as DomainEvent : null;
+  }
+
+  if (event.type === 'activity.updated') {
+    const events = filterRecordsForIssue(payload['events'], issueId);
+    return events.length > 0 ? { ...event, payload: { ...payload, events } } as DomainEvent : null;
   }
 
   return null;

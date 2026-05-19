@@ -4,16 +4,15 @@ import { useAlert, useConfirm } from '../DialogProvider';
 import { useResetIssue } from '../../hooks/useResetIssue';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
-import { cn } from '../../lib/utils';
+import { isAgentRunningStatus } from '../../lib/pipeline-state';
+import Button, { ButtonLink } from '../primitives/Button';
 import type { Agent } from '../../types';
 import { useDrawerData } from './useDrawerData';
 
 void COMMAND_DECK_SURFACE_REGISTRY;
 
-const GHOST_BUTTON_CLASSES = 'rounded-[var(--radius-sm)] border border-border px-[12px] py-[7px] text-[12px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45';
-
 function isActiveAgent(agent: Agent) {
-  return agent.status !== 'stopped' && agent.status !== 'dead' && agent.status !== 'failed';
+  return isAgentRunningStatus(agent.status);
 }
 
 async function responseError(response: Response, fallback: string) {
@@ -95,45 +94,43 @@ export default function DrawerActionBar() {
 
   return (
     <footer data-component="drawer-action-bar" data-testid="drawer-action-bar" className="flex items-center gap-[10px] border-t border-border bg-card/70 px-[22px] py-[12px]">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         data-testid="drawer-action-reset"
-        className={GHOST_BUTTON_CLASSES}
         disabled={!issueId || isResetPending}
         onClick={() => void confirmAndReset()}
       >
         {isResetPending ? 'Resetting…' : 'Reset'}
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="ghost"
         data-testid="drawer-action-stop"
-        className={GHOST_BUTTON_CLASSES}
         disabled={!activeAgent || stopMutation.isPending}
         onClick={() => void handleStop()}
       >
         {stopMutation.isPending ? 'Stopping…' : 'Stop agent'}
-      </button>
+      </Button>
       <div className="flex-1" />
       {prUrl ? (
-        <a
+        <ButtonLink
+          variant="ghost"
           data-testid="drawer-action-view-pr"
-          className={cn(GHOST_BUTTON_CLASSES, 'inline-flex items-center')}
           href={prUrl}
           target="_blank"
           rel="noopener noreferrer"
         >
           View PR
-        </a>
+        </ButtonLink>
       ) : null}
-      <button
-        type="button"
+      <Button
+        variant="primary"
         data-testid="drawer-action-merge"
-        className="rounded-[var(--radius-sm)] border border-success/70 bg-success px-[14px] py-[7px] text-[12px] font-semibold text-[#000] transition-colors hover:bg-success/90 disabled:cursor-not-allowed disabled:opacity-45"
+        className="border-success/70 bg-success text-[#000] hover:bg-success/90"
         disabled={!issueId || !canMerge || mergeMutation.isPending}
         onClick={() => void handleMerge()}
       >
         {mergeMutation.isPending ? 'Merging…' : 'Merge to main'}
-      </button>
+      </Button>
     </footer>
   );
 }
