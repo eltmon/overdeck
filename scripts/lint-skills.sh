@@ -19,6 +19,7 @@ DOC = ROOT / "docs" / "SKILLS-CONVENTION.md"
 SKILLS = ROOT / "skills"
 LOCAL_PAN = ["node", str(ROOT / "dist" / "cli" / "index.js")]
 RUN_PAN_CACHE: dict[tuple[str, ...], str] = {}
+LEGACY_REDIRECTS = {"all-up": "pan-flywheel"}
 
 
 def run_pan(*args: str) -> str:
@@ -109,6 +110,25 @@ def usage_allows_positional_arg(help_text: str) -> bool:
     return any(placeholder not in {"[options]", "[command]", "<command>"} for placeholder in placeholders)
 
 
+def validate_legacy_redirects() -> list[str]:
+    errors: list[str] = []
+    for legacy, canonical in LEGACY_REDIRECTS.items():
+        skill = SKILLS / legacy / "SKILL.md"
+        if not skill.exists():
+            errors.append(f"{skill}: legacy skill must remain as a one-release redirect to /{canonical}")
+            continue
+        text = skill.read_text()
+        required = [f"name: {legacy}", f"renamed to /{canonical}", f"invoke `/{canonical}`"]
+        for phrase in required:
+            if phrase not in text:
+                errors.append(f"{skill}: compatibility stub must contain {phrase!r}")
+        forbidden = ["## The flywheel", "### 0.1 Main hygiene check", "NEVER manually do agent work"]
+        for phrase in forbidden:
+            if phrase in text:
+                errors.append(f"{skill}: compatibility stub still contains legacy workflow text {phrase!r}")
+    return errors
+
+
 def validate_command(
     skill: Path,
     line_no: int,
@@ -169,6 +189,7 @@ def main() -> int:
     global_flags = option_names(pan_help)
     exclusions = excluded_verbs()
     errors: list[str] = []
+    errors.extend(validate_legacy_redirects())
 
     for skill_md in sorted(SKILLS.glob("pan-*/SKILL.md")):
         skill_name = skill_md.parent.name.removeprefix("pan-")
