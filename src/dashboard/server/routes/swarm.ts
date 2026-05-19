@@ -3,6 +3,7 @@
  *
  * Implements:
  *   POST /api/swarm          — dispatch wave-parallel agents for a vBRIEF plan
+ *   POST /api/swarm/refresh  — refresh swarm slot status and mergeability
  *   GET  /api/swarm/:issueId — get swarm state for an issue
  */
 
@@ -244,11 +245,13 @@ function stateFromRuntime(issueId: string, runtime: SwarmRuntime): SwarmState {
       ? 'failed'
       : slot.status === 'failed-merge'
         ? 'failed-merge'
-        : extra.completedStatus === 'completed'
-          ? 'completed'
-          : slot.status === 'merged'
-            ? 'merged'
-            : 'running';
+        : (slot.status as string) === 'pending'
+          ? 'pending'
+          : extra.completedStatus === 'completed'
+            ? 'completed'
+            : slot.status === 'merged'
+              ? 'merged'
+              : 'running';
     return {
       slot: slot.slotId,
       itemId: slot.itemId,
@@ -301,7 +304,9 @@ function runtimeFromState(state: SwarmState, existing?: SwarmRuntime): SwarmRunt
           ? 'failed'
           : slot.status === 'failed-merge'
             ? 'failed-merge'
-            : 'running',
+            : slot.status === 'pending'
+              ? ('pending' as any)
+              : 'running',
       completedStatus: slot.status === 'completed' ? 'completed' : undefined,
       phase: slot.phase,
       failureReason: slot.failureReason,
@@ -513,14 +518,27 @@ function slotBranch(issueId: string, slotId: number): string {
 }
 
 function failedMergeMessage(state: SwarmState, slot: SlotAssignment): string {
-  const branch = slotBranch(state.issueId, slot.slot);
   const pr = slot.prUrl ? ` PR ${slot.prUrl}` : '';
   const reason = slot.failureReason ?? 'slot PR is not mergeable';
-  return `Swarm slot ${slot.slot} (${slot.itemTitle}) branch ${branch}${pr} unmergeable: ${reason}. Recover with: pan swarm recover ${state.issueId} ${slot.slot} --action <retry|drop|handoff>`;
+  return `Swarm slot ${slot.slot}${pr} unmergeable: ${reason}. Recover with: pan swarm recover ${state.issueId} ${slot.slot} --action <retry|drop|handoff>`;
+}
+
+function isImplementationSlot(slot: SlotAssignment): boolean {
+  return slot.phase !== 'synthesis';
 }
 
 function isRecoveredFailedMergeSlot(slot: SlotAssignment): boolean {
   return slot.status === 'failed-merge' && Boolean(slot.recoveryAction);
+}
+
+function isRetryRecoverySlot(slot: SlotAssignment): boolean {
+  return slot.status === 'pending' && slot.recoveryAction === 'retry';
+}
+
+function slotKeepsSwarmPolling(slot: SlotAssignment): boolean {
+  return slot.status === 'running'
+    || slot.status === 'pending'
+    || (slot.status === 'completed' && isImplementationSlot(slot));
 }
 
 function firstFailedSlot(state: SwarmState): SlotAssignment | undefined {
@@ -530,7 +548,7 @@ function firstFailedSlot(state: SwarmState): SlotAssignment | undefined {
 function slotReadyToAdvance(slot: SlotAssignment): boolean {
   return slot.status === 'merged'
     || (slot.status === 'completed' && slot.phase === 'synthesis')
-    || (slot.status === 'failed-merge' && (slot.recoveryAction === 'retry' || slot.recoveryAction === 'drop'));
+    || (slot.status === 'failed-merge' && slot.recoveryAction === 'drop');
 }
 
 function newlyFailedMergeSlots(before: SwarmState, after: SwarmState): SlotAssignment[] {
@@ -560,6 +578,20 @@ async function refreshSwarmRuntimeState(
     state: mergeabilityRefresh.state,
     changed: statusRefresh.changed || mergeabilityRefresh.changed,
   };
+}
+
+async function refreshSwarmIssue(issueId: string): Promise<{ status: number; body: { success?: boolean; issueId?: string; changed?: boolean; state?: SwarmState; error?: string } }> {
+  const issueUpper = canonicalIssueId(issueId);
+  if (!issueUpper) return { status: 400, body: { error: 'issueId must be a tracker key like PAN-977.' } };
+
+  const state = await loadSwarmState(issueUpper);
+  if (!state) return { status: 404, body: { error: `No swarm state for ${issueUpper}` } };
+
+  const sessions = await listSessionNamesAsync();
+  const project = resolveProjectFromIssue(issueUpper);
+  const refreshed = await refreshSwarmRuntimeState(state, sessions, project?.projectPath);
+  if (refreshed.changed) await saveSwarmState(refreshed.state);
+  return { status: 200, body: { success: true, issueId: issueUpper, changed: refreshed.changed, state: refreshed.state } };
 }
 
 async function refreshSwarmSlotStatuses(
@@ -663,7 +695,7 @@ function latestImplementationSlotsBySlotNumber(slots: SlotAssignment[]): Mergeab
   const targets = new Map<number, MergeabilityRefreshResult>();
   for (let i = slots.length - 1; i >= 0; i--) {
     const slot = slots[i]!;
-    if (slot.phase !== 'implementation' || (slot.status !== 'running' && slot.status !== 'completed')) continue;
+    if (!isImplementationSlot(slot) || (slot.status !== 'running' && slot.status !== 'completed')) continue;
     const existing = targets.get(slot.slot);
     if (slot.status === 'running') {
       if (!existing || existing.slot.status !== 'running') {
@@ -1645,9 +1677,19 @@ async function recoverSwarmSlot(
   }
 
   const recoveredAt = new Date().toISOString();
-  const recoveredSlots = state.slots.map((candidate, index) => index === matchedIndex
-    ? { ...candidate, recoveryAction: action, recoveredAt }
-    : candidate);
+  const recoveredSlots = state.slots.map((candidate, index) => {
+    if (index !== matchedIndex) return candidate;
+    if (action !== 'retry') return { ...candidate, recoveryAction: action, recoveredAt };
+    return {
+      ...candidate,
+      status: 'pending' as const,
+      failureReason: undefined,
+      consecutiveConflictCount: undefined,
+      prUrl: undefined,
+      recoveryAction: action,
+      recoveredAt,
+    };
+  });
   const nextState = clearAutoAdvanceFailureFields({
     ...state,
     slots: recoveredSlots,
@@ -1810,7 +1852,7 @@ async function pollSwarmAutoAdvance(): Promise<void> {
       // operator sees the recorded failure before the swarm leaves the active
       // poll registry.
       if (state.currentWave >= state.totalWaves - 1 && !state.deferred?.length) {
-        const stillActive = state.slots.some(s => s.status === 'running' || s.status === 'pending');
+        const stillActive = state.slots.some(slotKeepsSwarmPolling);
         if (!stillActive) {
           activeSwarmIssueIds.delete(state.issueId);
         }
@@ -1818,13 +1860,15 @@ async function pollSwarmAutoAdvance(): Promise<void> {
       continue;
     }
 
+    const hasRetryRecoverySlot = state.slots.some(isRetryRecoverySlot);
+
     // PAN-977 round-12 high-1 / round-13 blocker #1: final-wave cleanup
     // consults observed post-refresh state and runs AFTER persistence. If
-    // the swarm is on the final wave AND no slots are still running/pending
-    // AND no deferred work remains, drop it from the active registry so the
-    // poll loop can converge to empty.
-    if (state.currentWave >= state.totalWaves - 1 && !state.deferred?.length) {
-      const stillActive = state.slots.some(s => s.status === 'running' || s.status === 'pending');
+    // the swarm is on the final wave AND no slots still need polling AND no
+    // deferred work remains, drop it from the active registry so the poll loop
+    // can converge to empty.
+    if (!hasRetryRecoverySlot && state.currentWave >= state.totalWaves - 1 && !state.deferred?.length) {
+      const stillActive = state.slots.some(slotKeepsSwarmPolling);
       if (!stillActive) {
         activeSwarmIssueIds.delete(state.issueId);
       }
@@ -1839,7 +1883,7 @@ async function pollSwarmAutoAdvance(): Promise<void> {
     // files. Synthesis slots end at 'completed' by design (they only
     // produce context, never merge), so allow them as ready-to-advance.
     const allSlotsReadyToAdvance = state.slots.length > 0 && state.slots.every(slotReadyToAdvance);
-    if (!allSlotsReadyToAdvance) continue;
+    if (!hasRetryRecoverySlot && !allSlotsReadyToAdvance) continue;
 
     autoAdvanceInFlight.add(state.issueId);
     try {
@@ -1909,7 +1953,7 @@ async function resumeSwarmAutoAdvanceLoopOnStartup(): Promise<void> {
   for (const issueId of issueIds) {
     const state = await loadSwarmState(issueId);
     if (!state?.autoAdvance) continue;
-    const stillActive = state.slots.some(slot => slot.status === 'running' || slot.status === 'pending');
+    const stillActive = state.slots.some(slotKeepsSwarmPolling);
     if (state.currentWave >= state.totalWaves - 1 && !state.deferred?.length && !stillActive) continue;
     activeSwarmIssueIds.add(issueId);
   }
@@ -2317,6 +2361,40 @@ function buildSlotPrompt(
   ].join('\n');
 }
 
+// ─── POST /api/swarm/refresh ────────────────────────────────────────────────
+
+const postSwarmRefreshRoute = HttpRouter.add(
+  'POST',
+  '/api/swarm/refresh',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
+      import('../../../lib/internal-token.js'),
+    );
+    const expected = getInternalToken();
+    if (!expected) {
+      return jsonResponse({ error: 'internal token not configured' }, { status: 503 });
+    }
+    const headers = request.headers as Record<string, string | string[] | undefined>;
+    const rawHeader = headers[INTERNAL_TOKEN_HEADER];
+    const provided = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    const tokenValid = constantTimeTokenEqual(provided, expected);
+    if (!tokenValid) {
+      const originCheck = validateOrigin(request);
+      if (!originCheck.ok) {
+        return jsonResponse({ error: 'forbidden' }, { status: 403 });
+      }
+    }
+
+    const body = yield* readJsonBody;
+    const issueId = canonicalIssueId((body as Record<string, unknown>)['issueId']);
+    if (!issueId) return jsonResponse({ error: 'issueId must be a tracker key like PAN-977.' }, { status: 400 });
+
+    const result = yield* Effect.promise(() => refreshSwarmIssue(issueId));
+    return jsonResponse(result.body, { status: result.status });
+  })),
+);
+
 // ─── POST /api/swarm/slot-merged ────────────────────────────────────────────
 
 function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
@@ -2455,6 +2533,7 @@ const getSwarmRoute = HttpRouter.add(
 export const __testInternals = {
   refreshSwarmSlotStatuses,
   refreshSwarmSlotMergeability,
+  refreshSwarmIssue,
   dispatchSwarmWave,
   pollSwarmAutoAdvance,
   ensureSwarmAutoAdvanceLoop,
@@ -2485,6 +2564,7 @@ export { resumeSwarmAutoAdvanceLoopOnStartup };
 
 export const swarmRouteLayer = Layer.mergeAll(
   postSwarmRoute,
+  postSwarmRefreshRoute,
   postSwarmSlotMergedRoute,
   postSwarmSlotRecoverRoute,
   getSwarmRoute,
