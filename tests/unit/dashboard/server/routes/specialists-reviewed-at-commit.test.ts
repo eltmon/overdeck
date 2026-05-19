@@ -41,11 +41,9 @@ vi.mock('child_process', async (importActual) => {
     exec: (...args: unknown[]) => {
       const command = String(args[0]);
       const callback = args[args.length - 1] as (err: null, result: { stdout: string; stderr: string }) => void;
-      const stdout = command.includes('oldsha1^{tree}')
-        ? 'oldtree\n'
-        : command.includes('newsha99^{tree}')
-          ? 'newtree\n'
-          : `${mockExecHeadSha}\n`;
+      const stdout = command.includes('^{tree}')
+        ? command.includes('oldsha1') ? `${mockOldTreeSha}\n` : `${mockNewTreeSha}\n`
+        : `${mockExecHeadSha}\n`;
       mockExecCallback(...args);
       callback(null, { stdout, stderr: '' });
       return {} as ReturnType<typeof actual.exec>;

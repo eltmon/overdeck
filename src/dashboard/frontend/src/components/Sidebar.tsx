@@ -95,7 +95,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
 
   const isDev = versionData?.isDev ?? false;
 
-  const { data: flywheelRuns = [] } = useQuery({
+  const { data: flywheelRunsRaw } = useQuery({
     queryKey: ['flywheel-runs'],
     queryFn: async () => {
       const res = await fetch('/api/flywheel/runs?limit=10');
@@ -104,6 +104,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
     },
     refetchInterval: 5000,
   });
+  const flywheelRuns = Array.isArray(flywheelRunsRaw) ? flywheelRunsRaw : [];
   const hasActiveFlywheelRun = flywheelRuns.some((run) => run.status === 'running');
 
   const rebuildMutation = useMutation({

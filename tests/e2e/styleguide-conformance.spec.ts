@@ -177,6 +177,7 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/session-trees') return json({ trees: [] });
       if (path === '/api/conversations') return json([]);
       if (path === '/api/conversations/cost' || path === '/api/conversations/cost/by-workspace') return json({ totalCost: 0, entries: [] });
+      if (path === '/api/flywheel/runs') return json([]);
       return json(search ? { search } : {});
     };
   }, { snapshotFixture: snapshot, featureFixture: feature });
