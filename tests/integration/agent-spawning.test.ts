@@ -16,6 +16,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { execSync } from 'child_process';
 import {
   spawnAgent,
   spawnRun,
@@ -23,6 +24,7 @@ import {
   type SpawnOptions,
   getAgentDir,
 } from '../../src/lib/agents.js';
+import { captureCheckpoint, hasCheckpoint } from '../../src/lib/checkpoint/checkpoint-manager.js';
 import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
 import { DEFAULT_ROLES, DEFAULT_WORKHORSES } from '../../src/lib/config-yaml.js';
 
@@ -238,6 +240,129 @@ describe('PAN-1048 role primitive — agent spawning', () => {
       })).rejects.toThrow(/No beads tasks found/);
 
       expect(getAgentState('agent-pan-nobeads-1')).toBeNull();
+    });
+
+    // ─── PAN-1215 cleanup block ─────────────────────────────────────────────────
+
+    it('untracks workspace .pan/ artifacts when tracked and working tree is clean (AC22)', async () => {
+      const workspace = join(tmpdir(), `pan-1215-ac22-${Date.now()}`);
+      mkdirSync(join(workspace, '.pan'), { recursive: true });
+      execSync('git init', { cwd: workspace });
+      execSync('git config user.email "test@test.com"', { cwd: workspace });
+      execSync('git config user.name "Test"', { cwd: workspace });
+      writeFileSync(join(workspace, '.pan', 'continue.json'), '{"v":1}');
+      writeFileSync(join(workspace, '.pan', 'spec.vbrief.json'), '{"p":1}');
+      execSync('git add .', { cwd: workspace });
+      execSync('git commit -m "initial"', { cwd: workspace });
+
+      await spawnAgent({ issueId: 'PAN-AC22', workspace, role: 'work' });
+
+      const tracked = execSync('git ls-files .pan/continue.json .pan/spec.vbrief.json', {
+        cwd: workspace,
+        encoding: 'utf-8',
+      }).trim();
+      expect(tracked).toBe('');
+
+      const log = execSync('git log --oneline', { cwd: workspace, encoding: 'utf-8' }).trim();
+      expect(log).toContain('chore: untrack workspace .pan/ artifacts (PAN-1215)');
+
+      rmSync(workspace, { recursive: true, force: true });
+    });
+
+    it('warns and skips untrack when .pan/ paths have uncommitted changes (AC23)', async () => {
+      const workspace = join(tmpdir(), `pan-1215-ac23-${Date.now()}`);
+      mkdirSync(join(workspace, '.pan'), { recursive: true });
+      execSync('git init', { cwd: workspace });
+      execSync('git config user.email "test@test.com"', { cwd: workspace });
+      execSync('git config user.name "Test"', { cwd: workspace });
+      writeFileSync(join(workspace, '.pan', 'continue.json'), '{"v":1}');
+      execSync('git add .', { cwd: workspace });
+      execSync('git commit -m "initial"', { cwd: workspace });
+
+      // Make .pan/ dirty
+      writeFileSync(join(workspace, '.pan', 'continue.json'), '{"v":2}');
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await spawnAgent({ issueId: 'PAN-AC23', workspace, role: 'work' });
+
+      // No untrack commit should have been made
+      const log = execSync('git log --oneline', { cwd: workspace, encoding: 'utf-8' }).trim();
+      expect(log.split('\n').length).toBe(1);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping .pan/ untrack'),
+      );
+      warnSpy.mockRestore();
+
+      rmSync(workspace, { recursive: true, force: true });
+    });
+
+    it('short-cuits .pan/ cleanup when neither file is tracked (AC24)', async () => {
+      const workspace = join(tmpdir(), `pan-1215-ac24-${Date.now()}`);
+      mkdirSync(join(workspace, '.pan'), { recursive: true });
+      execSync('git init', { cwd: workspace });
+      execSync('git config user.email "test@test.com"', { cwd: workspace });
+      execSync('git config user.name "Test"', { cwd: workspace });
+      writeFileSync(join(workspace, 'readme.md'), '# test');
+      execSync('git add readme.md', { cwd: workspace });
+      execSync('git commit -m "initial"', { cwd: workspace });
+
+      // Files exist on disk but are NOT tracked
+      writeFileSync(join(workspace, '.pan', 'continue.json'), '{"v":1}');
+
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await spawnAgent({ issueId: 'PAN-AC24', workspace, role: 'work' });
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
+
+      // No new commit
+      const log = execSync('git log --oneline', { cwd: workspace, encoding: 'utf-8' }).trim();
+      expect(log.split('\n').length).toBe(1);
+
+      // No warning about skipping untrack (the dirty-path warning)
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('Skipping .pan/ untrack'),
+      );
+      // No "Untracked workspace .pan/ artifacts" success log either
+      expect(logSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('Untracked workspace .pan/ artifacts'),
+      );
+
+      rmSync(workspace, { recursive: true, force: true });
+    });
+
+    it('checkpoint after cleanup excludes previously tracked .pan/ artifacts (AC28)', async () => {
+      const workspace = join(tmpdir(), `pan-1215-ac28-${Date.now()}`);
+      mkdirSync(join(workspace, '.pan'), { recursive: true });
+      execSync('git init', { cwd: workspace });
+      execSync('git config user.email "test@test.com"', { cwd: workspace });
+      execSync('git config user.name "Test"', { cwd: workspace });
+      writeFileSync(join(workspace, '.pan', 'continue.json'), '{"v":1}');
+      writeFileSync(join(workspace, '.pan', 'spec.vbrief.json'), '{"p":1}');
+      writeFileSync(join(workspace, 'readme.md'), '# test');
+      execSync('git add .', { cwd: workspace });
+      execSync('git commit -m "initial"', { cwd: workspace });
+
+      await spawnAgent({ issueId: 'PAN-AC28', workspace, role: 'work' });
+
+      // Modify the now-untracked file and capture a checkpoint
+      writeFileSync(join(workspace, '.pan', 'continue.json'), '{"v":2}');
+      await captureCheckpoint(workspace, 'agent-pan-ac28', 'turn-1');
+
+      expect(await hasCheckpoint(workspace, 'agent-pan-ac28', 'turn-1')).toBe(true);
+      const ref = 'refs/pan/turn/agent-pan-ac28/turn-1';
+      const commit = execSync(`git rev-parse ${ref}`, { cwd: workspace, encoding: 'utf-8' }).trim();
+      const files = execSync(`git ls-tree -r --name-only ${commit}`, { cwd: workspace, encoding: 'utf-8' })
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+
+      expect(files).not.toContain('.pan/continue.json');
+      expect(files).not.toContain('.pan/spec.vbrief.json');
+      expect(files).toContain('readme.md');
+
+      rmSync(workspace, { recursive: true, force: true });
     });
   });
 

@@ -142,7 +142,7 @@ vi.mock('../../src/lib/cloister/review-verdict-feedback.js', () => ({
 
 // ─── Imports after mocks ──────────────────────────────────────────────────────
 
-import { setReviewStatus, getReviewStatus } from '../../src/lib/review-status.js';
+import { setReviewStatus, getReviewStatus, verificationSatisfied } from '../../src/lib/review-status.js';
 import { checkPostReviewCommits } from '../../src/lib/cloister/deacon.js';
 import { doneCommand } from '../../src/cli/commands/specialists/done.js';
 import { captureCheckpoint, hasCheckpoint } from '../../src/lib/checkpoint/checkpoint-manager.js';
@@ -279,6 +279,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     expect(after?.verificationStatus).toBe('passed');
     expect(after?.verificationNotes).toContain('PAN-1215');
     expect(after?.verificationNotes).toContain('override');
+    expect(verificationSatisfied(after!)).toBe(true);
   });
 
   // ─── Gap B.1: Checkpoint excludes workspace-only .pan/ artifacts ────────────
@@ -316,5 +317,52 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     // Other files should still be present
     expect(files).toContain('readme.md');
     expect(files).toContain('.gitignore');
+  });
+
+  it('excludes untracked-on-disk .pan/continue.json from checkpoint commits (AC15)', async () => {
+    // Remove the tracked file from the index so it exists on disk but is untracked
+    execSync('git rm --cached .pan/continue.json', { cwd: testRepoDir });
+    writeFileSync(join(testRepoDir, '.pan', 'continue.json'), '{"version":"untracked"}');
+    // Ensure it is not in the index
+    const tracked = execSync('git ls-files .pan/continue.json', { cwd: testRepoDir, encoding: 'utf-8' }).trim();
+    expect(tracked).toBe('');
+
+    await captureCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-untracked');
+
+    const ref = 'refs/pan/turn/agent-pan-1215/turn-untracked';
+    const commit = execSync(`git rev-parse ${ref}`, { cwd: testRepoDir, encoding: 'utf-8' }).trim();
+    const files = execSync(`git ls-tree -r --name-only ${commit}`, { cwd: testRepoDir, encoding: 'utf-8' })
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+
+    expect(files).not.toContain('.pan/continue.json');
+  });
+
+  it('after cleanup, checkpoint no longer includes previously tracked .pan/ artifacts (AC28)', async () => {
+    // Seed a tracked .pan/continue.json (simulates pre-fix branch state)
+    writeFileSync(join(testRepoDir, '.pan', 'continue.json'), '{"version":"3"}');
+    execSync('git add .pan/continue.json', { cwd: testRepoDir });
+    execSync('git commit -m "tracked continue"', { cwd: testRepoDir });
+
+    // Run the cleanup logic (same commands spawnAgent uses)
+    execSync('git rm --cached --ignore-unmatch .pan/continue.json .pan/spec.vbrief.json', { cwd: testRepoDir });
+    execSync('git commit -m "chore: untrack workspace .pan/ artifacts (PAN-1215)"', { cwd: testRepoDir });
+
+    // Modify the now-untracked file
+    writeFileSync(join(testRepoDir, '.pan', 'continue.json'), '{"version":"4"}');
+
+    // Capture checkpoint — file should be excluded because it is no longer tracked
+    await captureCheckpoint(testRepoDir, 'agent-pan-1215', 'turn-post-cleanup');
+
+    const ref = 'refs/pan/turn/agent-pan-1215/turn-post-cleanup';
+    const commit = execSync(`git rev-parse ${ref}`, { cwd: testRepoDir, encoding: 'utf-8' }).trim();
+    const files = execSync(`git ls-tree -r --name-only ${commit}`, { cwd: testRepoDir, encoding: 'utf-8' })
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+
+    expect(files).not.toContain('.pan/continue.json');
+    expect(files).toContain('readme.md');
   });
 });

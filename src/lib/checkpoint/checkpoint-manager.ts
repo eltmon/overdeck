@@ -119,11 +119,15 @@ export async function captureCheckpoint(cwd: string, agentId: string, turnId: st
     }
 
     // Explicitly exclude workspace-only .pan/ artifacts from checkpoints.
-    // These files are gitignored but may still be tracked on older branches (once
-    // tracked, gitignore stops applying). Without this removal, read-tree HEAD
-    // copies them into the temp index and they leak into checkpoint commits.
-    // When the workspace is later rebased, these files can be dropped as "already
-    // upstream", causing the verification gate to lose AC progress (PAN-1215).
+    // Per CLAUDE.md's four-artifact model: spec on main is immutable;
+    // workspace-side continue state (`.pan/continue.json`) and workspace-side
+    // spec (`.pan/spec.vbrief.json`) must never escape the workspace via
+    // checkpoint commits. These files are gitignored but may still be tracked
+    // on older branches (once tracked, gitignore stops applying). Without this
+    // removal, read-tree HEAD copies them into the temp index and they leak
+    // into checkpoint commits. When the workspace is later rebased, these files
+    // can be dropped as "already upstream", causing the verification gate to
+    // lose AC progress (PAN-1215).
     try {
       await execFileAsync('git', ['rm', '--cached', '--ignore-unmatch', '.pan/continue.json', '.pan/spec.vbrief.json'], { cwd, env })
     } catch {
