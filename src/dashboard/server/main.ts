@@ -10,6 +10,7 @@ import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
+import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
@@ -80,6 +81,11 @@ console.log('[panopticon] IssueDataService started (non-blocking)');
 // for agentPhase, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
 startAgentEnrichmentService();
 console.log('[panopticon] AgentEnrichmentService started');
+
+// Start background agent output poller — emits agent.output_received domain events
+// so DrawerActiveAgent and other consumers receive live stream excerpts.
+startAgentOutputService();
+console.log('[panopticon] AgentOutputService started');
 
 // Wire up pipeline notifier → domain events.
 // Library code (review-status.ts) calls notifyPipeline() on every status change.
@@ -345,6 +351,7 @@ const handleShutdownSignal = (signal: NodeJS.Signals) => {
   emitShutdownActivity();
   clearInterval(attachmentCleanupTimer);
   stopAgentEnrichmentService();
+  stopAgentOutputService();
   stopConversationLifecycleService();
   stopTtsSummarizer();
   stopTtsPlayback();
