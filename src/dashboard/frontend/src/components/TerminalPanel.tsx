@@ -2,7 +2,7 @@ import { useRef, useEffect, useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, RefreshCw, ExternalLink } from 'lucide-react';
 import { Agent } from '../types';
-import { TerminalSessionWrapper } from './inspector/TerminalSessionWrapper';
+import { TerminalSessionWrapper } from './TerminalSessionWrapper';
 import { MessagesTimeline } from './chat/MessagesTimeline';
 import type { ChatMessage } from './chat/chat-types';
 import { ActivityView } from './CommandDeck/ActivityView';

@@ -43,6 +43,82 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
   } as DomainEvent;
 }
 
+function normalizedIssueId(value: unknown) {
+  return typeof value === 'string' ? value.toLowerCase() : null;
+}
+
+type AgentIssueLookup = ReadonlyMap<string, string>;
+
+type AgentIssueRecord = {
+  id?: unknown;
+  issueId?: unknown;
+};
+
+function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
+  const lookup = new Map<string, string>();
+  for (const agent of agents) {
+    const agentId = normalizedIssueId(agent.id);
+    const issueId = normalizedIssueId(agent.issueId);
+    if (agentId && issueId) lookup.set(agentId, issueId);
+  }
+  return lookup;
+}
+
+// ─── Shared agent-issue lookup cache for subscribeIssueEvents ─────────────────
+// Caches the lookup across all issue-event subscribers to avoid N× rebuilds
+// per event when N drawers are open. Refreshes on TTL expiry or agent events.
+const SHARED_AGENT_LOOKUP_TTL_MS = 500;
+let sharedAgentLookup: AgentIssueLookup = new Map();
+let sharedAgentLookupTimestamp = 0;
+
+function getCachedAgentIssueLookup(readModel: ReadModelServiceShape): Effect.Effect<AgentIssueLookup> {
+  const now = Date.now();
+  if (now - sharedAgentLookupTimestamp < SHARED_AGENT_LOOKUP_TTL_MS) {
+    return Effect.succeed(sharedAgentLookup);
+  }
+  return readModel.getSnapshot.pipe(
+    Effect.map((snapshot) => {
+      sharedAgentLookup = buildAgentIssueLookup(snapshot.agents);
+      sharedAgentLookupTimestamp = now;
+      return sharedAgentLookup;
+    }),
+  );
+}
+
+function recordMatchesIssue(record: unknown, issueId: string, agentIssueLookup: AgentIssueLookup = new Map()) {
+  if (!record || typeof record !== 'object') return false;
+  const data = record as Record<string, unknown>;
+  const target = issueId.toLowerCase();
+  const directIssueId = normalizedIssueId(data['issueId'] ?? data['identifier'] ?? data['id']);
+  if (directIssueId === target) return true;
+  const agentIssueId = normalizedIssueId((data['agent'] as Record<string, unknown> | undefined)?.['issueId']);
+  if (agentIssueId === target) return true;
+  const currentIssue = normalizedIssueId(data['currentIssue']);
+  if (currentIssue === target) return true;
+  const agentId = normalizedIssueId(data['agentId']);
+  return agentId ? agentIssueLookup.get(agentId) === target : false;
+}
+
+function filterRecordsForIssue(records: unknown, issueId: string, agentIssueLookup: AgentIssueLookup) {
+  return Array.isArray(records) ? records.filter((record) => recordMatchesIssue(record, issueId, agentIssueLookup)) : [];
+}
+
+export function filterDomainEventForIssue(event: DomainEvent, issueId: string, agentIssueLookup: AgentIssueLookup = new Map()): DomainEvent | null {
+  const payload = event.payload as Record<string, unknown>;
+  if (recordMatchesIssue(payload, issueId, agentIssueLookup)) return event;
+
+  // Bulk replacement events (issues.snapshot, activity.updated) are excluded
+  // from issue-specific streams. Their filtered payloads would replace the
+  // global store's full dataset, causing every issue-dependent component to
+  // re-render with incomplete data. The full bulk updates arrive via
+  // subscribeDomainEvents instead.
+  if (event.type === 'issues.snapshot' || event.type === 'activity.updated') {
+    return null;
+  }
+
+  return null;
+}
+
 function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
   return {
     id: session.id,
@@ -421,6 +497,20 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             (unsubscribe) => Effect.sync(() => unsubscribe()),
           ),
         ),
+
+      // ── subscribeIssueEvents ──────────────────────────────────────────────────
+      [WS_METHODS.subscribeIssueEvents]: (input) => {
+        console.log(`[ws-rpc] subscribeIssueEvents invoked issueId=${input.issueId}`);
+        return eventStore.streamEvents.pipe(
+          Stream.map(storedToDomainEvent),
+          Stream.mapEffect((event) =>
+            getCachedAgentIssueLookup(readModel).pipe(
+              Effect.map((lookup) => filterDomainEventForIssue(event, input.issueId, lookup)),
+            ),
+          ),
+          Stream.filter((event): event is DomainEvent => event !== null),
+        );
+      },
 
       // ── subscribeTerminal — live PTY stream (B20) ────────────────────────────
       [WS_METHODS.subscribeTerminal]: (input) =>

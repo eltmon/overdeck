@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Issue, Agent } from '../types';
 // PAN-1048 — SpecialistAgent retired; specialist-style indicators now come
 // from role-tagged AgentSnapshots passed through the `specialists` prop.
-import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard } from './KanbanBoard';
+import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, KanbanBoard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard } from './KanbanBoard';
 import { useDashboardStore } from '../lib/store';
 import { DialogProvider } from './DialogProvider';
 
@@ -501,6 +501,88 @@ describe('ListIssueRow', () => {
   });
 });
 
+describe('KanbanBoard drawer wiring', () => {
+  function createBoardIssue(overrides: Partial<Issue> = {}): Issue {
+    return {
+      id: overrides.identifier ?? 'PAN-1',
+      identifier: overrides.identifier ?? 'PAN-1',
+      title: overrides.title ?? 'Board drawer issue',
+      status: overrides.status ?? 'Todo',
+      state: overrides.state ?? 'todo',
+      priority: overrides.priority ?? 3,
+      labels: overrides.labels ?? [],
+      url: `https://example.com/${overrides.identifier ?? 'PAN-1'}`,
+      createdAt: '2026-05-18T00:00:00.000Z',
+      updatedAt: '2026-05-18T00:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  function renderBoard(props: Partial<ComponentProps<typeof KanbanBoard>> = {}) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <DialogProvider>
+          <KanbanBoard {...props} />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/board');
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = input.toString();
+      if (url === '/api/registered-projects') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve('{}'),
+        json: () => Promise.resolve({ issues: [], workspaces: [] }),
+      } as Response);
+    }));
+    useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
+      issuesRaw: [createBoardIssue()],
+      agentsById: {},
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('opens the issue drawer from a single Board card click without changing selection', async () => {
+    const onSelectIssue = vi.fn();
+    renderBoard({ selectedIssue: null, onSelectIssue });
+
+    fireEvent.click(await screen.findByTestId('issue-card-PAN-1'));
+
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
+    expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
+    expect(onSelectIssue).not.toHaveBeenCalled();
+
+    useDashboardStore.getState().closeIssue();
+
+    expect(onSelectIssue).not.toHaveBeenCalled();
+  });
+
+  it('keeps bulk selection on the checkbox affordance without opening the drawer', async () => {
+    renderBoard();
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Select PAN-1' }) as HTMLInputElement;
+    fireEvent.click(checkbox);
+
+    await waitFor(() => expect(checkbox.checked).toBe(true));
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: null, tab: 'overview' });
+  });
+});
+
 describe('IssueCard', () => {
   const createMockIssue = (overrides: Partial<Issue> = {}): Issue => ({
     id: 'issue-1',
@@ -579,71 +661,38 @@ describe('IssueCard', () => {
     return defaultProps;
   }
 
-  it('passes auto mode when Auto-plan is clicked', () => {
-    const onPlan = vi.fn();
+  it('renders queued board cards without legacy launch controls', () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo' }),
-      onPlan,
     });
 
-    fireEvent.click(screen.getByTestId('action-auto-plan-TEST-123'));
-
-    expect(onPlan).toHaveBeenCalledWith(true);
+    expect(screen.getByText('QUEUED FOR PLAN')).toBeInTheDocument();
+    expect(screen.queryByTestId('action-auto-plan-TEST-123')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('card-start-agent-TEST-123')).not.toBeInTheDocument();
   });
 
-  it('sends auto=true when Auto-start is clicked', async () => {
-    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
-      const url = input.toString();
-      if (url === '/api/settings' && init?.method === 'PUT') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response);
-      }
-      if (url === '/api/settings') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ tts: { mutedIssues: [] } }) } as Response);
-      }
-      if (url === '/api/settings/available-models') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as Response);
-      }
-      return Promise.resolve({
-        ok: true,
-        text: () => Promise.resolve(JSON.stringify({ success: true })),
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
+  it('does not render Board card launch controls after planning completes', () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo', hasPlan: true, hasBeads: true }),
       planningState: { hasPlan: true, hasBeads: true, planningComplete: true },
     });
 
-    fireEvent.click(screen.getByTestId('card-auto-start-agent-TEST-123'));
-
-    await waitFor(() => {
-      const startCall = fetchMock.mock.calls.find(([url]) => url === '/api/agents');
-      expect(startCall).toBeTruthy();
-      expect(JSON.parse((startCall?.[1] as RequestInit).body as string)).toMatchObject({ auto: true });
-    });
+    expect(screen.queryByTestId('card-start-agent-TEST-123')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('card-auto-start-agent-TEST-123')).not.toBeInTheDocument();
+    expect(screen.queryByText('Agent model')).not.toBeInTheDocument();
   });
 
-  it('toggles issue TTS mute from the card without selecting the card', async () => {
+  it('selects the issue when the shared board card is clicked', () => {
     const onSelect = vi.fn();
     renderIssueCard({ onSelect });
 
-    const muteButton = await screen.findByTestId('card-tts-mute-TEST-123');
-    await waitFor(() => expect(muteButton).not.toBeDisabled());
-    fireEvent.click(muteButton);
+    expect(screen.queryByTestId('card-tts-mute-TEST-123')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('issue-card-TEST-123'));
 
-    await waitFor(() => {
-      const putCall = vi.mocked(global.fetch).mock.calls.find(([url, init]) => (
-        url.toString() === '/api/settings' && init?.method === 'PUT'
-      ));
-      expect(putCall).toBeTruthy();
-      expect(JSON.parse(putCall?.[1]?.body as string).tts.mutedIssues).toEqual(['TEST-123']);
-    });
-    expect(onSelect).not.toHaveBeenCalled();
+    expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
-  it('shows unhealthy workspace stack state on the card', () => {
+  it('marks unhealthy workspace stack state on the shared card primitive', () => {
     renderIssueCard({
       workspace: {
         exists: true,
@@ -656,12 +705,12 @@ describe('IssueCard', () => {
       },
     });
 
-    const badge = screen.getByTestId('card-stack-health-TEST-123');
-    expect(badge).toHaveTextContent('Workspace unhealthy');
-    expect(badge).toHaveAttribute('title', 'test-stack-server stuck Created for 120s');
+    const card = screen.getByTestId('issue-card-TEST-123');
+    expect(card).toHaveAttribute('data-stuck-card', 'true');
+    expect(card).toHaveClass('border-destructive/60', 'bg-destructive/10');
   });
 
-  it('opens the inspector rather than the planning dialog for planning-only input', () => {
+  it('opens the drawer from the shared card instead of legacy planning input controls', () => {
     const onSelect = vi.fn();
     const onPlan = vi.fn();
     renderIssueCard({
@@ -676,7 +725,8 @@ describe('IssueCard', () => {
       }),
     });
 
-    fireEvent.click(screen.getByTestId('card-input-TEST-123'));
+    expect(screen.queryByTestId('card-input-TEST-123')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('issue-card-TEST-123'));
 
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onPlan).not.toHaveBeenCalled();
@@ -1225,18 +1275,18 @@ describe('CompactChildCard', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('applies selected background when isSelected is true', () => {
+  it('applies selected primitive state when isSelected is true', () => {
     const child = createMockChild();
     const { container } = render(<CompactChildCard issue={child} agents={[]} isSelected={true} />);
-    const el = container.querySelector('.bg-primary\\/10');
-    expect(el).toBeTruthy();
+    const el = container.querySelector('[data-component="issue-card"]');
+    expect(el).toHaveClass('ring-2', 'ring-warning/70');
   });
 
-  it('does not apply selected background when isSelected is false', () => {
+  it('does not apply selected primitive state when isSelected is false', () => {
     const child = createMockChild();
     const { container } = render(<CompactChildCard issue={child} agents={[]} isSelected={false} />);
-    const el = container.querySelector('.bg-primary\\/10');
-    expect(el).toBeFalsy();
+    const el = container.querySelector('[data-component="issue-card"]');
+    expect(el).not.toHaveClass('ring-2', 'ring-warning/70');
   });
 
   it('shows agent pulse dot when agent is running', () => {

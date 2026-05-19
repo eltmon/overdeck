@@ -23,13 +23,13 @@ export interface SurfaceActionRegistration {
 
 export const COMMAND_DECK_PARITY_SURFACES: readonly SurfaceDescriptor[] = [
   { surface: 'KanbanBoard', file: 'src/dashboard/frontend/src/components/KanbanBoard.tsx' },
-  { surface: 'ActionsSection', file: 'src/dashboard/frontend/src/components/inspector/ActionsSection.tsx' },
-  { surface: 'AgentInfoSection', file: 'src/dashboard/frontend/src/components/inspector/AgentInfoSection.tsx' },
-  { surface: 'ReviewPipelineSection', file: 'src/dashboard/frontend/src/components/inspector/ReviewPipelineSection.tsx' },
-  { surface: 'ContainerSection', file: 'src/dashboard/frontend/src/components/inspector/ContainerSection.tsx' },
+  { surface: 'ActionsSection', file: 'src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx' },
+  { surface: 'AgentInfoSection', file: 'src/dashboard/frontend/src/components/drawer/DrawerActiveAgent.tsx' },
+  { surface: 'ReviewPipelineSection', file: 'src/dashboard/frontend/src/components/drawer/DrawerVerificationGates.tsx' },
+  { surface: 'ContainerSection', file: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ContainerNode.tsx' },
   { surface: 'BadgeBar', file: 'src/dashboard/frontend/src/components/CommandDeck/FeatureMetadata/BadgeBar.tsx' },
-  { surface: 'StatusFlowControl', file: 'src/dashboard/frontend/src/components/WorkspaceStatusOverview.tsx' },
-  { surface: 'WorkspacePane', file: 'src/dashboard/frontend/src/components/InspectorPanel.tsx' },
+  { surface: 'StatusFlowControl', file: 'src/dashboard/frontend/src/components/CommandDeck/ZoneActionStrip.tsx' },
+  { surface: 'WorkspacePane', file: 'src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx' },
 ] as const;
 
 export const COMMAND_DECK_SURFACE_REGISTRY: readonly SurfaceActionRegistration[] = [
@@ -43,7 +43,7 @@ export const COMMAND_DECK_SURFACE_REGISTRY: readonly SurfaceActionRegistration[]
   { surface: 'KanbanBoard', actionKey: 'resumeSession', source: 'handleResumeSession' },
   { surface: 'KanbanBoard', actionKey: 'reopen', source: 'ReopenSection' },
 
-  // inspector/ActionsSection.tsx workspace + issue actions
+  // Retired workspace action groups now represented by drawer and Command Deck actions
   { surface: 'ActionsSection', actionKey: 'merge', source: 'MergeButton' },
   { surface: 'ActionsSection', actionKey: 'reviewTest', source: 'review-test-btn' },
   { surface: 'ActionsSection', actionKey: 'stopAgent', source: 'StopAgentButton' },
@@ -59,14 +59,14 @@ export const COMMAND_DECK_SURFACE_REGISTRY: readonly SurfaceActionRegistration[]
   { surface: 'ActionsSection', actionKey: 'resetIssue', source: 'ResetIssueButton' },
   { surface: 'ActionsSection', actionKey: 'cancel', source: 'inspector-cancel-issue' },
 
-  // inspector/AgentInfoSection.tsx git action
+  // Drawer active-agent and Command Deck git action
   { surface: 'AgentInfoSection', actionKey: 'syncMain', source: 'Sync with main' },
 
-  // inspector/ReviewPipelineSection.tsx pipeline actions/state transitions
+  // Drawer verification pipeline actions/state transitions
   { surface: 'ReviewPipelineSection', actionKey: 'reviewTest', source: 'Build Gate / Review / Tests pipeline' },
   { surface: 'ReviewPipelineSection', actionKey: 'recover', source: 'Failed or blocked pipeline states' },
 
-  // inspector/ContainerSection.tsx workspace controls
+  // Command Deck resource tree workspace controls
   { surface: 'ContainerSection', actionKey: 'createWorkspace', source: 'Refresh DB / container controls' },
 
   // CommandDeck/FeatureMetadata/BadgeBar.tsx planning artifact actions
@@ -89,7 +89,7 @@ export const COMMAND_DECK_SURFACE_REGISTRY: readonly SurfaceActionRegistration[]
   { surface: 'StatusFlowControl', actionKey: 'createWorkspace', source: 'Compact Create Workspace button' },
   { surface: 'StatusFlowControl', actionKey: 'reopen', source: 'Compact Reopen button' },
 
-  // InspectorPanel.tsx workspace pane sections
+  // Drawer workspace pane sections
   { surface: 'WorkspacePane', actionKey: 'syncMain', source: 'AgentInfoSection mount point' },
   { surface: 'WorkspacePane', actionKey: 'reviewTest', source: 'ActionsSection mount point' },
   { surface: 'WorkspacePane', actionKey: 'createWorkspace', source: 'Workspace creation state' },

@@ -30,6 +30,9 @@ export type ReviewStatusValue = typeof ReviewStatusValue.Type
 export const TestStatusValue = Schema.Literals(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"])
 export type TestStatusValue = typeof TestStatusValue.Type
 
+export const UatStatusValue = Schema.Literals(["pending", "testing", "passed", "failed"])
+export type UatStatusValue = typeof UatStatusValue.Type
+
 export const MergeStatusValue = Schema.Literals(["pending", "queued", "merging", "verifying", "merged", "failed"])
 export type MergeStatusValue = typeof MergeStatusValue.Type
 
@@ -300,6 +303,8 @@ export const ReviewStatusSnapshot = Schema.Struct({
   issueId: IssueId,
   reviewStatus: Schema.optional(ReviewStatusValue),
   testStatus: Schema.optional(TestStatusValue),
+  uatStatus: Schema.optional(UatStatusValue),
+  uatNotes: Schema.optional(Schema.String),
   mergeStatus: Schema.optional(MergeStatusValue),
   verificationStatus: Schema.optional(VerificationStatusValue),
   verificationNotes: Schema.optional(Schema.String),

@@ -33,6 +33,7 @@ export const WS_METHODS = {
 
   // Streaming subscriptions
   subscribeDomainEvents: "pan.subscribeDomainEvents",
+  subscribeIssueEvents: "pan.subscribeIssueEvents",
   subscribeTerminal: "pan.subscribeTerminal",
   subscribeAgentOutput: "pan.subscribeAgentOutput",
   subscribeConversationMessages: "pan.subscribeConversationMessages",
@@ -183,6 +184,13 @@ export type SessionTreeDelta = typeof SessionTreeDelta.Type
 /** 1. Subscribe to the live domain event stream (stream) */
 export const SubscribeDomainEventsRpc = Rpc.make(WS_METHODS.subscribeDomainEvents, {
   payload: Schema.Struct({}),
+  success: DomainEvent,
+  stream: true,
+})
+
+/** 1b. Subscribe to the live domain event stream for one issue (stream) */
+export const SubscribeIssueEventsRpc = Rpc.make(WS_METHODS.subscribeIssueEvents, {
+  payload: Schema.Struct({ issueId: IssueId }),
   success: DomainEvent,
   stream: true,
 })
@@ -446,6 +454,7 @@ export const GetConversationStatsRpc = Rpc.make(WS_METHODS.getConversationStats,
 /** All Panopticon WebSocket RPC methods */
 export const PanRpcGroup = RpcGroup.make(
   SubscribeDomainEventsRpc,
+  SubscribeIssueEventsRpc,
   SubscribeTerminalRpc,
   SubscribeAgentOutputRpc,
   GetSnapshotRpc,

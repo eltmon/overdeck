@@ -25,7 +25,8 @@ import {
   Bot,
   RefreshCw,
 } from 'lucide-react';
-import { useDashboardStore, selectAgentList, selectIssues } from '../lib/store';
+import { isAgentRunningStatus } from '../lib/pipeline-state';
+import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
 import type { Issue, Agent } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -47,6 +48,9 @@ interface CommandPaletteProps {
   onNavigate: (tab: string, issueId?: string) => void;
 }
 
+const EMPTY_AGENTS: Agent[] = [];
+const EMPTY_ISSUES: Issue[] = [];
+
 // ─── Server API ───────────────────────────────────────────────────────────────
 
 async function callApi(path: string, method = 'POST'): Promise<void> {
@@ -61,8 +65,9 @@ async function callApi(path: string, method = 'POST'): Promise<void> {
 
 export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
-  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
-  const issues = useDashboardStore(selectIssues) as Issue[];
+  const agents = useDashboardStore((state) => isOpen ? selectAgents(state) : EMPTY_AGENTS) as unknown as Agent[];
+  const issues = useDashboardStore((state) => isOpen ? selectIssues(state) : EMPTY_ISSUES) as Issue[];
+  const openIssue = useDashboardStore((state) => state.openIssue);
 
   // Reset query when opened
   useEffect(() => {
@@ -87,6 +92,8 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     // Small delay so modal closes before action side effects
     setTimeout(action, 50);
   }, [onClose]);
+
+  if (!isOpen) return null;
 
   // ─── Static actions ─────────────────────────────────────────────────────────
 
@@ -171,7 +178,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
       icon: Terminal,
       group: 'Navigation',
       keywords: ['shell', 'console'],
-      onSelect: () => onNavigate('terminal'),
+      onSelect: () => onNavigate('command-deck'),
     },
     {
       id: 'open-agents',
@@ -184,24 +191,32 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     },
   ];
 
-  // ─── Dynamic: active workspaces ─────────────────────────────────────────────
+  // ─── Dynamic: issues ────────────────────────────────────────────────────────
 
-  const activeAgents = agents.filter((a) => a.status !== 'dead');
+  const activeAgents = agents.filter((agent) => isAgentRunningStatus(agent.status));
   const activeIssueIds = new Set(activeAgents.map((a) => a.issueId?.toLowerCase()).filter(Boolean));
+  const branchByIssueId = new Map(
+    activeAgents
+      .filter((agent) => agent.issueId && agent.git?.branch)
+      .map((agent) => [agent.issueId!.toLowerCase(), agent.git!.branch]),
+  );
 
-  const workspaceActions: PaletteAction[] = issues
-    .filter((issue) => activeIssueIds.has(issue.identifier.toLowerCase()))
-    .map((issue) => ({
-      id: `workspace-${issue.identifier}`,
+  const issueActions: PaletteAction[] = issues.map((issue) => {
+    const issueKey = issue.identifier.toLowerCase();
+    const branch = branchByIssueId.get(issueKey);
+    const active = activeIssueIds.has(issueKey);
+    return {
+      id: `issue-${issue.identifier}`,
       label: issue.identifier,
-      description: issue.title,
+      description: branch ? `${issue.title} · ${branch}` : issue.title,
       icon: FolderOpen,
-      group: 'Active Workspaces',
-      keywords: [issue.identifier.toLowerCase(), issue.title.toLowerCase()],
+      group: active ? 'Active Workspaces' : 'Issues',
+      keywords: [issue.id, issue.identifier, issue.title, branch ?? '', issue.workspacePath ?? ''].filter(Boolean),
       onSelect: () => {
-        onNavigate('kanban', issue.identifier);
+        openIssue(issue.identifier);
       },
-    }));
+    };
+  });
 
   // ─── Dynamic: running agents ─────────────────────────────────────────────────
 
@@ -211,16 +226,16 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
     description: agent.issueId ? `Working on ${agent.issueId}` : agent.status,
     icon: User,
     group: 'Running Agents',
-    keywords: [agent.id, agent.issueId ?? '', agent.status],
+    keywords: [agent.id, agent.issueId ?? '', agent.git?.branch ?? '', agent.status],
     onSelect: () => {
-      if (agent.issueId) onNavigate('kanban', agent.issueId);
+      if (agent.issueId) openIssue(agent.issueId);
       else onNavigate('agents');
     },
   }));
 
   // ─── Filter ─────────────────────────────────────────────────────────────────
 
-  const allActions = [...staticActions, ...workspaceActions, ...agentActions];
+  const allActions = [...staticActions, ...issueActions, ...agentActions];
 
   const filtered = query.trim().length === 0
     ? allActions
@@ -235,8 +250,6 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
 
   // Group
   const groups = [...new Set(filtered.map((a) => a.group))];
-
-  if (!isOpen) return null;
 
   return (
     <div

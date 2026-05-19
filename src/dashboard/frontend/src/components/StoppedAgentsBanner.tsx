@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Play, X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
-import { useDashboardStore, selectAgentList } from '../lib/store';
+import { useDashboardStore, selectAgents } from '../lib/store';
 import { Agent, type StartAgentResponse } from '../types';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
 
@@ -12,7 +12,7 @@ interface RestartResult {
 }
 
 export function StoppedAgentsBanner() {
-  const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
 
   // Show toast when an agent hits an API error (resolution transitions to 'api_error')
   const prevApiErrorAgentsRef = useRef<Set<string>>(new Set());

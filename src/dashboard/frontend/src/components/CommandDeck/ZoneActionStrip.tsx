@@ -7,7 +7,7 @@
  * into a "…" menu (danger zone + non-essential artifacts).
  *
  * This component is self-contained: it fetches its own data and wires its own
- * mutations so ZoneA doesn't need to lift state from InspectorPanel.
+ * mutations so ZoneA doesn't need to lift state from Issue Drawer.
  */
 
 import { useState, useMemo } from 'react';
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { Agent, Issue } from '../../types';
 import { getZoneAActions, type ActionKey } from '../../lib/commandDeckActions';
+import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { useZoneAActions } from './useZoneAActions';
 import { MergeButton } from '../MergeButton';
 import { StopAgentButton } from '../StopAgentButton';
@@ -28,6 +29,8 @@ import { useAvailableModels, HarnessSelect } from '../shared/ModelPicker/ModelPi
 import type { Harness } from '../shared/ModelPicker';
 import { useSwitchModel } from '../../hooks/useSwitchModel';
 import { useRestartAgent } from '../../hooks/useRestartAgent';
+
+void COMMAND_DECK_SURFACE_REGISTRY;
 
 interface ZoneActionStripProps {
   issueId: string;

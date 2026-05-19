@@ -7,40 +7,47 @@ import App, {
   getConversationRouteState,
   getConversationViewModeFromSearch,
   getConvIdFromPath,
+  normalizeLegacyAwaitingMergeRoute,
   parseConversationViewModes,
   serializeConversationViewModes,
 } from './App';
 
 const {
   mockDashboardState,
+  mockOpenIssue,
   mockRefreshDashboardState,
   mockToastError,
   mockToastInfo,
   mockToastSuccess,
-} = vi.hoisted(() => ({
-  mockDashboardState: {
-    agents: [],
-    issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
-    dashboardLifecycle: { active: false },
-    channelPermissionRequestsById: {},
-  },
-  mockRefreshDashboardState: vi.fn().mockResolvedValue(undefined),
-  mockToastError: vi.fn(),
-  mockToastInfo: vi.fn(),
-  mockToastSuccess: vi.fn(),
-}))
+} = vi.hoisted(() => {
+  const mockOpenIssue = vi.fn();
+
+  return {
+    mockOpenIssue,
+    mockDashboardState: {
+      agents: [],
+      issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
+      dashboardLifecycle: { active: false },
+      channelPermissionRequestsById: {},
+      drawer: { issueId: null, tab: 'overview' },
+      openIssue: mockOpenIssue,
+    },
+    mockRefreshDashboardState: vi.fn().mockResolvedValue(undefined),
+    mockToastError: vi.fn(),
+    mockToastInfo: vi.fn(),
+    mockToastSuccess: vi.fn(),
+  };
+})
 
 vi.mock('./components/KanbanBoard', () => ({
   KanbanBoard: ({ onSelectIssue }: { onSelectIssue?: (issueId: string | null) => void }) => (
     <button onClick={() => onSelectIssue?.('PAN-123')}>Open issue</button>
   ),
 }));
-vi.mock('./components/AgentList', () => ({ AgentList: () => null }));
-vi.mock('./components/AgentOutputPanel', () => ({ AgentOutputPanel: () => null }));
+vi.mock('./components/Agents/FleetAgentsView', () => ({ FleetAgentsView: () => null }));
 vi.mock('./components/HealthDashboard', () => ({ HealthDashboard: () => null }));
 vi.mock('./components/SkillsList', () => ({ SkillsList: () => null }));
 vi.mock('./components/ActivityPanel', () => ({ ActivityPanel: () => null }));
-vi.mock('./components/AwaitingMergePage', () => ({ AwaitingMergePage: () => null }));
 vi.mock('./components/ConfirmationDialog', () => ({
   ConfirmationDialog: () => null,
 }));
@@ -71,11 +78,8 @@ vi.mock('./components/flywheel/FlywheelConversationPane', () => ({ FlywheelConve
 vi.mock('./components/Sidebar', () => ({ Sidebar: () => null }));
 vi.mock('./components/BootstrapGate', () => ({ BootstrapGate: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('./components/skeletons/KanbanSkeleton', () => ({ KanbanSkeleton: () => null }));
-vi.mock('./components/skeletons/AgentListSkeleton', () => ({ AgentListSkeleton: () => null }));
+vi.mock('./components/skeletons/AgentsSkeleton', () => ({ AgentsSkeleton: () => null }));
 vi.mock('./components/skeletons/GodViewSkeleton', () => ({ GodViewSkeleton: () => null }));
-vi.mock('./components/DetailPanelLayout', () => ({
-  DetailPanelLayout: ({ inline }: { inline?: boolean }) => <div data-testid="detail-panel-layout" data-inline={inline ? 'true' : 'false'} />,
-}));
 vi.mock('./components/StandaloneTerminal', () => ({ StandaloneTerminal: () => null }));
 vi.mock('./hooks/useCodexAutoRetry', () => ({ useCodexAutoRetry: () => null }));
 vi.mock('./components/SystemHealthPill', () => ({ SystemHealthPill: () => null }));
@@ -96,7 +100,7 @@ vi.mock('./lib/store', () => ({
     }
     return [];
   }),
-  selectAgentList: (state: { agents: unknown[] }) => state.agents,
+  selectAgents: (state: { agents: unknown[] }) => state.agents,
   selectChannelPermissionRequests: (state: { channelPermissionRequestsById?: Record<string, unknown> }) =>
     Object.values(state.channelPermissionRequestsById ?? {}),
   selectIssues: (state: { issues: unknown[] }) => state.issues,
@@ -116,6 +120,12 @@ vi.mock('./components/CommandDeck', () => ({
       <button onClick={() => onConversationViewModeChange?.('conversation')}>Conversation</button>
     </div>
   ),
+}));
+vi.mock('./components/Pipeline/PipelineView', () => ({
+  PipelineView: () => <div data-testid="pipeline-view" />,
+}));
+vi.mock('./components/drawer/IssueDrawer', () => ({
+  IssueDrawer: () => null,
 }));
 
 function renderApp() {
@@ -138,6 +148,9 @@ beforeEach(() => {
   mockDashboardState.issues = [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }]
   mockDashboardState.dashboardLifecycle = { active: false }
   mockDashboardState.channelPermissionRequestsById = {}
+  mockDashboardState.drawer = { issueId: null, tab: 'overview' }
+  mockDashboardState.openIssue = mockOpenIssue
+  mockOpenIssue.mockClear()
   mockRefreshDashboardState.mockClear()
   mockToastError.mockClear()
   mockToastInfo.mockClear()
@@ -196,6 +209,36 @@ describe('conversation route helpers', () => {
       tab: 'flywheel',
       convId: null,
     });
+  });
+
+  it('resolves Pipeline as the default route and Board as /board', () => {
+    window.history.replaceState(null, '', '/');
+    expect(getConversationRouteState().tab).toBe('pipeline');
+    window.history.replaceState(null, '', '/pipeline');
+    expect(getConversationRouteState().tab).toBe('pipeline');
+
+    window.history.replaceState(null, '', '/board');
+    expect(getConversationRouteState().tab).toBe('kanban');
+
+    window.history.replaceState(null, '', '/unknown');
+    expect(getConversationRouteState().tab).toBe('pipeline');
+  });
+
+  it('normalizes legacy awaiting-merge routes to Pipeline ship filters', () => {
+    expect(normalizeLegacyAwaitingMergeRoute('/awaiting-merge', '')).toBe('/pipeline?phase=ship');
+    expect(normalizeLegacyAwaitingMergeRoute('/awaiting-merge', '?subview=blocked')).toBe('/pipeline?phase=ship&blocked=1');
+    expect(normalizeLegacyAwaitingMergeRoute('/awaiting-merge', '?subview=no-pr')).toBe('/pipeline?phase=ship&noPr=1');
+    expect(normalizeLegacyAwaitingMergeRoute('/board', '')).toBeNull();
+  });
+
+  it('rewrites /awaiting-merge before rendering Pipeline', () => {
+    window.history.replaceState(null, '', '/awaiting-merge?subview=blocked');
+
+    renderApp();
+
+    expect(window.location.pathname).toBe('/pipeline');
+    expect(window.location.search).toBe('?phase=ship&blocked=1');
+    expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
   });
 });
 
@@ -256,9 +299,8 @@ describe('App conversation view routing', () => {
   });
 });
 
-describe('App kanban issue details', () => {
+describe('App Pipeline routing', () => {
   beforeEach(() => {
-    window.history.replaceState(null, '', '/');
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === '/api/version') {
@@ -274,12 +316,56 @@ describe('App kanban issue details', () => {
     }));
   });
 
-  it('opens issue details inline in a modal from kanban selection', () => {
+  it('renders PipelineView at /', () => {
+    window.history.replaceState(null, '', '/');
+    renderApp();
+    expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
+  });
+
+  it('renders PipelineView at /pipeline', () => {
+    window.history.replaceState(null, '', '/pipeline');
+    renderApp();
+    expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
+  });
+
+  it('marks the parent surface when the drawer is open', () => {
+    mockDashboardState.drawer = { issueId: 'PAN-123', tab: 'overview' };
+    window.history.replaceState(null, '', '/');
+    renderApp();
+    expect(screen.getByRole('main')).toHaveAttribute('data-drawer-open', 'true');
+  });
+
+  it('renders Board at /board', () => {
+    window.history.replaceState(null, '', '/board');
+    renderApp();
+    expect(screen.getByText('Open issue')).toBeInTheDocument();
+  });
+});
+
+describe('App kanban issue details', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/board');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/version') {
+        return new Response(JSON.stringify({ version: '0.5.0' }), { status: 200 });
+      }
+      if (url === '/api/tracker-status') {
+        return new Response(JSON.stringify({ primary: 'github', configured: [] }), { status: 200 });
+      }
+      if (url === '/api/confirmations') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    }));
+  });
+
+  it('opens the issue drawer from kanban selection', () => {
     renderApp();
 
     fireEvent.click(screen.getByText('Open issue'));
 
-    expect(screen.getByTestId('detail-panel-layout')).toHaveAttribute('data-inline', 'true');
+    expect(mockOpenIssue).toHaveBeenCalledWith('PAN-123');
   });
 });
 

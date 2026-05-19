@@ -26,7 +26,13 @@ import { saveSnapshotToCache } from './snapshotCache'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
+export type DrawerState = {
+  issueId: string | null
+  tab: string
+}
+
 export interface DashboardState extends ReadModelState {
+  drawer: DrawerState
   /** Whether the initial snapshot has been loaded */
   bootstrapComplete: boolean
   /** ISO timestamp of the last received snapshot (used for freshness indicator) */
@@ -37,12 +43,17 @@ export interface DashboardStore extends DashboardState {
   syncSnapshot(snapshot: DashboardSnapshot): void
   applyEvent(event: DomainEvent): void
   applyEvents(events: DomainEvent[]): void
+  openIssue(issueId: string, tab?: string): void
+  closeIssue(): void
+  setDrawerTab(tab: string): void
+  syncDrawerFromUrl(): void
 }
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
 const initialState: DashboardState = {
   ...INITIAL_READ_MODEL_STATE,
+  drawer: { issueId: null, tab: 'overview' },
   bootstrapComplete: false,
   snapshotTimestamp: null,
 }
@@ -50,18 +61,57 @@ const initialState: DashboardState = {
 // ─── Thin wrappers over shared reducers (add bootstrapComplete flag) ─────────
 
 function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): DashboardState {
-  return { ...syncSnapshotShared(state, snapshot), bootstrapComplete: true, snapshotTimestamp: snapshot.timestamp }
+  return {
+    ...syncSnapshotShared(state, snapshot),
+    drawer: state.drawer,
+    bootstrapComplete: true,
+    snapshotTimestamp: snapshot.timestamp,
+  }
 }
 
 function applyEvent(state: DashboardState, event: DomainEvent): DashboardState {
-  return { ...applyEventShared(state, event), bootstrapComplete: state.bootstrapComplete, snapshotTimestamp: state.snapshotTimestamp }
+  return {
+    ...applyEventShared(state, event),
+    drawer: state.drawer,
+    bootstrapComplete: state.bootstrapComplete,
+    snapshotTimestamp: state.snapshotTimestamp,
+  }
 }
 
 function applyEvents(state: DashboardState, events: DomainEvent[]): DashboardState {
-  return { ...applyEventsShared(state, events), bootstrapComplete: state.bootstrapComplete, snapshotTimestamp: state.snapshotTimestamp }
+  return {
+    ...applyEventsShared(state, events),
+    drawer: state.drawer,
+    bootstrapComplete: state.bootstrapComplete,
+    snapshotTimestamp: state.snapshotTimestamp,
+  }
 }
 
 // ─── Zustand store ────────────────────────────────────────────────────────────
+
+function replaceDrawerUrl(drawer: DrawerState) {
+  if (typeof window === 'undefined') return
+
+  const url = new URL(window.location.href)
+  if (drawer.issueId) {
+    url.searchParams.set('issue', drawer.issueId)
+    url.searchParams.set('tab', drawer.tab)
+  } else {
+    url.searchParams.delete('issue')
+    url.searchParams.delete('tab')
+  }
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+}
+
+function readDrawerFromUrl(): DrawerState {
+  if (typeof window === 'undefined') return { issueId: null, tab: 'overview' }
+
+  const params = new URLSearchParams(window.location.search)
+  return {
+    issueId: params.get('issue'),
+    tab: params.get('tab') || 'overview',
+  }
+}
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
   ...initialState,
@@ -76,6 +126,28 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
 
   applyEvents: (events) =>
     set((state) => applyEvents(state, events)),
+
+  openIssue: (issueId, tab = 'overview') => {
+    const drawer = { issueId, tab }
+    replaceDrawerUrl(drawer)
+    set({ drawer })
+  },
+
+  closeIssue: () => {
+    const drawer = { issueId: null, tab: 'overview' }
+    replaceDrawerUrl(drawer)
+    set({ drawer })
+  },
+
+  setDrawerTab: (tab) =>
+    set((state) => {
+      const drawer = { issueId: state.drawer.issueId, tab }
+      replaceDrawerUrl(drawer)
+      return { drawer }
+    }),
+
+  syncDrawerFromUrl: () =>
+    set({ drawer: readDrawerFromUrl() }),
 }))
 
 // ─── Selector memoization helpers ─────────────────────────────────────────────
@@ -103,7 +175,7 @@ function memoizeArraySelector<S, K extends keyof S, R>(
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
-export const selectAgentList = memoizeArraySelector<DashboardState, 'agentsById', AgentSnapshot[]>(
+export const selectAgents = memoizeArraySelector<DashboardState, 'agentsById', AgentSnapshot[]>(
   'agentsById',
   (agents) => Object.values(agents),
 )
@@ -115,7 +187,7 @@ export const selectAgentById =
 
 /**
  * PAN-1048 — selectSpecialistList retired. Consumers derive role-based lists
- * from `selectAgentList` filtered by `agent.role` (review / test / ship).
+ * from `selectAgents` filtered by `agent.role` (review / test / ship).
  */
 export const selectAgentsByRole =
   (role: 'review' | 'test' | 'ship' | 'work' | 'plan') =>

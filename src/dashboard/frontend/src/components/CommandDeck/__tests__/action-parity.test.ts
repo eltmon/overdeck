@@ -1,6 +1,6 @@
 /**
  * Action parity smoke test — verifies that every user-facing action from
- * the legacy views (KanbanBoard, InspectorPanel, BadgeBar, StatusFlowControl)
+ * the legacy views (KanbanBoard, Issue Drawer, BadgeBar, StatusFlowControl)
  * has a corresponding ActionKey in the Command Deck action maps.
  *
  * This is a compile-time/unit test — no DOM rendering needed.
@@ -84,7 +84,7 @@ describe('Command Deck action parity', () => {
     'Reopen': 'reopen',
     'Cancel': 'cancel',
 
-    // InspectorPanel / StatusFlowControl pipeline actions
+    // Issue Drawer / StatusFlowControl pipeline actions
     'Recover': 'recover',
     'Resume session': 'resumeSession',
     'Reset session': 'resetSession',

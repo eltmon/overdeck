@@ -2511,6 +2511,9 @@ const getIssueBeadsRoute = HttpRouter.add(
       type: bead.issue_type || bead.type || 'task',
       blockedBy: bead.blocked_by || [],
       createdAt: bead.created_at,
+      startedAt: bead.started_at,
+      updatedAt: bead.updated_at,
+      closedAt: bead.closed_at,
       labels: bead.labels || [],
       priority: bead.priority,
     }));

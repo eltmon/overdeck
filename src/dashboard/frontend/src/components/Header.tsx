@@ -2,8 +2,9 @@
 // The Tab type is exported here since App.tsx and other components import it.
 
 export type Tab =
-  | 'command-deck'
+  | 'pipeline'
   | 'kanban'
+  | 'command-deck'
   | 'agents'
   | 'flywheel'
   | 'resources'
@@ -12,7 +13,6 @@ export type Tab =
   | 'activity'
   | 'metrics'
   | 'costs'
-  | 'awaiting-merge'
   | 'autopreso'
   | 'settings'
   | 'god-view'

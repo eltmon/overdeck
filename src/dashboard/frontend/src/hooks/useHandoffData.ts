@@ -40,10 +40,11 @@ export function useHandoffSuggestion(agentId: string) {
   });
 }
 
-export function useAgentCost(agentId: string) {
+export function useAgentCost(agentId: string | null | undefined) {
   return useQuery({
     queryKey: ['agent-cost', agentId],
-    queryFn: () => fetchAgentCost(agentId),
-    refetchInterval: 60000, // Refresh every minute
+    queryFn: () => agentId ? fetchAgentCost(agentId) : Promise.reject(new Error('agentId required')),
+    enabled: Boolean(agentId),
+    refetchInterval: 60000,
   });
 }

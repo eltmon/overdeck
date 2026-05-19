@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
-import { bucketFeature, ProjectOverview, type PipelineStage } from '../ProjectOverview';
+import { bucketFeaturePhase, ProjectOverview } from '../ProjectOverview';
+import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useDashboardStore } from '../../../lib/store';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
 
@@ -12,7 +13,7 @@ function makeFeature(overrides: Partial<ProjectFeature> = {}): ProjectFeature {
     projectName: 'panopticon-cli',
     branch: 'feature/pan-1044',
     status: 'open',
-    stateLabel: 'In Progress',
+    stateLabel: 'Todo',
     agentStatus: null,
     hasPlanning: false,
     hasPrd: false,
@@ -30,39 +31,39 @@ function reviewStatus(overrides: Partial<ReviewStatusSnapshot>): ReviewStatusSna
   } as ReviewStatusSnapshot;
 }
 
-function expectStage(
-  expected: PipelineStage,
+function expectPhase(
+  expected: PipelineIssuePhase,
   featureOverrides: Partial<ProjectFeature>,
   status?: Partial<ReviewStatusSnapshot>,
 ) {
   expect(
-    bucketFeature(
+    bucketFeaturePhase(
       makeFeature(featureOverrides),
       status ? reviewStatus(status) : undefined,
     ),
   ).toBe(expected);
 }
 
-describe('bucketFeature', () => {
+describe('bucketFeaturePhase', () => {
   beforeEach(() => {
     useDashboardStore.setState({ reviewStatusByIssueId: {} });
   });
 
   it('buckets stuck issues by the stuck flag', () => {
-    expectStage('stuck', {}, { stuck: true });
+    expectPhase('todo', {}, { stuck: true });
   });
 
   it('buckets non-progress pipeline failures and blockers as stuck', () => {
-    expectStage('stuck', {}, { reviewStatus: 'failed' });
-    expectStage('stuck', {}, { reviewStatus: 'blocked' });
-    expectStage('stuck', {}, { testStatus: 'failed' });
-    expectStage('stuck', {}, { testStatus: 'dispatch_failed' });
-    expectStage('stuck', {}, { mergeStatus: 'failed' });
-    expectStage('stuck', {}, { verificationStatus: 'failed' });
+    expectPhase('review', {}, { reviewStatus: 'failed' });
+    expectPhase('review', {}, { reviewStatus: 'blocked' });
+    expectPhase('review', {}, { testStatus: 'failed' });
+    expectPhase('todo', {}, { testStatus: 'dispatch_failed' });
+    expectPhase('ship', {}, { mergeStatus: 'failed' });
+    expectPhase('review', {}, { verificationStatus: 'failed' });
   });
 
   it('buckets blocker reasons as stuck', () => {
-    expectStage('stuck', {}, {
+    expectPhase('todo', {}, {
       blockerReasons: [
         {
           type: 'merge_conflict',
@@ -74,43 +75,43 @@ describe('bucketFeature', () => {
   });
 
   it('buckets active merge statuses as merging', () => {
-    expectStage('merging', {}, { mergeStatus: 'queued' });
-    expectStage('merging', {}, { mergeStatus: 'merging' });
-    expectStage('merging', {}, { mergeStatus: 'verifying' });
+    expectPhase('ship', {}, { mergeStatus: 'queued' });
+    expectPhase('ship', {}, { mergeStatus: 'merging' });
+    expectPhase('ship', {}, { mergeStatus: 'verifying' });
   });
 
   it('buckets ready-for-merge issues as awaitingMerge', () => {
-    expectStage('awaitingMerge', {}, { readyForMerge: true });
+    expectPhase('ship', {}, { readyForMerge: true });
   });
 
   it('buckets testing issues as tests', () => {
-    expectStage('tests', {}, { testStatus: 'testing' });
+    expectPhase('review', {}, { testStatus: 'testing' });
   });
 
   it('buckets active reviews as review', () => {
-    expectStage('review', {}, { reviewStatus: 'reviewing' });
+    expectPhase('review', {}, { reviewStatus: 'reviewing' });
   });
 
   it('buckets running verification as buildGate', () => {
-    expectStage('buildGate', {}, { verificationStatus: 'running' });
+    expectPhase('review', {}, { verificationStatus: 'running' });
   });
 
   it('buckets active work-agent issues without review status as working', () => {
-    expectStage('working', { agentStatus: 'running' }, undefined);
-    expectStage('working', { agentStatus: 'active' }, undefined);
-    expectStage('working', {
+    expectPhase('work', { agentStatus: 'running' }, undefined);
+    expectPhase('work', { agentStatus: 'active' }, undefined);
+    expectPhase('work', {
       agentStatus: 'stopped',
       sessions: [{ type: 'work', presence: 'active' }] as ProjectFeature['sessions'],
     }, undefined);
   });
 
   it('does not bucket stopped or suspended agents as working', () => {
-    expectStage('idle', { agentStatus: 'stopped' }, undefined);
-    expectStage('idle', { agentStatus: 'suspended' }, undefined);
+    expectPhase('todo', { agentStatus: 'stopped' }, undefined);
+    expectPhase('todo', { agentStatus: 'suspended' }, undefined);
   });
 
   it('buckets planned issues without work sessions as planning using SessionNode.type', () => {
-    expectStage('planning', {
+    expectPhase('plan', {
       hasPlanning: true,
       sessions: [
         { type: 'planning' },
@@ -120,14 +121,14 @@ describe('bucketFeature', () => {
   });
 
   it('does not bucket planned issues with a work session as planning', () => {
-    expectStage('idle', {
+    expectPhase('plan', {
       hasPlanning: true,
       sessions: [{ type: 'work' }] as ProjectFeature['sessions'],
     });
   });
 
   it('buckets issues with no active signals as idle', () => {
-    expectStage('idle', {}, undefined);
+    expectPhase('todo', {}, undefined);
   });
 
   it('shows stuck reasons for blocked review and test dispatch failures', () => {
@@ -180,6 +181,58 @@ describe('bucketFeature', () => {
     expect(screen.getByText('Active agents').parentElement).toHaveTextContent('3');
   });
 
+  it('renders a project-scoped five-tile metric strip that updates with feature state', () => {
+    const { rerender } = render(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        features={[
+          makeFeature({ issueId: 'PAN-1', agentStatus: 'running' }),
+          makeFeature({ issueId: 'PAN-2' }),
+        ]}
+        issueCosts={{ 'PAN-1': 1.25, 'PAN-2': 2 }}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    const strip = screen.getByText('Active issues').closest('[data-component="metric-strip"]') as HTMLElement;
+    expect(strip).toHaveAttribute('data-columns', '5');
+    expect(strip).toHaveTextContent('Active issues2panopticon-cli');
+    expect(strip).toHaveTextContent('Work running1work agents');
+    expect(strip).toHaveTextContent('Spend$3.25');
+
+    rerender(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        features={[
+          makeFeature({ issueId: 'PAN-1', agentStatus: 'running' }),
+          makeFeature({ issueId: 'PAN-2', agentStatus: 'active' }),
+          makeFeature({ issueId: 'PAN-3', agentStatus: 'running' }),
+        ]}
+        issueCosts={{ 'PAN-1': 1.25, 'PAN-2': 2, 'PAN-3': 4 }}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(strip).toHaveTextContent('Active issues3panopticon-cli');
+    expect(strip).toHaveTextContent('Work running3work agents');
+    expect(strip).toHaveTextContent('Spend$7.25');
+  });
+
+  it('renders project issues with shared command-deck IssueRow and VerbBadge primitives', () => {
+    render(
+      <ProjectOverview
+        projectName="panopticon-cli"
+        features={[makeFeature({ issueId: 'PAN-1', agentStatus: 'running' })]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    const row = screen.getByText('PAN-1').closest('[data-component="issue-row"]') as HTMLElement;
+    expect(row).toHaveAttribute('data-variant', 'command-deck');
+    expect(row.querySelector('[data-component="verb-badge"]')).toHaveAttribute('data-variant', 'WORK RUNNING');
+  });
+
   it('renders partial cost breakdown details without crashing', () => {
     render(
       <ProjectOverview
@@ -196,7 +249,7 @@ describe('bucketFeature', () => {
       />,
     );
 
-    fireEvent.mouseEnter(screen.getByText('$1.23'));
+    fireEvent.mouseEnter(screen.getAllByText('$1.23')[1]!);
 
     expect(screen.getAllByText('No cost data')).toHaveLength(2);
   });

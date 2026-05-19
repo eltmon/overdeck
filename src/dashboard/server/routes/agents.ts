@@ -19,6 +19,7 @@ import { withBdMutex } from '../../../lib/bd-mutex.js';
  *   GET    /api/agents
  *   GET    /api/agents/:id/output
  *   POST   /api/agents/:id/message
+ *   POST   /api/agents/:id/tell
  *   DELETE /api/agents/:id
  *   GET    /api/agents/:id/health-history
  *   POST   /api/agents/:id/poke
@@ -979,84 +980,127 @@ const getAgentConversationRoute = HttpRouter.add(
   })),
 );
 
+async function sendAgentMessage(id: string, message: string) {
+  const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
+  const remoteStateFile = join(agentStateDir, 'remote-state.json');
+  let isRemote = false;
+  let vmName = '';
+
+  if (existsSync(remoteStateFile)) {
+    try {
+      const state = JSON.parse(await readFile(remoteStateFile, 'utf-8'));
+      if (state.location === 'remote' && state.vmName) {
+        isRemote = true;
+        vmName = state.vmName;
+      }
+    } catch {}
+  }
+
+  if (isRemote && vmName) {
+    const { sendToRemoteAgent } = await import('../../../lib/remote/remote-agents.js');
+    await sendToRemoteAgent(id, vmName, message);
+    return { success: true, remote: true };
+  }
+
+  await messageAgent(id, message);
+  return { success: true };
+}
+
+export function validateAgentMessageOrigin(request: HttpServerRequest.HttpServerRequest) {
+  const originCheck = validateOrigin(request);
+  if (!originCheck.ok) {
+    return {
+      ok: false as const,
+      response: jsonResponse({ ok: false, error: originCheck.error }, { status: 403 }),
+    };
+  }
+  return { ok: true as const };
+}
+
+function postAgentMessageLikeRoute(path: string) {
+  return HttpRouter.add(
+    'POST',
+    path,
+    httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const originCheck = validateAgentMessageOrigin(request);
+      if (!originCheck.ok) return originCheck.response;
+
+      const params = yield* HttpRouter.params;
+      const id = params['id'] ?? '';
+      const body = yield* readJsonBody;
+
+      const { message } = body as any;
+      if (!message) {
+        return jsonResponse({ error: 'Message required' }, { status: 400 });
+      }
+
+      return yield* Effect.promise(() => sendAgentMessage(id, message)).pipe(
+        Effect.map((result) => jsonResponse(result)),
+      );
+    })),
+  );
+}
+
 // ─── Route: POST /api/agents/:id/message ─────────────────────────────────────
 
-const postAgentMessageRoute = HttpRouter.add(
-  'POST',
-  '/api/agents/:id/message',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    const body = yield* readJsonBody;
+const postAgentMessageRoute = postAgentMessageLikeRoute('/api/agents/:id/message');
 
-    const { message } = body as any;
-    if (!message) {
-      return jsonResponse({ error: 'Message required' }, { status: 400 });
-    }
+// ─── Route: POST /api/agents/:id/tell ────────────────────────────────────────
 
-    const agentStateDir = join(homedir(), '.panopticon', 'agents', id);
-    const remoteStateFile = join(agentStateDir, 'remote-state.json');
-    let isRemote = false;
-    let vmName = '';
+const postAgentTellRoute = postAgentMessageLikeRoute('/api/agents/:id/tell');
 
-    if (existsSync(remoteStateFile)) {
-      try {
-        const state = JSON.parse(yield* Effect.promise(() => readFile(remoteStateFile, 'utf-8')));
-        if (state.location === 'remote' && state.vmName) {
-          isRemote = true;
-          vmName = state.vmName;
-        }
-      } catch {}
-    }
+function agentStopRoute(method: 'DELETE' | 'POST', path: string) {
+  return HttpRouter.add(
+    method,
+    path,
+    httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const originCheck = validateOrigin(request);
+      if (!originCheck.ok) {
+        return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
+      }
 
-    if (isRemote && vmName) {
-      const { sendToRemoteAgent } = yield* Effect.promise(() => import('../../../lib/remote/remote-agents.js'));
-      yield* Effect.promise(() => sendToRemoteAgent(id, vmName, message));
-      return jsonResponse({ success: true, remote: true });
-    } else {
-      yield* Effect.promise(() => messageAgent(id, message));
+      const params = yield* HttpRouter.params;
+      const id = params['id'] ?? '';
+      const eventStore = yield* EventStoreService;
+
+      const stateBeforeStop = yield* Effect.promise(() => getAgentStateAsync(id));
+      yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.stop_requested'));
+      yield* Effect.promise(() => stopAgentAsync(id));
+      // PAN-1048 review feedback 004 (C1): AgentStoppedEvent requires both
+      // agentId AND issueId on the payload (packages/contracts/src/events.ts:36);
+      // ws-rpc drops events that fail Schema validation, so emits without issueId
+      // never reach subscribers and the dashboard misses the stop transition.
+      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+        type: 'agent.stopped',
+        timestamp: new Date().toISOString(),
+        payload: { agentId: id, issueId: stateBeforeStop?.issueId ?? '' },
+      })));
+      const issueId = stateBeforeStop?.issueId;
+      // PAN-1048: derive label from role; legacy state.phase no longer exists.
+      const phaseLabel = stateBeforeStop?.role === 'plan' ? 'planning' : 'work';
+      emitActivityEntry({
+        source: 'dashboard',
+        level: 'info',
+        message: issueId
+          ? `User stopped ${issueId} ${phaseLabel} agent`
+          : `User stopped agent ${id}`,
+        issueId,
+      });
+      invalidateAgentsCache();
       return jsonResponse({ success: true });
-    }
-  })),
-);
+    })),
+  );
+}
 
 // ─── Route: DELETE /api/agents/:id ───────────────────────────────────────────
 
-const deleteAgentRoute = HttpRouter.add(
-  'DELETE',
-  '/api/agents/:id',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    const eventStore = yield* EventStoreService;
+const deleteAgentRoute = agentStopRoute('DELETE', '/api/agents/:id');
 
-    const stateBeforeStop = yield* Effect.promise(() => getAgentStateAsync(id));
-    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.delete_requested'));
-    yield* Effect.promise(() => stopAgentAsync(id));
-    // PAN-1048 review feedback 004 (C1): AgentStoppedEvent requires both
-    // agentId AND issueId on the payload (packages/contracts/src/events.ts:36);
-    // ws-rpc drops events that fail Schema validation, so emits without issueId
-    // never reach subscribers and the dashboard misses the stop transition.
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-      type: 'agent.stopped',
-      timestamp: new Date().toISOString(),
-      payload: { agentId: id, issueId: stateBeforeStop?.issueId ?? '' },
-    })));
-    const issueId = stateBeforeStop?.issueId;
-    // PAN-1048: derive label from role; legacy state.phase no longer exists.
-    const phaseLabel = stateBeforeStop?.role === 'plan' ? 'planning' : 'work';
-    emitActivityEntry({
-      source: 'dashboard',
-      level: 'info',
-      message: issueId
-        ? `User stopped ${issueId} ${phaseLabel} agent`
-        : `User stopped agent ${id}`,
-      issueId,
-    });
-    invalidateAgentsCache();
-    return jsonResponse({ success: true });
-  })),
-);
+// ─── Route: POST /api/agents/:id/stop ────────────────────────────────────────
+
+const postAgentStopRoute = agentStopRoute('POST', '/api/agents/:id/stop');
 
 // ─── Route: GET /api/agents/:id/health-history ───────────────────────────────
 
@@ -1854,7 +1898,7 @@ const postAgentRestartRoute = HttpRouter.add(
     }
 
     // Quick restart — synchronous
-    const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, graceful: false, message }));
+    const result = yield* Effect.promise(() => restartAgent(id, { model: restartModel, harness, graceful: false, message }));
 
     if (result.success) {
       const updatedState = yield* Effect.promise(() => getAgentStateAsync(id));
@@ -3461,7 +3505,9 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentOutputRoute,
   getAgentConversationRoute,
   postAgentMessageRoute,
+  postAgentTellRoute,
   deleteAgentRoute,
+  postAgentStopRoute,
   getAgentHealthHistoryRoute,
   postAgentPokeRoute,
   getAgentPendingQuestionsRoute,

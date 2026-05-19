@@ -22,7 +22,7 @@ import {
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
 } from '@panctl/contracts';
-import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEvent } from '../../lib/persistent-logger.js';
 
@@ -91,6 +91,7 @@ const VALID_SPECIALIST_NAMES = new Set<SpecialistAgentName>(["review-agent", "te
 const VALID_SPECIALIST_LIFECYCLE_STATES = new Set<SpecialistLifecycleState>(["active", "sleeping", "uninitialized"]);
 const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing", "passed", "failed", "blocked"]);
 const VALID_TEST_STATUSES = new Set<TestStatusValue>(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"]);
+const VALID_UAT_STATUSES = new Set<UatStatusValue>(["pending", "testing", "passed", "failed"]);
 const VALID_MERGE_STATUSES = new Set<MergeStatusValue>(["pending", "queued", "merging", "verifying", "merged", "failed"]);
 const VALID_VERIFICATION_STATUSES = new Set<VerificationStatusValue>(["pending", "running", "passed", "failed", "skipped"]);
 
@@ -116,6 +117,9 @@ export function toReviewStatus(v: unknown): ReviewStatusValue | undefined {
 export function toTestStatus(v: unknown): TestStatusValue | undefined {
   return v && VALID_TEST_STATUSES.has(v as TestStatusValue) ? v as TestStatusValue : undefined;
 }
+export function toUatStatus(v: unknown): UatStatusValue | undefined {
+  return v && VALID_UAT_STATUSES.has(v as UatStatusValue) ? v as UatStatusValue : undefined;
+}
 export function toMergeStatus(v: unknown): MergeStatusValue | undefined {
   return v && VALID_MERGE_STATUSES.has(v as MergeStatusValue) ? v as MergeStatusValue : undefined;
 }
@@ -123,11 +127,13 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason' | 'blockerReasons' | 'queuePosition' | 'mergeRetryCount' | 'mergeNotes' | 'autoRequeueCount'> & { reviewCoordinatorSessionName?: string; reviewSessionNames?: string[]; reviewSubStatuses?: Record<string, 'running' | 'done'>; activeSpecialist?: string }): ReviewStatusSnapshot {
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'uatStatus' | 'uatNotes' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason' | 'blockerReasons' | 'queuePosition' | 'mergeRetryCount' | 'mergeNotes' | 'autoRequeueCount'> & { reviewCoordinatorSessionName?: string; reviewSessionNames?: string[]; reviewSubStatuses?: Record<string, 'running' | 'done'>; activeSpecialist?: string }): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
     testStatus: toTestStatus(status.testStatus),
+    uatStatus: toUatStatus(status.uatStatus),
+    uatNotes: status.uatNotes || undefined,
     mergeStatus: toMergeStatus(status.mergeStatus),
     verificationStatus: toVerificationStatus(status.verificationStatus),
     verificationNotes: status.verificationNotes || undefined,

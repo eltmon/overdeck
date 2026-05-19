@@ -1,4 +1,6 @@
-import type { Agent } from '../types';
+import type { Agent, Issue } from '../types';
+
+export type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo';
 
 type PipelineStateLike = {
   reviewStatus?: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
@@ -72,6 +74,14 @@ export function isReviewInfraStuck(status?: PipelineStateLike | null): boolean {
   return status?.stuck === true && status.stuckReason === 'review_infrastructure_failure';
 }
 
+export function isAgentRunningStatus(status?: Agent['status'] | null): boolean {
+  return status === 'running' || status === 'starting' || status === 'healthy' || status === 'warning';
+}
+
+export function isAgentProblemStatus(status?: Agent['status'] | null): boolean {
+  return status === 'stuck' || status === 'failed' || status === 'error' || status === 'unknown';
+}
+
 /**
  * PAN-1034: a pending review with no active queue/specialist for more than 2x
  * the longest specialist timeout is stranded. This is distinct from a fresh
@@ -100,4 +110,63 @@ export function isPendingReviewStranded(status?: PipelineStateLike | null, now =
  */
 export function isDeaconIgnored(status?: PipelineStateLike | null): boolean {
   return status?.deaconIgnored === true;
+}
+
+export function getPipelineIssuePhase(
+  issue: Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus'>,
+  reviewStatus?: PipelineStateLike | null,
+  agent?: Pick<Agent, 'role' | 'status' | 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'> | null,
+): PipelineIssuePhase {
+  const state = issue.state ?? issue.status;
+  if (state === 'done' || state === 'closed' || state === 'completed') {
+    return 'ship';
+  }
+
+  if (
+    issue.mergeStatus === 'queued' ||
+    issue.mergeStatus === 'merging' ||
+    issue.mergeStatus === 'verifying' ||
+    issue.mergeStatus === 'failed' ||
+    issue.mergeStatus === 'merged' ||
+    reviewStatus?.readyForMerge === true ||
+    reviewStatus?.mergeStatus === 'queued' ||
+    reviewStatus?.mergeStatus === 'merging' ||
+    reviewStatus?.mergeStatus === 'verifying' ||
+    reviewStatus?.mergeStatus === 'failed' ||
+    reviewStatus?.mergeStatus === 'merged'
+  ) {
+    return 'ship';
+  }
+
+  if (
+    reviewStatus?.reviewStatus === 'reviewing' ||
+    reviewStatus?.reviewStatus === 'passed' ||
+    reviewStatus?.reviewStatus === 'failed' ||
+    reviewStatus?.reviewStatus === 'blocked' ||
+    reviewStatus?.testStatus === 'testing' ||
+    reviewStatus?.testStatus === 'passed' ||
+    reviewStatus?.testStatus === 'failed' ||
+    reviewStatus?.verificationStatus === 'running' ||
+    reviewStatus?.verificationStatus === 'passed' ||
+    reviewStatus?.verificationStatus === 'failed' ||
+    reviewStatus?.inspectStatus === 'inspecting' ||
+    reviewStatus?.inspectStatus === 'passed' ||
+    reviewStatus?.inspectStatus === 'failed'
+  ) {
+    return 'review';
+  }
+
+  if (agent?.role === 'plan' && isAgentRunningStatus(agent.status)) {
+    return 'plan';
+  }
+
+  if (agent?.role === 'work' && isAgentRunningStatus(agent.status)) {
+    return 'work';
+  }
+
+  const derivedState = issue.state ?? issue.status;
+  if (derivedState === 'in_review') return 'review';
+  if (derivedState === 'in_progress' || issue.stateType === 'started') return 'work';
+  if (issue.hasPlan === true || issue.planningComplete === true) return 'plan';
+  return 'todo';
 }

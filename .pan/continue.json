@@ -1,0 +1,654 @@
+{
+  "version": "1",
+  "issueId": "PAN-1148",
+  "created": "2026-05-18T05:07:18.265Z",
+  "updated": "2026-05-19T10:59:30.710Z",
+  "gitState": {
+    "branch": "feature/pan-1148",
+    "dirty": true,
+    "sha": "ed0f98ddc"
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Primitives live in src/dashboard/frontend/src/components/primitives/, NOT packages/contracts.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §6 step 1 allows either location; desktop sharing is out of scope, so co-locate with the only consumer. Avoids packaging churn and contract re-publish."
+    },
+    {
+      "id": "D2",
+      "summary": "Issue Detail drawer state is a slice on the existing Zustand store (src/dashboard/frontend/src/lib/store.ts), not a new store.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "The drawer needs to react to existing domain events (review status, agents, beads). Adding a separate store would require cross-store synchronization. PRD §4.3 specifies 'owned by a single global store slice'."
+    },
+    {
+      "id": "D3",
+      "summary": "Drawer addressing uses query string ?issue=<id>&tab=<tab>, layered over the existing tab/path routing — not a nested route.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §4.6 + §5.3 explicitly call out ?issue=<id>&tab=<tab>. Layering on top of the existing path-based tab routing keeps the parent surface scroll position when closing (browser back stays on the host page)."
+    },
+    {
+      "id": "D4",
+      "summary": "Default route flip: '/' renders Pipeline (was Board). '/board' is added as the explicit Board route. Sidebar logo click goes to Pipeline.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §5.3 routes table. Sidebar.tsx line 139 currently routes logo click to 'kanban' tab; that handler needs to point at the new default."
+    },
+    {
+      "id": "D5",
+      "summary": "Sidebar Operations group order: Pipeline, Board, Command Deck, Agents. Awaiting Merge entry is removed. AutoPreso stays.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §4.1 information architecture. Pipeline first because it is the new default landing. AutoPreso is out of scope per PRD non-goals and not listed for removal."
+    },
+    {
+      "id": "D6",
+      "summary": "InspectorPanel retirement is gated by a written feature-parity audit. The audit ships as its own bead before any removal bead.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §7 risk row 5 mandates 'audit Inspector Panel usages before deletion; explicit feature parity checklist'. InspectorPanel.tsx is 1387 LOC and used by KanbanBoard, BulkActionBar, AwaitingMergePage and others — silent regressions would be expensive."
+    },
+    {
+      "id": "D7",
+      "summary": "Board card swap is a swap, not a rewrite. KanbanBoard.tsx (4268 LOC) retains drag-to-reorder, filters, bulk actions, status counters — only the card render call and the drag-to-phase wiring change.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §6 step 4: 'Replace the existing kanban card with the new Issue Card. … Drop drag-to-phase wiring; keep drag-to-reorder within a column.' Limiting scope to the card slot keeps the diff reviewable."
+    },
+    {
+      "id": "D8",
+      "summary": "Command Deck right pane reframe reuses existing tab content components from ZoneCOverviewTabs (OverviewTab, BeadsTab, VBriefTab, ActivityTab, DiscussionsTab, CostsTab, PrDiffTab). Only the shell that hosts them changes.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §6 step 5: 'Preserve the existing conversation thread component inside the Conversations tab — no rewrite of conversation rendering.' Tab content is already partitioned; this is a shell reframe, not a content rewrite."
+    },
+    {
+      "id": "D9",
+      "summary": "/awaiting-merge → /pipeline?phase=ship redirect ships in the same bead as the route-table change. AwaitingMergePage.tsx file deletion ships in a follow-up bead once no inbound references remain.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "Two-step retirement protects user muscle memory (PRD §7 risk row 3). Splitting the redirect from the file delete also keeps the rollback surface small — a regression in the new Pipeline view can be reverted without restoring the AwaitingMerge component."
+    },
+    {
+      "id": "D10",
+      "summary": "Verb badge component does NOT require inspection. The verb→token mapping is fully specified in PRD §4.4 / §4.7.7 and is enforced as a TypeScript discriminated union. Lint/typecheck catches taxonomy drift.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "Per work.inspect criteria, mechanically-spec'd primitives do not earn the inspection cost. Foundation status alone does not warrant inspection — only foundation + judgment-call risk does."
+    },
+    {
+      "id": "D11",
+      "summary": "Drawer shell+store and drawer subscription contract are the only two beads with requiresInspection=true (both at depth 'deep'). Everything else is requiresInspection=false.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "Drawer shell encodes the single-instance/URL contract that every surface composes — wrong shape here cascades to 5 surfaces. Subscription contract is a cross-cutting protocol other drawer subsections produce/consume. Per the planning template: 'most plans will have 0-2 beads with requiresInspection: true'."
+    },
+    {
+      "id": "D12",
+      "summary": "Drawer data subscriptions filter at the server side by issueId. The drawer client opens one Effect-managed subscription that is torn down on close.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §5.2: 'server-side filtering by issue id, not new transports'. Client-side filtering of the full domain-event stream would balloon when many issues are active. The contract bead is the place this gets pinned down."
+    },
+    {
+      "id": "D13",
+      "summary": "Styleguide-conformance Playwright test asserts that the SAME primitive class signatures (data-component attributes) appear on Pipeline, Board, Command Deck, and Agents. Existing tests stay; this is one new spec.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §8 success metrics: 'visually unified (verified by a styleguide-conformance Playwright test that asserts component class usage across pages).' Implementation: tag each primitive with data-component=verb-badge|issue-row|issue-card|agent-card and the test asserts presence."
+    },
+    {
+      "id": "D14",
+      "summary": "⌘K command palette result click opens the drawer instead of navigating to a route. Existing CommandPalette.tsx handler is rewired.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §4.6 explicitly lists ⌘K as a drawer entry: '⌘K command palette is the universal jump: type ID, branch, or fragment of a title to land in the drawer from anywhere.'"
+    },
+    {
+      "id": "D15",
+      "summary": "Deacon status UI moves from Agents view to Health page. The component (DeaconStatus.tsx in CommandDeck) is relocated, not duplicated; AgentList.tsx's deacon section is removed.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §4.1 'What's preserved' bullet: 'Deacon status — moved to Health'. Health page (HealthDashboard.tsx) is the natural home; CloisterStatusBar already lives in the sidebar separately."
+    },
+    {
+      "id": "D16",
+      "summary": "Where the PRD and the mock HTML disagree, mock wins for visual layout (spacing, color, typography), PRD wins for behavior and data contracts.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "PRD §4.2 establishes this rule explicitly. Encoded here so the work agent does not need to re-derive it."
+    },
+    {
+      "id": "D17",
+      "summary": "Phased delivery is forbidden — every bead in this plan must land before pan done. The PRD's 7-step migration is implementation sequencing, not separate releases.",
+      "recordedAt": "2026-05-18T05:10:55.134Z",
+      "rationale": "CLAUDE.md 'Deliver Complete Features' rule + PRD §6 opening line: 'a feature is a feature — the redesign ships as one initiative.' Each individual bead may be independently mergeable to keep diffs reviewable, but the issue itself only closes when all 40+ beads ship."
+    },
+    {
+      "id": "D18",
+      "summary": "VerbBadge variants use the PRD literal verb strings as the TypeScript discriminant, including STUCK · Nh for the hours-bearing stuck badge.",
+      "recordedAt": "2026-05-18T05:42:56.951Z",
+      "rationale": "The styleguide-conformance test needs data-variant to match the variant prop exactly, and literal PRD labels make unknown variants fail at compile time."
+    },
+    {
+      "id": "D19",
+      "summary": "PhaseGlyph supports plan as a typed phase in addition to todo/work/review/ship/done, reusing the signal-review token.",
+      "recordedAt": "2026-05-18T05:46:41.560Z",
+      "rationale": "The bead title lists five glyph phases, but its action text explicitly maps ship/plan to --signal-review-foreground and PhaseHeader uses Plan as a lifecycle group."
+    },
+    {
+      "id": "D20",
+      "summary": "MetricStrip accepts typed tile data and applies its Pipeline/Agents variant to each MetricTile it composes.",
+      "recordedAt": "2026-05-18T05:57:09.000Z",
+      "rationale": "The PRD defines strip-level density differences, so keeping variant at the strip boundary prevents consumers from repeating density props on every tile."
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "PR #1160 (reconcileClosedPrReadyForMerge patrol) is a prerequisite for READY TO MERGE badge freshness. Without it, closed-without-merge PRs (cancel flow, manual gh pr close, branch deleted) leave a phantom badge.",
+      "mitigation": "Work agent: check whether PR #1160 is merged before starting board-card-swap. If not merged AND this initiative reaches the badge wiring beads first, duplicate the reconciliation logic inline (clear readyForMerge=false when PR state != OPEN) and flag the duplication for removal once #1160 lands. See eltmon comment 2026-05-17 on issue."
+    },
+    {
+      "id": "H2",
+      "summary": "KanbanBoard.tsx is 4268 LOC. The card swap risks regressing drag-to-reorder, status filters, bulk actions, queue counters, and stuck-issue handling.",
+      "mitigation": "Before the board-card-swap bead, snapshot KanbanBoard.test.tsx coverage. The card swap bead's acceptance criteria require: (a) all existing KanbanBoard tests still pass, (b) drag-to-reorder within a column verified manually in browser, (c) the bulk action bar (BulkActionBar.tsx) still receives selection events from the new card."
+    },
+    {
+      "id": "H3",
+      "summary": "InspectorPanel.tsx is 1387 LOC and referenced from KanbanBoard, BulkActionBar, AwaitingMergePage, and elsewhere. Pre-emptive deletion would regress unscoped features.",
+      "mitigation": "The inspector-parity-audit bead is a deliverable in its own right: produces docs/design/inspector-parity-checklist.md mapping every InspectorPanel feature to either (a) its new location in the drawer, (b) its new location elsewhere in the redesign, or (c) explicit out-of-scope flag. The inspector-panel-retirement bead may not start until this checklist is complete and every item is in category (a) or (b)."
+    },
+    {
+      "id": "H4",
+      "summary": "Drawer subscription fan-out — repeatedly opening/closing the drawer or rapidly switching between issues could leak streams or fire redundant subscribe/unsubscribe calls.",
+      "mitigation": "drawer-shell-and-store bead's AC includes: (a) single store-owned drawer instance — opening drawer for issue B while A is open replaces, does not stack, (b) integration test asserting subscription teardown on drawer close, (c) test for rapid open→close→open burst (50 iterations) showing no orphan subscriptions in the Effect runtime."
+    },
+    {
+      "id": "H5",
+      "summary": "/awaiting-merge URL is in operator muscle memory and may be bookmarked. A hard-removal would 404.",
+      "mitigation": "awaiting-merge-redirect bead ships before awaiting-merge-component-removal. Redirect is browser-level (window.history.replaceState) or React Router-level so existing share links resolve to /pipeline?phase=ship. Sidebar tooltip on Pipeline reads 'Awaiting Merge → filter on Pipeline' for one release (added to sidebar-nav-reshuffle bead AC)."
+    },
+    {
+      "id": "H6",
+      "summary": "Command Deck right pane reframe could accidentally rewrite ZoneCOverviewTabs content (the tabs already exist as separate components).",
+      "mitigation": "command-deck-right-pane-reframe bead's AC explicitly forbids edits to OverviewTab.tsx, BeadsTab.tsx, VBriefTab.tsx, ActivityTab.tsx, DiscussionsTab.tsx, CostsTab.tsx, PrDiffTab.tsx, MarkdownTab.tsx. The bead changes only the shell composition (which tab host renders these and what wraps them)."
+    },
+    {
+      "id": "H7",
+      "summary": "Cost figure (--signal-cost / cyan) is the single style-guide-mandated exception to 'one colored signal per element' (PRD §4.5 / §4.7.5 'Ledger cell'). Reviewers seeing two colored elements on a row may flag this as a violation.",
+      "mitigation": "Verb-badge bead and issue-row bead AC both reference PRD §4.5 explicitly in the implementation file's docstring. styleguide-conformance-playwright-test bead asserts that a row showing both a verb badge AND a cost figure is the only legal multi-color row case."
+    },
+    {
+      "id": "H8",
+      "summary": "Default route flip ('/' → Pipeline) breaks anyone who has bookmarked '/' expecting Board. App.tsx TAB_PATHS table (line 62) needs careful coordination with PATH_TO_TAB inverse map and getTabFromPath() fallback (line 86 returns 'command-deck' default — needs update).",
+      "mitigation": "default-route-flip bead's AC covers: (a) TAB_PATHS['kanban'] = '/board' (was '/'), (b) new TAB_PATHS entry for 'pipeline' = '/' (and '/pipeline'), (c) getTabFromPath default updated to 'pipeline', (d) Sidebar.tsx line 139 + 155 logo-click handler updated, (e) test in App.test.tsx for path→tab resolution."
+    },
+    {
+      "id": "H9",
+      "summary": "Awaiting Merge has ~3 distinct sub-views in the current page (awaiting / blocked / open merge requests — selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests). The redirect maps to only one filter; some signal may be lost.",
+      "mitigation": "pipeline-cross-project-filter bead must expose at minimum: phase=ship (default for redirect), phase=ship AND blocked, phase=ship AND no-pr. The redirect bead's AC covers all three legacy views by mapping each to a deeper-link filter combination."
+    },
+    {
+      "id": "H10",
+      "summary": "Drawer interplay with currently-open conversation views in CommandDeck — Command Deck has its own selection/routing (selectedConvId, ZoneCConversation, ZoneCOverview). Opening the drawer from a CommandDeck row should not collide with conversation routing.",
+      "mitigation": "command-deck-drawer-wiring bead AC: tree selection persists, conversation route persists, drawer opens as overlay with ?issue=<id> appended to whatever the existing search params are. Closing the drawer restores both selection and conversation state."
+    },
+    {
+      "id": "H11",
+      "summary": "GodView retains its scoped tokens (PRD §3 explicitly out of scope). Surrounding-surface refresh may make GodView visually drift further.",
+      "mitigation": "Acceptable per PRD §7 risk row 4. styleguide-conformance-playwright-test bead's surface list MUST exclude /god-view. No changes to GodView code in this initiative."
+    },
+    {
+      "id": "H12",
+      "summary": "AgentList.tsx serves both the standalone /agents route AND is referenced from App.tsx line 904. The agents-fleet-grid bead must replace BOTH while preserving any selection-handling props that App.tsx passes through (e.g., onSelectAgent for inspector wiring).",
+      "mitigation": "agents-fleet-grid bead AC: (a) new component file FleetAgentsView.tsx is the route content for /agents, (b) App.tsx import swap from AgentList → FleetAgentsView, (c) selection handler swap routes to drawer-open instead of inspector, (d) AgentList.tsx and GodView/AgentGrid.tsx files marked for removal in agents-cleanup sub-step."
+    },
+    {
+      "id": "H13",
+      "summary": "bd close treated workspace-hu0c as blocked by open downstream beads even though bd dep tree shows those beads are dependents marked [blocks].",
+      "mitigation": "For completed upstream foundation beads, verify bd dep tree before using bd close --force; do not force-close beads that are genuinely waiting on blockers."
+    },
+    {
+      "id": "H14",
+      "summary": "workspace-ltqb was listed ready even though workspace-1aqz had been closed without leaving a Pipeline tab, /pipeline route, or PipelineView.tsx in the workspace.",
+      "mitigation": "Reopened workspace-1aqz and returned workspace-ltqb to open with blocker comments; do not flip / to Pipeline until the Pipeline shell bead is actually implemented."
+    }
+  ],
+  "resumePoint": {
+    "description": "workspace-9a7q legacy inspector deletion is implemented and verified; commit and close workspace-9a7q, then continue with the next ready bead.",
+    "beadId": "workspace-9a7q",
+    "filesToRead": [
+      "docs/design/inspector-parity-checklist.md",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/lib/commandDeckSurfaceRegistry.ts"
+    ]
+  },
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "reason": "planning",
+      "note": "Planning session started for PAN-1148: Unified dashboard redesign — Pipeline, Board, Command Deck, Agents, and shared Issue Detail drawer",
+      "timestamp": "2026-05-18T05:07:18.265Z"
+    },
+    {
+      "timestamp": "2026-05-18T05:10:55.134Z",
+      "reason": "planning",
+      "note": "Auto-mode planning complete. 17 decisions recorded, 12 hazards flagged. vBRIEF decomposes the redesign into 43 beads across foundation primitives, drawer, four surfaces (Pipeline, Board, Command Deck, Agents), Awaiting Merge retirement, and styleguide-conformance test. 2 beads carry requiresInspection=true (both 'deep'): drawer shell+store and drawer subscription contract.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-18T05:42:56.951Z",
+      "reason": "bead",
+      "note": "Implemented workspace-hu0c / f1-verb-badge: added VerbBadge primitive, pulse animation utility, radius-sm token, visual snapshot coverage, and completed vBRIEF statuses.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:44:04.606Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-hu0c. bd required --force because downstream dependents were reported as blockers despite dep tree showing workspace-hu0c as their upstream [blocks] dependency.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:46:41.560Z",
+      "reason": "bead",
+      "note": "Implemented workspace-9lm0 / f2-phase-glyph: added typed PhaseGlyph primitive, token-backed phase colors, SVG shapes for lifecycle phases, tests, and completed vBRIEF statuses.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:47:40.299Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-9lm0. bd required --force because downstream dependents were reported as blockers, matching the dependency-direction issue recorded in H13.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:49:59.804Z",
+      "reason": "bead",
+      "note": "Implemented workspace-3mr2 / f3-phase-header: added sticky PhaseHeader primitive composing PhaseGlyph, phase token colors, variant padding, count/subline/right-meta slots, tests, and completed vBRIEF statuses.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:50:48.314Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-3mr2. bd required --force because downstream dependents were reported as blockers, matching the dependency-direction issue recorded in H13.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:56:18.000Z",
+      "reason": "bead",
+      "note": "Implemented workspace-5tj2 / f4-metric-tile: added MetricTile and MetricStrip primitives, signal-scoped icon coloring, strip-level Pipeline/Agents density, delta colors, focused tests, and completed vBRIEF statuses.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T05:57:09.000Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-5tj2. Inspection skipped because requiresInspection=false; bd required --force because downstream dependents were reported as blockers, matching H13.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T06:00:10.000Z",
+      "reason": "bead",
+      "note": "Implemented workspace-tjhs / r2-awaiting-merge-component-removal: deleted AwaitingMergePage, removed Tab/TAB_PATHS/render/sidebar/test references, preserved store merge selectors, and completed vBRIEF statuses.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T06:00:59.000Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-tjhs. Inspection skipped because requiresInspection=false; verified App test, typecheck, lint, grep, and graph update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T09:19:20.982Z",
+      "reason": "end",
+      "note": "Slot 5 beads complete: c1-command-deck-right-pane-reframe + workspace-6qm7 drawer wiring"
+    },
+    {
+      "timestamp": "2026-05-18T21:18:20.000Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-mofs after tightening IssueRow grid/label tokens, adding focused tests, running IssueRow test, typecheck, lint, and graphify update. Reopened workspace-1aqz and unclaimed workspace-ltqb because Pipeline route prerequisites were missing.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T21:21:45.000Z",
+      "reason": "bead-close",
+      "note": "Closed workspace-dvq1 after adding Pipeline-first Operations nav, the Awaiting Merge migration tooltip, and Sidebar tests for expanded/collapsed modes. Verified Sidebar test, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T21:31:30.000Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-1aqz Pipeline shell with /pipeline routing, TopBar primitive, helper-based phase grouping, App/Pipeline tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T21:41:30.000Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-ltqb default route flip: / and /pipeline resolve to Pipeline, /board resolves to Board, sidebar logo clicks route to Pipeline, and focused App/Sidebar tests pass.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:27:00.000Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-i5mc Board card swap to the IssueCard primitive shell, restored dnd-kit wrappers around cards, preserved drawer/bulk selection handlers, added closed-not-merged readyForMerge display guard, and verified KanbanBoard tests, typecheck, lint, and graphify update. Browser smoke was attempted through the dev server but backend session bootstrap rejected the dev origin with Invalid origin.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:31:30.000Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-tlov drawer Live Activity rail with a 320px right column, issue-scoped useDrawerData activity selector, most-recent-first stream items, scroll-to-top on new activity, phase dot colors, focused drawer tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:36:00.000Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-30xk drawer Review Specialists list with four sub-role rows, status dot colors, useDrawerData-derived review specialist state, focused drawer tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:46:30.000Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-ruj9 drawer Beads List with useDrawerData-normalized bead rows, done/current/open visual states, exact current ping animation, 18% white line-through for done titles, focused drawer tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-18T23:53:30.000Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-q5wk drawer Verification Gates grid with four typecheck/lint/test/UAT cards, useDrawerData-derived gate state, PRD color-mix pass/fail border utilities, focused drawer tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T00:03:09.009Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-mesr drawer Active Agent card with signal-review accent, agent name/verb/meta row, PRD stream excerpt panel, Tell input posting to /api/agents/:id/tell, empty state, focused drawer tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T00:07:20.909Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-tw8n Agents card drawer wiring: AgentCard Open issue now opens overview with #active-agent, IssueDrawer scrolls to the Active Agent anchor, focused FleetAgentsView and IssueDrawer tests pass, plus typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T00:11:28.061Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-eztf drawer Phase Timeline with six PRD steps, done/current/upcoming top accents, useDrawerData-derived phase state, current when-stamp foreground styling, focused drawer tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T00:21:42.345Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-lr3v drawer Action Bar with reset, stop, View PR, and merge controls, added POST /api/agents/:id/stop route alias, focused drawer tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T00:25:32.627Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-p6bj drawer Tabs with Overview/Plan/Beads/Conversation/Terminal/Activity/Files, URL tab sync, Beads count chip, tab placeholders, focused drawer tests, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T00:34:31.552Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-bffv InspectorPanel parity checklist at docs/design/inspector-parity-checklist.md, enumerating legacy InspectorPanel features, inspector/* sub-files, AgentList, and GodView/AgentGrid deletion gates with destination or confirmation status. Verified conflict-marker check, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T00:45:36.323Z",
+      "reason": "bead-close",
+      "note": "Implemented workspace-epub drawer subscription contract with subscribeIssueEvents(issueId), server-side event filtering, shared useDrawerData-managed subscription teardown/reuse, focused WS-RPC and drawer tests, full npm test, typecheck, lint, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T01:08:44.502Z",
+      "reason": "bead",
+      "note": "Resolved workspace-pok2 InspectorPanel parity checklist blockers by converting every unresolved legacy feature row to Covered, Out of scope, or Covered / Out of scope with rationale, leaving deletion execution checks for workspace-9a7q.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T01:29:14.234Z",
+      "reason": "bead",
+      "note": "Implemented workspace-9a7q legacy inspector deletion by removing InspectorPanel, components/inspector-only files, AgentList, DetailPanelLayout, and GodView/AgentGrid; moved still-live shared utilities/components to Command Deck or lib locations; rewired legacy issue selections to IssueDrawer; verified deletion greps, frontend suite, typecheck, lint, root tests, and graphify update.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T01:51:51.805Z",
+      "reason": "feedback",
+      "note": "Completed stale PAN-1148 vBRIEF criteria for Command Deck project metrics, sidebar nav reshuffle, and styleguide conformance after implementing missing shared primitive coverage and tests.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-19T02:08:38.058Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-19T08:13:48.418Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-19T10:54:05.383Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-19T10:57:05.237Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-19T10:59:30.710Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    }
+  ],
+  "feedback": [],
+  "statusOverrides": {
+    "f1-verb-badge": "completed",
+    "f1-verb-badge.f1-verb-badge.ac1": "completed",
+    "f1-verb-badge.f1-verb-badge.ac2": "completed",
+    "f1-verb-badge.f1-verb-badge.ac3": "completed",
+    "f1-verb-badge.f1-verb-badge.ac4": "completed",
+    "f1-verb-badge.f1-verb-badge.ac5": "completed",
+    "f1-verb-badge.f1-verb-badge.ac6": "completed",
+    "f2-phase-glyph": "completed",
+    "f2-phase-glyph.f2-phase-glyph.ac1": "completed",
+    "f2-phase-glyph.f2-phase-glyph.ac2": "completed",
+    "f2-phase-glyph.f2-phase-glyph.ac3": "completed",
+    "f3-phase-header": "completed",
+    "f3-phase-header.f3-phase-header.ac1": "completed",
+    "f3-phase-header.f3-phase-header.ac2": "completed",
+    "f3-phase-header.f3-phase-header.ac3": "completed",
+    "f4-metric-tile": "completed",
+    "f4-metric-tile.f4-metric-tile.ac1": "completed",
+    "f4-metric-tile.f4-metric-tile.ac2": "completed",
+    "f4-metric-tile.f4-metric-tile.ac3": "completed",
+    "f4-metric-tile.f4-metric-tile.ac4": "completed",
+    "f5-issue-row": "completed",
+    "f5-issue-row.f5-issue-row.ac1": "completed",
+    "f5-issue-row.f5-issue-row.ac2": "completed",
+    "f5-issue-row.f5-issue-row.ac3": "completed",
+    "f5-issue-row.f5-issue-row.ac4": "completed",
+    "f5-issue-row.f5-issue-row.ac5": "completed",
+    "f5-issue-row.f5-issue-row.ac6": "completed",
+    "f5-issue-row.f5-issue-row.ac7": "completed",
+    "f5-issue-row.f5-issue-row.ac8": "completed",
+    "f7-agent-card": "completed",
+    "f6-issue-card": "completed",
+    "f6-issue-card.f6-issue-card.ac1": "completed",
+    "f6-issue-card.f6-issue-card.ac2": "completed",
+    "f6-issue-card.f6-issue-card.ac3": "completed",
+    "f6-issue-card.f6-issue-card.ac4": "completed",
+    "f6-issue-card.f6-issue-card.ac5": "completed",
+    "f8-universal-chrome": "completed",
+    "p1-pipeline-page-shell": "completed",
+    "f7-agent-card.f7-agent-card.ac1": "completed",
+    "f7-agent-card.f7-agent-card.ac2": "completed",
+    "f7-agent-card.f7-agent-card.ac3": "completed",
+    "f7-agent-card.f7-agent-card.ac4": "completed",
+    "f7-agent-card.f7-agent-card.ac5": "completed",
+    "a4-agents-move-deacon-to-health": "completed",
+    "c1-command-deck-right-pane-reframe": "completed",
+    "b3-board-drop-drag-to-phase": "completed",
+    "a4-agents-move-deacon-to-health.a4-agents-move-deacon-to-health.ac1": "completed",
+    "a4-agents-move-deacon-to-health.a4-agents-move-deacon-to-health.ac2": "completed",
+    "a4-agents-move-deacon-to-health.a4-agents-move-deacon-to-health.ac3": "completed",
+    "f8-universal-chrome.f8-universal-chrome.ac1": "completed",
+    "f8-universal-chrome.f8-universal-chrome.ac2": "completed",
+    "f8-universal-chrome.f8-universal-chrome.ac3": "completed",
+    "b3-board-drop-drag-to-phase.b3-board-drop-drag-to-phase.ac1": "completed",
+    "b3-board-drop-drag-to-phase.b3-board-drop-drag-to-phase.ac2": "completed",
+    "b3-board-drop-drag-to-phase.b3-board-drop-drag-to-phase.ac3": "completed",
+    "b3-board-drop-drag-to-phase.b3-board-drop-drag-to-phase.ac4": "completed",
+    "p1-pipeline-page-shell.p1-pipeline-page-shell.ac1": "completed",
+    "p1-pipeline-page-shell.p1-pipeline-page-shell.ac2": "completed",
+    "p1-pipeline-page-shell.p1-pipeline-page-shell.ac3": "completed",
+    "p1-pipeline-page-shell.p1-pipeline-page-shell.ac4": "completed",
+    "p1-pipeline-page-shell.p1-pipeline-page-shell.ac5": "completed",
+    "p1-pipeline-page-shell.p1-pipeline-page-shell.ac6": "completed",
+    "c1-command-deck-right-pane-reframe.c1-command-deck-right-pane-reframe.ac1": "completed",
+    "c1-command-deck-right-pane-reframe.c1-command-deck-right-pane-reframe.ac2": "completed",
+    "c1-command-deck-right-pane-reframe.c1-command-deck-right-pane-reframe.ac3": "completed",
+    "c1-command-deck-right-pane-reframe.c1-command-deck-right-pane-reframe.ac4": "completed",
+    "c1-command-deck-right-pane-reframe.c1-command-deck-right-pane-reframe.ac5": "completed",
+    "i1-inspector-parity-audit": "completed",
+    "t1-styleguide-conformance-test": "completed",
+    "r2-awaiting-merge-component-removal": "completed",
+    "r2-awaiting-merge-component-removal.ac1": "completed",
+    "r2-awaiting-merge-component-removal.ac2": "completed",
+    "r2-awaiting-merge-component-removal.ac3": "completed",
+    "r2-awaiting-merge-component-removal.ac4": "completed",
+    "r2-awaiting-merge-component-removal.ac5": "completed",
+    "r1-awaiting-merge-redirect": "completed",
+    "r1-awaiting-merge-redirect.ac1": "completed",
+    "r1-awaiting-merge-redirect.ac2": "completed",
+    "r1-awaiting-merge-redirect.ac3": "completed",
+    "r1-awaiting-merge-redirect.ac4": "completed",
+    "c3-command-deck-drawer-wiring": "completed",
+    "c3-command-deck-drawer-wiring.ac1": "completed",
+    "c3-command-deck-drawer-wiring.ac2": "completed",
+    "c3-command-deck-drawer-wiring.ac3": "completed",
+    "i1-inspector-parity-audit.ac1": "completed",
+    "i1-inspector-parity-audit.ac2": "completed",
+    "i1-inspector-parity-audit.ac3": "completed",
+    "i1-inspector-parity-audit.ac4": "completed",
+    "n2-default-route-flip": "completed",
+    "n2-default-route-flip.n2-default-route-flip.ac1": "completed",
+    "n2-default-route-flip.n2-default-route-flip.ac2": "completed",
+    "n2-default-route-flip.n2-default-route-flip.ac3": "completed",
+    "n2-default-route-flip.n2-default-route-flip.ac4": "completed",
+    "n2-default-route-flip.n2-default-route-flip.ac5": "completed",
+    "d1-drawer-shell-store": "completed",
+    "d1-drawer-shell-store.ac1": "completed",
+    "d1-drawer-shell-store.ac2": "completed",
+    "d1-drawer-shell-store.ac3": "completed",
+    "d1-drawer-shell-store.ac4": "completed",
+    "d1-drawer-shell-store.ac5": "completed",
+    "d1-drawer-shell-store.ac6": "completed",
+    "d1-drawer-shell-store.ac7": "completed",
+    "d1-drawer-shell-store.ac8": "completed",
+    "d1-drawer-shell-store.ac9": "completed",
+    "p5-pipeline-drawer-wiring": "completed",
+    "p5-pipeline-drawer-wiring.ac1": "completed",
+    "p5-pipeline-drawer-wiring.ac2": "completed",
+    "p4-pipeline-cross-project-filter": "completed",
+    "p4-pipeline-cross-project-filter.ac1": "completed",
+    "p4-pipeline-cross-project-filter.ac2": "completed",
+    "p4-pipeline-cross-project-filter.ac3": "completed",
+    "p4-pipeline-cross-project-filter.ac4": "completed",
+    "p3-pipeline-phase-grouping": "completed",
+    "p3-pipeline-phase-grouping.ac1": "completed",
+    "p3-pipeline-phase-grouping.ac2": "completed",
+    "p3-pipeline-phase-grouping.ac3": "completed",
+    "p3-pipeline-phase-grouping.ac4": "completed",
+    "p2-pipeline-metric-strip": "completed",
+    "p2-pipeline-metric-strip.ac1": "completed",
+    "p2-pipeline-metric-strip.ac2": "completed",
+    "p2-pipeline-metric-strip.ac3": "completed",
+    "i3-command-palette-drawer-integration": "completed",
+    "i3-command-palette-drawer-integration.ac1": "completed",
+    "i3-command-palette-drawer-integration.ac2": "completed",
+    "i3-command-palette-drawer-integration.ac3": "completed",
+    "b4-board-drawer-wiring": "completed",
+    "b4-board-drawer-wiring.ac1": "completed",
+    "b4-board-drawer-wiring.ac2": "completed",
+    "b4-board-drawer-wiring.ac3": "completed",
+    "a1-agents-fleet-grid": "completed",
+    "a1-agents-fleet-grid.ac1": "completed",
+    "a1-agents-fleet-grid.ac2": "completed",
+    "a1-agents-fleet-grid.ac3": "completed",
+    "a1-agents-fleet-grid.ac4": "completed",
+    "b2-board-strip-config-controls": "completed",
+    "b2-board-strip-config-controls.ac1": "completed",
+    "b2-board-strip-config-controls.ac2": "completed",
+    "b2-board-strip-config-controls.ac3": "completed",
+    "a3-agents-filter-row": "completed",
+    "a3-agents-filter-row.ac1": "completed",
+    "a3-agents-filter-row.ac2": "completed",
+    "a3-agents-filter-row.ac3": "completed",
+    "a2-agents-metric-strip": "completed",
+    "a2-agents-metric-strip.ac1": "completed",
+    "a2-agents-metric-strip.ac2": "completed",
+    "a2-agents-metric-strip.ac3": "completed",
+    "b1-board-card-swap": "completed",
+    "b1-board-card-swap.ac1": "completed",
+    "b1-board-card-swap.ac2": "completed",
+    "b1-board-card-swap.ac3": "completed",
+    "b1-board-card-swap.ac4": "completed",
+    "b1-board-card-swap.ac5": "completed",
+    "b1-board-card-swap.ac6": "completed",
+    "d9-drawer-live-activity-rail": "completed",
+    "d9-drawer-live-activity-rail.ac1": "completed",
+    "d9-drawer-live-activity-rail.ac2": "completed",
+    "d9-drawer-live-activity-rail.ac3": "completed",
+    "d8-drawer-review-specialists": "completed",
+    "d8-drawer-review-specialists.ac1": "completed",
+    "d8-drawer-review-specialists.ac2": "completed",
+    "d7-drawer-beads-list": "completed",
+    "d7-drawer-beads-list.ac1": "completed",
+    "d7-drawer-beads-list.ac2": "completed",
+    "d7-drawer-beads-list.ac3": "completed",
+    "d7-drawer-beads-list.ac4": "completed",
+    "d6-drawer-verification-gates": "completed",
+    "d6-drawer-verification-gates.ac1": "completed",
+    "d6-drawer-verification-gates.ac2": "completed",
+    "d6-drawer-verification-gates.ac3": "completed",
+    "d5-drawer-active-agent": "completed",
+    "d5-drawer-active-agent.ac1": "completed",
+    "d5-drawer-active-agent.ac2": "completed",
+    "d5-drawer-active-agent.ac3": "completed",
+    "d5-drawer-active-agent.ac4": "completed",
+    "a5-agents-drawer-wiring": "completed",
+    "a5-agents-drawer-wiring.ac1": "completed",
+    "a5-agents-drawer-wiring.ac2": "completed",
+    "d3-drawer-phase-timeline": "completed",
+    "d3-drawer-phase-timeline.ac1": "completed",
+    "d3-drawer-phase-timeline.ac2": "completed",
+    "d3-drawer-phase-timeline.ac3": "completed",
+    "d10-drawer-action-bar": "completed",
+    "d10-drawer-action-bar.ac1": "completed",
+    "d10-drawer-action-bar.ac2": "completed",
+    "d10-drawer-action-bar.ac3": "completed",
+    "d10-drawer-action-bar.ac4": "completed",
+    "d10-drawer-action-bar.ac5": "completed",
+    "d4-drawer-tabs": "completed",
+    "d4-drawer-tabs.ac1": "completed",
+    "d4-drawer-tabs.ac2": "completed",
+    "d4-drawer-tabs.ac3": "completed",
+    "d4-drawer-tabs.ac4": "completed",
+    "d2-drawer-subscription-contract": "completed",
+    "d2-drawer-subscription-contract.ac1": "completed",
+    "d2-drawer-subscription-contract.ac2": "completed",
+    "d2-drawer-subscription-contract.ac3": "completed",
+    "d2-drawer-subscription-contract.ac4": "completed",
+    "d2-drawer-subscription-contract.ac5": "completed",
+    "d2-drawer-subscription-contract.ac6": "completed",
+    "i2-inspector-panel-retirement": "completed",
+    "i2-inspector-panel-retirement.ac1": "completed",
+    "i2-inspector-panel-retirement.ac2": "completed",
+    "i2-inspector-panel-retirement.ac3": "completed",
+    "i2-inspector-panel-retirement.ac4": "completed",
+    "i2-inspector-panel-retirement.ac5": "completed",
+    "c2-command-deck-mini-metric-strip.ac2": "completed",
+    "n1-sidebar-nav-reshuffle.ac4": "completed",
+    "t1-styleguide-conformance-test.ac4": "completed",
+    "c2-command-deck-mini-metric-strip": "completed",
+    "t1-styleguide-conformance-test.ac2": "completed",
+    "n1-sidebar-nav-reshuffle.ac3": "completed",
+    "t1-styleguide-conformance-test.ac3": "completed",
+    "n1-sidebar-nav-reshuffle.ac1": "completed",
+    "n1-sidebar-nav-reshuffle": "completed",
+    "t1-styleguide-conformance-test.ac5": "completed",
+    "n1-sidebar-nav-reshuffle.ac2": "completed",
+    "c2-command-deck-mini-metric-strip.ac1": "completed",
+    "t1-styleguide-conformance-test.ac1": "completed"
+  }
+}

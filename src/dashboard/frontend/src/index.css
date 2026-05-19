@@ -37,6 +37,7 @@
 :root {
   color-scheme: light;
   --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
 
   /* Surfaces */
   --background: #ffffff;
@@ -240,6 +241,55 @@ body::after {
   .badge-border-info {
     border-color: color-mix(in srgb, var(--info) 32%, transparent);
   }
+  .drawer-gate-border-pass {
+    border-color: color-mix(in srgb, var(--success) 32%, transparent);
+  }
+  .drawer-gate-border-fail {
+    border-color: color-mix(in srgb, var(--destructive) 32%, transparent);
+  }
+  .verb-badge-pulse {
+    animation: verb-badge-pulse 1.6s ease-out infinite;
+  }
+  .drawer-bead-current-ping {
+    animation: drawer-bead-current-ping 1.6s ease-out infinite;
+  }
+}
+
+@keyframes drawer-bead-current-ping {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes verb-badge-pulse {
+  0% {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 1;
+  }
+  80% {
+    box-shadow: 0 0 0 6px transparent;
+    opacity: 0.5;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    opacity: 1;
+  }
+}
+
+@keyframes issue-drawer-slide-in {
+  0% {
+    transform: translateX(24px) scale(0.98);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
 }
 
 /* ─── Ready-to-merge shimmer animation ─── */
@@ -321,7 +371,8 @@ body::after {
   .anim-stuck-shake,
   .anim-error-shake,
   .anim-row-flash,
-  .anim-round-active {
+  .anim-round-active,
+  .drawer-bead-current-ping {
     animation: none !important;
   }
   .anim-round-active {
