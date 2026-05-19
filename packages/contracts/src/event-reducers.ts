@@ -14,7 +14,9 @@ import type {
   AgentSnapshot,
   ChannelPermissionRequestSnapshot,
   DashboardSnapshot,
-  DomainEvent,
+  EmbedProgressSnapshot,
+  EnrichProgressSnapshot,
+  EnrichStatsSnapshot,
   MemoryObservation,
   MemoryStatus,
   PendingTurn,
@@ -22,8 +24,10 @@ import type {
   ResetMarker,
   ResourceStats,
   ReviewStatusSnapshot,
+  ScanProgressSnapshot,
   TurnDiffSummary,
-} from './index'
+} from './types'
+import type { DomainEvent } from './events'
 
 // ─── Read model state shape ──────────────────────────────────────────────────
 
@@ -106,46 +110,6 @@ export interface ReadModelState {
   embedProgressBySessionId: Record<number, EmbedProgressSnapshot>
   /** sessionId (from agent snapshot or runtime claudeSessionId) → agentId index */
   agentIdBySessionId: Record<string, string>
-}
-
-export interface ScanProgressSnapshot {
-  active: boolean
-  mode: 'targeted' | 'watched' | 'system'
-  dirs: string[]
-  dirsProcessed: number
-  dirsTotal: number
-  sessionsFound: number
-  elapsedMs: number
-  inserted: number
-  updated: number
-  skipped: number
-  errors: number
-  durationMs: number
-}
-
-export interface EnrichStatsSnapshot {
-  processed: number
-  totalCost: number
-  failures: number
-  durationMs: number
-}
-
-export interface EnrichProgressSnapshot {
-  sessionId: number
-  level: number
-  model: string
-  cost: number
-  success: boolean
-  error?: string
-  timestamp: string
-}
-
-export interface EmbedProgressSnapshot {
-  sessionId: number
-  model: string
-  success: boolean
-  error?: string
-  timestamp: string
 }
 
 export interface DashboardLifecycleState {
@@ -480,40 +444,25 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       const nextTurnDiffSummariesByAgentId = isTerminalTurnDiffSummaryStatus(event.payload.status)
         ? omitTurnDiffSummariesForAgent(state.turnDiffSummariesByAgentId, event.payload.agentId)
         : state.turnDiffSummariesByAgentId
-      const nextAgent: AgentSnapshot = { ...agent, status: event.payload.status }
-
-      if ('stoppedByUser' in event.payload) nextAgent.stoppedByUser = event.payload.stoppedByUser
-      if ('paused' in event.payload) nextAgent.paused = event.payload.paused
-      if ('pausedReason' in event.payload) {
-        if (event.payload.pausedReason === null || event.payload.pausedReason === undefined) delete nextAgent.pausedReason
-        else nextAgent.pausedReason = event.payload.pausedReason
-      }
-      if ('pausedAt' in event.payload) {
-        if (event.payload.pausedAt === null || event.payload.pausedAt === undefined) delete nextAgent.pausedAt
-        else nextAgent.pausedAt = event.payload.pausedAt
-      }
-      if ('troubled' in event.payload) nextAgent.troubled = event.payload.troubled
-      if ('troubledAt' in event.payload) {
-        if (event.payload.troubledAt === null || event.payload.troubledAt === undefined) delete nextAgent.troubledAt
-        else nextAgent.troubledAt = event.payload.troubledAt
-      }
-      if ('consecutiveFailures' in event.payload) nextAgent.consecutiveFailures = event.payload.consecutiveFailures
-      if ('firstFailureInRunAt' in event.payload) {
-        if (event.payload.firstFailureInRunAt === null || event.payload.firstFailureInRunAt === undefined) delete nextAgent.firstFailureInRunAt
-        else nextAgent.firstFailureInRunAt = event.payload.firstFailureInRunAt
-      }
-      if ('lastFailureAt' in event.payload) {
-        if (event.payload.lastFailureAt === null || event.payload.lastFailureAt === undefined) delete nextAgent.lastFailureAt
-        else nextAgent.lastFailureAt = event.payload.lastFailureAt
-      }
-      if ('lastFailureReason' in event.payload) {
-        if (event.payload.lastFailureReason === null || event.payload.lastFailureReason === undefined) delete nextAgent.lastFailureReason
-        else nextAgent.lastFailureReason = event.payload.lastFailureReason
-      }
-      if ('lastFailureNextRetryAt' in event.payload) {
-        if (event.payload.lastFailureNextRetryAt === null || event.payload.lastFailureNextRetryAt === undefined) delete nextAgent.lastFailureNextRetryAt
-        else nextAgent.lastFailureNextRetryAt = event.payload.lastFailureNextRetryAt
-      }
+      const nextAgent: AgentSnapshot = (() => {
+        const base: Record<string, unknown> = { ...agent, status: event.payload.status }
+        const optionalFields = [
+          'stoppedByUser', 'paused', 'pausedReason', 'pausedAt',
+          'troubled', 'troubledAt', 'consecutiveFailures',
+          'firstFailureInRunAt', 'lastFailureAt', 'lastFailureReason', 'lastFailureNextRetryAt',
+        ] as const
+        for (const field of optionalFields) {
+          if (field in event.payload) {
+            const value = (event.payload as Record<string, unknown>)[field]
+            if (value === null || value === undefined) {
+              delete base[field]
+            } else {
+              base[field] = value
+            }
+          }
+        }
+        return base as AgentSnapshot
+      })()
 
       return {
         ...state,
