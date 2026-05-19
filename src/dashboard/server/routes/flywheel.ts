@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { Effect, Layer, Option, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -14,9 +14,16 @@ import {
   type FlywheelRunListOptions,
   type FlywheelRunStateOptions,
 } from '../services/flywheel-run-state.js';
-import { openFlywheelRunReport, pauseFlywheelRun, resumeFlywheelRun, startFlywheelRun } from '../../../cli/commands/flywheel.js';
-import { getConversationByName } from '../../../lib/database/conversations-db.js';
+import { hasDashboardInternalToken } from './dashboard-auth.js';
 import { sessionExistsAsync } from '../../../lib/tmux.js';
+import { runDashboardDbJob } from '../services/dashboard-db-task.js';
+import {
+  openFlywheelRunReportForDashboard,
+  pauseFlywheelRunForDashboard,
+  readCurrentFlywheelStatusForDashboard,
+  resumeFlywheelRunForDashboard,
+  startFlywheelRunForDashboard,
+} from '../services/flywheel-actions.js';
 
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
@@ -43,6 +50,7 @@ const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
 const decodeFlywheelRunId = Schema.decodeUnknownSync(FlywheelRunId);
 
 function requireTrustedOrigin(request: HttpServerRequest.HttpServerRequest) {
+  if (hasDashboardInternalToken(request)) return null;
   const originCheck = validateOrigin(request);
   return originCheck.ok ? null : jsonResponse({ error: originCheck.error }, { status: 403 });
 }
@@ -93,6 +101,32 @@ function resolveBriefAbsolutePath(projectRoot: string, requestedPath?: string): 
   };
 }
 
+async function assertExistingPathInsideRoot(projectRoot: string, candidate: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const [realRoot, realCandidate] = await Promise.all([realpath(projectRoot), realpath(candidate)]);
+  return isInsideRoot(realRoot, realCandidate)
+    ? { ok: true }
+    : { ok: false, error: 'Brief path must stay inside the project root' };
+}
+
+async function assertWritePathInsideRoot(projectRoot: string, candidate: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const realRoot = await realpath(projectRoot);
+  const realParent = await realpath(dirname(candidate));
+  if (!isInsideRoot(realRoot, realParent)) return { ok: false, error: 'Brief path must stay inside the project root' };
+
+  try {
+    const info = await lstat(candidate);
+    if (info.isSymbolicLink()) {
+      const realCandidate = await realpath(candidate);
+      if (!isInsideRoot(realRoot, realCandidate)) return { ok: false, error: 'Brief path must stay inside the project root' };
+    }
+  } catch (error) {
+    const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+    if (code !== 'ENOENT') throw error;
+  }
+
+  return { ok: true };
+}
+
 const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
@@ -138,18 +172,22 @@ export async function getFlywheelRunPayload(runId: string, options: FlywheelRunS
   return getFlywheelRunDetail(runId, options);
 }
 
+export async function getFlywheelCurrentPayload() {
+  return readCurrentFlywheelStatusForDashboard();
+}
+
 export async function getFlywheelConversationPayload() {
-  const conversation = getConversationByName(FLYWHEEL_CONVERSATION_NAME);
+  const conversation = await runDashboardDbJob<{ tmuxSession: string } | null>('getConversationByName', FLYWHEEL_CONVERSATION_NAME);
   if (!conversation) return null;
   const sessionAlive = await sessionExistsAsync(conversation.tmuxSession);
   return { ...conversation, sessionAlive };
 }
 
 interface FlywheelActionDeps {
-  start?: typeof startFlywheelRun;
-  pause?: typeof pauseFlywheelRun;
-  resume?: typeof resumeFlywheelRun;
-  openReport?: typeof openFlywheelRunReport;
+  start?: typeof startFlywheelRunForDashboard;
+  pause?: typeof pauseFlywheelRunForDashboard;
+  resume?: typeof resumeFlywheelRunForDashboard;
+  openReport?: typeof openFlywheelRunReportForDashboard;
 }
 
 export async function postFlywheelStartPayload(payload: unknown, deps: FlywheelActionDeps = {}) {
@@ -157,17 +195,17 @@ export async function postFlywheelStartPayload(payload: unknown, deps: FlywheelA
   if (body.brief !== undefined && typeof body.brief !== 'string') {
     return { status: 400, body: { error: 'brief must be a string when provided' } };
   }
-  const result = await (deps.start ?? startFlywheelRun)({ cwd: process.cwd(), brief: body.brief });
+  const result = await (deps.start ?? startFlywheelRunForDashboard)({ cwd: process.cwd(), brief: body.brief });
   return { status: 200, body: { ok: true, runId: result.runId } };
 }
 
 export async function postFlywheelPausePayload(deps: FlywheelActionDeps = {}) {
-  const result = await (deps.pause ?? pauseFlywheelRun)();
+  const result = await (deps.pause ?? pauseFlywheelRunForDashboard)();
   return { status: 200, body: { ok: true, changed: result.changed } };
 }
 
 export async function postFlywheelResumePayload(deps: FlywheelActionDeps = {}) {
-  const result = await (deps.resume ?? resumeFlywheelRun)();
+  const result = await (deps.resume ?? resumeFlywheelRunForDashboard)();
   return { status: 200, body: { ok: true, changed: result.changed } };
 }
 
@@ -180,7 +218,7 @@ export async function postFlywheelReportOpenPayload(payload: unknown, deps: Flyw
     const parsed = parseRunIdParam(body.runId);
     if (!parsed.ok) return { status: 400, body: { error: parsed.error } };
   }
-  const result = await (deps.openReport ?? openFlywheelRunReport)({ runId: body.runId });
+  const result = await (deps.openReport ?? openFlywheelRunReportForDashboard)({ runId: body.runId });
   return { status: 200, body: { ok: true, runId: result.runId, path: result.path } };
 }
 
@@ -216,6 +254,14 @@ const getFlywheelConversationRoute = HttpRouter.add(
   '/api/flywheel/conversation',
   httpHandler(Effect.gen(function* () {
     return yield* Effect.promise(async () => jsonResponse(await getFlywheelConversationPayload()));
+  })),
+);
+
+const getFlywheelCurrentRoute = HttpRouter.add(
+  'GET',
+  '/api/flywheel/current',
+  httpHandler(Effect.gen(function* () {
+    return yield* Effect.promise(async () => jsonResponse(await getFlywheelCurrentPayload()));
   })),
 );
 
@@ -323,6 +369,8 @@ const getFlywheelBriefRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
       try {
+        const containment = await assertExistingPathInsideRoot(process.cwd(), resolved.absolutePath);
+        if (!containment.ok) return jsonResponse({ error: containment.error }, { status: 400 });
         const content = await readFile(resolved.absolutePath, 'utf8');
         return jsonResponse({ path: resolved.displayPath, content });
       } catch (error) {
@@ -359,6 +407,8 @@ const postFlywheelBriefRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
       await mkdir(dirname(resolved.absolutePath), { recursive: true });
+      const containment = await assertWritePathInsideRoot(process.cwd(), resolved.absolutePath);
+      if (!containment.ok) return jsonResponse({ error: containment.error }, { status: 400 });
       await writeFile(resolved.absolutePath, body.content, 'utf8');
       return jsonResponse({ ok: true, path: resolved.displayPath });
     });
@@ -369,6 +419,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelRunsRoute,
   getFlywheelRunRoute,
   getFlywheelConversationRoute,
+  getFlywheelCurrentRoute,
   postFlywheelStatusRoute,
   postFlywheelStartRoute,
   postFlywheelPauseRoute,

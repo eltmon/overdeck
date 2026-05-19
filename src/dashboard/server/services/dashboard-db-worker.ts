@@ -7,6 +7,8 @@ import {
   getDiscoveredSessionById,
   getDiscoveredStats,
 } from '../../../lib/database/discovered-sessions-db.js';
+import { getConversationByName } from '../../../lib/database/conversations-db.js';
+import { getSetting, setSetting } from '../../../lib/database/app-settings.js';
 import type { ConversationFilter } from '../../../lib/database/discovered-sessions-db.js';
 import { searchSessions } from '../../../lib/conversations/search.js';
 import type { SearchQuery } from '../../../lib/conversations/search.js';
@@ -27,7 +29,10 @@ type DashboardDbOperation =
   | 'searchSessionsSemantic'
   | 'scanConversations'
   | 'enrichSessions'
-  | 'embedSessions';
+  | 'embedSessions'
+  | 'getConversationByName'
+  | 'getSetting'
+  | 'setSetting';
 
 interface DashboardDbRequest {
   id: string;
@@ -77,6 +82,15 @@ async function runJob(
       return enrichSessions({ ...(payload as EnrichOptions), onProgress: emitProgress });
     case 'embedSessions':
       return embedSessions({ ...(payload as EmbedSessionsOptions), onProgress: emitProgress });
+    case 'getConversationByName':
+      return getConversationByName(payload as string);
+    case 'getSetting':
+      return getSetting(payload as string);
+    case 'setSetting': {
+      const input = payload as { key: string; value: string };
+      setSetting(input.key, input.value);
+      return null;
+    }
   }
 }
 

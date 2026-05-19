@@ -68,7 +68,7 @@ export function isFlywheelDevcontainerRuntime(env: NodeJS.ProcessEnv = process.e
   return hostname.includes('devcontainer') || hostname.startsWith('api-feature-') || hostname.startsWith('workspace-');
 }
 
-async function spawnFlywheelAgent(runId: string, options: FlywheelLifecycleOptions = {}): Promise<AgentState> {
+export async function spawnFlywheelAgent(runId: string, options: FlywheelLifecycleOptions = {}): Promise<AgentState> {
   const briefContent = options.briefPath ? await readFile(options.briefPath, 'utf8') : undefined;
   return spawnRun(runId, 'flywheel', {
     agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,

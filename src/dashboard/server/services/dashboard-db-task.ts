@@ -8,6 +8,8 @@ import {
   getDiscoveredSessionById,
   getDiscoveredStats,
 } from '../../../lib/database/discovered-sessions-db.js';
+import { getConversationByName } from '../../../lib/database/conversations-db.js';
+import { getSetting, setSetting } from '../../../lib/database/app-settings.js';
 import type { ConversationFilter } from '../../../lib/database/discovered-sessions-db.js';
 import { searchSessions } from '../../../lib/conversations/search.js';
 import type { SearchQuery } from '../../../lib/conversations/search.js';
@@ -28,7 +30,10 @@ export type DashboardDbOperation =
   | 'searchSessionsSemantic'
   | 'scanConversations'
   | 'enrichSessions'
-  | 'embedSessions';
+  | 'embedSessions'
+  | 'getConversationByName'
+  | 'getSetting'
+  | 'setSetting';
 
 type ProgressHandler = (progress: unknown) => void | Promise<void>;
 type WorkerLane = 'read' | 'long' | 'semantic';
@@ -218,6 +223,15 @@ async function runInline(
       return enrichSessions({ ...(payload as EnrichOptions), onProgress });
     case 'embedSessions':
       return embedSessions({ ...(payload as EmbedSessionsOptions), onProgress });
+    case 'getConversationByName':
+      return getConversationByName(payload as string);
+    case 'getSetting':
+      return getSetting(payload as string);
+    case 'setSetting': {
+      const input = payload as { key: string; value: string };
+      setSetting(input.key, input.value);
+      return null;
+    }
   }
 }
 

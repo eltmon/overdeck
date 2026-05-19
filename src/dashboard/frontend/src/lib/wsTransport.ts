@@ -241,12 +241,12 @@ export function getTransport(): WsTransport {
 }
 
 export function subscribeFlywheelStatus(
-  listener: (status: FlywheelStatus) => void,
+  listener: (status: FlywheelStatus | null) => void,
   options?: SubscribeOptions,
 ): () => void {
   return getTransport().subscribe(
     (client) =>
-      (client as PanRpcProtocolClient)[WS_METHODS.subscribeFlywheelStatus]({}) as unknown as Stream.Stream<FlywheelStatus, Error>,
+      (client as PanRpcProtocolClient)[WS_METHODS.subscribeFlywheelStatus]({}) as unknown as Stream.Stream<FlywheelStatus | null, Error>,
     listener,
     options,
   )

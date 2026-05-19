@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -15,6 +15,7 @@ import {
   resolveFlywheelBriefPath,
 } from '../flywheel.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../services/flywheel-run-state.js';
+import { requireFlywheelBrief as requireDashboardFlywheelBrief } from '../../services/flywheel-actions.js';
 
 function makeStatus(runId: string, startedAt: string): FlywheelStatus {
   return {
@@ -87,6 +88,18 @@ describe('resolveFlywheelBriefPath', () => {
       ok: false,
       error: 'Brief path must stay inside the project root',
     });
+  });
+
+  it('rejects brief symlinks that resolve outside the project root', async () => {
+    const outsideDir = await mkdtemp(join(tmpdir(), 'pan-flywheel-brief-outside-'));
+    try {
+      await writeFile(join(outsideDir, 'brief.md'), '# Outside\n');
+      await symlink(join(outsideDir, 'brief.md'), join(projectRoot, 'brief-link.md'));
+
+      await expect(requireDashboardFlywheelBrief(projectRoot, './brief-link.md')).rejects.toThrow('Brief path must stay inside the project root');
+    } finally {
+      await rm(outsideDir, { recursive: true, force: true });
+    }
   });
 });
 

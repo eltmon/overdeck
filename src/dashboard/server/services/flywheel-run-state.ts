@@ -41,7 +41,8 @@ const RUN_ID_PATTERN = /^RUN-(\d+)$/;
 const DEFAULT_RUNS_LIMIT = 20;
 const MAX_RUNS_LIMIT = 100;
 const RUN_SUMMARY_CONCURRENCY = 4;
-type FlywheelStatusListener = (status: FlywheelStatus) => void;
+type FlywheelStatusSnapshot = FlywheelStatus | null;
+type FlywheelStatusListener = (status: FlywheelStatusSnapshot) => void;
 const flywheelStatusListeners = new Set<FlywheelStatusListener>();
 
 export function subscribeLatestFlywheelStatus(listener: FlywheelStatusListener): () => void {
@@ -51,10 +52,14 @@ export function subscribeLatestFlywheelStatus(listener: FlywheelStatusListener):
   };
 }
 
-function publishLatestFlywheelStatus(status: FlywheelStatus): void {
+function publishLatestFlywheelStatus(status: FlywheelStatusSnapshot): void {
   for (const listener of flywheelStatusListeners) {
     listener(status);
   }
+}
+
+export function publishFlywheelStatusCleared(): void {
+  publishLatestFlywheelStatus(null);
 }
 
 export function parseFlywheelRunId(runId: string): FlywheelRunId {

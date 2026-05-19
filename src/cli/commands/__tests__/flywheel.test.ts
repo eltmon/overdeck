@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
@@ -7,7 +7,7 @@ import { Readable } from 'node:stream';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 import type { FlywheelStatus } from '@panctl/contracts';
-import { writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
+import { subscribeLatestFlywheelStatus, writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
 
 const flywheelLifecycleMocks = vi.hoisted(() => ({
   paused: false,
@@ -179,7 +179,10 @@ describe('flywheel CLI commands', () => {
 
     expect(fetchMock).toHaveBeenCalledWith('http://dashboard.test/api/flywheel/status', expect.objectContaining({
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: expect.objectContaining({
+        'Content-Type': 'application/json',
+        'x-panopticon-internal-token': expect.any(String),
+      }),
       body: JSON.stringify(validStatus),
     }));
     expect(logSpy).toHaveBeenCalledWith('Flywheel status emitted for RUN-1');
@@ -291,6 +294,19 @@ describe('flywheel CLI commands', () => {
     expect(errorSpy).toHaveBeenCalledWith('Flywheel brief not found: missing.md');
   });
 
+  it('rejects a brief symlink that resolves outside the project root', async () => {
+    const outsideDir = await mkdtemp(join(tmpdir(), 'pan-flywheel-outside-'));
+    await writeFile(join(outsideDir, 'brief.md'), '# Outside\n', 'utf8');
+    await symlink(join(outsideDir, 'brief.md'), join(tempDir, 'brief-link.md'));
+
+    await flywheelStartCommand({ cwd: tempDir, brief: './brief-link.md' });
+
+    expect(flywheelLifecycleMocks.spawnFlywheel).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith('Brief path must stay inside the project root');
+    await rm(outsideDir, { recursive: true, force: true });
+  });
+
   it('surfaces the active run gate when start is refused', async () => {
     await mkdir(join(tempDir, 'docs'), { recursive: true });
     await writeFile(join(tempDir, 'docs', 'flywheel-brief.md'), '# Flywheel Brief\n', 'utf8');
@@ -350,6 +366,8 @@ describe('flywheel CLI commands', () => {
     const repoDir = await createReportRepo(tempDir);
     flywheelLifecycleMocks.activeRunId = 'RUN-1';
     flywheelLifecycleMocks.paused = true;
+    const received: Array<FlywheelStatus | null> = [];
+    const unsubscribe = subscribeLatestFlywheelStatus((next) => received.push(next));
     await writeLatestFlywheelStatus({
       ...validStatus,
       activePipeline: [{ issueId: 'PAN-1', title: 'Pipeline item', verb: 'working', status: 'running', progressPercent: 50, pr: 123 }],
@@ -359,6 +377,7 @@ describe('flywheel CLI commands', () => {
     });
 
     await flywheelReportCommand({ cwd: repoDir });
+    unsubscribe();
 
     const stateReport = await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8');
     const operationLog = await readFile(join(repoDir, 'docs', 'OPERATION-FIX-ALL.md'), 'utf8');
@@ -374,6 +393,7 @@ describe('flywheel CLI commands', () => {
     ].join('\n'));
     expect(flywheelLifecycleMocks.activeRunId).toBeNull();
     expect(flywheelLifecycleMocks.paused).toBe(false);
+    expect(received.at(-1)).toBeNull();
 
     flywheelLifecycleMocks.spawnFlywheel.mockClear();
     await writeFile(join(repoDir, 'docs', 'flywheel-brief.md'), '# Flywheel Brief\n', 'utf8');

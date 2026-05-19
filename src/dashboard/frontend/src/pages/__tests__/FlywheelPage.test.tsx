@@ -1,10 +1,10 @@
 import { act, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelStatus } from '@panctl/contracts';
 import { FlywheelPage } from '../FlywheelPage';
 
 const mocks = vi.hoisted(() => ({
-  listener: undefined as ((status: FlywheelStatus) => void) | undefined,
+  listener: undefined as ((status: FlywheelStatus | null) => void) | undefined,
   unsubscribe: vi.fn(),
   subscribeFlywheelStatus: vi.fn(),
   statusDetails: vi.fn(),
@@ -66,15 +66,20 @@ const status: FlywheelStatus = {
 
 describe('FlywheelPage', () => {
   beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(null)));
     mocks.listener = undefined;
     mocks.unsubscribe.mockReset();
     mocks.statusDetails.mockReset();
     mocks.conversationPane.mockReset();
     mocks.subscribeFlywheelStatus.mockReset();
-    mocks.subscribeFlywheelStatus.mockImplementation((listener: (status: FlywheelStatus) => void) => {
+    mocks.subscribeFlywheelStatus.mockImplementation((listener: (status: FlywheelStatus | null) => void) => {
       mocks.listener = listener;
       return mocks.unsubscribe;
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('mounts the Flywheel status subscription and renders the two-pane shell', () => {
@@ -110,6 +115,21 @@ describe('FlywheelPage', () => {
     expect(mocks.statusDetails).toHaveBeenCalledWith(expect.objectContaining({ status, onNavigateAgent }));
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+
+  it('clears stale live status when the subscription emits null', () => {
+    render(<FlywheelPage />);
+
+    act(() => {
+      mocks.listener?.(status);
+    });
+    expect(screen.getByTestId('status-details')).toHaveTextContent('RUN-7');
+
+    act(() => {
+      mocks.listener?.(null);
+    });
+    expect(screen.getByText(/No active run/)).toBeInTheDocument();
+    expect(screen.queryByTestId('status-details')).not.toBeInTheDocument();
   });
 
   it('unsubscribes on unmount', () => {

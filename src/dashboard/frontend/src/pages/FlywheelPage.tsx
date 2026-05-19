@@ -9,6 +9,12 @@ interface FlywheelPageProps {
   onNavigateAgent?: (agentId: string) => void;
 }
 
+async function fetchCurrentFlywheelStatus(): Promise<FlywheelStatus | null> {
+  const res = await fetch('/api/flywheel/current');
+  if (!res.ok) throw new Error(`Request failed (${res.status})`);
+  return res.json() as Promise<FlywheelStatus | null>;
+}
+
 function formatElapsed(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return '—';
   const totalSeconds = Math.floor(ms / 1000);
@@ -21,7 +27,29 @@ function formatElapsed(ms: number): string {
 export function FlywheelPage({ onOpenSettings, onNavigateAgent }: FlywheelPageProps) {
   const [status, setStatus] = useState<FlywheelStatus | null>(null);
 
-  useEffect(() => subscribeFlywheelStatus(setStatus), []);
+  useEffect(() => {
+    let cancelled = false;
+    const refreshCurrentStatus = async () => {
+      try {
+        const current = await fetchCurrentFlywheelStatus();
+        if (!cancelled) setStatus(current);
+      } catch {
+        // The RPC subscription remains authoritative while the dashboard restarts.
+      }
+    };
+    void refreshCurrentStatus();
+    const interval = window.setInterval(() => {
+      void refreshCurrentStatus();
+    }, 5000);
+    const unsubscribe = subscribeFlywheelStatus((next) => {
+      setStatus(next);
+    });
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      unsubscribe();
+    };
+  }, []);
 
   return (
     <div

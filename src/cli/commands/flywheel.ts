@@ -1,16 +1,17 @@
 import { exec, spawn } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { freemem, totalmem } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { Schema } from 'effect';
 import { Command } from 'commander';
 import { FlywheelStatus } from '@panctl/contracts';
-import { getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
+import { getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, publishFlywheelStatusCleared, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
 import { loadConfig, resolveModel, type FlywheelScope, type RoleEffort } from '../../lib/config-yaml.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused, setFlywheelActiveRunId, setFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
 import { sessionExistsAsync } from '../../lib/tmux.js';
+import { ensureInternalToken, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
 
@@ -97,7 +98,7 @@ function isInsideRoot(projectRoot: string, candidate: string): boolean {
   return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
 }
 
-function resolveFlywheelStartBriefPath(cwd: string, requestedPath?: string): { absolutePath: string; displayPath: string } {
+export function resolveFlywheelStartBriefPath(cwd: string, requestedPath?: string): { absolutePath: string; displayPath: string } {
   const rawPath = requestedPath?.trim() || DEFAULT_BRIEF_PATH;
   if (rawPath.includes('\0')) throw new Error('Brief path is invalid');
 
@@ -110,9 +111,15 @@ function resolveFlywheelStartBriefPath(cwd: string, requestedPath?: string): { a
   return { absolutePath, displayPath: absolutePath.startsWith(normalizedRoot) ? displayPath : absolutePath };
 }
 
-async function requireFlywheelBrief(cwd: string, requestedPath?: string): Promise<{ absolutePath: string; displayPath: string }> {
+async function assertExistingPathInsideRoot(projectRoot: string, candidate: string): Promise<void> {
+  const [realRoot, realCandidate] = await Promise.all([realpath(projectRoot), realpath(candidate)]);
+  if (!isInsideRoot(realRoot, realCandidate)) throw new Error('Brief path must stay inside the project root');
+}
+
+export async function requireFlywheelBrief(cwd: string, requestedPath?: string): Promise<{ absolutePath: string; displayPath: string }> {
   const resolved = resolveFlywheelStartBriefPath(cwd, requestedPath);
   try {
+    await assertExistingPathInsideRoot(cwd, resolved.absolutePath);
     await readFile(resolved.absolutePath, 'utf8');
     return resolved;
   } catch (error) {
@@ -190,9 +197,13 @@ async function createInitialFlywheelStatus(
 }
 
 export async function postFlywheelStatus(status: FlywheelStatus, fetchImpl: typeof fetch = fetch): Promise<void> {
+  const internalToken = ensureInternalToken();
   const res = await fetchImpl(`${dashboardBaseUrl()}/api/flywheel/status`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      [INTERNAL_TOKEN_HEADER]: internalToken,
+    },
     body: JSON.stringify(status),
   });
 
@@ -533,6 +544,7 @@ function clearFlywheelRunGate(runId: string): void {
   if (getFlywheelActiveRunId() === runId) {
     setFlywheelActiveRunId(null);
     setFlywheelGloballyPaused(false);
+    publishFlywheelStatusCleared();
   }
 }
 

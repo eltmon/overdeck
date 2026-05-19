@@ -301,7 +301,7 @@ export const SubscribeProjectSessionTreeRpc = Rpc.make(WS_METHODS.subscribeProje
 /** 18. Subscribe to latest Flywheel status snapshots (stream) */
 export const SubscribeFlywheelStatusRpc = Rpc.make(WS_METHODS.subscribeFlywheelStatus, {
   payload: Schema.Struct({}),
-  success: FlywheelStatus,
+  success: Schema.NullOr(FlywheelStatus),
   error: PanRpcError,
   stream: true,
 })

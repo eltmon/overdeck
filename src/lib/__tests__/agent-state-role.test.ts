@@ -67,6 +67,13 @@ describe('AgentState role persistence', () => {
     expect(command).toContain('--effort low');
   });
 
+  it('preserves the flywheel singleton agent id during normalization', async () => {
+    const { normalizeAgentId } = await import('../agents.js');
+
+    expect(normalizeAgentId('flywheel-orchestrator')).toBe('flywheel-orchestrator');
+    expect(normalizeAgentId('PAN-1')).toBe('agent-pan-1');
+  });
+
   it('does not pass --agent for review convoy sub-roles (prompts are harness-agnostic templates inlined by the orchestrator)', async () => {
     const { getRoleRuntimeBaseCommand, roleAgentDefinitionPath } = await import('../agents.js');
 
