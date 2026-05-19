@@ -28,6 +28,21 @@ export interface FlywheelRunDetail extends FlywheelRunSummary {
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
 const RUN_ID_PATTERN = /^RUN-(\d+)$/;
+type FlywheelStatusListener = (status: FlywheelStatus) => void;
+const flywheelStatusListeners = new Set<FlywheelStatusListener>();
+
+export function subscribeLatestFlywheelStatus(listener: FlywheelStatusListener): () => void {
+  flywheelStatusListeners.add(listener);
+  return () => {
+    flywheelStatusListeners.delete(listener);
+  };
+}
+
+function publishLatestFlywheelStatus(status: FlywheelStatus): void {
+  for (const listener of flywheelStatusListeners) {
+    listener(status);
+  }
+}
 
 export function getFlywheelHome(options: FlywheelRunStateOptions = {}): string {
   return join(options.panopticonHome ?? process.env['PANOPTICON_HOME'] ?? join(homedir(), '.panopticon'), 'flywheel');
@@ -61,6 +76,7 @@ export async function writeLatestFlywheelStatus(status: FlywheelStatus, options:
   await mkdir(dirname(latestPath), { recursive: true });
   await writeFile(tmpPath, `${JSON.stringify(status, null, 2)}\n`, 'utf8');
   await rename(tmpPath, latestPath);
+  publishLatestFlywheelStatus(status);
   return latestPath;
 }
 
@@ -102,6 +118,11 @@ async function summarizeRun(runId: string, options: FlywheelRunStateOptions): Pr
     startedAt: latest?.startedAt ?? '',
     status,
   };
+}
+
+export async function readCurrentLatestFlywheelStatus(options: FlywheelRunStateOptions = {}): Promise<FlywheelStatus | null> {
+  const latestRun = (await listFlywheelRuns(options))[0];
+  return latestRun ? readLatestFlywheelStatus(latestRun.id, options) : null;
 }
 
 export async function listFlywheelRuns(options: FlywheelRunStateOptions = {}): Promise<FlywheelRunSummary[]> {

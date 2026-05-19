@@ -22,7 +22,7 @@ import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
 import { ConversationsPage } from './components/conversations/ConversationsPage';
 import { AutoPresoView } from './components/autopreso/AutoPresoView';
-import { FlywheelConversationPane } from './components/flywheel/FlywheelConversationPane';
+import { FlywheelPage } from './pages/FlywheelPage';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { BootstrapGate } from './components/BootstrapGate';
@@ -963,7 +963,13 @@ export default function App() {
         )}
         {activeTab === 'flywheel' && (
           <div className="w-full h-full overflow-hidden">
-            <FlywheelConversationPane onOpenSettings={() => setActiveTab('settings')} />
+            <FlywheelPage
+              onOpenSettings={() => setActiveTab('settings')}
+              onNavigateAgent={(agentId) => {
+                setSelectedAgent(agentId);
+                setActiveTab('agents');
+              }}
+            />
           </div>
         )}
         {activeTab === 'settings' && (

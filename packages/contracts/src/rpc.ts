@@ -15,6 +15,7 @@ import {
   WorkspaceDetail,
 } from "./types"
 import { EditorIdSchema, OpenInEditorInput } from "./editor"
+import { FlywheelStatus } from "./flywheel"
 
 // ─── RPC method names ─────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ export const WS_METHODS = {
   subscribeAgentOutput: "pan.subscribeAgentOutput",
   subscribeConversationMessages: "pan.subscribeConversationMessages",
   subscribeProjectSessionTree: "pan.subscribeProjectSessionTree",
+  subscribeFlywheelStatus: "pan.subscribeFlywheelStatus",
 
   // Snapshot / replay
   getSnapshot: "pan.getSnapshot",
@@ -296,7 +298,15 @@ export const SubscribeProjectSessionTreeRpc = Rpc.make(WS_METHODS.subscribeProje
   stream: true,
 })
 
-/** 18. Open a workspace in an editor (PAN-966) */
+/** 18. Subscribe to latest Flywheel status snapshots (stream) */
+export const SubscribeFlywheelStatusRpc = Rpc.make(WS_METHODS.subscribeFlywheelStatus, {
+  payload: Schema.Struct({}),
+  success: FlywheelStatus,
+  error: PanRpcError,
+  stream: true,
+})
+
+/** 19. Open a workspace in an editor (PAN-966) */
 export const ShellOpenInEditorRpc = Rpc.make(WS_METHODS.shellOpenInEditor, {
   payload: OpenInEditorInput,
   error: PanRpcError,
@@ -452,6 +462,7 @@ export const PanRpcGroup = RpcGroup.make(
   ResizeTerminalRpc,
   SubscribeConversationMessagesRpc,
   SubscribeProjectSessionTreeRpc,
+  SubscribeFlywheelStatusRpc,
   ShellOpenInEditorRpc,
   GetAvailableEditorsRpc,
   ScanConversationsRpc,

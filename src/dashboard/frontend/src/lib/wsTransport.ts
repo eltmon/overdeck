@@ -11,7 +11,7 @@
 import { Duration, Effect, Exit, Layer, ManagedRuntime, Schedule, Scope, Stream } from 'effect'
 import { RpcClient, RpcSerialization } from 'effect/unstable/rpc'
 import * as Socket from 'effect/unstable/socket/Socket'
-import { PanRpcGroup } from '@panctl/contracts'
+import { PanRpcGroup, WS_METHODS, type FlywheelStatus } from '@panctl/contracts'
 
 // ─── Protocol setup ───────────────────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ function createPanRpcProtocolLayer(url?: string) {
 
 // ─── WsTransport ─────────────────────────────────────────────────────────────
 
-interface SubscribeOptions {
+export interface SubscribeOptions {
   readonly retryDelay?: Duration.Input
   /** Called when the subscription reconnects after a failure. Use this to
    *  re-bootstrap state (e.g. re-fetch the snapshot from the new server). */
@@ -238,6 +238,18 @@ export function getTransport(): WsTransport {
     _transport = new WsTransport()
   }
   return _transport
+}
+
+export function subscribeFlywheelStatus(
+  listener: (status: FlywheelStatus) => void,
+  options?: SubscribeOptions,
+): () => void {
+  return getTransport().subscribe(
+    (client) =>
+      (client as PanRpcProtocolClient)[WS_METHODS.subscribeFlywheelStatus]({}) as unknown as Stream.Stream<FlywheelStatus, Error>,
+    listener,
+    options,
+  )
 }
 
 export function resetTransport(): void {
