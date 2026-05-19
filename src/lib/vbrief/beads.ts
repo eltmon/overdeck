@@ -371,7 +371,7 @@ export async function syncBeadStatusToVBrief(
     // Strip issue prefix: "{PLAN_ID}: {item.title}" → "{item.title}"
     const planId = doc.plan.id;
     const prefix = `${planId}: `;
-    const itemTitle = beadTitle.startsWith(prefix)
+    const itemTitle = beadTitle.toLowerCase().startsWith(prefix.toLowerCase())
       ? beadTitle.slice(prefix.length)
       : beadTitle;
 

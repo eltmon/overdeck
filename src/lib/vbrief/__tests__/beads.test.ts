@@ -82,6 +82,14 @@ describe('syncBeadStatusToVBrief', () => {
     expect(updated.plan.items[0].status).toBe('completed');
   });
 
+  it('syncs status when bead title has a lowercase plan prefix', async () => {
+    writePlan(makePlanDoc([{ id: 'item-lowercase-prefix', title: 'Wire the pipeline' }]));
+    writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-lowercase-prefix', title: 'pan-388: Wire the pipeline' }]);
+
+    const result = await syncBeadStatusToVBrief('bead-lowercase-prefix', WORKSPACE_PATH);
+    expect(result).toBe('item-lowercase-prefix');
+  });
+
   it('syncs status when bead title matches without plan prefix', async () => {
     writePlan(makePlanDoc([{ id: 'item-2', title: 'Wire the pipeline' }]));
     writeBeadsFile(WORKSPACE_PATH, [{ id: 'bead-2', title: 'Wire the pipeline' }]);
