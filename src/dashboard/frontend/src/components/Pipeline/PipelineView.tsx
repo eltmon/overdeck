@@ -267,8 +267,7 @@ export function PipelineView() {
       if (
         status.reviewStatus === 'reviewing' ||
         status.testStatus === 'testing' ||
-        status.verificationStatus === 'running' ||
-        status.inspectStatus === 'inspecting'
+        status.verificationStatus === 'running'
       ) {
         reviewIssueIds.add(status.issueId);
       }

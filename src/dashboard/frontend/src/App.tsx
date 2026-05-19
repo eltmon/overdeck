@@ -352,7 +352,7 @@ export default function App() {
 
   const queryClient = useQueryClient();
 
-  const [planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
+  const [_planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);

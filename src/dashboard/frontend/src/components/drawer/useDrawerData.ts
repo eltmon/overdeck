@@ -351,16 +351,17 @@ function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot |
   const currentIndex = merged ? -1 : shippingCurrent ? 4 : reviewedCurrent ? 3 : implementedCurrent || plannedDone ? 2 : 1;
   const done = [Boolean(issue), plannedDone, implementedDone, reviewedDone, merged, merged];
 
-  return [
+  const steps: DrawerPhaseTimelineStep[] = [
     { id: 'triaged', label: 'Triaged', when: formatWhen(issue?.createdAt), sub: 'issue' },
     { id: 'planned', label: 'Planned', when: formatWhen(issue?.updatedAt), sub: 'plan' },
     { id: 'implemented', label: 'Implemented', when: formatWhen(reviewStatus?.updatedAt), sub: 'work' },
     { id: 'reviewed', label: 'Reviewed', when: formatWhen(reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt), sub: 'review' },
     { id: 'shipping', label: 'Shipping', when: formatWhen(reviewStatus?.updatedAt), sub: 'ship' },
     { id: 'merged', label: 'Merged', when: formatWhen(issue?.completedAt ?? (merged ? reviewStatus?.updatedAt : undefined)), sub: 'done' },
-  ].map((step, index) => ({
+  ];
+  return steps.map((step, index) => ({
     ...step,
-    state: done[index] ? 'done' : index === currentIndex ? 'current' : 'upcoming',
+    state: (done[index] ? 'done' : index === currentIndex ? 'current' : 'upcoming') as DrawerPhaseTimelineStep['state'],
   }));
 }
 

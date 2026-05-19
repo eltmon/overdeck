@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1148",
   "created": "2026-05-18T05:07:18.265Z",
-  "updated": "2026-05-19T08:13:48.418Z",
+  "updated": "2026-05-19T10:54:05.383Z",
   "gitState": {
     "branch": "feature/pan-1148",
     "dirty": true,
@@ -411,6 +411,11 @@
     },
     {
       "timestamp": "2026-05-19T08:13:48.418Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-19T10:54:05.383Z",
       "reason": "end",
       "note": "Agent signaled work complete"
     }
