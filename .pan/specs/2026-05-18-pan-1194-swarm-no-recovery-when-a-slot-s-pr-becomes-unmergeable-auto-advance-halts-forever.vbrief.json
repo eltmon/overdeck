@@ -4,7 +4,7 @@
     "created": "2026-05-18T22:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1194: Swarm: no recovery when a slot's PR becomes unmergeable — auto-advance halts forever",
-    "updated": "2026-05-19T00:04:18.114Z"
+    "updated": "2026-05-19T05:43:42.243Z"
   },
   "plan": {
     "id": "pan-1194",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "8452620e-f664-41c0-b8b4-4fb39fe2205f",
     "author": "agent:claude-opus-4-7",
-    "sequence": 51,
+    "sequence": 121,
     "created": "2026-05-18T22:40:00.000Z",
-    "updated": "2026-05-19T00:04:18.114Z",
+    "updated": "2026-05-19T05:43:42.243Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1194",
@@ -620,58 +620,60 @@
     "metadata": {
       "canonicalFilename": "2026-05-18-PAN-1194-swarm-no-recovery-when-a-slot-s-pr-becomes-unmergeable-auto-advance-halts-forever.vbrief.json",
       "pipeline": {
-        "phase": "review",
+        "phase": "done",
         "issueId": "PAN-1194",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-19T00:04:18.046Z",
+        "updatedAt": "2026-05-19T05:43:42.243Z",
         "work": {
-          "updatedAt": "2026-05-19T00:04:18.046Z",
+          "updatedAt": "2026-05-19T05:43:42.243Z",
           "history": []
         },
         "verification": {
           "status": "passed",
-          "updatedAt": "2026-05-19T00:04:18.046Z",
+          "updatedAt": "2026-05-19T05:43:42.243Z",
           "history": [
             {
               "status": "passed",
-              "at": "2026-05-19T00:04:18.046Z"
+              "at": "2026-05-19T05:43:42.243Z"
             }
           ]
         },
         "review": {
-          "status": "reviewing",
-          "updatedAt": "2026-05-19T00:04:18.046Z",
-          "notes": "Agent re-review request (2/25): Fixed verification error",
+          "status": "passed",
+          "updatedAt": "2026-05-19T05:43:42.243Z",
+          "notes": "41/41 AC implemented, 0 blockers — one perf advisory (non-blocking)",
           "history": [
             {
-              "status": "reviewing",
-              "at": "2026-05-19T00:04:18.046Z",
-              "notes": "Agent re-review request (2/25): Fixed verification error"
+              "status": "passed",
+              "at": "2026-05-19T05:43:42.243Z",
+              "notes": "41/41 AC implemented, 0 blockers — one perf advisory (non-blocking)"
             }
           ],
-          "approval": "pending"
+          "approval": "approved"
         },
         "test": {
-          "status": "pending",
-          "updatedAt": "2026-05-19T00:04:18.046Z",
+          "status": "passed",
+          "updatedAt": "2026-05-19T05:43:42.243Z",
+          "notes": "Skipped: no code changed since pre-review verification gate",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-19T00:04:18.046Z"
+              "status": "passed",
+              "at": "2026-05-19T05:43:42.243Z",
+              "notes": "Skipped: no code changed since pre-review verification gate"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-19T00:04:18.046Z",
+          "updatedAt": "2026-05-19T05:43:42.243Z",
           "history": []
         },
         "merge": {
-          "status": "pending",
-          "updatedAt": "2026-05-19T00:04:18.046Z",
+          "status": "merged",
+          "updatedAt": "2026-05-19T05:43:42.243Z",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-19T00:04:18.046Z"
+              "status": "merged",
+              "at": "2026-05-19T05:43:42.243Z"
             }
           ],
           "readyForMerge": false,

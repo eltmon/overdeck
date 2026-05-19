@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-16T04:05:31.860Z",
-  "updated": "2026-05-18T21:31:49.639Z",
+  "updated": "2026-05-19T06:28:25.766Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,7 +34,102 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-05-18T21:31:49.639Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T01:32Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-19T01:32:36.386Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-19T01:32:36.451Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T01:36Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-05-19T01:36:28.156Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-19T01:36:28.494Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T01:37Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-19T01:37:19.433Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T01:46Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-19T01:46:18.622Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-05-19T01:46:19.340Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T02:15Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-19T02:15:55.651Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T02:28Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-19T02:28:11.259Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T02:58Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-19T02:58:36.065Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T03:33Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-19T03:33:07.504Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T03:58Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-19T03:58:44.973Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T04:27Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-19T04:27:22.798Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T04:53Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-19T04:53:39.971Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T05:32Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-19T05:32:44.551Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-19T06:28Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-19T06:28:25.766Z"
     }
   ],
-  "feedback": []
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-19T05:32:44Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1052\n\n# Review Synthesis — PAN-1052 — 2026-05-19\n\n## Verdict: BLOCKED (4 reviewers — 2 clean, 2 blocked)\n\n---\n\n## Reviewer Outcomes\n\n| Reviewer | Status | Blockers |\n|---|---|---|\n| Security | PASSED | 0 |\n| Correctness | BLOCKED | 2 |\n| Performance | BLOCKED | 2 |\n| Requirements | INCOMPLETE | 1 missing, 2 partial |\n\n---\n\n## Cross-Reviewer Root Cause\n\nAll four correctness/performance blockers trace to the same two root problems in\n`src/lib/memory/checkpoints.ts` and the synchronous `better-sqlite3` call pattern:\n\n1. **`claimTranscriptRange()` is not atomic** — it reads `last_offset` and returns\n   `status: 'claimed'` without reserving the range inside the transaction. Concurrent\n   hook + poller jobs both receive `claimed` for the same bytes, causing duplicate\n   compression, duplicate LLM extraction, and duplicate observation writes.\n\n2. **Synchronous `better-sqlite3` on the dashboard event loop** — both the prompt-\n   injection HTTP path and the worker-pool extraction daemon path call synchronous\n   SQLite prepared statements directly, blocking all HTTP, WebSocket, SSE, and\n   terminal streaming while SQLite is busy.\n\n---\n\n## Blockers\n\n### B-1 (Correctness + Requirements): Non-exclusive transcript range claim\n\n**Files:** `src/lib/memory/checkpoints.ts:59`, `tests/lib/memory/checkpoints.test.ts:79`\n\n`claimTranscriptRange()` inserts an initial checkpoint then only `SELECT`s the row\nwhere `last_offset = @expectedFromOffset`. It does not update or reserve the row\nbefore returning `{ status: 'claimed' }`. `releaseTranscriptRange()` is a no-op.\n\nConcurrent Stop-hook, poller, and reconciliation jobs can all receive\n`status: 'claimed'` for the same `[lastOffset, toOffset]` range. All proceed to\ncompress the transcript and call the extraction LLM. The first to commit succeeds;\nthe others overwrite or are discarded. This violates the pipeline's exactly-once\nrange invariant.\n\nThe concurrency test at `tests/lib/memory/checkpoints.test.ts:79` asserts that all\n50 concurrent claimants are `claimed` and only one later commit succeeds — confirming\nthe test codifies the broken behavior rather than verifying correct semantics.\n\n**Fix:** Add in-flight claim fields (owner, from/to, expiry) to the checkpoint row.\nUse `UPDATE ... WHERE last_offset = ? AND no_active_claim RETURNING ...` as the\natomic claim operation. `releaseTranscriptRange()` clears the reservation. Commits\nverify and clear the same reservation before advancing `last_offset`. Update the\nconcurrency test to assert one `claimed` result and 49 `empty` results.\n\n---\n\n### B-2 (Correctness): Offset-mismatch commits reported as success\n\n**File:** `src/lib/memory/pipeline.ts:210`\n\nAfter writing observation, pending turn, event, and rollup side effects,\n`safeCommit()` is called and only `committed.status === 'failed'` is checked.\n`safeCommit()` maps both successful commits and `offset-mismatch` results into\nnon-failed statuses. The written path then sets `checkpointCommitted = true`\nand returns `{ status: 'written' }` even when `safeCommit()` returned\n`{ status: 'empty', reason: 'offset-mismatch' }`.\n\nThis means a successful write result is returned while the checkpoint has not\nadvanced for the processed range. The checkpoint remains at the old offset. A later\npoller/hook pass can reprocess the same bytes or skip accounting. No failed status\nis recorded, so operators cannot diagnose the stale write.\n\n**Fix:** Treat `committed.status === 'empty'` in the final write path as a\nfailed/offset-mismatch result. Do not mark `checkpointCommitted = true`. Record\na failing or degraded health indicator. This is naturally addressed by B-1's\nexclusive claim fix, since a proper reservation prevents offset mismatch after\nside effects except in genuine corruption/stale-state cases.\n\n---\n\n### B-3 (Performance): Synchronous cost-cap SQLite reads in HTTP prompt-injection path\n\n**Files:** `src/lib/database/cost-events-db.ts:120`, `src/lib/memory/providers/policy.ts:42`,\n`src/lib/memory/query-expansion.ts:99`, `src/dashboard/server/routes/hooks.ts:224`\n\n`POST /api/memory/inject` (called by `scripts/user-prompt-submit-hook` on every\n`UserPromptSubmit` before the prompt is released) awaits `injectPromptTimeMemory()`.\nQuery expansion calls `extractWithProviderPolicy()` which checks spend with\n`getTodayMemoryExtractionSpendUsd()`, running `getDatabase().prepare(...).get()`\nsynchronously on the dashboard event loop.\n\nThis blocks the Node.js event loop for the duration of the SQLite read. During that\ntime the process cannot service WebSockets, terminal streaming, SSE keepalives, or\nother HTTP requests. At 10x agent load the contention increases.\n\n**Fix:** Move memory extraction spend accounting off the dashboard event loop.\nOptions: (a) maintain an async/worker-backed cost query API like the FTS worker,\n(b) keep a daily per-issue spend counter updated asynchronously when extraction\ncost events are recorded, or (c) inject a non-blocking cached `getDailySpendUsd`\ndependency for dashboard prompt injection. Do not call\n`getDatabase().prepare().get()` from `/api/memory/inject`.\n\n---\n\n### B-4 (Performance): Synchronous checkpoint SQLite transactions in dashboard daemon\n\n**Files:** `src/lib/memory/checkpoints.ts:64,97,125,162`, `src/lib/memory/pipeline.ts:114,210`,\n`src/lib/memory/worker-pool.ts:15,277`, `src/dashboard/server/routes/hooks.ts:147`,\n`src/lib/memory/poller.ts:192`\n\nStop hooks and the 2s transcript poller enqueue `MemoryPipelineWorkerPool` jobs.\nEach job runs inside the dashboard Node process and performs synchronous SQLite\nclaim/commit operations on `panopticon.db`. One busy checkpoint transaction or DB\nlock stalls the entire server event loop, freezing live terminal streaming, RPC\nevent delivery, and unrelated API requests during DB contention.\n\n**Fix:** Put checkpoint claim/commit behind an async boundary that does not execute\n`better-sqlite3` on the server event loop. Move transcript checkpoint operations\ninto a dedicated worker thread with a serialized DB connection, or make the memory\npipeline worker a real `worker_threads` pool that owns the blocking SQLite calls.\nKeep the claim/commit atomicity but perform it outside the dashboard event loop.\n\n---\n\n## Partial / Advisory Issues\n\n### P-1 (Requirements — Partial): Hook scripts block instead of fire-and-forget\n\n**File:** `src/lib/caveman/workspace.ts:151`\n\nThe generated workspace memory hook script awaits\n`post('/api/memory/turn', input, 500)` and `post('/api/memory/session/start', input, 500)`.\nPrompt injection may need to await context (to return memory-augmented prompts), but\nStop and SessionStart hooks are not fire-and-forget and can delay Claude Code hook\nexecution up to the `curl` timeout.\n\n**Fix:** Make non-injection hooks fire-and-forget (detach the POST from hook\ncompletion). Keep UserPromptSubmit synchronous only if prompt-time context return\nis required.\n\n---\n\n### P-2 (Requirements — Partial): Disable-observations stops processing but not registration\n\n**Files:** `src/dashboard/server/routes/hooks.ts:96`, `src/lib/memory/poller.ts:141`,\n`src/lib/caveman/workspace.ts:55`\n\nRoutes and poller no-op when disabled, but existing poller entries are not\nunregistered on a settings change and workspace hook entries are still installed\nunconditionally by `injectMemoryHookSettings()`.\n\n**Fix:** On setting changes, unregister active poller entries and skip/reconcile\nworkspace hook installation when observations are disabled. Or clarify the\nrequirement to processing-disable semantics if hook registration is intentionally\nalways present.\n\n---\n\n### N-1 (Performance — Advisory): YAML config parsed on every settings lookup\n\n**File:** `src/lib/memory/settings.ts:19`\n\n`areMemoryObservationsEnabled`, `isMemoryPromptTimeInjectionEnabled`,\n`getMemoryWorkerConcurrency`, and `getMemoryRollupPendingThreshold` all read and\nparse the YAML config on every call. Not a blocker (async file I/O, not sync), but\nadds per-tick and per-job overhead. A small cached settings snapshot with\ninvalidation would reduce this.\n\n---\n\n## Summary for `pan admin specialists done`\n\n- **Status:** blocked\n- **Top blocker:** `claimTranscriptRange()` does not atomically reserve transcript\n  ranges — concurrent hook/poller jobs both receive `claimed` for the same bytes,\n  causing duplicate extraction and duplicate observation writes. Additionally,\n  synchronous `better-sqlite3` calls in both the HTTP prompt-injection path and the\n  worker-pool daemon path block the dashboard event loop.\n- **Files needing fixes:** `src/lib/memory/checkpoints.ts`, `src/lib/memory/pipeline.ts`,\n  `src/lib/database/cost-events-db.ts`, `src/lib/memory/providers/policy.ts`,\n  `src/lib/memory/query-expansion.ts`, `src/dashboard/server/routes/hooks.ts`,\n  `src/lib/memory/worker-pool.ts`, `src/lib/caveman/workspace.ts`\n- **Tests needing updates:** `tests/lib/memory/checkpoints.test.ts`\n\nSource: /home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1052/.pan/review/agent-pan-1052-review-cdb5442b/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1052 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-05-19T06:28:25Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-1052 (attempt 2/10):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - graphify-out/GRAPH_REPORT.md\n  - graphify-out/manifest.json\n  - src/lib/agents.ts\n  - tests/lib/cloister/review-agent.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-1052 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+    }
+  ]
 }

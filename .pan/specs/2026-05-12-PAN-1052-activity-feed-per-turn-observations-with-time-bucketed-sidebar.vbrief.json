@@ -4,7 +4,7 @@
     "created": "2026-05-12T19:50:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1052: Activity feed: per-turn observations with time-bucketed sidebar",
-    "updated": "2026-05-18T21:57:56.145Z"
+    "updated": "2026-05-19T06:28:25.791Z"
   },
   "plan": {
     "id": "pan-1052",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "7c4e9a2f-3d18-4b6e-9f2a-8c5d1e4f7a3b",
     "author": "agent:claude-opus-4-7",
-    "sequence": 19,
+    "sequence": 109,
     "created": "2026-05-12T19:50:00.000Z",
-    "updated": "2026-05-18T21:57:56.145Z",
+    "updated": "2026-05-19T06:28:25.791Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1052",
@@ -2279,56 +2279,61 @@
         "phase": "work",
         "issueId": "PAN-1052",
         "sqliteAuthoritative": true,
-        "updatedAt": "2026-05-18T21:57:56.144Z",
+        "updatedAt": "2026-05-19T06:28:25.791Z",
         "work": {
-          "updatedAt": "2026-05-18T21:57:56.144Z",
+          "updatedAt": "2026-05-19T06:28:25.791Z",
           "history": []
         },
         "verification": {
-          "status": "pending",
-          "updatedAt": "2026-05-18T21:57:56.144Z",
+          "status": "failed",
+          "updatedAt": "2026-05-19T06:28:25.791Z",
+          "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - graphify-out/GRAPH_REPORT.md\n  - graphify-out/manifest.json\n  - src/lib/agents.ts\n  - tests/lib/cloister/review-agent.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
           "history": [
             {
-              "status": "pending",
-              "at": "2026-05-18T21:57:56.144Z"
+              "status": "failed",
+              "at": "2026-05-19T06:28:25.791Z",
+              "notes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - graphify-out/GRAPH_REPORT.md\n  - graphify-out/manifest.json\n  - src/lib/agents.ts\n  - tests/lib/cloister/review-agent.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts"
             }
           ]
         },
         "review": {
           "status": "pending",
-          "updatedAt": "2026-05-18T21:57:56.144Z",
+          "updatedAt": "2026-05-19T06:28:25.791Z",
+          "notes": "claimTranscriptRange() not atomic + sync SQLite on dashboard event loop",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-18T21:57:56.144Z"
+              "at": "2026-05-19T06:28:25.791Z",
+              "notes": "claimTranscriptRange() not atomic + sync SQLite on dashboard event loop"
             }
           ],
           "approval": "pending"
         },
         "test": {
           "status": "pending",
-          "updatedAt": "2026-05-18T21:57:56.144Z",
+          "updatedAt": "2026-05-19T06:28:25.791Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-18T21:57:56.144Z"
+              "at": "2026-05-19T06:28:25.791Z"
             }
           ]
         },
         "uat": {
-          "updatedAt": "2026-05-18T21:57:56.144Z",
+          "updatedAt": "2026-05-19T06:28:25.791Z",
           "history": []
         },
         "merge": {
           "status": "pending",
-          "updatedAt": "2026-05-18T21:57:56.144Z",
+          "updatedAt": "2026-05-19T06:28:25.791Z",
           "history": [
             {
               "status": "pending",
-              "at": "2026-05-18T21:57:56.144Z"
+              "at": "2026-05-19T06:28:25.791Z"
             }
           ],
-          "readyForMerge": false
+          "readyForMerge": false,
+          "prUrl": "https://github.com/eltmon/panopticon-cli/pull/1211"
         }
       }
     }
