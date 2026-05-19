@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../../lib/store';
 import type { Issue } from '../../types';
+import { DialogProvider } from '../DialogProvider';
 import { IssueDrawer } from './IssueDrawer';
 
 const issue: Issue = {
@@ -36,7 +37,9 @@ function createQueryClient(beads: TestBead[] = []) {
 function drawerUi(queryClient: QueryClient) {
   return (
     <QueryClientProvider client={queryClient}>
-      <IssueDrawer />
+      <DialogProvider>
+        <IssueDrawer />
+      </DialogProvider>
     </QueryClientProvider>
   );
 }
@@ -267,6 +270,117 @@ describe('IssueDrawer', () => {
       }));
     });
     expect(screen.getByLabelText('Tell active agent')).toHaveValue('');
+  });
+
+  it('renders action bar with reset stop PR and merge controls', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-PAN-1': {
+          id: 'agent-PAN-1',
+          issueId: 'PAN-1',
+          runtime: 'claude-code',
+          harness: 'claude-code',
+          model: 'gpt-5.5',
+          status: 'running',
+          role: 'work',
+          startedAt: '2026-05-18T00:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+        },
+      },
+      reviewStatusByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          readyForMerge: true,
+          mergeStatus: 'pending',
+          prUrl: 'https://example.com/pr/1',
+          updatedAt: '2026-05-18T00:00:00.000Z',
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    expect(screen.getByTestId('drawer-action-bar')).toHaveClass('px-[22px]', 'py-[12px]', 'border-t', 'bg-card/70');
+    expect(screen.getByTestId('drawer-action-reset')).toHaveClass('border', 'text-muted-foreground');
+    expect(screen.getByTestId('drawer-action-stop')).toBeEnabled();
+    expect(screen.getByTestId('drawer-action-view-pr')).toHaveAttribute('href', 'https://example.com/pr/1');
+    expect(screen.getByTestId('drawer-action-merge')).toBeEnabled();
+    expect(screen.getByTestId('drawer-action-merge')).toHaveClass('bg-success', 'text-[#000]');
+  });
+
+  it('confirms action bar reset stop and merge requests', async () => {
+    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(async () => new Response(JSON.stringify({ success: true }), { status: 200 }));
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-PAN-1': {
+          id: 'agent-PAN-1',
+          issueId: 'PAN-1',
+          runtime: 'claude-code',
+          harness: 'claude-code',
+          model: 'gpt-5.5',
+          status: 'running',
+          role: 'work',
+          startedAt: '2026-05-18T00:00:00.000Z',
+          consecutiveFailures: 0,
+          killCount: 0,
+        },
+      },
+      reviewStatusByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          readyForMerge: true,
+          mergeStatus: 'pending',
+          updatedAt: '2026-05-18T00:00:00.000Z',
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    fireEvent.click(screen.getByTestId('drawer-action-reset'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset Issue' }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/reset', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ deleteWorkspace: true }),
+      }));
+    });
+
+    fireEvent.click(screen.getByTestId('drawer-action-stop'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop Agent' }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-PAN-1/stop', { method: 'POST' });
+    });
+
+    fireEvent.click(screen.getByTestId('drawer-action-merge'));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Merge to main' }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/merge', expect.objectContaining({ method: 'POST' }));
+    });
+  });
+
+  it('disables merge and hides View PR when action bar targets are unavailable', () => {
+    useDashboardStore.setState({
+      issuesRaw: [{ ...issue, url: '' }],
+      reviewStatusByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          readyForMerge: false,
+          mergeStatus: 'merged',
+          updatedAt: '2026-05-18T00:00:00.000Z',
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    useDashboardStore.getState().openIssue('PAN-1');
+
+    renderDrawer();
+
+    expect(screen.queryByTestId('drawer-action-view-pr')).toBeNull();
+    expect(screen.getByTestId('drawer-action-stop')).toBeDisabled();
+    expect(screen.getByTestId('drawer-action-merge')).toBeDisabled();
   });
 
   it('renders active agent placeholder when no agent is active', () => {

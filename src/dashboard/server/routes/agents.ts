@@ -1035,43 +1035,51 @@ const postAgentMessageRoute = postAgentMessageLikeRoute('/api/agents/:id/message
 
 const postAgentTellRoute = postAgentMessageLikeRoute('/api/agents/:id/tell');
 
+function agentStopRoute(method: 'DELETE' | 'POST', path: string) {
+  return HttpRouter.add(
+    method,
+    path,
+    httpHandler(Effect.gen(function* () {
+      const params = yield* HttpRouter.params;
+      const id = params['id'] ?? '';
+      const eventStore = yield* EventStoreService;
+
+      const stateBeforeStop = yield* Effect.promise(() => getAgentStateAsync(id));
+      yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.stop_requested'));
+      yield* Effect.promise(() => stopAgentAsync(id));
+      // PAN-1048 review feedback 004 (C1): AgentStoppedEvent requires both
+      // agentId AND issueId on the payload (packages/contracts/src/events.ts:36);
+      // ws-rpc drops events that fail Schema validation, so emits without issueId
+      // never reach subscribers and the dashboard misses the stop transition.
+      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+        type: 'agent.stopped',
+        timestamp: new Date().toISOString(),
+        payload: { agentId: id, issueId: stateBeforeStop?.issueId ?? '' },
+      })));
+      const issueId = stateBeforeStop?.issueId;
+      // PAN-1048: derive label from role; legacy state.phase no longer exists.
+      const phaseLabel = stateBeforeStop?.role === 'plan' ? 'planning' : 'work';
+      emitActivityEntry({
+        source: 'dashboard',
+        level: 'info',
+        message: issueId
+          ? `User stopped ${issueId} ${phaseLabel} agent`
+          : `User stopped agent ${id}`,
+        issueId,
+      });
+      invalidateAgentsCache();
+      return jsonResponse({ success: true });
+    })),
+  );
+}
+
 // ─── Route: DELETE /api/agents/:id ───────────────────────────────────────────
 
-const deleteAgentRoute = HttpRouter.add(
-  'DELETE',
-  '/api/agents/:id',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    const eventStore = yield* EventStoreService;
+const deleteAgentRoute = agentStopRoute('DELETE', '/api/agents/:id');
 
-    const stateBeforeStop = yield* Effect.promise(() => getAgentStateAsync(id));
-    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.delete_requested'));
-    yield* Effect.promise(() => stopAgentAsync(id));
-    // PAN-1048 review feedback 004 (C1): AgentStoppedEvent requires both
-    // agentId AND issueId on the payload (packages/contracts/src/events.ts:36);
-    // ws-rpc drops events that fail Schema validation, so emits without issueId
-    // never reach subscribers and the dashboard misses the stop transition.
-    yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-      type: 'agent.stopped',
-      timestamp: new Date().toISOString(),
-      payload: { agentId: id, issueId: stateBeforeStop?.issueId ?? '' },
-    })));
-    const issueId = stateBeforeStop?.issueId;
-    // PAN-1048: derive label from role; legacy state.phase no longer exists.
-    const phaseLabel = stateBeforeStop?.role === 'plan' ? 'planning' : 'work';
-    emitActivityEntry({
-      source: 'dashboard',
-      level: 'info',
-      message: issueId
-        ? `User stopped ${issueId} ${phaseLabel} agent`
-        : `User stopped agent ${id}`,
-      issueId,
-    });
-    invalidateAgentsCache();
-    return jsonResponse({ success: true });
-  })),
-);
+// ─── Route: POST /api/agents/:id/stop ────────────────────────────────────────
+
+const postAgentStopRoute = agentStopRoute('POST', '/api/agents/:id/stop');
 
 // ─── Route: GET /api/agents/:id/health-history ───────────────────────────────
 
@@ -3478,6 +3486,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentMessageRoute,
   postAgentTellRoute,
   deleteAgentRoute,
+  postAgentStopRoute,
   getAgentHealthHistoryRoute,
   postAgentPokeRoute,
   getAgentPendingQuestionsRoute,

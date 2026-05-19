@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
 import { useDashboardStore } from '../../lib/store';
+import DrawerActionBar from './DrawerActionBar';
 import DrawerActiveAgent from './DrawerActiveAgent';
 import DrawerActivityRail from './DrawerActivityRail';
 import DrawerBeadsList from './DrawerBeadsList';
@@ -52,7 +53,7 @@ export function IssueDrawer() {
         aria-modal="true"
         aria-label={issue ? `Issue ${issue.identifier}` : `Issue ${drawer.issueId}`}
         data-testid="issue-drawer"
-        className="h-screen w-[min(980px,calc(100vw-48px))] max-w-[calc(100vw-48px)] origin-right scale-100 overflow-hidden border-l border-border bg-background opacity-100 shadow-[-24px_0_64px_rgb(0_0_0_/_40%)] animate-[issue-drawer-slide-in_200ms_ease-in-out]"
+        className="flex h-screen w-[min(980px,calc(100vw-48px))] max-w-[calc(100vw-48px)] origin-right scale-100 flex-col overflow-hidden border-l border-border bg-background opacity-100 shadow-[-24px_0_64px_rgb(0_0_0_/_40%)] animate-[issue-drawer-slide-in_200ms_ease-in-out]"
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex h-[52px] items-center gap-[12px] border-b border-border px-[22px]">
@@ -73,7 +74,7 @@ export function IssueDrawer() {
             ×
           </button>
         </header>
-        <div className="grid h-[calc(100vh-52px)] grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 overflow-auto px-[22px] py-[18px]">
             <div className="space-y-[14px]">
               <div className="rounded-[var(--radius)] border border-border bg-card p-[18px]">
@@ -93,6 +94,7 @@ export function IssueDrawer() {
           </div>
           <DrawerActivityRail />
         </div>
+        <DrawerActionBar />
       </aside>
     </div>
   );

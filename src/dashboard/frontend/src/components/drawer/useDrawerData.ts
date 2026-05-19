@@ -83,6 +83,7 @@ type BeadsResponse = {
 export type DrawerData = {
   issue: Issue | null;
   agents: Agent[];
+  reviewStatus?: ReviewStatusSnapshot;
   beads: DrawerBeadItem[];
   reviewSpecialists: DrawerReviewSpecialist[];
   verificationGates: DrawerVerificationGate[];
@@ -306,7 +307,7 @@ export function useDrawerData(): DrawerData {
 
   return useMemo(() => {
     if (!drawerIssueId) {
-      return { issue: null, agents: [], beads: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [] };
+      return { issue: null, agents: [], reviewStatus: undefined, beads: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [] };
     }
 
     const issue = issues.find((candidate) => issueMatches(candidate, drawerIssueId)) ?? null;
@@ -328,6 +329,7 @@ export function useDrawerData(): DrawerData {
     return {
       issue,
       agents: issueAgents,
+      reviewStatus,
       beads: normalizeBeads(beadsData?.tasks, drawerIssueId),
       reviewSpecialists: reviewSpecialists(reviewStatus),
       verificationGates: verificationGates(reviewStatus),
