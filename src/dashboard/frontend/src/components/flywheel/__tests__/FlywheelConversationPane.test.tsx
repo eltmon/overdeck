@@ -84,7 +84,7 @@ function mockFetch() {
     if (init?.method === 'POST') {
       return Response.json({ ok: true });
     }
-    if (url === '/api/flywheel/runs') {
+    if (url === '/api/flywheel/runs?limit=10') {
       return Response.json([{ id: 'RUN-2', startedAt: flywheelStatus.startedAt, status: 'running' }]);
     }
     if (url === '/api/flywheel/runs/RUN-2') {

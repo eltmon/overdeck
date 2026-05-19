@@ -1,4 +1,4 @@
-import { exec } from 'node:child_process';
+import { exec, spawn } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { freemem, totalmem } from 'node:os';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -8,7 +8,7 @@ import { Command } from 'commander';
 import { FlywheelStatus } from '@panctl/contracts';
 import { getFlywheelRunDetail, getFlywheelRunDir, listFlywheelRuns, nextFlywheelRunId, writeLatestFlywheelStatus } from '../../dashboard/server/services/flywheel-run-state.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID, pauseFlywheel, resumeFlywheel, spawnFlywheel } from '../../lib/cloister/flywheel.js';
-import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
+import { getFlywheelActiveRunId, isFlywheelGloballyPaused, setFlywheelActiveRunId, setFlywheelGloballyPaused } from '../../lib/database/app-settings.js';
 import { sessionExistsAsync } from '../../lib/tmux.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
@@ -26,8 +26,19 @@ interface StartOptions {
   cwd?: string;
 }
 
+interface StartFlywheelRunResult {
+  runId: string;
+  briefDisplayPath: string;
+  agentModel?: string;
+}
+
 interface ReportOptions {
   cwd?: string;
+}
+
+interface ReportOpenOptions {
+  runId?: string;
+  opener?: (path: string) => void | Promise<void>;
 }
 
 interface FlywheelGateSnapshot {
@@ -176,17 +187,22 @@ export async function emitStatusCommand(options: EmitStatusOptions): Promise<voi
   }
 }
 
+export async function startFlywheelRun(options: StartOptions = {}): Promise<StartFlywheelRunResult> {
+  const cwd = options.cwd ?? process.cwd();
+  const brief = await requireFlywheelBrief(cwd, options.brief);
+  const runId = await nextFlywheelRunId();
+  const startedAt = new Date().toISOString();
+  const agent = await spawnFlywheel({ runId, briefPath: brief.absolutePath, workspace: cwd });
+  await writeLatestFlywheelStatus(await createInitialFlywheelStatus(runId, startedAt, cwd, agent.model));
+  return { runId, briefDisplayPath: brief.displayPath, agentModel: agent.model };
+}
+
 export async function flywheelStartCommand(options: StartOptions = {}): Promise<void> {
   try {
-    const cwd = options.cwd ?? process.cwd();
-    const brief = await requireFlywheelBrief(cwd, options.brief);
-    const runId = await nextFlywheelRunId();
-    const startedAt = new Date().toISOString();
-    const agent = await spawnFlywheel({ runId, briefPath: brief.absolutePath, workspace: cwd });
-    await writeLatestFlywheelStatus(await createInitialFlywheelStatus(runId, startedAt, cwd, agent.model));
+    const result = await startFlywheelRun(options);
 
-    console.log(`Flywheel started: ${runId}`);
-    console.log(`Brief: ${brief.displayPath}`);
+    console.log(`Flywheel started: ${result.runId}`);
+    console.log(`Brief: ${result.briefDisplayPath}`);
     console.log(`Run URL: ${dashboardBaseUrl()}/flywheel`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
@@ -411,37 +427,56 @@ function formatGateSnapshot(snapshot: FlywheelGateSnapshot): string {
   return `paused=${snapshot.paused ? 'true' : 'false'} active_run_id=${snapshot.activeRunId ?? 'none'}`;
 }
 
+export async function pauseFlywheelRun(): Promise<{ before: FlywheelGateSnapshot; after: FlywheelGateSnapshot; changed: boolean }> {
+  const before = readFlywheelGateSnapshot();
+  if (before.paused) return { before, after: before, changed: false };
+  await pauseFlywheel();
+  return { before, after: readFlywheelGateSnapshot(), changed: true };
+}
+
 export async function flywheelPauseCommand(): Promise<void> {
   try {
-    const before = readFlywheelGateSnapshot();
-    if (before.paused) {
-      console.log(`Flywheel already paused (${formatGateSnapshot(before)})`);
+    const result = await pauseFlywheelRun();
+    if (!result.changed) {
+      console.log(`Flywheel already paused (${formatGateSnapshot(result.before)})`);
       return;
     }
 
-    await pauseFlywheel();
-    const after = readFlywheelGateSnapshot();
-    console.log(`Flywheel paused: before ${formatGateSnapshot(before)}; after ${formatGateSnapshot(after)}`);
+    console.log(`Flywheel paused: before ${formatGateSnapshot(result.before)}; after ${formatGateSnapshot(result.after)}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   }
 }
 
+export async function resumeFlywheelRun(): Promise<{ before: FlywheelGateSnapshot; after: FlywheelGateSnapshot; changed: boolean }> {
+  const before = readFlywheelGateSnapshot();
+  if (!before.paused && await sessionExistsAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID)) {
+    return { before, after: before, changed: false };
+  }
+  await resumeFlywheel();
+  return { before, after: readFlywheelGateSnapshot(), changed: true };
+}
+
 export async function flywheelResumeCommand(): Promise<void> {
   try {
-    const before = readFlywheelGateSnapshot();
-    if (!before.paused && await sessionExistsAsync(FLYWHEEL_ORCHESTRATOR_AGENT_ID)) {
-      console.log(`Flywheel already running (${formatGateSnapshot(before)})`);
+    const result = await resumeFlywheelRun();
+    if (!result.changed) {
+      console.log(`Flywheel already running (${formatGateSnapshot(result.before)})`);
       return;
     }
 
-    await resumeFlywheel();
-    const after = readFlywheelGateSnapshot();
-    console.log(`Flywheel resumed: before ${formatGateSnapshot(before)}; after ${formatGateSnapshot(after)}`);
+    console.log(`Flywheel resumed: before ${formatGateSnapshot(result.before)}; after ${formatGateSnapshot(result.after)}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
+  }
+}
+
+function clearFlywheelRunGate(runId: string): void {
+  if (getFlywheelActiveRunId() === runId) {
+    setFlywheelActiveRunId(null);
+    setFlywheelGloballyPaused(false);
   }
 }
 
@@ -468,6 +503,7 @@ export async function flywheelReportCommand(options: ReportOptions = {}): Promis
 
     const existingState = await readTextIfExists(statePath);
     if (existingState === stateReport && existingOperation === operationReport) {
+      clearFlywheelRunGate(status.runId);
       console.log('nothing to report');
       return;
     }
@@ -476,7 +512,52 @@ export async function flywheelReportCommand(options: ReportOptions = {}): Promis
     await writeFile(operationPath, operationReport, 'utf8');
     await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), stateReport, 'utf8');
     const mode = await commitFlywheelReport(cwd, runNumber, hasRunSection(existingOperation, runNumber));
+    clearFlywheelRunGate(status.runId);
     console.log(`${mode === 'amend' ? 'Updated' : 'Created'} docs(flywheel): run ${runNumber}`);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  }
+}
+
+function getPlatformOpenCommand(): string {
+  switch (process.platform) {
+    case 'linux': return 'xdg-open';
+    case 'darwin': return 'open';
+    case 'win32': return 'explorer';
+    default: throw new Error(`Opening files is not supported on ${process.platform}`);
+  }
+}
+
+function openPathDetached(path: string): void {
+  const child = spawn(getPlatformOpenCommand(), [path], {
+    detached: true,
+    stdio: 'ignore',
+  });
+  child.unref();
+}
+
+async function resolveReportOpenRunId(runId: string | undefined): Promise<string> {
+  if (runId) return runId;
+  const runs = await listFlywheelRuns();
+  const run = runs.find((candidate) => candidate.status === 'complete') ?? runs[0];
+  if (!run) throw new Error('no flywheel run report to open');
+  return run.id;
+}
+
+export async function openFlywheelRunReport(options: ReportOpenOptions = {}): Promise<{ runId: string; path: string }> {
+  const runId = await resolveReportOpenRunId(options.runId);
+  const detail = await getFlywheelRunDetail(runId);
+  if (!detail) throw new Error(`Flywheel run not found: ${runId}`);
+  if (!detail.paths.report) throw new Error(`No report exists for ${runId}`);
+  await (options.opener ?? openPathDetached)(detail.paths.report);
+  return { runId, path: detail.paths.report };
+}
+
+export async function flywheelReportOpenCommand(options: ReportOpenOptions = {}): Promise<void> {
+  try {
+    const result = await openFlywheelRunReport(options);
+    console.log(`Opened Flywheel report for ${result.runId}: ${result.path}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

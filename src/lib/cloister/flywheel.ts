@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import { Schema } from 'effect';
+import { FlywheelRunId } from '@panctl/contracts';
 import type { AgentState } from '../agents.js';
 import { spawnRun, stopAgentAsync } from '../agents.js';
 import {
@@ -9,8 +11,10 @@ import {
 
 export const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';
 
+const decodeFlywheelRunId = Schema.decodeUnknownSync(FlywheelRunId);
+
 export interface FlywheelLifecycleOptions {
-  runId?: string;
+  runId?: FlywheelRunId;
   workspace?: string;
   briefPath?: string;
   prompt?: string;
@@ -28,8 +32,12 @@ export interface FlywheelResumeResult {
   agent: AgentState;
 }
 
-function defaultFlywheelRunId(): string {
-  return `RUN-${Date.now()}`;
+function parseRunId(runId: string): FlywheelRunId {
+  return decodeFlywheelRunId(runId);
+}
+
+function defaultFlywheelRunId(): FlywheelRunId {
+  return parseRunId(`RUN-${Date.now()}`);
 }
 
 function defaultFlywheelPrompt(runId: string, briefPath?: string, briefContent?: string): string {
@@ -51,7 +59,7 @@ export function isFlywheelDevcontainerRuntime(env: NodeJS.ProcessEnv = process.e
 
 async function spawnFlywheelAgent(runId: string, options: FlywheelLifecycleOptions = {}): Promise<AgentState> {
   const briefContent = options.briefPath ? await readFile(options.briefPath, 'utf8') : undefined;
-  return spawnRun(runId, 'plan', {
+  return spawnRun(runId, 'flywheel', {
     agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
     workspace: options.workspace ?? process.cwd(),
     prompt: options.prompt ?? defaultFlywheelPrompt(runId, options.briefPath, briefContent),
@@ -72,7 +80,7 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
     throw new Error(`Flywheel run ${activeRunId} is already active; pause, resume, or report it before starting another run`);
   }
 
-  const runId = options.runId ?? defaultFlywheelRunId();
+  const runId = options.runId ? parseRunId(options.runId) : defaultFlywheelRunId();
   const agent = await spawnFlywheelAgent(runId, options);
   setFlywheelActiveRunId(runId);
   setFlywheelGloballyPaused(false);
@@ -95,8 +103,9 @@ export async function resumeFlywheel(options: FlywheelLifecycleOptions = {}): Pr
   if (!activeRunId) {
     throw new Error('No active flywheel run to resume');
   }
+  const runId = parseRunId(activeRunId);
 
   setFlywheelGloballyPaused(false);
-  const agent = await spawnFlywheelAgent(activeRunId, options);
+  const agent = await spawnFlywheelAgent(runId, options);
   return { activeRunId, agent };
 }

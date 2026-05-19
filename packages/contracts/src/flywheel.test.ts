@@ -5,7 +5,7 @@ import { FlywheelStatus } from "./flywheel"
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus)
 
 const validPayload = {
-  runId: "run-2026-05-18T13-05-00Z",
+  runId: "RUN-1",
   startedAt: "2026-05-18T13:05:00.000Z",
   elapsedMs: 7200000,
   orchestrator: {
@@ -87,6 +87,18 @@ describe("FlywheelStatus", () => {
     const { runId: _runId, ...payload } = validPayload
 
     expect(() => decodeFlywheelStatus(payload)).toThrow()
+  })
+
+  it("rejects non-canonical run IDs", () => {
+    expect(() => decodeFlywheelStatus({ ...validPayload, runId: "../../RUN-1" })).toThrow()
+    expect(() => decodeFlywheelStatus({ ...validPayload, runId: "run-1" })).toThrow()
+  })
+
+  it("rejects non-http substrate bug URLs", () => {
+    expect(() => decodeFlywheelStatus({
+      ...validPayload,
+      substrateBugs: [{ ...validPayload.substrateBugs[0], url: "javascript:alert(1)" }],
+    })).toThrow()
   })
 
   it("rejects payloads missing headline.bugsFixed", () => {

@@ -116,6 +116,23 @@ describe('AgentState role persistence', () => {
     expect(rawState.type).toBeUndefined();
   });
 
+  it('accepts flywheel role in persisted state.json', async () => {
+    const { getAgentState, saveAgentState } = await import('../agents.js');
+
+    saveAgentState({
+      id: 'agent-flywheel-orchestrator',
+      issueId: 'RUN-1',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'flywheel',
+      model: 'claude-opus-4-7',
+      status: 'running',
+      startedAt: '2026-05-18T00:00:00.000Z',
+    } as any);
+
+    expect(getAgentState('agent-flywheel-orchestrator')?.role).toBe('flywheel');
+  });
+
   it('bases Channels eligibility on work role and claude-code harness', async () => {
     vi.doMock('../config-yaml.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../config-yaml.js')),

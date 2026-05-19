@@ -3,12 +3,16 @@ import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promi
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Schema } from 'effect';
-import { FlywheelStatus } from '@panctl/contracts';
+import { FlywheelRunId, FlywheelStatus } from '@panctl/contracts';
 
 export type FlywheelRunStatus = 'running' | 'complete' | 'aborted';
 
 export interface FlywheelRunStateOptions {
   panopticonHome?: string;
+}
+
+export interface FlywheelRunListOptions extends FlywheelRunStateOptions {
+  limit?: number;
 }
 
 export interface FlywheelRunSummary {
@@ -27,7 +31,11 @@ export interface FlywheelRunDetail extends FlywheelRunSummary {
 }
 
 const decodeFlywheelStatus = Schema.decodeUnknownSync(FlywheelStatus);
+const decodeFlywheelRunId = Schema.decodeUnknownSync(FlywheelRunId);
 const RUN_ID_PATTERN = /^RUN-(\d+)$/;
+const DEFAULT_RUNS_LIMIT = 20;
+const MAX_RUNS_LIMIT = 100;
+const RUN_SUMMARY_CONCURRENCY = 4;
 type FlywheelStatusListener = (status: FlywheelStatus) => void;
 const flywheelStatusListeners = new Set<FlywheelStatusListener>();
 
@@ -44,6 +52,38 @@ function publishLatestFlywheelStatus(status: FlywheelStatus): void {
   }
 }
 
+export function parseFlywheelRunId(runId: string): FlywheelRunId {
+  return decodeFlywheelRunId(runId);
+}
+
+export function isFlywheelRunId(runId: string): runId is FlywheelRunId {
+  return RUN_ID_PATTERN.test(runId);
+}
+
+function runNumber(runId: string): number {
+  const match = RUN_ID_PATTERN.exec(runId);
+  return match ? Number(match[1]) : 0;
+}
+
+function normalizeLimit(limit: number | undefined): number {
+  if (limit === undefined) return DEFAULT_RUNS_LIMIT;
+  if (!Number.isFinite(limit) || limit <= 0) return DEFAULT_RUNS_LIMIT;
+  return Math.min(Math.floor(limit), MAX_RUNS_LIMIT);
+}
+
+async function mapWithConcurrency<T, R>(items: readonly T[], concurrency: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let index = 0;
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (index < items.length) {
+      const current = index;
+      index += 1;
+      results[current] = await mapper(items[current]!);
+    }
+  }));
+  return results;
+}
+
 export function getFlywheelHome(options: FlywheelRunStateOptions = {}): string {
   return join(options.panopticonHome ?? process.env['PANOPTICON_HOME'] ?? join(homedir(), '.panopticon'), 'flywheel');
 }
@@ -53,10 +93,10 @@ export function getFlywheelRunsDir(options: FlywheelRunStateOptions = {}): strin
 }
 
 export function getFlywheelRunDir(runId: string, options: FlywheelRunStateOptions = {}): string {
-  return join(getFlywheelRunsDir(options), runId);
+  return join(getFlywheelRunsDir(options), parseFlywheelRunId(runId));
 }
 
-export async function nextFlywheelRunId(options: FlywheelRunStateOptions = {}): Promise<string> {
+export async function nextFlywheelRunId(options: FlywheelRunStateOptions = {}): Promise<FlywheelRunId> {
   const runsDir = getFlywheelRunsDir(options);
   await mkdir(runsDir, { recursive: true });
   const entries = await readdir(runsDir, { withFileTypes: true });
@@ -66,7 +106,7 @@ export async function nextFlywheelRunId(options: FlywheelRunStateOptions = {}): 
     if (!match) return max;
     return Math.max(max, Number(match[1]));
   }, 0);
-  return `RUN-${maxRunNumber + 1}`;
+  return parseFlywheelRunId(`RUN-${maxRunNumber + 1}`);
 }
 
 export async function writeLatestFlywheelStatus(status: FlywheelStatus, options: FlywheelRunStateOptions = {}): Promise<string> {
@@ -125,7 +165,7 @@ export async function readCurrentLatestFlywheelStatus(options: FlywheelRunStateO
   return latestRun ? readLatestFlywheelStatus(latestRun.id, options) : null;
 }
 
-export async function listFlywheelRuns(options: FlywheelRunStateOptions = {}): Promise<FlywheelRunSummary[]> {
+export async function listFlywheelRuns(options: FlywheelRunListOptions = {}): Promise<FlywheelRunSummary[]> {
   const runsDir = getFlywheelRunsDir(options);
   let entries: Dirent[];
   try {
@@ -135,11 +175,12 @@ export async function listFlywheelRuns(options: FlywheelRunStateOptions = {}): P
     if (code === 'ENOENT') return [];
     throw error;
   }
-  const summaries = await Promise.all(
-    entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => summarizeRun(entry.name, options)),
-  );
+  const runIds = entries
+    .filter((entry) => entry.isDirectory() && isFlywheelRunId(entry.name))
+    .map((entry) => entry.name)
+    .sort((a, b) => runNumber(b) - runNumber(a))
+    .slice(0, normalizeLimit(options.limit));
+  const summaries = await mapWithConcurrency(runIds, RUN_SUMMARY_CONCURRENCY, (runId) => summarizeRun(runId, options));
   return summaries.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
 

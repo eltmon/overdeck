@@ -89,7 +89,7 @@ function formatTtsHealthTitle(health: TtsHealthStatus | undefined, failed: boole
   const details = [
     health.model !== undefined ? `model: ${String(health.model)}` : undefined,
     health.queueDepth !== undefined ? `queue: ${String(health.queueDepth)}` : health.queue !== undefined ? `queue: ${String(health.queue)}` : undefined,
-    health.pid !== null ? `pid: ${health.pid}` : undefined,
+    typeof health.pid === 'number' ? `pid: ${health.pid}` : undefined,
     health.gpuMemoryUsedMb !== undefined ? `VRAM: ${health.gpuMemoryUsedMb}MB` : undefined,
   ].filter(Boolean);
   return details.length > 0 ? `TTS: Running (${details.join(', ')})` : 'TTS: Running';

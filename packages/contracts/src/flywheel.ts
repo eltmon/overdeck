@@ -1,5 +1,11 @@
 import { Schema } from "effect"
 
+export const FlywheelRunId = Schema.String.check(Schema.isPattern(/^RUN-\d+$/))
+export type FlywheelRunId = typeof FlywheelRunId.Type
+
+export const FlywheelHttpUrl = Schema.String.check(Schema.isPattern(/^https?:\/\/\S+$/i))
+export type FlywheelHttpUrl = typeof FlywheelHttpUrl.Type
+
 export const FlywheelHarness = Schema.Literals(["claude-code", "pi"])
 export interface FlywheelOrchestrator {
   harness: typeof FlywheelHarness.Type
@@ -80,7 +86,7 @@ export interface FlywheelSubstrateBug {
   title: string
   status: typeof FlywheelSubstrateBugStatus.Type
   commitSha?: string | undefined
-  url?: string | undefined
+  url?: FlywheelHttpUrl | undefined
 }
 
 export const FlywheelSubstrateBug = Schema.Struct({
@@ -88,7 +94,7 @@ export const FlywheelSubstrateBug = Schema.Struct({
   title: Schema.String,
   status: FlywheelSubstrateBugStatus,
   commitSha: Schema.optional(Schema.String),
-  url: Schema.optional(Schema.String),
+  url: Schema.optional(FlywheelHttpUrl),
 })
 
 export const FlywheelAgentStatus = Schema.Literals([
@@ -157,7 +163,7 @@ export const FlywheelSystemStatus = Schema.Struct({
 })
 
 export interface FlywheelStatus {
-  runId: string
+  runId: FlywheelRunId
   startedAt: string
   elapsedMs: number
   orchestrator: FlywheelOrchestrator
@@ -173,7 +179,7 @@ export interface FlywheelStatus {
 }
 
 export const FlywheelStatus = Schema.Struct({
-  runId: Schema.String,
+  runId: FlywheelRunId,
   startedAt: Schema.String,
   elapsedMs: Schema.Number,
   orchestrator: FlywheelOrchestrator,

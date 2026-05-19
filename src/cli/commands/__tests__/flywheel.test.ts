@@ -23,7 +23,7 @@ const flywheelLifecycleMocks = vi.hoisted(() => ({
     id: 'flywheel-orchestrator',
     issueId: runId,
     workspace: '/repo',
-    role: 'plan',
+    role: 'flywheel',
     model: 'claude-opus-4-7',
     status: 'running',
     startedAt: '2026-05-18T12:00:00.000Z',
@@ -40,6 +40,12 @@ vi.mock('../../../lib/cloister/flywheel.js', () => ({
 vi.mock('../../../lib/database/app-settings.js', () => ({
   getFlywheelActiveRunId: () => flywheelLifecycleMocks.activeRunId,
   isFlywheelGloballyPaused: () => flywheelLifecycleMocks.paused,
+  setFlywheelActiveRunId: (runId: string | null) => {
+    flywheelLifecycleMocks.activeRunId = runId;
+  },
+  setFlywheelGloballyPaused: (paused: boolean) => {
+    flywheelLifecycleMocks.paused = paused;
+  },
 }));
 
 vi.mock('../../../lib/tmux.js', () => ({
@@ -314,6 +320,8 @@ describe('flywheel CLI commands', () => {
 
   it('writes and commits a deterministic run report', async () => {
     const repoDir = await createReportRepo(tempDir);
+    flywheelLifecycleMocks.activeRunId = 'RUN-1';
+    flywheelLifecycleMocks.paused = true;
     await writeLatestFlywheelStatus({
       ...validStatus,
       activePipeline: [{ issueId: 'PAN-1', title: 'Pipeline item', verb: 'working', status: 'running', progressPercent: 50, pr: 123 }],
@@ -336,6 +344,15 @@ describe('flywheel CLI commands', () => {
       'docs/FLYWHEEL-STATE.md',
       'docs/OPERATION-FIX-ALL.md',
     ].join('\n'));
+    expect(flywheelLifecycleMocks.activeRunId).toBeNull();
+    expect(flywheelLifecycleMocks.paused).toBe(false);
+
+    flywheelLifecycleMocks.spawnFlywheel.mockClear();
+    await writeFile(join(repoDir, 'docs', 'flywheel-brief.md'), '# Flywheel Brief\n', 'utf8');
+    await flywheelStartCommand({ cwd: repoDir });
+
+    expect(flywheelLifecycleMocks.spawnFlywheel).toHaveBeenCalledWith(expect.objectContaining({ runId: 'RUN-2' }));
+    expect(process.exitCode).toBeUndefined();
   });
 
   it('does not create a second report commit without new ticks', async () => {

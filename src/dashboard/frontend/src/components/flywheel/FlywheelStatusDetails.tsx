@@ -28,7 +28,7 @@ const AGENT_STATUS_MAP: Record<FlywheelAgent['status'], AgentStatus> = {
   error: 'failed',
 };
 
-const ROLE_VALUES = new Set<AgentRole>(['plan', 'work', 'review', 'test', 'ship']);
+const ROLE_VALUES = new Set<AgentRole>(['plan', 'work', 'review', 'test', 'ship', 'flywheel']);
 
 function formatMemory(mb: number): string {
   if (!Number.isFinite(mb)) return '—';
@@ -38,6 +38,16 @@ function formatMemory(mb: number): string {
 
 function shortSha(sha: string): string {
   return sha.slice(0, 7);
+}
+
+function safeHttpUrl(rawUrl: string | undefined): string | null {
+  if (!rawUrl) return null;
+  try {
+    const url = new URL(rawUrl);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeRole(role: string | undefined): AgentRole | undefined {
@@ -120,26 +130,29 @@ export function FlywheelStatusDetails({ status, onNavigateAgent }: FlywheelStatu
                   </tr>
                 </thead>
                 <tbody>
-                  {status.substrateBugs.map((bug) => (
-                    <tr key={`${bug.issueId}-${bug.title}`} className="border-b border-border/60 last:border-0">
-                      <td className="py-2 pr-3 font-mono text-xs text-primary">{bug.issueId}</td>
-                      <td className="py-2 pr-3 text-foreground">{bug.title}</td>
-                      <td className="py-2 pr-3"><StatusBadge status={bug.status} /></td>
-                      <td className="py-2 font-mono text-xs">
-                        {bug.commitSha ? (
-                          bug.url ? (
-                            <a className="text-primary hover:underline" href={bug.url} target="_blank" rel="noreferrer">
-                              {shortSha(bug.commitSha)}
-                            </a>
+                  {status.substrateBugs.map((bug) => {
+                    const commitUrl = safeHttpUrl(bug.url);
+                    return (
+                      <tr key={`${bug.issueId}-${bug.title}`} className="border-b border-border/60 last:border-0">
+                        <td className="py-2 pr-3 font-mono text-xs text-primary">{bug.issueId}</td>
+                        <td className="py-2 pr-3 text-foreground">{bug.title}</td>
+                        <td className="py-2 pr-3"><StatusBadge status={bug.status} /></td>
+                        <td className="py-2 font-mono text-xs">
+                          {bug.commitSha ? (
+                            commitUrl ? (
+                              <a className="text-primary hover:underline" href={commitUrl} target="_blank" rel="noreferrer">
+                                {shortSha(bug.commitSha)}
+                              </a>
+                            ) : (
+                              <span className="text-foreground">{shortSha(bug.commitSha)}</span>
+                            )
                           ) : (
-                            <span className="text-foreground">{shortSha(bug.commitSha)}</span>
-                          )
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

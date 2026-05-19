@@ -48,12 +48,19 @@ describe('flywheel lifecycle', () => {
     expect(agent.id).toBe(FLYWHEEL_ORCHESTRATOR_AGENT_ID);
     expect(mocks.activeRunId).toBe('RUN-1');
     expect(mocks.paused).toBe(false);
-    expect(mocks.spawnRun).toHaveBeenCalledWith('RUN-1', 'plan', expect.objectContaining({
+    expect(mocks.spawnRun).toHaveBeenCalledWith('RUN-1', 'flywheel', expect.objectContaining({
       agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
       workspace: '/repo',
       allowHost: true,
       registerConversation: true,
     }));
+  });
+
+  it('rejects non-canonical run IDs before spawning', async () => {
+    await expect(spawnFlywheel({ runId: '../../RUN-1' as any, workspace: '/repo', env: cleanEnv })).rejects.toThrow();
+
+    expect(mocks.spawnRun).not.toHaveBeenCalled();
+    expect(mocks.activeRunId).toBeNull();
   });
 
   it('refuses a second spawn while a flywheel run is active', async () => {
@@ -91,7 +98,7 @@ describe('flywheel lifecycle', () => {
     expect(mocks.paused).toBe(false);
     expect(mocks.activeRunId).toBe('RUN-9');
     expect(mocks.spawnRun).toHaveBeenCalledTimes(2);
-    expect(mocks.spawnRun).toHaveBeenLastCalledWith('RUN-9', 'plan', expect.objectContaining({
+    expect(mocks.spawnRun).toHaveBeenLastCalledWith('RUN-9', 'flywheel', expect.objectContaining({
       agentId: FLYWHEEL_ORCHESTRATOR_AGENT_ID,
       workspace: '/repo',
       registerConversation: true,

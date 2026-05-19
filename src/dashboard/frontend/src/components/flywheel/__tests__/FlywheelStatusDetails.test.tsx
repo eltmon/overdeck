@@ -121,6 +121,22 @@ describe('FlywheelStatusDetails', () => {
     expect(screen.getByText('1234567')).toBeInTheDocument();
   });
 
+  it('renders unsafe bug URLs as plain commit text', () => {
+    render(<FlywheelStatusDetails status={{
+      ...status,
+      substrateBugs: [{
+        issueId: 'PAN-4',
+        title: 'Unsafe link',
+        status: 'fixed',
+        commitSha: 'badbadbadbad',
+        url: 'javascript:alert(1)',
+      } as any],
+    }} />);
+
+    expect(screen.getByText('badbadb')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'badbadb' })).not.toBeInTheDocument();
+  });
+
   it('delegates running agents to AgentCard and preserves navigation', () => {
     const onNavigateAgent = vi.fn();
     render(<FlywheelStatusDetails status={status} onNavigateAgent={onNavigateAgent} />);

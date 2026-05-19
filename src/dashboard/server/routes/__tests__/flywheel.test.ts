@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -6,6 +6,10 @@ import type { FlywheelStatus } from '@panctl/contracts';
 import {
   getFlywheelRunPayload,
   getFlywheelRunsPayload,
+  postFlywheelPausePayload,
+  postFlywheelReportOpenPayload,
+  postFlywheelResumePayload,
+  postFlywheelStartPayload,
   postFlywheelStatusPayload,
   resolveFlywheelBriefPath,
 } from '../flywheel.js';
@@ -112,6 +116,8 @@ describe('flywheel status POST payload helper', () => {
 
   it.each([
     ['missing runId', { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z'), runId: undefined }],
+    ['path traversal runId', { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z'), runId: '../../RUN-1' }],
+    ['unsafe bug URL', { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z'), substrateBugs: [{ issueId: 'PAN-1', title: 'Bad link', status: 'fixed', url: 'javascript:alert(1)' }] }],
     ['invalid orchestrator effort', { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z'), orchestrator: { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z').orchestrator, effort: 'maximum' } }],
     ['invalid activePipeline', { ...makeStatus('RUN-1', '2026-05-18T13:00:00.000Z'), activePipeline: [{ issueId: 'PAN-1' }] }],
   ])('rejects schema-invalid payloads: %s', async (_name, payload) => {
@@ -120,6 +126,25 @@ describe('flywheel status POST payload helper', () => {
     expect(result.status).toBe(400);
     expect(result.body).toMatchObject({ error: 'Invalid FlywheelStatus payload' });
     expect('details' in result.body && result.body.details.length).toBeGreaterThan(0);
+  });
+});
+
+describe('flywheel action payload helpers', () => {
+  it('starts, pauses, resumes, and opens reports through lifecycle actions', async () => {
+    const start = async () => ({ runId: 'RUN-3', briefDisplayPath: 'docs/flywheel-brief.md', agentModel: 'claude-opus-4-7' });
+    const pause = async () => ({ before: { paused: false, activeRunId: 'RUN-3' }, after: { paused: true, activeRunId: 'RUN-3' }, changed: true });
+    const resume = async () => ({ before: { paused: true, activeRunId: 'RUN-3' }, after: { paused: false, activeRunId: 'RUN-3' }, changed: true });
+    const openReport = async () => ({ runId: 'RUN-3', path: '/tmp/report.md' });
+
+    await expect(postFlywheelStartPayload({ brief: 'docs/flywheel-brief.md' }, { start })).resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-3' } });
+    await expect(postFlywheelPausePayload({ pause })).resolves.toEqual({ status: 200, body: { ok: true, changed: true } });
+    await expect(postFlywheelResumePayload({ resume })).resolves.toEqual({ status: 200, body: { ok: true, changed: true } });
+    await expect(postFlywheelReportOpenPayload({ runId: 'RUN-3' }, { openReport })).resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-3', path: '/tmp/report.md' } });
+  });
+
+  it('rejects invalid action payload fields', async () => {
+    await expect(postFlywheelStartPayload({ brief: 1 })).resolves.toEqual({ status: 400, body: { error: 'brief must be a string when provided' } });
+    await expect(postFlywheelReportOpenPayload({ runId: '../RUN-3' })).resolves.toEqual({ status: 400, body: { error: 'Flywheel run id must match RUN-<number>' } });
   });
 });
 
@@ -142,6 +167,20 @@ describe('flywheel run payload helpers', () => {
       { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'running' },
       { id: 'RUN-1', startedAt: '2026-05-18T10:00:00.000Z', status: 'running' },
     ]);
+  });
+
+  it('limits run summaries and ignores non-canonical run directories', async () => {
+    await writeLatestFlywheelStatus(makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), { panopticonHome });
+    await writeLatestFlywheelStatus(makeStatus('RUN-2', '2026-05-18T12:00:00.000Z'), { panopticonHome });
+    await mkdir(join(panopticonHome, 'flywheel', 'runs', 'not-a-run'), { recursive: true });
+
+    await expect(getFlywheelRunsPayload({ panopticonHome, limit: 1 })).resolves.toEqual([
+      { id: 'RUN-2', startedAt: '2026-05-18T12:00:00.000Z', status: 'running' },
+    ]);
+  });
+
+  it('returns null for a non-canonical run id', async () => {
+    await expect(getFlywheelRunPayload('../RUN-1', { panopticonHome })).resolves.toBeNull();
   });
 
   it('returns a run detail with report path when the run exists', async () => {

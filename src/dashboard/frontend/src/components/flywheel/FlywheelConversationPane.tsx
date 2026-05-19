@@ -94,7 +94,7 @@ export function FlywheelConversationPane({ onOpenSettings }: FlywheelConversatio
   const queryClient = useQueryClient();
   const runsQuery = useQuery({
     queryKey: ['flywheel-runs'],
-    queryFn: () => fetchJson<FlywheelRunSummary[]>('/api/flywheel/runs'),
+    queryFn: () => fetchJson<FlywheelRunSummary[]>('/api/flywheel/runs?limit=10'),
     refetchInterval: 5000,
   });
   const latestRun = runsQuery.data?.[0] ?? null;
