@@ -3800,7 +3800,10 @@ async function getAutoCloseOutCanonicalState(issueId: string): Promise<string | 
 
 function recordAutoCloseOutFailure(issueId: string, message: string): void {
   console.warn(`[deacon] Auto close-out failed for ${issueId}: ${message}`);
-  setReviewStatus(issueId, { mergeNotes: `Auto close-out failed: ${message}` });
+  setReviewStatus(issueId, {
+    mergeNotes: `Auto close-out failed: ${message}`,
+    updatedAt: new Date().toISOString(),
+  });
   emitActivityEntry({
     source: 'cloister',
     level: 'warn',

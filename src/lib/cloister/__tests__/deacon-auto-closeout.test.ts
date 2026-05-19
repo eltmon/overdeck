@@ -199,7 +199,13 @@ describe('autoCloseOut', () => {
     const actions = await autoCloseOut(now);
 
     expect(actions).toEqual(['Auto close-out failed for PAN-1190: archive failed']);
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1190', { mergeNotes: 'Auto close-out failed: archive failed' });
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(
+      'PAN-1190',
+      expect.objectContaining({
+        mergeNotes: 'Auto close-out failed: archive failed',
+        updatedAt: expect.any(String),
+      }),
+    );
     expect(mockEmitActivityEntry).toHaveBeenCalledWith({
       source: 'cloister',
       level: 'warn',

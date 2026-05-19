@@ -119,7 +119,8 @@ export function rejectUnsafeDashboardMutationRequest(
 
   if (hasDashboardInternalToken(request)) return null;
 
-  if (!hasTrustedExactOrigin(headers)) {
+  const origin = getHeaderFromMap(headers, 'origin');
+  if (origin && !hasTrustedExactOrigin(headers)) {
     return jsonResponse({ error: 'Invalid origin' }, { status: 403 });
   }
   if (!hasValidCsrfToken(headers)) {

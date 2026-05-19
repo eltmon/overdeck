@@ -1439,6 +1439,11 @@ const postIssueReopenRoute = HttpRouter.add(
     if (!parseIssueId(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
+
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
     const body = yield* readJsonBody;
     const lifecycle = yield* IssueLifecycle;
     const linear = yield* LinearClient;
@@ -2367,18 +2372,25 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
     const { closeOut } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
     const issueDataService = getIssueDataService();
 
-    // Pre-validate all issues and build contexts sequentially (lightweight).
-    // Then run closeOut with bounded concurrency (max 3) to avoid unbounded
+    // Pre-validate all issues: run agent checks in parallel, then build contexts.
+    // CloseOut runs with bounded concurrency (max 3) to avoid unbounded
     // resource use while keeping git index-lock risk low for independent issues.
     type CloseOutTask = { id: string; ctx: LifecycleContext } | { id: string; skipped: true; error: string };
     const tasks: CloseOutTask[] = [];
-    for (const id of issueIds) {
-      const cachedIssue = issueDataService.getIssues().find(
-        (issue: any) => (issue.identifier || '').toUpperCase() === id.toUpperCase(),
-      );
-      const reviewStatus = getReviewStatus(id.toUpperCase());
-      const allowPausedMerged = reviewStatus?.mergeStatus === 'merged' || cachedIssue?.mergeStatus === 'merged';
-      const hasActiveAgent = yield* Effect.promise(() => hasActiveAgentForIssue(id, allowPausedMerged));
+
+    const agentChecks = yield* Effect.promise(() => Promise.all(
+      issueIds.map(async id => {
+        const cachedIssue = issueDataService.getIssues().find(
+          (issue: any) => (issue.identifier || '').toUpperCase() === id.toUpperCase(),
+        );
+        const reviewStatus = getReviewStatus(id.toUpperCase());
+        const allowPausedMerged = reviewStatus?.mergeStatus === 'merged' || cachedIssue?.mergeStatus === 'merged';
+        const hasActiveAgent = await hasActiveAgentForIssue(id, allowPausedMerged);
+        return { id, hasActiveAgent };
+      })
+    ));
+
+    for (const { id, hasActiveAgent } of agentChecks) {
       if (hasActiveAgent) {
         tasks.push({ id, skipped: true, error: 'Skipped: active agent running' });
         continue;
