@@ -39,6 +39,8 @@ function collectAllPossibleActions(): Set<ActionKey> {
     { ...base, issueCanonicalState: 'in_progress', reviewStatus: { reviewStatus: 'passed', readyForMerge: true } as any },
     // ready_to_merge → merge, reviewTest
     { ...base, issueCanonicalState: 'in_progress', reviewStatus: { readyForMerge: true } as any },
+    // verifying_on_main → closeOut
+    { ...base, issueCanonicalState: 'verifying_on_main', isMerged: true },
     // done → reopen
     { ...base, issueCanonicalState: 'done', isMerged: true },
     // canceled → reopen
@@ -81,6 +83,7 @@ describe('Command Deck action parity', () => {
     'Start agent': 'startAgent',
     'Create workspace': 'createWorkspace',
     'Merge': 'merge',
+    'Close Out': 'closeOut',
     'Reopen': 'reopen',
     'Cancel': 'cancel',
 

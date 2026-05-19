@@ -44,7 +44,7 @@ import type { CreateBeadsResult } from '../../../lib/vbrief/beads.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus, getReviewStatus } from '../review-status.js';
-import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
+import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
@@ -2183,7 +2183,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
     }
 
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnauthorizedDashboardRequest(request);
+    const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return authError;
 
     const ctx = buildCloseOutContext(id);
@@ -2311,46 +2311,13 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
   '/api/issues/bulk-close-out',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnauthorizedDashboardRequest(request);
+    const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return authError;
-
-    // Content-Type enforcement — exact match, no substring trickery
-    const contentType = (request.headers as Record<string, string | string[] | undefined>)['content-type'];
-    const contentTypeStr = Array.isArray(contentType) ? contentType[0] : contentType;
-    const isJsonContentType = (() => {
-      if (!contentTypeStr) return false;
-      const [mime] = contentTypeStr.toLowerCase().split(';');
-      return mime.trim() === 'application/json';
-    })();
-    if (!isJsonContentType) {
-      return jsonResponse({ error: 'Content-Type must be application/json' }, { status: 400 });
-    }
 
     const text = yield* request.text;
     const body: Record<string, unknown> = (() => { try { return text ? JSON.parse(text) : {}; } catch { return {}; } })();
     const rawIssueIds = Array.isArray(body.issueIds) ? body.issueIds : [];
     const issueIds = [...new Set(rawIssueIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0))];
-
-    // Origin check — parse as URL and validate hostname exactly
-    const origin = (request.headers as Record<string, string | string[] | undefined>)['origin'];
-    const originStr = Array.isArray(origin) ? origin[0] : origin;
-    const isValidOrigin = (() => {
-      // Same-origin requests omit the Origin header — accept them.
-      if (!originStr) return true;
-      try {
-        const url = new URL(originStr);
-        return (
-          url.hostname === 'localhost' ||
-          url.hostname === '127.0.0.1' ||
-          url.hostname.endsWith('.localhost')
-        );
-      } catch {
-        return false;
-      }
-    })();
-    if (!isValidOrigin) {
-      return jsonResponse({ error: 'Invalid origin' }, { status: 403 });
-    }
 
     // Input validation
     if (issueIds.length === 0) {

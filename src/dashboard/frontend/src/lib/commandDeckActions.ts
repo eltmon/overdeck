@@ -48,6 +48,7 @@ export type ActionKey =
   | 'resetSession'
   | 'createWorkspace'
   | 'copySettings'
+  | 'closeOut'
   // Issue artifact / planning surface
   | 'beads'
   | 'inference'
@@ -269,6 +270,7 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
       }
       break;
     case 'verifying':
+      primary.push('closeOut');
       break;
     case 'merged':
       break;

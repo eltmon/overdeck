@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCheck, Loader2 } from 'lucide-react';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 
 interface CloseOutIssueButtonProps {
   issueId: string;
@@ -18,7 +19,7 @@ export function CloseOutIssueButton({ issueId, variant = 'card', stopPropagation
     mutationFn: async () => {
       const res = await fetch(`/api/issues/${issueId}/close-out`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await dashboardMutationJsonHeaders(),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {

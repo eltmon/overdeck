@@ -25,6 +25,7 @@ import { StopAgentButton } from '../StopAgentButton';
 import { RecoverButton } from '../RecoverButton';
 import { RestartFromPlanButton } from '../RestartFromPlanButton';
 import { ResetIssueButton } from '../ResetIssueButton';
+import { CloseOutIssueButton } from '../CloseOutIssueButton';
 import { useAvailableModels, HarnessSelect } from '../shared/ModelPicker/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { useSwitchModel } from '../../hooks/useSwitchModel';
@@ -175,6 +176,9 @@ export function ZoneActionStrip({
             variant="inspector"
           />
         );
+
+      case 'closeOut':
+        return <CloseOutIssueButton key={key} issueId={issueId} variant="inspector" stopPropagation={false} />;
 
       case 'stopAgent':
         return agent ? (

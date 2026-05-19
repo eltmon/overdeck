@@ -23,7 +23,7 @@ import { COMMAND_DECK_PARITY_SURFACES, COMMAND_DECK_SURFACE_REGISTRY } from '../
 const ALL_ACTION_KEYS: readonly ActionKey[] = [
   'merge', 'reviewTest', 'recover', 'stopAgent',
   'startAgent', 'resumeSession', 'resetSession',
-  'createWorkspace', 'copySettings',
+  'createWorkspace', 'copySettings', 'closeOut',
   'beads', 'inference',
   'discussions', 'transcripts', 'upload', 'syncDiscussions', 'syncMain', 'statusReview',
   'reopen', 'restartFromPlan', 'resetIssue', 'cancel',
@@ -97,6 +97,10 @@ function getCommandDeckReachableActions(): Set<ActionKey> {
     getZoneAActions({
       ...baseZoneA,
       issueCanonicalState: 'canceled',
+    }),
+    getZoneAActions({
+      ...baseZoneA,
+      issueCanonicalState: 'verifying_on_main',
     }),
     getZoneAActions({
       ...baseZoneA,
@@ -196,6 +200,7 @@ describe('getZoneAActions', () => {
         updatedAt: '2026-04-26T00:00:00Z',
       },
     });
+    expect(layout.primary).toContain('closeOut');
     expect(layout.primary).not.toContain('merge');
     expect(layout.primary).not.toContain('startAgent');
     expect(layout.overflow).not.toContain('resetIssue');
@@ -214,8 +219,17 @@ describe('getZoneAActions', () => {
         updatedAt: '2026-04-26T00:00:00Z',
       },
     });
+    expect(layout.primary).toContain('closeOut');
     expect(layout.primary).not.toContain('merge');
     expect(layout.overflow).not.toContain('resetIssue');
+  });
+
+  it('non-verifying issues do not surface close-out', () => {
+    const layout = getZoneAActions({
+      ...baseZoneA,
+      issueCanonicalState: 'in_progress',
+    });
+    expect(flattenActions(layout)).not.toContain('closeOut');
   });
 
   it('failed pipeline surfaces recover + reviewTest', () => {

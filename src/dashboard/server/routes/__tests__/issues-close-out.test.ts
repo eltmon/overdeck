@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
@@ -41,6 +41,8 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
 import { issuesRouteLayer } from '../issues.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
+import { DASHBOARD_CSRF_HEADER, DASHBOARD_SESSION_COOKIE, _resetDashboardSessionTokenForTests, dashboardCsrfToken } from '../dashboard-auth.js';
+import { _resetTrustedOriginsForTests } from '../origin-validation.js';
 
 function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
   return Layer.succeed(EventStoreService, {
@@ -59,13 +61,13 @@ function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
   });
 }
 
-async function postCloseOut(issueId: string) {
+async function postCloseOut(issueId: string, headers: Record<string, string> = {}) {
   const appendedEvents: Record<string, unknown>[] = [];
   const eventStoreLayer = eventStoreLayerFor(appendedEvents);
 
   const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/issues/${issueId}/close-out`, {
     method: 'POST',
-    headers: { [INTERNAL_TOKEN_HEADER]: 'test-token' },
+    headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: 'test-token', ...headers },
   }));
 
   const response = await Effect.runPromise(
@@ -101,11 +103,26 @@ async function postBulkCloseOut(headers: Record<string, string> = {}) {
   return { status: response.status, body: JSON.parse(text), appendedEvents };
 }
 
+afterEach(() => {
+  delete process.env.PANOPTICON_INTERNAL_TOKEN;
+  delete process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN;
+  delete process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN;
+  delete process.env.PANOPTICON_TRUSTED_ORIGINS;
+  _resetInternalTokenCacheForTests();
+  _resetDashboardSessionTokenForTests();
+  _resetTrustedOriginsForTests();
+});
+
 describe('POST /api/issues/:id/close-out', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+    process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
+    process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    delete process.env.PANOPTICON_TRUSTED_ORIGINS;
     _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+    _resetTrustedOriginsForTests();
     resolveProjectFromIssueMock.mockReturnValue({
       projectName: 'panopticon',
       projectPath: '/tmp/panopticon',
@@ -177,13 +194,55 @@ describe('POST /api/issues/:id/close-out', () => {
       }),
     ]);
   });
+
+  it('allows cookie-authenticated dashboard requests with exact trusted origin and CSRF token', async () => {
+    const result = await postCloseOut('PAN-1190', {
+      [INTERNAL_TOKEN_HEADER]: '',
+      cookie: `${DASHBOARD_SESSION_COOKIE}=test-browser-session-token`,
+      origin: 'http://localhost:3011',
+      [DASHBOARD_CSRF_HEADER]: dashboardCsrfToken(),
+    });
+
+    expect(result.status).toBe(200);
+    expect(closeOutMock).toHaveBeenCalledOnce();
+  });
+
+  it('rejects cookie-authenticated close-out requests from same-site workspace origins', async () => {
+    const result = await postCloseOut('PAN-1190', {
+      [INTERNAL_TOKEN_HEADER]: '',
+      cookie: `${DASHBOARD_SESSION_COOKIE}=test-browser-session-token`,
+      origin: 'http://api-feature-pan-1190.pan.localhost:3011',
+      [DASHBOARD_CSRF_HEADER]: dashboardCsrfToken(),
+    });
+
+    expect(result.status).toBe(403);
+    expect(result.body).toEqual({ error: 'Invalid origin' });
+    expect(closeOutMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects cookie-authenticated close-out requests without a CSRF token', async () => {
+    const result = await postCloseOut('PAN-1190', {
+      [INTERNAL_TOKEN_HEADER]: '',
+      cookie: `${DASHBOARD_SESSION_COOKIE}=test-browser-session-token`,
+      origin: 'http://localhost:3011',
+    });
+
+    expect(result.status).toBe(403);
+    expect(result.body).toEqual({ error: 'Invalid CSRF token' });
+    expect(closeOutMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/issues/bulk-close-out', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.PANOPTICON_INTERNAL_TOKEN = 'test-token';
+    process.env.PANOPTICON_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
+    process.env.PANOPTICON_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    delete process.env.PANOPTICON_TRUSTED_ORIGINS;
     _resetInternalTokenCacheForTests();
+    _resetDashboardSessionTokenForTests();
+    _resetTrustedOriginsForTests();
   });
 
   it('rejects requests without dashboard authorization', async () => {
@@ -191,6 +250,18 @@ describe('POST /api/issues/bulk-close-out', () => {
 
     expect(result.status).toBe(401);
     expect(result.body).toEqual({ error: 'unauthorized' });
+    expect(closeOutMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects cookie-authenticated bulk close-out from untrusted same-site origins', async () => {
+    const result = await postBulkCloseOut({
+      cookie: `${DASHBOARD_SESSION_COOKIE}=test-browser-session-token`,
+      origin: 'http://feature-pan-1190.pan.localhost:3011',
+      [DASHBOARD_CSRF_HEADER]: dashboardCsrfToken(),
+    });
+
+    expect(result.status).toBe(403);
+    expect(result.body).toEqual({ error: 'Invalid origin' });
     expect(closeOutMock).not.toHaveBeenCalled();
   });
 });

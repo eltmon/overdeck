@@ -20,6 +20,8 @@ export function getTrustedOrigins(): string[] {
   addTrustedOrigin(origins, dashboardUrl);
   addTrustedOrigin(origins, `http://localhost:${port}`);
   addTrustedOrigin(origins, `http://127.0.0.1:${port}`);
+  addTrustedOrigin(origins, 'http://localhost:3010');
+  addTrustedOrigin(origins, 'http://127.0.0.1:3010');
 
   const trustedOrigins = process.env['PANOPTICON_TRUSTED_ORIGINS'];
   for (const origin of trustedOrigins?.split(',') ?? []) {
