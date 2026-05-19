@@ -19,7 +19,7 @@ import type { IssueTracker } from '../tracker/interface.js';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { extractNumber, extractPrefix, normalizeIssueId } from '../issue-id.js';
-import { getAgentState, markAgentStoppedState, saveAgentState } from '../agents.js';
+import { getAgentStateAsync, markAgentStoppedState, saveAgentStateAsync } from '../agents.js';
 
 const execAsync = promisify(exec);
 
@@ -47,12 +47,12 @@ export interface CloseIssueOptions {
  * If a tracker is provided, uses the abstraction layer.
  * Otherwise, falls back to direct gh CLI (GitHub) or Linear SDK calls.
  */
-function markWorkAgentStoppedForIssue(issueId: string): void {
+async function markWorkAgentStoppedForIssue(issueId: string): Promise<void> {
   const agentId = `agent-${normalizeIssueId(issueId)}`;
-  const state = getAgentState(agentId);
+  const state = await getAgentStateAsync(agentId);
   if (!state) return;
   markAgentStoppedState(state);
-  saveAgentState(state);
+  await saveAgentStateAsync(state);
 }
 
 export function closeIssue(
@@ -103,7 +103,7 @@ function closeViaTracker(
   const step = 'close-issue:transition';
   return Effect.gen(function* () {
     yield* tracker.transitionIssue(ctx.issueId, 'closed');
-    markWorkAgentStoppedForIssue(ctx.issueId);
+    yield* Effect.promise(() => markWorkAgentStoppedForIssue(ctx.issueId));
     if (comment) {
       // Best-effort comment — swallow errors
       yield* tracker.addComment(ctx.issueId, comment).pipe(
@@ -138,7 +138,7 @@ function closeViaDirect(
   }
 
   // Try Linear
-  const linearApiKey = getLinearApiKey();
+  const linearApiKey = await getLinearApiKey();
   if (linearApiKey) {
     return closeLinearDirect(ctx, linearApiKey);
   }
@@ -202,7 +202,7 @@ async function closeGitHubDirectImpl(ctx: LifecycleContext, comment?: string): P
       `gh issue close ${number} --repo ${owner}/${repo}${commentArg}`,
       { encoding: 'utf-8' },
     );
-    markWorkAgentStoppedForIssue(ctx.issueId);
+    await markWorkAgentStoppedForIssue(ctx.issueId);
     return stepOk(step, [`Closed GitHub issue #${number} on ${owner}/${repo}`]);
   } catch (err) {
     return stepFailed(step, `gh issue close failed: ${(err as Error).message}`);
@@ -336,7 +336,7 @@ async function closeLinearDirectImpl(ctx: LifecycleContext, apiKey: string): Pro
       }
     }
 
-    markWorkAgentStoppedForIssue(ctx.issueId);
+    await markWorkAgentStoppedForIssue(ctx.issueId);
     return stepOk(step, [`Moved Linear issue ${ctx.issueId} to Done`]);
   } catch (err) {
     const message = (err as Error).message;
@@ -380,7 +380,7 @@ async function closeRallyDirectImpl(ctx: LifecycleContext): Promise<StepResult> 
   });
   // RallyTracker.transitionIssue returns Effect (migrated in PAN-1249).
   await Effect.runPromise(tracker.transitionIssue(ctx.issueId, 'closed'));
-  markWorkAgentStoppedForIssue(ctx.issueId);
+  await markWorkAgentStoppedForIssue(ctx.issueId);
   return stepOk(step, [`Closed Rally issue ${ctx.issueId}`]);
 }
 
@@ -402,7 +402,7 @@ function applyClosedOutLabel(
     return applyLabelGitHub(ctx);
   }
 
-  const linearApiKey = getLinearApiKey();
+  const linearApiKey = await getLinearApiKey();
   if (linearApiKey) {
     return applyLabelLinear(ctx, linearApiKey);
   }

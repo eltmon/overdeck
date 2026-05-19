@@ -10,14 +10,15 @@
  * In Phase 2, removeWorkspace() will delegate to this module for the common steps.
  */
 
-import { existsSync, rmSync } from 'fs';
-import { readFile } from 'fs/promises';
-import { join, basename } from 'path';
+import { existsSync } from 'fs';
+import { appendFile, readFile, rm, writeFile } from 'fs/promises';
+import { join, basename, dirname } from 'path';
+import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from '../paths.js';
-import { killSessionAsync, sessionExists, listSessionNamesAsync } from '../tmux.js';
+import { killSessionAsync, sessionExistsAsync, listSessionNamesAsync } from '../tmux.js';
 import type { LifecycleContext, StepResult, TeardownOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js';
@@ -52,7 +53,7 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
     `planning-${issueLower}`,
   ];
   for (const session of exactPatterns) {
-    if (sessionExists(session)) {
+    if (await sessionExistsAsync(session)) {
       try {
         await killSessionAsync(session);
         killed++;
@@ -287,18 +288,17 @@ async function syncWorkspaceBeadsImpl(
       return stepOk(step, [`Synced workspace beads to project root for ${issueLower}`]);
     } catch {
       // bd import may not exist — try manual JSONL merge
-      const { readFileSync, appendFileSync } = await import('fs');
       const wsJsonl = join(workspacePath, '.beads', 'issues.jsonl');
       const projJsonl = join(projectPath, '.beads', 'issues.jsonl');
 
       if (existsSync(wsJsonl) && existsSync(projJsonl)) {
-        const wsContent = readFileSync(wsJsonl, 'utf-8');
+        const wsContent = await readFile(wsJsonl, 'utf-8');
         const issuePattern = issueLower.replace('-', '[-_]');
         const relevantLines = wsContent.split('\n').filter(
           line => line.trim() && new RegExp(issuePattern, 'i').test(line)
         );
         if (relevantLines.length > 0) {
-          appendFileSync(projJsonl, '\n' + relevantLines.join('\n'));
+          await appendFile(projJsonl, '\n' + relevantLines.join('\n'));
           return stepOk(step, [`Appended ${relevantLines.length} beads entries for ${issueLower} to project JSONL`]);
         }
       }
@@ -338,8 +338,7 @@ async function clearProjectBeadsImpl(
   }
 
   try {
-    const { readFileSync, writeFileSync } = await import('fs');
-    const content = readFileSync(projJsonl, 'utf-8');
+    const content = await readFile(projJsonl, 'utf-8');
     const lines = content.split('\n');
     const issueUpper = issueLower.toUpperCase();
     const before = lines.length;
@@ -357,7 +356,7 @@ async function clearProjectBeadsImpl(
     });
     const removed = before - filtered.length;
     if (removed > 0) {
-      writeFileSync(projJsonl, filtered.join('\n'));
+      await writeFile(projJsonl, filtered.join('\n'));
       return stepOk(step, [`Removed ${removed} beads entries for ${issueLower} from project JSONL`]);
     }
     return stepSkipped(step, [`No beads entries found for ${issueLower}`]);
@@ -409,8 +408,8 @@ async function removeWorktreeImpl(
   } catch {
     // worktree remove failed — try direct removal
     try {
-      rmSync(workspacePath, { recursive: true, force: true });
-      return stepOk(step, ['Removed workspace directory (worktree remove failed, used rmSync)']);
+      await rm(workspacePath, { recursive: true, force: true });
+      return stepOk(step, ['Removed workspace directory after worktree removal failed']);
     } catch (err) {
       return stepFailed(step, `Failed to remove workspace: ${(err as Error).message}`);
     }
@@ -542,15 +541,22 @@ function clearLegacyPlanningDir(
   projectPath: string,
   issueLower: string,
 ): Effect.Effect<StepResult> {
-  return Effect.sync(() => {
-    const step = 'teardown:legacy-planning-dir';
-    const legacyDir = join(projectPath, '.planning', issueLower);
-    if (existsSync(legacyDir)) {
-      rmSync(legacyDir, { recursive: true, force: true });
+  return Effect.tryPromise({
+    try: async () => {
+      const step = 'teardown:legacy-planning-dir';
+      const legacyDir = join(projectPath, '.planning', issueLower);
+      if (!existsSync(legacyDir)) {
+        return stepSkipped(step, ['No legacy planning directory found']);
+      }
+      await rm(legacyDir, { recursive: true, force: true });
       return stepOk(step, [`Deleted legacy planning dir: ${legacyDir}`]);
-    }
-    return stepSkipped(step, ['No legacy planning directory found']);
-  });
+    },
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed('teardown:legacy-planning-dir', `Failed to delete legacy planning dir: ${(err as Error).message}`)),
+    ),
+  );
 }
 
 /**

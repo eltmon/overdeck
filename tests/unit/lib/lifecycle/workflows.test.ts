@@ -29,7 +29,7 @@ vi.mock('util', async (importOriginal) => {
 });
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
-  sessionExists: vi.fn().mockReturnValue(false),
+  sessionExistsAsync: vi.fn().mockResolvedValue(false),
   killSessionAsync: vi.fn().mockResolvedValue(undefined),
   listSessionNamesAsync: vi.fn().mockResolvedValue([]),
 }));
@@ -283,6 +283,9 @@ describe('workflows', () => {
 
       expect(result.steps.find(s => s.step === 'close-out:vbrief-completed')).toBeDefined();
       expect(result.steps.find(s => s.step === 'teardown:checkpoint-refs')).toBeDefined();
+      expect(result.steps.findIndex(s => s.step === 'close-issue:transition')).toBeLessThan(
+        result.steps.findIndex(s => s.step === 'teardown:checkpoint-refs'),
+      );
 
       const commands = mockExecAsync.mock.calls.map(([command, args]) => ({ command: String(command), args }));
       expect(commands.some(({ command, args }) => command === 'git' && Array.isArray(args) && args.includes('refs/pan/turn/agent-pan-100/'))).toBe(true);
@@ -293,7 +296,7 @@ describe('workflows', () => {
       expect(spec?.document.plan.status).toBe('completed');
     });
 
-    it('should abort before closing the tracker issue when teardown fails', async () => {
+    it('should close the tracker issue before aborting on teardown failure', async () => {
       mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
         if (command === 'git' && Array.isArray(args) && args.includes('for-each-ref')) {
           throw new Error('ref storage unavailable');
@@ -305,11 +308,11 @@ describe('workflows', () => {
       const result = await closeOut(ctx, { tracker });
 
       expect(result.success).toBe(false);
+      expect(result.steps.find(s => s.step === 'close-issue:transition')?.success).toBe(true);
       expect(result.steps.find(s => s.step === 'teardown:checkpoint-refs')?.success).toBe(false);
       expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('teardown failed');
-      expect(result.steps.some(s => s.step.startsWith('close-issue:'))).toBe(false);
       expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
-      expect(tracker.transitionIssue).not.toHaveBeenCalled();
+      expect(tracker.transitionIssue).toHaveBeenCalledWith('PAN-100', 'closed');
       expect(mockClearReviewStatus).not.toHaveBeenCalled();
     });
 
@@ -322,6 +325,8 @@ describe('workflows', () => {
       expect(result.success).toBe(false);
       expect(result.steps.find(s => s.step === 'close-issue:transition')?.success).toBe(false);
       expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('issue close failed');
+      expect(result.steps.some(s => s.step === 'close-out:vbrief-completed')).toBe(false);
+      expect(result.steps.some(s => s.step.startsWith('teardown:'))).toBe(false);
       expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
       expect(mockClearReviewStatus).not.toHaveBeenCalled();
     });

@@ -10,9 +10,9 @@ vi.mock('util', () => ({
   promisify: () => (...args: any[]) => mockExecAsync(...args),
 }));
 vi.mock('../../../../src/lib/agents.js', () => ({
-  getAgentState: vi.fn(() => null),
+  getAgentStateAsync: vi.fn().mockResolvedValue(null),
   markAgentStoppedState: vi.fn((state: unknown) => state),
-  saveAgentState: vi.fn(),
+  saveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock lifecycle helpers used by close-issue

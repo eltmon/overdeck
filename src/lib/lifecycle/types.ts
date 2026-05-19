@@ -5,7 +5,8 @@
  * multiple operations and return a WorkflowResult.
  */
 
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { IssueTracker } from '../tracker/interface.js';
@@ -140,11 +141,11 @@ export function stepFailed(step: string, error: string, details?: string[]): Ste
  * outside the lifecycle/ batch (src/lib/close-out.ts) consume it synchronously.
  * Those callers will migrate in their own batches.
  */
-export function getLinearApiKey(): string | null {
+export async function getLinearApiKey(): Promise<string | null> {
   if (process.env.LINEAR_API_KEY) return process.env.LINEAR_API_KEY;
   const envFile = join(homedir(), '.panopticon.env');
   if (existsSync(envFile)) {
-    const content = readFileSync(envFile, 'utf-8');
+    const content = await readFile(envFile, 'utf-8');
     const match = content.match(/LINEAR_API_KEY=(.+)/);
     if (match) return match[1].trim();
   }

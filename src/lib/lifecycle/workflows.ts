@@ -140,6 +140,18 @@ export function close(
 
 /**
  * closeOut() — Full close-out ceremony.
+ *
+ * This is the human-gated verification and cleanup workflow.
+ * Replaces the monolithic executeCloseOut() function.
+ *
+ * 1. Verify branch merged (hard fail if not — must pass before any cleanup)
+ * 2. Move PRD + archive workspace artifacts (hard fail if archiving fails)
+ * 3. Mark vBRIEF completed
+ * 4. Clean up workspace (tmux, TLDR, Docker, worktree)
+ * 5. Clean up agent state
+ * 6. Close issue on tracker
+ * 7. Apply closed-out label
+ * 8. Clear review status
  */
 export function closeOut(
   ctx: LifecycleContext,
@@ -535,7 +547,7 @@ async function resetIssueToTodoImpl(ctx: LifecycleContext): Promise<StepResult> 
     }
 
     // Linear: reopen to Todo
-    const linearApiKey = getLinearApiKey();
+    const linearApiKey = await getLinearApiKey();
     if (linearApiKey) {
       const { LinearClient } = await import('@linear/sdk');
       const client = new LinearClient({ apiKey: linearApiKey });
@@ -639,7 +651,7 @@ async function resetIssueToCanceledImpl(ctx: LifecycleContext): Promise<StepResu
       return stepOk(step, [`Marked GitHub issue #${number} as canceled/wontfix`]);
     }
 
-    const linearApiKey = getLinearApiKey();
+    const linearApiKey = await getLinearApiKey();
     if (linearApiKey) {
       const { LinearClient } = await import('@linear/sdk');
       const client = new LinearClient({ apiKey: linearApiKey });

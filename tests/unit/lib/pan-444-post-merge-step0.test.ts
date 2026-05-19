@@ -242,6 +242,16 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     expect(mockWriteFile).not.toHaveBeenCalled();
     expect(mockSpawn).not.toHaveBeenCalled();
   }, 30_000);
+
+  it('coalesces concurrent post-merge lifecycle calls before step 0 repeats', async () => {
+    const first = postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+    const second = postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
+
+    await Promise.all([first, second]);
+
+    expect(mockWriteFile).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
 });
 
 describe('postMergeLifecycle — repoRoot derivation', () => {
