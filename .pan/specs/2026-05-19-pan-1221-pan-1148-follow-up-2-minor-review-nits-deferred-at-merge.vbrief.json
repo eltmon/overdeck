@@ -1,0 +1,247 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-19T21:50:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1221: PAN-1148 follow-up — 2 minor review nits deferred at merge, plus a post-merge stream output panel regression discovered in UAT.",
+    "updated": "2026-05-19T21:41:01.171Z"
+  },
+  "plan": {
+    "id": "pan-1221",
+    "title": "PAN-1148 follow-up: 2 minor review nits deferred at merge",
+    "status": "proposed",
+    "uid": "f7d8c9e2-1a4b-4f3c-8e5d-9b2a7c6f1e3d",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 2,
+    "created": "2026-05-19T21:50:00.000Z",
+    "updated": "2026-05-19T21:41:01.171Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1221",
+        "label": "PAN-1221",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/pull/1184",
+        "label": "PAN-1148 (#1184)",
+        "type": "pull-request"
+      }
+    ],
+    "tags": [
+      "follow-up",
+      "review-nits",
+      "dashboard",
+      "agents",
+      "drawer",
+      "fleet-view"
+    ],
+    "narratives": {
+      "Problem": "PAN-1148 shipped with two deferred review nits (F1: DELETE route emits the wrong lifecycle event after sharing a factory with POST /stop; F2: NaN-poisoning in FleetAgentsView avg-runtime reduce when startedAt is invalid) and a post-merge UAT regression (F3: DrawerActiveAgent stream excerpt panel renders 'No recent stream output' for agents that are actively producing output, contrary to PRD §4.7.8).",
+      "Proposal": "Three independent beads, one per finding. F1 parameterizes the lifecycle event name in the shared agentStopRoute factory so DELETE re-emits agent.delete_requested while POST /stop keeps agent.stop_requested. F2 adds Number.isFinite guards inside the avg-runtime reduce and divides by the count of finite entries so a single bad startedAt no longer poisons the metric. F3 walks the agent-output data flow from server emission through WS subscription to the selectAgentOutput consumer, fixes the broken link at its source (no defensive shims), and adds a Playwright e2e to lock in the behavior. Each bead is shippable and reviewable in isolation; no hard ordering between them.",
+      "OutOfScope": "The substrate gaps that caused PAN-1148's churn cycle (kimi-k2.6 rate-limit halts, correctness-reviewer recurring timeouts, test-passed-via-skip → no-ship-auto-dispatch gap) are tracked separately under PAN-1215 and other follow-ups and are not addressed here."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Include F3 (stream output panel regression) as a third bead in scope.",
+        "rationale": "The issue body was amended on 2026-05-19 with the F3 update explicitly tagged 'Severity: User-visible regression on the merged redesign's headline feature. Worth fixing before the next ship.' Keeping it in this issue avoids splintering follow-ups and matches the user's update intent."
+      },
+      {
+        "summary": "F1 shipped as a single bead that parameterizes the shared agentStopRoute factory (third arg for the lifecycle event name) rather than splitting the routes back into two near-identical handlers.",
+        "rationale": "Splitting would duplicate ~40 lines of identical body (eventStore append, activity emit, cache invalidation). Parameterizing is the smaller diff and preserves DRY without losing observable distinction. The issue's recommended fix lists both approaches; pick the cheaper one."
+      },
+      {
+        "summary": "F2 also fixes the divisor (count of finite-duration agents) instead of only guarding the reducer.",
+        "rationale": "A pure guard without divisor adjustment understates the average proportional to how many invalid entries there are — a still-broken metric, just a different broken value. The hazards section explicitly tests the all-invalid case to ensure it returns 0 (matches the existing empty-array branch)."
+      },
+      {
+        "summary": "F3 includes a Playwright e2e test that seeds agentOutputById via store.setState rather than relying on a live agent.",
+        "rationale": "Issue's stated minimum bar includes a Playwright test. Existing patterns in src/dashboard/frontend/tests/*.spec.ts (e.g. command-deck-resource-strip.spec.ts) stub the dashboard store via page.evaluate — same shape used here."
+      },
+      {
+        "summary": "Every bead ships with a regression test (server route test for F1, FleetAgentsView unit test for F2, Playwright e2e for F3).",
+        "rationale": "PAN-1148 cycle-15/16 review history shows the original gaps shipped without test coverage and re-surfaced as nits. Adding tests is the cheapest way to prevent a third recurrence."
+      },
+      {
+        "summary": "All three beads default metadata.requiresInspection to false.",
+        "rationale": "None of the three beads lays foundation, defines a public API, encodes a cross-cutting protocol, or touches a security boundary. F1 is a string parameter addition. F2 is a numeric guard. F3 is a discrete data-flow bug fix in one panel. The work.inspect gate would have no judgment-call defects to catch."
+      },
+      {
+        "summary": "No hard 'blocks' edges between the three beads.",
+        "rationale": "Each bead touches different files (agents.ts server route vs FleetAgentsView.tsx frontend vs DrawerActiveAgent.tsx / store wiring). Ordering is mechanically irrelevant; the work agent can land them in any order or in parallel sub-commits within one PR."
+      }
+    ],
+    "items": [
+      {
+        "id": "f1-delete-lifecycle-event",
+        "title": "Restore agent.delete_requested lifecycle event for DELETE /api/agents/:id",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-19T21:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1221",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Parameterize the lifecycle event name in src/dashboard/server/routes/agents.ts:1053 agentStopRoute(method, path) by adding a third argument `event: 'agent.delete_requested' | 'agent.stop_requested'`. Pass 'agent.delete_requested' from the DELETE construction (line 1099) and 'agent.stop_requested' from the POST /stop construction (line 1103). Before changing, grep both event names across src/ and packages/ to confirm no downstream consumer was relying on the merged behavior; if a consumer was, update it to subscribe to both (do NOT silently re-alias). Add a server route test that asserts each method produces the correct lifecycle event in the log."
+        },
+        "subItems": [
+          {
+            "id": "f1-delete-lifecycle-event.ac1",
+            "title": "agentStopRoute factory accepts a lifecycle event name argument and uses it in the appendAgentLifecycleLog call (no hardcoded 'agent.stop_requested')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-delete-lifecycle-event.ac2",
+            "title": "DELETE /api/agents/:id construction passes 'agent.delete_requested'; POST /api/agents/:id/stop passes 'agent.stop_requested'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-delete-lifecycle-event.ac3",
+            "title": "PR description documents the grep result for both event names and confirms either (a) no downstream consumer breaks, or (b) which consumers were updated to subscribe to both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-delete-lifecycle-event.ac4",
+            "title": "New server route test in src/dashboard/server/routes/__tests__/ asserts DELETE emits 'agent.delete_requested' and POST /stop emits 'agent.stop_requested' to the lifecycle log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-delete-lifecycle-event.ac5",
+            "title": "npm run typecheck, npm run lint, npm test all pass from the workspace root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f2-runtime-nan-guard",
+        "title": "Guard FleetAgentsView avg-runtime reduce against NaN startedAt",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-19T21:50:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1221",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Agents/FleetAgentsView.tsx:290, replace the unguarded reduce over runningAgents with a version that computes `new Date(agent.startedAt).getTime()` once per agent, skips entries where the result is not Number.isFinite (covering undefined/null/empty/malformed startedAt and the NaN return from invalid Date), accumulates only finite durations, and divides by the count of finite durations (not runningAgents.length). When zero agents have finite durations, return 0 to match the existing empty-array branch. Update FleetAgentsView.test.tsx with three new cases."
+        },
+        "subItems": [
+          {
+            "id": "f2-runtime-nan-guard.ac1",
+            "title": "Reduce in FleetAgentsView.tsx:290 skips any running agent whose `new Date(agent.startedAt).getTime()` is not Number.isFinite",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f2-runtime-nan-guard.ac2",
+            "title": "avgRuntime is the sum of finite durations divided by the count of finite-duration agents; returns 0 (not NaN, not Infinity) when no running agent has a finite startedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f2-runtime-nan-guard.ac3",
+            "title": "FleetAgentsView.test.tsx adds three regression cases: (a) all valid startedAt (avg matches), (b) mixed valid+invalid (avg uses only valid entries and is finite), (c) all invalid startedAt (avgRuntime tile renders the formatted 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f2-runtime-nan-guard.ac4",
+            "title": "npm run typecheck, npm run lint, npm test all pass from the workspace root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f3-stream-output-panel",
+        "title": "Fix DrawerActiveAgent stream excerpt panel showing 'No recent stream output' for active agents",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-19T21:50:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1221",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "Reproduce the regression first: start the dashboard, open IssueDrawer for an issue whose work/plan/review agent is actively emitting output (the issue body cites PAN-1052), and confirm DrawerActiveAgent.tsx renders 'No recent stream output' despite the agent being live. Walk back the data flow until the broken link is identified: (1) does selectAgentOutput(activeAgent.id) return data? (2) is `agentOutputById[activeAgent.id]` populated in the store? (3) is the WS subscription to agent.output_received delivering events for that agent (see src/dashboard/server/ws-rpc.ts:524 and packages/contracts/src/event-reducers.ts:431)? (4) is the agent key the server uses ('agent-pan-1052' style) the same key the component looks up? Fix at the broken link only — no defensive shims downstream. Document the root cause in the PR body. Add a Playwright e2e test in src/dashboard/frontend/tests/ that stubs agentOutputById and asserts the stream-excerpt panel renders the seeded lines (not the empty-state fallback)."
+        },
+        "subItems": [
+          {
+            "id": "f3-stream-output-panel.ac1",
+            "title": "Repro confirmed: PR body documents the exact reproduction steps and shows the diagnosed root cause (which step in server-emit → WS-subscribe → store-reduce → selector-read was dropping the data, and why)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f3-stream-output-panel.ac2",
+            "title": "Fix is applied at the broken link itself, not as a defensive workaround downstream. PR body explicitly addresses the CLAUDE.md 'No Bandaids' rule and explains why the chosen fix is at the root cause.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f3-stream-output-panel.ac3",
+            "title": "After the fix, opening the drawer for an active agent that is producing output renders the agent's last N output lines in the stream-excerpt panel (data-testid='drawer-active-agent-stream') instead of the 'No recent stream output' empty-state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f3-stream-output-panel.ac4",
+            "title": "New Playwright e2e test in src/dashboard/frontend/tests/ uses an isolated browser instance, seeds useDashboardStore with at least one active agent and at least 8 lines in agentOutputById for that agent's id, opens the drawer, and asserts data-testid='drawer-active-agent-stream' contains the seeded lines (the last 8) and does NOT contain the 'No recent stream output' empty-state text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f3-stream-output-panel.ac5",
+            "title": "npm run typecheck, npm run lint, npm test all pass; the new Playwright spec passes against the local dashboard build",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-05-19-PAN-1221-pan-1148-follow-up-2-minor-review-nits-deferred-at-merge.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
