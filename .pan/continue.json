@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1052",
   "created": "2026-05-12T18:13:23.700Z",
-  "updated": "2026-05-16T23:09:00.000Z",
+  "updated": "2026-05-18T21:48:04.025Z",
   "gitState": {
     "branch": "feature/pan-1052",
     "sha": "ba1999366",
@@ -372,5 +372,12 @@
       "agentModel": "gpt-5.5"
     }
   ],
-  "feedback": []
+  "feedback": [],
+  "statusOverrides": {
+    "a5-checkpoint-table": "completed",
+    "a5-checkpoint-table.ac1": "completed",
+    "a5-checkpoint-table.ac2": "completed",
+    "a5-checkpoint-table.ac3": "completed",
+    "a5-checkpoint-table.ac4": "completed"
+  }
 }

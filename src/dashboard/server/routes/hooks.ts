@@ -172,7 +172,14 @@ export async function handleMemorySessionStartBody(
   return { status: 'accepted', sessionId };
 }
 
-export async function handleMemoryInjectBody(body: Record<string, unknown>) {
+export interface HandleMemoryInjectBodyOptions {
+  injectMemory?: typeof injectPromptTimeMemory;
+}
+
+export async function handleMemoryInjectBody(
+  body: Record<string, unknown>,
+  options: HandleMemoryInjectBodyOptions = {},
+) {
   const prompt = typeof body.prompt === 'string'
     ? body.prompt
     : typeof body.userPrompt === 'string'
@@ -194,7 +201,7 @@ export async function handleMemoryInjectBody(body: Record<string, unknown>) {
     return { error: 'memory identity could not be resolved', status: 202 } as const;
   }
 
-  return await injectPromptTimeMemory({ prompt, identity });
+  return await (options.injectMemory ?? injectPromptTimeMemory)({ prompt, identity });
 }
 
 const postMemoryInjectRoute = HttpRouter.add(

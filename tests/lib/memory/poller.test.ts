@@ -27,6 +27,30 @@ function entry(overrides: Partial<TranscriptEntry> = {}): TranscriptEntry {
 }
 
 describe('TranscriptPoller', () => {
+  it('starts one 2s interval and stops it idempotently', () => {
+    vi.useFakeTimers();
+    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+    try {
+      const poller = new TranscriptPoller();
+
+      poller.start();
+      poller.start();
+
+      expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+      expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 2_000);
+
+      poller.stop();
+      poller.stop();
+
+      expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it('does no syscalls or extraction work when the registry is empty', async () => {
     const statTranscript = vi.fn();
     const extract = vi.fn();
@@ -128,6 +152,32 @@ describe('TranscriptPoller', () => {
         lastObservationAt: null,
         lastMidTurnAt: '2026-05-16T23:00:30.000Z',
         midTurnCountInCurrentTurn: 1,
+        updatedAt: '2026-05-16T23:00:30.000Z',
+      }),
+      extractFromTranscriptDelta: extract,
+    });
+    poller.register(entry());
+
+    await expect(poller.tick()).resolves.toMatchObject({ rateLimited: 1, fired: 0 });
+    expect(extract).not.toHaveBeenCalled();
+  });
+
+  it('enforces the maximum mid-turn extraction count before firing extraction', async () => {
+    const extract = vi.fn();
+    const poller = new TranscriptPoller({
+      activityLineThreshold: 1,
+      statTranscript: async () => ({ size: 10, mtimeMs: 1 }),
+      readTranscriptSlice: async () => '{"type":"assistant"}\n',
+      getTranscriptCheckpoint: () => ({
+        sessionId: 'session-1',
+        projectId: 'panopticon-cli',
+        workspaceId: 'feature-pan-1052',
+        issueId: 'PAN-1052',
+        transcriptPath: '/tmp/session-1.jsonl',
+        lastOffset: 0,
+        lastObservationAt: null,
+        lastMidTurnAt: null,
+        midTurnCountInCurrentTurn: 3,
         updatedAt: '2026-05-16T23:00:30.000Z',
       }),
       extractFromTranscriptDelta: extract,

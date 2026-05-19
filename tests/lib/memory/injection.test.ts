@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { MemoryIdentity, MemoryStatus } from '@panctl/contracts';
 import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
 import { ensureParentDir, resolveRagRunsFile, resolveStatusFile } from '../../../src/lib/memory/paths.js';
+import { handleMemoryInjectBody } from '../../../src/dashboard/server/routes/hooks.js';
 import { injectPromptTimeMemory, PROMPT_TIME_MEMORY_BUDGETS } from '../../../src/lib/memory/injection.js';
 
 let tempDir: string | null = null;
@@ -105,6 +106,27 @@ async function readRagEntries() {
 }
 
 describe('prompt-time memory injection', () => {
+  it('accepts hook receiver input and returns promptly without blocking the agent', async () => {
+    const started = performance.now();
+    const calls: Array<{ prompt: string; identity: MemoryIdentity }> = [];
+    const result = await handleMemoryInjectBody({
+      prompt: 'Need memory context for receiver test',
+      sessionId: 'session-1',
+      identity,
+    }, {
+      injectMemory: async (input) => {
+        calls.push(input);
+        return { status: 'injected', reason: null, context: '<panopticon-memory-context>ok</panopticon-memory-context>', decision: {} as never };
+      },
+    });
+    const elapsed = performance.now() - started;
+
+    expect('error' in result).toBe(false);
+    expect(elapsed).toBeLessThan(1000);
+    expect(result.context).toContain('<panopticon-memory-context>');
+    expect(calls).toEqual([{ prompt: 'Need memory context for receiver test', identity }]);
+  });
+
   it('returns injectable context within budgets and logs the RAG decision', async () => {
     await writeStatus();
     await insertRow({ content: 'prompt injection memory retrieval summary observation hit', doc_type: 'observation' });
