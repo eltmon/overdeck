@@ -393,7 +393,7 @@ export function PipelineView() {
           >
             <PhaseHeader phase={phase} count={groupedIssues[phase].length} />
             {groupedIssues[phase].map((issue) => {
-              const agent = agentByIssueId.get(issue.identifier);
+              const agent = agentByIssueId.get(issue.identifier.toLowerCase());
               return (
                 <IssueRow
                   key={issue.identifier}

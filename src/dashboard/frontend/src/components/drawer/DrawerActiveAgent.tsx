@@ -72,13 +72,23 @@ export default function DrawerActiveAgent() {
     if (!text || sending) return;
 
     setSending(true);
-    const response = await fetch(`/api/agents/${activeAgent.id}/tell`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text }),
-    });
-    setSending(false);
-    if (response.ok) setMessage('');
+    try {
+      const response = await fetch(`/api/agents/${activeAgent.id}/tell`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+      if (response.ok) {
+        setMessage('');
+      } else {
+        const body = await response.text();
+        console.error('Tell failed:', body);
+      }
+    } catch (error) {
+      console.error('Tell failed:', error);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (

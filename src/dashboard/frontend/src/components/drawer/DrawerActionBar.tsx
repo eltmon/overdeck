@@ -89,7 +89,17 @@ export default function DrawerActionBar() {
     if (confirmed) mergeMutation.mutate();
   };
 
-  const prUrl = reviewStatus?.prUrl ?? issue?.url;
+  function isSafeUrl(url: string | undefined): url is string {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  const prUrl = isSafeUrl(reviewStatus?.prUrl) ? reviewStatus.prUrl : isSafeUrl(issue?.url) ? issue.url : undefined;
   const canMerge = reviewStatus?.readyForMerge === true && reviewStatus.mergeStatus !== 'merged';
 
   return (

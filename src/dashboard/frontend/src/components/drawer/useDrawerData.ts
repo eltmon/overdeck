@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Stream } from 'effect';
 
 import { WS_METHODS, type DomainEvent, type ReviewStatusSnapshot } from '@panctl/contracts';
@@ -351,8 +351,9 @@ function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot |
   const reviewedCurrent = !reviewedDone && reviewStatus?.reviewStatus === 'reviewing';
   const implementedDone = reviewedDone || reviewedCurrent || reviewStatus?.verificationStatus === 'passed' || reviewStatus?.testStatus === 'passed';
   const implementedCurrent = !implementedDone && (reviewStatus?.verificationStatus === 'running' || reviewStatus?.testStatus === 'testing' || issue?.state === 'in_progress' || issue?.status?.toLowerCase() === 'in progress');
-  const plannedDone = implementedDone || implementedCurrent || Boolean(issue?.planningComplete || issue?.hasPlan);
-  const currentIndex = merged ? -1 : shippingCurrent ? 4 : reviewedCurrent ? 3 : implementedCurrent || plannedDone ? 2 : 1;
+  const plannedDone = implementedDone || implementedCurrent || Boolean(issue?.planningComplete);
+  const plannedCurrent = !plannedDone && Boolean(issue?.hasPlan);
+  const currentIndex = merged ? -1 : shippingCurrent ? 4 : reviewedCurrent ? 3 : implementedCurrent ? 2 : plannedCurrent ? 1 : 0;
   const done = [Boolean(issue), plannedDone, implementedDone, reviewedDone, merged, merged];
 
   const steps = [
@@ -377,11 +378,6 @@ export function useDrawerData(): DrawerData {
   const detailedActivity = useDashboardStore((state) => state.detailedActivity) as ActivityEntry[];
   const reviewStatus = useDashboardStore(selectReviewStatus(drawerIssueId ?? ''));
 
-  useEffect(() => {
-    if (!drawerIssueId) return;
-    return acquireDrawerIssueSubscription(drawerIssueId, () => {});
-  }, [drawerIssueId]);
-
   return useMemo(() => {
     if (!drawerIssueId) {
       return { issue: null, agents: [], reviewStatus: undefined, beads: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [] };
@@ -396,20 +392,18 @@ export function useDrawerData(): DrawerData {
     }
 
     const activityRail = Array.from(byId.entries())
-      .map(([id, entry]) => ({
-        id,
-        phase: phaseForActivity(entry),
-        message: entry.message ?? 'Activity update',
-        when: entry.timestamp ?? '',
-      }))
-      .sort((a, b) => {
-        const aTime = a.when ? new Date(a.when).getTime() : 0;
-        const bTime = b.when ? new Date(b.when).getTime() : 0;
-        if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
-        if (Number.isNaN(aTime)) return 1;
-        if (Number.isNaN(bTime)) return -1;
-        return bTime - aTime;
+      .map(([id, entry]) => {
+        const when = entry.timestamp ?? '';
+        const time = when ? new Date(when).getTime() : 0;
+        return {
+          id,
+          phase: phaseForActivity(entry),
+          message: entry.message ?? 'Activity update',
+          when,
+          time: Number.isNaN(time) ? 0 : time,
+        };
       })
+      .sort((a, b) => b.time - a.time)
       .slice(0, 100);
 
     return {
