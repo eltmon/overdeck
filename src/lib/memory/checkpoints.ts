@@ -212,7 +212,7 @@ export function commitTranscriptRange(input: CommitTranscriptRangeInput): Commit
   return { status: 'committed', checkpoint: rowToCheckpoint(row) };
 }
 
-export function releaseTranscriptRange(sessionId: string, _expectedFromOffset: number, _toOffset: number): void {
+export function releaseTranscriptRange(sessionId: string, expectedFromOffset: number, toOffset: number): void {
   const db = getDatabase();
   db.prepare(`
     UPDATE transcript_checkpoints
@@ -222,7 +222,9 @@ export function releaseTranscriptRange(sessionId: string, _expectedFromOffset: n
         claim_expires_at = NULL
     WHERE session_id = ?
       AND claim_owner IS NOT NULL
-  `).run(sessionId);
+      AND claim_from = ?
+      AND claim_to = ?
+  `).run(sessionId, expectedFromOffset, toOffset);
 }
 
 export function listTranscriptCheckpoints(limit = 100): TranscriptCheckpoint[] {

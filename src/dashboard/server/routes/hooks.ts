@@ -248,11 +248,13 @@ const postMemoryInjectRoute = HttpRouter.add(
     }
 
     const readModel = yield* ReadModelService;
-    const result = yield* Effect.promise(() => handleMemoryInjectBody(body, {
+    // Fire-and-forget: prompt-time injection can exceed the 1 s client hook
+    // timeout (query expansion + FTS search). Return 202 immediately so the
+    // hook client doesn't abort and waste the in-flight LLM call.
+    void Effect.runPromise(Effect.promise(() => handleMemoryInjectBody(body, {
       resolveAgentIdBySessionId: async (sessionId) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId)),
-    }));
-    if ('error' in result) return jsonResponse({ ok: false, error: result.error }, { status: result.status });
-    return jsonResponse({ ok: true, ...result });
+    })));
+    return jsonResponse({ ok: true }, { status: 202 });
   })),
 );
 
