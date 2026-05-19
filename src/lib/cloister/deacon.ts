@@ -149,6 +149,7 @@ import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunning
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, isPaneDeadAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
+import { withConcurrencyLimit } from '../concurrency.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 
 // ============================================================================
@@ -3753,6 +3754,15 @@ function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>)
 const autoCloseOutCache = new Map<string, { state: string | null; timestamp: number }>();
 const AUTO_CLOSE_OUT_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
+function sweepAutoCloseOutCache(): void {
+  const now = Date.now();
+  for (const [issueId, entry] of autoCloseOutCache.entries()) {
+    if (now - entry.timestamp > AUTO_CLOSE_OUT_CACHE_TTL_MS) {
+      autoCloseOutCache.delete(issueId);
+    }
+  }
+}
+
 async function getAutoCloseOutCanonicalState(issueId: string): Promise<string | null> {
   const cached = autoCloseOutCache.get(issueId);
   if (cached && Date.now() - cached.timestamp < AUTO_CLOSE_OUT_CACHE_TTL_MS) {
@@ -3795,11 +3805,15 @@ export async function autoCloseOut(now = new Date()): Promise<string[]> {
   const closeOutConfig = (await loadCloisterConfigAsync()).close_out;
   if (closeOutConfig?.auto !== true) return [];
 
+  // Evict stale cache entries before each patrol cycle
+  sweepAutoCloseOutCache();
+
   const delayMinutes = Math.max(0, closeOutConfig.auto_delay_minutes ?? 60);
   const cutoff = now.getTime() - delayMinutes * 60 * 1000;
   const actions: string[] = [];
   const statuses = loadReviewStatuses();
 
+  const candidates: Array<{ issueId: string }> = [];
   for (const [key, status] of Object.entries(statuses)) {
     const issueId = (status.issueId || key).toUpperCase();
     if (status.mergeStatus !== 'merged') continue;
@@ -3808,23 +3822,25 @@ export async function autoCloseOut(now = new Date()): Promise<string[]> {
     const updatedAt = Date.parse(status.updatedAt || '');
     if (!Number.isFinite(updatedAt) || updatedAt > cutoff) continue;
 
+    candidates.push({ issueId });
+  }
+
+  const tasks = candidates.map(({ issueId }) => async () => {
     let canonicalState: string | null;
     try {
       canonicalState = await getAutoCloseOutCanonicalState(issueId);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       recordAutoCloseOutFailure(issueId, message);
-      actions.push(`Auto close-out failed for ${issueId}: ${message}`);
-      continue;
+      return `Auto close-out failed for ${issueId}: ${message}`;
     }
-    if (canonicalState !== 'verifying_on_main') continue;
+    if (canonicalState !== 'verifying_on_main') return null;
 
     const resolvedProject = resolveProjectFromIssue(issueId);
     if (!resolvedProject) {
       const message = 'no project configured';
       recordAutoCloseOutFailure(issueId, message);
-      actions.push(`Auto close-out failed for ${issueId}: ${message}`);
-      continue;
+      return `Auto close-out failed for ${issueId}: ${message}`;
     }
 
     const ghResolved = resolveGitHubIssue(issueId);
@@ -3847,12 +3863,17 @@ export async function autoCloseOut(now = new Date()): Promise<string[]> {
       const message = `Auto close-out completed for ${issueId}`;
       console.log(`[deacon] ${message}`);
       emitActivityEntry({ source: 'cloister', level: 'info', issueId, message });
-      actions.push(message);
+      return message;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       recordAutoCloseOutFailure(issueId, message);
-      actions.push(`Auto close-out failed for ${issueId}: ${message}`);
+      return `Auto close-out failed for ${issueId}: ${message}`;
     }
+  });
+
+  const results = await withConcurrencyLimit(tasks, 5);
+  for (const result of results) {
+    if (result !== null) actions.push(result);
   }
 
   return actions;
