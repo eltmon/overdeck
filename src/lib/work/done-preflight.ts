@@ -57,22 +57,26 @@ async function listBeadsByStatus(
     return JSON.stringify(preloadedBeads.filter((bead) => bead.status === status));
   }
 
-  const jsonlBeads = await readIssueBeadsFromJsonl(workspacePath, issueId);
-  if (jsonlBeads !== null) {
-    return JSON.stringify(jsonlBeads.filter((bead) => bead.status === status));
+  try {
+    const { stdout } = await execFileAsync(
+      'bd',
+      ['list', '--status', status, '-l', issueId.toLowerCase(), '--limit', '0', '--json'],
+      {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+        timeout: BD_LIST_TIMEOUT_MS,
+        killSignal: 'SIGKILL',
+      },
+    );
+    return stdout;
+  } catch (error) {
+    if (!isMissingCommand(error) && !isTimeout(error)) throw error;
+    const jsonlBeads = await readIssueBeadsFromJsonl(workspacePath, issueId);
+    if (jsonlBeads !== null) {
+      return JSON.stringify(jsonlBeads.filter((bead) => bead.status === status));
+    }
+    throw error;
   }
-
-  const { stdout } = await execFileAsync(
-    'bd',
-    ['list', '--status', status, '-l', issueId.toLowerCase(), '--limit', '0', '--json'],
-    {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-      timeout: BD_LIST_TIMEOUT_MS,
-      killSignal: 'SIGKILL',
-    },
-  );
-  return stdout;
 }
 
 /**
@@ -210,10 +214,8 @@ export function checkVBriefACStatus(workspacePath: string): string[] {
 export async function runPreflightChecks(workspacePath: string, issueId: string): Promise<string[]> {
   const failures: string[] = [];
 
-  const issueBeads = await readIssueBeadsFromJsonl(workspacePath, issueId);
-
   // Check 1: Open beads
-  const beadFailures = await checkOpenBeads(workspacePath, issueId, issueBeads);
+  const beadFailures = await checkOpenBeads(workspacePath, issueId);
   failures.push(...beadFailures);
 
   // Check 2: Uncommitted changes
@@ -222,7 +224,7 @@ export async function runPreflightChecks(workspacePath: string, issueId: string)
 
   // Sync closed beads to vBRIEF before AC check
   try {
-    const stdout = await listBeadsByStatus(workspacePath, issueId, 'closed', issueBeads);
+    const stdout = await listBeadsByStatus(workspacePath, issueId, 'closed');
     const closedBeads = JSON.parse(stdout || '[]');
     let synced = 0;
     for (const bead of closedBeads) {
