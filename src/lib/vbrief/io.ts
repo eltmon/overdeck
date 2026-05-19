@@ -207,6 +207,8 @@ export async function findWorkspaceDraftPlanAsync(workspacePath: string): Promis
 export function findPlan(workspacePath: string): string | null {
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return null;
+  const workspaceEntry = findSpecByIssue(workspacePath, issueId);
+  if (workspaceEntry) return workspaceEntry.path;
   const projectRoot = projectRootFromWorkspace(workspacePath);
   const entry = findSpecByIssueSync(projectRoot, issueId);
   return entry ? entry.path : findWorkspaceDraftPlan(workspacePath);
@@ -216,6 +218,8 @@ export function findPlan(workspacePath: string): string | null {
 export async function findPlanAsync(workspacePath: string): Promise<string | null> {
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return null;
+  const workspaceEntry = await findSpecByIssueAsync(workspacePath, issueId);
+  if (workspaceEntry) return workspaceEntry.path;
   const projectRoot = projectRootFromWorkspace(workspacePath);
   const entry = await findSpecByIssueAsyncLocal(projectRoot, issueId);
   return entry ? entry.path : findWorkspaceDraftPlanAsync(workspacePath);

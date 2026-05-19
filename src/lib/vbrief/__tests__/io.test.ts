@@ -43,6 +43,14 @@ function writePlanDoc(doc: VBriefDocument): string {
   return writeMainSpec(doc);
 }
 
+function writeWorkspaceSpec(doc: VBriefDocument): string {
+  const specsDir = join(WORKSPACE_PATH, '.pan', 'specs');
+  mkdirSync(specsDir, { recursive: true });
+  const specPath = join(specsDir, SPEC_FILENAME);
+  writeFileSync(specPath, JSON.stringify({ ...doc, status: 'active' }, null, 2));
+  return specPath;
+}
+
 function writeWorkspaceDraft(doc: VBriefDocument): string {
   const panDir = join(WORKSPACE_PATH, '.pan');
   mkdirSync(panDir, { recursive: true });
@@ -78,6 +86,14 @@ describe('findPlan', () => {
     expect(result).toContain('.pan/specs/');
     expect(result).toContain(SPEC_FILENAME);
     expect(existsSync(result!)).toBe(true);
+  });
+
+  it('prefers the workspace worktree spec over the parent project spec', () => {
+    writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    const workspaceSpec = writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+
+    expect(findPlan(WORKSPACE_PATH)).toBe(workspaceSpec);
+    expect(readWorkspacePlan(WORKSPACE_PATH)?.plan.items[0].id).toBe('workspace-item');
   });
 
   it('falls back to the matching workspace draft before the canonical spec exists', () => {
