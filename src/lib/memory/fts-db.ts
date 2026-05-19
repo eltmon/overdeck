@@ -105,12 +105,13 @@ function configureDatabase(db: Database.Database): void {
 }
 
 function initializeMemoryFtsSchema(db: Database.Database): void {
+  migrateMemoryFtsBranchColumn(db);
   db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
       content,
       display_content UNINDEXED,
       source,
-      branch,
+      branch UNINDEXED,
       entry_date,
       entry_time,
       entry_type,
@@ -154,6 +155,40 @@ function initializeMemoryFtsSchema(db: Database.Database): void {
   `);
 }
 
+function migrateMemoryFtsBranchColumn(db: Database.Database): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'memory_fts'").get() as { sql?: string } | undefined;
+  if (!row?.sql || row.sql.includes('branch UNINDEXED')) return;
+
+  db.exec(`
+    CREATE VIRTUAL TABLE memory_fts_rebuild USING fts5(
+      content,
+      display_content UNINDEXED,
+      source,
+      branch UNINDEXED,
+      entry_date,
+      entry_time,
+      entry_type,
+      files,
+      tags UNINDEXED,
+      doc_type UNINDEXED,
+      scope UNINDEXED,
+      project_id,
+      workspace_id,
+      issue_id,
+      run_id,
+      session_id,
+      agent_role,
+      agent_harness,
+      tokenize = 'porter unicode61'
+    );
+    INSERT INTO memory_fts_rebuild(rowid, content, display_content, source, branch, entry_date, entry_time, entry_type, files, tags, doc_type, scope, project_id, workspace_id, issue_id, run_id, session_id, agent_role, agent_harness)
+    SELECT rowid, content, display_content, source, branch, entry_date, entry_time, entry_type, files, tags, doc_type, scope, project_id, workspace_id, issue_id, run_id, session_id, agent_role, agent_harness
+    FROM memory_fts;
+    DROP TABLE memory_fts;
+    ALTER TABLE memory_fts_rebuild RENAME TO memory_fts;
+  `);
+}
+
 function postWorkerRequest<T>(payload: { projectId: string; statements: MemoryFtsStatement[]; transaction: boolean }): Promise<T> {
   const requestId = nextRequestId++;
   const activeWorker = getMemoryFtsWorker();
@@ -166,6 +201,7 @@ function postWorkerRequest<T>(payload: { projectId: string; statements: MemoryFt
 function getMemoryFtsWorker(): Worker {
   if (worker) return worker;
   worker = new Worker(memoryFtsWorkerSource(), { eval: true });
+  const activeWorker = worker;
   worker.on('message', (message: { id: number; ok: boolean; result?: unknown; error?: string }) => {
     const request = pendingWorkerRequests.get(message.id);
     if (!request) return;
@@ -174,15 +210,17 @@ function getMemoryFtsWorker(): Worker {
     else request.reject(new Error(message.error ?? 'Memory FTS worker failed'));
   });
   worker.on('error', (error) => {
+    if (worker !== activeWorker) return;
     for (const request of pendingWorkerRequests.values()) request.reject(error);
     pendingWorkerRequests.clear();
     worker = null;
   });
   worker.on('exit', (code) => {
+    if (worker !== activeWorker) return;
+    worker = null;
     if (code === 0) return;
     for (const request of pendingWorkerRequests.values()) request.reject(new Error(`Memory FTS worker exited with code ${code}`));
     pendingWorkerRequests.clear();
-    worker = null;
   });
   return worker;
 }
@@ -254,12 +292,13 @@ function assertSafeSegment(value) {
 }
 
 function initializeMemoryFtsSchema(db) {
+  migrateMemoryFtsBranchColumn(db);
   db.exec(\`
     CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
       content,
       display_content UNINDEXED,
       source,
-      branch,
+      branch UNINDEXED,
       entry_date,
       entry_time,
       entry_type,
@@ -300,6 +339,40 @@ function initializeMemoryFtsSchema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_observation_index_path_offset
       ON observation_index(observation_path_jsonl, byte_offset);
+  \`);
+}
+
+function migrateMemoryFtsBranchColumn(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'memory_fts'").get();
+  if (!row || !row.sql || row.sql.includes('branch UNINDEXED')) return;
+
+  db.exec(\`
+    CREATE VIRTUAL TABLE memory_fts_rebuild USING fts5(
+      content,
+      display_content UNINDEXED,
+      source,
+      branch UNINDEXED,
+      entry_date,
+      entry_time,
+      entry_type,
+      files,
+      tags UNINDEXED,
+      doc_type UNINDEXED,
+      scope UNINDEXED,
+      project_id,
+      workspace_id,
+      issue_id,
+      run_id,
+      session_id,
+      agent_role,
+      agent_harness,
+      tokenize = 'porter unicode61'
+    );
+    INSERT INTO memory_fts_rebuild(rowid, content, display_content, source, branch, entry_date, entry_time, entry_type, files, tags, doc_type, scope, project_id, workspace_id, issue_id, run_id, session_id, agent_role, agent_harness)
+    SELECT rowid, content, display_content, source, branch, entry_date, entry_time, entry_type, files, tags, doc_type, scope, project_id, workspace_id, issue_id, run_id, session_id, agent_role, agent_harness
+    FROM memory_fts;
+    DROP TABLE memory_fts;
+    ALTER TABLE memory_fts_rebuild RENAME TO memory_fts;
   \`);
 }
 `;

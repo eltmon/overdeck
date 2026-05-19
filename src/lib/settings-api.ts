@@ -154,6 +154,7 @@ export interface ApiSettingsConfig {
     per_day_cost_cap_usd?: number;
     fallback_provider?: 'anthropic' | 'cliproxy' | '';
     fallback_model?: string;
+    fallback_chain?: Array<{ provider: 'anthropic' | 'cliproxy'; model: string }>;
     observations_enabled?: boolean;
     prompt_time_injection_enabled?: boolean;
     rollup_pending_threshold?: number;
@@ -526,6 +527,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
       per_day_cost_cap_usd: memory.extraction.perDayCostCapUsd,
       fallback_provider: memory.extraction.fallbackChain[0]?.provider ?? '',
       fallback_model: memory.extraction.fallbackChain[0]?.model,
+      fallback_chain: memory.extraction.fallbackChain,
       observations_enabled: memory.observationsEnabled,
       prompt_time_injection_enabled: memory.promptTimeInjectionEnabled,
       rollup_pending_threshold: memory.rollupPendingThreshold,
@@ -668,9 +670,9 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
             provider: settings.memory.provider || undefined,
             model: settings.memory.model || undefined,
             per_day_cost_cap_usd: settings.memory.per_day_cost_cap_usd,
-            fallback_chain: settings.memory.fallback_provider && settings.memory.fallback_model
+            fallback_chain: settings.memory.fallback_chain ?? (settings.memory.fallback_provider && settings.memory.fallback_model
               ? [{ provider: settings.memory.fallback_provider, model: settings.memory.fallback_model }]
-              : undefined,
+              : undefined),
           },
           features: {
             observations: settings.memory.observations_enabled,

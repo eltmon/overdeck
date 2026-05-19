@@ -43,8 +43,6 @@ export type CommitTranscriptRangeResult =
   | { status: 'committed'; checkpoint: TranscriptCheckpoint }
   | { status: 'empty'; reason: 'invalid-range' | 'offset-mismatch' };
 
-const reservedRanges = new Map<string, string>();
-
 interface TranscriptCheckpointRow {
   session_id: string;
   project_id: string;
@@ -96,9 +94,6 @@ export function claimTranscriptRange(input: ClaimTranscriptRangeInput): ClaimTra
       AND last_offset = @expectedFromOffset
   `);
 
-  const reservationKey = rangeKey(input.sessionId, input.expectedFromOffset);
-  if (reservedRanges.has(reservationKey)) return { status: 'empty', reason: 'offset-mismatch' };
-
   const runClaim = db.transaction(() => {
     insertInitialCheckpoint.run(bind(input, now));
     return claim.get(bind(input, now)) as TranscriptCheckpointRow | undefined;
@@ -106,7 +101,6 @@ export function claimTranscriptRange(input: ClaimTranscriptRangeInput): ClaimTra
 
   const row = runClaim();
   if (!row) return { status: 'empty', reason: 'offset-mismatch' };
-  reservedRanges.set(reservationKey, rangeValue(input.toOffset));
 
   return {
     status: 'claimed',
@@ -127,9 +121,6 @@ export function commitTranscriptRange(input: CommitTranscriptRangeInput): Commit
   ) {
     return { status: 'empty', reason: 'invalid-range' };
   }
-
-  const reservationKey = rangeKey(input.sessionId, input.expectedFromOffset);
-  if (reservedRanges.get(reservationKey) !== rangeValue(input.toOffset)) return { status: 'empty', reason: 'offset-mismatch' };
 
   const db = getDatabase();
   const now = (input.now ?? new Date()).toISOString();
@@ -168,18 +159,13 @@ export function commitTranscriptRange(input: CommitTranscriptRangeInput): Commit
       updated_at
   `);
 
-  try {
-    const row = commit.get({ ...bind(input, now), consumedOffset: input.consumedOffset }) as TranscriptCheckpointRow | undefined;
-    if (!row) return { status: 'empty', reason: 'offset-mismatch' };
-    return { status: 'committed', checkpoint: rowToCheckpoint(row) };
-  } finally {
-    reservedRanges.delete(reservationKey);
-  }
+  const row = commit.get({ ...bind(input, now), consumedOffset: input.consumedOffset }) as TranscriptCheckpointRow | undefined;
+  if (!row) return { status: 'empty', reason: 'offset-mismatch' };
+  return { status: 'committed', checkpoint: rowToCheckpoint(row) };
 }
 
-export function releaseTranscriptRange(sessionId: string, expectedFromOffset: number, toOffset: number): void {
-  const reservationKey = rangeKey(sessionId, expectedFromOffset);
-  if (reservedRanges.get(reservationKey) === rangeValue(toOffset)) reservedRanges.delete(reservationKey);
+export function releaseTranscriptRange(_sessionId: string, _expectedFromOffset: number, _toOffset: number): void {
+  return undefined;
 }
 
 export function listTranscriptCheckpoints(limit = 100): TranscriptCheckpoint[] {
@@ -237,14 +223,6 @@ function bind(input: ClaimTranscriptRangeInput, now: string) {
     trigger: input.trigger ?? 'manual',
     now,
   };
-}
-
-function rangeKey(sessionId: string, fromOffset: number): string {
-  return `${sessionId}:${fromOffset}`;
-}
-
-function rangeValue(toOffset: number): string {
-  return String(toOffset);
 }
 
 function rowToCheckpoint(row: TranscriptCheckpointRow): TranscriptCheckpoint {

@@ -1,12 +1,13 @@
 import { randomUUID } from 'crypto';
-import { open, readFile, rename, writeFile } from 'fs/promises';
+import { open, readFile, rename, stat, writeFile } from 'fs/promises';
 import { dirname } from 'path';
 import type { MemoryObservation } from '@panctl/contracts';
 import { ensureParentDir, resolveObservationsFile } from './paths.js';
-import { runMemoryFtsTransaction } from './fts-db.js';
+import { runMemoryFtsStatement, runMemoryFtsTransaction } from './fts-db.js';
 import { updateMemoryHealth } from './health.js';
 
 const appendLocks = new Map<string, Promise<void>>();
+const LEGACY_OBSERVATION_REPAIR_MAX_BYTES = 1_000_000;
 
 export interface WriteObservationResult {
   jsonlPath: string;
@@ -24,7 +25,7 @@ export async function writeObservation(observation: MemoryObservation, options: 
 
   await ensureParentDir(jsonlPath);
   await withAppendLock(jsonlPath, async () => {
-    const existingOffset = await findObservationByteOffset(jsonlPath, observation.id);
+    const existingOffset = await findObservationByteOffset(observation.projectId, jsonlPath, observation.id);
     const byteOffset = existingOffset ?? await appendJsonl(jsonlPath, observation);
     try {
       await (options.indexObservation ?? indexObservation)(observation, jsonlPath, byteOffset);
@@ -53,7 +54,16 @@ export function renderObservationMarkdownLine(observation: MemoryObservation): s
   return `- <!-- obs:${observation.id} --> **${time}** ${inline(status)}${files}${tags}`;
 }
 
-async function findObservationByteOffset(jsonlPath: string, observationId: string): Promise<number | null> {
+async function findObservationByteOffset(projectId: string, jsonlPath: string, observationId: string): Promise<number | null> {
+  const indexed = await findIndexedObservationByteOffset(projectId, observationId);
+  if (indexed !== null) return indexed;
+
+  const stats = await stat(jsonlPath).catch((error: unknown) => {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (!stats || stats.size > LEGACY_OBSERVATION_REPAIR_MAX_BYTES) return null;
+
   const raw = await readOptional(jsonlPath);
   let byteOffset = 0;
   for (const line of raw.split('\n')) {
@@ -65,11 +75,20 @@ async function findObservationByteOffset(jsonlPath: string, observationId: strin
       const parsed = JSON.parse(line) as { id?: unknown };
       if (parsed.id === observationId) return byteOffset;
     } catch {
-      // Malformed historical lines must not block retry idempotency.
+      // Malformed historical lines must not block bounded repair.
     }
     byteOffset += Buffer.byteLength(`${line}\n`);
   }
   return null;
+}
+
+async function findIndexedObservationByteOffset(projectId: string, observationId: string): Promise<number | null> {
+  const row = await runMemoryFtsStatement<{ byte_offset: number } | undefined>(projectId, {
+    method: 'get',
+    sql: 'SELECT byte_offset FROM observation_index WHERE id = ?',
+    params: [observationId],
+  });
+  return typeof row?.byte_offset === 'number' ? row.byte_offset : null;
 }
 
 async function appendJsonl(jsonlPath: string, observation: MemoryObservation): Promise<number> {

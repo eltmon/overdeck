@@ -86,6 +86,7 @@ export interface MemorySettingsConfig {
   per_day_cost_cap_usd?: number;
   fallback_provider?: 'anthropic' | 'cliproxy' | '';
   fallback_model?: string;
+  fallback_chain?: Array<{ provider: 'anthropic' | 'cliproxy'; model: string }>;
   observations_enabled?: boolean;
   prompt_time_injection_enabled?: boolean;
   rollup_pending_threshold?: number;

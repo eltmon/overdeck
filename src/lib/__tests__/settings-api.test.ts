@@ -273,7 +273,10 @@ describe('loadSettingsApi', () => {
           provider: 'cliproxy',
           model: 'gpt-4.1-nano',
           perDayCostCapUsd: 0,
-          fallbackChain: [{ provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }],
+          fallbackChain: [
+            { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
+            { provider: 'cliproxy', model: 'gpt-4.1-nano-fallback' },
+          ],
         },
         observationsEnabled: false,
         promptTimeInjectionEnabled: false,
@@ -291,6 +294,10 @@ describe('loadSettingsApi', () => {
       per_day_cost_cap_usd: 0,
       fallback_provider: 'anthropic',
       fallback_model: 'claude-haiku-4-5-20251001',
+      fallback_chain: [
+        { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
+        { provider: 'cliproxy', model: 'gpt-4.1-nano-fallback' },
+      ],
       observations_enabled: false,
       prompt_time_injection_enabled: false,
       rollup_pending_threshold: 6,
@@ -323,6 +330,10 @@ describe('saveSettingsApi', () => {
         per_day_cost_cap_usd: 0,
         fallback_provider: 'anthropic',
         fallback_model: 'claude-haiku-4-5-20251001',
+        fallback_chain: [
+          { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
+          { provider: 'cliproxy', model: 'gpt-4.1-nano-fallback' },
+        ],
         observations_enabled: false,
         prompt_time_injection_enabled: false,
         rollup_pending_threshold: 6,
@@ -339,6 +350,9 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('memory:');
     expect(written).toContain('provider: cliproxy');
     expect(written).toContain('per_day_cost_cap_usd: 0');
+    expect(written).toContain('fallback_chain:');
+    expect(written).toContain('model: claude-haiku-4-5-20251001');
+    expect(written).toContain('model: gpt-4.1-nano-fallback');
     expect(written).toContain('observations: false');
     expect(written).not.toContain('overrides:');
     expect(mockClearConfigCache).toHaveBeenCalledOnce();

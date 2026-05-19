@@ -137,6 +137,31 @@ export function insertCostEvents(
 /**
  * Get all cost events, optionally filtered.
  */
+export function queryMemoryExtractionCostUsd(opts: {
+  issueId: string;
+  startTs: string;
+  endTs?: string;
+}): number {
+  const db = getDatabase();
+  const conditions = [
+    'UPPER(issue_id) = UPPER(?)',
+    "source_file = 'memory-extraction'",
+    'ts >= ?',
+  ];
+  const params: string[] = [opts.issueId, opts.startTs];
+  if (opts.endTs) {
+    conditions.push('ts <= ?');
+    params.push(opts.endTs);
+  }
+
+  const row = db.prepare(`
+    SELECT COALESCE(SUM(cost), 0) AS total
+    FROM cost_events
+    WHERE ${conditions.join(' AND ')}
+  `).get(...params) as { total: number } | undefined;
+  return row?.total ?? 0;
+}
+
 export function queryCostEvents(opts: {
   issueId?: string;
   agentId?: string;

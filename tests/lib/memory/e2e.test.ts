@@ -151,7 +151,6 @@ describe('PAN-1052 memory extraction end-to-end flow', () => {
         trigger: 'stop-hook',
         gitBranch: 'feature/pan-1052',
         now: new Date('2026-05-16T23:07:00.000Z'),
-        id: 'obs-7-hook',
         extract: async () => extractedTurn(7),
         emitObservationCreated: async () => undefined,
         updateHealth: async () => undefined,
@@ -166,7 +165,6 @@ describe('PAN-1052 memory extraction end-to-end flow', () => {
         trigger: 'poller',
         gitBranch: 'feature/pan-1052',
         now: new Date('2026-05-16T23:07:00.000Z'),
-        id: 'obs-7-poller',
         extract: async () => extractedTurn(7),
         emitObservationCreated: async () => undefined,
         updateHealth: async () => undefined,
@@ -175,7 +173,7 @@ describe('PAN-1052 memory extraction end-to-end flow', () => {
     ]);
 
     const statuses = [hookResult.status, pollerResult.status].sort();
-    expect(statuses).toEqual(['noop', 'written']);
+    expect(statuses).toEqual(['written', 'written']);
     expect(await readPersistedObservations()).toHaveLength(7);
   });
 });

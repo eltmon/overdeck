@@ -126,10 +126,11 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
     }
     if (compressed.result.eventsConsumed === 0 || compressed.result.text.trim().length === 0) {
       const committed = await safeCommit(input, claimed.result, compressed.result.lastFullLineOffset);
-      if (committed.status === 'failed') {
+      if (committed.status === 'failed' || (committed.status === 'empty' && committed.result.reason !== 'offset-mismatch')) {
         await recordHealth({ status: 'failing', reason: 'checkpoint-commit-failed', success: false });
         return { status: 'failed', observation: null, reason: 'checkpoint-commit-failed' };
       }
+      if (committed.status === 'empty') return { status: 'noop', observation: null, reason: committed.result.reason };
       checkpointCommitted = true;
       return { status: 'noop', observation: null, reason: 'empty-delta' };
     }
@@ -149,10 +150,11 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
 
     if (extracted.status === 'skipped') {
       const committed = await safeCommit(input, claimed.result, compressed.result.lastFullLineOffset);
-      if (committed.status === 'failed') {
+      if (committed.status === 'failed' || (committed.status === 'empty' && committed.result.reason !== 'offset-mismatch')) {
         await recordHealth({ status: 'failing', reason: 'checkpoint-commit-failed', success: false });
         return { status: 'failed', observation: null, reason: 'checkpoint-commit-failed' };
       }
+      if (committed.status === 'empty') return { status: 'noop', observation: null, reason: committed.result.reason };
       checkpointCommitted = true;
       await recordHealth({ status: 'degraded', reason: extracted.reason, success: false });
       return { status: 'skipped', observation: null, reason: extracted.reason };
@@ -160,10 +162,11 @@ export async function extractFromTranscriptDelta(input: ExtractFromTranscriptDel
 
     if (extracted.status === 'dropped') {
       const committed = await safeCommit(input, claimed.result, compressed.result.lastFullLineOffset);
-      if (committed.status === 'failed') {
+      if (committed.status === 'failed' || (committed.status === 'empty' && committed.result.reason !== 'offset-mismatch')) {
         await recordHealth({ status: 'failing', reason: 'checkpoint-commit-failed', success: false });
         return { status: 'failed', observation: null, reason: 'checkpoint-commit-failed' };
       }
+      if (committed.status === 'empty') return { status: 'noop', observation: null, reason: committed.result.reason };
       checkpointCommitted = true;
       await recordHealth({ status: 'failing', reason: extracted.reason, success: false });
       return { status: 'dropped', observation: null, reason: extracted.reason };
@@ -281,7 +284,11 @@ async function safeCommit(
   input: ExtractFromTranscriptDeltaInput,
   claimed: Extract<ClaimTranscriptRangeResult, { status: 'claimed' }>,
   consumedOffset: number,
-): Promise<{ status: 'committed'; result: CommitTranscriptRangeResult } | { status: 'failed' }> {
+): Promise<
+  | { status: 'committed'; result: Extract<CommitTranscriptRangeResult, { status: 'committed' }> }
+  | { status: 'empty'; result: Extract<CommitTranscriptRangeResult, { status: 'empty' }> }
+  | { status: 'failed' }
+> {
   try {
     const commit = input.commitRange ?? commitTranscriptRange;
     const result = commit({
@@ -294,7 +301,9 @@ async function safeCommit(
       trigger: input.trigger,
       now: input.now,
     });
-    return result.status === 'committed' ? { status: 'committed', result } : { status: 'failed' };
+    return result.status === 'committed'
+      ? { status: 'committed', result }
+      : { status: 'empty', result };
   } catch {
     return { status: 'failed' };
   }

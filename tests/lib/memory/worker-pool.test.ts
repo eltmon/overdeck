@@ -193,11 +193,13 @@ describe('memory extraction worker pool', () => {
   it('coalesces queued transcript-delta jobs by session only when the queue limit is reached', async () => {
     const releases: Array<() => void> = [];
     const processed: string[] = [];
+    const ranges: Array<{ fromOffset: number | undefined; toOffset: number; transcriptPath: string }> = [];
     const pool = new MemoryPipelineWorkerPool({
       loadConcurrency: () => 1,
       queueLimit: 2,
       extractFromTranscriptDelta: async (input) => {
         processed.push(input.jobId ?? 'missing');
+        ranges.push({ fromOffset: input.fromOffset, toOffset: input.toOffset, transcriptPath: input.transcriptPath });
         await new Promise<void>((resolve) => releases.push(resolve));
         return { status: 'noop' as const, observation: null, reason: 'empty-delta' as const };
       },
@@ -206,10 +208,10 @@ describe('memory extraction worker pool', () => {
     pool.enqueue(pipelineJob({ jobId: 'pipeline-0', sessionId: 'session-1' }));
     await vi.waitFor(() => expect(releases).toHaveLength(1));
 
-    for (let index = 1; index < 4; index++) {
-      pool.enqueue(pipelineJob({ jobId: `pipeline-${index}`, sessionId: 'session-1' }));
-    }
-    expect(pool.droppedCount()).toBe(1);
+    pool.enqueue(pipelineJob({ jobId: 'pipeline-1', sessionId: 'session-1', fromOffset: 0, toOffset: 100, transcriptPath: '/tmp/trusted-session-1.jsonl' }));
+    pool.enqueue(pipelineJob({ jobId: 'pipeline-2', sessionId: 'session-1', fromOffset: 100, toOffset: 200, transcriptPath: '/tmp/untrusted-session-1.jsonl' }));
+    pool.enqueue(pipelineJob({ jobId: 'pipeline-3', sessionId: 'session-1', fromOffset: 200, toOffset: 300, transcriptPath: '/tmp/newest-session-1.jsonl' }));
+    expect(pool.droppedCount()).toBe(0);
 
     releases.splice(0).forEach((release) => release());
     await vi.waitFor(() => expect(releases).toHaveLength(1));
@@ -219,6 +221,7 @@ describe('memory extraction worker pool', () => {
     await pool.waitForIdle();
 
     expect(processed).toEqual(['pipeline-0', 'pipeline-2', 'pipeline-3']);
+    expect(ranges[2]).toEqual({ fromOffset: 0, toOffset: 300, transcriptPath: '/tmp/trusted-session-1.jsonl' });
   });
 
   it('writes observations and records one healthy extraction per successful job', async () => {

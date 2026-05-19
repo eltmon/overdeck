@@ -62,6 +62,12 @@ function normalizeQueueLimit(value: number | undefined): number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : DEFAULT_MEMORY_WORKER_QUEUE_LIMIT;
 }
 
+function earliestOffset(left: number | undefined, right: number | undefined): number | undefined {
+  if (left === undefined) return right;
+  if (right === undefined) return left;
+  return Math.min(left, right);
+}
+
 export class MemoryExtractionWorkerPool {
   private readonly queue: QueuedMemoryExtractionJob[] = [];
   private readonly loadConcurrency: () => number | Promise<number>;
@@ -226,8 +232,8 @@ export class MemoryPipelineWorkerPool {
 
   enqueue(job: MemoryPipelineJob): string {
     const jobId = job.jobId ?? randomUUID();
-    this.coalesceOrDrop(job);
-    this.queue.push({ jobId, job: { ...job, jobId } });
+    const queuedJob = this.coalesceOrDrop({ ...job, jobId });
+    this.queue.push({ jobId, job: queuedJob });
     void this.pump();
     return jobId;
   }
@@ -245,16 +251,23 @@ export class MemoryPipelineWorkerPool {
     await new Promise<void>((resolve) => this.idleResolvers.push(resolve));
   }
 
-  private coalesceOrDrop(job: MemoryPipelineJob): void {
-    if (this.queue.length < this.queueLimit) return;
+  private coalesceOrDrop(job: MemoryPipelineJob): MemoryPipelineJob {
+    if (this.queue.length < this.queueLimit) return job;
     const existingIndex = this.queue.findIndex((queued) => queued.job.sessionId === job.sessionId);
     if (existingIndex !== -1) {
-      this.queue.splice(existingIndex, 1);
-      this.droppedJobs += 1;
-      return;
+      const [existing] = this.queue.splice(existingIndex, 1);
+      if (!existing) return job;
+      return {
+        ...job,
+        fromOffset: earliestOffset(existing.job.fromOffset, job.fromOffset),
+        toOffset: job.toOffset,
+        transcriptPath: existing.job.transcriptPath,
+        identity: existing.job.identity,
+      };
     }
     this.queue.shift();
     this.droppedJobs += 1;
+    return job;
   }
 
   private async pump(): Promise<void> {

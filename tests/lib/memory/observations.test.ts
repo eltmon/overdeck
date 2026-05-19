@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm } from 'fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -101,6 +101,24 @@ describe('observation writer', () => {
 
     const files = await readdir(join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations'));
     expect(files.sort()).toEqual(['2026-05-16.jsonl', '2026-05-16.md']);
+  });
+
+  it('repairs small legacy JSONL files with missing observation_index rows before appending', async () => {
+    const entry = observation({ summary: 'Legacy indexed summary.' });
+    const jsonlPath = join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations/2026-05-16.jsonl');
+    await mkdir(join(tempDir!, 'memory/panopticon-cli/PAN-1052/observations'), { recursive: true });
+    await writeFile(jsonlPath, `${JSON.stringify(entry)}\n`, 'utf8');
+
+    await writeObservation(observation({ summary: 'Updated legacy summary.' }));
+
+    const jsonlEntries = (await readFile(jsonlPath, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
+    expect(jsonlEntries).toEqual([entry]);
+    const indexRow = await withMemoryFtsDatabase(entry.projectId, (db) => db.prepare(`
+      SELECT id, observation_path_jsonl, byte_offset
+      FROM observation_index
+      WHERE id = ?
+    `).get(entry.id) as { id: string; observation_path_jsonl: string; byte_offset: number });
+    expect(indexRow).toEqual({ id: entry.id, observation_path_jsonl: jsonlPath, byte_offset: 0 });
   });
 
   it('indexes observations into memory_fts with a JSONL byte-offset back-reference', async () => {

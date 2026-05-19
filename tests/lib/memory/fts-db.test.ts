@@ -83,7 +83,7 @@ describe('memory FTS database', () => {
         'running runners run',
         'running runners run',
         'observation',
-        'feature/pan-1052',
+        'uniquebranchtoken',
         '2026-05-16',
         '22:55:00',
         'memory',
@@ -103,6 +103,9 @@ describe('memory FTS database', () => {
     });
 
     expect(matches).toHaveLength(1);
+
+    const branchMatches = await withMemoryFtsDatabase('panopticon-cli', (db) => db.prepare("SELECT rowid FROM memory_fts WHERE memory_fts MATCH 'uniquebranchtoken'").all());
+    expect(branchMatches).toHaveLength(0);
   });
 
   it('creates reset_markers and observation_index tables with lookup indexes', async () => {

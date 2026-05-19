@@ -76,33 +76,32 @@ describe('memory transcript checkpoints', () => {
     });
   });
 
-  it('atomically allows only one overlapping claimant to advance a range', async () => {
+  it('allows overlapping claims but atomically commits only one range from the expected offset', async () => {
     const attempts = await Promise.all(Array.from({ length: 50 }, (_, index) => Promise.resolve().then(() => claim({
       sessionId: 'session-concurrent',
       toOffset: 100 + index,
       transcriptPath: '/tmp/session-concurrent.jsonl',
     }))));
 
-    const winners = attempts.filter((result) => result.status === 'claimed');
-    const losers = attempts.filter((result) => result.status === 'empty');
+    const claims = attempts.filter((result) => result.status === 'claimed');
 
-    expect(winners).toHaveLength(1);
-    expect(losers).toHaveLength(49);
-    expect(new Set(winners.map((result) => result.status === 'claimed' ? `${result.fromOffset}:${result.toOffset}` : '')).size).toBe(1);
+    expect(claims).toHaveLength(50);
     expect(getTranscriptCheckpoint('session-concurrent')?.lastOffset).toBe(0);
 
-    const winner = winners[0];
-    expect(winner?.status).toBe('claimed');
-    if (winner?.status === 'claimed') {
-      expect(commit({
-        sessionId: 'session-concurrent',
-        expectedFromOffset: winner.fromOffset,
-        toOffset: winner.toOffset,
-        consumedOffset: winner.toOffset,
-        transcriptPath: '/tmp/session-concurrent.jsonl',
-      })).toMatchObject({ status: 'committed' });
-      expect(getTranscriptCheckpoint('session-concurrent')?.lastOffset).toBe(winner.toOffset);
-    }
+    const commits = await Promise.all(claims.map((range) => Promise.resolve().then(() => commit({
+      sessionId: 'session-concurrent',
+      expectedFromOffset: range.fromOffset,
+      toOffset: range.toOffset,
+      consumedOffset: range.toOffset,
+      transcriptPath: '/tmp/session-concurrent.jsonl',
+    }))));
+
+    const committed = commits.filter((result) => result.status === 'committed');
+    const rejected = commits.filter((result) => result.status === 'empty');
+
+    expect(committed).toHaveLength(1);
+    expect(rejected).toHaveLength(49);
+    expect(getTranscriptCheckpoint('session-concurrent')?.lastOffset).toBe(committed[0]?.status === 'committed' ? committed[0].checkpoint.lastOffset : null);
   });
 
   it('commits adjacent ranges without duplicates or gaps', () => {
@@ -148,9 +147,9 @@ describe('memory transcript checkpoints', () => {
     releaseTranscriptRange('session-partial', 72, 120);
   });
 
-  it('releases uncommitted claims so failed pipeline stages can retry the same range', () => {
+  it('keeps failed pipeline ranges retryable without process-local reservations', () => {
     expect(claim({ sessionId: 'session-retry', expectedFromOffset: 0, toOffset: 100 })).toMatchObject({ status: 'claimed' });
-    expect(claim({ sessionId: 'session-retry', expectedFromOffset: 0, toOffset: 100 })).toEqual({ status: 'empty', reason: 'offset-mismatch' });
+    expect(claim({ sessionId: 'session-retry', expectedFromOffset: 0, toOffset: 100 })).toMatchObject({ status: 'claimed' });
 
     releaseTranscriptRange('session-retry', 0, 100);
 

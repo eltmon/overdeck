@@ -14,8 +14,6 @@ export interface ExtractionCost {
   usd: number;
 }
 
-const dailyMemoryExtractionSpendUsd = new Map<string, number>();
-
 export interface ExtractionProviderOptions {
   model?: string;
   temperature?: number;
@@ -90,10 +88,6 @@ export function calculateExtractionCost(provider: string, model: string, usage: 
   return { usd };
 }
 
-export function getCachedDailyMemoryExtractionSpendUsd(issueId: string, now = new Date()): number {
-  return dailyMemoryExtractionSpendUsd.get(dailySpendKey(issueId, now)) ?? 0;
-}
-
 export function recordExtractionCost(input: {
   provider: string;
   model: string;
@@ -122,14 +116,7 @@ export function recordExtractionCost(input: {
     sessionId: input.identity.sessionId,
   };
 
-  if (insertCostEvent(event) !== null) {
-    const key = dailySpendKey(input.identity.issueId, new Date(event.ts));
-    dailyMemoryExtractionSpendUsd.set(key, (dailyMemoryExtractionSpendUsd.get(key) ?? 0) + input.cost.usd);
-  }
-}
-
-function dailySpendKey(issueId: string, date: Date): string {
-  return `${issueId.toUpperCase()}:${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+  insertCostEvent(event);
 }
 
 function getPricing(provider: string, model: string): {
