@@ -128,7 +128,8 @@
   },
   "analytics": {
     "posthog": {
-      "apiKey": ""
+      "apiKey": "",
+      "host": "https://us.i.posthog.com"
     }
   }
 }
