@@ -19,7 +19,7 @@ const PHASE_BORDER_CLASSES = {
   review: 'border-t-warning',
   work: 'border-t-info',
   plan: 'border-t-signal-review',
-  todo: 'border-t-border',
+  todo: 'border-t-[rgb(255_255_255_/_15%)]',
 } satisfies Record<PhaseHeaderPhase, string>;
 
 const PHASE_DOT_CLASSES = {

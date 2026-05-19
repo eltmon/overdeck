@@ -117,16 +117,23 @@ export function getPipelineIssuePhase(
   reviewStatus?: PipelineStateLike | null,
   agent?: Pick<Agent, 'role' | 'status' | 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'> | null,
 ): PipelineIssuePhase {
+  const state = issue.state ?? issue.status;
+  if (state === 'done' || state === 'closed' || state === 'completed') {
+    return 'ship';
+  }
+
   if (
     issue.mergeStatus === 'queued' ||
     issue.mergeStatus === 'merging' ||
     issue.mergeStatus === 'verifying' ||
     issue.mergeStatus === 'failed' ||
+    issue.mergeStatus === 'merged' ||
     reviewStatus?.readyForMerge === true ||
     reviewStatus?.mergeStatus === 'queued' ||
     reviewStatus?.mergeStatus === 'merging' ||
     reviewStatus?.mergeStatus === 'verifying' ||
-    reviewStatus?.mergeStatus === 'failed'
+    reviewStatus?.mergeStatus === 'failed' ||
+    reviewStatus?.mergeStatus === 'merged'
   ) {
     return 'ship';
   }
@@ -153,9 +160,9 @@ export function getPipelineIssuePhase(
     return 'work';
   }
 
-  const state = issue.state ?? issue.status;
-  if (state === 'in_review') return 'review';
-  if (state === 'in_progress' || issue.stateType === 'started') return 'work';
+  const derivedState = issue.state ?? issue.status;
+  if (derivedState === 'in_review') return 'review';
+  if (derivedState === 'in_progress' || issue.stateType === 'started') return 'work';
   if (issue.hasPlan === true || issue.planningComplete === true) return 'plan';
   return 'todo';
 }

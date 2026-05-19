@@ -368,9 +368,9 @@ describe('IssueDrawer', () => {
           killCount: 0,
         },
       },
-      recentActivity: [
-        { id: 'stream-1', timestamp: '2026-05-18T00:00:00.000Z', source: 'agent', level: 'info', message: 'Implementing drawer card', issueId: 'PAN-1' },
-      ],
+      agentOutputById: {
+        'agent-PAN-1': ['Implementing drawer card'],
+      },
     } as Parameters<typeof useDashboardStore.setState>[0]);
     useDashboardStore.getState().openIssue('PAN-1');
 

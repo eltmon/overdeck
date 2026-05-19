@@ -107,14 +107,13 @@ export function filterDomainEventForIssue(event: DomainEvent, issueId: string, a
   const payload = event.payload as Record<string, unknown>;
   if (recordMatchesIssue(payload, issueId, agentIssueLookup)) return event;
 
-  if (event.type === 'issues.snapshot') {
-    const issues = filterRecordsForIssue(payload['issues'], issueId, agentIssueLookup);
-    return issues.length > 0 ? { ...event, payload: { ...payload, issues } } as DomainEvent : null;
-  }
-
-  if (event.type === 'activity.updated') {
-    const events = filterRecordsForIssue(payload['events'], issueId, agentIssueLookup);
-    return events.length > 0 ? { ...event, payload: { ...payload, events } } as DomainEvent : null;
+  // Bulk replacement events (issues.snapshot, activity.updated) are excluded
+  // from issue-specific streams. Their filtered payloads would replace the
+  // global store's full dataset, causing every issue-dependent component to
+  // re-render with incomplete data. The full bulk updates arrive via
+  // subscribeDomainEvents instead.
+  if (event.type === 'issues.snapshot' || event.type === 'activity.updated') {
+    return null;
   }
 
   return null;

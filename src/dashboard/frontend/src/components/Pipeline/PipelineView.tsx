@@ -219,6 +219,8 @@ export function PipelineView() {
     };
 
     for (const issue of issues) {
+      if (isClosedIssue(issue)) continue;
+
       const projectOption = projectOptionForIssue(issue);
       if (filter.projects.length > 0 && (!projectOption || !filter.projects.includes(projectOption.id))) {
         continue;

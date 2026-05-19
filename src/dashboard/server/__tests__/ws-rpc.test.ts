@@ -99,16 +99,27 @@ describe('filterDomainEventForIssue', () => {
       },
     } as DomainEvent;
 
-    expect(filterDomainEventForIssue(issuesSnapshot, 'PAN-1')).toMatchObject({
-      type: 'issues.snapshot',
-      payload: { issues: [{ id: 'PAN-1', identifier: 'PAN-1' }] },
-    });
+    // issues.snapshot and activity.updated are excluded from issue-specific
+    // streams because their filtered payloads would replace the global store's
+    // full dataset. Full updates arrive via subscribeDomainEvents instead.
+    expect(filterDomainEventForIssue(issuesSnapshot, 'PAN-1')).toBeNull();
+    expect(filterDomainEventForIssue(activity, 'PAN-1')).toBeNull();
+
     const lookup = new Map([['agent-pan-1-review-requirements', 'pan-1']]);
 
-    expect(filterDomainEventForIssue(activity, 'PAN-1', lookup)).toMatchObject({
-      type: 'activity.updated',
-      payload: { events: [{ id: 'a', issueId: 'PAN-1' }, { id: 'agent-event', agentId: 'agent-pan-1-review-requirements' }] },
+    // Direct record matches (non-bulk events) still pass through when matched.
+    const agentEvent: DomainEvent = {
+      type: 'agent.status_changed',
+      sequence: 4,
+      timestamp: '2026-05-19T00:00:00.000Z',
+      payload: { agentId: 'agent-pan-1-review-requirements', status: 'running' },
+    } as DomainEvent;
+    expect(filterDomainEventForIssue(agentEvent, 'PAN-1', lookup)).toMatchObject({
+      type: 'agent.status_changed',
+      payload: { agentId: 'agent-pan-1-review-requirements', status: 'running' },
     });
+
+    // No match returns null.
     expect(filterDomainEventForIssue(issuesSnapshot, 'PAN-3')).toBeNull();
     expect(filterDomainEventForIssue(activity, 'PAN-3')).toBeNull();
   });

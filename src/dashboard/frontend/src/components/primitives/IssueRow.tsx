@@ -54,7 +54,7 @@ const ROW_CLASSES = {
 const PRIORITY_BORDER_CLASSES = {
   urgent: 'before:bg-destructive',
   high: 'before:bg-warning',
-  medium: 'before:bg-muted-foreground/30',
+  medium: 'before:bg-[rgb(255_255_255_/_22%)]',
   low: 'before:bg-transparent',
 } satisfies Record<IssueRowPriority, string>;
 
