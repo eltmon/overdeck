@@ -5,7 +5,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { access, mkdir, readFile, writeFile } from 'fs/promises';
 import { parse, stringify } from '@iarna/toml';
 import { join } from 'path';
 import { Effect } from 'effect';
@@ -386,6 +386,31 @@ function deepMerge<T extends object>(defaults: T, overrides: Partial<T>): T {
   return result;
 }
 
+function applyEnvironmentOverrides(config: CloisterConfig): CloisterConfig {
+  const stashJanitorEnv = process.env.PAN_STASH_JANITOR_CYCLES;
+  if (stashJanitorEnv === undefined) return config;
+
+  const parsed = Number.parseInt(stashJanitorEnv, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return config;
+
+  return {
+    ...config,
+    monitoring: {
+      ...config.monitoring,
+      stash_janitor_every_cycles: parsed,
+    },
+  };
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Load Cloister configuration
  *
@@ -417,21 +442,41 @@ export function loadCloisterConfig(): CloisterConfig {
     }
   }
 
-  const stashJanitorEnv = process.env.PAN_STASH_JANITOR_CYCLES;
-  if (stashJanitorEnv !== undefined) {
-    const parsed = Number.parseInt(stashJanitorEnv, 10);
-    if (Number.isFinite(parsed) && parsed >= 0) {
-      config = {
-        ...config,
-        monitoring: {
-          ...config.monitoring,
-          stash_janitor_every_cycles: parsed,
-        },
-      };
+  return applyEnvironmentOverrides(config);
+}
+
+export async function loadCloisterConfigAsync(): Promise<CloisterConfig> {
+  await mkdir(PANOPTICON_HOME, { recursive: true });
+
+  let config = DEFAULT_CLOISTER_CONFIG;
+
+  if (!(await fileExists(CLOISTER_CONFIG_FILE))) {
+    await saveCloisterConfigAsync(DEFAULT_CLOISTER_CONFIG);
+  } else {
+    try {
+      const content = await readFile(CLOISTER_CONFIG_FILE, 'utf-8');
+      const parsed = parse(content) as unknown as Partial<CloisterConfig>;
+      config = deepMerge(DEFAULT_CLOISTER_CONFIG, parsed);
+    } catch (error) {
+      console.error('Failed to load Cloister config:', error);
+      console.error('Using default configuration');
+      config = DEFAULT_CLOISTER_CONFIG;
     }
   }
 
-  return config;
+  return applyEnvironmentOverrides(config);
+}
+
+export async function saveCloisterConfigAsync(config: CloisterConfig): Promise<void> {
+  await mkdir(PANOPTICON_HOME, { recursive: true });
+
+  try {
+    const content = stringify(config as any);
+    await writeFile(CLOISTER_CONFIG_FILE, content, 'utf-8');
+  } catch (error) {
+    console.error('Failed to save Cloister config:', error);
+    throw error;
+  }
 }
 
 /**

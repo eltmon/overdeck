@@ -164,8 +164,8 @@ export function applyReviewStateToIssue(
   labels.add('merged');
 
   // PAN-1190: keep verifying_on_main visible after merge until close-out completes.
-  const currentCanonical = STATUS_LABELS[issue.status] || 'backlog';
-  if (currentCanonical === 'verifying_on_main' || issue.targetCanonicalState === 'verifying_on_main') {
+  const canonicalState = issue.targetCanonicalState ?? issue.state ?? STATUS_LABELS[issue.status];
+  if (canonicalState === 'verifying_on_main') {
     return {
       ...issue,
       mergeStatus: 'merged',

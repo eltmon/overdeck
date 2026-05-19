@@ -452,18 +452,13 @@ async function applyLabelGitHubImpl(ctx: LifecycleContext): Promise<StepResult> 
       `gh label create "${CLOSED_OUT_LABEL}" --repo ${owner}/${repo} --color "${CLOSED_OUT_COLOR}" --description "Verified and closed out" --force 2>/dev/null || true`,
       { encoding: 'utf-8' },
     );
-    // Add label
+    const removeLabelArgs = WORKFLOW_LABELS
+      .map(label => `--remove-label "${label}"`)
+      .join(' ');
     await execAsync(
-      `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${CLOSED_OUT_LABEL}"`,
+      `gh issue edit ${number} --repo ${owner}/${repo} --add-label "${CLOSED_OUT_LABEL}" ${removeLabelArgs}`,
       { encoding: 'utf-8' },
     );
-    // Remove workflow labels
-    for (const label of WORKFLOW_LABELS) {
-      await execAsync(
-        `gh issue edit ${number} --repo ${owner}/${repo} --remove-label "${label}" 2>/dev/null || true`,
-        { encoding: 'utf-8' },
-      );
-    }
     return stepOk(step, [`Applied '${CLOSED_OUT_LABEL}' label on GitHub`]);
   } catch (err) {
     return stepSkipped(step, [`Label management failed (non-fatal): ${(err as Error).message}`]);

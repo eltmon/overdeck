@@ -118,6 +118,25 @@ describe('close-issue', () => {
       expect(labelResult!.success).toBe(true);
     });
 
+    it('adds closed-out and removes workflow labels in one GitHub edit', async () => {
+      mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: '/tmp/test',
+        github: { owner: 'eltmon', repo: 'panopticon-cli', number: 100 },
+      };
+
+      await closeIssue(ctx, { applyLabel: true });
+
+      const editCalls = mockExecAsync.mock.calls
+        .map((call: any[]) => String(call[0]))
+        .filter(command => command.includes('gh issue edit 100') && command.includes('--add-label "closed-out"'));
+      expect(editCalls).toHaveLength(1);
+      expect(editCalls[0]).toContain('--remove-label "verifying-on-main"');
+      expect(editCalls[0]).toContain('--remove-label "needs-close-out"');
+    });
+
     it('should skip labels when applyLabel is false', async () => {
       mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
 
