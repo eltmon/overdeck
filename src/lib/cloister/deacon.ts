@@ -123,7 +123,7 @@ const unlinkEffect = (path: string): Effect.Effect<void, FsError> =>
 export { GitError, ProcessTimeoutError };
 
 import { PANOPTICON_HOME, AGENTS_DIR } from '../paths.js';
-import { loadCloisterConfig } from './config.js';
+import { loadCloisterConfig, loadCloisterConfigAsync } from './config.js';
 import { getNoResumeMode } from './no-resume-mode.js';
 import { setReviewStatus, loadReviewStatuses, getReviewStatus, type ReviewStatus } from '../review-status.js';
 import { markWorkspaceStuck } from '../database/review-status-db.js';
@@ -3781,7 +3781,7 @@ function recordAutoCloseOutFailure(issueId: string, message: string): void {
 }
 
 export async function autoCloseOut(now = new Date()): Promise<string[]> {
-  const closeOutConfig = loadCloisterConfig().close_out;
+  const closeOutConfig = (await loadCloisterConfigAsync()).close_out;
   if (closeOutConfig?.auto !== true) return [];
 
   const delayMinutes = Math.max(0, closeOutConfig.auto_delay_minutes ?? 60);

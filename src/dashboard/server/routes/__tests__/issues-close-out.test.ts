@@ -96,7 +96,9 @@ describe('POST /api/issues/:id/close-out', () => {
       {
         identifier: 'PAN-1190',
         status: 'Verifying on Main',
+        state: 'verifying_on_main',
         canonicalStatus: 'verifying_on_main',
+        mergeStatus: 'merged',
         labels: ['bug', 'verifying-on-main', 'needs-close-out'],
       },
     ]);
@@ -131,7 +133,10 @@ describe('POST /api/issues/:id/close-out', () => {
     });
     expect(issueDataServiceMock.patchIssue).toHaveBeenCalledWith('PAN-1190', {
       status: 'Done',
+      state: 'done',
       canonicalStatus: 'done',
+      targetCanonicalState: 'done',
+      mergeStatus: undefined,
       labels: ['bug', 'closed-out'],
     });
     expect(result.appendedEvents).toEqual([
@@ -140,6 +145,7 @@ describe('POST /api/issues/:id/close-out', () => {
         payload: {
           issueId: 'PAN-1190',
           status: 'Done',
+          state: 'done',
           canonicalStatus: 'done',
           labels: ['bug', 'closed-out'],
         },

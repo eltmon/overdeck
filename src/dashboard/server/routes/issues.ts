@@ -2148,8 +2148,26 @@ function closeOutFailureResponse(result: WorkflowResult) {
   }, { status: 422 });
 }
 
+const CLOSED_OUT_CACHE_WORKFLOW_LABELS = new Set([
+  'in-review',
+  'in-progress',
+  'needs-close-out',
+  'verifying-on-main',
+]);
+
+function buildClosedOutCacheLabels(labels: string[]): string[] {
+  return [
+    ...labels.filter((label) => {
+      const normalized = label.toLowerCase();
+      return normalized !== 'closed-out' && !CLOSED_OUT_CACHE_WORKFLOW_LABELS.has(normalized);
+    }),
+    'closed-out',
+  ];
+}
+
 function sanitizeCloseOutError(error: unknown): string {
-  return error instanceof Error ? error.message : 'Internal server error';
+  console.error('Close-out route failed:', error);
+  return 'Internal server error';
 }
 
 // ─── Route: POST /api/issues/:id/close-out ───────────────────────────────────
@@ -2216,17 +2234,21 @@ const postIssueCloseOutRoute = HttpRouter.add(
         (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
       );
       const currentLabels: string[] = cachedIssue?.labels || [];
-      newLabels = [
-        ...currentLabels.filter((l: string) => !['in-review', 'in-progress', 'needs-close-out', 'verifying-on-main'].includes(l.toLowerCase())),
-        'closed-out',
-      ];
-      issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done', labels: newLabels });
+      newLabels = buildClosedOutCacheLabels(currentLabels);
+      issueDataService.patchIssue(id, {
+        status: 'Done',
+        state: 'done',
+        canonicalStatus: 'done',
+        targetCanonicalState: 'done',
+        mergeStatus: undefined,
+        labels: newLabels,
+      });
     } catch { /* non-fatal */ }
 
     yield* eventStore.append({
       type: 'issue.statusChanged',
       timestamp: new Date().toISOString(),
-      payload: { issueId: id, status: 'Done', canonicalStatus: 'done', labels: newLabels },
+      payload: { issueId: id, status: 'Done', state: 'done', canonicalStatus: 'done', labels: newLabels },
     });
 
     issueDataService.invalidateTracker('github').catch(() => {});
@@ -2411,18 +2433,22 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
             (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
           );
           const currentLabels: string[] = cachedIssue?.labels || [];
-          newLabels = [
-            ...currentLabels.filter((l: string) => !['in-review', 'in-progress', 'needs-close-out'].includes(l.toLowerCase())),
-            'closed-out',
-          ];
-          issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done', labels: newLabels });
+          newLabels = buildClosedOutCacheLabels(currentLabels);
+          issueDataService.patchIssue(id, {
+            status: 'Done',
+            state: 'done',
+            canonicalStatus: 'done',
+            targetCanonicalState: 'done',
+            mergeStatus: undefined,
+            labels: newLabels,
+          });
         } catch (e) {
           console.error('Failed to patch issue status:', e);
         }
         yield* eventStore.append({
           type: 'issue.statusChanged',
           timestamp: new Date().toISOString(),
-          payload: { issueId: id, status: 'Done', canonicalStatus: 'done', labels: newLabels },
+          payload: { issueId: id, status: 'Done', state: 'done', canonicalStatus: 'done', labels: newLabels },
         });
       }
 

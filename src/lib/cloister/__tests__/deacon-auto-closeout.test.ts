@@ -86,6 +86,7 @@ vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssue: vi.fn(() => ({ is
 vi.mock('../../tracker/factory.js', () => ({ createTracker: vi.fn() }));
 vi.mock('../config.js', () => ({
   loadCloisterConfig: vi.fn(() => ({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} })),
+  loadCloisterConfigAsync: vi.fn(async () => ({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} })),
 }));
 vi.mock('../specialists.js', () => ({
   getAllProjectSpecialistStatuses: vi.fn(async () => []),
@@ -94,14 +95,14 @@ vi.mock('../specialists.js', () => ({
 }));
 
 import { autoCloseOut } from '../deacon.js';
-import { loadCloisterConfig } from '../config.js';
+import { loadCloisterConfigAsync } from '../config.js';
 import { loadReviewStatuses, setReviewStatus } from '../../../lib/review-status.js';
 import { resolveProjectFromIssue } from '../../projects.js';
 import { resolveGitHubIssue } from '../../tracker-utils.js';
 import { emitActivityEntry } from '../../activity-logger.js';
 import { closeOut } from '../../lifecycle/workflows.js';
 
-const mockLoadCloisterConfig = vi.mocked(loadCloisterConfig);
+const mockLoadCloisterConfig = vi.mocked(loadCloisterConfigAsync);
 const mockLoadReviewStatuses = vi.mocked(loadReviewStatuses);
 const mockSetReviewStatus = vi.mocked(setReviewStatus);
 const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssue);
@@ -133,7 +134,7 @@ function mergedStatus(issueId: string, updatedAt = oldTimestamp) {
 describe('autoCloseOut', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockLoadCloisterConfig.mockReturnValue({ close_out: { auto: true, auto_delay_minutes: 60 }, monitoring: {} } as any);
+    mockLoadCloisterConfig.mockResolvedValue({ close_out: { auto: true, auto_delay_minutes: 60 }, monitoring: {} } as any);
     mockLoadReviewStatuses.mockReturnValue({});
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: '/repo' } as any);
     mockResolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'panopticon-cli', number: 1190 } as any);
@@ -142,7 +143,7 @@ describe('autoCloseOut', () => {
   });
 
   it('returns without side effects when automatic close-out is disabled', async () => {
-    mockLoadCloisterConfig.mockReturnValue({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} } as any);
+    mockLoadCloisterConfig.mockResolvedValue({ close_out: { auto: false, auto_delay_minutes: 60 }, monitoring: {} } as any);
     mockLoadReviewStatuses.mockReturnValue({ 'PAN-1190': mergedStatus('PAN-1190') } as any);
 
     const actions = await autoCloseOut(now);
