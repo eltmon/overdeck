@@ -215,6 +215,8 @@ export function closeOut(
     const clearResult = yield* clearReviewStatusStep(ctx.issueId);
     allSteps.push(clearResult);
 
+    yield* Effect.promise(() => resetPostMergeStateForIssue(ctx.issueId));
+
     return buildResult('close-out', ctx.issueId, allSteps, start);
   });
 }
@@ -587,6 +589,16 @@ async function resetIssueToTodoImpl(ctx: LifecycleContext): Promise<StepResult> 
 /**
  * Clear review status for an issue.
  */
+async function resetPostMergeStateForIssue(issueId: string): Promise<void> {
+  try {
+    const { resetPostMergeState } = await import('../cloister/merge-agent.js');
+    resetPostMergeState(issueId);
+    resetPostMergeState(issueId.toUpperCase());
+  } catch {
+    return;
+  }
+}
+
 function clearReviewStatusStep(issueId: string): Effect.Effect<StepResult> {
   return Effect.tryPromise({
     try: () => clearReviewStatusStepImpl(issueId),

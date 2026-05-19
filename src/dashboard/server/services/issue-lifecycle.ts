@@ -160,6 +160,18 @@ const GITHUB_STATE_LABELS: Record<IssueState, { add: string[]; remove: string[] 
   canceled: { add: ['wontfix'], remove: ['in-progress', 'in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out', 'duplicate'] },
 };
 
+const GITHUB_LABEL_METADATA: Record<string, { color: string; description: string }> = {
+  'planned': { color: 'cfd3d7', description: 'Planning complete' },
+  'in-progress': { color: 'fbca04', description: 'Implementation in progress' },
+  'in-review': { color: 'd4c5f9', description: 'Under review' },
+  'verifying-on-main': { color: 'fbca04', description: 'Merged — awaiting verification on main' },
+  'wontfix': { color: 'ffffff', description: 'Will not be fixed' },
+};
+
+function githubLabelMetadata(label: string): { color: string; description: string } {
+  return GITHUB_LABEL_METADATA[label] ?? { color: '0075ca', description: '' };
+}
+
 // ─── Live layer implementation ────────────────────────────────────────────────
 
 /** Map IssueState to canonical status string for cache patching. */
@@ -193,6 +205,8 @@ export const IssueLifecycleLive = Layer.effect(
             if (!ghInfo.isGitHub) return;
             const labelOps = GITHUB_STATE_LABELS[state];
             for (const label of labelOps.add) {
+              const metadata = githubLabelMetadata(label);
+              yield* github.ensureLabel(ghInfo.owner, ghInfo.repo, label, metadata.color, metadata.description);
               yield* github.addLabel(ghInfo.owner, ghInfo.repo, ghInfo.number, label);
             }
             for (const label of labelOps.remove) {

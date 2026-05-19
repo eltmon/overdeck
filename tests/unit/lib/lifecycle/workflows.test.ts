@@ -11,9 +11,10 @@ import { tmpdir } from 'os';
 vi.setConfig({ testTimeout: 30_000 });
 
 // Use vi.hoisted to avoid initialization order issues
-const { mockExecAsync, mockClearReviewStatus } = vi.hoisted(() => ({
+const { mockExecAsync, mockClearReviewStatus, mockResetPostMergeState } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
+  mockResetPostMergeState: vi.fn(),
 }));
 
 vi.mock('child_process', () => ({
@@ -51,6 +52,10 @@ vi.mock('../../../../src/lib/shadow-state.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   clearReviewStatus: mockClearReviewStatus,
+}));
+
+vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
+  resetPostMergeState: mockResetPostMergeState,
 }));
 
 vi.mock('@linear/sdk', () => ({
@@ -281,11 +286,14 @@ describe('workflows', () => {
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx, { tracker: successfulTracker() });
 
-      expect(result.steps.find(s => s.step === 'close-out:vbrief-completed')).toBeDefined();
-      expect(result.steps.find(s => s.step === 'teardown:checkpoint-refs')).toBeDefined();
-      expect(result.steps.findIndex(s => s.step === 'close-issue:transition')).toBeLessThan(
-        result.steps.findIndex(s => s.step === 'teardown:checkpoint-refs'),
-      );
+      const vbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
+      const teardownIdx = result.steps.findIndex(s => s.step === 'teardown:checkpoint-refs');
+      const closeIdx = result.steps.findIndex(s => s.step === 'close-issue:transition');
+      expect(vbriefIdx).toBeGreaterThanOrEqual(0);
+      expect(teardownIdx).toBeGreaterThanOrEqual(0);
+      expect(closeIdx).toBeGreaterThanOrEqual(0);
+      expect(vbriefIdx).toBeLessThan(teardownIdx);
+      expect(teardownIdx).toBeLessThan(closeIdx);
 
       const commands = mockExecAsync.mock.calls.map(([command, args]) => ({ command: String(command), args }));
       expect(commands.some(({ command, args }) => command === 'git' && Array.isArray(args) && args.includes('refs/pan/turn/agent-pan-100/'))).toBe(true);
@@ -294,9 +302,10 @@ describe('workflows', () => {
       const spec = findSpecByIssue(testDir, 'PAN-100');
       expect(spec?.status).toBe('completed');
       expect(spec?.document.plan.status).toBe('completed');
+      expect(mockResetPostMergeState).toHaveBeenCalledWith('PAN-100');
     });
 
-    it('should close the tracker issue before aborting on teardown failure', async () => {
+    it('should abort before closing the tracker issue on teardown failure', async () => {
       mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
         if (command === 'git' && Array.isArray(args) && args.includes('for-each-ref')) {
           throw new Error('ref storage unavailable');
@@ -308,11 +317,12 @@ describe('workflows', () => {
       const result = await closeOut(ctx, { tracker });
 
       expect(result.success).toBe(false);
-      expect(result.steps.find(s => s.step === 'close-issue:transition')?.success).toBe(true);
+      expect(result.steps.find(s => s.step === 'close-out:vbrief-completed')?.success).toBe(true);
       expect(result.steps.find(s => s.step === 'teardown:checkpoint-refs')?.success).toBe(false);
+      expect(result.steps.some(s => s.step === 'close-issue:transition')).toBe(false);
       expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('teardown failed');
       expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
-      expect(tracker.transitionIssue).toHaveBeenCalledWith('PAN-100', 'closed');
+      expect(tracker.transitionIssue).not.toHaveBeenCalled();
       expect(mockClearReviewStatus).not.toHaveBeenCalled();
     });
 
@@ -323,10 +333,10 @@ describe('workflows', () => {
       const result = await closeOut(ctx, { tracker });
 
       expect(result.success).toBe(false);
+      expect(result.steps.find(s => s.step === 'close-out:vbrief-completed')?.success).toBe(true);
+      expect(result.steps.some(s => s.step.startsWith('teardown:'))).toBe(true);
       expect(result.steps.find(s => s.step === 'close-issue:transition')?.success).toBe(false);
       expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('issue close failed');
-      expect(result.steps.some(s => s.step === 'close-out:vbrief-completed')).toBe(false);
-      expect(result.steps.some(s => s.step.startsWith('teardown:'))).toBe(false);
       expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
       expect(mockClearReviewStatus).not.toHaveBeenCalled();
     });

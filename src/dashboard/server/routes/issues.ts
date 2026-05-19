@@ -1449,21 +1449,28 @@ const postIssueReopenRoute = HttpRouter.add(
     const issueDataService = getIssueDataService();
     const issueSource = issueDataService.getIssueSource(id);
 
-    let newState = 'In Progress';
+    const reviewStatus = getReviewStatus(id.toUpperCase());
+    const cachedIssue = issueDataService.getIssues()
+      .find((issue: any) => String(issue.identifier ?? issue.id ?? '').toUpperCase() === id.toUpperCase());
+    const reopenToVerifying = reviewStatus?.mergeStatus === 'merged' || cachedIssue?.mergeStatus === 'merged';
+    const targetState: IssueState = reopenToVerifying ? 'verifying_on_main' : 'in_progress';
+    const targetCanonicalStatus = targetState;
+
+    let newState = reopenToVerifying ? 'Verifying on Main' : 'In Progress';
     let issueIdentifier = id;
 
-    // Transition to 'in_progress' via IssueLifecycle (handles all three trackers)
-    yield* lifecycle.transitionTo(id, 'in_progress').pipe(Effect.catch(() => Effect.void));
+    yield* lifecycle.transitionTo(id, targetState).pipe(Effect.catch(() => Effect.void));
 
     if (issueSource === 'rally') {
       issueDataService.invalidateTracker('rally').catch(() => {});
-      newState = 'Open';
+      if (!reopenToVerifying) newState = 'Open';
 
     } else if (githubCheck.isGitHub) {
-      // Also clean up done/needs-close-out/merged labels and ensure in-progress is set
-      yield* lifecycle.removeLabel(id, 'done').pipe(Effect.catch(() => Effect.void));
-      yield* lifecycle.removeLabel(id, 'needs-close-out').pipe(Effect.catch(() => Effect.void));
-      yield* lifecycle.removeLabel(id, 'merged').pipe(Effect.catch(() => Effect.void));
+      if (!reopenToVerifying) {
+        yield* lifecycle.removeLabel(id, 'done').pipe(Effect.catch(() => Effect.void));
+        yield* lifecycle.removeLabel(id, 'needs-close-out').pipe(Effect.catch(() => Effect.void));
+        yield* lifecycle.removeLabel(id, 'merged').pipe(Effect.catch(() => Effect.void));
+      }
 
       // Reopen closed (not merged) PR for the feature branch if one exists
       yield* Effect.promise(async () => {
@@ -1484,13 +1491,12 @@ const postIssueReopenRoute = HttpRouter.add(
       });
 
       issueDataService.invalidateTracker('github').catch(() => {});
-      newState = 'In Progress';
+      if (!reopenToVerifying) newState = 'In Progress';
 
     } else {
-      // Linear: fetch updated state name
       const updatedIssue = yield* linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)));
       issueIdentifier = updatedIssue?.identifier ?? id;
-      newState = updatedIssue?.state.name ?? 'In Progress';
+      if (!reopenToVerifying) newState = updatedIssue?.state.name ?? 'In Progress';
       issueDataService.invalidateTracker('linear').catch(() => {});
     }
 
@@ -1567,7 +1573,7 @@ const postIssueReopenRoute = HttpRouter.add(
     yield* eventStore.append({
       type: 'issue.statusChanged',
       timestamp: new Date().toISOString(),
-      payload: { issueId: issueIdentifier, status: newState, canonicalStatus: 'in_progress' },
+      payload: { issueId: issueIdentifier, status: newState, canonicalStatus: targetCanonicalStatus },
     });
     // Emit pipeline reset so frontend read model clears the stale readyForMerge badge
     yield* eventStore.append({
@@ -1583,7 +1589,7 @@ const postIssueReopenRoute = HttpRouter.add(
         },
       },
     });
-    try { getIssueDataService().patchIssue(issueIdentifier, { status: newState, canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
+    try { getIssueDataService().patchIssue(issueIdentifier, { status: newState, canonicalStatus: targetCanonicalStatus }); } catch { /* non-fatal */ }
 
     return jsonResponse({
       success: true,
